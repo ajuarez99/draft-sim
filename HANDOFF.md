@@ -7,8 +7,10 @@ Last updated 2026-08-29 by a Claude session that was running low on context.
 
 ## Where things actually stand
 
-Repo `ajuarez99/draft-sim`, branch `main`, three commits, **all pushed**, tree clean.
+Repo `ajuarez99/draft-sim`, branch `main`, tree clean. **Push `76d661d` and `e7ea1a1`.**
 
+    76d661d  manager tendencies: stated beliefs as shrinkage prior, per-seat unpredictability
+    e7ea1a1  add HANDOFF.md
     0b54d2d  deploy prep: env-var config, shared-token auth, Dockerfile, runbook
     ef17f3e  fix: backfillAdpAtTime UPDATE..FROM join, createArrayOf binding
     77f34bb  v0: ingest, board derivation, engine, Monte Carlo, SSE, React UI
@@ -26,6 +28,8 @@ running the Spring app.
 | Frontend build | `npm install`, `tsc -b`, `vite build` clean under `strict` |
 | SSE parser, 19 assertions | `api.ts` bundled with esbuild, run against a mock Node SSE server at chunk sizes 1, 7, 64, 100000 |
 | Token auth logic, 29 assertions | Compiled and run standalone |
+| Manager tendencies, 53 assertions total | Stated-as-prior blending, clamping, per-seat unpredictability |
+| `manual_json` / `feature_json` isolation | Postgres 16: proved neither upsert clobbers the other |
 
 ### Never executed
 
@@ -42,23 +46,38 @@ against the process working directory and **fails silently** when it doesn't res
 
 ## Do this next
 
-### 1. The open decision (answer before first boot)
+### 1. Manager tendencies — DONE, but no UI
 
-`manager_profile` is created by the migration and **nothing reads or writes it**.
-`ProfileService.fit()` computes profiles in memory and discards them, refitting from
-every pick in the database on every request.
+`manager_profile` was dead; it now carries two separately-owned columns.
+`feature_json` is fitted and written only by ingest. `manual_json` is what you say
+about a seat and is written only through the API. Neither upsert touches the other.
 
-Two options:
+A stated reach bias is the **shrinkage target**, not an override: no history means
+your number is used exactly, two drafts means one third data and two thirds you.
+That is what makes fantasy(heart) — zero history, fourteen otherwise-identical
+league-average bots — actually worth simulating.
 
-- **Persist on ingest** (recommended). Write profiles at the end of
-  `/api/ingest/board`, read at simulate time, recompute if absent. No invalidation
-  problem, because ingest is the only thing that changes the inputs. Kills the
-  per-request refit and makes the table mean what the project brief says it means.
-- **Drop the table.** Fitting ~360 picks is cheap. An unused table is worse than none.
+You can set `reachBias`, `unpredictability` (a multiplier on run temperature for
+that seat alone) and a free-text `note`. Positional tilt stays fitted-only.
 
-**This is time-sensitive.** No database exists anywhere yet, so `V1__init.sql` is
-still freely editable. The moment `bootRun` succeeds once, Flyway records a checksum
-and editing V1 fails validation — after that it's a V2 migration forever.
+**There is no UI for this.** Drive it with Postman or curl:
+
+    GET    /api/managers
+    PUT    /api/managers/{managerId}/tendencies
+           {"reachBias": 8, "unpredictability": 1.6, "note": "drafts his own Bengals"}
+    DELETE /api/managers/{managerId}/tendencies
+
+`GET /api/managers` shows `stated` (what you typed) next to `effectiveReachBias`
+(what the engine will use), so the blending is visible rather than mysterious.
+Seat cards in the UI would be the natural next frontend job.
+
+Provenance — `NEUTRAL` / `STATED` / `FITTED` / `BLENDED` — rides out to
+`/api/drafts/{id}/seats` and the confidence panel, so a seat running on your
+opinion is never displayed as though it were evidence.
+
+**Schema note:** this was folded into `V1__init.sql` because nothing has booted yet.
+Once `bootRun` succeeds once, Flyway records V1's checksum and further schema
+changes must be a V2.
 
 ### 2. Get it running
 
@@ -140,8 +159,8 @@ running a modal draft and seeing the 1.01 pick come back as the last man on the 
 
 | What | Weight |
 |---|---|
-| `manager_profile` written by nothing (see decision above) | open question |
-| `ProfileService.fit()` runs per simulate call | low, fixed by the above |
+| No UI for setting tendencies — API only | open |
+| `ProfileService.fit()` runs per simulate call. Deliberate: fitting ~360 picks is cheap and a cache would only add staleness | low |
 | `available.remove(choice)` is a linear scan — fine at 2k iterations, possibly minutes at 10k | medium |
 | Positional priors fit on ~360 picks with `alpha = 8`; smoothing dominates | by design |
 | 2025 picks excluded from reach fitting (no contemporaneous board) | by design |
