@@ -95,26 +95,18 @@ public class MonteCarloRunner {
         }
 
         List<SimulationResult.PredictedPick> board = new ArrayList<>(total);
-        for (int p = 1; p <= total; p++) {
-            Map<Long, Integer> c = counts.get(p);
-            if (c.isEmpty()) continue;
-            List<Map.Entry<Long, Integer>> ranked = c.entrySet().stream()
-                    .sorted(Map.Entry.<Long, Integer>comparingByValue().reversed())
-                    .limit(ALTERNATIVES + 1L)
-                    .toList();
-
-            Map.Entry<Long, Integer> top = ranked.getFirst();
-            int slot = DraftSlot.slot(p, teams);
+        for (BoardAssembler.Assignment a : BoardAssembler.assemble(counts, iterations, ALTERNATIVES)) {
+            int slot = DraftSlot.slot(a.pickNo(), teams);
             ManagerProfile prof = ctx.profileFor(slot);
 
-            List<SimulationResult.Candidate> alts = ranked.stream().skip(1)
-                    .map(e -> new SimulationResult.Candidate(ref(byId.get(e.getKey())),
-                            e.getValue() / (double) iterations))
+            List<SimulationResult.Candidate> alts = a.alternatives().stream()
+                    .map(r -> new SimulationResult.Candidate(ref(byId.get(r.playerId())), r.probability()))
+                    .filter(c -> c.player() != null)
                     .toList();
 
             board.add(new SimulationResult.PredictedPick(
-                    p, DraftSlot.round(p, teams), slot, prof.displayName(),
-                    ref(byId.get(top.getKey())), top.getValue() / (double) iterations, alts));
+                    a.pickNo(), DraftSlot.round(a.pickNo(), teams), slot, prof.displayName(),
+                    ref(byId.get(a.playerId())), a.probability(), a.isModal(), alts));
         }
 
         // --- availability curves ---------------------------------------

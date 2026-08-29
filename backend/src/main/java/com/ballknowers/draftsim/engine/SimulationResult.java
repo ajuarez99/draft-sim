@@ -18,10 +18,19 @@ public record SimulationResult(
 
     public record PlayerRef(long id, String name, String position, String team, double adp) {}
 
-    /** Modal pick at a slot, with how often it actually happened. */
+    /**
+     * One cell of the predicted board.
+     *
+     * @param probability marginal — the share of runs in which this player went at
+     *                    this pick. NOT the probability of the board as a whole.
+     * @param isModal     false when this player is not the single most-voted at this
+     *                    pick, which happens where the most-voted player was already
+     *                    assigned earlier. Those cells are the least certain.
+     */
     public record PredictedPick(
             int pickNo, int round, int slot, String manager,
-            PlayerRef player, double probability, List<Candidate> alternatives) {}
+            PlayerRef player, double probability, boolean isModal,
+            List<Candidate> alternatives) {}
 
     public record Candidate(PlayerRef player, double probability) {}
 

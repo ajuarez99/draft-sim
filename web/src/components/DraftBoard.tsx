@@ -39,13 +39,20 @@ export default function DraftBoard({ board, teams, rounds, myPicks }: Props) {
                   const indexInRound = round % 2 === 1 ? slot : teams - slot + 1
                   const pickNo = (round - 1) * teams + indexInRound
                   const pick = byPick.get(pickNo)
+                  const cls =
+                    'cell' +
+                    (mine.has(pickNo) ? ' mine' : '') +
+                    (pick && !pick.isModal ? ' uncertain' : '')
                   return (
                     <td
                       key={slot}
-                      className={mine.has(pickNo) ? 'cell mine' : 'cell'}
+                      className={cls}
                       title={
                         pick
-                          ? `${pick.manager} — ${Math.round(pick.probability * 100)}% likely\n` +
+                          ? `${pick.manager} — ${Math.round(pick.probability * 100)}% of runs\n` +
+                            (pick.isModal
+                              ? ''
+                              : 'Not the most likely player here; the most likely one went earlier.\n') +
                             pick.alternatives
                               .map((a) => `${a.player.name} ${Math.round(a.probability * 100)}%`)
                               .join('\n')

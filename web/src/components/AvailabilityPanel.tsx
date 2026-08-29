@@ -21,14 +21,18 @@ export default function AvailabilityPanel({ availability, myPicks, teams }: Prop
   const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
   const [depth, setDepth] = useState(4)
 
-  const picks = myPicks.slice(0, depth)
+  // myPicks belongs in the dependency list: it feeds `picks`, which the filter
+  // below reads. It only changes alongside `availability` today, so the stale
+  // value was never observable -- but that is a coincidence of the call site,
+  // not a property of this component.
+  const picks = useMemo(() => myPicks.slice(0, depth), [myPicks, depth])
   const rows = useMemo(
     () =>
       availability
         .filter((r) => filter === 'ALL' || r.player.position === filter)
         .filter((r) => picks.some((p) => (r.survivalByPick[String(p)] ?? 0) > 0.01))
         .slice(0, 60),
-    [availability, filter, depth],
+    [availability, filter, picks],
   )
 
   const label = (pickNo: number) => {

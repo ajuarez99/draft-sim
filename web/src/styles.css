@@ -76,9 +76,11 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board-scroll { overflow-x: auto; }
 .board { font-size: 11px; min-width: 900px; }
 .board th.rnd { width: 24px; color: var(--muted); }
-.board .cell { border: 1px solid var(--line); padding: 4px 5px; vertical-align: top; min-width: 92px; }
+.board .cell { border: 1px solid var(--line); padding: 4px 5px; vertical-align: top; min-width: 84px; }
+/* The most-voted player here went earlier, so this cell is a second choice. */
+.board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
 .board .cell.mine { background: rgba(76,141,255,0.12); }
-.board .name { display: block; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 96px; }
+.board .name { display: block; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
 .board .prob { display: block; color: var(--muted); font-variant-numeric: tabular-nums; }
 .board .empty { color: var(--muted); }
 

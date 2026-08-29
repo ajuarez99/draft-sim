@@ -119,8 +119,10 @@ export default function App() {
         <section className="panel">
           <h2>Predicted board</h2>
           <p className="muted small">
-            Modal pick at each slot with how often it happened. Low percentages are the model saying
-            it does not know, which is most of the board after round three.
+            Each cell is the most likely player still unassigned at that pick, with the share of runs
+            he actually went there. Low percentages mean the model does not know, which is most of the
+            board after round three. Faded names are cells where the most likely player had already
+            gone earlier.
           </p>
           <DraftBoard
             board={result.board}

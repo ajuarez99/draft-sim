@@ -17,7 +17,10 @@ export type PredictedPick = {
   slot: number
   manager: string
   player: PlayerRef
+  /** Marginal: share of runs this player went at this pick. Not the board's probability. */
   probability: number
+  /** False when the most-voted player at this pick was already assigned earlier. */
+  isModal: boolean
   alternatives: Candidate[]
 }
 
