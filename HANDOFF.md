@@ -2,6 +2,8 @@
 
 Last updated 2026-08-29 by a Claude session that was running low on context.
 **Read this first.** `DEPLOY.md` covers deployment; `README.md` covers running it.
+A Claude session should then read `claude/` — orientation, sandbox recipes and bug
+post-mortems that are not worth rediscovering.
 
 ---
 
@@ -199,27 +201,12 @@ remaining payoff. `startState` also exists on the API and is unexposed in the UI
 
 ## Environment notes for a future Claude session
 
-Discovering these cost real time; they are worth reading before you start.
+Moved to `claude/environment.md` and expanded — what is reachable from the sandbox,
+how to execute engine code without Maven, how to stand up Postgres to test SQL, the
+`device_stage_files` depth limit, and the git lock-file problem.
 
-- **Maven Central is blocked** by egress policy from the cloud sandbox — both
-  `repo1.maven.org` and `repo.maven.apache.org`. No Spring, Flyway, Jackson or pgjdbc
-  dependency can be resolved there, so the backend cannot be built or run in the
-  sandbox. Do not try to route around it.
-- **PostgreSQL 16, JDK 21, Node 22, npm and pip are all available** in the sandbox.
-  `initdb` refuses to run as root — create an unprivileged user first. This is how the
-  SQL was verified and it is worth doing again for any schema change.
-- **npm and pypi are reachable**, so the frontend can be fully built and tested.
-- **The engine compiles standalone** if you stub `@Component` and
-  `@ConfigurationProperties` as empty annotations. `/home/claude/verify` used that
-  trick; it's the only way to execute engine code in the sandbox.
-- **Staging files off the device fails beyond 7 folders deep.** Java sources under
-  `backend/src/main/java/com/ballknowers/draftsim/<pkg>/` exceed it. Workaround: copy
-  them flat into a temp folder near the repo root, stage from there, reconstruct.
-- **`device_bash` cannot delete by default.** `git commit` leaves `.git/*.lock` and
-  `tmp_obj_*` files behind that block the next git command. Request delete permission
-  and clean them, or the user hits a confusing failure later.
-- Commit as the user: `git -c user.email=allanjuarez86@gmail.com -c user.name=allan`.
-  No global git identity is set in the mounted VM.
+`claude/lessons.md` has the bug post-mortems. Read it before trusting a green test
+run: the `valueDelta` sign inversion passed every structural test in the suite.
 
 ### Working style that fits this project
 
