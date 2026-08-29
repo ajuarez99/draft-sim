@@ -3,6 +3,11 @@
 Fantasy football mock drafts simulated against models of the actual managers in
 a Sleeper league, rather than generic ADP bots.
 
+## Start here
+
+`HANDOFF.md` — current state, what is and isn't verified, and what to do next.
+`DEPLOY.md` — deployment runbook (nothing is deployed yet).
+
 ## Status
 
 Vertical slice, end to end: ingest -> board -> profiles -> Monte Carlo -> SSE -> UI.
