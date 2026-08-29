@@ -70,6 +70,37 @@ Then a Node script with `http.createServer` that writes the SSE body in slices o
 1, 7, 64 and 100000 bytes, overriding `globalThis.fetch` to resolve the relative
 `/api` path against the test server. One byte at a time is the case that matters.
 
+## Recipe: see the UI without a backend
+
+The only way to look at the frontend here. It found a bug that was invisible in
+source review and to a passing `tsc -b` (lesson 6).
+
+Build `web/`, then serve `dist/` from a small Node server that also answers
+`GET /api/drafts/:id/seats` and `POST /api/sims/stream` with mock payloads shaped
+like the Java records. Drive it with Playwright — Chromium is pre-installed:
+
+    npm i -D playwright
+    chromium.launch({ executablePath: '/opt/pw-browsers/chromium' })
+
+Screenshot whole panels rather than the page: find them by heading text and call
+`element.screenshot()`, which avoids stitching a 3000px full-page image.
+
+Two things worth doing every time: collect `console` and `pageerror` events and
+report the count, and keep the mock's shapes in sync with the Java records —
+a mock that has drifted will hide exactly the bug you are looking for.
+
+Note the mock server needs `nohup ... &` in its own subshell; a plain `&` inside a
+`set -e` script exits 144 when the shell returns.
+
+## Recipe: compile something that imports slf4j
+
+`MonteCarloRunner` and the services log. Stub `org.slf4j.Logger` as an interface
+with no-op `info/warn/debug/error` (including `warn(String, Throwable)`) and
+`LoggerFactory.getLogger` returning an anonymous impl. That brings the whole
+`engine` package into the standalone compile, which is worth it — lesson 8 is a
+compile error that reached the repo because a file was written straight to the
+device and never compiled anywhere.
+
 ## device_bash gotchas
 
 - Runs in a **Linux VM on Allan's machine**, not the cloud sandbox. Separate
