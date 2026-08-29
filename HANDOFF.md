@@ -168,7 +168,10 @@ running a modal draft and seeing the 1.01 pick come back as the last man on the 
 
 ### Deferred by design
 
-`docs/affinity.md` — whether manager tendencies and players belong in a vector store.
+`ideas/` holds speculative directions that are explicitly not planned work — see
+`ideas/README.md` for the convention. Nothing there is scheduled or half-built.
+
+`ideas/player-affinity.md` — whether manager tendencies and players belong in a vector store.
 Summary: player-to-player similarity built from *features* is worth building and slots
 into the scorer as the `w_aff` term the plan already reserves. Embedding notes and
 players into a *shared* text space is the appealing wrong answer and the doc says why.

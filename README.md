@@ -7,6 +7,7 @@ a Sleeper league, rather than generic ADP bots.
 
 `HANDOFF.md` — current state, what is and isn't verified, and what to do next.
 `DEPLOY.md` — deployment runbook (nothing is deployed yet).
+`ideas/` — speculative directions, explicitly not planned work.
 
 ## Status
 
