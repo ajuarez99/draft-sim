@@ -1,3 +1,9 @@
+# Default (`docker compose up -d`) brings up Postgres only, which is what local
+# development wants -- the backend runs from your IDE against it.
+#
+# `docker compose --profile full up --build` additionally builds and runs the
+# backend image, which is how you rehearse a deployment locally.
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -5,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: draftsim
       POSTGRES_USER: draftsim
-      POSTGRES_PASSWORD: draftsim
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-draftsim}
     ports:
       - "5433:5432"
     volumes:
@@ -15,3 +21,23 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  backend:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: draftsim-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Container-to-container, so the service name and the internal port.
+      DB_URL: jdbc:postgresql://postgres:5432/draftsim
+      DB_USER: draftsim
+      DB_PASSWORD: ${DB_PASSWORD:-draftsim}
+      API_TOKEN: ${API_TOKEN:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080"

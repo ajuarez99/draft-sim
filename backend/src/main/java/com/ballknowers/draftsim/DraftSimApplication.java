@@ -10,7 +10,9 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         ScoringProperties.class,
         ShrinkageProperties.class,
         BoardProperties.class,
-        PriorProperties.class
+        PriorProperties.class,
+        ApiSecurityProperties.class,
+        CorsProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

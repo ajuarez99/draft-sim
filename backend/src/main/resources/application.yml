@@ -1,3 +1,7 @@
+# Every deployment-varying value is an env var with a local-dev default, so
+# running this on your machine needs no environment at all and running it
+# anywhere else needs no code change.
+
 spring:
   application:
     name: draft-sim
@@ -5,23 +9,35 @@ spring:
     virtual:
       enabled: true
   datasource:
-    url: jdbc:postgresql://localhost:5433/draftsim
-    username: draftsim
-    password: draftsim
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/draftsim}
+    username: ${DB_USER:draftsim}
+    password: ${DB_PASSWORD:draftsim}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
   flyway:
     enabled: true
     locations: classpath:db/migration
   config:
-    import: optional:file:../config/weights.yml
+    # Relative to the process working directory. bootRun from backend/ resolves
+    # it; the Docker image sets WEIGHTS_FILE to an absolute path instead.
+    import: optional:file:${WEIGHTS_FILE:../config/weights.yml}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
+
+draftsim:
+  security:
+    # Empty means auth is OFF -- the local-dev default. Set API_TOKEN to any
+    # long random string and every /api/** route except /api/health starts
+    # requiring "Authorization: Bearer <token>".
+    token: ${API_TOKEN:}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
 
 sleeper:
-  base-url: https://api.sleeper.app/v1
-  # Players endpoint is ~5MB. Sleeper asks you to call it once a day, not per request.
+  base-url: ${SLEEPER_BASE_URL:https://api.sleeper.app/v1}
   players-cache-ttl: PT24H
 
 logging:
   level:
-    com.ballknowers.draftsim: DEBUG
+    com.ballknowers.draftsim: ${LOG_LEVEL:DEBUG}

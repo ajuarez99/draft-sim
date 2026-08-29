@@ -1,0 +1,12 @@
+.git
+.gitignore
+pgdata/
+web/
+**/build/
+**/.gradle/
+**/node_modules/
+**/dist/
+*.md
+.env
+.env.*
+!.env.example

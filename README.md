@@ -14,6 +14,7 @@ Nothing has been backtested. See "What not to trust" below.
     cd backend && gradle wrapper --gradle-version 8.14   # once; wrapper is not committed
     ./gradlew bootRun
 
+    curl localhost:8080/api/health           # weightsLoaded must be true
     curl -X POST localhost:8080/api/ingest/all/1391509063170293760
     curl localhost:8080/api/board?limit=40   # eyeball this before trusting a sim
 
@@ -21,6 +22,24 @@ Nothing has been backtested. See "What not to trust" below.
 
 Ingest order matters the first time: players -> leagues -> board. `/api/ingest/all/{leagueId}`
 does all three. It is idempotent; re-run it whenever you want a fresh board.
+
+No environment variables are needed locally — every deployment-varying value has a
+local default. `docker compose --profile full up --build` runs the production image
+against local Postgres if you want to rehearse a deploy.
+
+## Configuration and auth
+
+All deployment values are env vars with local defaults; see `.env.example` and
+`config/weights.yml`. The one that matters:
+
+`API_TOKEN` blank (the local default) means **authentication is off** and every route
+is open. Set it to any long random string and `/api/**` starts requiring
+`Authorization: Bearer <token>`, with `/api/health` left open for platform health
+checks. The app logs which mode it started in — check it before exposing anything.
+
+`DEPLOY.md` has the full deployment sequence. Nothing has been deployed yet, and the
+frontend still assumes a same-origin API with no auth header, so it needs two small
+changes before a remote backend will work.
 
 ## Layout
 
