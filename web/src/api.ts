@@ -97,6 +97,40 @@ async function json<T>(res: Response): Promise<T> {
 export const getSeats = (draftId: string) =>
   fetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
 
+export type ManualTendencies = {
+  reachBias: number | null
+  unpredictability: number | null
+  note: string | null
+}
+
+// Mirrors ManagerController.describe()'s response shape (api/ManagerController.java:63-82).
+// Only field the tendencies UI actually needs is `stated`, but keep the type honest/complete
+// per this file's own convention of mirroring the backend record shape exactly.
+export type ManagerSummary = {
+  managerId: number
+  manager: string
+  provenance: Provenance
+  effectiveReachBias: number
+  unpredictability: number
+  positionalTilt: Record<string, number>
+  note: string | null
+  draftsObserved: number
+  picksScored: number
+  stated: ManualTendencies
+}
+
+export const getManagers = () => fetch('/api/managers').then(json<ManagerSummary[]>)
+
+export const setTendencies = (managerId: number, body: ManualTendencies) =>
+  fetch(`/api/managers/${managerId}/tendencies`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(json<unknown>)
+
+export const clearTendencies = (managerId: number) =>
+  fetch(`/api/managers/${managerId}/tendencies`, { method: 'DELETE' }).then(json<unknown>)
+
 export const getBoard = (limit = 60) =>
   fetch(`/api/board?limit=${limit}`).then(json<{ capturedOn: string; entries: unknown[] }>)
 

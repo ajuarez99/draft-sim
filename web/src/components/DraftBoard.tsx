@@ -5,6 +5,7 @@ type Props = {
   teams: number
   rounds: number
   myPicks: number[]
+  revealedThrough?: number
 }
 
 /**
@@ -12,7 +13,7 @@ type Props = {
  * often it actually happened across the runs -- a cell at 22% is the model
  * telling you it has very little idea, and it should read that way.
  */
-export default function DraftBoard({ board, teams, rounds, myPicks }: Props) {
+export default function DraftBoard({ board, teams, rounds, myPicks, revealedThrough }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
 
@@ -39,31 +40,33 @@ export default function DraftBoard({ board, teams, rounds, myPicks }: Props) {
                   const indexInRound = round % 2 === 1 ? slot : teams - slot + 1
                   const pickNo = (round - 1) * teams + indexInRound
                   const pick = byPick.get(pickNo)
+                  const hidden = revealedThrough !== undefined && pickNo > revealedThrough
+                  const visible = hidden ? undefined : pick
                   const cls =
                     'cell' +
                     (mine.has(pickNo) ? ' mine' : '') +
-                    (pick && !pick.isModal ? ' uncertain' : '')
+                    (visible && !visible.isModal ? ' uncertain' : '')
                   return (
                     <td
                       key={slot}
                       className={cls}
                       title={
-                        pick
-                          ? `${pick.manager} — ${Math.round(pick.probability * 100)}% of runs\n` +
-                            (pick.isModal
+                        visible
+                          ? `${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
+                            (visible.isModal
                               ? ''
                               : 'Not the most likely player here; the most likely one went earlier.\n') +
-                            pick.alternatives
+                            visible.alternatives
                               .map((a) => `${a.player.name} ${Math.round(a.probability * 100)}%`)
                               .join('\n')
                           : ''
                       }
                     >
-                      {pick ? (
+                      {visible ? (
                         <>
-                          <span className={`pos ${pick.player.position}`}>{pick.player.position}</span>
-                          <span className="name">{pick.player.name}</span>
-                          <span className="prob">{Math.round(pick.probability * 100)}%</span>
+                          <span className={`pos ${visible.player.position}`}>{visible.player.position}</span>
+                          <span className="name">{visible.player.name}</span>
+                          <span className="prob">{Math.round(visible.probability * 100)}%</span>
                         </>
                       ) : (
                         <span className="empty">—</span>

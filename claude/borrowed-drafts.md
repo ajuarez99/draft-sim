@@ -36,6 +36,36 @@ no contemporaneous board exists for them (`HANDOFF.md`, known warts).
 So the ordering is: same-season borrowed drafts first, prior-season borrowed drafts
 second and probably down-weighted, and 2025 shared-league picks stay where they are.
 
+## Verified this session: one real manager's actual numbers
+
+Allan asked, looking at the live UI, whether Bartner (fantasy(heart) slot 1)
+really has no draft history — `draftsObserved: 0` looked suspicious for someone
+he knows is in multiple leagues. Checked directly against Sleeper's API rather
+than guessed: `GET /v1/user/670342422659690496/drafts/nfl/2026` and `/2025`.
+
+**He has 55 drafts across the two seasons (17 + 38). Zero are usable by this
+doc's own filters.** Every single one is `linear` (not snake) or carries
+`dynasty_2qb` / `idp` in `metadata.scoring_type` — auction/linear format,
+superflex, or individual-defensive-player leagues. This doc's filter table
+already says to drop all of those, for the reasons already given there (a
+2QB league rewrites rounds 1-4 entirely; linear isn't snake; IDP is a
+different roster shape this project doesn't model). `draftsObserved: 0` for
+Bartner is correct given the current 4 leagues, and would *still* be 0 even
+with the borrowed-drafts idea fully built — not because the idea doesn't work,
+but because this particular manager's other leagues happen to be the wrong
+kind, this year.
+
+**Worth knowing before selling this idea on Bartner specifically: it won't
+help him.** It may still help others — this was one manager, checked because
+he was the one Allan asked about, not a survey. The volume-check script in
+"Step zero" below still needs to run across all 13 leaguemates before knowing
+whether the idea is worth 40-60 picks per manager or 3.
+
+(Also worth noting since it wasn't obvious going in: `scoring_type` in the
+drafts-for-user response names dynasty/2qb/idp status directly, which makes
+filtering cheaper than expected — no need to cross-reference `settings.type`
+against every draft to know a league is out of scope.)
+
 ## Step zero, before anything is designed around this
 
 A ~30 line script. Loop the 13 leaguemate user IDs through

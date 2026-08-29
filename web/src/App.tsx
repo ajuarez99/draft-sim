@@ -4,6 +4,8 @@ import DraftBoard from './components/DraftBoard'
 import AvailabilityPanel from './components/AvailabilityPanel'
 import SeatList from './components/SeatList'
 import ConfidenceNote from './components/ConfidenceNote'
+import RevealScrubber from './components/RevealScrubber'
+import { useRevealedBoard } from './useRevealedBoard'
 
 // fantasy(heart) 2026 -- 14 teams, PPR, you are slot 11.
 const DEFAULT_DRAFT = '1391509064357273600'
@@ -20,9 +22,22 @@ export default function App() {
   const [progress, setProgress] = useState(0)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [seatsDirty, setSeatsDirty] = useState(false)
+
+  const reveal = useRevealedBoard(result?.board, result ? result.teams * result.rounds : 0)
+
+  function refetchSeats() {
+    getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
+  }
+
+  function handleSeatsChanged() {
+    refetchSeats()
+    if (result) setSeatsDirty(true)
+  }
 
   useEffect(() => {
-    getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
+    refetchSeats()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId])
 
   async function run() {
@@ -35,6 +50,7 @@ export default function App() {
         setProgress,
       )
       setResult(r)
+      setSeatsDirty(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -113,7 +129,11 @@ export default function App() {
         />
       )}
 
-      {seats && <SeatList seats={seats.seats} mySlot={mySlot} />}
+      {seatsDirty && result && (
+        <div className="error">Seats changed since this simulation ran — re-run to refresh the board.</div>
+      )}
+
+      {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
 
       {result && (
         <section className="panel">
@@ -124,11 +144,20 @@ export default function App() {
             board after round three. Faded names are cells where the most likely player had already
             gone earlier.
           </p>
+          <RevealScrubber
+            value={reveal.revealedThrough}
+            max={result.teams * result.rounds}
+            myPicks={result.myPicks}
+            isRevealing={reveal.isRevealing}
+            onChange={reveal.scrubTo}
+            onSkip={reveal.skip}
+          />
           <DraftBoard
             board={result.board}
             teams={result.teams}
             rounds={result.rounds}
             myPicks={result.myPicks}
+            revealedThrough={reveal.revealedThrough}
           />
         </section>
       )}

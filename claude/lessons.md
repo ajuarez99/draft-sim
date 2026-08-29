@@ -209,3 +209,75 @@ that quietly changes what a field *means* rather than failing loudly. Fixed by
 building the response with a mutable `LinkedHashMap` instead, which tolerates
 nulls directly. Worth a general check: any other `Map.of(...)` in an API
 response path that might carry a nullable field is worth the same look.
+
+## 13. A team can draft one position 6+ times in a row, and it's real, not display
+
+Allan noticed this by eye in the UI. Reproduced and quantified with a standalone
+harness (1000 trials, real `DraftSimulator`, one seat, `T=1.0`): run-length
+histogram `{1:6, 2:277, 3:417, 4:188, 5:80, 6:23, 7:5, 8:3, 9:1}` — about 3% of
+trials hit a run of 6 or worse, worst observed was 9 straight WRs.
+
+**First hypothesis, checked and ruled out:** that this was a `BoardAssembler`
+display artifact like #7 (the marginal-mode-per-cell issue) rather than real
+per-trial behavior. It is not — a single `T=0` deterministic trajectory alternates
+positions normally (max run of 2), but real `T=1.0` per-trial roster construction
+does produce long runs in the tail. Confirmed by instrumenting `DraftSimulator`'s
+own scoring loop and replaying the worst seed with a printed candidate/score
+breakdown at every pick.
+
+**Root cause, from the actual numbers, not a guess:** `rosterNeed` *is* discounting
+correctly — a 5th+ WR scores `need=0.150` (`benchFloor`) exactly as designed,
+correctly below `need=1.000` for an empty RB/QB/TE slot. The problem is what it's
+discounted *against*: at `candidatePool=30`, WR is often 12-13 of the 30 candidates
+scored. Even with each individual WR pick unlikely under the softmax, the
+*aggregate* probability mass of "some WR wins" stays non-trivial every single
+pick, because there are so many of them competing. Over a long draft (up to 9
+of a manager's own picks watched here), a run of unlucky-but-not-impossible draws
+compounds. Seed 303's pick 67, for example: top candidate was a TE at score 0.910,
+the best WR candidate scored 0.175 (`need=0.150` already applied) — individually a
+longshot, but one of ~12 similarly-longshot WRs, and it won anyway.
+
+**Not yet fixed — this is a modeling decision, not a bug fix, per the project's own
+rule against silently retuning `weights.yml`.** Two candidate directions, neither
+implemented:
+
+- Lower `benchFloor` globally (blunt, touches every position's bench value, not
+  just the pathological case).
+- A stacking/diminishing term scoped to *count already rostered at this
+  position*, independent of starting-slot math — so a team's 6th WR is worth
+  measurably less than its 5th even though both are technically "bench," which
+  `rosterNeed` alone can't currently express since it only asks "does this fill a
+  starting slot," not "how many have I already taken."
+
+See `claude/live-reveal-and-tendencies-ui.md`'s "Related" section for where this
+is tracked next.
+
+## 14. Manager tendencies could never have worked from a browser, and nothing caught it until a browser tried
+
+`WebConfig.addCorsMappings` allowed `GET, POST, OPTIONS` only. `PUT
+/api/managers/{id}/tendencies` and `DELETE /api/managers/{id}/tendencies` —
+the only PUT/DELETE calls in the whole app — have existed since `76d661d`
+(the tendencies feature itself). Every save and clear from an actual browser
+origin was silently rejected by Spring's own CORS preflight before ever
+reaching `ManagerController`: `403 Forbidden`, `"Invalid CORS request"`. The
+endpoints worked flawlessly by every method this project used to verify them —
+curl in this session, Postman per HANDOFF's own instructions — because neither
+sends a CORS preflight. **This bug was invisible to every verification method
+in this file except the one that actually drove it from a browser.**
+
+Found by a verification-pipeline agent that ran a real simulation, opened the
+real UI, and clicked "save" on a seat card, in a session where a coding agent
+had just built the first-ever frontend consumer of these endpoints. The bug
+predates that session's frontend work entirely — it was sitting there,
+unreachable by design of how it had only ever been tested, since the tendencies
+feature was born with no UI in front of it.
+
+**The class:** an API that has genuinely never been called the way its real
+client will call it isn't verified by that client's absence — it's untested in
+exactly the dimension that matters. `claude/lessons.md` #5 already warned about
+generalizing one failed check into a capability claim; this is the same lesson
+about the *positive* case — passing every check available so far is not the
+same as being correct, when none of the checks available so far exercised the
+actual path. The general version: **"has no UI yet" is not the same claim as
+"works," and shouldn't be allowed to quietly become one** just because nothing
+has said otherwise. Fixed by adding `PUT, DELETE` to `allowedMethods`.

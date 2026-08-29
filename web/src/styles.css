@@ -93,9 +93,35 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
 .seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seat .prov { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+.seat .prov { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
 .seat .prov.neutral { color: var(--muted); background: var(--line); }
 .seat .prov.stated { color: #0f1115; background: var(--te); }
 .seat .prov.fitted { color: #0f1115; background: var(--rb); }
 .seat .note { color: var(--text); opacity: 0.85; font-style: italic; }
 .seat p { margin: 4px 0 0; }
+
+.seat-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.seat-edit {
+  background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 8px; font: inherit; font-size: 10px; cursor: pointer;
+}
+.seat-edit:hover { color: var(--text); border-color: var(--accent); }
+
+.seat-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.seat-form label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.seat-form input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px; font: inherit;
+}
+.seat-form-actions { display: flex; gap: 6px; margin-top: 2px; }
+.seat-form-actions button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+  padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.seat-form-actions button:disabled { opacity: 0.6; cursor: default; }
+.seat-form-actions button:nth-child(n+2) { background: var(--line); color: var(--text); }
+.seat-form-error { color: #e07a7a; }
+
+.reveal-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.reveal-status { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+.reveal-slider { flex: 1; }

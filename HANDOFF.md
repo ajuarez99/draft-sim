@@ -147,12 +147,17 @@ including the `adp_snapshot` columns in `claude/adp-sources.md` and the
 `league`/`manager_profile` changes in `claude/borrowed-drafts.md` — is a **V2**
 migration from here on. Do not edit V1 again.
 
-### 1. Manager tendencies — DONE and verified live; seat *display* is real, seat *editing* still is not
+### 1. Manager tendencies — DONE, both display and editing, verified live
 
-Correction to be precise about what changed: seat cards now correctly **display**
-provenance (`3d65302`, `39f4a72`, verified live in a browser this session — see
-below). Setting `reachBias` / `unpredictability` / `note` still has no UI; that
-wart is still open, see "Known warts."
+Seat cards correctly **display** provenance (`3d65302`, `39f4a72`, verified live
+in a browser). **Setting** `reachBias` / `unpredictability` / `note` now has a UI
+too — added in a later pass this same session via an architect → coder →
+reviewer → verification pipeline, `claude/live-reveal-and-tendencies-ui.md` has
+the full design. Each seat card is now editable in place. That pass also found
+and fixed a real, previously-invisible bug: `WebConfig`'s CORS config never
+allowed `PUT`/`DELETE`, so save/clear silently 403'd from any browser the entire
+time this feature existed — worked fine over curl (no preflight), never worked
+from the UI it was built for. See `claude/lessons.md` #14.
 
 `manager_profile` was dead; it now carries two separately-owned columns.
 `feature_json` is fitted and written only by ingest. `manual_json` is what you say
@@ -285,7 +290,7 @@ running a modal draft and seeing the 1.01 pick come back as the last man on the 
 
 | What | Weight |
 |---|---|
-| No UI for setting tendencies — API only | open |
+| ~~No UI for setting tendencies~~ — DONE, seat cards are editable in place, verified live in a browser (see below) | closed |
 | `ProfileService.fit()` runs per simulate call. Deliberate: fitting ~360 picks is cheap and a cache would only add staleness | low |
 | `available.remove(choice)` is a linear scan — fine at 2k iterations, possibly minutes at 10k | medium |
 | Positional priors fit on ~360 picks with `alpha = 8`; smoothing dominates | by design |
