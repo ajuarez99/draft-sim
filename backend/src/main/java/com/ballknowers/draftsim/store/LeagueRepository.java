@@ -2,10 +2,12 @@ package com.ballknowers.draftsim.store;
 
 import com.ballknowers.draftsim.domain.LeagueSettings;
 import com.ballknowers.draftsim.domain.Sport;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Array;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,15 +15,23 @@ import java.util.Optional;
 public class LeagueRepository {
 
     private final JdbcClient db;
+    private final JdbcTemplate jdbc;
 
-    public LeagueRepository(JdbcClient db) {
+    public LeagueRepository(JdbcClient db, JdbcTemplate jdbc) {
         this.db = db;
+        this.jdbc = jdbc;
     }
 
+    /**
+     * roster_positions is a text[]. Binding it goes through JdbcTemplate with an
+     * explicit createArrayOf rather than JdbcClient's generic parameter path:
+     * handing the driver a bare String[] relies on pgjdbc inferring the SQL type,
+     * which is version-dependent. This way there is nothing to infer.
+     */
     public long upsert(Sport sport, int season, String sleeperId, String previousLeagueId,
                        String name, int totalRosters, String settingsJson, String scoringJson,
                        List<String> rosterPositions) {
-        return db.sql("""
+        String sql = """
                 insert into league (sport, season, sleeper_id, previous_league_id, name,
                                     total_rosters, settings_json, scoring_json, roster_positions)
                 values (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)
@@ -34,13 +44,25 @@ public class LeagueRepository {
                     scoring_json = excluded.scoring_json,
                     roster_positions = excluded.roster_positions
                 returning id
-                """)
-                .param(1, sport.code()).param(2, season).param(3, sleeperId)
-                .param(4, previousLeagueId).param(5, name).param(6, totalRosters)
-                .param(7, settingsJson).param(8, scoringJson)
-                .param(9, rosterPositions.toArray(String[]::new))
-                .query(Long.class)
-                .single();
+                """;
+
+        Long id = jdbc.execute(sql, (PreparedStatement ps) -> {
+            Array slots = ps.getConnection().createArrayOf("text", rosterPositions.toArray());
+            ps.setString(1, sport.code());
+            ps.setInt(2, season);
+            ps.setString(3, sleeperId);
+            ps.setString(4, previousLeagueId);
+            ps.setString(5, name);
+            ps.setInt(6, totalRosters);
+            ps.setString(7, settingsJson);
+            ps.setString(8, scoringJson);
+            ps.setArray(9, slots);
+            try (var rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        });
+        if (id == null) throw new IllegalStateException("league upsert returned no id: " + sleeperId);
+        return id;
     }
 
     public record LeagueRow(long id, String sleeperId, String name, int season,

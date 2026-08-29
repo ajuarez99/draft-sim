@@ -149,17 +149,20 @@ public class BoardService {
      * is mostly a year of player movement, not a manager's behavior.
      */
     private int backfillAdpAtTime(Sport sport) {
+        // Postgres will not let the UPDATE target be referenced from inside a
+        // JOIN's ON clause ("invalid reference to FROM-clause entry for table
+        // dp"), so the two FROM relations are comma-joined and every predicate
+        // lives in WHERE. Verified against Postgres 16.
         return jdbc.update("""
                 update draft_pick dp
                 set adp_at_time = s.adp
-                from draft d
-                join adp_snapshot s
-                  on s.player_id = dp.player_id
-                 and s.sport = ?
-                 and s.source = ?
-                 and s.captured_on between (d.start_time::date - make_interval(days => ?))
-                                       and (d.start_time::date + make_interval(days => ?))
+                from draft d, adp_snapshot s
                 where d.id = dp.draft_id
+                  and s.player_id = dp.player_id
+                  and s.sport = ?
+                  and s.source = ?
+                  and s.captured_on between (d.start_time::date - make_interval(days => ?))
+                                        and (d.start_time::date + make_interval(days => ?))
                   and dp.player_id is not null
                   and d.start_time is not null
                 """,
