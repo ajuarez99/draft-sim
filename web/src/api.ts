@@ -27,10 +27,16 @@ export type AvailabilityRow = {
   survivalByPick: Record<string, number>
 }
 
+export type Provenance = 'NEUTRAL' | 'STATED' | 'FITTED' | 'BLENDED'
+
 export type Confidence = {
   draftsObserved: number
   scoreablePicks: number
   managersWithHistory: number
+  /** Seats running on what you typed, with no history behind them. */
+  managersStated: number
+  /** Seats with neither history nor stated tendencies. */
+  managersNeutral: number
   totalSeats: number
   boardSource: string
   caveats: string[]
@@ -51,9 +57,13 @@ export type SimulationResult = {
 
 export type Seat = {
   slot: number
+  managerId: number
   manager: string
+  provenance: Provenance
   reachBias: number
+  unpredictability: number
   positionalTilt: Record<string, number>
+  note: string | null
   draftsObserved: number
   picksScored: number
 }
