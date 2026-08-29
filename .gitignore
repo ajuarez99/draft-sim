@@ -1,0 +1,13 @@
+.gradle/
+build/
+bin/
+out/
+*.class
+.idea/
+*.iml
+.vscode/
+node_modules/
+dist/
+.env
+.env.local
+pgdata/

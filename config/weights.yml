@@ -1,0 +1,71 @@
+# Scoring weights and model constants. External on purpose: when a second and
+# third season of history accumulate these get fit, not hand-tuned, and the
+# engine should not need to change.
+#
+# EVERY NUMBER IN THIS FILE IS A GUESS. None of it is fit to data. Treat the
+# relative magnitudes as a starting point, not as a claim.
+
+draftsim:
+  scoring:
+    football:
+      # score = w_adp*valueDelta + w_pos*positionalPrior + w_need*rosterNeed + w_run*runPressure
+      weights:
+        adp: 1.00
+        positionalPrior: 0.35
+        rosterNeed: 0.50
+        runPressure: 0.25
+
+      # valueDelta = (adp - pick_no + reachBias) / adpScale, clamped.
+      # Larger adpScale = value decays more slowly with distance from ADP,
+      # which makes drafters look more willing to reach.
+      adpScale: 12.0
+      valueDeltaClamp: 3.0
+
+      # Board value = exp(-adp / valueDecay). At 60, the 1.01 pick is worth
+      # ~6x the pick at 1.10 and ~30x a pick at the 4/5 turn. That drop is
+      # steeper than reality for RB/WR and flatter than reality for elite TE.
+      valueDecay: 60.0
+
+      # A bench player is not worthless (byes, injuries, upside). Floor on
+      # rosterNeed so late-round depth does not score at exactly zero.
+      benchFloor: 0.15
+
+      # runPressure looks at the last N picks; a position appearing k times
+      # contributes k/window, decayed by recency.
+      runWindow: 6
+      runRecencyDecay: 0.85
+
+      # Positions nobody takes before this round. Real constraint, not a guess:
+      # Sleeper's board enforces it and drafters follow it.
+      earliestRound:
+        K: 13
+        DEF: 12
+
+      # Softmax temperature. ~0 = modal board, 1 = realistic variance, >2 = chaos.
+      temperature: 1.0
+      # How many available players get scored at each pick.
+      candidatePool: 30
+
+  board:
+    # 0 = Sleeper search_rank only, 1 = observed draft order only.
+    # 0.5 is a coin flip dressed as a parameter. Change it freely.
+    observedWeight: 0.5
+    observedDrafts:
+      - "1346366555776126976"   # (Foot) Ball Knowers 2026, 12-team PPR, complete
+    referenceTeams: 14
+    # A pick is only scored for reach against a board captured within this many
+    # days of the draft. Older picks stay unscored rather than being measured
+    # against a board from a different season.
+    maxBoardLagDays: 30
+
+  priors:
+    # Dirichlet pseudo-counts per (round, position) cell. With 2 drafts of
+    # history this is doing most of the work; it is deliberately heavy.
+    alpha: 8.0
+
+  # Per-manager parameters are shrunk toward the league mean:
+  #   effective = (n/(n+k))*manager + (k/(n+k))*leagueMean
+  # With two drafts observed and k=4, a manager's own history carries 1/3 weight.
+  # k is deliberately large. Lower it only when more seasons exist.
+  shrinkage:
+    k: 4.0

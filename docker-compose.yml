@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: draftsim-pg
+    environment:
+      POSTGRES_DB: draftsim
+      POSTGRES_USER: draftsim
+      POSTGRES_PASSWORD: draftsim
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U draftsim"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
