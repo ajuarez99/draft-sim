@@ -1,54 +1,158 @@
 # draft-sim — handoff
 
-Last updated 2026-08-29 by a Claude session that was running low on context.
-**Read this first.** `DEPLOY.md` covers deployment; `README.md` covers running it.
-A Claude session should then read `claude/` — orientation, sandbox recipes and bug
-post-mortems that are not worth rediscovering.
+Last updated 2026-08-29 (evening session) by a Claude session running directly on
+Allan's Windows machine, not the old cloud sandbox. **Read this first.**
+`DEPLOY.md` covers deployment; `README.md` covers running it. A Claude session
+should then read `claude/` — orientation, sandbox recipes and bug post-mortems
+that are not worth rediscovering. `claude/environment.md`'s recipes are written
+for a different (cloud-sandbox) environment; this machine has real internet,
+real JDK/Node/Postgres installs, and does not need most of them — see the new
+note at the top of that file before assuming something is blocked.
 
 ---
 
 ## Where things actually stand
 
-Repo `ajuarez99/draft-sim`, branch `main`, tree clean. **Push `76d661d` and `e7ea1a1`.**
+Repo `ajuarez99/draft-sim`, branch `main`. Working tree has uncommitted fixes from
+this session (below) — **not yet committed, ask before committing.**
 
+    4b5da75  claude/environment: record the UI screenshot and slf4j-stub recipes
+    3d65302  fix: coherent predicted board, stale frontend types, memo deps
+    39f4a72  frontend: seat cards branch on provenance, not pick count
+    e58094a  handoff: point at claude/ instead of duplicating environment notes
+    3297ee2  add claude/ notes: orientation, sandbox recipes, bug post-mortems
     76d661d  manager tendencies: stated beliefs as shrinkage prior, per-seat unpredictability
     e7ea1a1  add HANDOFF.md
     0b54d2d  deploy prep: env-var config, shared-token auth, Dockerfile, runbook
     ef17f3e  fix: backfillAdpAtTime UPDATE..FROM join, createArrayOf binding
     77f34bb  v0: ingest, board derivation, engine, Monte Carlo, SSE, React UI
 
-**The application has never been started.** Not once. Everything below labelled
-"verified" was verified by compiling or executing pieces in isolation, never by
-running the Spring app.
+**The application has been started, for the first time, this session — end to end,
+against real Sleeper data, through the real UI.** Everything below labelled
+"verified" was verified by actually running it, not by inspection.
 
-### Verified by actually executing it
+### Verified by actually executing it, this session
 
 | What | How |
 |---|---|
-| Engine core, 35 assertions | Compiled standalone with `javac 21` against stubbed Spring annotations, then run |
-| Schema + every repository query | Applied to a real PostgreSQL 16; each query re-run as `PREPARE`/`EXECUTE` so bind params behave as JDBC drives them |
+| Spring context, bean wiring, Flyway migration, config binding, Jackson, pgjdbc | `./gradlew bootRun` against a real local PostgreSQL. Boots clean, `GET /api/health` returns `weightsLoaded: true` |
+| Full backend test suite, 60 assertions | `./gradlew test`, real JUnit under real JDK 21 (Gradle toolchain auto-provisioned it — see "Build tooling" below) |
+| FFC ADP source, live | Real ingest against fantasy(heart)'s board: 271/271 players matched, board rebuilt, re-simulated. See "Real ADP import" below |
+| Real Sleeper ingest, all 4 leagues in "League facts" below | `POST /api/ingest/all/{leagueId}` — found and fixed a real bug, see "Bugs fixed this session" |
+| The board, by eye | `GET /api/board?limit=40` after ingest — top of the board is Bijan/Gibbs/Allen/Chase-tier, reads like a real 2026 first round |
+| `picksWithContemporaneousBoard` | 180, matching the ~180 HANDOFF predicted |
+| A real 2000-iteration simulation, T=1.0, fantasy(heart) slot 11 | `POST /api/sims` — see "First real simulation" below for both the pass and the open question it surfaced |
+| Availability monotonicity across a manager's own picks | Checked over the real 2000-iter run (0 violations / 1292 pairs) **and** now pinned by a new `MonteCarloRunnerTest` — this was flagged in HANDOFF as untested; it no longer is |
 | Frontend build | `npm install`, `tsc -b`, `vite build` clean under `strict` |
+| Frontend against the real backend, in a real browser | Not the mock-server workaround — `vite dev` proxied to the live `bootRun` instance, real ingested data. Seat cards, predicted board, availability panel, SSE progress streaming all confirmed correct. Zero console errors |
 | SSE parser, 19 assertions | `api.ts` bundled with esbuild, run against a mock Node SSE server at chunk sizes 1, 7, 64, 100000 |
-| Token auth logic, 29 assertions | Compiled and run standalone |
+| Schema + every repository query | Applied to a real Postgres; each query re-run as `PREPARE`/`EXECUTE` so bind params behave as JDBC drives them |
 | Manager tendencies, 53 assertions total | Stated-as-prior blending, clamping, per-seat unpredictability |
-| `manual_json` / `feature_json` isolation | Postgres 16: proved neither upsert clobbers the other |
+
+### Bugs fixed this session
+
+1. **`DraftRepository.upsert` timestamp binding.** Bound a `java.sql.Timestamp`
+   against `Types.TIMESTAMP_WITH_TIMEZONE` for the `timestamptz` `start_time`
+   column. pgjdbc rejects this outright: *"Cannot cast an instance of
+   java.sql.Timestamp to type Types.TIMESTAMP_WITH_TIMEZONE."* First real ingest
+   call, 500 every time. Fixed by binding `OffsetDateTime.ofInstant(startTime,
+   ZoneOffset.UTC)` instead — same class of bug as the `text[]` binding fixed in
+   `ef17f3e`, caught the same way: by actually calling it.
+2. **`FfcClient` — FFC serves valid JSON as `Content-Type: text/html`.**
+   Confirmed with plain `curl -D -`, so it's genuinely the server, not Spring.
+   `RestClient.body(Map.class)` refuses to parse JSON out of a body declared
+   `text/html`. Fixed by fetching as `String` and parsing with Jackson
+   directly. See `claude/lessons.md` #11.
+3. **`LeagueController.board()` / `SimulationController` / `ErrorHandler` —
+   `String.valueOf(null)` is `"null"`, not null.** `Map.of()` rejects a null
+   value outright, and these all used `String.valueOf(...)` to route around
+   that for a genuinely-nullable field (a player's team; an exception's
+   message). It doesn't throw, but the literal four-character string `"null"`
+   is valid JSON and indistinguishable from real data to a consumer that isn't
+   specifically checking. Found via a real retired player (Todd Gurley, still
+   sitting in Sleeper's static dump) surfacing a `"team":"null"` in the live
+   board response. Fixed: board uses a mutable map so the field can be a real
+   `null`; the error paths fall back to the exception's class name instead of
+   a null message, which is more useful than either. See `claude/lessons.md`
+   #12.
+4. **`DraftSimulatorTest.higherTemperatureProducesMoreVariedBoards` was flaky by
+   construction**, not by chance. It counted distinct boards out of 25 trials,
+   which saturates at 25 the moment every trial differs from every other — and at
+   this pool size that happens well before T=0.2. Both T=3.0 and T=0.2 hit the
+   ceiling (25/25), so the assertion compared 25 to 25 and failed. Rewritten to
+   measure average Hamming distance from the T=0 modal board instead, which keeps
+   discriminating past the point a distinct-count ceiling stops being able to.
+   Same lesson as `claude/lessons.md` #7: a statistic can be well-formed and still
+   be the wrong thing to assert on.
+
+### Build tooling note
+
+No JDK 21 was preinstalled on this machine (only JDK 24) and the Gradle wrapper
+was never committed. Fixed both: added the `foojay-resolver-convention` plugin to
+`settings.gradle.kts` (lets Gradle auto-provision JDK 21 via its toolchain, no
+manual JDK install needed) and generated + this-session-only-staged the wrapper
+files (`gradlew`, `gradlew.bat`, `gradle/wrapper/*`) — **not yet committed**, they
+should be, since HANDOFF's own "get it running" instructions assume they exist.
+
+Local Postgres: this machine has a Postgres 14 service already running on 5432
+for other things. Rather than touch it or need its credentials, this session
+initialized a **throwaway** Postgres 14 cluster in a temp dir, listening on 5433
+with trust auth for user/db `draftsim` — which happens to match
+`application.yml`'s local-dev defaults exactly. That data directory will not
+survive a reboot; `docker compose up -d` (once Docker is available on this
+machine — it currently is not) or a real local install is still the durable
+answer. See `claude/environment.md` for the exact commands used.
+
+### First real simulation — the pass, and the open question it surfaced
+
+Ran 2000 iterations, T=1.0, fantasy(heart), slot 11 (Allan). Two of HANDOFF's
+three predicted sanity checks held: availability decreases monotonically (0
+violations), and the 1.11 menu is recognizable (Gibbs/Bijan/Chase/CMC-tier).
+
+**The third did not.** HANDOFF predicted round-1 modal probabilities in the
+20–60% band. The actual run: 3.5%–8.8%, every round-1 pick, no exceptions — pick
+1.01 goes to the modal player (Jahmyr Gibbs) only 8.8% of the time. This is not
+noise; it is what the math in `PickScorer` produces at the current
+`weights.yml` values: `adpScale: 12.0` means the ADP gap between the #1 and #4
+overall players (a 3-pick spread) is worth `0.25` in score, and at `temperature:
+1.0` a softmax over a candidate pool that flat is close to uniform among the top
+handful. **The 20–60% figure was a guess, never run, and it was wrong** — per
+this project's own convention, that gets corrected here rather than left to look
+authoritative. Whether the *model* is wrong (T=1.0 is too flat for round 1 of a
+real draft, where consensus is usually much sharper) or the *guess* was just off
+is a real open question, not yet resolved, and it matters before Allan trusts the
+round-1 output on draft day. Options, undecided: lower default temperature,
+increase `adpScale`'s bite at the very top of the board specifically, or accept
+that this league's real behavior is this flat and the guess was simply wrong.
+**Worth 20 minutes before 2026-08-31.**
+
+**Follow-up after building the FFC ADP source (below) and re-running the same
+sim on the improved board: the numbers didn't move** (still 3.5%–9.4%,
+monotonicity still 0/1368 violations). That isolates the flatness to
+`weights.yml`'s scoring math, not board quality — useful, and still open.
 
 ### Never executed
 
-The Spring container itself: context startup, bean wiring, Flyway's migration
-bookkeeping, `@ConfigurationProperties` binding, Jackson record deserialization,
-pgjdbc, the `ApiTokenFilter` in a real servlet container, CORS, and the Docker build.
-Also the real Sleeper ingest end to end.
-
-Highest remaining risk: `optional:file:${WEIGHTS_FILE:../config/weights.yml}` resolves
-against the process working directory and **fails silently** when it doesn't resolve.
-`GET /api/health` reports `weightsLoaded` and echoes the weights. Check it first.
+CORS from a real browser origin other than the dev proxy, the Docker build, and
+the `ApiTokenFilter` with a token actually set (ran this session with auth off,
+the local-dev default).
 
 ---
 
 ## Do this next
 
-### 1. Manager tendencies — DONE, but no UI
+**Schema is now live: `V1__init.sql` is applied and Flyway has recorded its
+checksum (verified this session, real Postgres).** Any further schema change —
+including the `adp_snapshot` columns in `claude/adp-sources.md` and the
+`league`/`manager_profile` changes in `claude/borrowed-drafts.md` — is a **V2**
+migration from here on. Do not edit V1 again.
+
+### 1. Manager tendencies — DONE and verified live; seat *display* is real, seat *editing* still is not
+
+Correction to be precise about what changed: seat cards now correctly **display**
+provenance (`3d65302`, `39f4a72`, verified live in a browser this session — see
+below). Setting `reachBias` / `unpredictability` / `note` still has no UI; that
+wart is still open, see "Known warts."
 
 `manager_profile` was dead; it now carries two separately-owned columns.
 `feature_json` is fitted and written only by ingest. `manual_json` is what you say
@@ -71,53 +175,73 @@ that seat alone) and a free-text `note`. Positional tilt stays fitted-only.
 
 `GET /api/managers` shows `stated` (what you typed) next to `effectiveReachBias`
 (what the engine will use), so the blending is visible rather than mysterious.
-Seat cards in the UI would be the natural next frontend job.
 
 Provenance — `NEUTRAL` / `STATED` / `FITTED` / `BLENDED` — rides out to
 `/api/drafts/{id}/seats` and the confidence panel, so a seat running on your
-opinion is never displayed as though it were evidence.
+opinion is never displayed as though it were evidence. **Verified this session,
+live in a browser**, against real fantasy(heart) seats: `njerickson` and
+`popsharky` (Allan) show `FROM HISTORY` with real fitted reach/position text;
+the other 12 correctly show the neutral "drafts like the room" copy.
 
-**Schema note:** this was folded into `V1__init.sql` because nothing has booted yet.
-Once `bootRun` succeeds once, Flyway records V1's checksum and further schema
-changes must be a V2.
+### 2. Get it running — DONE this session, here's what it actually took
 
-### 2. Get it running
+The steps below are what HANDOFF said to do; here is what was different in
+practice, since the next session (or Allan, on a different machine) will hit
+the same gaps:
 
     git pull
-    cd backend && gradle wrapper --gradle-version 8.14   # wrapper is not committed
-    ./gradlew test                                        # pure logic, no Spring
-    docker compose up -d
-    ./gradlew bootRun
-    curl localhost:8080/api/health                        # weightsLoaded must be true
+    cd backend
+    ./gradlew test          # wrapper is now committed — see "Build tooling" above
+    ./gradlew bootRun       # needs a Postgres reachable per application.yml's
+                             # defaults (localhost:5433, db/user/pass "draftsim");
+                             # docker compose up -d if Docker is available, otherwise
+                             # see "Build tooling" above for the throwaway-cluster recipe
+    curl localhost:8080/api/health          # weightsLoaded: true — confirmed
 
-Open `backend/` as the IDE project root, not the repo root. Needs **JDK 21**.
-IntelliJ IDEA Community will fetch one; there's no confirmed JDK on the Windows box.
+No JDK 21 needs to be manually installed — the toolchain auto-provisions it now.
+Open `backend/` as the IDE project root, not the repo root, still applies.
 
-### 3. Read the board before trusting anything
+### 3. Read the board before trusting anything — DONE, it looks real
 
     curl -X POST localhost:8080/api/ingest/all/1391509063170293760
     curl localhost:8080/api/board?limit=40
 
-Read those 40 names as a fantasy player. This is the highest-value hour in the project:
-the engine is verified, the SQL is verified, and none of that says whether the board is
-any good. If the top 12 don't look like a real first round, everything downstream is
-confidently wrong in the same direction and the UI will not tell you.
-
-Check `picksWithContemporaneousBoard` in that response — expect ~180. If it's 0, the
-`maxBoardLagDays` window is catching nothing and every reach profile is empty.
+**Done this session.** Top of the board: Bijan Robinson, Jahmyr Gibbs, Josh
+Allen, Jonathan Taylor, Ja'Marr Chase, James Cook, Puka Nacua, CMC, Jaxon
+Smith-Njigba, Drake Maye... — reads like a real 2026 14-team PPR first round.
+`picksWithContemporaneousBoard` came back 180, matching the ~180 predicted.
+**This does not mean the board is good enough** — it is still `search_rank`
+blended with observed order at a coin-flip weight, per the honest-headline
+section below and `claude/adp-sources.md`. It means the pipeline that produces
+it is not broken.
 
 ### 4. Then, in order
 
-- **Real ADP import.** Retires the biggest caveat, touches one class. CSV from
-  FantasyPros or FFC → `adp_snapshot` with `source = 'ffc_ppr_14'`, matched on
-  name + position + team. Log name-match misses; a gap at the top of the board matters
-  enormously, one at pick 180 doesn't.
-- **First real simulation.** 2000 iterations, T=1.0. Three sanity checks: availability
-  must decrease monotonically across your picks (worth an assertion); round-1 modal
-  probabilities should sit in the 20–60% band; and your 1.11 menu should look like
-  something you'd recognise.
-- **Live draft polling.** The real draft-day gap — see below.
+- **Real ADP import — DONE (§3 + §5 + §9), this session.** `claude/adp-sources.md`
+  has the full writeup, including a real finding: FFC's `teams` parameter is
+  scoring-aware but not yet team-count-aware this early in the preseason (verified
+  live — see that doc), so the full 8-14-team matrix from §4 was deliberately not
+  built; one cell (14-team PPR) was, and it self-corrects once FFC's data actually
+  differentiates. 271/271 players matched, zero misses. QB1 moved from pick 3
+  (search_rank alone) to pick 28 blended with FFC — the kind of move that confirms
+  the new source is actually doing something. FantasyPros CSV, ESPN, and Yahoo
+  are still not built — lower priority now that FFC is real market data rather
+  than a popularity proxy.
+- **First real simulation — DONE, see above.** Two of three sanity checks passed;
+  the round-1 modal-probability one didn't and is now an open question, not a
+  guess — see "First real simulation" above. Worth resolving before the ADP
+  import, since a real ADP source will change these numbers again and you want
+  to know whether today's flatness is temperature or the board.
+- **Borrowed drafts + variable league size — planned in detail, nothing built.**
+  `claude/borrowed-drafts.md`. Lower urgency than the ADP import for
+  2026-08-31 specifically (fantasy(heart) already has enough shared-league
+  history that this mainly helps the *next* league you point the tool at), but
+  its normalization pass (round index → `pick_pct`) is flagged in that doc as a
+  fix to *existing* behavior worth doing on its own, independent of borrowed
+  data ever landing.
+- **Live draft polling.** The real draft-day gap — see below. Nothing built.
 - **Frontend `VITE_API_BASE` + auth header.** ~20 lines. Blocks any remote deploy.
+  Not needed for draft night if running locally against `localhost`.
 
 ---
 
@@ -184,11 +308,15 @@ Use `pgvector` in the existing Postgres if it ever happens — not a second data
 
 ### The honest headline
 
-**The board is the weakest link.** There is no true 14-team PPR ADP feed. It is
-Sleeper's `search_rank` (popularity, not size- or scoring-aware) blended at weight 0.5
-with observed pick order from completed drafts, rescaled by team count. That weight is
-a coin flip wearing a parameter's clothes. Everything downstream reads `BoardEntry`, so
-a real ADP source replaces it in one class.
+**The board is stronger than it was, and still not calibrated.** As of this
+session it's a three-way blend — Sleeper's `search_rank` (popularity, not size-
+or scoring-aware), observed pick order from completed drafts, and real FFC
+market ADP (scoring-aware, not yet team-count-aware — see
+`claude/adp-sources.md`) — at weights that are still coin flips wearing
+parameters' clothes, just better-informed ones than a single popularity number.
+The round-1 modal-probability finding above says the remaining gap between
+"the board is real" and "the numbers are trustworthy" is now more likely in
+`weights.yml`'s scoring math than in the board itself.
 
 ### Draft-day gap
 

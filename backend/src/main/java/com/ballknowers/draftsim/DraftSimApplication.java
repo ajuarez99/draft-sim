@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         ScoringProperties.class,
         ShrinkageProperties.class,
         BoardProperties.class,
+        AdpProperties.class,
         PriorProperties.class,
         ApiSecurityProperties.class,
         CorsProperties.class

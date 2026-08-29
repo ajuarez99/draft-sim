@@ -60,8 +60,11 @@ public class SimulationController {
             } catch (Exception e) {
                 log.warn("simulation stream failed", e);
                 try {
+                    // Map.of rejects a null value, and a message-less exception has one —
+                    // fall back to the class name rather than the literal string "null".
+                    String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                     emitter.send(SseEmitter.event().name("error")
-                            .data(Map.of("message", String.valueOf(e.getMessage()))));
+                            .data(Map.of("message", message)));
                 } catch (IOException ignored) {
                     // nothing left to tell
                 }

@@ -108,20 +108,30 @@ class DraftSimulatorTest {
     @Test
     void higherTemperatureProducesMoreVariedBoards() {
         DraftContext c = ctx(12, 15, Map.of());
-        assertTrue(distinctFirstRoundBoards(c, 3.0) > distinctFirstRoundBoards(c, 0.2),
-                "chaos mode should produce more distinct first rounds than a near-modal run");
+        double hi = averageDeviationFromModal(c, 3.0);
+        double lo = averageDeviationFromModal(c, 0.2);
+        assertTrue(hi > lo,
+                "chaos mode should deviate from the modal board more than a near-modal run");
     }
 
-    private int distinctFirstRoundBoards(DraftContext c, double temperature) {
-        Set<String> seen = new HashSet<>();
-        for (int i = 0; i < 25; i++) {
+    /**
+     * "Distinct board count out of N trials" saturates at N the moment every
+     * trial differs from every other, which happens well before T=0.2 at this
+     * pool size — it cannot tell "a little varied" from "very varied" once both
+     * hit the ceiling. Average Hamming distance from the T=0 modal board keeps
+     * discriminating past that point.
+     */
+    private double averageDeviationFromModal(DraftContext c, double temperature) {
+        var modal = new DraftSimulator(c, new PickScorer(CFG, c.rules(), c.priors()), 0.0, 1L)
+                .run(new int[]{5}, 5);
+        int trials = 25;
+        int totalDiff = 0;
+        for (int i = 0; i < trials; i++) {
             var r = new DraftSimulator(c, new PickScorer(CFG, c.rules(), c.priors()), temperature, i)
                     .run(new int[]{5}, 5);
-            StringBuilder sb = new StringBuilder();
-            for (int p = 1; p <= 12; p++) sb.append(r.picked()[p]).append(',');
-            seen.add(sb.toString());
+            for (int p = 1; p <= 12; p++) if (r.picked()[p] != modal.picked()[p]) totalDiff++;
         }
-        return seen.size();
+        return (double) totalDiff / trials;
     }
 
     /**

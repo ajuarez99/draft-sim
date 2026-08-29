@@ -4,6 +4,35 @@ Everything here was discovered the slow way. Read it before deciding something
 cannot be tested — that conclusion was reached too early once already this session
 and it was wrong.
 
+## If you are running directly on Allan's Windows machine, not the cloud sandbox
+
+Most of this file describes a **cloud sandbox** session: Linux, `device_bash`,
+blocked Maven Central, no committed Gradle wrapper. A 2026-08-29 evening session
+ran directly on Allan's Windows box instead and almost everything below did not
+apply: Maven Central, Gradle's distribution server, npm and the Sleeper API were
+all directly reachable (no `WebFetch`-vs-`curl` asymmetry), a JDK was present
+(24, not 21 — Gradle's toolchain now auto-provisions 21, see HANDOFF's "Build
+tooling" note), and a local Postgres 14 service was already running for other
+things. That session generated and staged the Gradle wrapper (bootstrapped by
+downloading `gradle-8.14-bin.zip` directly and running `gradle wrapper` once)
+and stood up a **throwaway** Postgres cluster rather than touch the existing
+service or need its password:
+
+    # from a shell with the PostgreSQL 14 bin dir on PATH
+    initdb -D <tempdir> -U draftsim --auth=trust --encoding=UTF8
+    pg_ctl -D <tempdir> -l <tempdir>/pg.log -o "-p 5433" start
+    psql -h localhost -p 5433 -U draftsim -d postgres -c "create database draftsim;"
+
+Port 5433 and user/db `draftsim` with no password match `application.yml`'s
+local-dev defaults exactly, so `./gradlew bootRun` needs no configuration
+against it. That data directory is temporary and will not survive a reboot —
+fine for a same-session verification pass, not a substitute for `docker compose
+up -d` as the durable local setup.
+
+**Check what's actually reachable before assuming a recipe below applies.**
+`java -version`, `node --version`, `psql --version`, a `curl -sI` to
+`services.gradle.org` and `repo.maven.apache.org` settle it in under a minute.
+
 ## What does and does not work
 
 | | Status |

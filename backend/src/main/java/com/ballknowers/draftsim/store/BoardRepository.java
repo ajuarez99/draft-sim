@@ -14,6 +14,7 @@ public class BoardRepository {
 
     public static final String SOURCE_SEARCH_RANK = "sleeper_search_rank";
     public static final String SOURCE_BLEND = "blend";
+    public static final String SOURCE_FFC = "ffc";
 
     private final JdbcClient db;
     private final JdbcTemplate jdbc;
@@ -42,6 +43,51 @@ public class BoardRepository {
                     ps.setDouble(5, r.adp());
                     if (r.positionalRank() == null) ps.setNull(6, java.sql.Types.INTEGER);
                     else ps.setInt(6, r.positionalRank());
+                });
+    }
+
+    /**
+     * A source row that carries the provenance metadata search_rank/observed
+     * never needed: sample size, the league shape it was actually served for,
+     * and whether it was substituted rather than native. See
+     * claude/adp-sources.md #2-3; not yet read back by {@link #load}, which
+     * only the blend needs today — this is stored so a future stdev-sampling
+     * pass or a UI staleness note does not need a second migration.
+     */
+    public record SourceRow(long playerId, double adp, Integer positionalRank,
+                            Double stdev, Integer sourceTeams, String sourceScoring,
+                            Integer sampleDrafts, boolean derived, String derivation) {}
+
+    public void saveDetailed(Sport sport, String source, LocalDate capturedOn, List<SourceRow> rows) {
+        jdbc.batchUpdate("""
+                insert into adp_snapshot (player_id, sport, source, captured_on, adp, positional_rank,
+                                          stdev, source_teams, source_scoring, sample_drafts, derived, derivation)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict (player_id, source, captured_on) do update set
+                    adp = excluded.adp,
+                    positional_rank = excluded.positional_rank,
+                    stdev = excluded.stdev,
+                    source_teams = excluded.source_teams,
+                    source_scoring = excluded.source_scoring,
+                    sample_drafts = excluded.sample_drafts,
+                    derived = excluded.derived,
+                    derivation = excluded.derivation
+                """,
+                rows, 500,
+                (ps, r) -> {
+                    ps.setLong(1, r.playerId());
+                    ps.setString(2, sport.code());
+                    ps.setString(3, source);
+                    ps.setObject(4, capturedOn);
+                    ps.setDouble(5, r.adp());
+                    if (r.positionalRank() == null) ps.setNull(6, java.sql.Types.INTEGER);
+                    else ps.setInt(6, r.positionalRank());
+                    if (r.stdev() == null) ps.setNull(7, java.sql.Types.NUMERIC); else ps.setDouble(7, r.stdev());
+                    if (r.sourceTeams() == null) ps.setNull(8, java.sql.Types.INTEGER); else ps.setInt(8, r.sourceTeams());
+                    ps.setString(9, r.sourceScoring());
+                    if (r.sampleDrafts() == null) ps.setNull(10, java.sql.Types.INTEGER); else ps.setInt(10, r.sampleDrafts());
+                    ps.setBoolean(11, r.derived());
+                    ps.setString(12, r.derivation());
                 });
     }
 

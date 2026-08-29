@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.ingest;
 
+import com.ballknowers.draftsim.config.AdpProperties;
 import com.ballknowers.draftsim.config.BoardProperties;
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.store.*;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Builds the board the engine actually values players against.
@@ -34,15 +36,17 @@ public class BoardService {
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
 
     private final BoardProperties cfg;
+    private final AdpProperties adpCfg;
     private final BoardRepository boards;
     private final PlayerRepository players;
     private final DraftRepository drafts;
     private final JdbcClient db;
     private final JdbcTemplate jdbc;
 
-    public BoardService(BoardProperties cfg, BoardRepository boards, PlayerRepository players,
-                        DraftRepository drafts, JdbcClient db, JdbcTemplate jdbc) {
+    public BoardService(BoardProperties cfg, AdpProperties adpCfg, BoardRepository boards,
+                        PlayerRepository players, DraftRepository drafts, JdbcClient db, JdbcTemplate jdbc) {
         this.cfg = cfg;
+        this.adpCfg = adpCfg;
         this.boards = boards;
         this.players = players;
         this.drafts = drafts;
@@ -50,7 +54,7 @@ public class BoardService {
         this.jdbc = jdbc;
     }
 
-    public record Result(int entries, int fromBothSources, int backfilledPicks) {}
+    public record Result(int entries, int fromBothSources, int fromFfc, int backfilledPicks) {}
 
     public Result rebuild(Sport sport) {
         LocalDate today = LocalDate.now();
@@ -63,12 +67,21 @@ public class BoardService {
                 .forEach(r -> searchRank.put(r.playerId(), r.adp()));
 
         Map<Long, List<Double>> observed = observedPickNumbers();
+        Map<Long, Double> ffc = loadFfc(sport);
 
-        double w = cfg.observedWeight();
+        // Three independent weights rather than one complement, since a player
+        // can be present in any subset of the three sources. Normalizing by
+        // whichever weights are actually present for that player (below) means
+        // a player FFC has never heard of is not penalized for FFC's absence.
+        double wObs = cfg.observedWeight();
+        double wFfc = ffc.isEmpty() ? 0.0 : adpCfg.ffc().weight();
+        double wSr = Math.max(0, 1 - wObs - wFfc);
+
         Set<Long> universe = new LinkedHashSet<>(searchRank.keySet());
         universe.addAll(observed.keySet());
+        universe.addAll(ffc.keySet());
 
-        int both = 0;
+        int both = 0, fromFfcCount = 0;
         List<Map.Entry<Long, Double>> blended = new ArrayList<>(universe.size());
         for (Long playerId : universe) {
             Double sr = searchRank.get(playerId);
@@ -76,16 +89,21 @@ public class BoardService {
             Double obsMean = (obs == null || obs.isEmpty())
                     ? null
                     : obs.stream().mapToDouble(Double::doubleValue).average().orElseThrow();
+            Double ffcVal = ffc.get(playerId);
 
-            double value;
-            if (sr != null && obsMean != null) {
-                value = (1 - w) * sr + w * obsMean;
-                both++;
-            } else if (sr != null) {
-                value = sr;
-            } else {
-                value = obsMean;
-            }
+            double sumW = 0, sumWV = 0;
+            if (sr != null) { sumW += wSr; sumWV += wSr * sr; }
+            if (obsMean != null) { sumW += wObs; sumWV += wObs * obsMean; }
+            if (ffcVal != null) { sumW += wFfc; sumWV += wFfc * ffcVal; }
+            // A player present only in a zero-weighted source (e.g. FFC-only
+            // with wFfc effectively swamped elsewhere) still needs a value —
+            // fall back to an unweighted average of whatever is present.
+            double value = sumW > 1e-9 ? sumWV / sumW
+                    : Stream.of(sr, obsMean, ffcVal).filter(Objects::nonNull)
+                            .mapToDouble(Double::doubleValue).average().orElseThrow();
+
+            if (sr != null && obsMean != null) both++;
+            if (ffcVal != null) fromFfcCount++;
             blended.add(Map.entry(playerId, value));
         }
 
@@ -111,11 +129,29 @@ public class BoardService {
             rows.add(new BoardRepository.Row(playerId, i + 1.0, posRank));
         }
         boards.save(sport, BoardRepository.SOURCE_BLEND, today, rows);
-        log.info("blended board: {} entries, {} present in both sources, observedWeight={}",
-                rows.size(), both, w);
+        log.info("blended board: {} entries, {} present in both sources, {} from FFC, "
+                        + "weights sr={} obs={} ffc={}",
+                rows.size(), both, fromFfcCount, String.format("%.2f", wSr), wObs, wFfc);
 
         int backfilled = backfillAdpAtTime(sport);
-        return new Result(rows.size(), both, backfilled);
+        return new Result(rows.size(), both, fromFfcCount, backfilled);
+    }
+
+    /**
+     * FFC rows, rescaled from FFC's own team count to referenceTeams the same
+     * way observed draft order is — an FFC ADP of 30 in a 14-team fetch and an
+     * observed pick 30 in a 12-team draft are not the same board position, and
+     * neither should be compared to sleeper_search_rank without conversion.
+     */
+    private Map<Long, Double> loadFfc(Sport sport) {
+        if (adpCfg.ffc() == null || !adpCfg.ffc().enabled()) return Map.of();
+        Optional<LocalDate> date = boards.latestCapture(sport, BoardRepository.SOURCE_FFC);
+        if (date.isEmpty()) return Map.of();
+        double scale = (double) cfg.referenceTeams() / adpCfg.ffc().teams();
+        Map<Long, Double> out = new LinkedHashMap<>();
+        boards.load(sport, BoardRepository.SOURCE_FFC, date.get())
+                .forEach(r -> out.put(r.playerId(), r.adp() * scale));
+        return out;
     }
 
     /** Pick order from the configured completed drafts, rescaled to referenceTeams. */

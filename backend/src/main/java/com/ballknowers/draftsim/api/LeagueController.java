@@ -73,12 +73,19 @@ public class LeagueController {
     public Map<String, Object> board(@RequestParam(defaultValue = "60") int limit) {
         var entries = boards.currentBoard(Sport.NFL).stream()
                 .limit(limit)
-                .map(e -> Map.of(
-                        "adp", e.adp(),
-                        "name", e.player().name(),
-                        "position", e.position().name(),
-                        "team", String.valueOf(e.player().team()),
-                        "positionalRank", e.positionalRank()))
+                .map(e -> {
+                    // Map.of rejects null values, and a free agent / retired player can have
+                    // a null team — String.valueOf(null) used to paper over that by producing
+                    // the literal string "null", which a client can't tell apart from a real
+                    // team code. LinkedHashMap tolerates the null directly.
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("adp", e.adp());
+                    row.put("name", e.player().name());
+                    row.put("position", e.position().name());
+                    row.put("team", e.player().team());
+                    row.put("positionalRank", e.positionalRank());
+                    return row;
+                })
                 .toList();
         return Map.of(
                 "capturedOn", boards.currentBoardDate(Sport.NFL).map(Object::toString).orElse("none"),

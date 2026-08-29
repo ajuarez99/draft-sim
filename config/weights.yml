@@ -47,8 +47,9 @@ draftsim:
       candidatePool: 30
 
   board:
-    # 0 = Sleeper search_rank only, 1 = observed draft order only.
-    # 0.5 is a coin flip dressed as a parameter. Change it freely.
+    # Weight on observed draft order in the blend. 0.5 is a coin flip dressed as
+    # a parameter. Change it freely. (What's left over after this and adp.ffc.weight
+    # goes to sleeper_search_rank -- see BoardService.rebuild.)
     observedWeight: 0.5
     observedDrafts:
       - "1346366555776126976"   # (Foot) Ball Knowers 2026, 12-team PPR, complete
@@ -57,6 +58,22 @@ draftsim:
     # days of the draft. Older picks stay unscored rather than being measured
     # against a board from a different season.
     maxBoardLagDays: 30
+
+  # Fantasy Football Calculator: real market ADP from live mock drafts, scoring-
+  # format aware. See claude/adp-sources.md. teams/format describe the ONE cell
+  # fetched -- not the 8-14 matrix the doc designs, because this session found
+  # FFC's `teams` parameter, though validated, currently returns identical data
+  # across team counts on the same format (verified live, see FfcAdpService).
+  # Building the full per-size matrix would model a distinction that isn't real
+  # in the data yet. weight is another coin-flip parameter, same as observedWeight.
+  adp:
+    ffc:
+      enabled: true
+      teams: 14
+      format: ppr
+      year: 2026
+      weight: 0.5
+      minDrafts: 500
 
   priors:
     # Dirichlet pseudo-counts per (round, position) cell. With 2 drafts of

@@ -6,6 +6,8 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Types;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,7 +39,7 @@ public class DraftRepository {
                 """)
                 .param(1, leagueId).param(2, sleeperDraftId).param(3, season).param(4, rounds)
                 .param(5, teams).param(6, type).param(7, status)
-                .param(8, startTime == null ? null : java.sql.Timestamp.from(startTime), Types.TIMESTAMP_WITH_TIMEZONE)
+                .param(8, startTime == null ? null : OffsetDateTime.ofInstant(startTime, ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE)
                 .param(9, slotToManagerJson)
                 .query(Long.class)
                 .single();
