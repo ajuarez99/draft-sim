@@ -166,6 +166,17 @@ running a modal draft and seeing the 1.01 pick come back as the last man on the 
 | 2025 picks excluded from reach fitting (no contemporaneous board) | by design |
 | No backtesting; probabilities are internally consistent, not calibrated | by design |
 
+### Deferred by design
+
+`docs/affinity.md` — whether manager tendencies and players belong in a vector store.
+Summary: player-to-player similarity built from *features* is worth building and slots
+into the scorer as the `w_aff` term the plan already reserves. Embedding notes and
+players into a *shared* text space is the appealing wrong answer and the doc says why.
+Notes want a one-off LLM extraction into structured attributes, not vector search.
+Anything at corpus scale is blocked on an unverified assumption: that public Sleeper
+drafts can be enumerated at volume. Check that with a small script first.
+Use `pgvector` in the existing Postgres if it ever happens — not a second datastore.
+
 ### The honest headline
 
 **The board is the weakest link.** There is no true 14-team PPR ADP feed. It is
