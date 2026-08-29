@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.profile.ProfileService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -20,12 +21,14 @@ public class IngestController {
     private final PlayerIngestService playerIngest;
     private final LeagueIngestService leagueIngest;
     private final BoardService boards;
+    private final ProfileService profiles;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
-                            BoardService boards) {
+                            BoardService boards, ProfileService profiles) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.boards = boards;
+        this.profiles = profiles;
     }
 
     /** ~5MB from Sleeper. Once a day is plenty. */
@@ -40,10 +43,15 @@ public class IngestController {
         return leagueIngest.ingestChain(Sport.NFL, sleeperLeagueId);
     }
 
-    /** Rebuilds the blended board and backfills adp_at_time onto historical picks. */
+    /**
+     * Rebuilds the blended board, backfills adp_at_time onto historical picks, then
+     * writes the fitted half of every manager profile. Never touches manual_json.
+     */
     @PostMapping("/board")
-    public BoardService.Result board() {
-        return boards.rebuild(Sport.NFL);
+    public Map<String, Object> board() {
+        BoardService.Result result = boards.rebuild(Sport.NFL);
+        int written = profiles.persistFitted(Sport.NFL);
+        return Map.of("board", result, "profilesWritten", written);
     }
 
     /** Everything, in order. Safe to re-run. */
@@ -53,6 +61,7 @@ public class IngestController {
         out.put("players", playerIngest.ingest(Sport.NFL));
         out.put("league", leagueIngest.ingestChain(Sport.NFL, sleeperLeagueId));
         out.put("board", boards.rebuild(Sport.NFL));
+        out.put("profilesWritten", profiles.persistFitted(Sport.NFL));
         return out;
     }
 }

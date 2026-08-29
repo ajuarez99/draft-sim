@@ -13,13 +13,16 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 /**
- * Fits the per-manager layer and the shared positional prior from ingested
- * drafts.
+ * Combines two sources of knowledge about each seat.
  *
- * Everything here is thin by construction. A manager with one scoreable draft
- * contributes ~15 picks. After shrinkage their profile is mostly the league
- * mean, which is the correct outcome at this sample size and the reason
- * draftsObserved and picksScored are carried all the way out to the UI.
+ * Fitted history is thin by construction — one or two drafts, ~15 picks each. What
+ * the user states about their own leaguemates is often better information than that,
+ * and for a league with no history at all it is the only information there is.
+ *
+ * So a stated reach bias is used as the SHRINKAGE TARGET rather than as an override.
+ * A seat with no history lands exactly on the stated value; a seat with two drafts
+ * lands one third of the way from it toward what actually happened. Where nothing is
+ * stated the target is the league mean, exactly as before.
  */
 @Service
 public class ProfileService {
@@ -30,14 +33,17 @@ public class ProfileService {
     private final DraftRepository drafts;
     private final PlayerRepository players;
     private final ManagerRepository managers;
+    private final ManagerProfileRepository profiles;
     private final ShrinkageProperties shrinkage;
     private final PriorProperties priorCfg;
 
     public ProfileService(DraftRepository drafts, PlayerRepository players, ManagerRepository managers,
-                          ShrinkageProperties shrinkage, PriorProperties priorCfg) {
+                          ManagerProfileRepository profiles, ShrinkageProperties shrinkage,
+                          PriorProperties priorCfg) {
         this.drafts = drafts;
         this.players = players;
         this.managers = managers;
+        this.profiles = profiles;
         this.shrinkage = shrinkage;
         this.priorCfg = priorCfg;
     }
@@ -49,6 +55,7 @@ public class ProfileService {
         Map<Long, Position> posById = new HashMap<>();
         for (Player p : players.findAll(sport)) posById.put(p.id(), p.primary());
         Map<Long, String> names = managers.names();
+        Map<Long, ManualTendencies> manual = profiles.manualBySport(sport);
 
         PositionalPriors priors = fitPriors(picks, posById);
 
@@ -87,29 +94,77 @@ public class ProfileService {
             earlyTotal++;
         }
 
+        // Every known manager gets a profile, not just those with picks: a seat with
+        // no history but a stated tendency must not fall back to neutral.
+        Set<Long> allManagers = new HashSet<>(names.keySet());
+        allManagers.addAll(draftsByManager.keySet());
+        allManagers.addAll(manual.keySet());
+
         Map<Long, ManagerProfile> out = new HashMap<>();
-        for (Long managerId : draftsByManager.keySet()) {
-            int observed = draftsByManager.get(managerId).size();
+        for (Long managerId : allManagers) {
+            ManualTendencies stated = manual.getOrDefault(managerId, ManualTendencies.EMPTY);
+            int observed = draftsByManager.getOrDefault(managerId, Set.of()).size();
             List<Double> reaches = reachByManager.getOrDefault(managerId, List.of());
             int picksScored = reaches.size();
 
-            double rawReach = reaches.stream().mapToDouble(Double::doubleValue).average()
-                    .orElse(leagueMeanReach);
-            // Shrink on the number of scoreable drafts, not raw pick count: picks
-            // within one draft are correlated and would overstate the evidence.
+            // The stated value, when present, replaces the league mean as the target
+            // shrinkage pulls toward. With no observations that IS the result.
+            double target = stated.reachBias() != null ? stated.reachBias() : leagueMeanReach;
+            double rawReach = reaches.stream().mapToDouble(Double::doubleValue).average().orElse(target);
+            // Shrink on scoreable drafts, not raw pick count: picks within one draft
+            // are correlated and would overstate the evidence.
             int shrinkN = picksScored == 0 ? 0 : observed;
-            double reach = shrinkage.shrink(rawReach, leagueMeanReach, shrinkN);
+            double reach = shrinkage.shrink(rawReach, target, shrinkN);
 
             Map<Position, Double> tilt = fitTilt(
                     earlyByManager.getOrDefault(managerId, Map.of()), earlyLeague, earlyTotal, observed);
 
+            boolean hasData = picksScored > 0;
+            boolean hasStated = stated.affectsBehaviour();
+            Provenance provenance = hasData && hasStated ? Provenance.BLENDED
+                    : hasData ? Provenance.FITTED
+                    : hasStated ? Provenance.STATED
+                    : Provenance.NEUTRAL;
+
             out.put(managerId, new ManagerProfile(
-                    managerId, names.getOrDefault(managerId, "?"), reach, tilt, observed, picksScored));
+                    managerId, names.getOrDefault(managerId, "?"), reach, tilt,
+                    stated.unpredictability() == null ? 1.0 : stated.unpredictability(),
+                    stated.note(), observed, picksScored, provenance));
         }
 
-        log.info("fit {} manager profiles from {} picks ({} scoreable for reach), league mean reach {}",
-                out.size(), picks.size(), scoreable, String.format("%.2f", leagueMeanReach));
+        log.info("profiles: {} managers, {} scoreable picks, league mean reach {}, {} with stated tendencies",
+                out.size(), scoreable, String.format("%.2f", leagueMeanReach), manual.size());
         return new Fit(out, priors, scoreable);
+    }
+
+    /**
+     * Writes the fitted half back to manager_profile. Called after ingest.
+     *
+     * This is a readable snapshot for inspection, not a cache the engine reads —
+     * fitting is cheap at this data size and a cache would only add staleness. The
+     * load-bearing column is manual_json, which this never touches.
+     */
+    public int persistFitted(Sport sport) {
+        Fit fit = fit(sport);
+        fit.profiles().forEach((managerId, p) -> {
+            Map<String, Object> feature = new LinkedHashMap<>();
+            feature.put("reachBias", round3(p.reachBias()));
+            feature.put("positionalTilt", p.positionalTilt());
+            feature.put("picksScored", p.picksScored());
+            feature.put("provenance", p.provenance().name());
+            profiles.saveFitted(managerId, sport, JsonUtil.write(feature), p.draftsObserved());
+        });
+        log.info("persisted {} fitted profiles", fit.profiles().size());
+        return fit.profiles().size();
+    }
+
+    public void setManual(long managerId, Sport sport, ManualTendencies manual) {
+        profiles.saveManual(managerId, sport, manual);
+        log.info("manual tendencies set for manager {}: {}", managerId, manual);
+    }
+
+    private static double round3(double d) {
+        return Math.round(d * 1000.0) / 1000.0;
     }
 
     private Map<Position, Double> fitTilt(Map<Position, Integer> mine,
@@ -124,9 +179,8 @@ public class ProfileService {
             double leagueShare = league.getOrDefault(pos, 0) / (double) leagueTotal;
             if (leagueShare <= 0) continue;
             double myShare = mine.getOrDefault(pos, 0) / (double) myTotal;
-            double rawRatio = myShare / leagueShare;
             // Shrink the ratio toward 1.0 (= drafts like the room does).
-            tilt.put(pos, shrinkage.shrink(rawRatio, 1.0, draftsObserved));
+            tilt.put(pos, shrinkage.shrink(myShare / leagueShare, 1.0, draftsObserved));
         }
         return tilt;
     }

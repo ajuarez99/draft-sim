@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.ManagerProfile;
+import com.ballknowers.draftsim.profile.Provenance;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.store.*;
@@ -113,30 +114,41 @@ public class SimulationService {
     private SimulationResult.Confidence buildConfidence(Map<Integer, ManagerProfile> bySlot,
                                                         ProfileService.Fit fit,
                                                         LeagueSettings settings) {
-        int withHistory = (int) bySlot.values().stream().filter(p -> p.picksScored() > 0).count();
-        int maxDrafts = bySlot.values().stream().mapToInt(ManagerProfile::draftsObserved).max().orElse(0);
+        var seats = bySlot.values();
+        int withHistory = (int) seats.stream()
+                .filter(p -> p.provenance() == Provenance.FITTED || p.provenance() == Provenance.BLENDED)
+                .count();
+        int stated = (int) seats.stream().filter(p -> p.provenance() == Provenance.STATED).count();
+        int neutral = (int) seats.stream().filter(p -> p.provenance() == Provenance.NEUTRAL).count();
+        int maxDrafts = seats.stream().mapToInt(ManagerProfile::draftsObserved).max().orElse(0);
 
         List<String> caveats = new ArrayList<>();
         caveats.add("Board is Sleeper search_rank blended with observed draft order at weight "
                 + boardCfg.observedWeight() + ". Neither input is a true 14-team PPR ADP.");
         caveats.add("Scoring weights in weights.yml are hand-set, not fit to data.");
-        if (withHistory == 0) {
-            caveats.add("No seat in this draft has scoreable history. Every manager is running the "
-                    + "league-average model, so these boards show how drafters behave in general, "
-                    + "not how these specific people draft.");
-        } else if (withHistory < settings.teams()) {
-            caveats.add(withHistory + " of " + settings.teams() + " seats have any history. The rest "
-                    + "are the league-average drafter.");
+
+        if (stated > 0) {
+            caveats.add(stated + " of " + settings.teams() + " seats are running on tendencies you "
+                    + "entered by hand, with no draft history behind them. Those seats behave the way "
+                    + "you said they would, which is a statement about your judgement rather than "
+                    + "evidence about them.");
+        }
+        if (neutral == settings.teams()) {
+            caveats.add("No seat has history or stated tendencies. Every manager is the league-average "
+                    + "drafter, so this shows how drafters behave in general, not how these people draft.");
+        } else if (neutral > 0) {
+            caveats.add(neutral + " of " + settings.teams() + " seats have neither history nor stated "
+                    + "tendencies and are running the league-average model.");
         }
         if (maxDrafts > 0 && maxDrafts <= 2) {
             caveats.add("At most " + maxDrafts + " draft(s) observed per manager. After shrinkage each "
-                    + "profile is mostly the league average; treat per-manager differences as a hint.");
+                    + "fitted profile stays close to its prior; treat per-manager differences as a hint.");
         }
         caveats.add("Nothing here has been backtested. The probabilities are internally consistent, "
                 + "which is not the same as being calibrated.");
 
         return new SimulationResult.Confidence(
-                maxDrafts, fit.scoreablePicks(), withHistory, settings.teams(),
+                maxDrafts, fit.scoreablePicks(), withHistory, stated, neutral, settings.teams(),
                 "sleeper_search_rank + observed drafts (blend)", caveats);
     }
 }

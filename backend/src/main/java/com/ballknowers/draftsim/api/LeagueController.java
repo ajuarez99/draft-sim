@@ -45,13 +45,18 @@ public class LeagueController {
         draft.get().slotToManager().forEach((slot, managerId) -> {
             long id = ((Number) managerId).longValue();
             ManagerProfile p = fit.profiles().getOrDefault(id, ManagerProfile.neutral(id, "seat " + slot));
-            seats.add(new LinkedHashMap<>(Map.of(
-                    "slot", Integer.parseInt(slot),
-                    "manager", p.displayName(),
-                    "reachBias", round2(p.reachBias()),
-                    "positionalTilt", p.positionalTilt(),
-                    "draftsObserved", p.draftsObserved(),
-                    "picksScored", p.picksScored())));
+            Map<String, Object> seat = new LinkedHashMap<>();
+            seat.put("slot", Integer.parseInt(slot));
+            seat.put("managerId", p.managerId());
+            seat.put("manager", p.displayName());
+            seat.put("provenance", p.provenance().name());
+            seat.put("reachBias", round2(p.reachBias()));
+            seat.put("unpredictability", p.unpredictability());
+            seat.put("positionalTilt", p.positionalTilt());
+            seat.put("note", p.note());
+            seat.put("draftsObserved", p.draftsObserved());
+            seat.put("picksScored", p.picksScored());
+            seats.add(seat);
         });
         seats.sort(Comparator.comparingInt(s -> (Integer) s.get("slot")));
 

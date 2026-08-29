@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.engine;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.profile.ManagerProfile;
+import com.ballknowers.draftsim.profile.Provenance;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.sport.FootballRules;
 import org.junit.jupiter.api.Test;
@@ -157,6 +158,50 @@ class DraftSimulatorTest {
         // adpScale, so even a cold run does not pin a single player. That is a
         // property of adpScale, not a bug -- turn adpScale down to sharpen it.
         assertTrue(cold.size() <= 10, "cold runs should concentrate, got " + cold.size());
+    }
+
+    private static DraftContext ctxWithChaosSeat(int chaosSlot, double multiplier) {
+        LeagueSettings settings = new LeagueSettings(14, 15, SLOTS, 1.0);
+        Map<Integer, ManagerProfile> profiles = new HashMap<>();
+        for (int s = 1; s <= 14; s++) {
+            profiles.put(s, s == chaosSlot
+                    ? new ManagerProfile(s, "chaos", 0.0, Map.of(), multiplier, null, 0, 0, Provenance.STATED)
+                    : ManagerProfile.neutral(s, "seat " + s));
+        }
+        return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(),
+                new FootballRules(new ScoringProperties(CFG)), CFG, List.of(), Map.of());
+    }
+
+    private static int distinctPickAt(DraftContext c, double t, int pickNo) {
+        var scorer = new PickScorer(CFG, c.rules(), c.priors());
+        Set<Long> seen = new HashSet<>();
+        for (int i = 0; i < 60; i++) {
+            seen.add(new DraftSimulator(c, scorer, t, i).run(new int[]{11}, 5).picked()[pickNo]);
+        }
+        return seen.size();
+    }
+
+    @Test
+    void anUnpredictableSeatVariesMoreAtItsOwnPick() {
+        int calm = distinctPickAt(ctxWithChaosSeat(11, 1.0), 0.4, 11);
+        int wild = distinctPickAt(ctxWithChaosSeat(11, 4.0), 0.4, 11);
+        assertTrue(wild > calm, "chaos seat should spread its own pick (" + wild + " vs " + calm + ")");
+    }
+
+    @Test
+    void oneChaoticSeatDoesNotDisturbTheOthers() {
+        // pick 1 belongs to slot 1; slot 11's multiplier must not reach it
+        assertEquals(distinctPickAt(ctxWithChaosSeat(11, 1.0), 0.4, 1),
+                distinctPickAt(ctxWithChaosSeat(11, 4.0), 0.4, 1));
+    }
+
+    /**
+     * The whole reason unpredictability is a multiplier rather than an absolute:
+     * the global chaos slider has to keep its meaning at both ends.
+     */
+    @Test
+    void temperatureZeroStaysModalEvenForAChaosSeat() {
+        assertEquals(1, distinctPickAt(ctxWithChaosSeat(11, 5.0), 0.0, 11));
     }
 
     @Test

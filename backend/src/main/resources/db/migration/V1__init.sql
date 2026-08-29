@@ -84,11 +84,22 @@ create table draft_pick (
 create index draft_pick_manager_idx on draft_pick (manager_id);
 create index draft_pick_draft_idx on draft_pick (draft_id, pick_no);
 
+-- Two kinds of knowledge about a manager, deliberately kept in separate columns
+-- so neither can clobber the other:
+--
+--   feature_json  FITTED from draft history. Written only by profile fitting.
+--   manual_json   STATED by the user. Written only through the API.
+--
+-- With one or two drafts of history a fitted estimate is mostly noise, while the
+-- user genuinely knows these people. manual_json is treated as the prior that
+-- shrinkage pulls toward, so a seat with no history uses the stated value exactly
+-- and a seat with history blends toward what actually happened.
 create table manager_profile (
     id               bigserial primary key,
     manager_id       bigint not null references manager (id) on delete cascade,
     sport            text   not null,
     feature_json     jsonb  not null default '{}'::jsonb,
+    manual_json      jsonb  not null default '{}'::jsonb,
     -- surfaced in the API so the UI can be honest about how thin this is
     drafts_observed  int    not null default 0,
     updated_at       timestamptz not null default now(),

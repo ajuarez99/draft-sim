@@ -106,16 +106,25 @@ public final class DraftSimulator {
             return available.isEmpty() ? null : available.getFirst();
         }
 
+        var profile = ctx.profileFor(slot);
         double[] scores = new double[candidates.size()];
         for (int i = 0; i < candidates.size(); i++) {
             scores[i] = scorer.score(candidates.get(i), pickNo, round, roster,
-                    ctx.profileFor(slot), ctx.settings(), recent);
+                    profile, ctx.settings(), recent);
         }
-        return candidates.get(sample(scores));
+        // Per-seat unpredictability is a MULTIPLIER on the run temperature, not a
+        // replacement for it. That keeps the global chaos slider meaningful: at
+        // temperature 0 the board is still the modal board, however erratic a seat
+        // is said to be.
+        return candidates.get(sample(scores, temperature * profile.unpredictability()));
     }
 
-    /** Softmax over scores at the configured temperature; T at or below ~0 is argmax. */
+    /** Softmax over scores at the given temperature; T at or below ~0 is argmax. */
     int sample(double[] scores) {
+        return sample(scores, temperature);
+    }
+
+    int sample(double[] scores, double temperature) {
         if (temperature <= 1e-6) {
             int best = 0;
             for (int i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;

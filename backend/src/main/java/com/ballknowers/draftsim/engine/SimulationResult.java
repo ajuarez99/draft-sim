@@ -39,6 +39,10 @@ public record SimulationResult(
             int draftsObserved,
             int scoreablePicks,
             int managersWithHistory,
+            /** Seats running on what the user typed, with no history behind it. */
+            int managersStated,
+            /** Seats with neither history nor a stated opinion: the league average. */
+            int managersNeutral,
             int totalSeats,
             String boardSource,
             List<String> caveats) {}
