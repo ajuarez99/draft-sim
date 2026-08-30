@@ -39,4 +39,14 @@ public class ManagerRepository {
                 .list().stream()
                 .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
+
+    /** Keyed on Sleeper user id, same shape as {@link PlayerRepository#idsBySleeperId}. */
+    public Map<String, Long> idsBySleeperUserId() {
+        Map<String, Long> out = new java.util.HashMap<>();
+        db.sql("select sleeper_user_id, id from manager")
+                .query((rs, i) -> Map.entry(rs.getString(1), rs.getLong(2)))
+                .list()
+                .forEach(e -> out.put(e.getKey(), e.getValue()));
+        return out;
+    }
 }

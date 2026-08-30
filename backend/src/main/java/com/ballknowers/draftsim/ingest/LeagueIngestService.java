@@ -125,24 +125,7 @@ public class LeagueIngestService {
 
         List<DraftRepository.PickRow> rows = new ArrayList<>(raw.size());
         for (Map<String, Object> p : raw) {
-            String sleeperPlayerId = str(p.get("player_id"));
-            int slot = asInt(p.get("draft_slot"), 0);
-
-            // picked_by is empty on autopicked picks; the slot is authoritative.
-            String pickedBy = str(p.get("picked_by"));
-            Long managerId = (pickedBy != null && !pickedBy.isBlank())
-                    ? managerByUserId.get(pickedBy)
-                    : slotLookup.get(slot);
-            if (managerId == null) managerId = slotLookup.get(slot);
-
-            rows.add(new DraftRepository.PickRow(
-                    id,
-                    asInt(p.get("pick_no"), 0),
-                    asInt(p.get("round"), 0),
-                    slot,
-                    managerId,
-                    sleeperPlayerId == null ? null : playerIds.get(sleeperPlayerId),
-                    null));   // adp_at_time filled in by BoardService after the board exists
+            rows.add(PickMapper.toPickRow(id, p, managerByUserId, slotLookup, playerIds));
         }
         drafts.replacePicks(id, rows);
         return rows.size();

@@ -119,21 +119,9 @@ export default function App() {
         </div>
       )}
 
-      {result && <ConfidenceNote c={result.confidence} />}
-
-      {result && (
-        <AvailabilityPanel
-          availability={result.availability}
-          myPicks={result.myPicks}
-          teams={result.teams}
-        />
-      )}
-
       {seatsDirty && result && (
         <div className="error">Seats changed since this simulation ran — re-run to refresh the board.</div>
       )}
-
-      {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
 
       {result && (
         <section className="panel">
@@ -170,6 +158,18 @@ export default function App() {
           </p>
         </section>
       )}
+
+      {result && <ConfidenceNote c={result.confidence} />}
+
+      {result && (
+        <AvailabilityPanel
+          availability={result.availability}
+          myPicks={result.myPicks}
+          teams={result.teams}
+        />
+      )}
+
+      {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
     </div>
   )
 }

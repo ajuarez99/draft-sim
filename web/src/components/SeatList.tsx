@@ -36,6 +36,12 @@ function behaviour(s: Seat) {
   return [...bits, ...tilts].join(' · ')
 }
 
+function hueFor(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360
+  return h
+}
+
 function footnote(s: Seat) {
   switch (s.provenance) {
     case 'NEUTRAL':
@@ -67,6 +73,10 @@ function SeatCard({
   const [note, setNote] = useState('')
 
   const label = LABEL[s.provenance]
+  const hue = hueFor(String(s.managerId))
+  const avatarStyle = isMe
+    ? { background: 'var(--crimson)', color: 'var(--bg)' }
+    : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
 
   async function startEdit() {
     setEditing(true)
@@ -126,7 +136,8 @@ function SeatCard({
     <div className={`seat ${label.className}${isMe ? ' me' : ''}`}>
       <div className="seat-head">
         <span className="slot">{s.slot}</span>
-        <span className="who">{s.manager}</span>
+        <span className="avatar" style={avatarStyle}>{s.manager.trim().charAt(0).toUpperCase()}</span>
+        <span className={`who${isMe ? ' mine-name' : ''}`}>{s.manager}</span>
         <span className="seat-head-right">
           {label.badge && <span className={`prov ${label.className}`}>{label.badge}</span>}
           <button className="seat-edit" onClick={() => (editing ? setEditing(false) : startEdit())}>

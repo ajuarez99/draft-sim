@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
+import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
@@ -19,13 +20,15 @@ public class LeagueController {
     private final DraftRepository drafts;
     private final ProfileService profiles;
     private final BoardService boards;
+    private final LiveDraftPoller poller;
 
     public LeagueController(LeagueRepository leagues, DraftRepository drafts,
-                            ProfileService profiles, BoardService boards) {
+                            ProfileService profiles, BoardService boards, LiveDraftPoller poller) {
         this.leagues = leagues;
         this.drafts = drafts;
         this.profiles = profiles;
         this.boards = boards;
+        this.poller = poller;
     }
 
     @GetMapping("/leagues")
@@ -66,6 +69,17 @@ public class LeagueController {
                 "rounds", draft.get().rounds(),
                 "status", String.valueOf(draft.get().status()),
                 "seats", seats));
+    }
+
+    /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */
+    @PostMapping("/drafts/{sleeperDraftId}/track")
+    public ResponseEntity<?> track(@PathVariable String sleeperDraftId) {
+        Optional<DraftRepository.DraftRow> draft = drafts.bySleeperId(sleeperDraftId);
+        if (draft.isEmpty()) return ResponseEntity.notFound().build();
+        LiveDraftPoller.TrackResult r = poller.track(draft.get());
+        return ResponseEntity.ok(Map.of(
+                "draftId", sleeperDraftId, "tracking", true,
+                "alreadyTracking", !r.started(), "status", r.status()));
     }
 
     /** What the engine is valuing against, so it can be eyeballed before trusting a sim. */

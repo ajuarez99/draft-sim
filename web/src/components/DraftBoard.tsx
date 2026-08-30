@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { PredictedPick } from '../api'
 
 type Props = {
@@ -19,66 +20,66 @@ export default function DraftBoard({ board, teams, rounds, myPicks, revealedThro
 
   return (
     <div className="board-scroll">
-      <table className="board">
-        <thead>
-          <tr>
-            <th className="rnd">R</th>
-            {Array.from({ length: teams }, (_, i) => (
-              <th key={i}>{i + 1}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: rounds }, (_, r) => {
-            const round = r + 1
-            return (
-              <tr key={round}>
-                <th className="rnd">{round}</th>
-                {Array.from({ length: teams }, (_, s) => {
-                  const slot = s + 1
-                  // snake: even rounds run right to left
-                  const indexInRound = round % 2 === 1 ? slot : teams - slot + 1
-                  const pickNo = (round - 1) * teams + indexInRound
-                  const pick = byPick.get(pickNo)
-                  const hidden = revealedThrough !== undefined && pickNo > revealedThrough
-                  const visible = hidden ? undefined : pick
-                  const cls =
-                    'cell' +
-                    (mine.has(pickNo) ? ' mine' : '') +
-                    (visible && !visible.isModal ? ' uncertain' : '')
-                  return (
-                    <td
-                      key={slot}
-                      className={cls}
-                      title={
-                        visible
-                          ? `${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
-                            (visible.isModal
-                              ? ''
-                              : 'Not the most likely player here; the most likely one went earlier.\n') +
-                            visible.alternatives
-                              .map((a) => `${a.player.name} ${Math.round(a.probability * 100)}%`)
-                              .join('\n')
-                          : ''
-                      }
-                    >
-                      {visible ? (
-                        <>
-                          <span className={`pos ${visible.player.position}`}>{visible.player.position}</span>
-                          <span className="name">{visible.player.name}</span>
-                          <span className="prob">{Math.round(visible.probability * 100)}%</span>
-                        </>
-                      ) : (
-                        <span className="empty">—</span>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+      <div className="board" style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(84px, 1fr))` }}>
+        <div />
+        {Array.from({ length: teams }, (_, i) => (
+          <div key={i} className="col-head">{i + 1}</div>
+        ))}
+        {Array.from({ length: rounds }, (_, r) => {
+          const round = r + 1
+          return (
+            <Fragment key={round}>
+              <div className="rnd cond">R{round}</div>
+              {Array.from({ length: teams }, (_, s) => {
+                const slot = s + 1
+                // snake: even rounds run right to left
+                const indexInRound = round % 2 === 1 ? slot : teams - slot + 1
+                const pickNo = (round - 1) * teams + indexInRound
+                const pick = byPick.get(pickNo)
+                const hidden = revealedThrough !== undefined && pickNo > revealedThrough
+                const visible = hidden ? undefined : pick
+                const cls =
+                  'cell' +
+                  (mine.has(pickNo) ? ' mine' : '') +
+                  (visible && !visible.isModal ? ' uncertain' : '')
+                return (
+                  <div
+                    key={slot}
+                    className={cls}
+                    title={
+                      visible
+                        ? `${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
+                          (visible.isModal
+                            ? ''
+                            : 'Not the most likely player here; the most likely one went earlier.\n') +
+                          visible.alternatives
+                            .map((a) => `${a.player.name} ${Math.round(a.probability * 100)}%`)
+                            .join('\n')
+                        : ''
+                    }
+                  >
+                    {visible ? (
+                      <>
+                        <span className={`pos ${visible.player.position}`}>{visible.player.position}</span>
+                        <span className="name">{visible.player.name}</span>
+                        <div className="meta">
+                          <span className="team-code mono">{visible.player.team ?? '—'}</span>
+                          <span className="prob mono">{Math.round(visible.probability * 100)}%</span>
+                        </div>
+                        <div className="bar-track">
+                          <div className="bar-fill" style={{ width: `${Math.round(visible.probability * 100)}%` }} />
+                        </div>
+                      </>
+                    ) : (
+                      <span className="empty">—</span>
+                    )}
+                  </div>
+                )
+              })}
+            </Fragment>
+          )
+        })}
+      </div>
     </div>
   )
 }

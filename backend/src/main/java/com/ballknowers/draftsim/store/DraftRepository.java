@@ -54,16 +54,44 @@ public class DraftRepository {
                 insert into draft_pick (draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time)
                 values (?, ?, ?, ?, ?, ?, ?)
                 """,
-                picks, 500,
-                (ps, p) -> {
-                    ps.setLong(1, p.draftId());
-                    ps.setInt(2, p.pickNo());
-                    ps.setInt(3, p.round());
-                    ps.setInt(4, p.draftSlot());
-                    if (p.managerId() == null) ps.setNull(5, Types.BIGINT); else ps.setLong(5, p.managerId());
-                    if (p.playerId() == null) ps.setNull(6, Types.BIGINT); else ps.setLong(6, p.playerId());
-                    if (p.adpAtTime() == null) ps.setNull(7, Types.NUMERIC); else ps.setDouble(7, p.adpAtTime());
-                });
+                picks, 500, DraftRepository::bindPickRow);
+    }
+
+    /**
+     * Re-upserts the full pick list every call — safe to call every poll tick.
+     * adp_at_time is coalesced, not overwritten: a freshly-observed pick always
+     * carries adp_at_time = null (BoardService backfills it later), and a naive
+     * `= excluded.adp_at_time` would null out that backfill on every subsequent
+     * tick for the rest of the draft.
+     */
+    public void upsertPicks(long draftId, List<PickRow> picks) {
+        if (picks == null || picks.isEmpty()) return;
+        jdbc.batchUpdate("""
+                insert into draft_pick (draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time)
+                values (?, ?, ?, ?, ?, ?, ?)
+                on conflict (draft_id, pick_no) do update set
+                    round = excluded.round,
+                    draft_slot = excluded.draft_slot,
+                    manager_id = excluded.manager_id,
+                    player_id = excluded.player_id,
+                    adp_at_time = coalesce(draft_pick.adp_at_time, excluded.adp_at_time)
+                """,
+                picks, 500, DraftRepository::bindPickRow);
+    }
+
+    private static void bindPickRow(java.sql.PreparedStatement ps, PickRow p) throws java.sql.SQLException {
+        ps.setLong(1, p.draftId());
+        ps.setInt(2, p.pickNo());
+        ps.setInt(3, p.round());
+        ps.setInt(4, p.draftSlot());
+        if (p.managerId() == null) ps.setNull(5, Types.BIGINT); else ps.setLong(5, p.managerId());
+        if (p.playerId() == null) ps.setNull(6, Types.BIGINT); else ps.setLong(6, p.playerId());
+        if (p.adpAtTime() == null) ps.setNull(7, Types.NUMERIC); else ps.setDouble(7, p.adpAtTime());
+    }
+
+    /** Flips only status, without needing the full row this poller doesn't have on hand. */
+    public void updateStatus(long draftId, String status) {
+        jdbc.update("update draft set status = ? where id = ?", status, draftId);
     }
 
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,
