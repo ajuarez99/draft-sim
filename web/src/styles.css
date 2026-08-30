@@ -17,6 +17,8 @@
 
 * { box-sizing: border-box; }
 
+html, body, #root { height: 100%; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -28,10 +30,25 @@ body {
 .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
 
-.app { max-width: 1400px; margin: 0 auto; padding: 20px; }
+/*
+ * A Sleeper draft room fits on one screen: the board and the panels below it
+ * share a fixed budget of vertical space and scroll internally, rather than
+ * each growing to its natural content height and stacking into one long
+ * page. `.app` claims the viewport height; `.content`'s three bands
+ * (board / availability+confidence / seats) split what's left after the
+ * header and any alert banners, each with its own internal scroller.
+ * `min-height: 0` shows up at every level of that chain on purpose --
+ * without it a flex/grid child refuses to shrink below its content size and
+ * the inner `overflow: auto` never actually kicks in.
+ */
+.app {
+  height: 100vh; max-width: 1400px; margin: 0 auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
+}
 
-.top { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; margin-bottom: 16px; }
+.top { display: flex; align-items: flex-end; gap: 24px; flex-wrap: wrap; flex: 0 0 auto; }
 .top h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.top h1 a { color: inherit; text-decoration: none; }
 
 .controls { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; }
 .controls label { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -55,7 +72,7 @@ body {
 .error { background: #3a1d1d; border: 1px solid #6b2b2b; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
 
 .panel {
-  background: var(--panel); border-radius: 14px; padding: 18px 20px; margin-bottom: 20px;
+  background: var(--panel); border-radius: 14px; padding: 18px 20px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
 }
 .panel.warn { background: var(--warn); box-shadow: 0 1px 2px rgba(0,0,0,0.25); border: 1px solid #55492c; }
@@ -76,7 +93,26 @@ code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px;
 .chip:hover { border-color: var(--teal); color: var(--text); }
 .chip.on { background: var(--teal); border-color: var(--teal); color: var(--bg); }
 .chip.on:hover { color: var(--bg); }
+.chip.status-drafting { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+.chip.status-complete { background: var(--line); border-color: var(--line); color: var(--muted); }
 .depth { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-left: 10px; }
+
+/*
+ * A list of drafts to open, not a card grid -- there's one line of real
+ * content per row (league, season, size, status), so a row is the shape that
+ * matches it rather than padding each entry out into an empty-feeling card.
+ */
+.draft-list { display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 10px; overflow: hidden; }
+.draft-row {
+  display: flex; align-items: center; gap: 16px; padding: 12px 14px;
+  background: var(--panel); color: inherit; text-decoration: none;
+  transition: background 100ms ease;
+}
+.draft-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.draft-row-league { font-weight: 600; flex: 1; }
+.draft-row .chip { pointer-events: none; margin-left: auto; }
+
+.add-draft .controls { margin-top: 6px; }
 
 .pos { display: inline-block; min-width: 24px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 7px; margin-right: 6px; letter-spacing: 0.02em; }
 .pos.QB { background: color-mix(in oklch, var(--qb) 24%, var(--panel)); color: var(--qb); }
@@ -105,15 +141,15 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
  * hairline grid: cells never set their own border, so there's never a
  * doubled line at a shared edge.
  */
-.board-scroll { overflow-x: auto; }
 .board {
   display: grid; gap: 1px; background: var(--line);
   border-radius: 10px; overflow: hidden; font-size: 11px;
 }
-.board .corner { background: var(--panel); }
+.board .corner { background: var(--panel); position: sticky; top: 0; left: 0; z-index: 2; }
 .board .col-head {
   background: var(--panel); display: flex; flex-direction: column; align-items: center;
   gap: 4px; padding: 8px 2px; text-align: center;
+  position: sticky; top: 0; z-index: 1;
 }
 .board .col-head-name {
   font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -121,6 +157,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .rnd {
   background: var(--panel); display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
+  position: sticky; left: 0; z-index: 1;
 }
 .board .cell {
   position: relative; background: var(--panel); padding: 6px 7px 7px; min-width: 0;
@@ -140,15 +177,30 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .bar-fill { height: 100%; background: var(--teal); border-radius: 1px; transition: width 200ms ease; }
 .board .empty { color: var(--muted); }
 
-.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
-.workspace-side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.workspace-side .panel { margin-bottom: 0; }
-.workspace-main { min-width: 0; }
+.panel-body { flex: 1; min-height: 0; overflow: auto; }
+
+.content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+
+.board-panel { flex: 3 1 0; min-height: 0; display: flex; }
+.board-panel > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.lower-grid {
+  flex: 2 1 0; min-height: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr); gap: 16px;
+}
+.lower-grid > .panel:first-child { min-height: 0; display: flex; flex-direction: column; }
+.lower-grid > .panel:last-child { align-self: start; }
+
+.seats-panel { flex: 2 1 0; min-height: 0; display: flex; }
+.seats-panel > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
 @media (max-width: 900px) {
-  .workspace { grid-template-columns: 1fr; }
+  .lower-grid { grid-template-columns: 1fr; grid-template-rows: auto auto; }
 }
 
-.seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.avail-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+
+.seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; align-content: start; }
 .seat {
   border: 1px solid var(--line); border-radius: 12px; padding: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.22);

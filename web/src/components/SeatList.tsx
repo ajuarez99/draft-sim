@@ -218,7 +218,7 @@ export default function SeatList({
   return (
     <section className="panel">
       <h2>Seats</h2>
-      <div className="seats">
+      <div className="seats panel-body">
         {seats.map((s) => (
           <SeatCard key={s.slot} s={s} isMe={s.slot === mySlot} onChanged={onChanged} />
         ))}

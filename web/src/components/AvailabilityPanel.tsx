@@ -65,39 +65,41 @@ export default function AvailabilityPanel({ availability, myPicks, teams }: Prop
         </div>
       </header>
 
-      <table className="avail">
-        <thead>
-          <tr>
-            <th className="player-col">Player</th>
-            <th>Board</th>
-            {picks.map((p) => (
-              <th key={p}>{label(p)}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.player.id}>
-              <td className="player-col">
-                <span className={`pos ${r.player.position}`}>{r.player.position}</span>
-                {r.player.name}
-                <span className="team">{r.player.team}</span>
-              </td>
-              <td className="num">{Math.round(r.player.adp)}</td>
-              {picks.map((p) => {
-                const v = r.survivalByPick[String(p)] ?? 0
-                return (
-                  <td key={p} className="bar-cell">
-                    <div className="bar" style={{ width: `${Math.round(v * 100)}%` }} />
-                    <span className="bar-label">{Math.round(v * 100)}%</span>
-                  </td>
-                )
-              })}
+      <div className="avail-scroll panel-body">
+        <table className="avail">
+          <thead>
+            <tr>
+              <th className="player-col">Player</th>
+              <th>Board</th>
+              {picks.map((p) => (
+                <th key={p}>{label(p)}</th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {rows.length === 0 && <p className="muted">No players survive to these picks in any run.</p>}
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.player.id}>
+                <td className="player-col">
+                  <span className={`pos ${r.player.position}`}>{r.player.position}</span>
+                  {r.player.name}
+                  <span className="team">{r.player.team}</span>
+                </td>
+                <td className="num">{Math.round(r.player.adp)}</td>
+                {picks.map((p) => {
+                  const v = r.survivalByPick[String(p)] ?? 0
+                  return (
+                    <td key={p} className="bar-cell">
+                      <div className="bar" style={{ width: `${Math.round(v * 100)}%` }} />
+                      <span className="bar-label">{Math.round(v * 100)}%</span>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && <p className="muted">No players survive to these picks in any run.</p>}
+      </div>
     </section>
   )
 }

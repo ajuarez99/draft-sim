@@ -97,6 +97,24 @@ async function json<T>(res: Response): Promise<T> {
 export const getSeats = (draftId: string) =>
   fetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
 
+// Mirrors DraftRepository.DraftSummary (store/DraftRepository.java). Backs the picker screen.
+export type DraftSummary = {
+  id: number
+  sleeperDraftId: string
+  leagueId: number
+  leagueName: string
+  season: number
+  teams: number
+  rounds: number
+  status: string
+  startTime: string | null
+}
+
+export const getDrafts = () => fetch('/api/drafts').then(json<DraftSummary[]>)
+
+export const ingestLeague = (sleeperLeagueId: string) =>
+  fetch(`/api/ingest/all/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+
 export type ManualTendencies = {
   reachBias: number | null
   unpredictability: number | null

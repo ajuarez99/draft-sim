@@ -36,6 +36,12 @@ public class LeagueController {
         return leagues.all();
     }
 
+    /** Every draft in the DB, newest first. Backs the app-shell picker screen. */
+    @GetMapping("/drafts")
+    public List<DraftRepository.DraftSummary> drafts() {
+        return drafts.allWithLeague();
+    }
+
     /** Seats with their profiles. draftsObserved is here so the UI can be honest. */
     @GetMapping("/drafts/{sleeperDraftId}/seats")
     public ResponseEntity<?> seats(@PathVariable String sleeperDraftId) {

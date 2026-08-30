@@ -22,7 +22,7 @@ export default function DraftBoard({ board, teams, rounds, myPicks, revealedThro
   const seatBySlot = new Map((seats ?? []).map((s) => [s.slot, s]))
 
   return (
-    <div className="board-scroll">
+    <div className="board-scroll panel-body">
       <div className="board" style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(84px, 1fr))` }}>
         <div className="corner" />
         {Array.from({ length: teams }, (_, i) => {
