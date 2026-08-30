@@ -61,7 +61,8 @@ export default function DraftPicker() {
       <section className="panel add-draft">
         <h2>Add a draft</h2>
         <p className="muted small">
-          Paste a Sleeper league ID to ingest its players, board, and draft history.
+          Paste a Sleeper league ID to add its draft history. Run a full ingest separately
+          first if the player pool and board haven't been loaded yet.
         </p>
         <div className="controls">
           <label>

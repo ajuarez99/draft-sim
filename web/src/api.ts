@@ -112,8 +112,10 @@ export type DraftSummary = {
 
 export const getDrafts = () => fetch('/api/drafts').then(json<DraftSummary[]>)
 
+// Scoped to the one league being added -- unlike /api/ingest/all, this doesn't
+// re-download the entire player pool or rebuild the global board/profiles.
 export const ingestLeague = (sleeperLeagueId: string) =>
-  fetch(`/api/ingest/all/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  fetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export type ManualTendencies = {
   reachBias: number | null

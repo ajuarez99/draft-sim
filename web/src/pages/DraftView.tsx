@@ -8,12 +8,15 @@ import ConfidenceNote from '../components/ConfidenceNote'
 import RevealScrubber from '../components/RevealScrubber'
 import { useRevealedBoard } from '../useRevealedBoard'
 
-const DEFAULT_SLOT = 11
+// Every league, of any size, has a slot 1 -- unlike the single-league app's old
+// hardcoded 11, this stays a valid seat no matter which draft the picker opens.
+const DEFAULT_SLOT = 1
 
 export default function DraftView() {
   const { draftId = '' } = useParams<{ draftId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
-  const mySlot = Number(searchParams.get('slot') ?? DEFAULT_SLOT)
+  const slotParam = searchParams.get('slot')
+  const mySlot = slotParam ? Number(slotParam) : DEFAULT_SLOT
 
   const [iterations, setIterations] = useState(2000)
   const [temperature, setTemperature] = useState(1.0)
@@ -42,11 +45,16 @@ export default function DraftView() {
   }, [draftId])
 
   function setMySlot(slot: number) {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev)
-      next.set('slot', String(slot))
-      return next
-    })
+    // replace: true -- otherwise every keystroke in the slot input pushes its own
+    // history entry, and Back steps through transient values instead of leaving.
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('slot', String(slot))
+        return next
+      },
+      { replace: true },
+    )
   }
 
   async function run() {
