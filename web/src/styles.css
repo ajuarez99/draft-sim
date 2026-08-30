@@ -97,27 +97,56 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .bar { position: absolute; inset: 6px auto 6px 8px; background: var(--teal); opacity: 0.28; border-radius: 3px; }
 .bar-label { position: relative; font-variant-numeric: tabular-nums; font-size: 12px; }
 
+/*
+ * Deliberately spreadsheet-like, not a wall of floating cards: a Sleeper draft
+ * room reads as a dense, contiguous grid with thin dividers and flat cells,
+ * highlighted only by a fill color -- not shadowed stat cards with gaps
+ * between them. The `gap: 1px` + container background is what draws the
+ * hairline grid: cells never set their own border, so there's never a
+ * doubled line at a shared edge.
+ */
 .board-scroll { overflow-x: auto; }
-.board { display: grid; gap: 7px; font-size: 11px; }
-.board .col-head { text-align: center; font-size: 10px; color: var(--muted); padding-bottom: 4px; }
-.board .rnd { display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
-.board .cell {
-  background: var(--panel); border-radius: 10px; padding: 9px; min-width: 0;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.28);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+.board {
+  display: grid; gap: 1px; background: var(--line);
+  border-radius: 10px; overflow: hidden; font-size: 11px;
 }
-.board .cell:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(0,0,0,0.4); }
+.board .corner { background: var(--panel); }
+.board .col-head {
+  background: var(--panel); display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 2px; text-align: center;
+}
+.board .col-head-name {
+  font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.board .rnd {
+  background: var(--panel); display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
+}
+.board .cell {
+  position: relative; background: var(--panel); padding: 6px 7px 7px; min-width: 0;
+  transition: background 100ms ease;
+}
+.board .cell:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.board .pickno { position: absolute; top: 4px; right: 6px; font-size: 8px; color: var(--muted); opacity: 0.7; }
 /* The most-voted player here went earlier, so this cell is a second choice. */
 .board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
-.board .cell.mine { box-shadow: 0 0 0 1.5px var(--crimson), 0 1px 2px rgba(0,0,0,0.28); }
-.board .cell.mine:hover { box-shadow: 0 0 0 1.5px var(--crimson), 0 5px 12px rgba(0,0,0,0.4); }
-.board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .cell.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson); }
+.board .cell.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
+.board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
 .board .meta { display: flex; justify-content: space-between; align-items: baseline; margin-top: 3px; gap: 6px; }
 .board .team-code { color: var(--muted); font-size: 9px; }
 .board .prob { color: var(--muted); font-size: 9px; }
 .board .bar-track { height: 2px; background: var(--line); margin-top: 6px; border-radius: 1px; overflow: hidden; }
 .board .bar-fill { height: 100%; background: var(--teal); border-radius: 1px; transition: width 200ms ease; }
 .board .empty { color: var(--muted); }
+
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.workspace-side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.workspace-side .panel { margin-bottom: 0; }
+.workspace-main { min-width: 0; }
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; }
+}
 
 .seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .seat {

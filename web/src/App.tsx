@@ -146,6 +146,7 @@ export default function App() {
             rounds={result.rounds}
             myPicks={result.myPicks}
             revealedThrough={reveal.revealedThrough}
+            seats={seats?.seats}
           />
         </section>
       )}
@@ -159,17 +160,21 @@ export default function App() {
         </section>
       )}
 
-      {result && <ConfidenceNote c={result.confidence} />}
-
-      {result && (
-        <AvailabilityPanel
-          availability={result.availability}
-          myPicks={result.myPicks}
-          teams={result.teams}
-        />
-      )}
-
-      {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
+      <div className="workspace">
+        <div className="workspace-main">
+          {result && (
+            <AvailabilityPanel
+              availability={result.availability}
+              myPicks={result.myPicks}
+              teams={result.teams}
+            />
+          )}
+        </div>
+        <aside className="workspace-side">
+          {result && <ConfidenceNote c={result.confidence} />}
+          {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
+        </aside>
+      </div>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { Fragment } from 'react'
-import type { PredictedPick } from '../api'
+import type { PredictedPick, Seat } from '../api'
+import { hueFor } from '../hue'
 
 type Props = {
   board: PredictedPick[]
@@ -7,6 +8,7 @@ type Props = {
   rounds: number
   myPicks: number[]
   revealedThrough?: number
+  seats?: Seat[]
 }
 
 /**
@@ -14,17 +16,28 @@ type Props = {
  * often it actually happened across the runs -- a cell at 22% is the model
  * telling you it has very little idea, and it should read that way.
  */
-export default function DraftBoard({ board, teams, rounds, myPicks, revealedThrough }: Props) {
+export default function DraftBoard({ board, teams, rounds, myPicks, revealedThrough, seats }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
+  const seatBySlot = new Map((seats ?? []).map((s) => [s.slot, s]))
 
   return (
     <div className="board-scroll">
       <div className="board" style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(84px, 1fr))` }}>
-        <div />
-        {Array.from({ length: teams }, (_, i) => (
-          <div key={i} className="col-head">{i + 1}</div>
-        ))}
+        <div className="corner" />
+        {Array.from({ length: teams }, (_, i) => {
+          const slot = i + 1
+          const seat = seatBySlot.get(slot)
+          const hue = seat ? hueFor(String(seat.managerId)) : hueFor(String(slot))
+          return (
+            <div key={i} className="col-head">
+              <span className="avatar" style={{ background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }}>
+                {seat ? seat.manager.trim().charAt(0).toUpperCase() : slot}
+              </span>
+              <span className="col-head-name mono">{seat ? seat.manager : slot}</span>
+            </div>
+          )
+        })}
         {Array.from({ length: rounds }, (_, r) => {
           const round = r + 1
           return (
@@ -58,6 +71,7 @@ export default function DraftBoard({ board, teams, rounds, myPicks, revealedThro
                         : ''
                     }
                   >
+                    <span className="pickno mono">{pickNo}</span>
                     {visible ? (
                       <>
                         <span className={`pos ${visible.player.position}`}>{visible.player.position}</span>

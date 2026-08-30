@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { getManagers, setTendencies, clearTendencies, type Seat, type Provenance } from '../api'
+import { hueFor } from '../hue'
 
 /**
  * One card per seat.
@@ -34,12 +35,6 @@ function behaviour(s: Seat) {
     .map(([pos, v]) => `${v > 1 ? 'leans' : 'fades'} ${pos}`)
 
   return [...bits, ...tilts].join(' · ')
-}
-
-function hueFor(seed: string) {
-  let h = 0
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360
-  return h
 }
 
 function footnote(s: Seat) {
