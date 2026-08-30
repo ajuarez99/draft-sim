@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    :root {
+      --bg: oklch(12% 0.01 240); --panel: oklch(17% 0.012 240); --line: oklch(26% 0.01 240);
+      --text: oklch(94% 0.005 240); --muted: oklch(60% 0.015 240); --accent: oklch(78% 0.15 175);
+      --qb: oklch(72% 0.13 20); --rb: oklch(72% 0.13 150); --wr: oklch(72% 0.13 230); --te: oklch(72% 0.13 300);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: var(--accent); } a:hover { color: oklch(85% 0.15 175); }
+    .avatar { width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; flex-shrink:0; }
+    .pill { border-radius:999px; padding:2px 9px; font-size:9px; font-weight:700; }
+  </style>
+</helmet>
+<div style="width:1440px; min-height:940px; background:var(--bg); padding:36px; box-sizing:border-box; display:flex; flex-direction:column; gap:24px;">
+
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:34px; height:34px; border-radius:10px; background:var(--accent); display:flex; align-items:center; justify-content:center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(15% 0.01 240)" stroke-width="2.4" stroke-linecap="round"><path d="M4 18 L10 10 L14 14 L20 6"/><path d="M15 6 L20 6 L20 11"/></svg>
+      </div>
+      <h1 style="margin:0; font-size:19px; font-weight:700;">Draft Room</h1>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span style="font-size:11px; color:var(--muted); background:var(--panel); border-radius:999px; padding:6px 14px;">2,000 sims</span>
+      <span style="font-size:11px; color:var(--muted); background:var(--panel); border-radius:999px; padding:6px 14px;">temp 0.85</span>
+      <span style="font-size:12px; font-weight:700; color:oklch(15% 0.01 240); background:var(--accent); border-radius:999px; padding:7px 18px;">Re-run</span>
+    </div>
+  </div>
+
+  <div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+      <span style="font-size:13px; font-weight:600; color:var(--muted);">Predicted board &middot; rounds 1&ndash;4 of 14</span>
+      <div style="display:flex; align-items:center; gap:6px;"><div class="avatar" style="background:var(--accent); color:oklch(15% 0.01 240); width:18px; height:18px; font-size:9px;">A</div><span style="font-size:11px; color:var(--muted);">that's you, slot 4</span></div>
+    </div>
+    <div style="display:grid; grid-template-columns:44px repeat(10, 1fr); gap:8px;">
+      <div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 20); color:oklch(85% 0.1 20); margin:0 auto 4px;">P</div><div style="font-size:9px; color:var(--muted);">Priya</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 60); color:oklch(85% 0.1 60); margin:0 auto 4px;">M</div><div style="font-size:9px; color:var(--muted);">Marcus</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 100); color:oklch(85% 0.1 100); margin:0 auto 4px;">W</div><div style="font-size:9px; color:var(--muted);">Wyatt</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:var(--accent); color:oklch(15% 0.01 240); margin:0 auto 4px; box-shadow:0 0 0 2px var(--accent), 0 0 0 4px var(--bg);">A</div><div style="font-size:9px; color:var(--accent); font-weight:700;">Allan</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 190); color:oklch(85% 0.1 190); margin:0 auto 4px;">D</div><div style="font-size:9px; color:var(--muted);">Dee</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 230); color:oklch(85% 0.1 230); margin:0 auto 4px;">T</div><div style="font-size:9px; color:var(--muted);">Theo</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 270); color:oklch(85% 0.1 270); margin:0 auto 4px;">N</div><div style="font-size:9px; color:var(--muted);">Nadia</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 310); color:oklch(85% 0.1 310); margin:0 auto 4px;">S</div><div style="font-size:9px; color:var(--muted);">Sam K.</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 350); color:oklch(85% 0.1 350); margin:0 auto 4px;">J</div><div style="font-size:9px; color:var(--muted);">Jon</div></div>
+      <div style="text-align:center;"><div class="avatar" style="background:oklch(30% 0.03 30); color:oklch(85% 0.1 30); margin:0 auto 4px;">R</div><div style="font-size:9px; color:var(--muted);">Ruiz</div></div>
+
+      <div style="display:flex; align-items:center; justify-content:center;"><span style="font-size:11px; font-weight:700; color:var(--muted);">R1</span></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Ja'Marr Chase</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">CIN &middot; 71%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Bijan Robinson</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">ATL &middot; 64%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">CeeDee Lamb</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">DAL &middot; 69%</div></div>
+      <div style="background:oklch(20% 0.05 175); border-radius:12px; padding:9px; box-shadow:0 0 0 1.5px var(--accent);"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Justin Jefferson</div><div style="font-size:10px; color:var(--accent); margin-top:2px; font-weight:600;">MIN &middot; 58%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Christian McCaffrey</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">SF &middot; 73%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Breece Hall</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">NYJ &middot; 34%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Amon-Ra St. Brown</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">DET &middot; 61%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Puka Nacua</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">LAR &middot; 55%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Jahmyr Gibbs</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">DET &middot; 29%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Malik Nabers</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">NYG &middot; 62%</div></div>
+
+      <div style="display:flex; align-items:center; justify-content:center;"><span style="font-size:11px; font-weight:700; color:var(--muted);">R2</span></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 300); color:var(--te);">TE</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Brock Bowers</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">LV &middot; 64%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 300); color:var(--te);">TE</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Trey McBride</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">ARI &middot; 35%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Josh Jacobs</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">GB &middot; 59%</div></div>
+      <div style="background:oklch(20% 0.05 175); border-radius:12px; padding:9px; box-shadow:0 0 0 1.5px var(--accent);"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Bucky Irving</div><div style="font-size:10px; color:var(--accent); margin-top:2px; font-weight:600;">TB &middot; 66%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">A.J. Brown</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">PHI &middot; 38%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Drake London</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">ATL &middot; 52%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Brian Thomas Jr.</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">JAX &middot; 60%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Ashton Jeanty</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">LV &middot; 31%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">De'Von Achane</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">MIA &middot; 63%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Nico Collins</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">HOU &middot; 57%</div></div>
+
+      <div style="display:flex; align-items:center; justify-content:center;"><span style="font-size:11px; font-weight:700; color:var(--muted);">R3</span></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Kyren Williams</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">LAR &middot; 56%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Jonathan Taylor</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">IND &middot; 60%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Chase Brown</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">CIN &middot; 33%</div></div>
+      <div style="background:oklch(20% 0.05 175); border-radius:12px; padding:9px; box-shadow:0 0 0 1.5px var(--accent);"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Ladd McConkey</div><div style="font-size:10px; color:var(--accent); margin-top:2px; font-weight:600;">LAC &middot; 71%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Tyreek Hill</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">MIA &middot; 65%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Davante Adams</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">LAR &middot; 58%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Rome Odunze</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">CHI &middot; 30%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">James Cook</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">BUF &middot; 62%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Zay Flowers</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">BAL &middot; 54%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 300); color:var(--te);">TE</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Sam LaPorta</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">DET &middot; 67%</div></div>
+
+      <div style="display:flex; align-items:center; justify-content:center;"><span style="font-size:11px; font-weight:700; color:var(--muted);">R4</span></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 20); color:var(--qb);">QB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Lamar Jackson</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">BAL &middot; 65%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 20); color:var(--qb);">QB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Patrick Mahomes</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">KC &middot; 28%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Alvin Kamara</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">NO &middot; 60%</div></div>
+      <div style="background:oklch(20% 0.05 175); border-radius:12px; padding:9px; box-shadow:0 0 0 1.5px var(--accent);"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">George Pickens</div><div style="font-size:10px; color:var(--accent); margin-top:2px; font-weight:600;">DAL &middot; 69%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Joe Mixon</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">HOU &middot; 63%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 20); color:var(--qb);">QB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Jayden Daniels</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">WAS &middot; 32%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Jaylen Waddle</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">MIA &middot; 56%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 150); color:var(--rb);">RB</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Isiah Pacheco</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">KC &middot; 61%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px; opacity:0.6;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">DK Metcalf</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">PIT &middot; 37%</div></div>
+      <div style="background:var(--panel); border-radius:12px; padding:9px;"><span class="pill" style="background:oklch(28% 0.04 230); color:var(--wr);">WR</span><div style="font-size:11px; margin-top:5px; font-weight:600;">Terry McLaurin</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">WAS &middot; 59%</div></div>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-size:13px; font-weight:600; color:var(--muted); margin-bottom:12px;">Seats</div>
+    <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:12px;">
+      <div style="background:var(--panel); border-radius:14px; padding:12px;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:oklch(30% 0.03 20); color:oklch(85% 0.1 20);">P</div><span style="font-weight:600; font-size:13px;">Priya</span></div><p style="font-size:10px; color:var(--muted); margin:8px 0 0;">Drafts like the room.</p></div>
+      <div style="background:var(--panel); border-radius:14px; padding:12px;"><div style="display:flex; align-items:center; justify-content:space-between;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:oklch(30% 0.03 100); color:oklch(85% 0.1 100);">W</div><span style="font-weight:600; font-size:13px;">Wyatt</span></div><span class="pill" style="background:oklch(28% 0.06 300); color:var(--te);">your call</span></div><p style="font-size:10px; margin:8px 0 0;">+3.2 early &middot; leans RB</p></div>
+      <div style="background:var(--panel); border-radius:14px; padding:12px;"><div style="display:flex; align-items:center; justify-content:space-between;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:oklch(30% 0.03 190); color:oklch(85% 0.1 190);">D</div><span style="font-weight:600; font-size:13px;">Dee</span></div><span class="pill" style="background:oklch(28% 0.06 150); color:var(--rb);">from history</span></div><p style="font-size:10px; margin:8px 0 0;">-1.8 late &middot; predictable</p><p style="font-size:9px; color:var(--muted); margin:4px 0 0;">6 drafts &middot; 84 picks</p></div>
+      <div style="background:var(--panel); border-radius:14px; padding:12px;"><div style="display:flex; align-items:center; justify-content:space-between;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:oklch(30% 0.03 270); color:oklch(85% 0.1 270);">N</div><span style="font-weight:600; font-size:13px;">Nadia</span></div><span class="pill" style="background:oklch(28% 0.06 150); color:var(--rb);">both</span></div><p style="font-size:10px; margin:8px 0 0;">+5.0 early &middot; erratic &middot; WR</p></div>
+      <div style="background:oklch(18% 0.03 175); border-radius:14px; padding:12px; box-shadow:0 0 0 1.5px var(--accent);"><div style="display:flex; align-items:center; justify-content:space-between;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:var(--accent); color:oklch(15% 0.01 240);">A</div><span style="font-weight:600; font-size:13px; color:var(--accent);">Allan &middot; you</span></div><span class="pill" style="background:oklch(28% 0.06 300); color:var(--te);">your call</span></div><p style="font-size:10px; margin:8px 0 0;">+1.0 early</p><p style="font-size:9px; font-style:italic; margin:4px 0 0; opacity:0.85;">"always robs Bijan tier"</p></div>
+      <div style="background:var(--panel); border-radius:14px; padding:12px;"><div style="display:flex; align-items:center; gap:8px;"><div class="avatar" style="background:oklch(30% 0.03 30); color:oklch(85% 0.1 30);">R</div><span style="font-weight:600; font-size:13px;">Ruiz</span></div><p style="font-size:10px; color:var(--muted); margin:8px 0 0;">Drafts like the room.</p></div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

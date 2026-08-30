@@ -6,6 +6,7 @@ Notes for Claude sessions working on this repo. Not documentation for humans —
     claude/README.md        this file: orientation and working conventions
     claude/environment.md   sandbox constraints and verification recipes
     claude/lessons.md       bugs found, their class, and what catches them
+    claude/design/          chosen visual direction for the board re-skin, not yet built
 
 ## Read in this order, every session
 
