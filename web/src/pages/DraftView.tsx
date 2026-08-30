@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
@@ -22,6 +22,18 @@ import { useRevealedBoard } from '../useRevealedBoard'
 // hardcoded 11, this stays a valid seat no matter which draft the picker opens.
 const DEFAULT_SLOT = 1
 
+// Measured live against the real fantasy(heart) board (see
+// claude/reactive-resimulation.md's acceptance criterion #7): 2000 iterations
+// took ~18.5-18.8s wall clock for a resim at pick 11 of 210, which does not
+// match the UI's own "may take a few seconds" copy. 500 iterations took
+// ~4.9s -- cost scales roughly linearly with iteration count (not dominated
+// by the fixed ProfileService.fit() cost every simulate() call pays, as
+// originally worried), so a lower cap directly buys a faster resim rather
+// than hitting a floor. 500 is not a guess: it's an option already offered
+// in this app's own "runs" dropdown, chosen here as the one that actually
+// keeps a resim in the few-seconds range the UI promises.
+const RESIM_ITERATION_CAP = 500
+
 export default function DraftView() {
   const { draftId = '' } = useParams<{ draftId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -40,8 +52,31 @@ export default function DraftView() {
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
   const [userPicks, setUserPicks] = useState<Record<number, PlayerRef>>({})
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [resimming, setResimming] = useState(false)
+  const [resimProgress, setResimProgress] = useState(0)
 
-  const reveal = useRevealedBoard(result?.board, result ? result.teams * result.rounds : 0, result?.myPicks)
+  // Bumped only by run() -- passed to useRevealedBoard as its resetKey, so a
+  // resim's setResult() (which changes `board`'s identity but not this) does
+  // not restart the reveal from pick 1. See useRevealedBoard.ts and
+  // claude/reactive-resimulation.md §3, "Why run()'s existing 'fresh board'
+  // reset must NOT fire on a resim".
+  const [runSeq, setRunSeq] = useState(0)
+
+  // Bumped at the start of *every* streamSimulation call (a fresh run() or a
+  // resim), never read for its value beyond identity -- exists purely so a
+  // response can tell whether it's still the most recent request before
+  // applying itself. See the stale-response guard in choosePick/run() below.
+  const requestSeqRef = useRef(0)
+
+  // Synchronous reentrancy lock for choosePick -- see its own comment.
+  const choosingRef = useRef(false)
+
+  const reveal = useRevealedBoard(
+    result?.board,
+    result ? result.teams * result.rounds : 0,
+    result?.myPicks,
+    runSeq,
+  )
 
   function refetchSeats() {
     getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
@@ -71,40 +106,134 @@ export default function DraftView() {
   }
 
   // The one place a pick gets recorded, whichever of the two entry points
-  // (PickPrompt's "take model's pick" or a PlayerPicker row) triggered it --
-  // see the design doc's §3. The dedup guard has to live here, not in
-  // PlayerPicker's own filtering, because "take the model's pick" has no list
-  // to filter against.
-  function choosePick(player: PlayerRef) {
-    if (reveal.pausedAt == null) return
+  // (PickPrompt's "take model's pick" or a PlayerPicker row) triggered it.
+  // Builds a startState covering every pick from 1 through the pick just
+  // made -- your own choice wherever you have one, the model's own
+  // already-revealed prediction everywhere else -- and re-runs the
+  // simulation with it before resuming the reveal. See the design doc's §3.
+  async function choosePick(player: PlayerRef) {
+    // Also refuses while a fresh run() is in flight (running): PickPrompt/
+    // PlayerPicker used to stay clickable through that window (only resimming
+    // hid them), letting a stale pick fire a redundant resim against a result
+    // about to be replaced anyway. Guarding here is enough -- no render change
+    // needed, since a click during that window now simply no-ops.
+    //
+    // choosingRef is a synchronous reentrancy lock, checked and set before
+    // anything else: `resimming`/`userPicks` above are still last-render
+    // state, so two invocations racing before React commits the first one's
+    // setResimming(true) could otherwise both pass every check above and
+    // both proceed -- a plain ref mutation is synchronous and closes that
+    // window regardless of render timing, which relying on a setState
+    // updater's side effect would not actually guarantee.
+    if (reveal.pausedAt == null || resimming || running || !result || choosingRef.current) return
     if (Object.values(userPicks).some((p) => p.id === player.id)) return // already claimed at an earlier pick
-    setUserPicks((prev) => ({ ...prev, [reveal.pausedAt!]: player }))
-    setPickerOpen(false)
-    reveal.resume()
+    choosingRef.current = true
+    setError(null) // clear any stale error from a previous failed resim -- see run()'s identical reset
+    const pausedAt = reveal.pausedAt
+    const nextUserPicks = { ...userPicks, [pausedAt]: player }
+
+    const seq = ++requestSeqRef.current
+    setResimming(true)
+    setResimProgress(0)
+    try {
+      setUserPicks(nextUserPicks)
+      setPickerOpen(false)
+
+      // Everything through this pick is now "decided": your own picks win, the
+      // model's own already-shown prediction fills every other slot. A pick
+      // number with no board entry at all (BoardAssembler.assemble skips a pick
+      // only when literally every run ran out of distinct candidates there -- a
+      // late-round edge case) is left out of startState rather than guessed
+      // at; the engine just resimulates that one slot fresh, which is the same
+      // thing it would do if this pick had never been reached yet.
+      const startState: Record<number, string> = {}
+      for (let n = 1; n <= pausedAt; n++) {
+        const chosen = nextUserPicks[n]
+        if (chosen) {
+          startState[n] = chosen.sleeperId
+          continue
+        }
+        const predicted = result.board.find((p) => p.pickNo === n)
+        if (predicted) startState[n] = predicted.player.sleeperId
+      }
+
+      const r2 = await streamSimulation(
+        {
+          draftSleeperId: draftId,
+          // Both frozen to what produced the prefix being locked in, not live
+          // control state -- see the design doc's §3 for why (temperature) and
+          // the code-review finding for why mySlot needed the same treatment:
+          // the whole "useRevealedBoard doesn't need to reset on a resim"
+          // argument depends on mySlot staying invariant across one.
+          mySlot: result.mySlot,
+          iterations: Math.min(iterations, RESIM_ITERATION_CAP),
+          temperature: result.temperature,
+          startState,
+        },
+        setResimProgress,
+      )
+      if (seq !== requestSeqRef.current) return // superseded by a newer run()/pick
+
+      // Defensive: startState resolution can silently drop an unmapped
+      // sleeperId (SimulationService.resolveStartState just skips it rather
+      // than erroring). Checking only the pick just made isn't enough -- an
+      // earlier locked pick could just as easily be the one silently
+      // dropped, quietly re-deciding a pick the user already watched happen.
+      // Check the WHOLE locked prefix.
+      const byPickNo = new Map(r2.board.map((p) => [p.pickNo, p]))
+      for (const [pickNoStr, sleeperId] of Object.entries(startState)) {
+        const landed = byPickNo.get(Number(pickNoStr))
+        if (!landed || landed.player.sleeperId !== sleeperId) {
+          throw new Error(`Resimulation didn't preserve pick ${pickNoStr} as decided — showing the prior board.`)
+        }
+      }
+      setResult(r2)
+      reveal.resume()
+    } catch (e) {
+      if (seq !== requestSeqRef.current) return // a newer request already owns the screen
+      setError(e instanceof Error ? e.message : String(e))
+      reveal.resume() // don't strand the user paused forever; continue against the stale board
+    } finally {
+      if (seq === requestSeqRef.current) setResimming(false)
+      choosingRef.current = false
+    }
   }
 
   async function run() {
+    const seq = ++requestSeqRef.current
     setRunning(true)
     setError(null)
     setProgress(0)
     setOpenPick(null) // stale card from the previous board would otherwise linger through the re-run
     setUserPicks({}) // same staleness class of bug -- don't let a prior run's picks survive into this one
     setPickerOpen(false)
+    setResimming(false)
+    setResimProgress(0)
     try {
       const r = await streamSimulation(
         { draftSleeperId: draftId, mySlot, iterations, temperature },
         setProgress,
       )
+      if (seq !== requestSeqRef.current) return // superseded by a newer run()/pick
       setResult(r)
       setSeatsDirty(false)
+      setRunSeq((n) => n + 1)
     } catch (e) {
+      if (seq !== requestSeqRef.current) return
       setError(e instanceof Error ? e.message : String(e))
     } finally {
-      setRunning(false)
+      if (seq === requestSeqRef.current) setRunning(false)
     }
   }
 
   const pickedPlayerIds = new Set(Object.values(userPicks).map((p) => p.id))
+  // Only the picks that haven't happened yet -- once resimulated, an already
+  // decided pick reads ~100% everywhere (every iteration replays it
+  // identically), which is dead information that would otherwise hide the
+  // genuinely new future-pick numbers this whole feature exists to produce.
+  // DraftBoard/RevealScrubber still get the full, unfiltered result.myPicks
+  // below -- they need every one of your slots marked, decided or not.
+  const undecidedMyPicks = result ? result.myPicks.filter((p) => !(p in userPicks)) : []
 
   return (
     <>
@@ -148,7 +277,7 @@ export default function DraftView() {
                 : `chaos (${temperature.toFixed(1)})`}
           </span>
         </label>
-        <button onClick={run} disabled={running}>
+        <button onClick={run} disabled={running || resimming}>
           {running ? `simulating ${Math.round(progress * 100)}%` : 'run'}
         </button>
       </div>
@@ -182,16 +311,24 @@ export default function DraftView() {
                 myPicks={result.myPicks}
                 onChange={reveal.scrubTo}
                 onSkip={reveal.skip}
+                disabled={resimming}
               />
-              {reveal.pausedAt != null && (
-                <PickPrompt
-                  pausedAt={reveal.pausedAt}
-                  teams={result.teams}
-                  modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
-                  onPick={choosePick}
-                  onOpenPicker={() => setPickerOpen(true)}
-                />
-              )}
+              {reveal.pausedAt != null &&
+                (resimming ? (
+                  <div className="pause-banner">
+                    <span className="muted small">
+                      Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
+                    </span>
+                  </div>
+                ) : (
+                  <PickPrompt
+                    pausedAt={reveal.pausedAt}
+                    teams={result.teams}
+                    modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
+                    onPick={choosePick}
+                    onOpenPicker={() => setPickerOpen(true)}
+                  />
+                ))}
               <DraftBoard
                 board={result.board}
                 teams={result.teams}
@@ -219,7 +356,7 @@ export default function DraftView() {
           <div className="lower-grid">
             <AvailabilityPanel
               availability={result.availability}
-              myPicks={result.myPicks}
+              myPicks={undecidedMyPicks}
               teams={result.teams}
               pickedPlayerIds={pickedPlayerIds}
             />
@@ -241,7 +378,7 @@ export default function DraftView() {
         />
       )}
 
-      {pickerOpen && result && reveal.pausedAt != null && (
+      {pickerOpen && result && reveal.pausedAt != null && !resimming && (
         <PlayerPicker
           pausedAt={reveal.pausedAt}
           teams={result.teams}

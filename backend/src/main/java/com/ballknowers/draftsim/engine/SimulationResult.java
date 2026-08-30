@@ -16,7 +16,7 @@ public record SimulationResult(
         Confidence confidence
 ) {
 
-    public record PlayerRef(long id, String name, String position, String team, double adp) {}
+    public record PlayerRef(long id, String sleeperId, String name, String position, String team, double adp) {}
 
     /**
      * One cell of the predicted board.

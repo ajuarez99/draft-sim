@@ -15,8 +15,8 @@ const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
 
 // Same "realistic options" data AvailabilityPanel already shows below the
 // board (SimulationResult.availability's survivalByPick), scoped to exactly
-// this pick. Picking here does not touch the rest of the board -- see the
-// honesty note below, and Scope decision in the design doc.
+// this pick. Picking here triggers a real resimulation of every pick after
+// this one -- see the honesty note below, and claude/reactive-resimulation.md.
 export default function PlayerPicker({ pausedAt, teams, availability, alreadyPicked, onPick, onClose }: Props) {
   const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
 
@@ -47,8 +47,8 @@ export default function PlayerPicker({ pausedAt, teams, availability, alreadyPic
           <h2 className="modal-name">Choose your pick</h2>
         </div>
         <p className="muted small">
-          Round {roundPickLabel(pausedAt, teams)} — pick #{pausedAt}. Doesn't change the rest of the board — later
-          picks are still the model's own projection.
+          Round {roundPickLabel(pausedAt, teams)} — pick #{pausedAt}. Recalculates every pick after this one based
+          on what you take — may take a few seconds.
         </p>
 
         <div className="controls-inline picker-filters">

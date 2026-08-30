@@ -3,6 +3,7 @@
 
 export type PlayerRef = {
   id: number
+  sleeperId: string
   name: string
   position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF'
   team: string | null
@@ -84,6 +85,7 @@ export type SimRequest = {
   mySlot: number
   iterations: number
   temperature: number
+  startState?: Record<number, string>
 }
 
 async function json<T>(res: Response): Promise<T> {

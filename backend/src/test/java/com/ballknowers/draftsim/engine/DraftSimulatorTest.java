@@ -96,6 +96,35 @@ class DraftSimulatorTest {
     }
 
     @Test
+    void completedPicksOverlappingMyPicksProducesAWellFormedSnapshot() {
+        // Previously completedPicks was always *other* teams' picks; reactive
+        // resimulation (claude/reactive-resimulation.md) makes it reachable for
+        // the viewing user's own pick too. The snapshot for a myPicks pick
+        // number is taken before the completedPicks short-circuit
+        // (DraftSimulator.run()'s ordering: snapshot first, then check
+        // `already`), so this pins that the ordering stays harmless under the
+        // new combination rather than corrupting or emptying the snapshot.
+        Map<Integer, Long> completed = Map.of(1, 50L);
+        DraftContext c = ctx(14, 15, completed);
+        var sim = new DraftSimulator(c, new PickScorer(CFG, c.rules(), c.priors()), 1.0, 3L);
+        var result = sim.run(new int[]{1, 25}, 10);
+
+        assertEquals(50L, result.picked()[1], "the completed pick should still be replayed exactly");
+
+        long[] snapshot = result.availableAtMyPicks().get(1);
+        assertNotNull(snapshot, "no snapshot recorded for a pick that is both completed and mine");
+        assertTrue(snapshot.length > 0, "snapshot at pick 1 came back empty");
+        Set<Long> seen = new HashSet<>();
+        for (long id : snapshot) {
+            assertNotEquals(0L, id, "snapshot contains a zero/placeholder id");
+            assertTrue(seen.add(id), "snapshot contains duplicate id " + id);
+        }
+
+        // pick 25 is untouched by this overlap and should behave exactly as before.
+        assertNotNull(result.availableAtMyPicks().get(25));
+    }
+
+    @Test
     void zeroTemperatureIsDeterministic() {
         DraftContext c = ctx(12, 15, Map.of());
         var a = new DraftSimulator(c, new PickScorer(CFG, c.rules(), c.priors()), 0.0, 1L)

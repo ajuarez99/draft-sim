@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PredictedPick } from './api'
 
-const EMPTY_BOARD: PredictedPick[] = []
 const EMPTY_PICKS: number[] = []
 
 export function useRevealedBoard(
-  board: PredictedPick[] | undefined,
+  // Not read internally -- the reset effect keys on `resetKey`, not board
+  // identity (see below), and every consumer reads `board` fresh off `result`
+  // on render. Kept (prefixed, unused) in the signature so callers pass the
+  // same inputs they always have and so a future reader can still tell what
+  // this hook is conceptually a view over.
+  _board: PredictedPick[] | undefined,
   maxPickNo: number,
   myPicks: number[] | undefined,
+  resetKey: number,
   opts?: { tickMs?: number },
 ) {
-  const b = board ?? EMPTY_BOARD
   const mine = myPicks ?? EMPTY_PICKS
   const [revealedThrough, setRevealedThrough] = useState(0)
   const [isRevealing, setIsRevealing] = useState(false)
@@ -57,7 +61,7 @@ export function useRevealedBoard(
       if (timerRef.current != null) window.clearInterval(timerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [b, maxPickNo])
+  }, [resetKey])
 
   function resume() {
     if (pausedAt == null) return

@@ -7,9 +7,10 @@ type Props = {
   myPicks: number[]
   onChange: (pickNo: number) => void
   onSkip: () => void
+  disabled?: boolean
 }
 
-export default function RevealScrubber({ value, max, teams, myPicks, onChange, onSkip }: Props) {
+export default function RevealScrubber({ value, max, teams, myPicks, onChange, onSkip, disabled }: Props) {
   if (max <= 0) return null
   const shown = Math.max(1, value)
   return (
@@ -19,7 +20,7 @@ export default function RevealScrubber({ value, max, teams, myPicks, onChange, o
           Pick {value} of {max} <span className="mono">{roundPickLabel(shown, teams)}</span>
         </span>
         {value < max && (
-          <button className="chip" onClick={onSkip}>
+          <button className="chip" onClick={onSkip} disabled={disabled}>
             skip
           </button>
         )}
@@ -31,6 +32,7 @@ export default function RevealScrubber({ value, max, teams, myPicks, onChange, o
         max={max}
         value={shown}
         list="reveal-ticks"
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
       />
       <datalist id="reveal-ticks">

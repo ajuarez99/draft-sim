@@ -22,7 +22,7 @@ export default function PickPrompt({ pausedAt, teams, modelPick, onPick, onOpenP
           Your pick — Round {roundPickLabel(pausedAt, teams)} (pick {pausedAt})
         </span>
         <span className="muted tiny">
-          Doesn't change the rest of the board — later picks are still the model's own projection.
+          Recalculates every pick after this one based on what you took — may take a few seconds.
         </span>
       </div>
       <div className="pick-prompt-actions">

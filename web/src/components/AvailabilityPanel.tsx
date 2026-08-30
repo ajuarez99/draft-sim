@@ -23,11 +23,20 @@ export default function AvailabilityPanel({ availability, myPicks, teams, picked
   const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
   const [depth, setDepth] = useState(4)
 
+  // myPicks now shrinks as reactive resimulation locks in each of your picks
+  // (DraftView passes only undecided ones), so `depth`'s own state can end up
+  // larger than the range input's current max -- clamp what's actually shown/
+  // sliced to the live max rather than the raw depth state, or the slider's
+  // value/max invert (browsers clamp display silently, `depth` itself would
+  // never visibly catch up without this).
+  const maxDepth = Math.max(1, Math.min(8, myPicks.length))
+  const shownDepth = Math.min(depth, maxDepth)
+
   // myPicks belongs in the dependency list: it feeds `picks`, which the filter
   // below reads. It only changes alongside `availability` today, so the stale
   // value was never observable -- but that is a coincidence of the call site,
   // not a property of this component.
-  const picks = useMemo(() => myPicks.slice(0, depth), [myPicks, depth])
+  const picks = useMemo(() => myPicks.slice(0, shownDepth), [myPicks, shownDepth])
   const rows = useMemo(
     () =>
       availability
@@ -53,11 +62,12 @@ export default function AvailabilityPanel({ availability, myPicks, teams, picked
             <input
               type="range"
               min={1}
-              max={Math.min(8, myPicks.length)}
-              value={depth}
+              max={maxDepth}
+              value={shownDepth}
+              disabled={myPicks.length === 0}
               onChange={(e) => setDepth(Number(e.target.value))}
             />
-            {depth}
+            {myPicks.length === 0 ? 'none left' : shownDepth}
           </label>
         </div>
       </header>
