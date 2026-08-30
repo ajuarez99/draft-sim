@@ -1,21 +1,33 @@
 # draft-sim — handoff
 
-Last updated 2026-08-29 (evening session) by a Claude session running directly on
-Allan's Windows machine, not the old cloud sandbox. **Read this first.**
-`DEPLOY.md` covers deployment; `README.md` covers running it. A Claude session
-should then read `claude/` — orientation, sandbox recipes and bug post-mortems
-that are not worth rediscovering. `claude/environment.md`'s recipes are written
-for a different (cloud-sandbox) environment; this machine has real internet,
-real JDK/Node/Postgres installs, and does not need most of them — see the new
-note at the top of that file before assuming something is blocked.
+Last updated 2026-08-30 by a Claude session running directly on Allan's Windows
+machine. **Read this first.** `DEPLOY.md` covers deployment; `README.md` covers
+running it. A Claude session should then read `claude/` — orientation, sandbox
+recipes and bug post-mortems that are not worth rediscovering.
+`claude/environment.md`'s recipes are written for a different (cloud-sandbox)
+environment; this machine has real internet, real JDK/Node/Postgres installs,
+and does not need most of them — see the new note at the top of that file
+before assuming something is blocked.
+
+**Time-sensitive:** fantasy(heart)'s real draft — 14 teams, league
+`1391509063170293760`, draft `1391509064357273600` — is scheduled 2026-08-31
+21:15 CDT. See "Draft-day gap" below; a checklist only Allan can run before
+then is in `claude/live-poller-plan.md`'s "Manual pre-draft-night checklist."
 
 ---
 
 ## Where things actually stand
 
-Repo `ajuarez99/draft-sim`, branch `main`. Working tree has uncommitted fixes from
-this session (below) — **not yet committed, ask before committing.**
+Repo `ajuarez99/draft-sim`, branch `main`. Working tree has uncommitted work from
+this session (below) — **not yet committed, ask before committing.** Multiple
+Claude Code sessions have been running concurrently against this same working
+directory (one on this live-poller work, others on separate frontend work per
+`git status`) — if you're picking this up, diff carefully before assuming the
+working tree matches what this doc describes.
 
+    f8df93d  Designs in and future work that needs to be done
+    795975b  frontend: pick-by-pick board reveal, manager tendencies UI
+    c4bf479  Add in simulation tests and booting up app locally first time
     4b5da75  claude/environment: record the UI screenshot and slf4j-stub recipes
     3d65302  fix: coherent predicted board, stale frontend types, memo deps
     39f4a72  frontend: seat cards branch on provenance, not pick count
@@ -26,6 +38,44 @@ this session (below) — **not yet committed, ask before committing.**
     0b54d2d  deploy prep: env-var config, shared-token auth, Dockerfile, runbook
     ef17f3e  fix: backfillAdpAtTime UPDATE..FROM join, createArrayOf binding
     77f34bb  v0: ingest, board derivation, engine, Monte Carlo, SSE, React UI
+
+### This session: live draft poller built (D, Phase 0 of `claude/next-features-roadmap.md`)
+
+`claude/next-features-roadmap.md` (written 2026-08-29, reconciling four parallel
+feature plans) prioritized D — live Sleeper draft polling — first, ahead of the
+other three features, specifically because of tomorrow's deadline. Built this
+session via a plan → build → code-review pipeline (three separate agent passes);
+full design and reasoning in `claude/live-poller-plan.md`. Summary:
+
+- `LiveDraftPoller` (new) — one virtual thread per tracked draft, polls Sleeper's
+  `/draft/{id}` + `/draft/{id}/picks` every 10s while `status` is `drafting`,
+  writes into the existing `draft`/`draft_pick` tables via a new
+  `DraftRepository.upsertPicks()` (idempotent `ON CONFLICT` upsert, replacing the
+  need for the destructive `replacePicks()` on the polling path).
+- `POST /api/drafts/{sleeperDraftId}/track` (new, on `LeagueController`) starts
+  tracking; safe to call any time before the draft goes live (no-ops on
+  `pre_draft`), idempotent if called twice.
+- `PickMapper` (new) — the raw-Sleeper-pick-to-`PickRow` mapping logic extracted
+  out of `LeagueIngestService.ingestDraft` so both the batch ingest path and the
+  poller share one implementation instead of two.
+- Tests: 14 new (`PickMapperTest`, `LiveDraftPollerTest` with mocked
+  `SleeperClient`/repositories, `DraftRepositoryUpsertPicksIT` and
+  `DifferentialReplayIT` against a real Postgres + real Sleeper API, gated to
+  skip cleanly with no Postgres reachable). Full suite: **74/74 passing**,
+  verified independently by both the build pass and a separate code-review pass
+  (which also killed Postgres mid-run to confirm the integration tests actually
+  skip rather than silently pass).
+- **What was NOT independently re-verified**: a fourth "test and verify" agent
+  pass (booting the real server, hitting `/track` live, checking logs, clean
+  shutdown) was planned but not run this session — Allan reviewed the plan +
+  build + code-review results and judged them sufficient, and moved on to
+  starting the next roadmap phase in a separate session. The one thing genuinely
+  unverified by any of this — per `claude/live-poller-plan.md`'s own "Open
+  risks" — is real `drafting`-status behavior; nothing in this codebase has ever
+  observed a truly live Sleeper draft. Budget the disposable-mock-draft dry run
+  in the manual checklist before trusting this against fantasy(heart) tomorrow.
+- **Still uncommitted.** Ask before committing — this doc may be read while that
+  decision is still pending.
 
 **The application has been started, for the first time, this session — end to end,
 against real Sleeper data, through the real UI.** Everything below labelled
@@ -244,7 +294,9 @@ it is not broken.
   its normalization pass (round index → `pick_pct`) is flagged in that doc as a
   fix to *existing* behavior worth doing on its own, independent of borrowed
   data ever landing.
-- **Live draft polling.** The real draft-day gap — see below. Nothing built.
+- **Live draft polling — built this session**, see "This session" above and
+  "Draft-day gap" below. Not yet committed; not yet dry-run against a real
+  `drafting`-status draft.
 - **Frontend `VITE_API_BASE` + auth header.** ~20 lines. Blocks any remote deploy.
   Not needed for draft night if running locally against `localhost`.
 
@@ -325,10 +377,29 @@ The round-1 modal-probability finding above says the remaining gap between
 
 ### Draft-day gap
 
-Resume-from-state works, but only against picks already in the database. There is no
-polling, so mid-draft you'd re-run ingest by hand. A scheduled job on
-`/draft/{id}/picks` every ~10s while status is `drafting` is small work and the largest
-remaining payoff. `startState` also exists on the API and is unexposed in the UI.
+**Built this session — see "This session: live draft poller built" above.**
+`LiveDraftPoller` now does the ~10s polling job on `/draft/{id}/picks` while
+status is `drafting` that this section used to describe as missing. Resume-
+from-state still works the same way it always did (against whatever's in the
+DB), it's just now kept current automatically once `/track` is called, instead
+of needing ingest re-run by hand mid-draft.
+
+**What's still actually open:**
+- Uncommitted — needs a commit decision.
+- No dry run has happened against a real `pre_draft → drafting → complete`
+  transition. The differential-replay test only proves the pick-mapping logic
+  is stable against already-`complete` drafts; it says nothing about whether
+  Sleeper's `status` field or pick-object shape behaves as assumed mid-draft.
+  See `claude/live-poller-plan.md`'s "Manual pre-draft-night checklist" — the
+  disposable-mock-draft dry run is the only way to close this before
+  2026-08-31 21:15 CDT.
+- `startState` still exists on the API and is still unexposed in the UI —
+  unrelated to the poller, still an open gap if you want a manual override for
+  a pick the poller hasn't caught up to yet.
+- In-memory-only tracking state: an app restart mid-draft silently drops
+  polling with no alert. Keep the process alive through the real draft.
+- No `/untrack` endpoint — if `/track` is ever called against the wrong draft
+  id, the only recovery in this version is an app restart.
 
 ---
 
