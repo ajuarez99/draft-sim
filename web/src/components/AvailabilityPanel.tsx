@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { AvailabilityRow } from '../api'
+import { roundPickLabel } from '../roundPickLabel'
 
 type Props = {
   availability: AvailabilityRow[]
   myPicks: number[]
   teams: number
+  pickedPlayerIds: Set<number>
 }
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
@@ -17,7 +19,7 @@ const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
  * the numbers are compounding a lot of model uncertainty and are worth much
  * less than they look.
  */
-export default function AvailabilityPanel({ availability, myPicks, teams }: Props) {
+export default function AvailabilityPanel({ availability, myPicks, teams, pickedPlayerIds }: Props) {
   const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
   const [depth, setDepth] = useState(4)
 
@@ -30,16 +32,11 @@ export default function AvailabilityPanel({ availability, myPicks, teams }: Prop
     () =>
       availability
         .filter((r) => filter === 'ALL' || r.player.position === filter)
+        .filter((r) => !pickedPlayerIds.has(r.player.id))
         .filter((r) => picks.some((p) => (r.survivalByPick[String(p)] ?? 0) > 0.01))
         .slice(0, 60),
-    [availability, filter, picks],
+    [availability, filter, picks, pickedPlayerIds],
   )
-
-  const label = (pickNo: number) => {
-    const round = Math.ceil(pickNo / teams)
-    const inRound = pickNo - (round - 1) * teams
-    return `${round}.${String(inRound).padStart(2, '0')}`
-  }
 
   return (
     <section className="panel">
@@ -72,7 +69,7 @@ export default function AvailabilityPanel({ availability, myPicks, teams }: Prop
               <th className="player-col">Player</th>
               <th>Board</th>
               {picks.map((p) => (
-                <th key={p}>{label(p)}</th>
+                <th key={p}>{roundPickLabel(p, teams)}</th>
               ))}
             </tr>
           </thead>
