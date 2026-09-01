@@ -157,6 +157,6 @@ public class MonteCarloRunner {
         if (e == null) return null;
         return new SimulationResult.PlayerRef(
                 e.player().id(), e.player().sleeperId(), e.player().name(),
-                e.position().name(), e.player().team(), e.adp());
+                e.position().name(), e.player().team(), e.adp(), e.positionalRank());
     }
 }

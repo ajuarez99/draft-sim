@@ -16,7 +16,14 @@ public record SimulationResult(
         Confidence confidence
 ) {
 
-    public record PlayerRef(long id, String sleeperId, String name, String position, String team, double adp) {}
+    /**
+     * positionalRank is 999 when Sleeper's own board has no rank for this
+     * player (BoardService's own sentinel, never null) -- a UI that renders
+     * "{position}{positionalRank}" must special-case 999 rather than showing
+     * "RB999".
+     */
+    public record PlayerRef(long id, String sleeperId, String name, String position, String team, double adp,
+                            int positionalRank) {}
 
     /**
      * One cell of the predicted board.

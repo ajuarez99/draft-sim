@@ -17,6 +17,7 @@ import PlayerCard from '../components/PlayerCard'
 import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
 import { useRevealedBoard } from '../useRevealedBoard'
+import { draftedSoFar } from '../teamNeeds'
 
 // Every league, of any size, has a slot 1 -- unlike the single-league app's old
 // hardcoded 11, this stays a valid seat no matter which draft the picker opens.
@@ -279,6 +280,11 @@ export default function DraftView() {
   // below -- they need every one of your slots marked, decided or not.
   const undecidedMyPicks = result ? result.myPicks.filter((p) => !(p in userPicks)) : []
 
+  // The user's own roster so far -- feeds PlayerPicker's "your team" strip
+  // and its "fills a need" row tags. See teamNeeds.ts's draftedSoFar().
+  const myDraftedPlayers =
+    result && reveal.pausedAt != null ? draftedSoFar(result.myPicks, reveal.pausedAt, result.board, userPicks) : []
+
   // Nothing has been started for this draft yet. The pre-start screen is a
   // real full-screen empty board (Sleeper's own draft room, before a pick has
   // landed, looks like this), not a small placeholder squeezed next to
@@ -396,6 +402,7 @@ export default function DraftView() {
                       pausedAt={reveal.pausedAt}
                       teams={result.teams}
                       modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
+                      bestAvailable={result.bestAvailable[String(reveal.pausedAt)]?.[0]?.player}
                       onPick={choosePick}
                       onOpenPicker={() => setPickerOpen(true)}
                     />
@@ -484,6 +491,8 @@ export default function DraftView() {
           teams={result.teams}
           availability={result.availability}
           alreadyPicked={pickedPlayerIds}
+          rosterPositions={seats?.rosterPositions ?? []}
+          draftedPlayers={myDraftedPlayers}
           onPick={choosePick}
           onClose={() => setPickerOpen(false)}
         />

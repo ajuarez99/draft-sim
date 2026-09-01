@@ -89,6 +89,14 @@ public class LeagueController {
         });
         seats.sort(Comparator.comparingInt(s -> (Integer) s.get("slot")));
 
+        // rosterPositions is always a non-null List (roster_positions is `text[]
+        // not null default '{}'`), including legitimately empty when a league's
+        // roster settings haven't synced -- the frontend team-needs helper treats
+        // [] as "hide the strip", not an error.
+        List<String> rosterPositions = leagues.byId(draft.get().leagueId())
+                .map(LeagueRepository.LeagueRow::rosterPositions)
+                .orElseGet(List::of);
+
         // Map.of rejects null values, and mySlot is null in the default case --
         // unset config, or a configured owner who isn't a manager in this
         // particular league -- i.e. the state every fresh checkout starts in.
@@ -101,6 +109,7 @@ public class LeagueController {
         response.put("status", String.valueOf(draft.get().status()));
         response.put("seats", seats);
         response.put("mySlot", mySlotHolder[0]);
+        response.put("rosterPositions", rosterPositions);
         return ResponseEntity.ok(response);
     }
 

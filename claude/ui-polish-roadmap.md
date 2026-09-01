@@ -298,6 +298,17 @@ FLEX-eligibility rule differently on the frontend).
 
 ---
 
+**Amended after review, 2026-09-01.** Plan-review pass found the section's code
+claims accurate, but flagged: `LeagueController.seats()` still builds its response
+with `Map.of(...)`, which throws on this section's sibling `mySlot` field (plan A)
+being null — must become a mutable map before either field lands, not after; no
+current repository method fetches a league by internal id for `rosterPositions`
+to source from; FLEX-overflow tie-break and empty-`rosterPositions` display are
+unspecified; and `SimulationResult.bestAvailable` — already computed per-your-pick,
+simulation-weighted, and currently unused anywhere in the frontend — may already be
+the right data source for `PickPrompt`'s new button instead of a fresh client-side
+ADP sort. Full detail and the complete amendment list: `claude/plan-review-B.md`.
+
 ## C. Start the board immediately, don't gate it behind a wait screen
 
 **Built and verified live, 2026-08-30**, same day as the plan. `DraftView.tsx` now
