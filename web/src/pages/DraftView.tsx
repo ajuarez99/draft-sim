@@ -71,6 +71,21 @@ export default function DraftView() {
   // Synchronous reentrancy lock for choosePick -- see its own comment.
   const choosingRef = useRef(false)
 
+  // Tracks whether the *current* URL slot value came from auto-detection
+  // (vs. an explicit ?slot= the user typed or loaded with) -- purely for the
+  // start-overlay CTA copy below. Can't be derived from slotParam alone:
+  // auto-detection adopts its value via the same setMySlot()/setSearchParams
+  // mechanism the manual input uses, so slotParam is non-null in *both* cases
+  // once it fires. A live-verification bug (claude/live-verification-A.md)
+  // found the CTA saying "we found your seat -- you're slot 11" even after an
+  // explicit ?slot=5 override, because the original check only looked at
+  // slotParam == null, which auto-detection itself falsifies the instant it
+  // runs. This ref is set only inside the auto-detect effect and cleared on
+  // any explicit slot edit (including an explicit ?slot= present when seats
+  // load), so it reflects "did auto-detection choose this," not "is a slot
+  // param present."
+  const autoAdoptedSlotRef = useRef(false)
+
   const reveal = useRevealedBoard(
     result?.board,
     result ? result.teams * result.rounds : 0,
@@ -108,8 +123,16 @@ export default function DraftView() {
   // claude/plan-review-A.md's "Auto-detect timing" finding.
   useLayoutEffect(() => {
     if (!seats) return
-    if (slotParam != null) return
-    if (seats.mySlot != null) setMySlot(seats.mySlot)
+    if (slotParam != null) {
+      autoAdoptedSlotRef.current = false
+      return
+    }
+    if (seats.mySlot != null) {
+      autoAdoptedSlotRef.current = true
+      setMySlot(seats.mySlot)
+    } else {
+      autoAdoptedSlotRef.current = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seats])
 
@@ -286,7 +309,10 @@ export default function DraftView() {
             value={slotKnown ? mySlot : ''}
             placeholder={slotKnown ? undefined : '...'}
             disabled={!slotKnown}
-            onChange={(e) => setMySlot(Number(e.target.value))}
+            onChange={(e) => {
+              autoAdoptedSlotRef.current = false
+              setMySlot(Number(e.target.value))
+            }}
             size={3}
           />
         </label>
@@ -404,7 +430,7 @@ export default function DraftView() {
                       <div className="start-overlay-cta">
                         <h2 className="cond">Ready when you are</h2>
                         <p className="muted small">
-                          {seats?.mySlot != null
+                          {autoAdoptedSlotRef.current && seats?.mySlot != null
                             ? `We found your seat — you're slot ${seats.mySlot}. Start the mock draft.`
                             : 'Set your slot above if you know it, then start the mock draft.'}
                         </p>
