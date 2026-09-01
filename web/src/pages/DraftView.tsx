@@ -30,9 +30,20 @@ const DEFAULT_SLOT = 1
 // ~4.9s -- cost scales roughly linearly with iteration count (not dominated
 // by the fixed ProfileService.fit() cost every simulate() call pays, as
 // originally worried), so a lower cap directly buys a faster resim rather
-// than hitting a floor. 500 is not a guess: it's an option already offered
-// in this app's own "runs" dropdown, chosen here as the one that actually
-// keeps a resim in the few-seconds range the UI promises.
+// than hitting a floor.
+//
+// 500 is now the default for the FIRST run too, not just the resim cap.
+// Why 500 rather than "as many as we can afford": the standard error of a
+// displayed proportion at p = 0.10 is +/-1.3 points at n = 500 against
+// +/-0.67 at n = 2000, and every probability in this UI is rounded to a whole
+// percent next to copy that already says low percentages mean the model does
+// not know. 2000 was buying precision the display cannot show, at 4x the wall
+// clock. See claude/board-first-layout-and-pick-latency.md §B6.
+const DEFAULT_ITERATIONS = 500
+
+// Kept as its own constant even though it now equals DEFAULT_ITERATIONS: the
+// runs dropdown still offers 1000/2000, and a resim of a 2000-run board must
+// still come back fast enough to not strand the reveal.
 const RESIM_ITERATION_CAP = 500
 
 export default function DraftView() {
@@ -41,7 +52,7 @@ export default function DraftView() {
   const slotParam = searchParams.get('slot')
   const mySlot = slotParam ? Number(slotParam) : DEFAULT_SLOT
 
-  const [iterations, setIterations] = useState(2000)
+  const [iterations, setIterations] = useState(DEFAULT_ITERATIONS)
   const [temperature, setTemperature] = useState(1.0)
 
   const [seats, setSeats] = useState<SeatsResponse | null>(null)
