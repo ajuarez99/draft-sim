@@ -146,6 +146,20 @@ needed.
    covering the new `mySlot` field's three states (matched, unset config, no match
    in this league), not just a "don't break anything" check.
 
+**Amended after review, 2026-09-01.** Full detail in `claude/plan-review-A.md`
+(plan-review stage of this feature's pipeline). Two corrections that change what
+gets built, not just how it's worded: (1) `LeagueController.seats()`'s response is
+currently built with `Map.of(...)`, which throws on any null value — since `mySlot`
+is null in the default/unconfigured case, adding it to that call as literally
+described would 500 on every request until the feature is fully configured. Must be
+built as a mutable map instead, mirroring `board()`'s existing fix for the same
+class of bug three methods below it in the same file. (2) The "no flash of `1`"
+language in acceptance criterion #1 is close to unsatisfiable given `mySlot` is
+derived from the URL on every render and the seats fetch is inherently async —
+decide which guarantee is actually wanted (brief flash during the fetch window
+acceptable vs. a hard zero-flash requiring the slot input to be gated on `seats`
+having loaded) before implementing, not after.
+
 ---
 
 ## B. Player picker: best available and team needs, not survival percentages
