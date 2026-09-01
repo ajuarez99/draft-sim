@@ -8,6 +8,10 @@ export type PlayerRef = {
   position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF'
   team: string | null
   adp: number
+  // 999 is Sleeper's own "no rank" sentinel (BoardService's default, never
+  // null) -- a "{position}{positionalRank}" label must special-case it rather
+  // than rendering "RB999".
+  positionalRank: number
 }
 
 export type Candidate = { player: PlayerRef; probability: number }
@@ -78,6 +82,11 @@ export type SeatsResponse = {
   rounds: number
   status: string
   seats: Seat[]
+  // Sleeper's raw flat slot list (e.g. ["QB","RB","RB","WR","WR","TE","FLEX",
+  // "FLEX","K","DEF","BN",...]), same shape as league.roster_positions --
+  // read-only, league/draft-level, constant across runs. Legitimately [] when
+  // a league's roster settings haven't synced; see teamNeeds.ts.
+  rosterPositions: string[]
 }
 
 export type SimRequest = {

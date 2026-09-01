@@ -377,6 +377,27 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .modal-your-pick { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
 .modal-your-pick h3, .modal-model-pick h3 { font-size: 11px; margin: 0 0 6px; letter-spacing: 0.04em; }
 
+/* PlayerPicker: "your team so far" strip -- one small block per starting
+   roster slot, filled (shows the player, same .pos badge language as
+   DraftBoard's cells) or open (dimmed position abbreviation). A row of
+   compact blocks, not a card grid -- there's one line of real content
+   (filled or open) per slot, matching feedback_avoid_flat_uniform_cards. */
+.team-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.team-slot {
+  display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+  border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 11px;
+}
+.team-slot.filled { border-color: color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.team-slot.open { color: var(--muted); }
+.team-slot-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-slot-empty { font-weight: 700; letter-spacing: 0.03em; }
+
+/* Row-level tags in the picker table: "fills a need" and the low-survival
+   signal that replaced the removed percentage bar/column. */
+.tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
+.tag.need { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
+.tag.likely-gone { background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); color: var(--crimson); }
+
 /* PlayerPicker: position chips above a scrollable, reused avail table. */
 .picker-filters { margin: 10px 0; }
 .picker-scroll { overflow: auto; min-height: 0; flex: 1; }

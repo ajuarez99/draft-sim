@@ -69,12 +69,28 @@ public class LeagueController {
         });
         seats.sort(Comparator.comparingInt(s -> (Integer) s.get("slot")));
 
-        return ResponseEntity.ok(Map.of(
-                "draftId", sleeperDraftId,
-                "teams", draft.get().teams(),
-                "rounds", draft.get().rounds(),
-                "status", String.valueOf(draft.get().status()),
-                "seats", seats));
+        // rosterPositions is always a non-null List (roster_positions is `text[]
+        // not null default '{}'`), including legitimately empty when a league's
+        // roster settings haven't synced -- the frontend team-needs helper treats
+        // [] as "hide the strip", not an error.
+        List<String> rosterPositions = leagues.byId(draft.get().leagueId())
+                .map(LeagueRepository.LeagueRow::rosterPositions)
+                .orElseGet(List::of);
+
+        // Map.of(...) throws NullPointerException on any null value (AGENTS.md's
+        // own named hard rule) -- board() below already had to switch to a mutable
+        // LinkedHashMap for the identical reason. This response is about to gain
+        // sibling nullable fields from other in-flight work on this same endpoint
+        // (plan A's mySlot), so it needs the same fix now rather than after the
+        // first null crashes it at runtime.
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("draftId", sleeperDraftId);
+        body.put("teams", draft.get().teams());
+        body.put("rounds", draft.get().rounds());
+        body.put("status", String.valueOf(draft.get().status()));
+        body.put("seats", seats);
+        body.put("rosterPositions", rosterPositions);
+        return ResponseEntity.ok(body);
     }
 
     /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */

@@ -85,6 +85,29 @@ public class LeagueRepository {
                 .optional();
     }
 
+    /**
+     * Forward-keyed lookup by the internal id -- added for
+     * LeagueController.seats(), which only has DraftRow.leagueId() (internal
+     * id) on hand and previously had no path from that to a league's
+     * roster_positions; bySleeperId()/all() weren't it.
+     */
+    public Optional<LeagueRow> byId(long id) {
+        return db.sql("""
+                select id, sleeper_id, name, season, total_rosters, roster_positions,
+                       coalesce((scoring_json->>'rec')::numeric, 0) as ppr
+                from league where id = ?
+                """)
+                .param(id)
+                .query((rs, i) -> {
+                    Array a = rs.getArray("roster_positions");
+                    List<String> slots = List.of((String[]) a.getArray());
+                    return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
+                            rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
+                            slots, rs.getDouble("ppr"));
+                })
+                .optional();
+    }
+
     public List<LeagueRow> all() {
         return db.sql("""
                 select id, sleeper_id, name, season, total_rosters, roster_positions,
