@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.TestPropertySource;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -35,8 +36,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * logically null" would not have caught that bug; this test also forces actual
  * JSON serialization of the response body, which is where Map.of(...) would
  * have thrown.
+ *
+ * Explicitly overrides draftsim.owner.sleeper-user-id to blank rather than
+ * relying on APP_OWNER_SLEEPER_USER_ID being unset in whatever shell runs the
+ * suite -- application.yml's default is blank, but a developer who has
+ * exported that env var locally (to actually use the feature) would otherwise
+ * silently flip this test into the "configured" state it isn't meant to
+ * cover, without a single line of test code changing to explain why it
+ * started failing (or, worse, matching some other manager and passing for
+ * the wrong reason).
  */
 @SpringBootTest
+@TestPropertySource(properties = "draftsim.owner.sleeper-user-id=")
 class LeagueControllerSeatsUnsetOwnerIT {
 
     private static final String JDBC_URL = "jdbc:postgresql://localhost:5433/draftsim";
