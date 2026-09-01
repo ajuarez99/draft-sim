@@ -228,12 +228,49 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board-panel { flex: 3 1 0; min-height: 0; min-width: 0; display: flex; }
 .board-panel > .panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 
+/* Wraps DraftBoard so the pre-start overlay can position itself against the
+   grid rather than the whole page -- `position: relative` here, `absolute`
+   on the overlay. `.board-scroll` (DraftBoard's own root) is already
+   `flex: 1; min-height: 0`, so nesting it one level deeper changes nothing
+   about its own sizing. */
+.board-stage { position: relative; flex: 1; min-height: 0; min-width: 0; display: flex; }
+
+/* The pre-start empty-board screen: DraftBoard renders its normal grid, every
+   cell hidden (revealedThrough is 0 until a result exists), and this sits on
+   top of it -- a Sleeper-style "nothing has happened yet, here's the whole
+   room" moment, not a placeholder screen next to an empty grid. Translucent
+   rather than opaque so the empty grid is still visibly *there* underneath. */
+.start-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklch, var(--bg) 72%, transparent);
+  backdrop-filter: blur(2px);
+  text-align: center; padding: 24px;
+}
+.start-overlay-cta { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 420px; }
+.start-overlay-cta h2 { margin: 0; font-size: 20px; color: var(--text); }
+.start-overlay-status { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.start-overlay-status .cond { font-size: 15px; color: var(--text); letter-spacing: 0.02em; }
+.start-button {
+  background: var(--teal); color: var(--bg); border: 0; border-radius: 10px;
+  padding: 14px 34px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  margin: 14px 0 10px; transition: filter 120ms ease, transform 120ms ease;
+}
+.start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
 .lower-grid {
   flex: 2 1 0; min-height: 0; display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); grid-template-rows: minmax(0, 1fr); gap: 16px;
 }
 .lower-grid > .panel:first-child { min-height: 0; display: flex; flex-direction: column; }
-.lower-grid > .panel:last-child { align-self: start; }
+/* Was `align-self: start` with no height/overflow constraint -- fine when
+   the caveats list is short, but with enough caveats (a real, reproducible
+   case for this league's board) the panel's actual content height exceeds
+   the row's, and with the default `overflow: visible` the excess just
+   bleeds past the grid row over whatever renders below/beside it instead of
+   being clipped. Stretching to the row height and scrolling the body
+   internally (same pattern as `.avail-scroll`/`.board-scroll` already use)
+   fixes it the same way those were fixed, not with a one-off max-height. */
+.lower-grid > .panel:last-child { align-self: stretch; min-height: 0; display: flex; flex-direction: column; }
 
 .seats-panel { flex: 2 1 0; min-height: 0; display: flex; }
 .seats-panel > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }

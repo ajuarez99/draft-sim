@@ -9,18 +9,20 @@ export default function ConfidenceNote({ c }: { c: Confidence }) {
   return (
     <section className="panel warn">
       <h2>How much to trust this</h2>
-      <p className="small">
-        Of {c.totalSeats} seats: <strong>{c.managersWithHistory}</strong> have draft history,{' '}
-        <strong>{c.managersStated}</strong> run on tendencies you entered, and{' '}
-        <strong>{c.managersNeutral}</strong> are the league-average drafter ·{' '}
-        {c.scoreablePicks} picks scoreable against a contemporaneous board · board source:{' '}
-        <code>{c.boardSource}</code>
-      </p>
-      <ul className="small">
-        {c.caveats.map((x, i) => (
-          <li key={i}>{x}</li>
-        ))}
-      </ul>
+      <div className="panel-body">
+        <p className="small">
+          Of {c.totalSeats} seats: <strong>{c.managersWithHistory}</strong> have draft history,{' '}
+          <strong>{c.managersStated}</strong> run on tendencies you entered, and{' '}
+          <strong>{c.managersNeutral}</strong> are the league-average drafter ·{' '}
+          {c.scoreablePicks} picks scoreable against a contemporaneous board · board source:{' '}
+          <code>{c.boardSource}</code>
+        </p>
+        <ul className="small">
+          {c.caveats.map((x, i) => (
+            <li key={i}>{x}</li>
+          ))}
+        </ul>
+      </div>
     </section>
   )
 }

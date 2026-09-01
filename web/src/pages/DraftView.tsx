@@ -235,6 +235,16 @@ export default function DraftView() {
   // below -- they need every one of your slots marked, decided or not.
   const undecidedMyPicks = result ? result.myPicks.filter((p) => !(p in userPicks)) : []
 
+  // Nothing has been started for this draft yet. The pre-start screen is a
+  // real full-screen empty board (Sleeper's own draft room, before a pick has
+  // landed, looks like this), not a small placeholder squeezed next to
+  // controls and empty side panels -- see claude/ui-polish-roadmap.md §C.
+  // `started` gates the lower-grid/seats-panel bands entirely: they have
+  // nothing to show yet (no availability curves, and seat-editing belongs to
+  // a moment before or after watching a draft, not squeezed alongside an
+  // empty grid) and hiding them is what lets the board fill the screen.
+  const started = result != null
+
   return (
     <>
       <div className="controls">
@@ -278,12 +288,15 @@ export default function DraftView() {
           </span>
         </label>
         <button onClick={run} disabled={running || resimming}>
-          {running ? `simulating ${Math.round(progress * 100)}%` : 'run'}
+          {running ? `simulating ${Math.round(progress * 100)}%` : 'start'}
         </button>
       </div>
 
       {error && <div className="error">{error}</div>}
-      {running && (
+      {/* Only for a re-run once a board already exists -- the first run's
+          progress lives inside the empty board's own overlay below, so the
+          two never show at once. */}
+      {started && running && (
         <div className="progress">
           <div className="progress-bar" style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
@@ -295,64 +308,90 @@ export default function DraftView() {
 
       <div className="content">
         <div className="board-panel">
-          {result && (
-            <section className="panel">
-              <h2>Predicted board</h2>
-              <p className="muted small">
-                Each cell is the most likely player still unassigned at that pick, with the share of runs
-                he actually went there. Low percentages mean the model does not know, which is most of the
-                board after round three. Faded names are cells where the most likely player had already
-                gone earlier.
-              </p>
-              <RevealScrubber
-                value={reveal.revealedThrough}
-                max={result.teams * result.rounds}
-                teams={result.teams}
-                myPicks={result.myPicks}
-                onChange={reveal.scrubTo}
-                onSkip={reveal.skip}
-                disabled={resimming}
-              />
-              {reveal.pausedAt != null &&
-                (resimming ? (
-                  <div className="pause-banner">
-                    <span className="muted small">
-                      Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
-                    </span>
-                  </div>
-                ) : (
-                  <PickPrompt
-                    pausedAt={reveal.pausedAt}
-                    teams={result.teams}
-                    modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
-                    onPick={choosePick}
-                    onOpenPicker={() => setPickerOpen(true)}
-                  />
-                ))}
-              <DraftBoard
-                board={result.board}
-                teams={result.teams}
-                rounds={result.rounds}
-                myPicks={result.myPicks}
-                userPicks={userPicks}
-                revealedThrough={reveal.revealedThrough}
-                seats={seats?.seats}
-                onCellClick={setOpenPick}
-              />
-            </section>
-          )}
+          <section className="panel">
+            {started && (
+              <>
+                <h2>Predicted board</h2>
+                <p className="muted small">
+                  Each cell is the most likely player still unassigned at that pick, with the share of runs
+                  he actually went there. Low percentages mean the model does not know, which is most of the
+                  board after round three. Faded names are cells where the most likely player had already
+                  gone earlier.
+                </p>
+                <RevealScrubber
+                  value={reveal.revealedThrough}
+                  max={result.teams * result.rounds}
+                  teams={result.teams}
+                  myPicks={result.myPicks}
+                  onChange={reveal.scrubTo}
+                  onSkip={reveal.skip}
+                  disabled={resimming}
+                />
+                {reveal.pausedAt != null &&
+                  (resimming ? (
+                    <div className="pause-banner">
+                      <span className="muted small">
+                        Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <PickPrompt
+                      pausedAt={reveal.pausedAt}
+                      teams={result.teams}
+                      modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
+                      onPick={choosePick}
+                      onOpenPicker={() => setPickerOpen(true)}
+                    />
+                  ))}
+              </>
+            )}
 
-          {!result && !running && (
-            <section className="panel">
-              <p className="muted">
-                Run ingest first if you have not:{' '}
-                <code>POST /api/ingest/all/1391509063170293760</code>, then hit run.
-              </p>
-            </section>
-          )}
+            {seats && (
+              // teams/rounds come from `seats` (fetched independently of a
+              // run) so the grid -- and its column headers -- exists before a
+              // simulation ever has. Everything else defaults to "nothing
+              // revealed yet": an empty board, not a placeholder screen.
+              <div className="board-stage">
+                <DraftBoard
+                  board={result?.board ?? []}
+                  teams={result?.teams ?? seats.teams}
+                  rounds={result?.rounds ?? seats.rounds}
+                  myPicks={result?.myPicks ?? []}
+                  userPicks={userPicks}
+                  revealedThrough={started ? reveal.revealedThrough : 0}
+                  seats={seats.seats}
+                  onCellClick={started ? setOpenPick : undefined}
+                />
+                {!started && (
+                  <div className="start-overlay">
+                    {running ? (
+                      <div className="start-overlay-status">
+                        <span className="cond">Simulating your draft...</span>
+                        <span className="muted small">{Math.round(progress * 100)}%</span>
+                      </div>
+                    ) : (
+                      <div className="start-overlay-cta">
+                        <h2 className="cond">Ready when you are</h2>
+                        <p className="muted small">
+                          Set your slot above if you know it, then start the mock draft.
+                        </p>
+                        <button className="start-button" onClick={run}>
+                          Start the mock draft
+                        </button>
+                        <p className="muted tiny">
+                          First time with this league? Ingest it first:{' '}
+                          <code>POST /api/ingest/all/1391509063170293760</code>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
         </div>
 
-        {result && (
+        {started && (
           <div className="lower-grid">
             <AvailabilityPanel
               availability={result.availability}
@@ -364,9 +403,11 @@ export default function DraftView() {
           </div>
         )}
 
-        <div className="seats-panel">
-          {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
-        </div>
+        {started && (
+          <div className="seats-panel">
+            {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
+          </div>
+        )}
       </div>
 
       {openPick && result && (
