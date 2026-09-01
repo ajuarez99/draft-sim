@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
@@ -91,6 +91,27 @@ export default function DraftView() {
     refetchSeats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftId])
+
+  // Auto-detect: once seats arrive, if the URL has no explicit ?slot= (an
+  // explicit param is a deliberate user choice and must never be overridden)
+  // and the backend matched the configured owner to a seat in this league,
+  // adopt that slot via the same setMySlot(..., {replace:true}) mechanism the
+  // manual input already uses. useLayoutEffect (not useEffect) so this commits
+  // before the browser paints: since `mySlot` is derived from the URL on every
+  // render, the plain-useEffect version would paint one real frame of
+  // DEFAULT_SLOT (1) on the exact full-screen start-overlay CTA this feature
+  // is meant to streamline, between the seats commit and the slot-URL commit.
+  // useLayoutEffect closes that gap; it can't do anything about the fetch
+  // window itself (nothing can, seats is inherently async), which is why the
+  // slot input below is separately gated on `seats` having loaded rather than
+  // rendering DEFAULT_SLOT while nothing is known yet. See
+  // claude/plan-review-A.md's "Auto-detect timing" finding.
+  useLayoutEffect(() => {
+    if (!seats) return
+    if (slotParam != null) return
+    if (seats.mySlot != null) setMySlot(seats.mySlot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seats])
 
   function setMySlot(slot: number) {
     // replace: true -- otherwise every keystroke in the slot input pushes its own
@@ -245,6 +266,14 @@ export default function DraftView() {
   // empty grid) and hiding them is what lets the board fill the screen.
   const started = result != null
 
+  // Whether the slot input has anything real to show yet. An explicit
+  // ?slot= is known immediately (nothing to wait for). Otherwise, until
+  // `seats` loads there is no way to tell "will auto-detect" from "will fall
+  // back to DEFAULT_SLOT" -- rendering DEFAULT_SLOT (1) here would be exactly
+  // the flash this feature is meant to avoid, so the input stays blank and
+  // disabled for that one short window instead of guessing.
+  const slotKnown = slotParam != null || seats != null
+
   return (
     <>
       <div className="controls">
@@ -254,7 +283,9 @@ export default function DraftView() {
             type="number"
             min={1}
             max={seats?.teams ?? 14}
-            value={mySlot}
+            value={slotKnown ? mySlot : ''}
+            placeholder={slotKnown ? undefined : '...'}
+            disabled={!slotKnown}
             onChange={(e) => setMySlot(Number(e.target.value))}
             size={3}
           />
@@ -373,7 +404,9 @@ export default function DraftView() {
                       <div className="start-overlay-cta">
                         <h2 className="cond">Ready when you are</h2>
                         <p className="muted small">
-                          Set your slot above if you know it, then start the mock draft.
+                          {seats?.mySlot != null
+                            ? `We found your seat — you're slot ${seats.mySlot}. Start the mock draft.`
+                            : 'Set your slot above if you know it, then start the mock draft.'}
                         </p>
                         <button className="start-button" onClick={run}>
                           Start the mock draft

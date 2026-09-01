@@ -13,7 +13,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         AdpProperties.class,
         PriorProperties.class,
         ApiSecurityProperties.class,
-        CorsProperties.class
+        CorsProperties.class,
+        OwnerProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

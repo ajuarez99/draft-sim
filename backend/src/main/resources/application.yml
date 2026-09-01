@@ -33,6 +33,10 @@ draftsim:
     token: ${API_TOKEN:}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  owner:
+    # Blank means slot auto-detection is OFF -- the local-dev default. Set to
+    # your own Sleeper user id to have the draft view auto-select your seat.
+    sleeper-user-id: ${APP_OWNER_SLEEPER_USER_ID:}
 
 sleeper:
   base-url: ${SLEEPER_BASE_URL:https://api.sleeper.app/v1}

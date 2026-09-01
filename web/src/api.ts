@@ -78,6 +78,8 @@ export type SeatsResponse = {
   rounds: number
   status: string
   seats: Seat[]
+  /** Auto-detected slot for the configured app owner, or null if unconfigured/not in this league. */
+  mySlot: number | null
 }
 
 export type SimRequest = {
