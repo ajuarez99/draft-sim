@@ -336,7 +336,10 @@ export default function DraftView() {
         <label>
           runs
           <select value={iterations} onChange={(e) => setIterations(Number(e.target.value))}>
-            {[500, 1000, 2000, 5000, 10000].map((n) => (
+            {/* 5000/10000 are gone: at the engine's current speed they are ~46s
+                and ~92s of progress bar, which is not a choice anyone should be
+                offered. Restore them if/when §B's hot-path work lands. */}
+            {[500, 1000, 2000].map((n) => (
               <option key={n} value={n}>
                 {n.toLocaleString()}
               </option>
