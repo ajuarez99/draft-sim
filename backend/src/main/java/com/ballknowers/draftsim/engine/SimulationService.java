@@ -9,6 +9,8 @@ import com.ballknowers.draftsim.profile.Provenance;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.store.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -16,6 +18,8 @@ import java.util.function.IntConsumer;
 
 @Service
 public class SimulationService {
+
+    private static final Logger log = LoggerFactory.getLogger(SimulationService.class);
 
     private final BoardService boards;
     private final ProfileService profiles;
@@ -42,6 +46,7 @@ public class SimulationService {
     }
 
     public SimulationResult simulate(SimulationRequest req, IntConsumer onProgress) {
+        long setupStart = System.nanoTime();
         Sport sport = Sport.NFL;
 
         DraftRepository.DraftRow draft = drafts.bySleeperId(req.draftSleeperId())
@@ -83,6 +88,9 @@ public class SimulationService {
 
         double temperature = req.temperature() != null ? req.temperature() : scoring.football().temperature();
         long seed = System.nanoTime();
+
+        long setupMs = (System.nanoTime() - setupStart) / 1_000_000;
+        log.info("request setup (board + profiles + Postgres): {} ms", setupMs);
 
         return runner.run(ctx, req.mySlot(), req.iterations(), temperature, seed,
                 buildConfidence(bySlot, fit, settings), onProgress);

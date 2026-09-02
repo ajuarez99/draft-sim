@@ -40,7 +40,7 @@ public class MonteCarloRunner {
         int[] myPicks = DraftSlot.picksForSlot(mySlot, teams, rounds);
         PickScorer scorer = new PickScorer(ctx.cfg(), ctx.rules(), ctx.priors());
 
-        long start = System.nanoTime();
+        long loopStart = System.nanoTime();
         List<DraftSimulator.RunResult> results = new ArrayList<>(iterations);
         AtomicInteger done = new AtomicInteger();
 
@@ -67,9 +67,19 @@ public class MonteCarloRunner {
                 }
             }
         }
-        log.info("{} iterations in {} ms", iterations, (System.nanoTime() - start) / 1_000_000);
+        long loopMs = (System.nanoTime() - loopStart) / 1_000_000;
 
-        return aggregate(ctx, mySlot, myPicks, iterations, temperature, results, confidence);
+        long aggStart = System.nanoTime();
+        SimulationResult result = aggregate(ctx, mySlot, myPicks, iterations, temperature, results, confidence);
+        long aggMs = (System.nanoTime() - aggStart) / 1_000_000;
+
+        // Split so the number logged is the number the UI actually waits on:
+        // aggregate() used to run entirely after this log line, silently
+        // uncounted (board-first-layout-and-pick-latency.md §B1).
+        log.info("{} iterations: {} ms simulation loop + {} ms aggregate = {} ms",
+                iterations, loopMs, aggMs, loopMs + aggMs);
+
+        return result;
     }
 
     private SimulationResult aggregate(DraftContext ctx, int mySlot, int[] myPicks,
@@ -81,8 +91,7 @@ public class MonteCarloRunner {
         int rounds = ctx.settings().rounds();
         int total = ctx.totalPicks();
 
-        Map<Long, BoardEntry> byId = new HashMap<>();
-        for (BoardEntry e : ctx.board()) byId.put(e.player().id(), e);
+        Map<Long, BoardEntry> byId = ctx.byId();   // built once on DraftContext, shared
 
         // --- modal pick per slot ---------------------------------------
         List<Map<Long, Integer>> counts = new ArrayList<>(total + 1);

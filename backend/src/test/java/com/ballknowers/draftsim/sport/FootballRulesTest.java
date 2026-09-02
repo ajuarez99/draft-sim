@@ -27,10 +27,15 @@ class FootballRulesTest {
                 "FA", "Active", null, null, null), adp, 1);
     }
 
+    private double need(RosterState roster, BoardEntry candidate) {
+        Object lineup = rules.prepareLineup(roster, SETTINGS, rules::value);
+        return rules.rosterNeed(candidate, lineup);
+    }
+
     @Test
     void anEmptyRosterNeedsEverythingAtFullValue() {
         RosterState empty = new RosterState();
-        assertEquals(1.0, rules.rosterNeed(empty, entry(1, "RB1", Position.RB, 3), SETTINGS), 1e-6);
+        assertEquals(1.0, need(empty, entry(1, "RB1", Position.RB, 3)), 1e-6);
     }
 
     @Test
@@ -41,8 +46,8 @@ class FootballRulesTest {
         r.add(entry(3, "RB3", Position.RB, 30));
         r.add(entry(4, "RB4", Position.RB, 40));   // fills RB, RB, FLEX, FLEX
 
-        double fifthRb = rules.rosterNeed(r, entry(5, "RB5", Position.RB, 90), SETTINGS);
-        double firstQb = rules.rosterNeed(r, entry(6, "QB1", Position.QB, 90), SETTINGS);
+        double fifthRb = need(r, entry(5, "RB5", Position.RB, 90));
+        double firstQb = need(r, entry(6, "QB1", Position.QB, 90));
         assertTrue(firstQb > fifthRb,
                 "an unfilled QB slot should outrank a fifth RB (" + firstQb + " vs " + fifthRb + ")");
     }
@@ -51,8 +56,8 @@ class FootballRulesTest {
     void benchDepthNeverScoresZero() {
         RosterState r = new RosterState();
         for (int i = 0; i < 4; i++) r.add(entry(i, "K" + i, Position.K, 200 + i));
-        double need = rules.rosterNeed(r, entry(99, "K5", Position.K, 250), SETTINGS);
-        assertTrue(need >= 0.15 - 1e-9, "benchFloor should apply, got " + need);
+        double n = need(r, entry(99, "K5", Position.K, 250));
+        assertTrue(n >= 0.15 - 1e-9, "benchFloor should apply, got " + n);
     }
 
     @Test
@@ -69,7 +74,46 @@ class FootballRulesTest {
         RosterState twoRb = new RosterState();
         twoRb.add(entry(1, "RB1", Position.RB, 3));
         twoRb.add(entry(2, "RB2", Position.RB, 15));
-        double third = rules.rosterNeed(twoRb, entry(3, "RB3", Position.RB, 25), SETTINGS);
+        double third = need(twoRb, entry(3, "RB3", Position.RB, 25));
         assertTrue(third > 0.9, "third RB should still be a starter via FLEX, got " + third);
+    }
+
+    /**
+     * Pins §B2's O(1) prepareLineup()/rosterNeed() against the O(n) full
+     * recomputation (startingLineupValue(after) - startingLineupValue(before))
+     * it replaced, across a mix of roster shapes: empty slots, full dedicated
+     * slots, FLEX overflow, and a displacement (a better player bumping an
+     * existing starter into FLEX contention).
+     */
+    @Test
+    void rosterNeedMatchesBruteForceLineupDelta() {
+        RosterState r = new RosterState();
+        r.add(entry(1, "RB1", Position.RB, 3));
+        r.add(entry(2, "RB2", Position.RB, 15));
+        r.add(entry(3, "RB3", Position.RB, 30));   // RB overflow -> FLEX contention
+        r.add(entry(4, "WR1", Position.WR, 5));
+        r.add(entry(5, "TE1", Position.TE, 45));
+        r.add(entry(6, "QB1", Position.QB, 20));
+
+        BoardEntry[] candidates = {
+                entry(100, "WR2", Position.WR, 8),          // second WR, empty slot
+                entry(101, "RBbetter", Position.RB, 2),      // beats an existing starter -> displaces
+                entry(102, "RBworse", Position.RB, 200),     // loses to weakest starter and to FLEX
+                entry(103, "K1", Position.K, 210),           // non-flex-eligible overflow
+                entry(104, "TEbetter", Position.TE, 1),      // beats the sole TE starter
+        };
+
+        double before = rules.startingLineupValue(r, SETTINGS);
+        for (BoardEntry c : candidates) {
+            RosterState after = r.copy();
+            after.add(c);
+            double bruteForce = rules.startingLineupValue(after, SETTINGS) - before;
+            double own = rules.value(c);
+            double expectedNeed = Math.max(0.0, Math.min(1.0, bruteForce / own)) * 0.85 + 0.15;
+
+            double actual = need(r, c);
+            assertEquals(expectedNeed, actual, 1e-9,
+                    "rosterNeed mismatch for " + c.player().name());
+        }
     }
 }

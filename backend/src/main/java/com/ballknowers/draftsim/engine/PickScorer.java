@@ -23,32 +23,58 @@ public final class PickScorer {
     private final SportRules rules;
     private final PositionalPriors priors;
 
+    // decay^age for age in [0, runWindow), precomputed once per PickScorer
+    // instance (one per simulation request, shared read-only across every
+    // iteration/pick/candidate) instead of recomputed with Math.pow() inside
+    // runPressure's per-candidate walk. Reading Math.pow(decay, k) from this
+    // table is bit-identical to calling it inline -- it is the exact same
+    // deterministic call, just made once instead of ~12.6M times.
+    private final double[] decayPow;
+
     public PickScorer(ScoringProperties.Sport cfg, SportRules rules, PositionalPriors priors) {
         this.cfg = cfg;
         this.rules = rules;
         this.priors = priors;
+        this.decayPow = new double[Math.max(1, cfg.runWindow())];
+        for (int k = 0; k < decayPow.length; k++) decayPow[k] = Math.pow(cfg.runRecencyDecay(), k);
     }
 
+    /**
+     * @param lineup {@link SportRules#prepareLineup} for this roster, before
+     *               {@code candidate} is added -- constant across every
+     *               candidate at this pick, so compute it once per pick.
+     * @param reachBias the seat's {@code profile.reachBias()} -- likewise
+     *               constant across candidates at this pick.
+     * @param positionalTerm {@code priors.logProbability(round, candidate.position())
+     *               + log(tilt)} -- constant for every candidate sharing
+     *               {@code candidate}'s position at this pick, so callers
+     *               scoring a whole candidate pool should compute this once
+     *               per position (see {@link #positionalTerm}) rather than
+     *               once per candidate.
+     * @param runTerm {@link #runPressure} for {@code candidate}'s position --
+     *               likewise constant per position per pick.
+     */
     public double score(BoardEntry candidate,
                         int pickNo,
-                        int round,
-                        RosterState roster,
-                        ManagerProfile profile,
-                        LeagueSettings settings,
-                        Deque<Position> recentPicks) {
+                        Object lineup,
+                        double reachBias,
+                        double positionalTerm,
+                        double runTerm) {
 
         ScoringProperties.Weights w = cfg.weights();
-        Position pos = candidate.position();
 
-        double valueDelta = valueDelta(candidate, pickNo, profile.reachBias());
-        double positional = priors.logProbability(round, pos) + Math.log(Math.max(profile.tilt(pos), 1e-3));
-        double need = rules.rosterNeed(roster, candidate, settings);
-        double run = runPressure(recentPicks, pos);
+        double valueDelta = valueDelta(candidate, pickNo, reachBias);
+        double need = rules.rosterNeed(candidate, lineup);
 
         return w.adp() * valueDelta
-                + w.positionalPrior() * positional
+                + w.positionalPrior() * positionalTerm
                 + w.rosterNeed() * need
-                + w.runPressure() * run;
+                + w.runPressure() * runTerm;
+    }
+
+    /** {@code log P(pos | round) + log positionalTilt}, the position-only half of the score. */
+    double positionalTerm(int round, Position pos, ManagerProfile profile) {
+        return priors.logProbability(round, pos) + Math.log(Math.max(profile.tilt(pos), 1e-3));
     }
 
     /**
@@ -80,11 +106,10 @@ public final class PickScorer {
      */
     double runPressure(Deque<Position> recent, Position pos) {
         if (recent.isEmpty()) return 0.0;
-        double decay = cfg.runRecencyDecay();
         double matched = 0, total = 0;
         int age = 0;
         for (Position p : recent) {          // iteration order: most recent first
-            double weight = Math.pow(decay, age++);
+            double weight = decayPow[age++];
             total += weight;
             if (p == pos) matched += weight;
             if (age >= cfg.runWindow()) break;
