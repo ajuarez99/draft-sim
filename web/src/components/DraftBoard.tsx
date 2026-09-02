@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { PlayerRef, PredictedPick, Seat } from '../api'
 import { hueFor } from '../hue'
+import { PROVENANCE_LABEL } from '../provenance'
 
 type Props = {
   board: PredictedPick[]
@@ -10,7 +11,11 @@ type Props = {
   userPicks: Record<number, PlayerRef>
   revealedThrough?: number
   seats?: Seat[]
+  // Undefined while the slot isn't known yet -- see DraftView's `slotKnown`.
+  // Distinct from "no seats at all" (seats itself being undefined).
+  mySlot?: number
   onCellClick?: (pick: PredictedPick) => void
+  onSeatClick?: (slot: number) => void
 }
 
 /**
@@ -26,7 +31,9 @@ export default function DraftBoard({
   userPicks,
   revealedThrough,
   seats,
+  mySlot,
   onCellClick,
+  onSeatClick,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
@@ -39,14 +46,41 @@ export default function DraftBoard({
         {Array.from({ length: teams }, (_, i) => {
           const slot = i + 1
           const seat = seatBySlot.get(slot)
+          const isMe = mySlot === slot
           const hue = seat ? hueFor(String(seat.managerId)) : hueFor(String(slot))
+          const label = seat ? PROVENANCE_LABEL[seat.provenance] : null
+          // The header carries what SeatList used to show in its own band
+          // (avatar, name, provenance, "you") -- see
+          // claude/board-first-layout-and-pick-latency.md §C. A dot, not the
+          // old text chip: fourteen "league average" chips across the top
+          // would be exactly the noise that map's own comment warns about.
+          // A real <button> (not a div) so it's reachable/activatable the
+          // same way a revealed cell already is, and opens SeatPopover.
           return (
-            <div key={i} className="col-head">
-              <span className="avatar" style={{ background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }}>
+            <button
+              key={i}
+              type="button"
+              className={`col-head${isMe ? ' mine' : ''}`}
+              onClick={() => seat && onSeatClick?.(seat.slot)}
+              disabled={!seat}
+              title={seat ? `${seat.manager} — click for details` : undefined}
+            >
+              <span
+                className="avatar"
+                style={
+                  isMe
+                    ? { background: 'var(--crimson)', color: 'var(--bg)' }
+                    : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
+                }
+              >
                 {seat ? seat.manager.trim().charAt(0).toUpperCase() : slot}
               </span>
               <span className="col-head-name mono">{seat ? seat.manager : slot}</span>
-            </div>
+              <span className="col-head-meta">
+                {label && <span className={`col-head-dot ${label.className}`} title={label.badge ?? 'drafts like the league average'} />}
+                {isMe && <span className="col-head-you mono">you</span>}
+              </span>
+            </button>
           )
         })}
         {Array.from({ length: rounds }, (_, r) => {

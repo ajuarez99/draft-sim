@@ -8,7 +8,6 @@
   --muted: oklch(63% 0.02 250);
   --crimson: oklch(58% 0.19 25);
   --teal: oklch(72% 0.14 175);
-  --warn: #3a2f1c;
   --qb: oklch(68% 0.14 45); --rb: oklch(68% 0.14 150);
   --wr: oklch(66% 0.15 235); --te: oklch(66% 0.14 300);
   --k: oklch(65% 0.02 250); --def: oklch(58% 0.03 250);
@@ -57,6 +56,10 @@ body {
   font-size: 22px; font-weight: 700; letter-spacing: 0.02em; margin: 0;
 }
 .top h1 a { color: inherit; text-decoration: none; }
+/* Portal target for DraftView's settings gear (§A) -- empty, and so
+   invisible, on any page that doesn't portal into it. */
+.top-slot { display: flex; align-items: center; }
+.gear-chip { font-size: 14px; line-height: 1; padding: 5px 9px; }
 
 .controls {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -81,12 +84,14 @@ body {
 .progress-bar { height: 100%; background: var(--teal); transition: width 120ms linear; }
 
 .error { background: #3a1d1d; border: 1px solid #6b2b2b; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+/* seatsDirty: the banner's own re-run action, not just a description of one
+   that lives elsewhere -- see DraftView.tsx's comment at this banner. */
+.error.seats-dirty { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 
 .panel {
   background: var(--panel); border-radius: 14px; padding: 18px 20px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
 }
-.panel.warn { background: var(--warn); box-shadow: 0 1px 2px rgba(0,0,0,0.25); border: 1px solid #55492c; }
 .panel h2 { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 
@@ -157,14 +162,36 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   font-size: 11px;
 }
 .board .corner { background: var(--panel); position: sticky; top: 0; left: 0; z-index: 2; }
+/* §C: the header now carries what SeatList's bottom band used to (name,
+   avatar, provenance, "you") -- it's a real <button> (opens SeatPopover), so
+   this resets browser button chrome the same way `.board button.cell`
+   already does for revealed cells. */
 .board .col-head {
   background: var(--panel); display: flex; flex-direction: column; align-items: center;
   gap: 4px; padding: 8px 2px; text-align: center;
   position: sticky; top: 0; z-index: 1;
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0; width: 100%;
+  font: inherit; color: inherit; cursor: pointer; transition: background 100ms ease;
 }
+.board .col-head:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.board .col-head:disabled { cursor: default; }
+.board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
+/* Same crimson identity as `.cell.mine` -- your own seat should read as the
+   same "you" everywhere on the board, not a second visual language. */
+.board .col-head.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson); }
+.board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
 .board .col-head-name {
   font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.board .col-head-meta { display: flex; align-items: center; gap: 5px; height: 8px; }
+/* A dot, not SeatList's old text chip -- fourteen "league average" chips
+   across the top would be exactly the noise that map's own comment warns
+   about (provenance.ts). */
+.board .col-head-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.board .col-head-dot.neutral { background: var(--muted); opacity: 0.5; }
+.board .col-head-dot.stated { background: var(--teal); }
+.board .col-head-dot.fitted { background: var(--rb); }
+.board .col-head-you { font-size: 8px; color: var(--crimson); letter-spacing: 0.04em; }
 .board .rnd {
   background: var(--panel); display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
@@ -225,7 +252,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    internally. Confirmed live: at a 900px window this pushed the entire page
    into horizontal scroll (documentElement.scrollWidth > innerWidth) rather
    than staying contained to the board's own scroller. */
-.board-panel { flex: 3 1 0; min-height: 0; min-width: 0; display: flex; }
+.board-panel { flex: 5 1 0; min-height: 0; min-width: 0; display: flex; }
 .board-panel > .panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 
 /* Wraps DraftBoard so the pre-start overlay can position itself against the
@@ -257,31 +284,18 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 }
 .start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
+/* Single column now (§E): the confidence panel that used to share this row
+   is gone outright (D/F3), and seats moved into the board's own column
+   headers (§C) rather than a second band below. AvailabilityPanel is the
+   whole row. */
 .lower-grid {
   flex: 2 1 0; min-height: 0; display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); grid-template-rows: minmax(0, 1fr); gap: 16px;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px;
 }
-.lower-grid > .panel:first-child { min-height: 0; display: flex; flex-direction: column; }
-/* Was `align-self: start` with no height/overflow constraint -- fine when
-   the caveats list is short, but with enough caveats (a real, reproducible
-   case for this league's board) the panel's actual content height exceeds
-   the row's, and with the default `overflow: visible` the excess just
-   bleeds past the grid row over whatever renders below/beside it instead of
-   being clipped. Stretching to the row height and scrolling the body
-   internally (same pattern as `.avail-scroll`/`.board-scroll` already use)
-   fixes it the same way those were fixed, not with a one-off max-height. */
-.lower-grid > .panel:last-child { align-self: stretch; min-height: 0; display: flex; flex-direction: column; }
-
-.seats-panel { flex: 2 1 0; min-height: 0; display: flex; }
-.seats-panel > .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-
-@media (max-width: 900px) {
-  .lower-grid { grid-template-columns: 1fr; grid-template-rows: auto auto; }
-}
+.lower-grid > .panel { min-height: 0; display: flex; flex-direction: column; }
 
 .avail-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
 
-.seats { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; align-content: start; }
 .seat {
   border: 1px solid var(--line); border-radius: 12px; padding: 12px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.22);
@@ -328,7 +342,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 
 .reveal-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .reveal-status { display: flex; align-items: center; gap: 8px; min-width: 190px; }
-.reveal-slider { width: 100%; }
 
 /* Same crimson-tinted "your pick" language as `.board .cell.mine`, so a
    paused board reads as one system rather than two different UIs. */
@@ -392,11 +405,10 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .team-slot-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-slot-empty { font-weight: 700; letter-spacing: 0.03em; }
 
-/* Row-level tags in the picker table: "fills a need" and the low-survival
-   signal that replaced the removed percentage bar/column. */
+/* Row-level tags in the picker table: "fills a need", the only one left now
+   that low-survival rows are filtered out of the list rather than tagged. */
 .tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
 .tag.need { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
-.tag.likely-gone { background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); color: var(--crimson); }
 
 /* PlayerPicker: position chips above a scrollable, reused avail table. */
 .picker-filters { margin: 10px 0; }

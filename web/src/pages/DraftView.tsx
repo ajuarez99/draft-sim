@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
@@ -10,14 +11,14 @@ import {
 } from '../api'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
-import SeatList from '../components/SeatList'
-import ConfidenceNote from '../components/ConfidenceNote'
+import SeatPopover from '../components/SeatPopover'
 import RevealScrubber from '../components/RevealScrubber'
 import PlayerCard from '../components/PlayerCard'
 import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
 import { useRevealedBoard } from '../useRevealedBoard'
 import { draftedSoFar } from '../teamNeeds'
+import { useTopSlot } from '../topSlot'
 
 // Every league, of any size, has a slot 1 -- unlike the single-league app's old
 // hardcoded 11, this stays a valid seat no matter which draft the picker opens.
@@ -66,6 +67,16 @@ export default function DraftView() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [resimming, setResimming] = useState(false)
   const [resimProgress, setResimProgress] = useState(0)
+
+  // §A/§C of claude/board-first-layout-and-pick-latency.md: the deleted top
+  // strip's `runs`/`chaos` live behind this gear popover instead, and the
+  // deleted `slot` input lives behind a seat header click (openSeatSlot).
+  // Slot, not the whole Seat object -- so the popover always reflects the
+  // latest fetched `seats` rather than a snapshot taken the moment it opened
+  // (handleSeatsChanged refetches after every edit).
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [openSeatSlot, setOpenSeatSlot] = useState<number | null>(null)
+  const topSlot = useTopSlot()
 
   // Bumped only by run() -- passed to useRevealedBoard as its resetKey, so a
   // resim's setResult() (which changes `board`'s identity but not this) does
@@ -159,6 +170,17 @@ export default function DraftView() {
       },
       { replace: true },
     )
+  }
+
+  // §C: "this seat is me" in the header popover, replacing the deleted
+  // number input as the way you pick your seat. An explicit choice, so it
+  // clears autoAdoptedSlotRef the same way the old manual input's onChange
+  // did -- see that ref's own comment for why the start-overlay CTA depends
+  // on this distinction.
+  function makeSeatMine(slot: number) {
+    autoAdoptedSlotRef.current = false
+    setMySlot(slot)
+    setOpenSeatSlot(null)
   }
 
   // The one place a pick gets recorded, whichever of the two entry points
@@ -300,74 +322,43 @@ export default function DraftView() {
   // real full-screen empty board (Sleeper's own draft room, before a pick has
   // landed, looks like this), not a small placeholder squeezed next to
   // controls and empty side panels -- see claude/ui-polish-roadmap.md §C.
-  // `started` gates the lower-grid/seats-panel bands entirely: they have
-  // nothing to show yet (no availability curves, and seat-editing belongs to
-  // a moment before or after watching a draft, not squeezed alongside an
-  // empty grid) and hiding them is what lets the board fill the screen.
+  // `started` gates the lower-grid (availability) entirely: it has nothing
+  // to show yet (no availability curves), and hiding it is part of what lets
+  // the board fill the screen. Seat editing/"this is me" stays reachable
+  // either way -- the header popover works off `seats`, fetched independent
+  // of `result` -- so the empty pre-start board doubles as the seat-setup
+  // screen (see §C's "watch out for").
   const started = result != null
 
-  // Whether the slot input has anything real to show yet. An explicit
-  // ?slot= is known immediately (nothing to wait for). Otherwise, until
-  // `seats` loads there is no way to tell "will auto-detect" from "will fall
-  // back to DEFAULT_SLOT" -- rendering DEFAULT_SLOT (1) here would be exactly
-  // the flash this feature is meant to avoid, so the input stays blank and
-  // disabled for that one short window instead of guessing.
+  // Whether the board headers have anything real to show as "you" yet. An
+  // explicit ?slot= is known immediately (nothing to wait for). Otherwise,
+  // until `seats` loads there is no way to tell "will auto-detect" from
+  // "will fall back to DEFAULT_SLOT" -- marking DEFAULT_SLOT's (1) header as
+  // "you" here would be exactly the flash this feature is meant to avoid, so
+  // no header is marked "you" for that one short window instead of guessing.
   const slotKnown = slotParam != null || seats != null
 
   return (
     <>
-      <div className="controls">
-        <label>
-          slot
-          <input
-            type="number"
-            min={1}
-            max={seats?.teams ?? 14}
-            value={slotKnown ? mySlot : ''}
-            placeholder={slotKnown ? undefined : '...'}
-            disabled={!slotKnown}
-            onChange={(e) => {
-              autoAdoptedSlotRef.current = false
-              setMySlot(Number(e.target.value))
-            }}
-            size={3}
-          />
-        </label>
-        <label>
-          runs
-          <select value={iterations} onChange={(e) => setIterations(Number(e.target.value))}>
-            {/* 5000/10000 are gone: at the engine's current speed they are ~46s
-                and ~92s of progress bar, which is not a choice anyone should be
-                offered. Restore them if/when §B's hot-path work lands. */}
-            {[500, 1000, 2000].map((n) => (
-              <option key={n} value={n}>
-                {n.toLocaleString()}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="temp">
-          chaos
-          <input
-            type="range"
-            min={0}
-            max={3}
-            step={0.1}
-            value={temperature}
-            onChange={(e) => setTemperature(Number(e.target.value))}
-          />
-          <span className="temp-value">
-            {temperature === 0
-              ? 'most likely board'
-              : temperature <= 1.2
-                ? `realistic (${temperature.toFixed(1)})`
-                : `chaos (${temperature.toFixed(1)})`}
-          </span>
-        </label>
-        <button onClick={run} disabled={running || resimming}>
-          {running ? `simulating ${Math.round(progress * 100)}%` : 'start'}
-        </button>
-      </div>
+      {/* §A: the deleted top strip's `runs`/`chaos` live behind this gear
+          instead of a permanent toolbar -- portaled into App's persistent
+          `.top` header (the one region that isn't part of any single draft's
+          own content) rather than duplicated inside every DraftView. The
+          popover itself doesn't need portaling: `.modal-backdrop` is
+          `position: fixed`, so it already escapes wherever it's mounted. */}
+      {topSlot &&
+        createPortal(
+          <button
+            type="button"
+            className="chip gear-chip"
+            onClick={() => setSettingsOpen((o) => !o)}
+            aria-label="Simulation settings"
+            title="Simulation settings"
+          >
+            ⚙
+          </button>,
+          topSlot,
+        )}
 
       {error && <div className="error">{error}</div>}
       {/* Only for a re-run once a board already exists -- the first run's
@@ -379,30 +370,37 @@ export default function DraftView() {
         </div>
       )}
 
+      {/* seatsDirty's own inline re-run makes the banner actionable from
+          itself, not just descriptive of an action available somewhere else
+          -- the board panel's RevealScrubber also carries a re-run chip
+          (below) for the common case where you're already looking at it. */}
       {seatsDirty && result && (
-        <div className="error">Seats changed since this simulation ran — re-run to refresh the board.</div>
+        <div className="error seats-dirty">
+          <span>Seats changed since this simulation ran — re-run to refresh the board.</span>
+          <button className="chip on" onClick={run} disabled={running || resimming}>
+            re-run
+          </button>
+        </div>
       )}
 
       <div className="content">
         <div className="board-panel">
           <section className="panel">
+            {/* F2: no heading/explainer paragraph -- the panel opens
+                directly on the reveal scrubber and grid. The cell format
+                (modal player / share of runs / faded = already gone) is
+                explained by each cell's own `title` attribute
+                (DraftBoard.tsx) instead of a permanent paragraph. */}
             {started && (
               <>
-                <h2>Predicted board</h2>
-                <p className="muted small">
-                  Each cell is the most likely player still unassigned at that pick, with the share of runs
-                  he actually went there. Low percentages mean the model does not know, which is most of the
-                  board after round three. Faded names are cells where the most likely player had already
-                  gone earlier.
-                </p>
                 <RevealScrubber
                   value={reveal.revealedThrough}
                   max={result.teams * result.rounds}
                   teams={result.teams}
-                  myPicks={result.myPicks}
-                  onChange={reveal.scrubTo}
                   onSkip={reveal.skip}
+                  onRerun={run}
                   disabled={resimming}
+                  rerunDisabled={running || resimming}
                 />
                 {reveal.pausedAt != null &&
                   (resimming ? (
@@ -438,7 +436,9 @@ export default function DraftView() {
                   userPicks={userPicks}
                   revealedThrough={started ? reveal.revealedThrough : 0}
                   seats={seats.seats}
+                  mySlot={slotKnown ? mySlot : undefined}
                   onCellClick={started ? setOpenPick : undefined}
+                  onSeatClick={setOpenSeatSlot}
                 />
                 {!started && (
                   <div className="start-overlay">
@@ -453,7 +453,7 @@ export default function DraftView() {
                         <p className="muted small">
                           {autoAdoptedSlotRef.current && seats?.mySlot != null
                             ? `We found your seat — you're slot ${seats.mySlot}. Start the mock draft.`
-                            : 'Set your slot above if you know it, then start the mock draft.'}
+                            : 'Click your name in the board above if you know your seat, then start the mock draft.'}
                         </p>
                         <button className="start-button" onClick={run}>
                           Start the mock draft
@@ -471,6 +471,11 @@ export default function DraftView() {
           </section>
         </div>
 
+        {/* D/F3: the confidence panel is gone outright, not folded into a
+            paragraph -- F2 deletes the very paragraph §D's original plan
+            would have folded it into. The caveats it carried remain in
+            README.md's "What not to trust". AvailabilityPanel now takes the
+            full row width (§E: `.lower-grid` collapses to one column). */}
         {started && (
           <div className="lower-grid">
             <AvailabilityPanel
@@ -479,13 +484,6 @@ export default function DraftView() {
               teams={result.teams}
               pickedPlayerIds={pickedPlayerIds}
             />
-            <ConfidenceNote c={result.confidence} />
-          </div>
-        )}
-
-        {started && (
-          <div className="seats-panel">
-            {seats && <SeatList seats={seats.seats} mySlot={mySlot} onChanged={handleSeatsChanged} />}
           </div>
         )}
       </div>
@@ -510,6 +508,79 @@ export default function DraftView() {
           onPick={choosePick}
           onClose={() => setPickerOpen(false)}
         />
+      )}
+
+      {/* §C: a board column header opens this instead of SeatList's old
+          bottom band. Looked up by slot (not a stored Seat object) so it
+          always reflects the latest `seats` after handleSeatsChanged
+          refetches -- see openSeatSlot's own comment above. */}
+      {openSeatSlot != null &&
+        seats &&
+        (() => {
+          const openSeat = seats.seats.find((s) => s.slot === openSeatSlot)
+          return openSeat ? (
+            <SeatPopover
+              seat={openSeat}
+              isMe={openSeat.slot === mySlot}
+              onChanged={handleSeatsChanged}
+              onClose={() => setOpenSeatSlot(null)}
+              onMakeMine={() => makeSeatMine(openSeat.slot)}
+            />
+          ) : null
+        })()}
+
+      {/* §A: `runs`/`chaos`, moved verbatim out of the deleted top strip.
+          Disabling the fields (rather than the gear trigger) while a run is
+          in flight keeps last-used values visible instead of hiding them. */}
+      {settingsOpen && (
+        <div className="modal-backdrop" onClick={() => setSettingsOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">
+              ✕
+            </button>
+            <h3 className="cond tiny muted">Simulation settings</h3>
+            <div className="controls">
+              <label>
+                runs
+                <select
+                  value={iterations}
+                  disabled={running || resimming}
+                  onChange={(e) => setIterations(Number(e.target.value))}
+                >
+                  {/* 5000/10000 are gone: at the engine's current speed they
+                      are ~46s and ~92s of progress bar, which is not a
+                      choice anyone should be offered. Restore them if/when
+                      §B's hot-path work lands. */}
+                  {[500, 1000, 2000].map((n) => (
+                    <option key={n} value={n}>
+                      {n.toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="temp">
+                chaos
+                <input
+                  type="range"
+                  min={0}
+                  max={3}
+                  step={0.1}
+                  value={temperature}
+                  disabled={running || resimming}
+                  onChange={(e) => setTemperature(Number(e.target.value))}
+                />
+                <span className="temp-value">
+                  {temperature === 0
+                    ? 'most likely board'
+                    : temperature <= 1.2
+                      ? `realistic (${temperature.toFixed(1)})`
+                      : `chaos (${temperature.toFixed(1)})`}
+                </span>
+              </label>
+            </div>
+            {(running || resimming) && <p className="muted tiny">Applies to the next run.</p>}
+          </div>
+        </div>
       )}
     </>
   )

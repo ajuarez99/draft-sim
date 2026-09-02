@@ -78,12 +78,5 @@ export function useRevealedBoard(
     setPausedAt(null)
   }
 
-  function scrubTo(pickNo: number) {
-    if (timerRef.current != null) window.clearInterval(timerRef.current)
-    setIsRevealing(false)
-    setPausedAt(null)
-    setRevealedThrough(Math.max(0, Math.min(maxPickNo, pickNo)))
-  }
-
-  return { revealedThrough, isRevealing, pausedAt, resume, skip, scrubTo }
+  return { revealedThrough, isRevealing, pausedAt, resume, skip }
 }

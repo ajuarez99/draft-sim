@@ -4,13 +4,21 @@ type Props = {
   value: number
   max: number
   teams: number
-  myPicks: number[]
-  onChange: (pickNo: number) => void
   onSkip: () => void
+  // Re-run lives here (not a top strip -- see
+  // claude/board-first-layout-and-pick-latency.md §A) because this is the
+  // board panel's own head, the same place `skip` already sits. Always
+  // rendered once a board exists, unlike `skip` which only makes sense
+  // mid-reveal -- re-running from scratch is always a valid action.
+  onRerun: () => void
   disabled?: boolean
+  rerunDisabled?: boolean
 }
 
-export default function RevealScrubber({ value, max, teams, myPicks, onChange, onSkip, disabled }: Props) {
+// No manual scrub control -- the reveal runs at its own pace (the 450ms tick
+// in useRevealedBoard.ts) and `skip` is the only way to move faster than
+// that, jumping straight to the end rather than to an arbitrary pick.
+export default function RevealScrubber({ value, max, teams, onSkip, onRerun, disabled, rerunDisabled }: Props) {
   if (max <= 0) return null
   const shown = Math.max(1, value)
   return (
@@ -19,27 +27,17 @@ export default function RevealScrubber({ value, max, teams, myPicks, onChange, o
         <span className="muted small">
           Pick {value} of {max} <span className="mono">{roundPickLabel(shown, teams)}</span>
         </span>
-        {value < max && (
-          <button className="chip" onClick={onSkip} disabled={disabled}>
-            skip
+        <div className="controls-inline">
+          {value < max && (
+            <button className="chip" onClick={onSkip} disabled={disabled}>
+              skip
+            </button>
+          )}
+          <button className="chip" onClick={onRerun} disabled={rerunDisabled}>
+            re-run
           </button>
-        )}
+        </div>
       </div>
-      <input
-        type="range"
-        className="reveal-slider"
-        min={1}
-        max={max}
-        value={shown}
-        list="reveal-ticks"
-        disabled={disabled}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-      <datalist id="reveal-ticks">
-        {myPicks.map((p) => (
-          <option key={p} value={p} />
-        ))}
-      </datalist>
     </div>
   )
 }

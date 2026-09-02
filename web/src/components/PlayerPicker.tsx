@@ -34,6 +34,11 @@ function rankLabel(p: PlayerRef): string {
 // displayed number. See claude/ui-polish-roadmap.md section B: the percentage
 // answers "how often did this player survive in simulation," not "who should
 // I take," and reads as noise for the latter question.
+//
+// The threshold is 0.2, not just >0 -- a row that would've carried the
+// "likely gone" tag is dropped from the list instead of shown with a warning.
+// Scanning a pick list for who's actually still there shouldn't require
+// reading each row's tag.
 export default function PlayerPicker({
   pausedAt,
   teams,
@@ -58,7 +63,7 @@ export default function PlayerPicker({
     const key = String(pausedAt)
     return availability
       .filter((r) => filter === 'ALL' || r.player.position === filter)
-      .filter((r) => (r.survivalByPick[key] ?? 0) > 0.01 && !alreadyPicked.has(r.player.id))
+      .filter((r) => (r.survivalByPick[key] ?? 0) >= 0.2 && !alreadyPicked.has(r.player.id))
       .sort((a, b) => a.player.adp - b.player.adp)
   }, [availability, filter, pausedAt, alreadyPicked])
 
@@ -120,7 +125,6 @@ export default function PlayerPicker({
             </thead>
             <tbody>
               {rows.map((r) => {
-                const survival = r.survivalByPick[String(pausedAt)] ?? 0
                 const need = needLabel(r.player.position, open)
                 return (
                   <tr
@@ -139,7 +143,6 @@ export default function PlayerPicker({
                       <span className={`pos ${r.player.position}`}>{r.player.position}</span>
                       {r.player.name}
                       <span className="team">{r.player.team}</span>
-                      {survival < 0.2 && <span className="tag likely-gone">likely gone</span>}
                     </td>
                     <td className="num">{rankLabel(r.player)}</td>
                     <td>{need && <span className="tag need">{need}</span>}</td>
@@ -150,7 +153,7 @@ export default function PlayerPicker({
           </table>
           {rows.length === 0 && (
             <p className="muted">
-              Nothing survives above 1% here. Close this and take the model's suggested pick from the prompt behind
+              Nothing survives above 20% here. Close this and take the model's suggested pick from the prompt behind
               it instead.
             </p>
           )}
