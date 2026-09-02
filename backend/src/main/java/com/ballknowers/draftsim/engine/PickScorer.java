@@ -45,7 +45,7 @@ public final class PickScorer {
      *               candidate at this pick, so compute it once per pick.
      * @param reachBias the seat's {@code profile.reachBias()} -- likewise
      *               constant across candidates at this pick.
-     * @param positionalTerm {@code priors.logProbability(round, candidate.position())
+     * @param positionalTerm {@code priors.logProbability(bucket, candidate.position())
      *               + log(tilt)} -- constant for every candidate sharing
      *               {@code candidate}'s position at this pick, so callers
      *               scoring a whole candidate pool should compute this once
@@ -72,9 +72,16 @@ public final class PickScorer {
                 + w.runPressure() * runTerm;
     }
 
-    /** {@code log P(pos | round) + log positionalTilt}, the position-only half of the score. */
-    double positionalTerm(int round, Position pos, ManagerProfile profile) {
-        return priors.logProbability(round, pos) + Math.log(Math.max(profile.tilt(pos), 1e-3));
+    /**
+     * {@code log P(pos | draft fraction) + log positionalTilt}, the
+     * position-only half of the score.
+     *
+     * @param bucket from {@link PositionalPriors#bucketOf}, NOT a round number
+     *               -- the priors table is keyed on fraction-of-draft so it
+     *               transfers across league sizes.
+     */
+    double positionalTerm(int bucket, Position pos, ManagerProfile profile) {
+        return priors.logProbability(bucket, pos) + Math.log(Math.max(profile.tilt(pos), 1e-3));
     }
 
     /**

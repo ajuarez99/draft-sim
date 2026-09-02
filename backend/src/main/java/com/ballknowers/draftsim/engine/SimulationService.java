@@ -1,13 +1,11 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.config.BoardProperties;
-import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.Provenance;
 import com.ballknowers.draftsim.profile.ProfileService;
-import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,23 +24,22 @@ public class SimulationService {
     private final DraftRepository drafts;
     private final LeagueRepository leagues;
     private final PlayerRepository players;
-    private final SportRules rules;
-    private final ScoringProperties scoring;
     private final BoardProperties boardCfg;
     private final MonteCarloRunner runner;
+    private final DraftContextFactory contexts;
 
     public SimulationService(BoardService boards, ProfileService profiles, DraftRepository drafts,
-                             LeagueRepository leagues, PlayerRepository players, SportRules rules,
-                             ScoringProperties scoring, BoardProperties boardCfg, MonteCarloRunner runner) {
+                             LeagueRepository leagues, PlayerRepository players,
+                             BoardProperties boardCfg, MonteCarloRunner runner,
+                             DraftContextFactory contexts) {
         this.boards = boards;
         this.profiles = profiles;
         this.drafts = drafts;
         this.leagues = leagues;
         this.players = players;
-        this.rules = rules;
-        this.scoring = scoring;
         this.boardCfg = boardCfg;
         this.runner = runner;
+        this.contexts = contexts;
     }
 
     public SimulationResult simulate(SimulationRequest req, IntConsumer onProgress) {
@@ -69,24 +66,14 @@ public class SimulationService {
         }
 
         ProfileService.Fit fit = profiles.fit(sport);
-        Map<Integer, ManagerProfile> bySlot = new HashMap<>();
-        draft.slotToManager().forEach((slot, managerId) -> {
-            long id = ((Number) managerId).longValue();
-            ManagerProfile p = fit.profiles().get(id);
-            bySlot.put(Integer.parseInt(slot),
-                    p != null ? p : ManagerProfile.neutral(id, "seat " + slot));
-        });
-        for (int s = 1; s <= settings.teams(); s++) {
-            bySlot.putIfAbsent(s, ManagerProfile.neutral(-1, "seat " + s));
-        }
-
+        List<SeatSpec> seats = seatsOf(draft, req.mySlot());
         Map<Integer, Long> completed = resolveStartState(req, draft, sport);
 
-        DraftContext ctx = new DraftContext(
-                board, settings, bySlot, fit.priors(), rules, scoring.football(),
-                completed.keySet().stream().sorted().toList(), completed);
+        DraftContext ctx = contexts.build(
+                settings, seats, fit.profiles(), fit.priors(), board, completed);
+        Map<Integer, ManagerProfile> bySlot = ctx.profileBySlot();
 
-        double temperature = req.temperature() != null ? req.temperature() : scoring.football().temperature();
+        double temperature = req.temperature() != null ? req.temperature() : ctx.cfg().temperature();
         long seed = System.nanoTime();
 
         long setupMs = (System.nanoTime() - setupStart) / 1_000_000;
@@ -94,6 +81,24 @@ public class SimulationService {
 
         return runner.run(ctx, req.mySlot(), req.iterations(), temperature, seed,
                 buildConfidence(bySlot, fit, settings), onProgress);
+    }
+
+    /**
+     * The league's own draft_order, as seats: every mapped slot is a modelled
+     * manager, the caller's own slot is marked USER, and anything Sleeper left
+     * unmapped falls through to a league-average bot in the factory.
+     */
+    private List<SeatSpec> seatsOf(DraftRepository.DraftRow draft, int mySlot) {
+        List<SeatSpec> seats = new ArrayList<>();
+        draft.slotToManager().forEach((slot, managerId) -> {
+            int s = Integer.parseInt(slot);
+            long id = ((Number) managerId).longValue();
+            seats.add(s == mySlot ? SeatSpec.user(s, id) : SeatSpec.manager(s, id));
+        });
+        if (seats.stream().noneMatch(x -> x.slot() == mySlot) && mySlot >= 1) {
+            seats.add(SeatSpec.user(mySlot, null));
+        }
+        return seats;
     }
 
     /**

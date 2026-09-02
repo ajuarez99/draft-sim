@@ -35,11 +35,18 @@ draftsim:
       runWindow: 6
       runRecencyDecay: 0.85
 
-      # Positions nobody takes before this round. Real constraint, not a guess:
-      # Sleeper's board enforces it and drafters follow it.
-      earliestRound:
-        K: 13
-        DEF: 12
+      # Positions nobody takes until the draft is nearly over, expressed as
+      # "only inside the last N rounds". Real constraint, not a guess: Sleeper's
+      # board enforces it and drafters follow it.
+      #
+      # Rounds remaining rather than a round number, because a round number only
+      # encodes the rule for one league length. These values reproduce the old
+      # earliestRound {K: 13, DEF: 12} exactly on a 15-round league (13 of 15
+      # leaves 3 rounds; 12 of 15 leaves 4) and keep meaning the same thing on
+      # a league of any other length.
+      latestRounds:
+        K: 3
+        DEF: 4
 
       # Softmax temperature. ~0 = modal board, 1 = realistic variance, >2 = chaos.
       temperature: 1.0
@@ -76,9 +83,16 @@ draftsim:
       minDrafts: 500
 
   priors:
-    # Dirichlet pseudo-counts per (round, position) cell. With 2 drafts of
+    # Dirichlet pseudo-counts per (bucket, position) cell. With 2 drafts of
     # history this is doing most of the work; it is deliberately heavy.
     alpha: 8.0
+    # How many equal slices of a draft P(position | when) is keyed on. NOT a
+    # round count -- round index does not survive a change of league size, so
+    # the table is keyed on fraction-of-draft instead. At 15 the buckets line up
+    # exactly with the rounds of a 15-round league, which is every league
+    # ingested so far, so this is identical to the old round-keyed table on
+    # today's data and correct on a league of any other shape.
+    buckets: 15
 
   # Per-manager parameters are shrunk toward the league mean:
   #   effective = (n/(n+k))*manager + (k/(n+k))*leagueMean

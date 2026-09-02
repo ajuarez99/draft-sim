@@ -28,7 +28,16 @@ import java.util.*;
 public class ProfileService {
 
     private static final Logger log = LoggerFactory.getLogger(ProfileService.class);
-    private static final int TILT_ROUNDS = 4;   // "coarse positional tilt" = the first four rounds
+
+    /**
+     * "Coarse positional tilt" is fit over the opening quarter-ish of a draft.
+     * Expressed as a fraction rather than the four rounds it used to be, for
+     * the same reason the priors are: four rounds is 48 picks of a 12-team
+     * draft and 56 of a 14-team one, and pooling those as though they were the
+     * same window is exactly the confound this pass removes. 4/15 reproduces
+     * "the first four rounds" exactly on any 15-round league.
+     */
+    private static final double TILT_FRACTION = 4.0 / 15.0;
 
     private final DraftRepository drafts;
     private final PlayerRepository players;
@@ -51,7 +60,7 @@ public class ProfileService {
     public record Fit(Map<Long, ManagerProfile> profiles, PositionalPriors priors, int scoreablePicks) {}
 
     public Fit fit(Sport sport) {
-        List<DraftRepository.PickRow> picks = drafts.allCompletedPicks();
+        List<DraftRepository.CompletedPick> picks = drafts.allCompletedPicks();
         Map<Long, Position> posById = new HashMap<>();
         for (Player p : players.findAll(sport)) posById.put(p.id(), p.primary());
         Map<Long, String> names = managers.names();
@@ -64,12 +73,24 @@ public class ProfileService {
         Map<Long, Set<Long>> draftsByManager = new HashMap<>();
         int scoreable = 0;
 
-        for (DraftRepository.PickRow p : picks) {
+        for (DraftRepository.CompletedPick p : picks) {
             if (p.managerId() == null) continue;
             draftsByManager.computeIfAbsent(p.managerId(), k -> new HashSet<>()).add(p.draftId());
             if (p.adpAtTime() == null) continue;   // no contemporaneous board; not scoreable
             scoreable++;
-            // positive = took him earlier than the board said
+            // Positive = took him earlier than the board said.
+            //
+            // Both terms count players consumed, so this needs no team-count
+            // conversion and does not get one. adp_at_time is a board RANK:
+            // BoardService rescales its three input sources to referenceTeams
+            // before blending, then re-ranks the blend to a dense 1..N
+            // ordering, so what lands on the pick is "the Nth best player",
+            // not a 14-team pick number. Pick 30 is likewise "the 30th player
+            // taken" in a draft of any size. claude/next-features-roadmap.md
+            // called this a scale bug; it is not one — see the note added
+            // there. What is genuinely size-dependent is what a fixed reach of
+            // +8 picks MEANS behaviourally (half a round at 16 teams, a full
+            // round at 8), which is a modelling question, not a unit error.
             reachByManager.computeIfAbsent(p.managerId(), k -> new ArrayList<>())
                     .add(p.adpAtTime() - p.pickNo());
         }
@@ -84,8 +105,8 @@ public class ProfileService {
         Map<Position, Integer> earlyLeague = new EnumMap<>(Position.class);
         int earlyTotal = 0;
 
-        for (DraftRepository.PickRow p : picks) {
-            if (p.managerId() == null || p.playerId() == null || p.round() > TILT_ROUNDS) continue;
+        for (DraftRepository.CompletedPick p : picks) {
+            if (p.managerId() == null || p.playerId() == null || !isEarly(p)) continue;
             Position pos = posById.get(p.playerId());
             if (pos == null) continue;
             earlyByManager.computeIfAbsent(p.managerId(), k -> new EnumMap<>(Position.class))
@@ -185,16 +206,33 @@ public class ProfileService {
         return tilt;
     }
 
-    private PositionalPriors fitPriors(List<DraftRepository.PickRow> picks, Map<Long, Position> posById) {
+    /** Is this pick inside the opening window positional tilt is fit over? */
+    private static boolean isEarly(DraftRepository.CompletedPick p) {
+        int total = p.totalPicks();
+        if (total <= 0) return false;
+        return (p.pickNo() - 1) < TILT_FRACTION * total;
+    }
+
+    /** Configured bucket count, falling back if an older external weights.yml omits it. */
+    private int buckets() {
+        return priorCfg.buckets() > 0 ? priorCfg.buckets() : PositionalPriors.DEFAULT_BUCKETS;
+    }
+
+    private PositionalPriors fitPriors(List<DraftRepository.CompletedPick> picks, Map<Long, Position> posById) {
+        int buckets = buckets();
         Map<Integer, Map<Position, Integer>> counts = new HashMap<>();
         Map<Position, Integer> overallCounts = new EnumMap<>(Position.class);
         int n = 0;
 
-        for (DraftRepository.PickRow p : picks) {
+        for (DraftRepository.CompletedPick p : picks) {
             if (p.playerId() == null) continue;
             Position pos = posById.get(p.playerId());
             if (pos == null) continue;
-            counts.computeIfAbsent(p.round(), k -> new EnumMap<>(Position.class)).merge(pos, 1, Integer::sum);
+            // Bucketed on fraction-of-draft, not round: the fitted drafts are
+            // 12-team and the simulated league is 14, so a round-keyed cell
+            // would pool two different slices of the board into one estimate.
+            int bucket = PositionalPriors.bucketOf(p.pickNo(), p.totalPicks(), buckets);
+            counts.computeIfAbsent(bucket, k -> new EnumMap<>(Position.class)).merge(pos, 1, Integer::sum);
             overallCounts.merge(pos, 1, Integer::sum);
             n++;
         }
@@ -202,14 +240,14 @@ public class ProfileService {
         double alpha = priorCfg.alpha();
         int k = Position.values().length;
 
-        Map<Integer, Map<Position, Double>> byRound = new HashMap<>();
-        counts.forEach((round, table) -> {
+        Map<Integer, Map<Position, Double>> byBucket = new HashMap<>();
+        counts.forEach((bucket, table) -> {
             int total = table.values().stream().mapToInt(Integer::intValue).sum();
             Map<Position, Double> probs = new EnumMap<>(Position.class);
             for (Position pos : Position.values()) {
                 probs.put(pos, (table.getOrDefault(pos, 0) + alpha) / (total + alpha * k));
             }
-            byRound.put(round, probs);
+            byBucket.put(bucket, probs);
         });
 
         Map<Position, Double> overall = new EnumMap<>(Position.class);
@@ -218,7 +256,8 @@ public class ProfileService {
             overall.put(pos, (overallCounts.getOrDefault(pos, 0) + alpha) / (total + alpha * k));
         }
 
-        log.info("fit positional priors from {} picks across {} rounds (alpha={})", n, byRound.size(), alpha);
-        return new PositionalPriors(byRound, overall, n);
+        log.info("fit positional priors from {} picks across {} of {} draft-fraction buckets (alpha={})",
+                n, byBucket.size(), buckets, alpha);
+        return new PositionalPriors(byBucket, overall, n, buckets);
     }
 }

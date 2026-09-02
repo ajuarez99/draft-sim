@@ -1,6 +1,8 @@
 package com.ballknowers.draftsim.domain;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,27 +40,51 @@ class DraftSlotTest {
         assertEquals(15, picks.length);
     }
 
-    @Test
-    void everyPickMapsBackToItsOwnSlot() {
-        int teams = 12, rounds = 15;
+    /**
+     * Run across every size the app can be asked for, plus the odd counts in
+     * between as insurance: off-by-one bugs in snake code love odd team counts,
+     * and nothing else in the suite would notice one.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {8, 9, 10, 11, 12, 13, 14, 15})
+    void everyPickMapsBackToItsOwnSlot(int teams) {
+        int rounds = 15;
         for (int slot = 1; slot <= teams; slot++) {
             for (int pick : DraftSlot.picksForSlot(slot, teams, rounds)) {
                 assertEquals(slot, DraftSlot.slot(pick, teams),
-                        "pick " + pick + " should belong to slot " + slot);
+                        "pick " + pick + " should belong to slot " + slot
+                                + " in a " + teams + "-team draft");
             }
         }
     }
 
-    @Test
-    void everyPickNumberIsClaimedExactlyOnce() {
-        int teams = 14, rounds = 15;
+    @ParameterizedTest
+    @ValueSource(ints = {8, 9, 10, 11, 12, 13, 14, 15})
+    void everyPickNumberIsClaimedExactlyOnce(int teams) {
+        int rounds = 15;
         boolean[] seen = new boolean[teams * rounds + 1];
         for (int slot = 1; slot <= teams; slot++) {
             for (int pick : DraftSlot.picksForSlot(slot, teams, rounds)) {
-                assertFalse(seen[pick], "pick " + pick + " claimed twice");
+                assertFalse(seen[pick], "pick " + pick + " claimed twice at " + teams + " teams");
                 seen[pick] = true;
             }
         }
-        for (int p = 1; p < seen.length; p++) assertTrue(seen[p], "pick " + p + " unclaimed");
+        for (int p = 1; p < seen.length; p++) {
+            assertTrue(seen[p], "pick " + p + " unclaimed at " + teams + " teams");
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {8, 9, 10, 11, 12, 13, 14, 15})
+    void roundAndSlotAgreeWithPickNumberInBothDirections(int teams) {
+        int rounds = 15;
+        for (int pick = 1; pick <= teams * rounds; pick++) {
+            int round = DraftSlot.round(pick, teams);
+            int slot = DraftSlot.slot(pick, teams);
+            assertTrue(round >= 1 && round <= rounds, "round " + round + " for pick " + pick);
+            assertTrue(slot >= 1 && slot <= teams, "slot " + slot + " for pick " + pick);
+            assertEquals(pick, DraftSlot.picksForSlot(slot, teams, rounds)[round - 1],
+                    "pick " + pick + " at " + teams + " teams");
+        }
     }
 }

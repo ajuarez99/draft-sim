@@ -47,21 +47,27 @@ class SimulationServiceTest {
     private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
-            Map.of("K", 13, "DEF", 12), 1.0, 30);
+            Map.of("K", 3, "DEF", 4), 1.0, 30);
 
     @Test
     void resolveStartStateDropsAnUnresolvableSleeperIdWithoutThrowing() {
         SimulationService service = new SimulationService(
-                boards, profiles, drafts, leagues, players, rules,
-                new ScoringProperties(CFG), new BoardProperties(0.5, List.of(), 14, 30), runner);
+                boards, profiles, drafts, leagues, players,
+                new BoardProperties(0.5, List.of(), 14, 30), runner,
+                new DraftContextFactory(rules, new ScoringProperties(CFG)));
 
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-xyz", 2026, 1, 2, "pre_draft", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 10L, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5);
-        List<BoardEntry> board = List.of(new BoardEntry(
-                new Player(1L, Sport.NFL, "board-player", "Board Player",
-                        List.of(Position.WR), "FA", "Active", null, null, null), 1.0, 1));
+        // Two entries for a 2-team, 1-round draft: DraftContextFactory rejects a
+        // board shorter than the draft it is asked to run, since the last picks
+        // would otherwise be chosen from an empty pool.
+        List<BoardEntry> board = List.of(
+                new BoardEntry(new Player(1L, Sport.NFL, "board-player", "Board Player",
+                        List.of(Position.WR), "FA", "Active", null, null, null), 1.0, 1),
+                new BoardEntry(new Player(2L, Sport.NFL, "board-player-2", "Board Player Two",
+                        List.of(Position.RB), "FA", "Active", null, null, null), 2.0, 1));
 
         when(drafts.bySleeperId("sleeper-draft-xyz")).thenReturn(Optional.of(draft));
         when(leagues.all()).thenReturn(List.of(league));

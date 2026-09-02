@@ -18,7 +18,7 @@ class PickScorerTest {
     private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
-            Map.of("K", 13, "DEF", 12), 1.0, 30);
+            Map.of("K", 3, "DEF", 4), 1.0, 30);
 
     private final PickScorer scorer = new PickScorer(
             CFG, new FootballRules(new ScoringProperties(CFG)), PositionalPriors.uniform());

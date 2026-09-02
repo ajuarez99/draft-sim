@@ -20,7 +20,7 @@ public record ScoringProperties(Sport football) {
             double benchFloor,
             int runWindow,
             double runRecencyDecay,
-            Map<String, Integer> earliestRound,
+            Map<String, Integer> latestRounds,
             double temperature,
             int candidatePool
     ) {}

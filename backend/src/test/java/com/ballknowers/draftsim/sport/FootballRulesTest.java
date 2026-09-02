@@ -20,7 +20,7 @@ class FootballRulesTest {
             new ScoringProperties.Sport(
                     new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
                     12.0, 3.0, 60.0, 0.15, 6, 0.85,
-                    Map.of("K", 13, "DEF", 12), 1.0, 30)));
+                    Map.of("K", 3, "DEF", 4), 1.0, 30)));
 
     private static BoardEntry entry(long id, String name, Position pos, double adp) {
         return new BoardEntry(new Player(id, Sport.NFL, "s" + id, name, List.of(pos),
@@ -62,11 +62,32 @@ class FootballRulesTest {
 
     @Test
     void kickersAndDefensesAreGatedEarly() {
-        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 5));
-        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 13));
-        assertFalse(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 11));
-        assertTrue(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 12));
-        assertTrue(rules.isDraftable(entry(3, "WR", Position.WR, 1), 1));
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 5, 15));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 13, 15));
+        assertFalse(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 11, 15));
+        assertTrue(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 12, 15));
+        assertTrue(rules.isDraftable(entry(3, "WR", Position.WR, 1), 1, 15));
+    }
+
+    /**
+     * The gate is rounds REMAINING, so it lands in the same place relative to
+     * the end of the draft whatever the draft's length. The old round-number
+     * form would have opened kickers in round 13 of an 18-round league — five
+     * rounds early — and never opened them at all in a 12-round one.
+     */
+    @Test
+    void theKickerGateFollowsTheEndOfTheDraftNotAFixedRoundNumber() {
+        // 12 rounds: the last three are 10, 11, 12.
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 9, 12));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 10, 12));
+
+        // 18 rounds: the last three are 16, 17, 18 — round 13 is far too early.
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 13, 18));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 16, 18));
+
+        // A draft shorter than the window still lets them in, rather than
+        // gating a position out of the draft entirely.
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 1, 2));
     }
 
     @Test

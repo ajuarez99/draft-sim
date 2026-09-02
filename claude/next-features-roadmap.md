@@ -68,7 +68,10 @@ onto `pick_pct`) is kept early despite this, split out from the rest of A — it
 an existing bug fix independent of whether ad-hoc sizing ships, and it touches the
 same files C needs to extract `DraftSimulator.choose()` from, so sequencing it
 before C avoids each landing through a rebase of the other's changes to
-`PickScorer`/`ProfileService`. See §4.
+`PickScorer`/`ProfileService`. See §4. **Built 2026-09-01** — and the "existing
+bug fix" framing turned out to be half wrong: the reach-bias half of it was not
+a bug at all (§Phase 1), leaving the rebase argument as the real reason it went
+first, which it still was.
 
 ---
 
@@ -228,16 +231,31 @@ A's rewrite of the same file.
 explained in §1/§4 intro. The ad-hoc league-size API, seat assignment, and
 frontend dropdown (the rest of A) move to Phase 5, after C.
 
-- **A's pick_pct normalization**: rebucketing `PositionalPriors`/`ProfileService.fitPriors`
-  off raw `round` onto `pick_pct`/board-rank space, moving K/DEF gating to
-  rounds-remaining, fixing the fitting-time reach-bias unit mismatch.
-  **This last item is a real, verified bug independent of any of these four
-  features**: `BoardService` rescales `adp_at_time` to `cfg.referenceTeams()`,
-  but `ProfileService.fit()`'s reach calculation compares that rescaled value
-  against the *raw*, un-rescaled `pickNo` from whatever team count the historical
-  draft actually was. For any league whose team count differs from
-  `referenceTeams`, every fitted reach-bias number today is on a subtly wrong
-  scale. Worth fixing regardless of whether league-size customization ships.
+- **A's pick_pct normalization — BUILT 2026-09-01.** Rebucketed
+  `PositionalPriors`/`ProfileService.fitPriors` off raw `round` onto
+  fraction-of-draft buckets, and moved K/DEF gating from a fixed round number
+  onto rounds-remaining (`weights.yml`'s `earliestRound: {K: 13, DEF: 12}` is
+  now `latestRounds: {K: 3, DEF: 4}`, identical on a 15-round league).
+  Positional tilt's "first four rounds" window moved onto the same fraction
+  basis. See "What the build found" below.
+
+- ~~**Fitting-time reach-bias unit mismatch.**~~ **This was not a bug — the
+  claim above was a misreading of `BoardService`, corrected here 2026-09-01
+  rather than left to look authoritative.** The claim was that `BoardService`
+  rescales `adp_at_time` to `cfg.referenceTeams()` while `ProfileService.fit()`
+  compares it against a raw `pickNo`. The `referenceTeams` rescale happens to
+  the three input sources *before* they are blended, and the blend is then
+  **re-ranked to a dense 1..N ordering** (`BoardService.rebuild`, the "Re-rank
+  so the board is a clean 1..N pick ordering" block) — so what lands on
+  `adp_at_time` is a board *rank*, not a 14-team pick number. Verified against
+  the live board, whose top entries carry `adp` of exactly 1.0, 2.0, 3.0, 4.0,
+  5.0. Board rank and pick number both count players consumed, so
+  `adpAtTime - pickNo` is dimensionally consistent at any team count, and the
+  re-rank has been there since v0 (`77f34bb`) — this was never true, not
+  something that drifted. What *is* genuinely size-dependent is what a fixed
+  reach of +8 picks means behaviourally (half a round at 16 teams, a full round
+  at 8); that is a modelling question, deliberately left alone, since changing
+  it would also change the units the tendencies UI states reach in.
 - **Sequence before Phase 3, not concurrently.** C needs to extract
   `DraftSimulator.choose()` (currently private) into a reusable unit shared with
   the batch `run()` loop. If A's rewrite of `PickScorer`/`ProfileService` lands
@@ -253,6 +271,50 @@ frontend dropdown (the rest of A) move to Phase 5, after C.
   was originally described as "part of A," even though the rest of A (the ad-hoc
   `SimulationRequest` branch, seat assignment, dropdown) is now deferred to
   Phase 5. Build just the builder here; the rest of A's plumbing waits.
+  **BUILT 2026-09-01** as `DraftContextFactory` + `SeatSpec` + `LeagueShape`.
+  `SimulationService.simulate()` was rewritten to go through it rather than
+  assembling a `DraftContext` inline, so C's `POST /api/mocks` and the deferred
+  ad-hoc branch inherit one already-exercised path instead of a second one. The
+  §3.2 3-state `SeatSpec` and the §3.3 fixed roster template are both settled in
+  code now, not just on paper.
+
+#### What the build found (2026-09-01)
+
+**The normalization is a numerical no-op on today's data, and that is the
+result, not a shortcut.** With buckets = 15 and every ingested league at 15
+rounds, a fraction-of-draft bucket *is* a round — for 12- and 14-team drafts
+alike — so the fitted table comes out identical. Likewise `latestRounds
+{K: 3, DEF: 4}` reproduces `earliestRound {K: 13, DEF: 12}` exactly at 15
+rounds. The change is what makes both correct at a round count or team count
+nothing was fit on; it buys nothing at 14×15 and was never going to.
+
+Verified by running it, per this phase's own safety net, though **not against
+fantasy(heart)** — that draft completed between the roadmap being written and
+this build, so it now replays 210 real picks and simulates nothing. Ran against
+West Coast FF 2026 instead (14 teams, `pre_draft`, no picks), old code and new
+code side by side on the same board:
+
+- **T=0, 1 iteration (fully deterministic): all 210 picks identical**, same
+  players, same probabilities, K in rounds 13–15 and DEF in 12–15 on both.
+- **T=1.0, 2000 iterations**: modal player agrees at 32/210, `mean |dProb|`
+  0.0040. That looks like a difference and is not — the **control** (old code
+  against *itself*, different seeds) gives 33/210 and 0.0039. At round-1 modal
+  probabilities of 4–9%, which player is modal is decided by sampling noise.
+  Cite the T=0 run, not this one, if you need the evidence.
+
+The suite went 74 → 132 tests, all passing, integration tests included (real
+Postgres, none skipped). New: `PositionalPriorsTest` (bucketing, and the
+property that makes the change safe — bucket == round at 15/15 for every
+supported size), `DraftContextFactoryTest`, `LeagueShapeTest`, a rounds-remaining
+gating test, and `DraftSlotTest` parametrized across {8,9,10,11,12,13,14,15} —
+the §Phase 0 snake matrix, which was free and is now done.
+
+**Deliberately not done, and it is the same class of bug:** `runWindow` is a
+fixed 6 picks, which is 43% of a round at 14 teams and 75% at 8
+(`claude/borrowed-drafts.md` flags it alongside the three items above). It is
+left for Phase 5, where it belongs with the rest of the size work — unlike the
+three above it has no correctness argument at 14 teams, and scaling it changes
+current behaviour rather than preserving it.
 
 ### Phase 2 — B's shell (parallel with Phase 0/1; land before Phase 3's frontend)
 
@@ -330,7 +392,10 @@ idea is ever revisited.
 on a deadline that matters for one.** A's normalization refactor: whether
 refitting priors/reach in pick_pct space actually changes fantasy(heart)'s real
 numbers is unknown until run — budget time for the before/after comparison, don't
-treat the refactor as done when it compiles and passes structural tests. D's
+treat the refactor as done when it compiles and passes structural tests.
+**Settled 2026-09-01: it changes nothing, and the run is what established that
+— see Phase 1's "What the build found". The advice stands for the next refactor
+that touches this math; it was worth the hour it took.** D's
 live-poll assumptions: every verification of Sleeper's `drafting`-status/`picked_by`
 behavior in this codebase so far has been against `pre_draft` or `complete`
 drafts, never a truly live one — the only way to know the poller's assumptions

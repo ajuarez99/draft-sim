@@ -49,6 +49,7 @@ public final class DraftSimulator {
      */
     public RunResult run(int[] myPicks, int snapshotDepth) {
         int teams = ctx.settings().teams();
+        int rounds = ctx.settings().rounds();
         int total = ctx.totalPicks();
 
         // Available players, best board position first. ArrayList + index removal
@@ -73,7 +74,7 @@ public final class DraftSimulator {
             int slot = DraftSlot.slot(pickNo, teams);
 
             if (pickNo <= total && myPickMask[pickNo]) {
-                snapshots.put(pickNo, topAvailable(available, round, snapshotDepth));
+                snapshots.put(pickNo, topAvailable(available, round, rounds, snapshotDepth));
             }
 
             long already = ctx.completedAt(pickNo);
@@ -88,7 +89,7 @@ public final class DraftSimulator {
                 continue;
             }
 
-            int chosenIdx = choose(available, pickNo, round, slot, rosters[slot], recent);
+            int chosenIdx = choose(available, pickNo, round, rounds, total, slot, rosters[slot], recent);
             if (chosenIdx < 0) break;
 
             BoardEntry choice = available.remove(chosenIdx);
@@ -102,20 +103,20 @@ public final class DraftSimulator {
         return new RunResult(picked, snapshots, rosterMap);
     }
 
-    private long[] topAvailable(List<BoardEntry> available, int round, int depth) {
+    private long[] topAvailable(List<BoardEntry> available, int round, int rounds, int depth) {
         long[] out = new long[Math.min(depth, available.size())];
         int n = 0;
         for (BoardEntry e : available) {
             if (n == out.length) break;
-            if (!ctx.rules().isDraftable(e, round)) continue;
+            if (!ctx.rules().isDraftable(e, round, rounds)) continue;
             out[n++] = e.player().id();
         }
         return n == out.length ? out : Arrays.copyOf(out, n);
     }
 
     /** @return the index into {@code available} of the chosen entry, or -1 if none. */
-    private int choose(List<BoardEntry> available, int pickNo, int round, int slot,
-                       RosterState roster, Deque<Position> recent) {
+    private int choose(List<BoardEntry> available, int pickNo, int round, int rounds, int totalPicks,
+                       int slot, RosterState roster, Deque<Position> recent) {
 
         int poolSize = ctx.cfg().candidatePool();
         candidateBuf.clear();
@@ -123,7 +124,7 @@ public final class DraftSimulator {
         int avail = available.size();
         for (int i = 0; i < avail && n < poolSize; i++) {
             BoardEntry e = available.get(i);
-            if (!ctx.rules().isDraftable(e, round)) continue;
+            if (!ctx.rules().isDraftable(e, round, rounds)) continue;
             candidateBuf.add(e);
             candidateIdxBuf[n] = i;
             n++;
@@ -144,9 +145,13 @@ public final class DraftSimulator {
         // fresh roster-wide re-walk per candidate.
         Object lineup = ctx.rules().prepareLineup(roster, ctx.settings(), ctx::valueOf);
         double reachBias = profile.reachBias();
+        // The priors table is keyed on fraction-of-draft, not round, so it
+        // transfers across league sizes -- bucket once per pick, not per
+        // position, since every position at this pick shares it.
+        int bucket = ctx.priors().bucketOf(pickNo, totalPicks);
         for (Position p : Position.values()) {
             int ord = p.ordinal();
-            positionalCache[ord] = scorer.positionalTerm(round, p, profile);
+            positionalCache[ord] = scorer.positionalTerm(bucket, p, profile);
             runCache[ord] = scorer.runPressure(recent, p);
         }
 

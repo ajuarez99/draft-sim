@@ -43,6 +43,18 @@ public class FootballRules implements SportRules {
 
     public FootballRules(ScoringProperties props) {
         this.cfg = props.football();
+        // weights.yml lives outside the jar, so a copy predating the move from
+        // earliestRound to latestRounds is a real thing to boot against. Fail
+        // here, loudly, rather than NPE on the first pick of the first
+        // simulation -- and never silently degrade to "no gate", which would
+        // put kickers on the board at 1.01 and look like a model problem.
+        if (cfg.latestRounds() == null) {
+            throw new IllegalStateException(
+                    "draftsim.scoring.football.latestRounds is missing from weights.yml. "
+                            + "It replaced earliestRound: the value is now how many rounds from "
+                            + "the END of the draft a position opens up, so the old "
+                            + "{K: 13, DEF: 12} of a 15-round league becomes {K: 3, DEF: 4}.");
+        }
     }
 
     @Override
@@ -212,9 +224,11 @@ public class FootballRules implements SportRules {
     }
 
     @Override
-    public boolean isDraftable(BoardEntry entry, int round) {
-        Integer min = cfg.earliestRound().get(entry.position().name());
-        return min == null || round >= min;
+    public boolean isDraftable(BoardEntry entry, int round, int totalRounds) {
+        Integer window = cfg.latestRounds().get(entry.position().name());
+        if (window == null) return true;
+        // rounds remaining, counting this one: round 13 of 15 has 3 left.
+        return (totalRounds - round + 1) <= window;
     }
 
     @Override

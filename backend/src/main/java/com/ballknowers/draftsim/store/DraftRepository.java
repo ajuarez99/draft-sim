@@ -141,17 +141,37 @@ public class DraftRepository {
     }
 
     /** Every completed pick across every ingested draft, for profile fitting. */
-    public List<PickRow> allCompletedPicks() {
+    /**
+     * A completed pick together with the shape of the draft it came from.
+     *
+     * The shape is the whole point: pick 30 is a different fraction of a
+     * 12-team draft than of a 14-team one, and profile fitting has to normalize
+     * on that before it can pool picks across leagues of different sizes. It is
+     * joined on rather than stored, since it is a property of the draft, not of
+     * the pick.
+     */
+    public record CompletedPick(long draftId, int pickNo, int round, int draftSlot,
+                                Long managerId, Long playerId, Double adpAtTime,
+                                int teams, int rounds) {
+
+        public int totalPicks() {
+            return teams * rounds;
+        }
+    }
+
+    public List<CompletedPick> allCompletedPicks() {
         return db.sql("""
-                select p.draft_id, p.pick_no, p.round, p.draft_slot, p.manager_id, p.player_id, p.adp_at_time
+                select p.draft_id, p.pick_no, p.round, p.draft_slot, p.manager_id, p.player_id,
+                       p.adp_at_time, d.teams, d.rounds
                 from draft_pick p join draft d on d.id = p.draft_id
                 where d.status = 'complete' and p.manager_id is not null
                 order by p.draft_id, p.pick_no
                 """)
-                .query((rs, i) -> new PickRow(rs.getLong(1), rs.getInt(2), rs.getInt(3), rs.getInt(4),
+                .query((rs, i) -> new CompletedPick(rs.getLong(1), rs.getInt(2), rs.getInt(3), rs.getInt(4),
                         rs.getObject(5) == null ? null : rs.getLong(5),
                         rs.getObject(6) == null ? null : rs.getLong(6),
-                        rs.getObject(7) == null ? null : rs.getDouble(7)))
+                        rs.getObject(7) == null ? null : rs.getDouble(7),
+                        rs.getInt(8), rs.getInt(9)))
                 .list();
     }
 }

@@ -43,8 +43,14 @@ public interface SportRules {
     /** Expected value of the seat's starting lineup as currently rostered. */
     double startingLineupValue(RosterState roster, LeagueSettings settings);
 
-    /** Hard gate: some positions are simply not taken before a given round. */
-    boolean isDraftable(BoardEntry entry, int round);
+    /**
+     * Hard gate: some positions are simply not taken until the draft is nearly
+     * over. Expressed in rounds REMAINING rather than rounds elapsed, so the
+     * gate means the same thing in a league of any length -- "kickers go in the
+     * last few rounds" is roster-filling behaviour, and a fixed round number
+     * only encodes it for the one league length it was written against.
+     */
+    boolean isDraftable(BoardEntry entry, int round, int totalRounds);
 
     boolean isEligible(Player player, String rosterSlot);
 }
