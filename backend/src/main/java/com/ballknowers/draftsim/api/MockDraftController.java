@@ -40,6 +40,19 @@ public class MockDraftController {
 
     public record CreateRequest(int teams, int userSlot) {}
 
+    /**
+     * Forks a real, {@code drafting}-status Sleeper draft into a new mock
+     * session seeded with its picks so far -- the live-draft-to-mock bridge
+     * (claude/next-features-roadmap.md's Phase 3/4 bridge). {@code mySlot} is
+     * optional; omitted, it falls back to the same owner auto-detection
+     * {@code GET /api/drafts/{id}/seats} already uses.
+     */
+    @PostMapping("/from-draft/{sleeperDraftId}")
+    public MockSessionState createFromDraft(@PathVariable String sleeperDraftId,
+                                            @RequestParam(required = false) Integer mySlot) {
+        return mocks.createSessionFromDraft(sleeperDraftId, mySlot);
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<MockSessionState> get(@PathVariable long id) {
         return mocks.get(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());

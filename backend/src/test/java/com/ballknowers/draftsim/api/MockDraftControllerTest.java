@@ -31,7 +31,7 @@ class MockDraftControllerTest {
     private MockSessionState sampleState(long id) {
         return new MockSessionState(id, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
                 List.of(new MockSessionState.SeatView(1, SeatSpec.Type.USER, null, "You")),
-                List.of(), List.of(), 1, 1, true);
+                List.of(), List.of(), 1, 1, true, null, null);
     }
 
     @Test
@@ -42,6 +42,26 @@ class MockDraftControllerTest {
         MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3));
 
         assertEquals(1, result.id());
+    }
+
+    @Test
+    void createFromDraftDelegatesDraftIdAndOptionalMySlotToTheService() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSessionFromDraft("sleeper-draft-1", 3)).thenReturn(sampleState(1));
+
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", 3);
+
+        assertEquals(1, result.id());
+    }
+
+    @Test
+    void createFromDraftPassesNullMySlotWhenOmitted() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSessionFromDraft("sleeper-draft-1", null)).thenReturn(sampleState(2));
+
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null);
+
+        assertEquals(2, result.id());
     }
 
     @Test

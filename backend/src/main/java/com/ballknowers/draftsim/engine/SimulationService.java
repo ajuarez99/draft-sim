@@ -87,18 +87,13 @@ public class SimulationService {
      * The league's own draft_order, as seats: every mapped slot is a modelled
      * manager, the caller's own slot is marked USER, and anything Sleeper left
      * unmapped falls through to a league-average bot in the factory.
+     *
+     * Delegates to {@link SeatSpec#fromDraftOrder}, which the mock room's
+     * "fork a live draft" path (claude/next-features-roadmap.md's Phase 3/4
+     * bridge) shares -- extracted there rather than duplicated.
      */
     private List<SeatSpec> seatsOf(DraftRepository.DraftRow draft, int mySlot) {
-        List<SeatSpec> seats = new ArrayList<>();
-        draft.slotToManager().forEach((slot, managerId) -> {
-            int s = Integer.parseInt(slot);
-            long id = ((Number) managerId).longValue();
-            seats.add(s == mySlot ? SeatSpec.user(s, id) : SeatSpec.manager(s, id));
-        });
-        if (seats.stream().noneMatch(x -> x.slot() == mySlot) && mySlot >= 1) {
-            seats.add(SeatSpec.user(mySlot, null));
-        }
-        return seats;
+        return SeatSpec.fromDraftOrder(draft.slotToManager(), mySlot);
     }
 
     /**

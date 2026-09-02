@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.DraftOrderMapper;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
+import com.ballknowers.draftsim.engine.OwnerSlot;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
@@ -80,21 +81,14 @@ public class LeagueController {
         ProfileService.Fit fit = profiles.fit(Sport.NFL);
         List<Map<String, Object>> seats = new ArrayList<>();
 
-        // Reverse-keyed lookup (sleeperUserId -> managerId) already exists for
-        // LiveDraftPoller; reused here rather than adding a new forward-keyed
-        // ManagerRepository method just to compare against each seat's managerId.
-        // A blank/unset config value is the local-dev default and is guarded
-        // explicitly rather than relying on a lookup miss to behave correctly.
-        Long ownerManagerId = owner.configured()
-                ? managers.idsBySleeperUserId().get(owner.sleeperUserId())
-                : null;
-        Integer[] mySlotHolder = new Integer[1]; // effectively-final box for the lambda below
+        // Extracted to OwnerSlot.resolve so the mock room's "fork a live draft"
+        // path can resolve the same default seat without a second copy of this
+        // lookup. A blank/unset config value is the local-dev default, handled
+        // there rather than relying on a lookup miss to behave correctly.
+        Integer mySlot = OwnerSlot.resolve(draft.get(), managers, owner);
 
         draft.get().slotToManager().forEach((slot, managerId) -> {
             long id = ((Number) managerId).longValue();
-            if (ownerManagerId != null && ownerManagerId == id) {
-                mySlotHolder[0] = Integer.parseInt(slot);
-            }
             ManagerProfile p = fit.profiles().getOrDefault(id, ManagerProfile.neutral(id, "seat " + slot));
             Map<String, Object> seat = new LinkedHashMap<>();
             seat.put("slot", Integer.parseInt(slot));
@@ -136,7 +130,7 @@ public class LeagueController {
         // workaround wasn't even buying anything.
         response.put("status", draft.get().status());
         response.put("seats", seats);
-        response.put("mySlot", mySlotHolder[0]);
+        response.put("mySlot", mySlot);
         response.put("rosterPositions", rosterPositions);
         return ResponseEntity.ok(response);
     }

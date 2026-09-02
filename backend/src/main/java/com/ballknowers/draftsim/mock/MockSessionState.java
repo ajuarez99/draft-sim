@@ -28,7 +28,11 @@ public record MockSessionState(
         int currentPickNo,
         /** Null once the session is COMPLETE. */
         Integer onTheClockSlot,
-        boolean isUsersTurn
+        boolean isUsersTurn,
+        /** The real draft this session was forked from, or null for an ordinary from-scratch mock. */
+        Long sourceDraftId,
+        /** The first pick this session hadn't yet decided at fork time. Null when sourceDraftId is null. */
+        Integer forkedAtPickNo
 ) {
     public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager) {}
 

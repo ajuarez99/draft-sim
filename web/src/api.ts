@@ -236,7 +236,11 @@ export type MockPick = {
   round: number
   draftSlot: number
   seatType: SeatType
-  source: 'USER' | 'BOT'
+  // LIVE means this pick was copied in from a real Sleeper draft at fork
+  // time (createMockSessionFromDraft) -- already-decided and non-editable,
+  // same as BOT, just decided by a real person in the real draft rather than
+  // by this session's engine or its own USER seat.
+  source: 'USER' | 'BOT' | 'LIVE'
   // Null only if the board changed (a re-ingest) since this pick was made and
   // the player dropped off it -- MockDraftView filters these out of the board
   // array entirely rather than rendering a broken cell.
@@ -260,6 +264,12 @@ export type MockSessionState = {
   currentPickNo: number
   onTheClockSlot: number | null
   isUsersTurn: boolean
+  // The real draft this session was forked from (createMockSessionFromDraft),
+  // or null for an ordinary from-scratch mock started at /mock/new.
+  sourceDraftId: number | null
+  // The first pick this session hadn't yet decided at fork time. Null when
+  // sourceDraftId is null.
+  forkedAtPickNo: number | null
 }
 
 // Mirrors store/MockDraftRepository.SessionSummary. Backs the picker screen's
@@ -282,6 +292,16 @@ export const createMockSession = (teams: number, userSlot: number) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ teams, userSlot }),
   }).then(json<MockSessionState>)
+
+// Forks a real, drafting-status Sleeper draft into a new mock session seeded
+// with its picks so far -- the live-draft-to-mock bridge. mySlot is optional;
+// omitted, the backend falls back to the same owner auto-detection
+// getSeats()'s mySlot already uses.
+export const createMockSessionFromDraft = (sleeperDraftId: string, mySlot?: number) =>
+  fetch(
+    `/api/mocks/from-draft/${sleeperDraftId}${mySlot != null ? `?mySlot=${mySlot}` : ''}`,
+    { method: 'POST' },
+  ).then(json<MockSessionState>)
 
 export const getMockSession = (id: number) => fetch(`/api/mocks/${id}`).then(json<MockSessionState>)
 

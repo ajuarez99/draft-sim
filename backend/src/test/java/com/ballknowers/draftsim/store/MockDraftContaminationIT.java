@@ -113,6 +113,36 @@ class MockDraftContaminationIT {
                 "this manager must show exactly the one real completed pick, not a second one from the mock session");
     }
 
+    /**
+     * The fork-specific case: a mock session forked from a real draft
+     * (source_draft_id set, its seeded picks source='LIVE' rather than 'BOT')
+     * must be exactly as invisible to allCompletedPicks()/fit() as an ordinary
+     * from-scratch mock session is -- the new source value and the new
+     * pointer-to-a-real-draft column are additions to mock_draft_session/
+     * mock_draft_pick, not a new path into draft_pick, so this must hold for
+     * the same structural reason the tests above do.
+     */
+    @Test
+    void aForkedSessionsLivePicksNeverLeakIntoAllCompletedPicksEither() {
+        long forkedSessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
+                "[{\"slot\":3,\"type\":\"MANAGER\",\"managerId\":" + managerId + "}]", 1, 100L,
+                realDraftId, 2);
+        mockDrafts.insertPicks(forkedSessionId, List.of(
+                new MockDraftRepository.PickRow(forkedSessionId, 3, 1, 3, "MANAGER", managerId, playerId, "LIVE")));
+        try {
+            boolean leaked = drafts.allCompletedPicks().stream()
+                    .anyMatch(p -> p.playerId() != null && p.playerId() == playerId && p.draftId() != realDraftId);
+            assertFalse(leaked, "a forked session's LIVE-sourced pick must never surface from allCompletedPicks()");
+
+            long fromRealDraftOnly = drafts.allCompletedPicks().stream()
+                    .filter(p -> p.managerId() != null && p.managerId() == managerId)
+                    .count();
+            assertEquals(1, fromRealDraftOnly, "still exactly the one real pick, not a second one from the fork");
+        } finally {
+            jdbc.update("delete from mock_draft_session where id = ?", forkedSessionId);
+        }
+    }
+
     @Test
     void fittingProfilesIsUnaffectedByTheMockSessionExisting() {
         ProfileService.Fit withMockSession = profiles.fit(Sport.NFL);

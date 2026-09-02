@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  createMockSessionFromDraft,
   getDrafts,
   getSeats,
   streamSimulation,
@@ -56,6 +57,7 @@ const DEFAULT_SLOT = 1
 export default function LiveDraftView() {
   const { draftId = '' } = useParams<{ draftId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const { live, connected, secondsSinceContact, error: liveError } = useLiveDraft(draftId)
 
@@ -67,6 +69,8 @@ export default function LiveDraftView() {
   const [error, setError] = useState<string | null>(null)
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
   const [openSeatSlot, setOpenSeatSlot] = useState<number | null>(null)
+  const [forking, setForking] = useState(false)
+  const [forkError, setForkError] = useState<string | null>(null)
 
   // An explicit ?slot= always wins; otherwise the backend's own owner match.
   // No auto-adopt effect is needed here (unlike DraftView) because this reads
@@ -176,6 +180,18 @@ export default function LiveDraftView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live?.picksMade, seats, mySlot])
 
+  async function forkToMock() {
+    setForking(true)
+    setForkError(null)
+    try {
+      const session = await createMockSessionFromDraft(draftId, slotKnown ? mySlot : undefined)
+      navigate(`/mock/${session.id}`)
+    } catch (e) {
+      setForkError(e instanceof Error ? e.message : String(e))
+      setForking(false)
+    }
+  }
+
   const picksMade = live?.picksMade ?? 0
 
   // Your picks that are still ahead of the draft. A pick that has already
@@ -279,7 +295,16 @@ export default function LiveDraftView() {
               >
                 re-run
               </button>
+              <button
+                className="chip on"
+                onClick={() => void forkToMock()}
+                disabled={forking || live?.status !== 'drafting'}
+                title="Start an interactive mock draft picking up from where this live draft is right now"
+              >
+                {forking ? 'forking…' : 'fork to mock →'}
+              </button>
             </div>
+            {forkError && <div className="error tiny">{forkError}</div>}
             {resimming && (
               <div className="progress live-resim-progress">
                 <div className="progress-bar" style={{ width: `${Math.round(resimProgress * 100)}%` }} />

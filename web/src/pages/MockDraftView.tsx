@@ -98,6 +98,11 @@ export default function MockDraftView() {
       {error && <div className="error">{error}</div>}
       <div className="board-panel">
         <section className="panel">
+          {state.sourceDraftId != null && (
+            <p className="muted small">
+              Forked from a live draft, continuing from pick {state.forkedAtPickNo}.
+            </p>
+          )}
           <TurnIndicator
             currentPickNo={state.currentPickNo}
             round={round}

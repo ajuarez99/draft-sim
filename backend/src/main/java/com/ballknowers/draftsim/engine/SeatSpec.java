@@ -1,6 +1,8 @@
 package com.ballknowers.draftsim.engine;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -57,5 +59,34 @@ public record SeatSpec(int slot, Type type, Long managerId) {
     public static int userSlot(List<SeatSpec> seats) {
         for (SeatSpec s : seats) if (s.type() == Type.USER) return s.slot();
         return -1;
+    }
+
+    /**
+     * A real draft's own {@code draft_order}, as seats: every slot Sleeper has
+     * mapped to a manager becomes a modelled {@code MANAGER} seat, {@code mySlot}
+     * is marked {@code USER} (carrying the manager id too, if Sleeper mapped it),
+     * and anything left unmapped falls through to a league-average bot in
+     * {@link DraftContextFactory#build}.
+     *
+     * Extracted out of {@code SimulationService.seatsOf} so the real-draft
+     * simulation path and the mock room's "fork a live draft" path
+     * (claude/next-features-roadmap.md's Phase 3/4 bridge) share one
+     * implementation rather than two.
+     *
+     * @param slotToManager {@code DraftRepository.DraftRow.slotToManager()} --
+     *                      String slot -> Number managerId, Jackson's shape for
+     *                      a JSON object read back out of {@code draft.slot_to_manager}.
+     */
+    public static List<SeatSpec> fromDraftOrder(Map<String, Object> slotToManager, int mySlot) {
+        List<SeatSpec> seats = new ArrayList<>();
+        slotToManager.forEach((slot, managerId) -> {
+            int s = Integer.parseInt(slot);
+            long id = ((Number) managerId).longValue();
+            seats.add(s == mySlot ? SeatSpec.user(s, id) : SeatSpec.manager(s, id));
+        });
+        if (seats.stream().noneMatch(x -> x.slot() == mySlot) && mySlot >= 1) {
+            seats.add(SeatSpec.user(mySlot, null));
+        }
+        return seats;
     }
 }

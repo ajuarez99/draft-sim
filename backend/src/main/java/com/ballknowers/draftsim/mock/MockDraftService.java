@@ -1,17 +1,22 @@
 package com.ballknowers.draftsim.mock;
 
+import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.DraftSlot;
+import com.ballknowers.draftsim.domain.LeagueSettings;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.DraftContext;
 import com.ballknowers.draftsim.engine.DraftContextFactory;
 import com.ballknowers.draftsim.engine.LeagueShape;
 import com.ballknowers.draftsim.engine.MockDraftEngine;
+import com.ballknowers.draftsim.engine.OwnerSlot;
 import com.ballknowers.draftsim.engine.SeatSpec;
 import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.ProfileService;
+import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.MockDraftRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -41,10 +46,14 @@ public class MockDraftService {
     private final ProfileService profiles;
     private final PlayerRepository players;
     private final ManagerRepository managers;
+    private final DraftRepository drafts;
+    private final LeagueRepository leagues;
+    private final OwnerProperties owner;
 
     public MockDraftService(MockDraftRepository mockDrafts, DraftContextFactory contexts,
                             MockDraftEngine engine, BoardService boards, ProfileService profiles,
-                            PlayerRepository players, ManagerRepository managers) {
+                            PlayerRepository players, ManagerRepository managers,
+                            DraftRepository drafts, LeagueRepository leagues, OwnerProperties owner) {
         this.mockDrafts = mockDrafts;
         this.contexts = contexts;
         this.engine = engine;
@@ -52,6 +61,9 @@ public class MockDraftService {
         this.profiles = profiles;
         this.players = players;
         this.managers = managers;
+        this.drafts = drafts;
+        this.leagues = leagues;
+        this.owner = owner;
     }
 
     @Transactional
@@ -76,6 +88,92 @@ public class MockDraftService {
         long rngSeed = System.nanoTime();
         long id = mockDrafts.createSession(teams, shape.rounds(), shape.rosterPositions(),
                 shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed);
+
+        advanceAndPersist(id, ctx, seats, rngSeed);
+        return buildState(id, ctx);
+    }
+
+    /**
+     * Forks a real, {@code drafting}-status Sleeper draft into a mock session
+     * seeded with exactly what has actually happened so far -- the bridge
+     * between live tracking and the mock room (claude/next-features-roadmap.md's
+     * Phase 3/4 bridge). Bots continuing past the fork point use the same real
+     * fitted manager profiles the live draft's own resim does, not neutral
+     * ones, which is the entire point of forking rather than starting fresh.
+     *
+     * @param mySlotOverride explicit slot from the caller, or null to fall back
+     *                       to {@link OwnerSlot#resolve} the same way the live
+     *                       page's seats() call already does.
+     */
+    @Transactional
+    public MockSessionState createSessionFromDraft(String sleeperDraftId, Integer mySlotOverride) {
+        DraftRepository.DraftRow draft = drafts.bySleeperId(sleeperDraftId)
+                .orElseThrow(() -> new IllegalArgumentException("draft " + sleeperDraftId + " not ingested"));
+
+        if (!"drafting".equals(draft.status())) {
+            throw new IllegalArgumentException("draft " + sleeperDraftId + " is "
+                    + (draft.status() == null ? "not tracked" : draft.status())
+                    + ", not drafting -- only a live, in-progress draft can be forked into a mock");
+        }
+
+        LeagueRepository.LeagueRow league = leagues.byId(draft.leagueId())
+                .orElseThrow(() -> new IllegalStateException("league missing for draft " + sleeperDraftId));
+        // The league's own totalRosters, not draft.teams(), is what
+        // DraftContextFactory/the engine actually treat as the team count
+        // (LeagueRepository.toSettings, mirroring SimulationService.simulate()) --
+        // everything below (validation, session persistence, DraftSlot math) uses
+        // settings.teams() so nothing can disagree with the DraftContext it's paired with.
+        LeagueSettings settings = LeagueRepository.toSettings(league, draft.rounds());
+
+        if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(settings.teams())) {
+            throw new IllegalArgumentException("league has " + settings.teams() + " teams, but only "
+                    + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
+                    + " can be forked into a mock");
+        }
+
+        Integer mySlot = mySlotOverride != null ? mySlotOverride : OwnerSlot.resolve(draft, managers, owner);
+        if (mySlot == null) {
+            throw new IllegalArgumentException(
+                    "could not determine which seat is yours -- pass ?mySlot=<slot>");
+        }
+        if (mySlot < 1 || mySlot > settings.teams()) {
+            throw new IllegalArgumentException(
+                    "mySlot must be between 1 and " + settings.teams() + ", got " + mySlot);
+        }
+
+        List<SeatSpec> seats = SeatSpec.fromDraftOrder(draft.slotToManager(), mySlot);
+
+        Map<Integer, Long> completed = new HashMap<>();
+        for (DraftRepository.PickRow p : drafts.picks(draft.id())) {
+            if (p.playerId() != null) completed.put(p.pickNo(), p.playerId());
+        }
+
+        List<BoardEntry> board = boards.currentBoard(Sport.NFL);
+        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        DraftContext ctx = contexts.build(settings, seats, fit.profiles(), fit.priors(), board, completed);
+
+        long rngSeed = System.nanoTime();
+        // The true first undecided pick, not max(completed)+1 -- those differ
+        // whenever a lower pick number is still missing (an autopick Sleeper
+        // hasn't attributed to a player yet: PickMapper/LiveDraftPoller can
+        // write a null player_id, which the loop above already filters out of
+        // `completed`). advanceAndPersist below will engine-decide that pick
+        // regardless, so the banner this feeds must not claim it was real.
+        int forkedAtPickNo = 1;
+        while (forkedAtPickNo <= ctx.totalPicks() && completed.containsKey(forkedAtPickNo)) forkedAtPickNo++;
+        long id = mockDrafts.createSession(settings.teams(), settings.rounds(), settings.rosterPositions(),
+                settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed, draft.id(), forkedAtPickNo);
+
+        List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
+        for (Map.Entry<Integer, Long> e : completed.entrySet()) {
+            int pickNo = e.getKey();
+            int slot = DraftSlot.slot(pickNo, settings.teams());
+            int round = DraftSlot.round(pickNo, settings.teams());
+            SeatSpec seat = seatAt(seats, slot);
+            seedRows.add(new MockDraftRepository.PickRow(
+                    id, pickNo, round, slot, seat.type().name(), seat.managerId(), e.getValue(), "LIVE"));
+        }
+        mockDrafts.insertPicks(id, seedRows);
 
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
@@ -217,7 +315,7 @@ public class MockDraftService {
 
         return new MockSessionState(row.id(), row.status(), row.teams(), row.rounds(), row.rosterPositions(),
                 row.userSlot(), myPicks, seatViews, pickViews, available, row.currentPickNo(), onTheClockSlot,
-                isUsersTurn);
+                isUsersTurn, row.sourceDraftId(), row.forkedAtPickNo());
     }
 
     /** A slot missing from `seats` is a BOT -- same convention DraftContextFactory.build() uses. */

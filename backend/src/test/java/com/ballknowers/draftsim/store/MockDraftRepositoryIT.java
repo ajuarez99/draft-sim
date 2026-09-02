@@ -88,6 +88,34 @@ class MockDraftRepositoryIT {
         assertEquals(42L, row.rngSeed());
         assertEquals(1, row.currentPickNo());
         assertTrue(row.seatsJson().contains("USER"));
+        assertNull(row.sourceDraftId(), "the 7-arg createSession (an ordinary from-scratch mock) must leave this null");
+        assertNull(row.forkedAtPickNo());
+    }
+
+    @Test
+    void createSessionWithASourceDraftRoundTripsThatProvenanceThroughFind() {
+        // source_draft_id is a real FK to draft(id), so a fixture draft (and the
+        // league it requires) has to exist first -- same minimal raw-jdbc fixture
+        // shape MockDraftContaminationIT/LeagueControllerSeatsOwnerConfiguredIT use.
+        jdbc.update("delete from league where sleeper_id = ?", "it-league-mdr-source-draft");
+        long leagueId = jdbc.queryForObject(
+                "insert into league (sport, season, sleeper_id, name, total_rosters) values (?, ?, ?, ?, ?) returning id",
+                Long.class, "nfl", 2026, "it-league-mdr-source-draft", "IT League", 8);
+        long draftId = jdbc.queryForObject(
+                "insert into draft (league_id, sleeper_draft_id, season, rounds, teams, draft_type, status) "
+                        + "values (?, ?, ?, ?, ?, ?, ?) returning id",
+                Long.class, leagueId, "it-draft-mdr-source-draft", 2026, 15, 8, "snake", "drafting");
+
+        long forkedId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5);
+        try {
+            MockDraftRepository.SessionRow row = mockDrafts.find(forkedId).orElseThrow();
+            assertEquals(draftId, row.sourceDraftId());
+            assertEquals(5, row.forkedAtPickNo());
+        } finally {
+            jdbc.update("delete from mock_draft_session where id = ?", forkedId);
+            jdbc.update("delete from league where id = ?", leagueId);   // cascades draft
+        }
     }
 
     @Test

@@ -1,13 +1,17 @@
 package com.ballknowers.draftsim.mock;
 
+import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.engine.DraftContextFactory;
+import com.ballknowers.draftsim.engine.LeagueShape;
 import com.ballknowers.draftsim.engine.MockDraftEngine;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.sport.FootballRules;
+import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.MockDraftRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -23,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 /**
  * MockDraftService is the interactive mock draft room's own orchestration
@@ -44,6 +49,8 @@ class MockDraftServiceTest {
     @Mock private ProfileService profiles;
     @Mock private PlayerRepository players;
     @Mock private ManagerRepository managers;
+    @Mock private DraftRepository drafts;
+    @Mock private LeagueRepository leagues;
 
     private FakeMockDraftRepository repo;
     private MockDraftService service;
@@ -72,7 +79,8 @@ class MockDraftServiceTest {
         repo = new FakeMockDraftRepository();
         DraftContextFactory contexts =
                 new DraftContextFactory(new FootballRules(new ScoringProperties(CFG)), new ScoringProperties(CFG));
-        service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers);
+        service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers,
+                drafts, leagues, new OwnerProperties(null));
     }
 
     @Test
@@ -188,6 +196,113 @@ class MockDraftServiceTest {
         assertEquals(8 * 15, drafted.size());
     }
 
+    @Test
+    void createSessionFromDraftSeedsLivePicksAndContinuesPastThem() {
+        long managerA = 501L, managerB = 502L;
+        Map<String, Object> slotToManager = Map.of("1", managerA, "2", managerB);
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                77L, 9L, "sleeper-draft-fork", 2026, 15, 8, "drafting", slotToManager);
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, "sleeper-league-fork", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0);
+        when(drafts.bySleeperId("sleeper-draft-fork")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+        // board(400)'s first entry has player id 1 -- already drafted by slot 1 (managerA).
+        when(drafts.picks(77L)).thenReturn(List.of(
+                new DraftRepository.PickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
+
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork", 2);
+
+        assertEquals(77L, state.sourceDraftId());
+        assertEquals(2, state.forkedAtPickNo());
+        assertEquals(1, state.picks().size(), "only the one seeded pick -- pick 2 is the user's own turn");
+        var pick1 = state.picks().get(0);
+        assertEquals(1, pick1.pickNo());
+        assertEquals("LIVE", pick1.source());
+        assertEquals("MANAGER", pick1.seatType().name());
+        assertEquals(1L, pick1.player().id());
+        assertTrue(state.isUsersTurn(), "slot 2 (mySlot) is next and has no seeded pick of its own");
+        assertEquals(2, state.currentPickNo());
+        assertEquals(2, state.onTheClockSlot());
+    }
+
+    @Test
+    void forkedAtPickNoIsTheFirstTrulyUndecidedPickNotMaxPlusOne() {
+        // Pick 2 is an unresolved autopick (player_id still null -- a real
+        // PickMapper/LiveDraftPoller path), so it's missing from `completed`
+        // even though pick 3 (a higher number) is landed. forkedAtPickNo must
+        // report 2, not 4 (max(completed)+1), since pick 2 is what actually
+        // gets engine-decided as speculative during this same fork call.
+        Map<String, Object> slotToManager = Map.of("1", 501L, "2", 502L, "3", 503L);
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                77L, 9L, "sleeper-draft-fork-gap", 2026, 15, 8, "drafting", slotToManager);
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, "sleeper-league-fork-gap", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0);
+        when(drafts.bySleeperId("sleeper-draft-fork-gap")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+        when(drafts.picks(77L)).thenReturn(List.of(
+                new DraftRepository.PickRow(77L, 1, 1, 1, 501L, 1L, 1.0),
+                new DraftRepository.PickRow(77L, 3, 1, 3, 503L, 3L, 3.0)));   // pick 2's player_id is null: unresolved
+
+        // mySlot=5 (unmapped, so a bare USER seat) rather than 2 -- if the user's
+        // own seat sat at slot 2, the engine would stop there for input rather
+        // than deciding it, which would defeat the point of this test.
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork-gap", 5);
+
+        assertEquals(2, state.forkedAtPickNo(), "pick 2 is the first genuinely undecided pick, not pick 4");
+        var pick2 = state.picks().stream().filter(p -> p.pickNo() == 2).findFirst().orElseThrow();
+        assertEquals("BOT", pick2.source(), "pick 2 had to be engine-decided since Sleeper hadn't resolved it");
+    }
+
+    @Test
+    void createSessionFromDraftRejectsANonDraftingStatus() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-not-live", 2026, 15, 8, "pre_draft", Map.of());
+        when(drafts.bySleeperId("sleeper-draft-not-live")).thenReturn(Optional.of(draft));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createSessionFromDraft("sleeper-draft-not-live", 1));
+    }
+
+    @Test
+    void createSessionFromDraftRejectsAnUnsupportedTeamCount() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-odd-size", 2026, 15, 9, "drafting", Map.of());
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, "sleeper-league-odd-size", "League", 2026, 9, LeagueShape.STANDARD_ROSTER, 1.0);
+        when(drafts.bySleeperId("sleeper-draft-odd-size")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createSessionFromDraft("sleeper-draft-odd-size", 1));
+    }
+
+    @Test
+    void createSessionFromDraftThrowsWhenNoMySlotCanBeResolved() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-no-slot", 2026, 15, 8, "drafting", Map.of());
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, "sleeper-league-no-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0);
+        when(drafts.bySleeperId("sleeper-draft-no-slot")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+        // owner is unconfigured (OwnerProperties(null) from setUp), and no override is passed.
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createSessionFromDraft("sleeper-draft-no-slot", null));
+    }
+
+    @Test
+    void createSessionFromDraftRejectsAnOutOfRangeMySlotOverride() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-bad-slot", 2026, 15, 8, "drafting", Map.of());
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, "sleeper-league-bad-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0);
+        when(drafts.bySleeperId("sleeper-draft-bad-slot")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createSessionFromDraft("sleeper-draft-bad-slot", 9));
+    }
+
     /** In-memory stand-in for the real JdbcClient-backed repository. */
     private static final class FakeMockDraftRepository extends MockDraftRepository {
         private final AtomicLong nextId = new AtomicLong(1);
@@ -198,12 +313,17 @@ class MockDraftServiceTest {
             super(null, null);
         }
 
+        // Only the 9-arg overload is overridden here: MockDraftRepository's own
+        // 7-arg createSession is a delegate to it (`this.createSession(..., null,
+        // null)`), so overriding just this one covers both callers via ordinary
+        // virtual dispatch -- no need for a second override.
         @Override
         public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
-                                  String seatsJson, int userSlot, long rngSeed) {
+                                  String seatsJson, int userSlot, long rngSeed,
+                                  Long sourceDraftId, Integer forkedAtPickNo) {
             long id = nextId.getAndIncrement();
             sessions.put(id, new SessionRow(id, "IN_PROGRESS", teams, rounds, rosterPositions, ppr,
-                    seatsJson, userSlot, rngSeed, 1));
+                    seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo));
             picksBySession.put(id, new ArrayList<>());
             return id;
         }
@@ -222,7 +342,8 @@ class MockDraftServiceTest {
         public void advanceCurrentPick(long id, int currentPickNo, String status) {
             SessionRow r = sessions.get(id);
             sessions.put(id, new SessionRow(r.id(), status, r.teams(), r.rounds(), r.rosterPositions(),
-                    r.pointsPerReception(), r.seatsJson(), r.userSlot(), r.rngSeed(), currentPickNo));
+                    r.pointsPerReception(), r.seatsJson(), r.userSlot(), r.rngSeed(), currentPickNo,
+                    r.sourceDraftId(), r.forkedAtPickNo()));
         }
 
         @Override
