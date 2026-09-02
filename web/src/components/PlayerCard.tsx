@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { PlayerRef, PredictedPick } from '../api'
+import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 
 type Props = {
@@ -33,7 +34,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
           <div className="modal-your-pick">
             <h3 className="cond tiny muted">You picked</h3>
             <div className="modal-head">
-              <span className={`pos ${yourPick.position}`}>{yourPick.position}</span>
+              <span className={`pos ${yourPick.position}`}>{posRank(yourPick)}</span>
               <h2 className="modal-name">{yourPick.name}</h2>
             </div>
             <p className="muted small">{yourPick.team ?? '—'}</p>
@@ -43,7 +44,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
         <div className={yourPick ? 'modal-model-pick' : undefined}>
           {yourPick && <h3 className="cond tiny muted">Model's own pick here</h3>}
           <div className="modal-head">
-            <span className={`pos ${pick.player.position}`}>{pick.player.position}</span>
+            <span className={`pos ${pick.player.position}`}>{posRank(pick.player)}</span>
             <h2 className="modal-name">{pick.player.name}</h2>
           </div>
           <p className="muted small">{pick.player.team ?? '—'}</p>
@@ -59,7 +60,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
             <h3 className="cond">Alternatives</h3>
             {pick.alternatives.map((a) => (
               <div key={a.player.id} className="modal-alt-row">
-                <span className={`pos ${a.player.position}`}>{a.player.position}</span>
+                <span className={`pos ${a.player.position}`}>{posRank(a.player)}</span>
                 <span className="name">{a.player.name}</span>
                 <span className="mono muted">{Math.round(a.probability * 100)}%</span>
               </div>

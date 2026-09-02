@@ -1,5 +1,66 @@
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
+/*
+ * ============================================================================
+ * House style. Read this before adding a component; these are the rules the
+ * existing screens already follow, not aspirations.
+ * (Design note: claude/pill-board-and-player-list-on-top.md)
+ * ============================================================================
+ *
+ * POSITION COLOR IS A SYSTEM, NOT A DECORATION
+ *   Six tokens -- --qb --rb --wr --te --k --def -- and a player's position is
+ *   always said in the same color wherever he appears. Three usages, all of
+ *   them already defined, so reach for the class rather than a new color:
+ *     .pos.RB              solid badge, `--bg` text. Carries the positional
+ *                          rank too ("RB4" via posRank.ts), never a bare
+ *                          position when a rank exists.
+ *     .cell.pos-RB         22% of the position color over `--panel`. This is
+ *                          the ceiling: the text on top is `--text` at
+ *                          oklch(95%), and past ~25% the name starts losing.
+ *                          Measure, don't eyeball -- 22% clears 12:1.
+ *     .chip.pos-chip.RB    filter control; 45% mix on the border, solid when
+ *                          `.on`.
+ *   Never encode position with color alone -- every one of the above carries
+ *   the position as text as well, because six hues are not memorizable and not
+ *   everyone can separate them.
+ *
+ * CRIMSON MEANS "YOU", AND IT YIELDS THE FILL
+ *   --crimson is reserved for the user's own seat, own pick, own column. Where
+ *   nothing else owns the background it can fill (`.col-head.mine`); where
+ *   something else does -- a position-colored cell -- it becomes a ring
+ *   (`.cell.mine`), never a competing fill. --teal is the opposite: generic
+ *   interaction (hover, focus, active chip), never identity.
+ *
+ * SHAPE
+ *   border-radius by role, not by taste: 999px for badges and chips, 10px for
+ *   board tiles and controls, 12px for floating sheets, 14px for panels.
+ *   Nothing in this app has square corners.
+ *
+ * ELEVATION IS A CLAIM ABOUT LAYERING
+ *   A shadow means "this is above the plane." Grid tiles are on the plane and
+ *   get none -- a dense board of shadowed cards is the failure mode this
+ *   design keeps walking away from. `.panel` and `.avail-sheet` genuinely
+ *   float and are the only things that carry one. What keeps flat elements
+ *   from reading as uniform boxes is tint and hover, not elevation.
+ *
+ * LAYOUT
+ *   The app is one screen: `.app` claims 100vh and every band scrolls
+ *   internally rather than growing the page. That only works if `min-height: 0`
+ *   (and `min-width: 0` beside a grid) appears at every level of the flex
+ *   chain -- a flex child refuses to shrink below its content otherwise and
+ *   the inner `overflow: auto` never engages.
+ *
+ * STACKING (over `.board-stage`)
+ *   0 cells · 1 sticky headers (2 for the corner) · 3 a focused cell ·
+ *   4 `.avail-sheet` · 5 `.start-overlay`. Add a layer here, not inline.
+ *
+ * DENSITY
+ *   Match the layout to the shape of the content: rows for lists
+ *   (`.draft-list`), a grid for the board, cards only for things that are
+ *   actually card-shaped. Padding a one-line record out into a card is how
+ *   this stops looking hand-built.
+ */
+
 :root {
   --bg: oklch(13% 0.02 250);
   --panel: oklch(18% 0.025 250);
@@ -152,13 +213,18 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 
 .add-draft .controls { margin-top: 6px; }
 
-.pos { display: inline-block; min-width: 24px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 7px; margin-right: 6px; letter-spacing: 0.02em; }
-.pos.QB { background: color-mix(in oklch, var(--qb) 24%, var(--panel)); color: var(--qb); }
-.pos.RB { background: color-mix(in oklch, var(--rb) 24%, var(--panel)); color: var(--rb); }
-.pos.WR { background: color-mix(in oklch, var(--wr) 24%, var(--panel)); color: var(--wr); }
-.pos.TE { background: color-mix(in oklch, var(--te) 24%, var(--panel)); color: var(--te); }
-.pos.K { background: color-mix(in oklch, var(--k) 24%, var(--panel)); color: var(--k); }
-.pos.DEF { background: color-mix(in oklch, var(--def) 24%, var(--panel)); color: var(--def); }
+.pos { display: inline-block; min-width: 30px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 7px; margin-right: 6px; letter-spacing: 0.02em; }
+/* Solid, not tinted. The badge used to be a 24% tint of the position color on
+   `--panel`, which worked while every cell behind it was `--panel` -- now the
+   cell is itself a tint of the same color and a tinted badge sinks into it.
+   Solid on `--bg` text also makes the badge the one thing in a dense cell that
+   is legible at a glance, which is what carries the rank ("RB4"). */
+.pos.QB { background: var(--qb); color: var(--bg); }
+.pos.RB { background: var(--rb); color: var(--bg); }
+.pos.WR { background: var(--wr); color: var(--bg); }
+.pos.TE { background: var(--te); color: var(--bg); }
+.pos.K { background: var(--k); color: var(--bg); }
+.pos.DEF { background: var(--def); color: var(--bg); }
 
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 8px; }
@@ -172,18 +238,44 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .bar-label { position: relative; font-variant-numeric: tabular-nums; font-size: 12px; }
 
 /*
- * Deliberately spreadsheet-like, not a wall of floating cards: a Sleeper draft
- * room reads as a dense, contiguous grid with thin dividers and flat cells,
- * highlighted only by a fill color -- not shadowed stat cards with gaps
- * between them. The `gap: 1px` + container background is what draws the
- * hairline grid: cells never set their own border, so there's never a
- * doubled line at a shared edge.
+ * Rounded tiles, not the hairline spreadsheet this used to be. The old grid
+ * drew its lines with `gap: 1px` over a `--line` background; rounded corners on
+ * that leave a dark notch at every cell corner, so the two changes had to
+ * happen together -- gap widened, container background dropped to `--bg`.
+ *
+ * Still one dense board, though, not a wall of floating cards: the gap is 4px
+ * rather than a card grid's 12-16, and no cell carries a shadow. What keeps
+ * cells from reading as uniform boxes is the position fill (`.cell.pos-*`) and
+ * the hover state, not elevation. The one element here that does float -- the
+ * availability sheet -- gets a shadow precisely because it genuinely sits above
+ * this plane.
+ *
+ * z-index order on the stage, defined here rather than discovered:
+ *   0  cells
+ *   1  sticky .col-head / .rnd, 2 for .corner (sticky in both directions)
+ *   3  a focused cell, so its outline is never clipped by a neighbour
+ *   4  .avail-sheet, the floating player list
+ *   5  .start-overlay, which covers everything by design
  */
 .board {
-  display: grid; gap: 1px; background: var(--line);
+  display: grid; gap: 4px; background: var(--bg);
   font-size: 11px;
+  /* Scrollable room after the last round equal to whatever the availability
+     sheet is currently covering (published by AvailabilityPanel, absent when
+     it is collapsed). The sheet floats over this grid, so without this the
+     deepest rounds are *permanently* unreachable: at maximum scroll they are
+     still underneath it. With it, every round can be scrolled up into the
+     clear -- which is the point of scrolling the board at all once the draft
+     is past round 6 or so. */
+  padding-bottom: var(--avail-sheet-reserve, 0px);
 }
-.board .corner { background: var(--panel); position: sticky; top: 0; left: 0; z-index: 2; }
+/* The sticky tiles each paint 4px of `--bg` around themselves. Without it the
+   gaps between them are transparent and rows scrolling underneath show through
+   the seams -- a strip of moving player names between every column header. */
+.board .corner {
+  background: var(--panel); position: sticky; top: 0; left: 0; z-index: 2;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
+}
 /* §C: the header now carries what SeatList's bottom band used to (name,
    avatar, provenance, "you") -- it's a real <button> (opens SeatPopover), so
    this resets browser button chrome the same way `.board button.cell`
@@ -192,6 +284,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   background: var(--panel); display: flex; flex-direction: column; align-items: center;
   gap: 4px; padding: 8px 2px; text-align: center;
   position: sticky; top: 0; z-index: 1;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
   appearance: none; -webkit-appearance: none; border: 0; margin: 0; width: 100%;
   font: inherit; color: inherit; cursor: pointer; transition: background 100ms ease;
 }
@@ -200,7 +293,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
 /* Same crimson identity as `.cell.mine` -- your own seat should read as the
    same "you" everywhere on the board, not a second visual language. */
-.board .col-head.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson); }
+.board .col-head.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
 .board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
 .board .col-head-name {
   font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -218,11 +311,30 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   background: var(--panel); display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
   position: sticky; left: 0; z-index: 1;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
 }
 .board .cell {
   position: relative; background: var(--panel); padding: 6px 7px 7px; min-width: 0;
-  transition: background 100ms ease;
+  border-radius: 10px; transition: background 100ms ease;
 }
+/* The cell carries the position color now, not just its `.pos` badge. 22% is
+   as far as this can go while the name on top stays `--text` at oklch(95%):
+   Sleeper's own cells are near-fully saturated because their text is
+   near-black, and ours isn't. Measured in the running app at 22%: the name
+   clears 12:1 against every position (RB tightest), and the faded
+   `.uncertain` name (opacity 0.62) still clears 5.5:1. */
+.board .cell.pos-QB { background: color-mix(in oklch, var(--qb) 22%, var(--panel)); }
+.board .cell.pos-RB { background: color-mix(in oklch, var(--rb) 22%, var(--panel)); }
+.board .cell.pos-WR { background: color-mix(in oklch, var(--wr) 22%, var(--panel)); }
+.board .cell.pos-TE { background: color-mix(in oklch, var(--te) 22%, var(--panel)); }
+.board .cell.pos-K  { background: color-mix(in oklch, var(--k) 14%, var(--panel)); }
+.board .cell.pos-DEF { background: color-mix(in oklch, var(--def) 22%, var(--panel)); }
+.board .cell.pos-QB:hover { background: color-mix(in oklch, var(--qb) 34%, var(--panel)); }
+.board .cell.pos-RB:hover { background: color-mix(in oklch, var(--rb) 34%, var(--panel)); }
+.board .cell.pos-WR:hover { background: color-mix(in oklch, var(--wr) 34%, var(--panel)); }
+.board .cell.pos-TE:hover { background: color-mix(in oklch, var(--te) 34%, var(--panel)); }
+.board .cell.pos-K:hover  { background: color-mix(in oklch, var(--k) 24%, var(--panel)); }
+.board .cell.pos-DEF:hover { background: color-mix(in oklch, var(--def) 34%, var(--panel)); }
 /* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
    this strips the browser's default button chrome so they still read as
    plain grid cells, not form controls. */
@@ -237,19 +349,24 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .pickno { position: absolute; top: 4px; right: 6px; font-size: 8px; color: var(--muted); opacity: 0.7; }
 /* The most-voted player here went earlier, so this cell is a second choice. */
 .board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
-.board .cell.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson); }
-.board .cell.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
-/* chosen is always also mine -- an addition to that crimson styling (a
-   second inset ring + a small badge), not a full recolor, so the far more
-   common mine-but-not-yet-chosen cell doesn't get harder to spot. */
+/* Position owns the fill now (`.cell.pos-*`), so "your seat" had to become a
+   ring -- the two cannot both be the background. The ring is declared after
+   the position fills and sets no background of its own, so an empty seat of
+   yours still reads crimson-on-panel and a filled one reads crimson-on-
+   position. */
+.board .cell.mine { box-shadow: inset 0 0 0 1.5px var(--crimson); }
+/* chosen is always also mine -- an addition to that crimson ring (a second,
+   thicker inset ring), not a full recolor, so the far more common
+   mine-but-not-yet-chosen cell doesn't get harder to spot.
+   It used to carry a "✓ yours" badge as well. Dropped: your whole column is
+   already ringed crimson, so a badge on every cell in it was saying the same
+   thing a second time. What still separates a pick you made from one the model
+   guessed for you is this inner ring, plus the cell's own title ("Your pick --
+   <name>") and the fact that the player in it is the one you took. */
 .board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--crimson), inset 0 0 0 4px color-mix(in oklch, var(--crimson) 35%, transparent); }
-.board .chosen-badge { color: var(--crimson); font-size: 9px; font-weight: 700; letter-spacing: 0.03em; }
 .board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
-.board .meta { display: flex; justify-content: space-between; align-items: baseline; margin-top: 3px; gap: 6px; }
+.board .meta { display: flex; align-items: baseline; margin-top: 3px; gap: 6px; }
 .board .team-code { color: var(--muted); font-size: 9px; }
-.board .prob { color: var(--muted); font-size: 9px; }
-.board .bar-track { height: 2px; background: var(--line); margin-top: 6px; border-radius: 1px; overflow: hidden; }
-.board .bar-fill { height: 100%; background: var(--teal); border-radius: 1px; transition: width 200ms ease; }
 .board .empty { color: var(--muted); }
 
 .panel-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
@@ -274,7 +391,9 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    internally. Confirmed live: at a 900px window this pushed the entire page
    into horizontal scroll (documentElement.scrollWidth > innerWidth) rather
    than staying contained to the board's own scroller. */
-.board-panel { flex: 5 1 0; min-height: 0; min-width: 0; display: flex; }
+/* The whole content area: the availability panel no longer takes a band of
+   its own, it floats over this one (`.avail-sheet`). */
+.board-panel { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; }
 .board-panel > .panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 
 /* Wraps DraftBoard so the pre-start overlay can position itself against the
@@ -290,7 +409,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    room" moment, not a placeholder screen next to an empty grid. Translucent
    rather than opaque so the empty grid is still visibly *there* underneath. */
 .start-overlay {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
   background: color-mix(in oklch, var(--bg) 72%, transparent);
   backdrop-filter: blur(2px);
   text-align: center; padding: 24px;
@@ -306,17 +425,67 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 }
 .start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
-/* Single column now (§E): the confidence panel that used to share this row
-   is gone outright (D/F3), and seats moved into the board's own column
-   headers (§C) rather than a second band below. AvailabilityPanel is the
-   whole row. */
-.lower-grid {
-  flex: 2 1 0; min-height: 0; display: grid;
-  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 16px;
+/*
+ * The player list, floating over the board instead of splitting the page with
+ * it (claude/pill-board-and-player-list-on-top.md section E).
+ *
+ * Anchored to the BOTTOM of the stage. It was anchored to the top first, on the
+ * reasoning that the rows up there are already resolved -- which is exactly
+ * backwards for most of a draft: at pick 18 the only rows with anything in them
+ * *are* the top ones, and the sheet covered every pick that had happened while
+ * leaving seven empty rounds on show. The deep rounds are the ones that stay
+ * empty almost the whole session, so they are what the sheet should lie on.
+ * `bottom` clears the board's own horizontal scrollbar rather than sitting on
+ * top of it.
+ *
+ * It is a layer, not a modal: no backdrop, no dimming, no focus trap. The
+ * board stays live everywhere this doesn't cover, and the header's own
+ * show/hide gives all of it back.
+ */
+.avail-sheet {
+  position: absolute; z-index: 4;
+  bottom: 18px; left: 8px; right: 8px; max-height: 46%;
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 10px 14px 12px; border-radius: 12px;
+  /* Near-opaque, unlike `.start-overlay`'s 72%: that recipe is for a centred
+     CTA, and under 60 rows of small text the board's position colors bleed
+     straight through the `.pos` pills. The shadow is the one in this file that
+     is earned -- section D bans them on cells because cells don't float; this
+     genuinely lies above the board. */
+  background: color-mix(in oklch, var(--panel) 95%, transparent);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 0 0 1px var(--line), 0 14px 34px rgba(0,0,0,0.5);
 }
-.lower-grid > .panel { min-height: 0; display: flex; flex-direction: column; }
+ /* Collapsed: a single pill in the board's bottom-right corner. A full-width
+    collapsed bar still covered a whole round, which is not what "show the whole
+    board" means. */
+.avail-sheet.collapsed {
+  max-height: none; left: auto; padding: 5px 7px;
+  background: color-mix(in oklch, var(--panel) 92%, transparent);
+}
+.avail-sheet h2 { margin: 0; }
+.avail-sheet .panel-head { margin-bottom: 8px; }
+.avail-sheet.collapsed .panel-head { margin-bottom: 0; }
+.sheet-toggle { margin-left: 10px; }
+/* Reaching the end of the player list must not start scrolling the board
+   underneath it. */
+.avail-sheet .avail-scroll { overscroll-behavior: contain; }
 
 .avail-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+
+/* The filter chips carry the same six position colors as the board cells and
+   the `.pos` badges, so the sheet's header reads as part of the board it is
+   lying on. "ALL" has no position and stays the neutral `.chip`. */
+.chip.pos-chip.QB { color: var(--qb); border-color: color-mix(in oklch, var(--qb) 45%, var(--line)); }
+.chip.pos-chip.RB { color: var(--rb); border-color: color-mix(in oklch, var(--rb) 45%, var(--line)); }
+.chip.pos-chip.WR { color: var(--wr); border-color: color-mix(in oklch, var(--wr) 45%, var(--line)); }
+.chip.pos-chip.TE { color: var(--te); border-color: color-mix(in oklch, var(--te) 45%, var(--line)); }
+.chip.pos-chip.QB.on { background: var(--qb); border-color: var(--qb); color: var(--bg); }
+.chip.pos-chip.RB.on { background: var(--rb); border-color: var(--rb); color: var(--bg); }
+.chip.pos-chip.WR.on { background: var(--wr); border-color: var(--wr); color: var(--bg); }
+.chip.pos-chip.TE.on { background: var(--te); border-color: var(--te); color: var(--bg); }
+.chip.pos-chip:hover { color: var(--text); }
+.chip.pos-chip.on:hover { color: var(--bg); }
 
 .seat {
   border: 1px solid var(--line); border-radius: 12px; padding: 12px;

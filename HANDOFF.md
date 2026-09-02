@@ -31,13 +31,24 @@ not new risk" was wrong twice now: it opened with a correctness fix in the
 ingest/poll path, and its own verification surfaced a second real bug in the
 frontend half.
 
-**New UI brief, not started: `claude/pill-board-and-docked-availability.md`**
-(2026-09-02). Allan's next round of board feedback, reconciled: position-colored
-cells, positional rank in the badge (`RB1`), the per-cell probability and bar
-deleted, Sleeper-style rounded tiles instead of the hairline grid, and the
-availability panel docked directly under the board. Planning only — nothing in
-it has been built. It touches `DraftBoard`/`AvailabilityPanel`, so it lands on
-the live page as well as the mock page.
+**Board re-skin built and verified, 2026-09-02:
+`claude/pill-board-and-player-list-on-top.md`.** Allan's board feedback, planned
+and then implemented in the same session: cells filled by position (22% tint,
+measured 12:1 on the player name), the positional rank in a now-solid badge
+(`RB4`, via the new `web/src/posRank.ts`), the per-cell probability and its bar
+deleted (the number survives in the cell's tooltip and PlayerCard), rounded
+tiles over a 4px gap instead of the hairline grid, and the board given the
+**full** content area with the availability panel floating over the bottom of
+it as a sheet that collapses to a corner pill. Verified in the running app on both the mock
+and live pages; `npm run build` clean. The doc's "Built" section records the two
+places the result departed from the plan and the one thing the current player
+pool could not exercise (no `positionalRank === 999` players).
+
+**`web/src/styles.css` now opens with a house-style header** — the position-color
+system and its three usages, "crimson means you and yields the fill", radius by
+role, when a shadow is allowed, the 100vh/`min-height: 0` layout rule and the
+stacking order over `.board-stage`. Read it before adding a component or
+inventing a color.
 
 **For tonight: set `APP_OWNER_SLEEPER_USER_ID=1122386008709910528` before
 `bootRun`**, or the live board's slot auto-detection stays off and every seat

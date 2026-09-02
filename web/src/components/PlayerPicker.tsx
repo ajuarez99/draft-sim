@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AvailabilityRow, PlayerRef } from '../api'
+import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
 
@@ -15,12 +16,6 @@ type Props = {
 }
 
 const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
-
-// 999 is Sleeper's own "no rank" sentinel (BoardService's default, never
-// null) -- fall back to a plain ADP number rather than rendering "RB999".
-function rankLabel(p: PlayerRef): string {
-  return p.positionalRank === 999 ? `ADP ${Math.round(p.adp)}` : `${p.position}${p.positionalRank}`
-}
 
 // Same "realistic options" data AvailabilityPanel already shows below the
 // board (SimulationResult.availability's survivalByPick), scoped to exactly
@@ -144,7 +139,7 @@ export default function PlayerPicker({
                       {r.player.name}
                       <span className="team">{r.player.team}</span>
                     </td>
-                    <td className="num">{rankLabel(r.player)}</td>
+                    <td className="num">{posRankOrAdp(r.player)}</td>
                     <td>{need && <span className="tag need">{need}</span>}</td>
                   </tr>
                 )

@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { PlayerRef, PredictedPick, Seat } from '../api'
 import { hueFor } from '../hue'
+import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
 
 type Props = {
@@ -19,9 +20,16 @@ type Props = {
 }
 
 /**
- * Rounds x slots grid, snake-aware. Each cell shows the modal pick and how
- * often it actually happened across the runs -- a cell at 22% is the model
- * telling you it has very little idea, and it should read that way.
+ * Rounds x slots grid, snake-aware. Each cell shows the modal pick, colored by
+ * the player's position and badged with his positional rank ("RB4").
+ *
+ * The per-cell probability and its bar are deliberately gone: by the time a
+ * cell is on screen the pick has been made, and "62% of runs" was answering a
+ * question nobody is asking at that moment. The number is still real model
+ * output and still reachable -- the cell's own `title`, and PlayerCard when you
+ * click it. What survives in the cell itself is the qualitative half:
+ * `.uncertain` still fades the name when the most likely player here went
+ * earlier. See claude/pill-board-and-player-list-on-top.md section B.
  */
 export default function DraftBoard({
   board,
@@ -97,18 +105,21 @@ export default function DraftBoard({
                 const hidden = revealedThrough !== undefined && pickNo > revealedThrough
                 const visible = hidden ? undefined : pick
                 // chosen is a player you actually picked at this slot (§3 of the
-                // design doc) -- it is never shown alongside the model's own
-                // probability/bar for this pick, since that number was never
-                // computed for him being taken by you. chosen and uncertain are
-                // mutually exclusive: "uncertain" describes the model's own
-                // guess-quality, and a cell you actually picked isn't a guess.
+                // design doc). chosen and uncertain are mutually exclusive:
+                // "uncertain" describes the model's own guess-quality, and a
+                // cell you actually picked isn't a guess.
                 // Gated on `hidden` like `visible` is -- otherwise scrubbing the
                 // reveal slider backward past a pick you've made would keep
                 // showing him, the only cell that would leak content past the
                 // hidden boundary every other not-yet-revealed cell respects.
                 const chosen = hidden ? undefined : userPicks[pickNo]
+                // The cell's own fill now comes from the position of whoever is
+                // in it (section A) -- so "your seat" and "your pick" had to give
+                // the fill up and become rings instead (styles.css `.cell.mine`).
+                const shown = chosen ?? visible?.player
                 const cls =
                   'cell' +
+                  (shown ? ` pos-${shown.position}` : '') +
                   (mine.has(pickNo) ? ' mine' : '') +
                   (chosen ? ' chosen' : visible && !visible.isModal ? ' uncertain' : '')
                 const titleAttr = chosen
@@ -122,27 +133,18 @@ export default function DraftBoard({
                         .map((a) => `${a.player.name} ${Math.round(a.probability * 100)}%`)
                         .join('\n')
                     : ''
-                const inner = chosen ? (
+                // One branch for both: a pick you made and a pick the model
+                // guessed now render identically (dropping the probability and
+                // then the "yours" badge is what collapsed them), and `shown`
+                // already applies the chosen-wins-over-predicted precedence.
+                // The difference between the two lives in `cls` and `titleAttr`.
+                const inner = shown ? (
                   <>
                     <span className="pickno mono">{pickNo}</span>
-                    <span className={`pos ${chosen.position}`}>{chosen.position}</span>
-                    <span className="name">{chosen.name}</span>
+                    <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
+                    <span className="name">{shown.name}</span>
                     <div className="meta">
-                      <span className="team-code mono">{chosen.team ?? '—'}</span>
-                      <span className="chosen-badge mono">✓ yours</span>
-                    </div>
-                  </>
-                ) : visible ? (
-                  <>
-                    <span className="pickno mono">{pickNo}</span>
-                    <span className={`pos ${visible.player.position}`}>{visible.player.position}</span>
-                    <span className="name">{visible.player.name}</span>
-                    <div className="meta">
-                      <span className="team-code mono">{visible.player.team ?? '—'}</span>
-                      <span className="prob mono">{Math.round(visible.probability * 100)}%</span>
-                    </div>
-                    <div className="bar-track">
-                      <div className="bar-fill" style={{ width: `${Math.round(visible.probability * 100)}%` }} />
+                      <span className="team-code mono">{shown.team ?? '—'}</span>
                     </div>
                   </>
                 ) : (

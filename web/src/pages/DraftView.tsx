@@ -470,6 +470,19 @@ export default function DraftView() {
                   onCellClick={started ? setOpenPick : undefined}
                   onSeatClick={setOpenSeatSlot}
                 />
+                {/* The player list lies on top of the board's earliest rounds
+                    rather than taking a band of its own below it (§E) -- the
+                    board now gets the whole content area, and this collapses
+                    to its own header to give all of it back. Always rendered,
+                    including before a run: gating it on `started` is what used
+                    to make the layout jump the moment you pressed start. */}
+                <AvailabilityPanel
+                  availability={result?.availability ?? []}
+                  myPicks={undecidedMyPicks}
+                  teams={result?.teams ?? seats.teams}
+                  pickedPlayerIds={revealedPlayerIds}
+                  started={started}
+                />
                 {!started && (
                   <div className="start-overlay">
                     {running ? (
@@ -501,21 +514,6 @@ export default function DraftView() {
           </section>
         </div>
 
-        {/* D/F3: the confidence panel is gone outright, not folded into a
-            paragraph -- F2 deletes the very paragraph §D's original plan
-            would have folded it into. The caveats it carried remain in
-            README.md's "What not to trust". AvailabilityPanel now takes the
-            full row width (§E: `.lower-grid` collapses to one column). */}
-        {started && (
-          <div className="lower-grid">
-            <AvailabilityPanel
-              availability={result.availability}
-              myPicks={undecidedMyPicks}
-              teams={result.teams}
-              pickedPlayerIds={revealedPlayerIds}
-            />
-          </div>
-        )}
       </div>
 
       {openPick && result && (

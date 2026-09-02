@@ -289,6 +289,17 @@ export default function LiveDraftView() {
             {seats && (
               <div className="board-stage">
                 {board}
+                {/* Same floating sheet as the mock page (§E) -- the board owns
+                    the whole content area on both. `started` here is "there is
+                    a projection to read options out of", which is what the old
+                    `result &&` gate below the board was saying too. */}
+                <AvailabilityPanel
+                  availability={result?.availability ?? []}
+                  myPicks={upcomingMyPicks}
+                  teams={result?.teams ?? seats.teams}
+                  pickedPlayerIds={takenPlayerIds}
+                  started={result != null}
+                />
                 {waiting && !result && (
                   <div className="start-overlay">
                     <div className="start-overlay-cta">
@@ -316,16 +327,6 @@ export default function LiveDraftView() {
           </section>
         </div>
 
-        {result && (
-          <div className="lower-grid">
-            <AvailabilityPanel
-              availability={result.availability}
-              myPicks={upcomingMyPicks}
-              teams={result.teams}
-              pickedPlayerIds={takenPlayerIds}
-            />
-          </div>
-        )}
       </div>
 
       {openPick && result && (
