@@ -450,3 +450,63 @@ Also added, at Allan's request: a **house-style header at the top of `styles.css
 the position-color system and its three usages, the crimson-yields-the-fill rule, the
 radius-by-role scale, the elevation rule, the 100vh/min-height layout rule and the
 stacking order. Future components should read it before inventing a color or a shadow.
+
+---
+
+## Parked, 2026-09-02 — not built, next pass
+
+Two nits Allan raised right after the merge, both "Sleeper does this and we don't."
+Recorded rather than built, at his request.
+
+### P1 — Reclaim the dead space around the board
+
+Sleeper's draft room runs edge to edge; ours has a visible gutter on all four sides
+that nothing lives in. It is not one padding, it is four nested ones stacking up:
+
+| Where | Now | Note |
+| --- | --- | --- |
+| `.app` (`styles.css:104-109`) | `padding: 16px 20px` | outermost gutter |
+| `.panel` (`:152-155`) | `padding: 18px 20px` | the board's own panel, inside that |
+| `.content` (`:385`) | `gap: 12px` | between bands |
+| `.app` | `gap: 10px` | header to content |
+| `.top` (`:111-114`) | `padding-bottom: 10px` | plus a 1px rule |
+
+So the grid's left edge sits ~40px in from the window on each side, and there is a
+comparable band above it. The board is the one panel that should probably not be a
+`.panel` at all — its padding buys nothing, because `.board-scroll` already clips and
+rounds its own corners.
+
+Suggested order, smallest first: drop `.panel`'s padding for the board panel
+specifically (keep it for the picker's panels, which are text and need it), then take
+`.app` to something like `10px 12px`, then look at whether the `.top` header band
+earns its height. Do not remove `.app`'s padding entirely — at 0 the board's rounded
+corners touch the window edge and read as clipped rather than full-bleed.
+
+**Watch out for:** `.avail-sheet` is positioned `left: 8px; right: 8px` against
+`.board-stage`, and `.board { padding-bottom: var(--avail-sheet-reserve) }` — both
+assume the stage has some inset. Re-check the sheet's edges after changing the panel
+padding, not just the grid's.
+
+### P2 — The scrollbar should appear only while scrolling
+
+Ours is a permanent classic scrollbar on `.board-scroll` (and inside `.avail-scroll`);
+Sleeper's fades in on scroll and disappears.
+
+**Be honest about what is achievable here.** There is no CSS that reproduces the
+macOS/Sleeper auto-hiding overlay scrollbar on Windows Chrome — `overflow: overlay`
+is removed, and `scrollbar-gutter: stable` reserves the space rather than freeing it.
+The realistic options, in order of effort:
+
+1. `scrollbar-width: thin` + `scrollbar-color: var(--line) transparent` — standard,
+   one line, makes it much less loud but still always present.
+2. `::-webkit-scrollbar` with a transparent thumb that becomes visible on
+   `.board-scroll:hover` and `:focus-within`. Close to the Sleeper feel without JS,
+   but "hover" is not "scrolling" — it will show when the mouse is merely over the
+   board.
+3. A scroll listener that adds a `.scrolling` class and removes it on a timeout, with
+   the thumb transitioning on that class. This is the only one that actually matches
+   "appears when you scroll," and it is real code on a hot path — throttle it, and do
+   not re-render React for it.
+
+Start at (1) and see whether it is already enough; it may well be, and it costs
+nothing. Only go to (3) if Allan still notices the bar afterwards.
