@@ -297,8 +297,10 @@ a rebuild.
 
 ## Where things actually stand
 
-Repo `ajuarez99/draft-sim`, branch `main`. Working tree has uncommitted work from
-this session (below) — **not yet committed, ask before committing.** Multiple
+Repo `ajuarez99/draft-sim`. **The 2026-09-02 draft-night batch and Phase 4 live
+frontend are committed on branch `draft-night-fixes-and-live-frontend`, not on
+`main`** — deliberately, because none of it has been verified against a running
+server (see "Stopped here" above). Merge it once it has been. Multiple
 Claude Code sessions have been running concurrently against this same working
 directory (one on this live-poller work, others on separate frontend work per
 `git status`) — if you're picking this up, diff carefully before assuming the
