@@ -12,8 +12,8 @@ its own build note.
 | 1 | **A**'s normalization: priors + tilt onto fraction-of-draft, K/DEF gating onto rounds-remaining | **built** 2026-09-01 |
 | 1 | Shared `DraftContext`-from-config builder — `DraftContextFactory`, `SeatSpec`, `LeagueShape` | **built** 2026-09-01 |
 | 2 | **B**'s shell — `GET /api/drafts`, router, `/` picker + `/drafts/:draftId`, free-text id field gone | **built** |
-| 3 | **C**'s interactive mock draft room | **not started** — the largest thing left, and the next one |
-| 4 | **D**'s live frontend — SSE `live-stream`, status bar, a `/track` button, picker status refresh | **not started** |
+| 3 | **C**'s interactive mock draft room | **built** 2026-09-02 — see "What the build found" below |
+| 4 | **D**'s live frontend — SSE `live-stream`, status bar, a `/track` button, picker status refresh | **built** — this row was stale; it shipped and was dry-run verified end-to-end against a real disposable Sleeper draft before Phase 3 started (`6481be5`, which also fixed a stuck-EventSource reconnect bug found during that run) |
 | 5 | **A**'s ad-hoc league sizing — the `SimulationRequest` branch, seat-assignment UI, the dropdown | **not started**, still deliberately last |
 
 `/mock/new` and `/drafts/:draftId/live` are both reserved in `web/src/App.tsx`
@@ -396,6 +396,42 @@ guard.
 Starting C's migration or extraction before Phase 1's normalization and shape
 decisions land means redoing the `SeatSpec`/`DraftContext` plumbing partway
 through — this is the one phase where "build the shared thing first" matters most.
+
+#### What the build found (2026-09-02)
+
+Built essentially as planned, in the order above. `DraftSimulator.choose()`/
+`sample()` extracted verbatim into `engine/PickDecider.java`, shared by the
+existing batch `run()` loop and a new `engine/MockDraftEngine.advanceUntilUserOrEnd`
+that stops the moment the next undecided pick belongs to the single `USER` seat.
+`mock_draft_session`/`mock_draft_pick` landed as `V3__mock_draft.sql`, with a row
+lock (`select ... for update`, held by the service's own `@Transactional`
+boundary — deliberately *not* annotated on the repository's lock method itself,
+which would only join an existing transaction or silently no-op one of its own)
+serializing `POST /mocks`/`POST /mocks/{id}/pick` against the same session.
+
+Three scope calls, decided with Allan before starting: add `vitest`+RTL now
+(this repo had zero frontend test tooling); defer the optional "outlook" rerun
+entirely (core create/pick/auto-advance loop first); add the "Mock drafts" list
+to the picker screen now rather than leaving sessions reachable only by URL.
+
+**No SSE, no polling, no bot-advance endpoint** — the one real design deviation
+from a literal reading of this section's brief, decided during the build.
+Every mutating call (`POST /mocks`, `POST /mocks/{id}/pick`) auto-advances bots
+synchronously and returns the fully-caught-up state in one response; `GET` exists
+only for resumability after a refresh. D's live poll needs a push channel because
+Sleeper itself moves the draft between requests; a mock session has no such
+external actor, so the simpler synchronous design is a strict improvement, not
+a shortcut.
+
+The standing profile-contamination guard (§2a) is `store/MockDraftContaminationIT`
+— confirmed by construction, not just by test: `DraftRepository.allCompletedPicks()`
+only ever queries `draft_pick join draft`, with no FK, shared id space, or view
+touching `mock_draft_pick` anywhere. 37 new backend tests (211 total), including
+a real-Postgres concurrency test proving the row lock actually serializes two
+racing transactions, plus 14 new frontend component tests.
+Verified live in the browser end-to-end: an 8-team mock from `/mock/new` through
+several rounds, snake order, bot auto-advance, and resumability via a page
+reload all behaved correctly against the real ingested board.
 
 ### Phase 4 — D's remaining pieces (can trail Phase 2/3 without blocking them)
 

@@ -225,6 +225,73 @@ export const clearTendencies = (managerId: number) =>
 export const getBoard = (limit = 60) =>
   fetch(`/api/board?limit=${limit}`).then(json<{ capturedOn: string; entries: unknown[] }>)
 
+// Mirrors engine/SeatSpec.java's 3-state shape.
+export type SeatType = 'USER' | 'MANAGER' | 'BOT'
+
+// Mirrors mock/MockSessionState.java field-for-field.
+export type MockSeat = { slot: number; type: SeatType; managerId: number | null; manager: string }
+
+export type MockPick = {
+  pickNo: number
+  round: number
+  draftSlot: number
+  seatType: SeatType
+  source: 'USER' | 'BOT'
+  // Null only if the board changed (a re-ingest) since this pick was made and
+  // the player dropped off it -- MockDraftView filters these out of the board
+  // array entirely rather than rendering a broken cell.
+  player: PlayerRef | null
+}
+
+export type MockSessionState = {
+  id: number
+  status: 'IN_PROGRESS' | 'COMPLETE'
+  teams: number
+  rounds: number
+  rosterPositions: string[]
+  userSlot: number
+  // This session's own snake-order pick numbers -- computed once on the
+  // backend (DraftSlot.picksForSlot) so the frontend doesn't need its own
+  // copy of the snake-order formula.
+  myPicks: number[]
+  seats: MockSeat[]
+  picks: MockPick[]
+  available: PlayerRef[]
+  currentPickNo: number
+  onTheClockSlot: number | null
+  isUsersTurn: boolean
+}
+
+// Mirrors store/MockDraftRepository.SessionSummary. Backs the picker screen's
+// "Mock drafts" list.
+export type MockSessionSummary = {
+  id: number
+  status: 'IN_PROGRESS' | 'COMPLETE'
+  teams: number
+  rounds: number
+  userSlot: number
+  currentPickNo: number
+  createdAt: string
+}
+
+export const getMockSessions = () => fetch('/api/mocks').then(json<MockSessionSummary[]>)
+
+export const createMockSession = (teams: number, userSlot: number) =>
+  fetch('/api/mocks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teams, userSlot }),
+  }).then(json<MockSessionState>)
+
+export const getMockSession = (id: number) => fetch(`/api/mocks/${id}`).then(json<MockSessionState>)
+
+export const submitMockPick = (id: number, sleeperPlayerId: string) =>
+  fetch(`/api/mocks/${id}/pick`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sleeperPlayerId }),
+  }).then(json<MockSessionState>)
+
 /**
  * The backend streams Server-Sent Events, but the request is a POST and the
  * browser's built-in EventSource only does GET. So we read the response body as

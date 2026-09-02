@@ -3,10 +3,9 @@ import { Link, Route, Routes, useParams } from 'react-router-dom'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
 import LiveDraftView from './pages/LiveDraftView'
+import MockSetup from './pages/MockSetup'
+import MockDraftView from './pages/MockDraftView'
 import { TopSlotContext } from './topSlot'
-
-// Reserved for later features, not built here: /mock/new (C, interactive mock
-// draft room).
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -26,6 +25,13 @@ function KeyedDraftView() {
 function KeyedLiveDraftView() {
   const { draftId } = useParams<{ draftId: string }>()
   return <LiveDraftView key={draftId} />
+}
+
+// Same remount wrapper, same reason: a param-only change would keep the old
+// session's fetched state and in-flight submitPick call alive across the switch.
+function KeyedMockDraftView() {
+  const { sessionId } = useParams<{ sessionId: string }>()
+  return <MockDraftView key={sessionId} />
 }
 
 export default function App() {
@@ -48,6 +54,8 @@ export default function App() {
           <Route path="/" element={<DraftPicker />} />
           <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
           <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
+          <Route path="/mock/new" element={<MockSetup />} />
+          <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
         </Routes>
       </TopSlotContext.Provider>
     </div>

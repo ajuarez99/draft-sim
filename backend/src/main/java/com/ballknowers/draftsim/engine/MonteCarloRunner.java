@@ -163,9 +163,6 @@ public class MonteCarloRunner {
     }
 
     private static SimulationResult.PlayerRef ref(BoardEntry e) {
-        if (e == null) return null;
-        return new SimulationResult.PlayerRef(
-                e.player().id(), e.player().sleeperId(), e.player().name(),
-                e.position().name(), e.player().team(), e.adp(), e.positionalRank());
+        return e == null ? null : SimulationResult.PlayerRef.from(e);
     }
 }

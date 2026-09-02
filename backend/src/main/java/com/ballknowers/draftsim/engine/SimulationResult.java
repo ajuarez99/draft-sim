@@ -1,5 +1,7 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.domain.BoardEntry;
+
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +25,18 @@ public record SimulationResult(
      * "RB999".
      */
     public record PlayerRef(long id, String sleeperId, String name, String position, String team, double adp,
-                            int positionalRank) {}
+                            int positionalRank) {
+
+        /**
+         * Reused by {@link MonteCarloRunner} and the mock draft room
+         * (claude/next-features-roadmap.md §4, Phase 3) -- one mapping from the
+         * engine's own board shape to the wire shape, so the two can never drift.
+         */
+        public static PlayerRef from(BoardEntry e) {
+            return new PlayerRef(e.player().id(), e.player().sleeperId(), e.player().name(),
+                    e.position().name(), e.player().team(), e.adp(), e.positionalRank());
+        }
+    }
 
     /**
      * One cell of the predicted board.

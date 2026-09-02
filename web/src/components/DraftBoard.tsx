@@ -17,6 +17,13 @@ type Props = {
   mySlot?: number
   onCellClick?: (pick: PredictedPick) => void
   onSeatClick?: (slot: number) => void
+  // The mock draft room (claude/next-features-roadmap.md §4, Phase 3) has no
+  // fitted-history provenance to show -- every seat is either the viewing
+  // user or an unmodelled bot -- so a NEUTRAL dot on every single header
+  // would be exactly the "eleven of fourteen headers carry an identical mark"
+  // noise PROVENANCE_LABEL's own comment says this feature exists to avoid.
+  // Same additive-prop pattern D used for live mode's `landed` field.
+  hideProvenanceDots?: boolean
 }
 
 /**
@@ -42,6 +49,7 @@ export default function DraftBoard({
   mySlot,
   onCellClick,
   onSeatClick,
+  hideProvenanceDots,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
@@ -85,7 +93,9 @@ export default function DraftBoard({
               </span>
               <span className="col-head-name mono">{seat ? seat.manager : slot}</span>
               <span className="col-head-meta">
-                {label && <span className={`col-head-dot ${label.className}`} title={label.badge ?? 'drafts like the league average'} />}
+                {!hideProvenanceDots && label && (
+                  <span className={`col-head-dot ${label.className}`} title={label.badge ?? 'drafts like the league average'} />
+                )}
                 {isMe && <span className="col-head-you mono">you</span>}
               </span>
             </button>

@@ -1,9 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getDrafts, ingestLeague, trackDraft, type DraftSummary, type TrackResponse } from '../api'
+import {
+  getDrafts,
+  getMockSessions,
+  ingestLeague,
+  trackDraft,
+  type DraftSummary,
+  type MockSessionSummary,
+  type TrackResponse,
+} from '../api'
 
 export default function DraftPicker() {
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
+  const [mocks, setMocks] = useState<MockSessionSummary[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [leagueId, setLeagueId] = useState('')
   const [adding, setAdding] = useState(false)
@@ -12,6 +21,7 @@ export default function DraftPicker() {
 
   function refetch() {
     getDrafts().then(setDrafts).catch((e) => setError(e.message))
+    getMockSessions().then(setMocks).catch(() => {}) // non-critical -- the picker still works without it
   }
 
   useEffect(refetch, [])
@@ -126,6 +136,33 @@ export default function DraftPicker() {
                 </div>
               )
             })}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <h2>Mock drafts</h2>
+          <Link className="chip on" to="/mock/new">
+            new mock draft
+          </Link>
+        </div>
+
+        {mocks && mocks.length === 0 && <p className="muted">No mock drafts yet — start one above.</p>}
+
+        {mocks && mocks.length > 0 && (
+          <div className="draft-list">
+            {mocks.map((m) => (
+              <Link key={m.id} to={`/mock/${m.id}`} className="draft-row">
+                <span className="draft-row-league">Mock draft #{m.id}</span>
+                <span className="muted small">
+                  {m.teams} teams &middot; slot {m.userSlot}
+                </span>
+                <span className={`chip status-${m.status === 'COMPLETE' ? 'complete' : 'drafting'}`}>
+                  {m.status === 'COMPLETE' ? 'complete' : `pick ${m.currentPickNo}`}
+                </span>
+              </Link>
+            ))}
           </div>
         )}
       </section>

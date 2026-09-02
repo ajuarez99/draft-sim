@@ -551,6 +551,22 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .pick-prompt-info { display: flex; flex-direction: column; gap: 2px; }
 .pick-prompt-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
+/* The mock draft room's own turn readout (claude/next-features-roadmap.md
+   §4, Phase 3) -- same banner shape as .pause-banner, teal by default and
+   crimson (matching PickPrompt's own "you're up" emphasis) when it's the
+   user's own turn. */
+.turn-indicator {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--line);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 10px;
+}
+.turn-indicator.mine {
+  background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
+  box-shadow: inset 0 0 0 1.5px var(--crimson);
+}
+.turn-indicator .cond { font-size: 13px; }
+.turn-indicator.done { justify-content: center; }
+
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;
   background: rgba(0, 0, 0, 0.55);

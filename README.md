@@ -14,6 +14,26 @@ a Sleeper league, rather than generic ADP bots.
 Vertical slice, end to end: ingest -> board -> profiles -> Monte Carlo -> SSE -> UI.
 Nothing has been backtested. See "What not to trust" below.
 
+Built so far:
+
+- **Ingest + board.** Sleeper league/draft ingest, a blended ADP board (search_rank
+  + observed draft order), per-manager profiles fit from completed drafts.
+- **Batch simulation.** Run a full Monte Carlo mock of a real, ingested draft --
+  reveal pick-by-pick, take your own picks and resimulate the rest live.
+- **App shell.** A picker screen listing every ingested draft plus every mock
+  draft session, "add a draft" by Sleeper league id, real routes instead of one
+  hardcoded page.
+- **Live draft tracking.** Poll a real, in-progress Sleeper draft in the
+  background and stream its state to the UI over SSE as picks land.
+- **Interactive mock draft room** (`/mock/new`). Start a from-scratch mock at
+  8/10/12/14 teams with no real Sleeper league or draft behind it -- bots
+  auto-pick down the snake order, you take your own picks on your turn, sessions
+  persist and resume from the picker screen.
+
+Not yet built: ad-hoc league sizing for a *real* league that doesn't match one of
+the four supported team counts (`claude/next-features-roadmap.md`'s Phase 5,
+deliberately last).
+
 ## Running
 
     docker compose up -d                     # Postgres 17 on localhost:5433

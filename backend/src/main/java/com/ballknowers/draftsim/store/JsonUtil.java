@@ -27,4 +27,13 @@ public final class JsonUtil {
             throw new IllegalStateException("json read failed: " + json, e);
         }
     }
+
+    /** Generic reader for shapes readMap() can't express, e.g. a List<SeatSpec>. */
+    public static <T> T read(String json, TypeReference<T> type) {
+        try {
+            return M.readValue(json, type);
+        } catch (Exception e) {
+            throw new IllegalStateException("json read failed: " + json, e);
+        }
+    }
 }
