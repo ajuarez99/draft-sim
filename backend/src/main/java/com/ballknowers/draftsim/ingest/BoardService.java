@@ -54,7 +54,8 @@ public class BoardService {
         this.jdbc = jdbc;
     }
 
-    public record Result(int entries, int fromBothSources, int fromFfc, int backfilledPicks) {}
+    public record Result(int entries, int fromBothSources, int fromFfc, int backfilledPicks,
+                         int excludedOffRoster) {}
 
     public Result rebuild(Sport sport) {
         LocalDate today = LocalDate.now();
@@ -77,9 +78,15 @@ public class BoardService {
         double wFfc = ffc.isEmpty() ? 0.0 : adpCfg.ffc().weight();
         double wSr = Math.max(0, 1 - wObs - wFfc);
 
+        Map<Long, Player> playersById = new HashMap<>();
+        for (Player p : players.findAll(sport)) {
+            playersById.put(p.id(), p);
+        }
+
         Set<Long> universe = new LinkedHashSet<>(searchRank.keySet());
         universe.addAll(observed.keySet());
         universe.addAll(ffc.keySet());
+        int excluded = dropOffRoster(universe, playersById, searchRank, ffc);
 
         int both = 0, fromFfcCount = 0;
         List<Map.Entry<Long, Double>> blended = new ArrayList<>(universe.size());
@@ -112,16 +119,13 @@ public class BoardService {
         // worth keeping.
         blended.sort(Map.Entry.comparingByValue());
 
-        Map<Long, Position> positionById = new HashMap<>();
-        for (Player p : players.findAll(sport)) {
-            positionById.put(p.id(), p.primary());
-        }
         Map<Position, Integer> posCounter = new EnumMap<>(Position.class);
 
         List<BoardRepository.Row> rows = new ArrayList<>(blended.size());
         for (int i = 0; i < blended.size(); i++) {
             long playerId = blended.get(i).getKey();
-            Position pos = positionById.get(playerId);
+            Player player = playersById.get(playerId);
+            Position pos = player == null ? null : player.primary();
             Integer posRank = null;
             if (pos != null) {
                 posRank = posCounter.merge(pos, 1, Integer::sum);
@@ -134,7 +138,60 @@ public class BoardService {
                 rows.size(), both, fromFfcCount, String.format("%.2f", wSr), wObs, wFfc);
 
         int backfilled = backfillAdpAtTime(sport);
-        return new Result(rows.size(), both, fromFfcCount, backfilled);
+        return new Result(rows.size(), both, fromFfcCount, backfilled, excluded);
+    }
+
+    /**
+     * Removes players who are not on an NFL roster and not in anyone's ADP.
+     *
+     * Sleeper's players dump is an archive, not a roster: it keeps every player
+     * it has ever seen and it never walks search_rank back when one leaves the
+     * league. Todd Gurley, out of football since 2021, still ships with
+     * search_rank 27, status "Active" and active true -- so dense-ranking
+     * search_rank put him on the board at 33 overall and the engine duly
+     * recommended him in round 2. He is not an outlier: Tom Brady, Drew Brees,
+     * Antonio Brown, Rob Gronkowski and Frank Gore are all inside the top 300,
+     * and 107 of the top 400 board slots were players nobody can draft.
+     *
+     * status and active are useless as the discriminator, since Gurley reads
+     * "Active"/true. The field Sleeper does maintain is team, which is nulled
+     * when a player is off an NFL roster. So: keep a player if he is rostered,
+     * or if the real market drafts him anyway (an FFC ADP row), which preserves
+     * a genuinely unsigned free agent that mock drafters are still taking. Both
+     * signals absent means no one is drafting him, in this league or any other.
+     *
+     * FFC is best-effort, so when its fetch fails this degrades to the roster
+     * check alone -- weaker, but still enough to keep the fossils off the board.
+     */
+    private int dropOffRoster(Set<Long> universe, Map<Long, Player> playersById,
+                              Map<Long, Double> searchRank, Map<Long, Double> ffc) {
+        List<Map.Entry<Double, String>> dropped = new ArrayList<>();
+        for (Iterator<Long> it = universe.iterator(); it.hasNext(); ) {
+            Long playerId = it.next();
+            Player p = playersById.get(playerId);
+            if (draftable(p, ffc.containsKey(playerId))) continue;
+            it.remove();
+            dropped.add(Map.entry(
+                    searchRank.getOrDefault(playerId, Double.MAX_VALUE),
+                    p == null ? "player#" + playerId : p.name()));
+        }
+        if (!dropped.isEmpty()) {
+            dropped.sort(Map.Entry.comparingByKey());
+            log.info("excluded {} off-roster players from the board; highest-ranked were {}",
+                    dropped.size(), dropped.stream().limit(15).map(Map.Entry::getValue).toList());
+        }
+        return dropped.size();
+    }
+
+    /**
+     * Rostered, or drafted by the wider market anyway. A player unknown to the
+     * player table ({@code p == null}) is only kept on the market signal, the
+     * same way {@link #currentBoard} already drops board rows it cannot resolve
+     * to a player.
+     */
+    static boolean draftable(Player p, boolean hasMarketAdp) {
+        if (hasMarketAdp) return true;
+        return p != null && p.team() != null && !p.team().isBlank();
     }
 
     /**

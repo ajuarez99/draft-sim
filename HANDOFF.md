@@ -363,6 +363,31 @@ Anything at corpus scale is blocked on an unverified assumption: that public Sle
 drafts can be enumerated at volume. Check that with a small script first.
 Use `pgvector` in the existing Postgres if it ever happens — not a second datastore.
 
+### Retired players are off the board (2026-09-01)
+
+Todd Gurley, out of football since 2021, was being recommended in round 2.
+Sleeper's players dump is an archive, not a roster: it never walks `search_rank`
+back when a player leaves the league, so Gurley still ships with `search_rank`
+27, `status` "Active" and `active` true. Dense-ranking `search_rank` therefore
+seeded the board with **1,177 undraftable players, 107 of them inside the top
+400** — Tom Brady at 93, Drew Brees at 94, Antonio Brown at 114, Gronkowski at
+192.
+
+`status`/`active` are useless as the filter (Gurley reads Active/true). The
+field Sleeper does maintain is `team`, nulled when a player is off an NFL
+roster. `BoardService.dropOffRoster` now keeps a player only if he is rostered
+**or** the wider market drafts him anyway (an FFC ADP row) — the second clause
+is load-bearing: Dean Connors (LAR, FFC ADP 170) is a real rookie Sleeper has
+not assigned a team yet. Board went 2,007 -> 830 entries; the drafted 210 are
+now all rostered players.
+
+Fixing this exposed a second bug worth knowing about: `BoardRepository.save`
+upserted without deleting, so a snapshot could only grow. A rebuild that
+*shrinks* the board left the dropped rows in place at their old ranks — the
+first clean rebuild landed 830 rows on top of 2,007 stale ones and Gurley
+stayed at board 33. Snapshot writes are now transactional delete-then-insert.
+Any other rebuild that removes players would have hit the same wall.
+
 ### The honest headline
 
 **The board is stronger than it was, and still not calibrated.** As of this

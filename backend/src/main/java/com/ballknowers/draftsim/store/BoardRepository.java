@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -26,7 +27,22 @@ public class BoardRepository {
 
     public record Row(long playerId, double adp, Integer positionalRank) {}
 
+    /**
+     * A snapshot is the complete row set for its (sport, source, captured_on),
+     * so writing one replaces it rather than merging into it.
+     *
+     * The upsert alone is not enough: it can only add or update, so a rebuild
+     * that drops players — which BoardService.dropOffRoster now does on every
+     * run — left the dropped rows sitting in the snapshot at their previous
+     * ranks. Re-ingesting on a day already ingested therefore appeared to do
+     * nothing: 830 clean rows landed on top of 2007 stale ones and Todd Gurley
+     * stayed at board 33. The delete makes the write authoritative; the upsert
+     * stays because the delete and insert share a transaction and a retry must
+     * not trip the unique constraint.
+     */
+    @Transactional
     public void save(Sport sport, String source, LocalDate capturedOn, List<Row> rows) {
+        clear(sport, source, capturedOn);
         jdbc.batchUpdate("""
                 insert into adp_snapshot (player_id, sport, source, captured_on, adp, positional_rank)
                 values (?, ?, ?, ?, ?, ?)
@@ -58,7 +74,10 @@ public class BoardRepository {
                             Double stdev, Integer sourceTeams, String sourceScoring,
                             Integer sampleDrafts, boolean derived, String derivation) {}
 
+    /** Same replace-the-whole-snapshot contract as {@link #save}. */
+    @Transactional
     public void saveDetailed(Sport sport, String source, LocalDate capturedOn, List<SourceRow> rows) {
+        clear(sport, source, capturedOn);
         jdbc.batchUpdate("""
                 insert into adp_snapshot (player_id, sport, source, captured_on, adp, positional_rank,
                                           stdev, source_teams, source_scoring, sample_drafts, derived, derivation)
@@ -89,6 +108,11 @@ public class BoardRepository {
                     ps.setBoolean(11, r.derived());
                     ps.setString(12, r.derivation());
                 });
+    }
+
+    private void clear(Sport sport, String source, LocalDate capturedOn) {
+        jdbc.update("delete from adp_snapshot where sport = ? and source = ? and captured_on = ?",
+                sport.code(), source, capturedOn);
     }
 
     public Optional<LocalDate> latestCapture(Sport sport, String source) {
