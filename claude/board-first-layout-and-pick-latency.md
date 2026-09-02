@@ -27,7 +27,8 @@ doc deletes hands its share back to the board. So there is no "make the board
 bigger" task, only "stop spending the screen on things that don't earn it," and a
 final layout pass (§E) to spend the reclaimed height deliberately.
 
-**Recommended order: E-prep → D → C → A → B.**
+**Recommended order: F2+F3 → D → C → A → B.** (§F is a second markup pass added after
+a live test run; read it before D, it changes D's conclusion.)
 
 1. **D (retire the confidence panel)** first — smallest, deletes a visible bug, and
    frees the lower-right column immediately.
@@ -134,9 +135,14 @@ What has to shrink is the time the machine spends with a progress bar up.
 
 | what | measured | source |
 | --- | --- | --- |
-| first run, 2000 iterations | **~18.5 s** | `DraftView.tsx:26-33` |
-| resim, 500 iterations | **~4.9 s** | same |
-| resim, 2000 iterations | ~18.7 s (why the cap exists) | same |
+| first run, 2000 iterations | **20.8 s** | measured 2026-09-01, see B1 results |
+| first run, 500 iterations (today's default) | **5.3 s** server, **6.5 s** click-to-first-cell | same |
+| resim at your first pick, 500 iterations | **6.0 s** of blocking spinner, ×15 a draft | same |
+
+**Status: §B6's first lever has already landed** — the default is now 500 iterations,
+not 2000, so a first run costs ~5.3 s rather than ~20.8 s. That does nothing for
+resims (already capped at 500) and nothing for the per-`score()` cost this section is
+actually about. Read the rest as still entirely outstanding.
 
 Two targets, both derived from something already on screen rather than picked out of
 the air:
@@ -188,9 +194,60 @@ and nobody knows.
 Also measure a **second** run in the same JVM. 18.5 s may include JIT warmup on a cold
 path; a run-2 number tells you whether you're optimizing steady state or startup.
 
-Everything below is read from the code, not from a profiler. The *direction* is
-solid — the inner loop allocates heavily and recomputes invariants — but the
-multipliers are hypotheses until B1 produces numbers.
+### B1 results — measured 2026-09-01, live stack
+
+Postgres (native, :5433) + `bootRun` (:8080) + vite (:5173), real fantasy(heart)
+board, 14 teams / 15 rounds / 210 picks.
+
+| run | wall clock | loop (logged) | remainder |
+| --- | --- | --- | --- |
+| 500, first sim in a cold JVM | 5262 ms | 5019 ms | 243 ms |
+| 500, warm | 5248 ms | 5076 ms | 172 ms |
+| 2000 | 20775 ms | 20504 ms | 271 ms |
+
+**Three hypotheses in this doc are now settled, and two of them were wrong:**
+
+1. **Aggregation is not the problem — §B5 is refuted.** The remainder column above
+   covers request setup (both Postgres hits), `aggregate()`, and JSON serialization
+   combined: **170-270 ms, flat.** It does not grow with iteration count. The
+   suspicion that it might be "a third of the time" was wrong; deprioritize §B5 and
+   §B4 accordingly. They are together under 5% of a 500-run and under 1.5% of a
+   2000-run.
+2. **There is no JIT warmup effect worth planning around.** The first simulation ever
+   run in a fresh JVM (5019 ms) and the next one (5076 ms) are within noise. Optimize
+   steady state; there is nothing else here.
+3. **Cost is essentially perfectly linear in iterations.** 10.04 ms/iteration at 500,
+   10.25 ms at 2000. Each iteration is 210 picks × 30 candidates = 6300 `score()`
+   calls, so **~1.6 µs per `PickScorer.score()` call** — which lands almost exactly on
+   the ~1.5 µs this doc estimated from the code. **§B2 is the whole problem: 95-99% of
+   wall clock is the scoring loop.**
+
+**Cost falls with the locked prefix**, which independently confirms the work is all in
+`choose()`/`score()` and that §B6's horizon idea would do what it claims:
+
+| resim | wall clock |
+| --- | --- |
+| nothing locked | 5591 ms |
+| locked through pick 28 | 4845 ms |
+| locked through pick 105 | 2917 ms |
+
+Note the implication for the *felt* experience: the resim is **slowest at your first
+pick and gets faster all draft**. The worst case is the first one anyone meets.
+
+**End-to-end through the UI** (what Allan actually experiences), slot 1 on this draft:
+
+- Click "Start the mock draft" → first cell painted: **6.5 s**
+- Click "Take Bijan Robinson" at 1.01 → reveal advances to 1.02: **6.0 s** of
+  "Recalculating the board past pick 1…", ×15 of your picks per draft.
+
+That 6.0 s is worse than the ~4.9 s previously on record, and it is the number §B2
+has to move.
+
+---
+
+Everything below was read from the code, not from a profiler, and predates the
+measurements above. The *direction* is confirmed correct — the inner loop is where
+the time goes — but the individual multipliers remain hypotheses.
 
 ### B2 — The inner loop is where the 18 seconds are
 
@@ -278,31 +335,49 @@ CPU-bound work — the carrier pool is already sized to the core count — and 2
 them each allocate a `DraftSimulator`, a 600-element `ArrayList` copy, and (until B3)
 a `byId` map. Chunk into `availableProcessors()` platform tasks of `iterations/cores`
 simulations each, reusing one `DraftSimulator` per chunk once B2(d)'s buffers make
-that safe. Lowest-confidence item here; do it last, and keep it only if B1's numbers
-justify it.
+that safe. Lowest-confidence item here; do it last, and keep it only if it measures.
 
-### B5 — Aggregation
+B1 did establish the machine is not idle-waiting: cost is linear in iterations with no
+warmup discontinuity, which is consistent with the carrier pool already being
+saturated. So expect this to be an allocation-pressure win (fewer `DraftSimulator`s
+and board copies) rather than a parallelism one.
 
-Unmeasured today (see B1). Its shape is suspicious: `aggregate()` builds 211
-`HashMap<Long,Integer>` and performs `iterations × totalPicks` = **420k boxed
-`merge()` calls** for the modal-pick counts alone (`MonteCarloRunner.java:78-83`), then
-`iterations × myPicks × SNAPSHOT_DEPTH` = 2000 × 15 × 75 ≈ **2.25M more** for the
-availability curves (lines 118-128). Both want dense `int[]` over a board-index space
-with the `Long` player ids resolved once at the end. Do this only if B1 says it
-matters.
+### B5 — Aggregation — **MEASURED, NOT WORTH DOING**
+
+B1's results settle this: aggregation, request setup and serialization together are a
+flat 170-270 ms regardless of iteration count. Everything below was written before
+that measurement and is kept only so nobody re-derives the same suspicion. **Do not
+spend time here** unless B2 lands and the constant starts to matter at the new scale.
+
+For the record, the shape that looked suspicious: `aggregate()` builds 211
+`HashMap<Long,Integer>` and performs `iterations × totalPicks` = 420k boxed `merge()`
+calls for the modal-pick counts alone (`MonteCarloRunner.java:78-83`), then
+`iterations × myPicks × SNAPSHOT_DEPTH` = 2000 × 15 × 75 ≈ 2.25M more for the
+availability curves (lines 118-128). All true, and all of it fits inside 270 ms — a
+useful calibration on how much this kind of counting actually costs next to 12.6M
+`score()` calls.
 
 ### B6 — Only if the above isn't enough
 
-Two levers that trade something real for speed. Neither should be needed if B2 lands,
-and both should be held back until it has:
+Two levers that trade something real for speed. The second should be held back until
+B2 has landed and been measured; the first is already done.
 
-- **Fewer iterations.** The standard error of a displayed proportion at *p* = 0.10 is
+- **Fewer iterations — DONE 2026-09-01, at Allan's call ("lets limit the simulations
+  to like 500").** The standard error of a displayed proportion at *p* = 0.10 is
   ±1.3 points at n = 500 and ±0.67 at n = 2000, against a UI that rounds to whole
-  percent and already says "low percentages mean the model does not know." 2000 is
-  buying precision the display cannot show. Dropping the default to 500 is a 4x
-  speedup available *today*, for free, at a cost that is arguably zero — but it is
-  also the kind of change that quietly makes the product worse if those numbers are
-  ever used for something finer-grained. Measure B2 first.
+  percent and already says "low percentages mean the model does not know." 2000 was
+  buying precision the display cannot show. Shipped as `DEFAULT_ITERATIONS = 500` in
+  `DraftView.tsx`, with the runs dropdown trimmed to `[500, 1000, 2000]` — 5000 and
+  10000 are gone because at the engine's current speed they are ~46 s and ~92 s of
+  progress bar, which is not a choice worth offering.
+
+  Two things this did **not** do, both worth keeping straight:
+  - **It is a first-run win only.** Resims were already capped at 500
+    (`RESIM_ITERATION_CAP`), so the wait at each of your picks is unchanged at ~4.9 s.
+    The pick-to-pick experience needs B2, not this.
+  - **The ~4x is arithmetic, not a measurement.** It is derived from the recorded
+    18.5 s @ 2000 / 4.9 s @ 500 figures; the API was down when this landed, so no run
+    was actually timed. Confirm it against a live backend as part of B1.
 - **Horizon truncation.** `DraftSimulator.run()` loops all 210 picks with no early exit
   (`DraftSimulator.java:50`); a resim at pick 28 simulates 182 remaining picks to
   answer a question about the next 14. Add a nullable `horizonPicks` to
@@ -393,6 +468,10 @@ identical.
 
 ## D. Retire the confidence panel
 
+> **Superseded in part — read §F3 first.** A second markup pass confirmed this panel
+> is still broken and killed option (1) below, which depended on a paragraph §F2
+> deletes. The live conclusion is: delete outright.
+
 Allan: "this thing is still bugged behind and doesn't need to be there."
 
 ### What's actually wrong with it
@@ -461,6 +540,77 @@ scroller. With ~5/7 of the viewport it will show roughly 8-9 rounds at once with
 scrolling, which is the first time the round-to-round shape of a draft is legible at a
 glance. Don't add anything to fill the space — that's what §4 of the feedback was
 asking for.
+
+---
+
+## F. Second markup pass (2026-09-01, after the live test run)
+
+Allan marked up a second screenshot, of the working stack this time. Three points; two
+confirm sections already written, one is new and **changes §D**.
+
+### F1 — the top strip, again ("we can get rid of, just bloats screen for no reason")
+
+No change to the plan: this is §A, unchanged. Recorded here only so the next session
+reads it as confirmed rather than as a new request.
+
+### F2 — NEW: delete the board panel's heading and description
+
+Allan: "we can get rid of wording here, it distracts from the actual board itself
+which is what matters."
+
+Delete both `<h2>Predicted board</h2>` (`DraftView.tsx:391`) and the four-line
+paragraph under it (`DraftView.tsx:392-397`, "Each cell is the most likely player
+still unassigned at that pick…"). The panel then opens directly on the reveal
+scrubber and the grid.
+
+This is right, and the reason is stronger than "it's wordy": the paragraph explains
+the cell format — modal player, share of runs, faded = already gone — which is a
+one-time onboarding read that costs permanent vertical space on every session
+thereafter, in a layout whose entire problem is vertical space. §E measures the board
+in rounds-visible; this is worth roughly another round.
+
+Where the explanation goes instead, in preference order:
+
+1. **Nowhere.** The cell already shows a position pill, a name, a team, a percentage
+   and a bar. The `title` attribute on every cell (`DraftBoard.tsx:82-88`) already
+   spells out the percentage and the alternatives on hover. Trying it with no prose at
+   all is the cheapest experiment and probably the right answer.
+2. A `?` chip in the panel head opening the existing `.modal-card`, carrying this
+   paragraph plus §D's caveats as one "how to read this board" explainer.
+
+**Do not** shrink it to a shorter sentence and call it done — that keeps the cost and
+loses the content.
+
+### F3 — the confidence box, again ("this thing is still busted")
+
+This is §D, and the second screenshot shows the failure more clearly than the first:
+the tan panel now visibly **overlaps the board grid above it**, its heading is cut
+off, its text starts mid-sentence, and it has its own scrollbar it cannot usefully
+scroll. Confirmed live at 2026-09-01 against a real run.
+
+**§D's recommended option is now dead.** §D option (1) said to fold the confidence
+numbers into "the board's existing description paragraph, which already does this job
+in the same voice." F2 deletes that paragraph. So §D collapses to:
+
+- **Delete `ConfidenceNote` and its `.lower-grid` slot outright** (`DraftView.tsx`'s
+  `<ConfidenceNote c={result.confidence} />`), letting `AvailabilityPanel` take the
+  full row width.
+- If the caveats are kept anywhere, they go in F2's option-2 `?` modal alongside the
+  board explainer — one explainer surface, not two.
+- `.panel.warn` (`styles.css:89`) and the `--warn` token become dead; delete them
+  unless the modal reuses them.
+
+The honesty argument in `ConfidenceNote.tsx`'s own doc comment ("deliberately not
+tucked into a collapsed details section") loses here, and it should be recorded as a
+deliberate reversal rather than an oversight: a panel that renders clipped,
+overlapping and half-scrolled communicates nothing, so "on screen but broken" was
+never actually serving the honesty goal it was written for. `README.md`'s "What not to
+trust" remains the durable home for the caveats.
+
+### Order
+
+F2 and F3 are one edit to the same JSX block and should land together, before or with
+§A. Neither depends on §B.
 
 ---
 

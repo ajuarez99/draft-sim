@@ -167,7 +167,8 @@ clean tree apart from this one frontend file.
 ## Not re-litigated
 
 - The deferred sub-16ms race on the top control-bar "start" button
-  (`claude/code-review-A.md`'s "Deferred" section) — still present, still a
+  (was `claude/code-review-A.md`'s "Deferred" section; that stage doc was removed
+  once feature A shipped — recover it from git history if needed) — still present, still a
   product judgment call, not touched here. Confirmed it's unrelated to the bug
   found above (different code path: the top bar's button vs. the full-screen
   overlay's CTA text).
