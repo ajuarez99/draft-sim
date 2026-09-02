@@ -1,6 +1,6 @@
 # draft-sim — handoff
 
-Last updated 2026-08-30 by a Claude session running directly on Allan's Windows
+Last updated 2026-09-02 by a Claude session running directly on Allan's Windows
 machine. **Read this first.** `DEPLOY.md` covers deployment; `README.md` covers
 running it. A Claude session should then read `claude/` — orientation, sandbox
 recipes and bug post-mortems that are not worth rediscovering.
@@ -9,10 +9,47 @@ environment; this machine has real internet, real JDK/Node/Postgres installs,
 and does not need most of them — see the new note at the top of that file
 before assuming something is blocked.
 
-**Time-sensitive:** fantasy(heart)'s real draft — 14 teams, league
-`1391509063170293760`, draft `1391509064357273600` — is scheduled 2026-08-31
-21:15 CDT. See "Draft-day gap" below; a checklist only Allan can run before
-then is in `claude/live-poller-plan.md`'s "Manual pre-draft-night checklist."
+**~~Time-sensitive: fantasy(heart)'s draft is 2026-08-31 21:15 CDT.~~ That draft
+has happened.** It is `complete` in the DB with all 210 picks. Nothing in this
+repo is on a deadline any more, and fantasy(heart) can no longer be used as a
+simulation target — it replays 210 real picks and simulates nothing. Point sims
+at **West Coast FF 2026** (`1389361939561332737`, 14 teams, `pre_draft`) instead.
+
+**Where the roadmap stands: `claude/next-features-roadmap.md` now opens with a
+status table.** Short version — D's poller, B's app shell, and A's normalization
++ the shared `DraftContextFactory` are built; **C's interactive mock draft room
+is the next and largest thing**, with D's live frontend and A's ad-hoc league
+sizing behind it.
+
+**Read before touching profile output:** a league ingest run *after* a board
+rebuild silently zeroes every fitted manager profile. See "Known live bug" below.
+
+**Several Claude sessions often run against this one working tree, DB and
+server at once.** Two of them landed work on 2026-09-01 within minutes of each
+other. Check `git status` before you start, and if you are taking a before/after
+measurement, boot your own build on a second port and run both sides back to
+back — the shared DB moves under you otherwise.
+
+---
+
+## Known live bug — fitted profiles are silently switched off
+
+`DraftRepository.replacePicks` (any league ingest) reinserts picks with
+`adp_at_time = null`. Only `BoardService.backfillAdpAtTime`, at the end of a
+board rebuild, puts it back. Ingest after a rebuild therefore leaves zero
+scoreable picks, and every manager comes back `NEUTRAL` with `picksScored: 0`
+while `/api/managers` still returns full-looking profiles. Found in exactly
+this state on 2026-09-01, and it is invisible unless you look for it.
+
+Check it:
+
+    curl localhost:8080/api/board | head -c 120     # picksWithContemporaneousBoard
+    # or: select count(adp_at_time) from draft_pick;
+
+Zero means re-run `POST /api/ingest/board`. **Not fixed in code.** The durable
+fix is to coalesce `adp_at_time` on replace the way `upsertPicks` already does,
+or to backfill at the end of a league ingest. Worth doing before Phase 3 — the
+mock room leans on those profiles.
 
 ---
 
@@ -287,18 +324,33 @@ it is not broken.
   guess — see "First real simulation" above. Worth resolving before the ADP
   import, since a real ADP source will change these numbers again and you want
   to know whether today's flatness is temperature or the board.
-- **Borrowed drafts + variable league size — planned in detail, nothing built.**
-  `claude/borrowed-drafts.md`. Lower urgency than the ADP import for
-  2026-08-31 specifically (fantasy(heart) already has enough shared-league
-  history that this mainly helps the *next* league you point the tool at), but
-  its normalization pass (round index → `pick_pct`) is flagged in that doc as a
-  fix to *existing* behavior worth doing on its own, independent of borrowed
-  data ever landing.
-- **Live draft polling — built this session**, see "This session" above and
-  "Draft-day gap" below. Not yet committed; not yet dry-run against a real
-  `drafting`-status draft.
+- **Borrowed drafts — planned in detail, nothing built.**
+  `claude/borrowed-drafts.md`. Its **normalization pass is now DONE**
+  (2026-09-01, Phase 1 of the roadmap): positional priors and positional tilt
+  are keyed on fraction-of-draft rather than round index, and K/DEF gating is on
+  rounds-remaining rather than a fixed round number. That was the piece the doc
+  flagged as a fix to existing behaviour worth doing on its own; the borrowed
+  *data* half is still unbuilt and still conditional on the volume check.
+  One item from that doc's normalization list was deliberately left: `runWindow`
+  is a fixed 6 picks (43% of a round at 14 teams, 75% at 8), deferred to the
+  ad-hoc-sizing work because it changes current behaviour rather than preserving
+  it.
+- **Live draft polling — built and committed.** See "This session" above and
+  "Draft-day gap" below. **Still never dry-run against a real
+  `drafting`-status draft**, and fantasy(heart)'s draft went by without one.
+- **Variable league size — half-built.** The shared pieces landed with the
+  normalization pass: `DraftContextFactory`, `SeatSpec` (3-state
+  `USER`/`MANAGER`/`BOT`), `LeagueShape` (sizes {8,10,12,14}, fixed roster
+  template). `SimulationService` already routes through them. What is left is
+  the visible half — the ad-hoc `SimulationRequest` branch and the frontend
+  dropdown — deliberately last, as Phase 5.
+- **The interactive mock draft room is the next real feature.** Phase 3 of
+  `claude/next-features-roadmap.md`, not started, the largest thing left:
+  V3 migration for `mock_draft_session`/`mock_draft_pick`, extracting
+  `DraftSimulator.choose()` into a reusable decide-and-apply unit, service +
+  controller, and a frontend at the already-reserved `/mock/new`.
 - **Frontend `VITE_API_BASE` + auth header.** ~20 lines. Blocks any remote deploy.
-  Not needed for draft night if running locally against `localhost`.
+  Not needed while running locally against `localhost`.
 
 ---
 
@@ -306,14 +358,22 @@ it is not broken.
 
 ### League facts
 
-    fantasy(heart)       2026  league 1391509063170293760  draft 1391509064357273600  14 teams, pre_draft, NO history
-    West Coast FF        2026  league 1389361939561332736  draft 1389361939561332737  14 teams, 2025 predecessor
+    fantasy(heart)       2026  league 1391509063170293760  draft 1391509064357273600  14 teams, COMPLETE (drafted 2026-08-31)
+    West Coast FF        2026  league 1389361939561332736  draft 1389361939561332737  14 teams, pre_draft  <- the one to simulate
     (Foot) Ball Knowers  2026  league 1346366555759341568  draft 1346366555776126976  12 teams, complete
     (Foot) Ball Knowers  2025  league 1254190892974084096  draft 1254190894563729408  12 teams, complete
+    West Coast FF        2025  league (see /api/drafts)     draft 1262506916932759552  12 teams, complete
 
 All PPR, snake, 15 rounds. Starters QB/RB/RB/WR/WR/TE/FLEX/FLEX/K/DEF + 5 bench.
 Sleeper user `popsharky` = `1122386008709910528`. Allan is **slot 11 of 14** in
 fantasy(heart), which drafted 2026-08-31 21:15 CDT.
+
+**fantasy(heart) is now a completed draft, which changes what it is good for.**
+It is no longer a simulation target — `SimulationService` replays its 210
+recorded picks and there is nothing left to predict. It is now *history*: 210
+picks in a 14-team league, which is the first 14-team data this project has ever
+had for profile fitting (everything fitted before was 12-team). Point live sims
+at **West Coast FF 2026** instead.
 
 ### Corrections to `draft-simulator-plan.md`
 
@@ -410,14 +470,21 @@ DB), it's just now kept current automatically once `/track` is called, instead
 of needing ingest re-run by hand mid-draft.
 
 **What's still actually open:**
-- Uncommitted — needs a commit decision.
-- No dry run has happened against a real `pre_draft → drafting → complete`
-  transition. The differential-replay test only proves the pick-mapping logic
-  is stable against already-`complete` drafts; it says nothing about whether
-  Sleeper's `status` field or pick-object shape behaves as assumed mid-draft.
-  See `claude/live-poller-plan.md`'s "Manual pre-draft-night checklist" — the
-  disposable-mock-draft dry run is the only way to close this before
-  2026-08-31 21:15 CDT.
+- ~~Uncommitted~~ — committed.
+- **No dry run has ever happened against a real `pre_draft → drafting →
+  complete` transition, and fantasy(heart)'s draft went by without one.** The
+  differential-replay test only proves the pick-mapping logic is stable against
+  already-`complete` drafts; it says nothing about whether Sleeper's `status`
+  field or pick-object shape behaves as assumed mid-draft. fantasy(heart) is
+  now `complete` with all 210 picks in the DB, but **how they got there was not
+  observed** — treat the poller's live behaviour as still unverified. The next
+  opportunity is West Coast FF 2026 (`1389361939561332737`); the
+  disposable-mock-draft dry run in `claude/live-poller-plan.md`'s "Manual
+  pre-draft-night checklist" is still the cheap way to close it without waiting
+  for a real draft.
+- **There is no UI for any of this.** `/track` is curl-only and the picker card
+  shows whatever `draft.status` was last written. That is Phase 4 of
+  `claude/next-features-roadmap.md`, not started.
 - `startState` still exists on the API and is still unexposed in the UI —
   unrelated to the poller, still an open gap if you want a manual override for
   a pick the poller hasn't caught up to yet.

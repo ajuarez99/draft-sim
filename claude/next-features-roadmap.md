@@ -1,6 +1,56 @@
 # Next features — reconciled plan and build order
 
-Design note, 2026-08-29. **Nothing built.** Produced by planning four features in
+## Status as of 2026-09-02
+
+Half of this is built. The table is the short answer; each phase in §4 carries
+its own build note.
+
+| Phase | What | State |
+|---|---|---|
+| 0 | **D**'s poller — `LiveDraftPoller`, `POST /api/drafts/{id}/track`, `DraftRepository.upsertPicks()`, `PickMapper` | **built** |
+| 0 | **D**'s Monte Carlo benchmark | **built** — superseded and gone past by the ~20-30x hot-path refactor in `be423eb`, see `claude/board-first-layout-and-pick-latency.md` §B |
+| 1 | **A**'s normalization: priors + tilt onto fraction-of-draft, K/DEF gating onto rounds-remaining | **built** 2026-09-01 |
+| 1 | Shared `DraftContext`-from-config builder — `DraftContextFactory`, `SeatSpec`, `LeagueShape` | **built** 2026-09-01 |
+| 2 | **B**'s shell — `GET /api/drafts`, router, `/` picker + `/drafts/:draftId`, free-text id field gone | **built** |
+| 3 | **C**'s interactive mock draft room | **not started** — the largest thing left, and the next one |
+| 4 | **D**'s live frontend — SSE `live-stream`, status bar, a `/track` button, picker status refresh | **not started** |
+| 5 | **A**'s ad-hoc league sizing — the `SimulationRequest` branch, seat-assignment UI, the dropdown | **not started**, still deliberately last |
+
+`/mock/new` and `/drafts/:draftId/live` are both reserved in `web/src/App.tsx`
+and unclaimed, so Phase 3 and Phase 4 each have a route to land in.
+
+**What changed underneath this plan since it was written:**
+
+- **fantasy(heart) drafted.** It completed 2026-08-31 and is `complete` in the
+  DB with all 210 picks. Every "before the draft" deadline argument in this
+  document is spent — D is no longer time-critical, and the league can no
+  longer be used as a simulation target (it replays 210 real picks and
+  simulates nothing). Use West Coast FF 2026 (`1389361939561332737`, 14 teams,
+  `pre_draft`) for anything needing a live-ish target.
+- **D's live-poll assumptions were never dry-run against a real
+  `pre_draft → drafting → complete` transition** — see §5 and `HANDOFF.md`.
+  That opportunity has now passed for this league. West Coast FF 2026 is the
+  next one.
+- **Phase 5 picked up an extra item.** `runWindow` is a fixed 6 picks, which is
+  43% of a round at 14 teams and 75% at 8 — the same class of size-dependence
+  this phase fixed elsewhere. Deliberately not done in Phase 1: unlike the
+  others it has no correctness argument at 14 teams, and scaling it changes
+  current behaviour rather than preserving it.
+
+**Known live bug, not in any phase and worth fixing before Phase 3.**
+`DraftRepository.replacePicks` reinserts picks with `adp_at_time = null`, and
+only `BoardService.backfillAdpAtTime` (end of a board rebuild) restores it. So
+a league ingest run after a board rebuild silently zeroes every scoreable pick
+and every manager reads `NEUTRAL` / `picksScored: 0` while the API still returns
+full-looking profiles. Observed in exactly this state on 2026-09-01. The mock
+room leans on those profiles, so fix it first: coalesce `adp_at_time` on
+replace the way `upsertPicks` already does, or backfill at the end of a league
+ingest. Check with `GET /api/board`'s `picksWithContemporaneousBoard`.
+
+---
+
+Design note, 2026-08-29. **Nothing built** *(when written — see the status table
+above)*. Produced by planning four features in
 parallel (separate agents, no visibility into each other's plans beyond a short
 description) and reconciling the results into one roadmap. The four source plans
 are not preserved verbatim here — this document is the reconciled result, written
