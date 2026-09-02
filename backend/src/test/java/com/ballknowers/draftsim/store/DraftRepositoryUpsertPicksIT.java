@@ -123,6 +123,58 @@ class DraftRepositoryUpsertPicksIT {
     }
 
     /**
+     * HANDOFF's "Known live bug", now closed. replacePicks (the league-ingest path,
+     * one click of the UI's "Add a draft" button) deleted every pick and reinserted
+     * it binding PickMapper's hardcoded null adp_at_time -- so any ingest run after
+     * a board rebuild silently zeroed the contemporaneous board position on every
+     * pick, and with it every fitted manager profile, while /api/managers went on
+     * returning full-looking output.
+     */
+    @Test
+    void replacePicksPreservesABackfilledAdpAtTime() {
+        List<DraftRepository.PickRow> rows = List.of(
+                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
+                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null));
+        drafts.replacePicks(draftId, rows);
+
+        // BoardService.backfillAdpAtTime, at the end of a board rebuild.
+        jdbc.update("update draft_pick set adp_at_time = ? where draft_id = ?", 17.5, draftId);
+
+        // A second league ingest of the same draft -- identical picks, still null adp.
+        drafts.replacePicks(draftId, rows);
+
+        List<DraftRepository.PickRow> after = drafts.picks(draftId);
+        assertEquals(2, after.size());
+        for (DraftRepository.PickRow p : after) {
+            assertNotNull(p.adpAtTime(), "pick " + p.pickNo() + " lost its adp_at_time on re-ingest");
+            assertEquals(17.5, p.adpAtTime(), 0.001);
+        }
+    }
+
+    /**
+     * replacePicks is still a *replace*: a pick that is no longer in the incoming
+     * list has to go. The rewrite swapped "delete everything then insert" for
+     * "delete what is missing then upsert", so this pins the half that could
+     * regress into an append-only upsert.
+     */
+    @Test
+    void replacePicksStillDropsPicksMissingFromTheIncomingList() {
+        drafts.replacePicks(draftId, List.of(
+                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
+                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+
+        drafts.replacePicks(draftId, List.of(
+                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+
+        List<DraftRepository.PickRow> after = drafts.picks(draftId);
+        assertEquals(1, after.size(), "pick 1 was not in the incoming list and should be gone");
+        assertEquals(2, after.get(0).pickNo());
+
+        drafts.replacePicks(draftId, List.of());
+        assertTrue(drafts.picks(draftId).isEmpty(), "an empty incoming list must clear the draft's picks");
+    }
+
+    /**
      * Regression guard, pinning behavior already true today (DraftRepository.java's
      * "where d.status = 'complete'" clause): a pick under a non-complete draft must never
      * leak into allCompletedPicks(), which feeds ProfileService.fit(). This draft's status

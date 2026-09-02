@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { Link, Route, Routes, useParams } from 'react-router-dom'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
+import LiveDraftView from './pages/LiveDraftView'
 import { TopSlotContext } from './topSlot'
 
 // Reserved for later features, not built here: /mock/new (C, interactive mock
-// draft room) and /drafts/:draftId/live (D, live Sleeper polling frontend).
+// draft room).
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -16,6 +17,15 @@ import { TopSlotContext } from './topSlot'
 function KeyedDraftView() {
   const { draftId } = useParams<{ draftId: string }>()
   return <DraftView key={draftId} />
+}
+
+// Same remount wrapper, same reason: LiveDraftView holds a simulation in
+// flight (requestSeqRef/result) and an EventSource keyed on draftId, and a
+// param-only change would keep every one of them alive across the switch --
+// an in-flight resim for the old draft could land and paint onto the new one.
+function KeyedLiveDraftView() {
+  const { draftId } = useParams<{ draftId: string }>()
+  return <LiveDraftView key={draftId} />
 }
 
 export default function App() {
@@ -37,6 +47,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<DraftPicker />} />
           <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
+          <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
         </Routes>
       </TopSlotContext.Provider>
     </div>

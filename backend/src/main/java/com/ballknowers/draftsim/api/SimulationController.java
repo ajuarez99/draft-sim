@@ -9,7 +9,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
 import java.util.Map;
 
 @RestController
@@ -50,8 +49,12 @@ public class SimulationController {
                                 "completed", done,
                                 "total", request.iterations(),
                                 "fraction", done / (double) request.iterations())));
-                    } catch (IOException e) {
-                        // client went away; the run will finish and be discarded
+                    } catch (Exception e) {
+                        // client went away; the run will finish and be discarded.
+                        // Exception, not IOException: send() on an already-completed
+                        // emitter throws IllegalStateException, which a narrower
+                        // catch lets escape -- out of the progress callback, up
+                        // through SimulationService, killing the run.
                     }
                 });
 
@@ -65,8 +68,12 @@ public class SimulationController {
                     String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
                     emitter.send(SseEmitter.event().name("error")
                             .data(Map.of("message", message)));
-                } catch (IOException ignored) {
-                    // nothing left to tell
+                } catch (Exception ignored) {
+                    // Nothing left to tell. Exception rather than IOException for the
+                    // same reason as above: this send happens on the failure path,
+                    // where the emitter is most likely to be already completed, and
+                    // an escaping IllegalStateException here would skip
+                    // completeWithError below and leak the emitter until timeout.
                 }
                 emitter.completeWithError(e);
             }

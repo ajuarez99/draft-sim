@@ -109,12 +109,9 @@ export default function DraftView() {
   // param present."
   const autoAdoptedSlotRef = useRef(false)
 
-  const reveal = useRevealedBoard(
-    result?.board,
-    result ? result.teams * result.rounds : 0,
-    result?.myPicks,
-    runSeq,
-  )
+  const maxPickNo = result ? result.teams * result.rounds : 0
+
+  const reveal = useRevealedBoard(result?.board, maxPickNo, result?.myPicks, runSeq)
 
   function refetchSeats() {
     getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
@@ -305,6 +302,39 @@ export default function DraftView() {
   }
 
   const pickedPlayerIds = new Set(Object.values(userPicks).map((p) => p.id))
+  // Everyone off the board so far, not just your own picks -- AvailabilityPanel
+  // and PlayerPicker otherwise kept offering players other teams had already
+  // drafted (a wide receiver taken three picks ago) because pickedPlayerIds
+  // only tracked your own roster.
+  //
+  // The cutoff is `pausedAt - 1`, NOT `revealedThrough`. useRevealedBoard sets
+  // both to the same value when it stops on your pick, so filtering on
+  // revealedThrough would swallow the board's *predicted* player at your own
+  // still-undecided pick: PickPrompt says "take Puka Nacua", DraftBoard shows
+  // him in your cell, and the panel below drops him -- the one player the
+  // column exists to talk about. Nothing at pausedAt is decided yet by
+  // definition.
+  //
+  // pickedPlayerIds is unioned in rather than replaced by the board slice,
+  // because it is the only thing covering a failed resim: choosePick's catch
+  // never calls setResult, so a player you just took is still absent from
+  // `result.board` and would come back as available.
+  //
+  // And once the reveal has run all the way to the end (reveal.skip(), or the
+  // ticker reaching the last pick) the board slice is the entire ~210-player
+  // modal board, which would filter AvailabilityPanel down to nothing and make
+  // it print "No players survive to these picks in any run" -- which is false.
+  // With the reveal over there is no "already gone vs. still to come" left to
+  // express, so this falls back to your own roster, which is what the panel
+  // filtered on before the reveal cutoff existed at all.
+  const revealFinished = reveal.pausedAt == null && maxPickNo > 0 && reveal.revealedThrough >= maxPickNo
+  const decidedThrough = reveal.pausedAt != null ? reveal.pausedAt - 1 : reveal.revealedThrough
+  const revealedPlayerIds = revealFinished
+    ? pickedPlayerIds
+    : new Set([
+        ...(result?.board ?? []).filter((p) => p.pickNo <= decidedThrough).map((p) => p.player.id),
+        ...pickedPlayerIds,
+      ])
   // Only the picks that haven't happened yet -- once resimulated, an already
   // decided pick reads ~100% everywhere (every iteration replays it
   // identically), which is dead information that would otherwise hide the
@@ -482,7 +512,7 @@ export default function DraftView() {
               availability={result.availability}
               myPicks={undecidedMyPicks}
               teams={result.teams}
-              pickedPlayerIds={pickedPlayerIds}
+              pickedPlayerIds={revealedPlayerIds}
             />
           </div>
         )}
@@ -502,7 +532,13 @@ export default function DraftView() {
           pausedAt={reveal.pausedAt}
           teams={result.teams}
           availability={result.availability}
-          alreadyPicked={pickedPlayerIds}
+          // The same revealed set AvailabilityPanel gets, not just your own
+          // roster. A player taken at pick 40 can still show survival > 0.2 at
+          // pick 45, so the picker listed players the board visibly showed as
+          // gone; taking one wrote his id into startState twice and the engine
+          // used to accept it silently (DraftSimulator's ignored remove()
+          // return), double-counting him on a roster.
+          alreadyPicked={revealedPlayerIds}
           rosterPositions={seats?.rosterPositions ?? []}
           draftedPlayers={myDraftedPlayers}
           onPick={choosePick}

@@ -119,11 +119,69 @@ export type DraftSummary = {
   season: number
   teams: number
   rounds: number
-  status: string
+  // Nullable: draft.status is a nullable column and Sleeper has been observed
+  // returning a draft object without one. This type said non-null, so
+  // DraftPicker did `d.status.replace(...)` and a single null row threw a
+  // TypeError mid-render -- with no error boundary above it, that white-screens
+  // the whole picker. Same stale-hand-maintained-type class as lessons.md #6.
+  status: string | null
   startTime: string | null
 }
 
 export const getDrafts = () => fetch('/api/drafts').then(json<DraftSummary[]>)
+
+/**
+ * One `event: state` frame from GET /api/drafts/{id}/live-stream (SSE, native
+ * EventSource, GET). Mirrors the backend's LiveState record field-for-field,
+ * hand-maintained per AGENTS.md -- if the record changes, change this in the
+ * same commit.
+ *
+ * `status` is Sleeper's own word ("pre_draft" | "drafting" | "complete") and is
+ * genuinely nullable: the column is, and Sleeper has been observed returning a
+ * draft object without one (same class as DraftSummary.status above).
+ *
+ * `onTheClockSlot` is typed nullable on the same reasoning: a pre_draft or
+ * complete draft has nobody on the clock. If the Java record turns out to
+ * declare a primitive `int` there, narrow this and drop the null branches in
+ * LiveStatusBar -- do not leave the two disagreeing.
+ */
+export type LiveState = {
+  draftId: string
+  status: string | null
+  tracking: boolean
+  picksMade: number
+  lastPickNo: number
+  totalPicks: number
+  teams: number
+  rounds: number
+  seatsMapped: number
+  onTheClockSlot: number | null
+  serverTime: string
+}
+
+/**
+ * POST /api/drafts/{id}/track's response. The tick now runs synchronously on
+ * the calling thread, so this doubles as the status refresh.
+ *
+ * `observed: false` means `status` is the stale DB value because Sleeper was
+ * unreachable on that tick -- it must be presented as stale, not as fact.
+ * `seatsMapped` is the draft-night health number: 0 means every seat is a
+ * league-average bot.
+ *
+ * (The current controller also echoes `draftId` back; it isn't in the frozen
+ * contract and nothing reads it, so it isn't mirrored here.)
+ */
+export type TrackResponse = {
+  status: string | null
+  observed: boolean
+  tracking: boolean
+  alreadyTracking: boolean
+  seatsMapped: number
+  teams: number
+}
+
+export const trackDraft = (sleeperDraftId: string) =>
+  fetch(`/api/drafts/${sleeperDraftId}/track`, { method: 'POST' }).then(json<TrackResponse>)
 
 // Scoped to the one league being added -- unlike /api/ingest/all, this doesn't
 // re-download the entire player pool or rebuild the global board/profiles.
@@ -195,29 +253,40 @@ export async function streamSimulation(
   let buffer = ''
   let result: SimulationResult | null = null
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += value
+  // The reader has to be released on EVERY exit path, not just the clean one.
+  // Before this, an abort (or an `event: error` throw) left the loop's reader
+  // holding the body open: the fetch was cancelled but nothing told the reader,
+  // so navigating away mid-run left a backend simulation still burning CPU
+  // against a result nobody would read. That matters in live mode, where an SSE
+  // stream is already held open alongside this one.
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += value
 
-    let split: number
-    while ((split = buffer.indexOf('\n\n')) !== -1) {
-      const raw = buffer.slice(0, split)
-      buffer = buffer.slice(split + 2)
+      let split: number
+      while ((split = buffer.indexOf('\n\n')) !== -1) {
+        const raw = buffer.slice(0, split)
+        buffer = buffer.slice(split + 2)
 
-      let name = 'message'
-      const dataLines: string[] = []
-      for (const line of raw.split('\n')) {
-        if (line.startsWith('event:')) name = line.slice(6).trim()
-        else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+        let name = 'message'
+        const dataLines: string[] = []
+        for (const line of raw.split('\n')) {
+          if (line.startsWith('event:')) name = line.slice(6).trim()
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+        }
+        if (dataLines.length === 0) continue
+        const payload = JSON.parse(dataLines.join('\n'))
+
+        if (name === 'progress') onProgress(payload.fraction)
+        else if (name === 'result') result = payload as SimulationResult
+        else if (name === 'error') throw new Error(payload.message)
       }
-      if (dataLines.length === 0) continue
-      const payload = JSON.parse(dataLines.join('\n'))
-
-      if (name === 'progress') onProgress(payload.fraction)
-      else if (name === 'result') result = payload as SimulationResult
-      else if (name === 'error') throw new Error(payload.message)
     }
+  } finally {
+    // Already-closed readers reject here; that is not an error worth surfacing.
+    reader.cancel().catch(() => {})
   }
 
   if (!result) throw new Error('stream ended without a result')

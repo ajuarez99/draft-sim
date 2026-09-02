@@ -16,13 +16,21 @@ simulation target — it replays 210 real picks and simulates nothing. Point sim
 at **West Coast FF 2026** (`1389361939561332737`, 14 teams, `pre_draft`) instead.
 
 **Where the roadmap stands: `claude/next-features-roadmap.md` now opens with a
-status table.** Short version — D's poller, B's app shell, and A's normalization
-+ the shared `DraftContextFactory` are built; **C's interactive mock draft room
-is the next and largest thing**, with D's live frontend and A's ad-hoc league
-sizing behind it.
+status table, and that table is now out of date.** D's poller, B's app shell, and
+A's normalization + the shared `DraftContextFactory` were already built. As of
+2026-09-02 **Phase 4 (D's live frontend) is built but unverified** — see "Stopped
+here" below. **C's interactive mock draft room (Phase 3) is planned in detail and
+not started**, and is the next real feature; A's ad-hoc league sizing stays last.
+The roadmap's claim that Phase 4 is "pure UI polish, not new risk" was wrong: it
+opened with a correctness fix in the ingest/poll path.
 
-**Read before touching profile output:** a league ingest run *after* a board
-rebuild silently zeroes every fitted manager profile. See "Known live bug" below.
+**~~Read before touching profile output:~~ FIXED 2026-09-02** — a league ingest
+run after a board rebuild used to silently zero every fitted manager profile.
+See "Known live bug" below, kept as a record of what it looked like.
+
+**Draft-night bug-fix batch, 2026-09-02.** Eight fixes ahead of
+West Coast FF 2026 going live — the first truly `drafting`-status draft this
+codebase has ever seen. See "2026-09-02: pre-draft-night bug batch" below.
 
 **Several Claude sessions often run against this one working tree, DB and
 server at once.** Two of them landed work on 2026-09-01 within minutes of each
@@ -32,7 +40,241 @@ back — the shared DB moves under you otherwise.
 
 ---
 
-## Known live bug — fitted profiles are silently switched off
+## 2026-09-02: pre-draft-night bug batch (committed, suite ended at 174/174 green)
+
+Eight bugs found by a review pass, each of which would have broken or degraded
+tonight's live draft. Nothing new was built. Backend suite went 137 -> 157
+tests, 0 skipped (the ITs ran against the real Postgres on 5433 and
+`DifferentialReplayIT` against the real Sleeper API), `npx tsc -b` clean.
+
+1. **`LiveDraftPoller` busy-looped on any error.** `Thread.sleep` was the last
+   statement *inside* the try, so an exception out of `pollOnce` skipped it and
+   the loop re-entered instantly — an unthrottled hammer on api.sleeper.app,
+   which trips Sleeper's rate limit, which throws, which sustains the loop. The
+   sleep now lives outside the try, with a capped 6x backoff on consecutive
+   failures.
+2. **The poller dropped the final picks of a draft.** It returned on `complete`
+   *before* fetching picks, so anything drafted between the last `drafting`
+   tick and the draft closing was permanently missing from `draft_pick`. It now
+   ingests once on the way out (`upsertPicks` is idempotent).
+3. **The seat map was frozen at `/track` time.** Sleeper returns
+   `"draft_order": null` until the commissioner sets the order — verified live
+   against West Coast FF 2026 — so `LeagueIngestService` persisted an **empty**
+   map for it and `/api/drafts/.../seats` came back `"seats": []`. Every
+   autopick (Sleeper leaves `picked_by` blank) would have landed with
+   `manager_id null`, been filtered out of `allCompletedPicks`, and left all 14
+   seats simulating as league-average bots all night. The poller now re-derives
+   slot->manager from the draft object it already fetches, **every tick,
+   `pre_draft` included**, and persists it via a new
+   `DraftRepository.updateSlotToManager`. The inversion is extracted into
+   `ingest/DraftOrderMapper` and shared with `LeagueIngestService` (mirroring
+   how `PickMapper` was extracted).
+   **Corrected 2026-09-02 by a review pass:** this used to say
+   "`DifferentialReplayIT` is the proof that extraction is behaviour-preserving."
+   It is not. `DifferentialReplayIT.java:103-105` hand-builds its `slotLookup`
+   from `draftRow.slotToManager()` — which `DraftOrderMapper` itself has just
+   written via `ingestChain`. Both sides of the "differential" therefore derive
+   from the same new code, so the test proves `Integer.parseInt` round-trips,
+   not equivalence with the deleted inline loop. What actually covers the
+   extraction is `DraftOrderMapperTest` plus `LiveDraftPollerTest`'s seat-map
+   cases; `DifferentialReplayIT` remains a real test of the *pick-mapping*
+   pipeline against live Sleeper data, which is what it was originally for.
+4. **`/track` could 500, and lied about status.** `Map.of` throws NPE on a null
+   value and `ErrorHandler` doesn't catch NPE. Rebuilt on `LinkedHashMap`. It
+   also reported the *stored* status, so it would say "pre_draft" for a draft
+   live for an hour — `track()` now runs one tick synchronously first and
+   returns the freshly-observed `status`, plus `seatsMapped`/`teams` as a
+   draft-night diagnostic. **Check `seatsMapped` before 8:15 PM: anything less
+   than 14 means seats are unattributed bots.**
+   **Caveat, added 2026-09-02:** West Coast FF 2026's `draft_order` was still
+   `null` as of 01:50 CDT, so `seatsMapped: 0` is *expected* until the
+   commissioner sets the draft order — it is not yet a failure. It becomes one
+   if it is still 0 close to 8:15 PM. The poller now logs an ERROR the first
+   time it sees zero mapped seats (it used to return early past the logging
+   block, so the total-failure case was the one case that said nothing).
+   The response also carries `"observed"`: false means the status came from the
+   DB because the synchronous Sleeper tick threw, not from Sleeper.
+5. **The picker screen white-screened on a null status.** `DraftSummary.status`
+   was typed non-null while the column is nullable.
+6. / 7. **Availability/picker filtering and a duplicate-player hole.** The
+   revealed-board filter used `revealedThrough`, which equals `pausedAt` while
+   paused, so the panel dropped the board's predicted player at your own
+   undecided pick. `PlayerPicker` was still filtered on your own roster only, so
+   it listed players the board showed as gone; taking one wrote a duplicate into
+   `startState` and **`DraftSimulator` accepted it silently** — `available.remove(e)`'s
+   return value was ignored, so the removal no-opped while the roster add ran
+   and the player was double-counted in `rosterNeed`. Both halves fixed.
+8. **`adp_at_time` null-wipe — closed, see below.**
+
+### Second pass, same day: review fixes + two new endpoints
+
+Six more findings from a code review of the batch above, plus the backend half of
+Phase 4's live UI. All still uncommitted.
+
+- `refreshSeatMap` was silent in exactly the case it exists to detect (0 seats
+  mapped returned early past the logging block). Now an ERROR, rate-limited
+  through the same `lastSeatMap` mechanism so it fires once, not 360 times an hour.
+- `/track` reports `observed` — false when the synchronous tick threw and the
+  status is the stale DB value.
+- `/track` no longer runs a second full tick when the draft is already tracked.
+  It used to `sleeper.draft` + `sleeper.draftPicks` + a 210-row upsert on the
+  Tomcat request thread on every call, racing the poll loop — and `/track` is the
+  only way to read `seatsMapped`, so refreshing it by hand doubled Sleeper load
+  mid-draft. `trackCalledTwiceStartsExactlyOnePollerAndFetchesSleeperOnlyOnce`
+  now asserts the fetch count, which is what made this invisible.
+- `/track` on a `complete` draft used to answer `"tracking": true,
+  "alreadyTracking": true` for a draft nothing was polling. `TrackResult` carries
+  `pollerRunning` now.
+- `LeagueIngestService.backfillAdpAtTime` moved out of the ingest transaction. It
+  is a global `UPDATE draft_pick` and was taking row write-locks on tonight's
+  picks and holding them across Sleeper HTTP calls until commit, while the poller
+  upserts the same rows every 10s. **Note:** the reviewer's suggested
+  `REQUIRES_NEW` would have been worse — it suspends the outer transaction but
+  does not release the locks it already holds, so the inner one would block on
+  its own caller. Done with an explicit `TransactionTemplate` instead.
+- `DraftSimulator` logs a WARN (once per player per process, not per iteration)
+  when a `startState` duplicate is dropped.
+- **`GET /api/drafts/{id}/live-stream`** — SSE, GET so the browser's native
+  `EventSource` drives it and reconnects for free. `state` on connect and on
+  every tick where status/picksMade/seatsMapped changed, `heartbeat` every 15s
+  regardless, `error`. Driven off the existing poll loop via a listener registry
+  on `LiveDraftPoller`, **not** a second polling loop. Auto-`track()`s on open.
+- **`POST /api/drafts/{id}/picks`** `{"pickNo": 38, "sleeperPlayerId": "4046"}` —
+  the manual escape hatch when the poller lags a pick already visible in Sleeper.
+  400 on an unknown player id rather than a silent `player_id = null`. Self-heals:
+  the poller overwrites the row with truth on its next tick.
+- **Not verified live.** Everything here is unit-tested only; nothing in this
+  pass has been driven against a running server or a real `drafting` draft.
+
+### Third pass, same day: the frontend half of Phase 4
+
+- **`/drafts/:draftId/live`** is a real route now. `web/src/App.tsx:7-8` reserved
+  it in a *comment* only — the roadmap called it "reserved," which was wrong.
+  It goes through a `KeyedLiveDraftView` remount wrapper for the same reason
+  `KeyedDraftView` exists: an in-flight resim for the old draft must not paint
+  onto a new one.
+- **`web/src/useLiveDraft.ts`** — native `EventSource` against `/live-stream`.
+  Closes itself on `status === 'complete'`: `EventSource` auto-reconnects after a
+  server-side close, and the reconnected request would see `complete` and close
+  again, forever, every ~3s. Last-contact time lives in a ref, not state, so a
+  15s heartbeat doesn't re-render the whole view.
+- **`web/src/components/LiveStatusBar.tsx`** — status pill, on-the-clock seat
+  (the largest element, `hueFor(managerId)` so it is the same identity colour the
+  board uses), `picksMade/totalPicks` over the existing `.progress` track, and a
+  freshness pill: `live · 4s` teal under 25s, `stale · 1m 40s` crimson past it.
+  **That pill is the point of the component** — it is what tells you the backend
+  died rather than the draft going quiet.
+- **`web/src/pages/LiveDraftView.tsx`** — reuses `DraftBoard` unmodified, feeding
+  `revealedThrough={live.picksMade}`: reality rather than an animation timer. The
+  roadmap's §3.5 asked for a new `landed: boolean` field on the board-cell type;
+  that is stale, `revealedThrough` already does the job and no `DraftBoard` edit
+  was needed. Resim on a new live pick reuses `startState`-free DB replay
+  (`SimulationService.resolveStartState` already falls back to the poller's own
+  rows), 1.5s trailing debounce, coalesced not cancelled.
+- **Picker screen** grew a `track` chip and a `live →` link as *siblings* of the
+  row `<Link>` — a `<button>` cannot nest inside an `<a>`, and
+  `.draft-row .chip { pointer-events: none }` would have killed a chip placed
+  inside it. The chip shows `seatsMapped/teams` inline, crimson at 0, and marks
+  the reading `· stale` when `observed === false`.
+- Added `.chip.status-pre_draft`. There was no rule for it, so the picker's most
+  common chip had been falling through to the base `.chip` by accident.
+
+---
+
+## Stopped here — read this before continuing
+
+**This session ended mid-flight, deliberately.** Two agents were building the
+backend and frontend halves of Phase 4 in parallel and were stopped partway.
+What is committed compiles and passes, but is **not finished and not verified
+live**:
+
+- `./gradlew test` — **174 tests, 0 failures, 0 skipped** (the ITs really ran
+  against Postgres on 5433 and the real Sleeper API, they did not skip).
+- `npx tsc -b` clean, `vite build` clean.
+- **Nothing in Phase 4 has been driven against a running server.** The backend on
+  8080 was deliberately left running pre-batch bytecode so other concurrent
+  sessions were not disrupted, which means `/live-stream`, `/picks`, the live
+  route and the whole SSE path are **unit-tested only**. Nobody has watched a
+  `state` event arrive in a browser.
+- The planned **test/verification agent pass never ran.** Same gap as the
+  original poller work — see "This session: live draft poller built" below,
+  which records the same omission for the same reason.
+
+### If you are picking this up before the draft
+
+West Coast FF 2026 (`1389361939561332737`, 14 teams) starts **2026-09-03
+01:15 UTC = 2026-09-02 20:15 CDT**. In order:
+
+1. **Restart the backend** — `bootRun` does not hot-reload, and everything above
+   is inert until you do. The poller keeps no persisted tracking state, so a
+   restart also silently un-tracks every draft.
+2. `curl -X POST localhost:8080/api/drafts/1389361939561332737/track` and read
+   **`seatsMapped`**. That one number is the draft-night health check.
+3. **`draft_order` was still `null` as of 2026-09-02 01:50 CDT**, verified
+   directly against Sleeper. It stays null until the commissioner sets or
+   randomizes the order, and *nothing* — not this app, not Sleeper's own UI —
+   can know your slot before then. `seatsMapped: 0` is EXPECTED until that
+   happens, not a bug. Re-check every ~30 min from 6 PM; chase the commissioner
+   if it is still null at 7:45 PM.
+   - A fallback via `slot_to_roster_id` was considered and **rejected on
+     evidence**: all four completed drafts in the DB carry a populated
+     `draft_order` *and* a real `slot_to_roster_id`, while West Coast has null
+     and an identity placeholder. The two fields fill in together, so the
+     fallback would buy nothing.
+4. **Do not run `POST /api/ingest/all` or `/api/ingest/league` while the poller
+   is live.** Both call `replacePicks`, and the board rebuild moves the pool
+   under a running draft.
+5. Dry run before 8:15 if there is time: the checklist wants a *real* throwaway
+   Sleeper league, not a public mock — `ingestChain` walks `previous_league_id`
+   from a **league** id and a public mock may carry none. Verify with
+   `curl -s https://api.sleeper.app/v1/draft/<ID> | grep league_id` first.
+   **Delete the throwaway league before the real draft** — it finishes
+   `complete`, so its picks enter `allCompletedPicks()` and get fitted into the
+   manager profiles you are about to draft against.
+
+### Then: Phase 3, the mock draft room
+
+Planned in detail this session but **not started**. Two corrections to
+`claude/next-features-roadmap.md`'s §4 Phase 3 that matter before anyone builds it:
+
+- **Its central instruction is wrong.** It says to extract
+  `DraftSimulator.choose()` into a reusable decide-and-apply unit. `choose()`
+  deliberately reads and writes six instance-level scratch buffers allocated once
+  in the constructor — that reuse is part of the ~20-30x speedup in `be423eb` —
+  and it returns an *index into `available`*, not a `BoardEntry`, so it cannot be
+  the shared unit's return type. It is also not the "apply" half at all; that
+  lives in `run()`. The reusable unit is **the mutable per-draft state**: a new
+  `DraftState` class plus a public `DraftSimulator.advance(state)`, with
+  `choose()` becoming a private `chooseIndex(state)` and every buffer staying put.
+  Acceptance is seeded-RNG output **byte-identical** before and after.
+- **"Not started" overstates it.** Reactive resimulation already shipped a
+  client-driven version of the user-visible flow — `choosePick()` in `DraftView`,
+  `PickPrompt`, `PlayerPicker`, `useRevealedBoard`. Phase 3 is really: give that
+  persistence, a real per-pick bot decision path, and an entry point that does
+  not need an ingested Sleeper draft. Do not rebuild those components.
+
+`V2__ffc_adp.sql` is the highest migration on disk, so the mock tables are a
+genuine **V3**. Build the profile-contamination guard as **two** tests, not one:
+the real-Postgres IT plus a no-database source-level check, because the IT
+silently skips on any machine without a database and that is exactly the machine
+where someone will add the join.
+
+---
+
+## ~~Known live bug~~ — fitted profiles are silently switched off (FIXED 2026-09-02)
+
+Both halves are now closed. `DraftRepository.replacePicks` no longer deletes and
+re-inserts: it prunes only the picks missing from the incoming list and hands the
+rest to `upsertPicks`, whose `coalesce(draft_pick.adp_at_time, excluded.adp_at_time)`
+already got this right. And `LeagueIngestService.ingestChain` now calls
+`BoardService.backfillAdpAtTime` (made public) at the end, so a fresh ingest's own
+picks are scoreable without remembering to `POST /api/ingest/board`. Coalescing a
+stale value is safe because the backfill overwrites unconditionally rather than
+only filling nulls. Pinned by `DraftRepositoryUpsertPicksIT.replacePicksPreservesABackfilledAdpAtTime`.
+
+The original description follows, because the *symptom* is worth recognising:
+
+### What it used to look like
 
 `DraftRepository.replacePicks` (any league ingest) reinserts picks with
 `adp_at_time = null`. Only `BoardService.backfillAdpAtTime`, at the end of a
@@ -46,10 +288,10 @@ Check it:
     curl localhost:8080/api/board | head -c 120     # picksWithContemporaneousBoard
     # or: select count(adp_at_time) from draft_pick;
 
-Zero means re-run `POST /api/ingest/board`. **Not fixed in code.** The durable
-fix is to coalesce `adp_at_time` on replace the way `upsertPicks` already does,
-or to backfill at the end of a league ingest. Worth doing before Phase 3 — the
-mock room leans on those profiles.
+Zero used to mean re-run `POST /api/ingest/board`. Both durable fixes are now in
+(coalesce on replace, and backfill at the end of a league ingest), so a zero here
+now means something genuinely new — investigate rather than papering over it with
+a rebuild.
 
 ---
 

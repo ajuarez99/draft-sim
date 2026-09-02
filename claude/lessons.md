@@ -281,3 +281,53 @@ same as being correct, when none of the checks available so far exercised the
 actual path. The general version: **"has no UI yet" is not the same claim as
 "works," and shouldn't be allowed to quietly become one** just because nothing
 has said otherwise. Fixed by adding `PUT, DELETE` to `allowedMethods`.
+
+## 15. Three draft-night bugs that only exist in a state nothing had ever reached
+
+Found by a review pass on 2026-09-02, hours before the first truly
+`drafting`-status Sleeper draft this project has ever polled. None of the three
+is reachable by any test, any curl, or any code path that had ever executed:
+
+- **`Thread.sleep` inside the `try`.** `LiveDraftPoller.loop` slept as the last
+  statement of the try block, so an exception out of `pollOnce` jumped straight
+  past it. The failure isn't the missed sleep, it's what the missed sleep
+  causes: an unthrottled retry loop trips Sleeper's rate limit, which is itself
+  an exception, which sustains the loop. One transient 500 becomes a
+  self-inflicted outage. It reads as correct in review because the sleep is
+  visibly right there.
+- **A "stop" condition that skipped the work it was stopping after.** The same
+  poller returned on `status == "complete"` *before* fetching picks, so the last
+  few picks of every draft — the ones made between the final `drafting` tick and
+  the draft closing — were silently never ingested.
+- **State captured once and held for the thread's whole life.** The poller's
+  slot->manager map came off an immutable `DraftRow` read at `/track` time.
+  Sleeper populates `draft_order` only when the commissioner sets the order, so
+  the map persisted for a `pre_draft` league was *empty* and would have stayed
+  empty all night. Every autopick (Sleeper leaves `picked_by` blank on those)
+  would have landed unattributed, and all 14 seats would have simulated as
+  league-average bots.
+
+**The class:** correct-looking code whose bug exists only in a state the process
+has never been in — a transient failure, a terminal transition, or a field that
+starts null and fills in later. The useful test question is not "does this work"
+but **"what does this do the first time it is wrong?"** Related to #14 from the
+other side: a code path that has only ever run against `complete` drafts is not
+verified for `drafting` ones, and the absence of a failure report is not
+evidence.
+
+**Corollary found while fixing them:** the obvious change-detector
+(`derived.equals(stored)`) is a trap here, because the stored map comes back
+from Jackson with `Integer` values while the derived one holds `Long`s.
+`Integer.valueOf(5).equals(5L)` is `false`, so the "only write when it changed"
+guard would have written every 10 seconds forever — the opposite of what it was
+added for. Normalize before comparing, or skip the comparison: an UPDATE by
+primary key is cheaper than the bug.
+
+**And one from the same batch that isn't about liveness at all:**
+`DraftSimulator.run` called `available.remove(e)` and ignored the return value.
+A duplicate id in `startState` therefore made the removal a no-op while the
+roster add on the next line still ran — the same player on a roster twice,
+double-counted in `rosterNeed`. Same shape as #1: structurally valid, silently
+wrong, and it surfaced only as an opaque downstream error message. **A
+collection mutator that returns a boolean is telling you something; dropping it
+is a decision, and it should be an explicit one.**

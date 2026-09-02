@@ -240,8 +240,15 @@ public class BoardService {
      * value. Everything older stays null and is excluded from profile fitting.
      * Scoring a 2025 pick against a 2026 board would produce a reach number that
      * is mostly a year of player movement, not a manager's behavior.
+     *
+     * Public because {@link LeagueIngestService#ingestChain} now calls it too: a
+     * league ingest inserts picks with adp_at_time null (PickMapper never sets
+     * one), and until this ran at the end of a *board rebuild* those picks were
+     * invisible to profile fitting with nothing reporting it. The UPDATE is
+     * unconditional rather than {@code where adp_at_time is null}, so calling it
+     * more often only refreshes values against the newest in-range snapshot.
      */
-    private int backfillAdpAtTime(Sport sport) {
+    public int backfillAdpAtTime(Sport sport) {
         // Postgres will not let the UPDATE target be referenced from inside a
         // JOIN's ON clause ("invalid reference to FROM-clause entry for table
         // dp"), so the two FROM relations are comma-joined and every predicate

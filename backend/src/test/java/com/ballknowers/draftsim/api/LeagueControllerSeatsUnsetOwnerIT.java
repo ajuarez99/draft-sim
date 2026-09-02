@@ -123,4 +123,26 @@ class LeagueControllerSeatsUnsetOwnerIT {
         String json = objectMapper.writeValueAsString(body);
         assertTrue(json.contains("\"mySlot\":null"), "serialized response must carry mySlot as JSON null: " + json);
     }
+
+    /**
+     * seats() serialized status as String.valueOf(draft.status()), which turns a
+     * null column into the literal four-character string "null" -- valid JSON, and
+     * indistinguishable from a real status to the frontend rendering it (which then
+     * calls .replace() on it and paints a `status-null` chip). claude/lessons.md
+     * #12, in the one place that fix had not landed. The response map is already a
+     * LinkedHashMap, so the workaround was not buying anything either.
+     */
+    @Test
+    void aNullDraftStatusSerializesAsJsonNullNotTheStringNull() throws Exception {
+        jdbc.update("update draft set status = null where sleeper_draft_id = ?", sleeperDraftId);
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) controller.seats(sleeperDraftId).getBody();
+        assertNotNull(body);
+        assertNull(body.get("status"), "a null status column must stay null, not become \"null\"");
+
+        String json = objectMapper.writeValueAsString(body);
+        assertTrue(json.contains("\"status\":null"), "serialized response must carry status as JSON null: " + json);
+        assertFalse(json.contains("\"status\":\"null\""), "the literal string \"null\" leaked into the response");
+    }
 }

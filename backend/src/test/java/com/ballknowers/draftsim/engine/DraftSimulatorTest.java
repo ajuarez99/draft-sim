@@ -124,6 +124,43 @@ class DraftSimulatorTest {
         assertNotNull(result.availableAtMyPicks().get(25));
     }
 
+    /**
+     * A duplicate in the completed/startState map used to corrupt a roster
+     * silently. `available.remove(e)` returned false the second time the same
+     * player came around, but the return value was ignored and `rosters[slot].add`
+     * ran anyway, so one player landed on a roster twice and was double-counted in
+     * rosterNeed. The frontend could produce exactly this: PlayerPicker filtered on
+     * the user's own picks only, so a player already taken by another team at an
+     * earlier pick stayed listed and could be taken again.
+     *
+     * The fix skips the duplicate pick, which surfaces as an unfilled pick (the
+     * caller's own "didn't preserve pick N" check catches it) rather than as a
+     * roster that quietly makes no sense -- and matters more once Phase 3 starts
+     * persisting these into mock_draft_pick.
+     */
+    @Test
+    void aPlayerRepeatedInCompletedPicksIsNotDraftedTwice() {
+        int teams = 14;
+        Map<Integer, Long> completed = Map.of(5, 50L, 9, 50L);   // same player, two picks
+        DraftContext c = ctx(teams, 15, completed);
+        var result = new DraftSimulator(c, new PickScorer(CFG, c.rules(), c.priors()), 1.0, 11L)
+                .run(new int[]{11}, 10);
+
+        assertEquals(50L, result.picked()[5], "the first occurrence still stands");
+        assertEquals(0L, result.picked()[9], "the duplicate must not be re-drafted");
+
+        int occurrences = 0;
+        for (int p = 1; p <= teams * 15; p++) if (result.picked()[p] == 50L) occurrences++;
+        assertEquals(1, occurrences, "player 50 appears at more than one pick");
+
+        // The roster half of the bug: slot 9 (pick 9 of a 14-team round 1) must not
+        // be carrying the player that slot 5 already took.
+        int slotOfDuplicate = DraftSlot.slot(9, teams);
+        long onRosterTwice = result.rosters().get(slotOfDuplicate).picks().stream()
+                .filter(e -> e.player().id() == 50L).count();
+        assertEquals(0, onRosterTwice, "the duplicate was added to a roster anyway");
+    }
+
     @Test
     void zeroTemperatureIsDeterministic() {
         DraftContext c = ctx(12, 15, Map.of());

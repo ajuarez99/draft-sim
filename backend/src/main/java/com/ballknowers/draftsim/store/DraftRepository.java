@@ -48,13 +48,41 @@ public class DraftRepository {
     public record PickRow(long draftId, int pickNo, int round, int draftSlot,
                           Long managerId, Long playerId, Double adpAtTime) {}
 
+    /**
+     * Makes {@code draft_pick} match {@code picks} exactly, without destroying
+     * adp_at_time.
+     *
+     * This used to be a literal delete-then-insert, and the insert bound
+     * {@code PickRow.adpAtTime()}, which {@code PickMapper} hardcodes to null. So
+     * any league ingest run after a board rebuild silently zeroed the
+     * contemporaneous board position on every pick in that league, which zeroed
+     * every fitted manager profile behind it — HANDOFF's "Known live bug", and
+     * one click of the UI's own "Add a draft" button was enough to trigger it.
+     *
+     * The fix is a shape change, not an {@code on conflict} clause: line-one's
+     * delete makes any conflict unreachable. Prune only the picks that are
+     * genuinely gone, then hand the rest to {@link #upsertPicks}, whose
+     * {@code coalesce} already gets this right. Coalescing a stale value is safe
+     * because {@code BoardService.backfillAdpAtTime} overwrites unconditionally
+     * rather than only filling nulls.
+     */
     public void replacePicks(long draftId, List<PickRow> picks) {
-        jdbc.update("delete from draft_pick where draft_id = ?", draftId);
-        jdbc.batchUpdate("""
-                insert into draft_pick (draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time)
-                values (?, ?, ?, ?, ?, ?, ?)
-                """,
-                picks, 500, DraftRepository::bindPickRow);
+        if (picks == null || picks.isEmpty()) {
+            jdbc.update("delete from draft_pick where draft_id = ?", draftId);
+            return;
+        }
+        Integer[] keep = picks.stream().map(PickRow::pickNo).toArray(Integer[]::new);
+        // createArrayOf rather than binding a bare array and letting pgjdbc infer
+        // the SQL type — same reasoning as LeagueRepository's text[] binding
+        // (claude/lessons.md #4): nothing left to infer.
+        jdbc.update(con -> {
+            var ps = con.prepareStatement(
+                    "delete from draft_pick where draft_id = ? and not (pick_no = any (?))");
+            ps.setLong(1, draftId);
+            ps.setArray(2, con.createArrayOf("integer", keep));
+            return ps;
+        });
+        upsertPicks(draftId, picks);
     }
 
     /**
@@ -92,6 +120,17 @@ public class DraftRepository {
     /** Flips only status, without needing the full row this poller doesn't have on hand. */
     public void updateStatus(long draftId, String status) {
         jdbc.update("update draft set status = ? where id = ?", status, draftId);
+    }
+
+    /**
+     * Flips only the seat map, same shape and same reason as {@link #updateStatus}:
+     * {@link #upsert} would demand league/season/rounds/teams/type/startTime that
+     * LiveDraftPoller does not carry, and its {@code on conflict} sets start_time
+     * from the incoming row — so reusing it would null out a start time the poller
+     * never had.
+     */
+    public void updateSlotToManager(long draftId, String slotToManagerJson) {
+        jdbc.update("update draft set slot_to_manager = ?::jsonb where id = ?", slotToManagerJson, draftId);
     }
 
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,

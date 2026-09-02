@@ -2,8 +2,11 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.profile.ManagerProfile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * One complete simulated draft. Single-threaded and self-contained: a fresh
@@ -11,6 +14,15 @@ import java.util.*;
  * thousands of these at once.
  */
 public final class DraftSimulator {
+
+    private static final Logger log = LoggerFactory.getLogger(DraftSimulator.class);
+
+    // One WARN per duplicated player per process, not per iteration. A fresh
+    // DraftSimulator is built for every iteration and a duplicated startState
+    // repeats identically in all of them, so an unguarded log line would emit 2000
+    // copies of the same warning per run and bury everything else on draft night.
+    // Bounded by the player table, so it cannot grow without limit.
+    private static final Set<Long> WARNED_DUPLICATES = ConcurrentHashMap.newKeySet();
 
     private final DraftContext ctx;
     private final PickScorer scorer;
@@ -80,11 +92,26 @@ public final class DraftSimulator {
             long already = ctx.completedAt(pickNo);
             if (already != 0L) {
                 BoardEntry e = byId.get(already);
-                if (e != null) {
-                    available.remove(e);
+                // remove()'s return value used to be ignored, which is how the same
+                // player could occupy two picks: a startState carrying a duplicate
+                // id (the frontend's picker listed a player the board already showed
+                // as gone) made the second removal a silent no-op while the roster
+                // add below still ran, so the player landed on a roster twice and
+                // was double-counted in rosterNeed. Skipping the pick surfaces the
+                // duplicate to the caller as an unpreserved pick instead of quietly
+                // corrupting the roster -- which matters more once Phase 3's
+                // mock_draft_pick table starts persisting these.
+                if (e != null && available.remove(e)) {
                     rosters[slot].add(e);
                     recent.addFirst(e.position());
                     picked[pickNo] = already;
+                } else if (e != null && WARNED_DUPLICATES.add(already)) {
+                    // Say something. Until now the only thing that noticed a
+                    // duplicate in startState was a check in the frontend -- the
+                    // backend dropped the pick and the caller got a board with an
+                    // unexplained hole in it and no explanation anywhere.
+                    log.warn("startState pick {} names player {} who is already off the board"
+                            + " -- skipping the pick; the caller sent a duplicate", pickNo, already);
                 }
                 continue;
             }

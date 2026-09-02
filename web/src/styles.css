@@ -111,6 +111,15 @@ code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px;
 .chip.on:hover { color: var(--bg); }
 .chip.status-drafting { background: var(--teal); border-color: var(--teal); color: var(--bg); }
 .chip.status-complete { background: var(--line); border-color: var(--line); color: var(--muted); }
+/* The picker's most common chip had no rule at all and was falling through to
+   the base `.chip` -- i.e. styled like a clickable control by accident. Muted
+   tone: a draft that hasn't started is the resting state, not an event. */
+.chip.status-pre_draft { background: color-mix(in oklch, var(--muted) 12%, var(--panel)); border-color: var(--line); color: var(--muted); }
+/* Same treatment for a draft whose status column is null (DraftPicker's
+   `?? 'unknown'` fallback) -- unknown is not an event either. */
+.chip.status-unknown, .chip.status-offline { background: transparent; border-color: var(--line); color: var(--muted); }
+/* `.chip` is written for <button>; the picker's "live ->" is an <a>. */
+a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .depth { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-left: 10px; }
 
 /*
@@ -127,6 +136,19 @@ code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px;
 .draft-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
 .draft-row-league { font-weight: 600; flex: 1; }
 .draft-row .chip { pointer-events: none; margin-left: auto; }
+
+/* The row's actions are siblings of the <Link>, not children: a <button>
+   cannot nest inside an <a>, and `.draft-row .chip` above is pointer-events:
+   none. The wrap carries the panel background so the actions area matches the
+   link half; the link keeps its own hover, which stops at its own edge. */
+.draft-row-wrap { display: flex; align-items: center; background: var(--panel); }
+.draft-row-wrap .draft-row { flex: 1; min-width: 0; }
+.draft-row-actions { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 6px; flex-shrink: 0; }
+.draft-row-actions .chip:hover { transform: translateY(-1px); }
+.draft-row-actions .chip { transition: border-color 120ms ease, color 120ms ease, transform 120ms ease; }
+.track-note { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Zero seats mapped, or a failed track, is the thing you most need to notice. */
+.track-note.failed { color: var(--crimson); }
 
 .add-draft .controls { margin-top: 6px; }
 
@@ -416,6 +438,90 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .picker-row { cursor: pointer; transition: background 100ms ease; }
 .picker-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
 .picker-row:focus-visible { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); outline: 2px solid var(--teal); outline-offset: -2px; }
+
+/*
+ * Live draft: one status bar above the board.
+ *
+ * A bar, not a row of cards. The content is one status word, one identity
+ * (whose pick it is), one fraction and one freshness clock -- four equal cards
+ * would give the status word the same weight as the thing you actually look
+ * at, and would be exactly the flat-uniform-card treatment this project has
+ * already rejected twice. `flex: 0 0 auto` so it never eats into the board's
+ * vertical budget, which is the whole point of the board-first layout.
+ * Shallower shadow than `.panel`: it sits above the board, it isn't a panel.
+ */
+.live-bar {
+  flex: 0 0 auto; position: sticky; top: 0; z-index: 5;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--panel); border-radius: 12px; padding: 8px 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+
+/* The largest element in the bar, and the only one that is a real control --
+   it opens the same SeatPopover a board column header does. Hover depth lives
+   here and on the track chip, never on the static readouts. */
+.live-onclock {
+  display: flex; align-items: center; gap: 10px;
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
+  background: transparent; color: inherit; font: inherit; text-align: left;
+  padding: 4px 10px; border-radius: 10px; cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+.live-onclock:hover {
+  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+}
+.live-onclock:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* The non-clickable placeholder (nobody on the clock) gets no lift at all. */
+.live-onclock.idle { cursor: default; }
+.live-onclock.idle:hover { background: transparent; transform: none; box-shadow: none; }
+.live-avatar { width: 32px; height: 32px; font-size: 12px; }
+.live-onclock-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+.live-onclock-label { font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
+.live-onclock-name { font-size: 15px; font-weight: 600; }
+/* Same crimson "you" identity as `.cell.mine` and the column header. */
+.live-onclock.mine .live-onclock-name { color: var(--crimson); }
+.live-onclock-pick { font-size: 11px; color: var(--muted); }
+
+.live-count { display: flex; flex-direction: column; gap: 5px; min-width: 110px; }
+.live-count-figure { font-size: 13px; }
+/* Reusing `.progress`/`.progress-bar` rather than inventing a second bar --
+   only the run-level margin comes off. */
+.live-progress { margin-bottom: 0; }
+
+.live-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.live-track { transition: border-color 120ms ease, color 120ms ease, transform 120ms ease; }
+.live-track:hover:not(:disabled) { transform: translateY(-1px); }
+.live-track-note { font-variant-numeric: tabular-nums; }
+/*
+ * The bar's real job: everything else here is a number the backend sent, and a
+ * number it sent ten minutes ago looks identical to one it sent a second ago.
+ * Two states only -- an amber middle tier would just make "is it dead" a
+ * judgement call at exactly the moment nobody wants to make one.
+ */
+.live-fresh {
+  font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 3px 10px; border-radius: 999px;
+}
+.live-fresh.ok { color: var(--teal); background: color-mix(in oklch, var(--teal) 15%, var(--panel)); }
+.live-fresh.stale { color: var(--crimson); background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); }
+
+.live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.live-resim-progress { margin-bottom: 10px; }
+/* Once a projection exists, the pre-draft waiting copy shrinks to this line
+   instead of covering the board it is worth looking at. */
+.live-waiting {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding: 8px 12px; border-radius: 8px;
+  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.live-waiting strong { font-size: 13px; letter-spacing: 0.03em; }
+/* Waiting for a draft to start is a teal (nothing wrong) state; waiting
+   because the backend isn't answering is not, and shouldn't wear the same
+   color as a healthy one. */
+.live-waiting.offline { background: color-mix(in oklch, var(--crimson) 14%, var(--panel)); }
+.live-waiting.offline strong { color: var(--crimson); }
 
 /* Breathing room only, not a restyle -- same tokens, larger at the width
    the 1400px cap used to keep this app from ever reaching. */
