@@ -1,9 +1,10 @@
 # draft-sim — handoff
 
-Last updated 2026-09-02 by a Claude session running directly on Allan's Windows
-machine. **Read this first.** `DEPLOY.md` covers deployment; `README.md` covers
-running it. A Claude session should then read `claude/` — orientation, sandbox
-recipes and bug post-mortems that are not worth rediscovering.
+Last updated 2026-09-02 (afternoon) by a Claude session running directly on
+Allan's Windows machine, the same day and the same machine as the entries
+below it. **Read this first.** `DEPLOY.md` covers deployment; `README.md`
+covers running it. A Claude session should then read `claude/` — orientation,
+sandbox recipes and bug post-mortems that are not worth rediscovering.
 `claude/environment.md`'s recipes are written for a different (cloud-sandbox)
 environment; this machine has real internet, real JDK/Node/Postgres installs,
 and does not need most of them — see the new note at the top of that file
@@ -15,14 +16,34 @@ repo is on a deadline any more, and fantasy(heart) can no longer be used as a
 simulation target — it replays 210 real picks and simulates nothing. Point sims
 at **West Coast FF 2026** (`1389361939561332737`, 14 teams, `pre_draft`) instead.
 
-**Where the roadmap stands: `claude/next-features-roadmap.md` now opens with a
-status table, and that table is now out of date.** D's poller, B's app shell, and
-A's normalization + the shared `DraftContextFactory` were already built. As of
-2026-09-02 **Phase 4 (D's live frontend) is built but unverified** — see "Stopped
-here" below. **C's interactive mock draft room (Phase 3) is planned in detail and
-not started**, and is the next real feature; A's ad-hoc league sizing stays last.
-The roadmap's claim that Phase 4 is "pure UI polish, not new risk" was wrong: it
-opened with a correctness fix in the ingest/poll path.
+**~~Phase 4 (D's live frontend) is built but unverified~~ — verified live
+2026-09-02, see "Live-draft dry run" below.** A real disposable 4-team Sleeper
+draft was run end to end through the live UI: SSE state/heartbeat delivery,
+slot auto-detection, board rendering against real landed picks, resim overlay,
+the on-the-clock indicator, the `/picks` escape hatch (400 + immediate write +
+self-heal), and the `complete`-status SSE teardown all confirmed working. One
+real bug was found and fixed in the process (`useLiveDraft.ts` never recovered
+from a backend process being killed outright — see that section). **C's
+interactive mock draft room (Phase 3) is planned in detail and not started**,
+and is the next real feature once tonight's draft is behind us; A's ad-hoc
+league sizing stays last. The roadmap's claim that Phase 4 is "pure UI polish,
+not new risk" was wrong twice now: it opened with a correctness fix in the
+ingest/poll path, and its own verification surfaced a second real bug in the
+frontend half.
+
+**New UI brief, not started: `claude/pill-board-and-docked-availability.md`**
+(2026-09-02). Allan's next round of board feedback, reconciled: position-colored
+cells, positional rank in the badge (`RB1`), the per-cell probability and bar
+deleted, Sleeper-style rounded tiles instead of the hairline grid, and the
+availability panel docked directly under the board. Planning only — nothing in
+it has been built. It touches `DraftBoard`/`AvailabilityPanel`, so it lands on
+the live page as well as the mock page.
+
+**For tonight: set `APP_OWNER_SLEEPER_USER_ID=1122386008709910528` before
+`bootRun`**, or the live board's slot auto-detection stays off and every seat
+shows "assumed — click your seat" instead of highlighting yours automatically.
+Confirmed this is the only thing gating it — the feature itself works
+correctly once the env var is set (verified live, see below).
 
 **~~Read before touching profile output:~~ FIXED 2026-09-02** — a league ingest
 run after a board rebuild used to silently zero every fitted manager profile.
@@ -181,12 +202,15 @@ Phase 4's live UI. All still uncommitted.
 
 ---
 
-## Stopped here — read this before continuing
+## ~~Stopped here~~ — resolved 2026-09-02 afternoon, see "Live-draft dry run" below
 
-**This session ended mid-flight, deliberately.** Two agents were building the
-backend and frontend halves of Phase 4 in parallel and were stopped partway.
-What is committed compiles and passes, but is **not finished and not verified
-live**:
+**This section originally described a session that ended mid-flight,
+deliberately.** Two agents were building the backend and frontend halves of
+Phase 4 in parallel and were stopped partway, with the test/verification pass
+never run. That gap is now closed: a full live dry run (real disposable Sleeper
+draft, real browser, real backend restarts) ran to completion the same day and
+found one real bug, now fixed. Left below as a record of what was still
+unverified going into that pass:
 
 - `./gradlew test` — **174 tests, 0 failures, 0 skipped** (the ITs really ran
   against Postgres on 5433 and the real Sleeper API, they did not skip).
@@ -224,13 +248,82 @@ West Coast FF 2026 (`1389361939561332737`, 14 teams) starts **2026-09-03
 4. **Do not run `POST /api/ingest/all` or `/api/ingest/league` while the poller
    is live.** Both call `replacePicks`, and the board rebuild moves the pool
    under a running draft.
-5. Dry run before 8:15 if there is time: the checklist wants a *real* throwaway
-   Sleeper league, not a public mock — `ingestChain` walks `previous_league_id`
-   from a **league** id and a public mock may carry none. Verify with
-   `curl -s https://api.sleeper.app/v1/draft/<ID> | grep league_id` first.
-   **Delete the throwaway league before the real draft** — it finishes
-   `complete`, so its picks enter `allCompletedPicks()` and get fitted into the
-   manager profiles you are about to draft against.
+5. ~~Dry run before 8:15 if there is time~~ — **done, 2026-09-02 morning/midday.
+   See "Live-draft dry run" below for the full writeup.** The short version:
+   it worked, one real bug was found and fixed (SSE reconnect after a killed
+   backend process), and the throwaway league's DB rows are already cleaned up
+   (`delete from league where sleeper_id = ...` cascades to `draft` and
+   `draft_pick` — deleting the league from Sleeper's own UI does **not** touch
+   this app's Postgres copy, so that DB delete is the part that actually
+   matters for profile contamination, not the Sleeper-side deletion).
+
+### Live-draft dry run, 2026-09-02 (morning/midday, ~10:15 AM–11:00 AM CDT)
+
+Ran the manual pre-draft-night checklist for real, ~10 hours ahead of West
+Coast FF going live. A real throwaway 4-team Sleeper league (`test`, league
+`1400900466891567104`, draft `1400900467730489344`) was created by Allan,
+autopicked through to `complete`, watched live in a real browser the whole
+way, then deleted from this app's Postgres afterward.
+
+**Confirmed working, live, not just unit-tested:**
+- Slot auto-detection (`mySlot`) — was `null` locally the whole time before
+  today because `APP_OWNER_SLEEPER_USER_ID` was never set (the documented
+  local-dev default, not a bug). Set it, restarted the backend, and the board
+  correctly highlighted the right seat with a "you" badge. **Set it for
+  tonight — see the top of this doc.**
+- SSE `state`/`heartbeat` delivery, the freshness pill flipping `live` ↔
+  `stale` (forced by killing the backend and watching it happen), and
+  recovering once the backend came back and `/track` was called again.
+- Board rendering against real landed picks (not just simulated ones) —
+  correct once a resim finishes; a mid-resim screenshot briefly showing dashes
+  during a resim in flight was the only thing that looked wrong, and it
+  self-resolved, not a bug.
+- The `/picks` manual escape hatch: 400 on an unknown `sleeperPlayerId`, an
+  immediate write for a pick ahead of where the real draft had gotten to, and
+  a clean overwrite (no duplicate row) once the real Sleeper pick landed on
+  the next poll tick.
+- The `complete`-status SSE teardown: exactly one `net::ERR_ABORTED` in the
+  network log when the client closed itself, no reconnect loop.
+- Poller self-stops on `complete` (`tracking: false` on the next `/track`).
+- Pick batching over a 10s poll tick looks choppy with 4 autopick bots racing
+  each other, which is specific to an all-bot dry run — a real human's pick
+  timer is long enough that 10s granularity will read as close to real-time.
+- The DB-delete cleanup: `draftsObserved` for popsharky's manager profile went
+  3 → 4 once the throwaway draft completed (confirming the contamination risk
+  HANDOFF already warned about was real, not theoretical), then back to 3 —
+  with `positionalTilt` byte-identical to before — immediately after `delete
+  from league where sleeper_id = '1400900466891567104'` cascaded through
+  `draft` and `draft_pick`.
+
+**One real bug found and fixed — `web/src/useLiveDraft.ts`.** Killing the
+backend process outright (`Stop-Process -Force`, not a graceful shutdown)
+while a browser tab had an open `/live-stream` connection left the browser's
+`EventSource` stuck in `readyState` OPEN/CONNECTING forever, at least through
+Vite's dev proxy — no `error` event ever fired, so neither the native
+auto-reconnect nor the existing `RETRY_MS`-on-`CLOSED` fallback ever
+triggered. The pill correctly went `stale` and kept climbing, but nothing ever
+recovered it — even a full ~2 minutes after the backend was back up and
+`/track` had succeeded, confirmed via the network log showing exactly one
+`live-stream` request the entire time. Fixed with a `WATCHDOG_AFTER_SECONDS =
+60` fallback: a 5s-interval check that force-reconnects (closing the stuck
+source first) if the stream has been silent that long, regardless of what
+`readyState` claims. Re-verified live the same way — killed the backend again,
+confirmed recovery within the 60–65s window with no page reload. A
+code-review pass on the fix found one real follow-up bug before it shipped:
+`connect()` didn't clear a pending `retryTimer`, so a stale CLOSED-path retry
+could fire after a successful watchdog-triggered reconnect and tear it back
+down for no reason — fixed by clearing it at the top of `connect()`. `npx tsc
+-b` and `vite build` both clean after both changes; no backend code touched,
+so the existing 174/174 backend suite is unaffected (confirmed still
+up-to-date, not re-run, since nothing on that side changed).
+
+**Not tested by this dry run:** the initial-connect-hang case (a request that
+never completes at all, as opposed to a connection that was open and then
+died) — the watchdog only starts counting from `lastContactRef`, which stays
+`null` until first contact, so a hung *first* connection attempt isn't
+covered by this fix. Considered low-priority: everything observed today was
+the "already connected, then the process died" shape, which is what tonight's
+restart-recovery procedure actually depends on.
 
 ### Then: Phase 3, the mock draft room
 

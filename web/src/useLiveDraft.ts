@@ -17,6 +17,18 @@ export const STALE_AFTER_SECONDS = 25
 // missing endpoint isn't hammered.
 const RETRY_MS = 5000
 
+// Verified live (2026-09-02, killing bootRun mid-tab): when the backend
+// process is killed outright rather than closing the connection cleanly, the
+// browser's EventSource can be left in readyState OPEN/CONNECTING forever
+// with no error event ever firing -- at least through Vite's dev proxy, which
+// apparently doesn't propagate the backend's dead socket as a client-visible
+// reset. Neither the native auto-reconnect nor the CLOSED-only RETRY_MS path
+// above covers this: both assume *something* tells the browser the
+// connection failed. This is the fallback for when nothing does. Comfortably
+// above STALE_AFTER_SECONDS so the pill has already gone red before this ever
+// fires -- it exists to recover, not to detect.
+const WATCHDOG_AFTER_SECONDS = 60
+
 export type LiveDraft = {
   live: LiveState | null
   connected: boolean
@@ -64,6 +76,18 @@ export function useLiveDraft(draftId: string): LiveDraft {
 
     function connect() {
       if (cancelled) return
+      // A watchdog-triggered call can land while a stuck-but-not-yet-CLOSED
+      // source is still sitting there; close it explicitly rather than
+      // leaking it, since nothing else will.
+      source?.close()
+      // A CLOSED-path retry can also be pending when this runs (the watchdog
+      // firing independently of it, or a caller reconnecting for its own
+      // reason) -- without clearing it, the stale timer still fires later and
+      // tears down the connection this call just successfully opened.
+      if (retryTimer !== undefined) {
+        window.clearTimeout(retryTimer)
+        retryTimer = undefined
+      }
       const es = new EventSource(`/api/drafts/${draftId}/live-stream`)
       source = es
 
@@ -140,8 +164,16 @@ export function useLiveDraft(draftId: string): LiveDraft {
     finishedRef.current = false
     connect()
 
+    const watchdog = window.setInterval(() => {
+      if (cancelled || finishedRef.current) return
+      const last = lastContactRef.current
+      if (last == null) return
+      if ((Date.now() - last) / 1000 >= WATCHDOG_AFTER_SECONDS) connect()
+    }, 5000)
+
     return () => {
       cancelled = true
+      window.clearInterval(watchdog)
       if (retryTimer !== undefined) window.clearTimeout(retryTimer)
       source?.close()
       setConnected(false)
