@@ -30,9 +30,9 @@ Built so far:
   auto-pick down the snake order, you take your own picks on your turn, sessions
   persist and resume from the picker screen.
 
-Not yet built: ad-hoc league sizing for a *real* league that doesn't match one of
-the four supported team counts (`claude/next-features-roadmap.md`'s Phase 5,
-deliberately last).
+Not yet built, and demoted out of the active roadmap: ad-hoc league sizing for a
+*real* league that doesn't match one of the four supported team counts. None of
+the leagues below need it; see `ideas/ad-hoc-league-sizing.md`.
 
 ## Running
 

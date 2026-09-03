@@ -57,7 +57,20 @@ public class ProfileService {
         this.priorCfg = priorCfg;
     }
 
-    public record Fit(Map<Long, ManagerProfile> profiles, PositionalPriors priors, int scoreablePicks) {}
+    /**
+     * @param empiricalReachBias the unshrunk mean of {@code adpAtTime() - pickNo()}
+     *                           over a manager's own scoreable picks -- "what they
+     *                           normally pick", independent of anything stated about
+     *                           them. Absent for a manager with zero scoreable picks.
+     *                           Separate from {@link ManagerProfile#reachBias()},
+     *                           which is shrunk toward the stated value when one
+     *                           exists and is what the engine actually scores
+     *                           against -- this field exists only so a stated value
+     *                           can be compared against the real number it would
+     *                           otherwise be blended with.
+     */
+    public record Fit(Map<Long, ManagerProfile> profiles, PositionalPriors priors, int scoreablePicks,
+                       Map<Long, Double> empiricalReachBias) {}
 
     public Fit fit(Sport sport) {
         List<DraftRepository.CompletedPick> picks = drafts.allCompletedPicks();
@@ -122,6 +135,7 @@ public class ProfileService {
         allManagers.addAll(manual.keySet());
 
         Map<Long, ManagerProfile> out = new HashMap<>();
+        Map<Long, Double> empirical = new HashMap<>();
         for (Long managerId : allManagers) {
             ManualTendencies stated = manual.getOrDefault(managerId, ManualTendencies.EMPTY);
             int observed = draftsByManager.getOrDefault(managerId, Set.of()).size();
@@ -136,6 +150,7 @@ public class ProfileService {
             // are correlated and would overstate the evidence.
             int shrinkN = picksScored == 0 ? 0 : observed;
             double reach = shrinkage.shrink(rawReach, target, shrinkN);
+            if (picksScored > 0) empirical.put(managerId, rawReach);
 
             Map<Position, Double> tilt = fitTilt(
                     earlyByManager.getOrDefault(managerId, Map.of()), earlyLeague, earlyTotal, observed);
@@ -155,7 +170,7 @@ public class ProfileService {
 
         log.info("profiles: {} managers, {} scoreable picks, league mean reach {}, {} with stated tendencies",
                 out.size(), scoreable, String.format("%.2f", leagueMeanReach), manual.size());
-        return new Fit(out, priors, scoreable);
+        return new Fit(out, priors, scoreable, empirical);
     }
 
     /**

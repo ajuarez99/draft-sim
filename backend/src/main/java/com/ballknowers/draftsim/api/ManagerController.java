@@ -13,8 +13,9 @@ import java.util.*;
 /**
  * Reading and setting what the user believes about each manager.
  *
- * There is no UI for this yet — drive it with curl or Postman. The engine reads
- * these values on the next simulation with no restart needed.
+ * Backs the standalone /managers page (web/src/pages/ManagerTendencies.tsx) as
+ * well as the per-seat popover inside a draft board. The engine reads these
+ * values on the next simulation with no restart needed.
  */
 @RestController
 @RequestMapping("/api/managers")
@@ -32,7 +33,8 @@ public class ManagerController {
     public List<Map<String, Object>> list() {
         ProfileService.Fit fit = profiles.fit(Sport.NFL);
         List<Map<String, Object>> out = new ArrayList<>();
-        fit.profiles().values().forEach(p -> out.add(describe(p, repo.manualFor(p.managerId(), Sport.NFL))));
+        fit.profiles().values().forEach(p -> out.add(describe(p, repo.manualFor(p.managerId(), Sport.NFL),
+                fit.empiricalReachBias().get(p.managerId()))));
         out.sort(Comparator.comparing(m -> String.valueOf(m.get("manager"))));
         return out;
     }
@@ -49,8 +51,9 @@ public class ManagerController {
         ManualTendencies stored = body == null ? ManualTendencies.EMPTY : body;
         profiles.setManual(managerId, Sport.NFL, stored);
 
-        return profiles.fit(Sport.NFL).profiles().get(managerId) instanceof ManagerProfile p
-                ? ResponseEntity.ok(describe(p, stored))
+        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        return fit.profiles().get(managerId) instanceof ManagerProfile p
+                ? ResponseEntity.ok(describe(p, stored, fit.empiricalReachBias().get(managerId)))
                 : ResponseEntity.ok(Map.of("managerId", managerId, "stored", stored));
     }
 
@@ -60,13 +63,18 @@ public class ManagerController {
         return Map.of("managerId", managerId, "cleared", true);
     }
 
-    private static Map<String, Object> describe(ManagerProfile p, ManualTendencies manual) {
+    private static Map<String, Object> describe(ManagerProfile p, ManualTendencies manual, Double empiricalReachBias) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("managerId", p.managerId());
         m.put("manager", p.displayName());
         m.put("provenance", p.provenance().name());
         // The value the engine will actually use, after blending.
         m.put("effectiveReachBias", Math.round(p.reachBias() * 100) / 100.0);
+        // The unshrunk average of this manager's own scoreable picks -- "what
+        // they normally pick," independent of any stated belief. Null with no
+        // scoreable picks. This is what a stated reachBias should be compared
+        // against to see whether the two agree.
+        m.put("empiricalReachBias", empiricalReachBias == null ? null : Math.round(empiricalReachBias * 100) / 100.0);
         m.put("unpredictability", p.unpredictability());
         m.put("positionalTilt", p.positionalTilt());
         m.put("note", p.note());

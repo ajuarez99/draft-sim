@@ -14,7 +14,7 @@ its own build note.
 | 2 | **B**'s shell — `GET /api/drafts`, router, `/` picker + `/drafts/:draftId`, free-text id field gone | **built** |
 | 3 | **C**'s interactive mock draft room | **built** 2026-09-02 — see "What the build found" below |
 | 4 | **D**'s live frontend — SSE `live-stream`, status bar, a `/track` button, picker status refresh | **built** — this row was stale; it shipped and was dry-run verified end-to-end against a real disposable Sleeper draft before Phase 3 started (`6481be5`, which also fixed a stuck-EventSource reconnect bug found during that run) |
-| 5 | **A**'s ad-hoc league sizing — the `SimulationRequest` branch, seat-assignment UI, the dropdown | **not started**, still deliberately last |
+| 5 | **A**'s ad-hoc league sizing — the `SimulationRequest` branch, seat-assignment UI, the dropdown | **demoted to `ideas/ad-hoc-league-sizing.md` 2026-09-02** — no real league of Allan's needs it; no longer active roadmap |
 
 `/mock/new` and `/drafts/:draftId/live` are both reserved in `web/src/App.tsx`
 and unclaimed, so Phase 3 and Phase 4 each have a route to land in.

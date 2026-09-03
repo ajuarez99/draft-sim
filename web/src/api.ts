@@ -202,6 +202,11 @@ export type ManagerSummary = {
   manager: string
   provenance: Provenance
   effectiveReachBias: number
+  // The unshrunk average of this manager's own scoreable picks -- "what they
+  // normally pick," independent of anything stated about them. Null with no
+  // scoreable picks. Compare against stated.reachBias; do not confuse with
+  // effectiveReachBias, which is already blended with any stated value.
+  empiricalReachBias: number | null
   unpredictability: number
   positionalTilt: Record<string, number>
   note: string | null
@@ -286,11 +291,15 @@ export type MockSessionSummary = {
 
 export const getMockSessions = () => fetch('/api/mocks').then(json<MockSessionSummary[]>)
 
-export const createMockSession = (teams: number, userSlot: number) =>
+// managerSeats seats a real manager's fitted/stated profile at a slot instead
+// of an unmodelled bot -- keyed by slot number, same shape MockDraftController
+// .CreateRequest expects. Any slot besides userSlot left out of it is still a
+// plain bot.
+export const createMockSession = (teams: number, userSlot: number, managerSeats?: Record<number, number>) =>
   fetch('/api/mocks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teams, userSlot }),
+    body: JSON.stringify({ teams, userSlot, managerSeats: managerSeats ?? {} }),
   }).then(json<MockSessionState>)
 
 // Forks a real, drafting-status Sleeper draft into a new mock session seeded

@@ -67,7 +67,7 @@ public class MockDraftService {
     }
 
     @Transactional
-    public MockSessionState createSession(int teams, int userSlot) {
+    public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats) {
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(teams)) {
             throw new IllegalArgumentException(
                     "teams must be one of " + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
@@ -76,13 +76,36 @@ public class MockDraftService {
         if (userSlot < 1 || userSlot > teams) {
             throw new IllegalArgumentException("userSlot must be between 1 and " + teams + ", got " + userSlot);
         }
+        // Only checks that aren't already owned elsewhere: SeatSpec's own compact
+        // constructor rejects slot < 1, and validate() (a few lines down, via
+        // buildContext) rejects slot > teams and a slot claimed twice -- including
+        // colliding with userSlot, since that seat is already in the same list.
+        // Re-deriving either of those here risks drifting out of sync with the
+        // one place that actually owns the rule.
+        Map<Long, String> managerNames = managers.names();
+        for (Map.Entry<Integer, Long> e : managerSeats.entrySet()) {
+            int slot = e.getKey();
+            Long managerId = e.getValue();
+            // A primitive `long` unboxing NPE below would surface as an
+            // unhandled 500 instead of this clean 400 -- validate before
+            // SeatSpec.manager ever sees it.
+            if (managerId == null) {
+                throw new IllegalArgumentException("managerSeats slot " + slot + " needs a managerId, got null");
+            }
+            if (!managerNames.containsKey(managerId)) {
+                throw new IllegalArgumentException("managerSeats slot " + slot + " has unknown managerId " + managerId);
+            }
+        }
 
         LeagueShape shape = LeagueShape.standard(teams);
-        List<SeatSpec> seats = List.of(SeatSpec.user(userSlot, null));
+        List<SeatSpec> seats = new ArrayList<>();
+        seats.add(SeatSpec.user(userSlot, null));
+        managerSeats.forEach((slot, managerId) -> seats.add(SeatSpec.manager(slot, managerId)));
 
         // Validates board depth / seat shape the same way POST /api/sims does --
-        // built here, before any row is written, so a bad request never leaves
-        // an orphaned session behind.
+        // including every managerSeats slot's range and any collision with
+        // userSlot -- built here, before any row is written, so a bad request
+        // never leaves an orphaned session behind.
         DraftContext ctx = buildContext(shape, seats, Map.of());
 
         long rngSeed = System.nanoTime();

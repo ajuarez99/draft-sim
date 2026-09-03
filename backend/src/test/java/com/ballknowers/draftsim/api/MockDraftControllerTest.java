@@ -37,11 +37,26 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesTeamsAndUserSlotToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3)).thenReturn(sampleState(1));
+        when(mocks.createSession(8, 3, Map.of())).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3));
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of()));
 
         assertEquals(1, result.id());
+    }
+
+    @Test
+    void createDelegatesManagerSeatsToTheService() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSession(8, 3, Map.of(5, 42L))).thenReturn(sampleState(1));
+
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L)));
+
+        assertEquals(1, result.id());
+    }
+
+    @Test
+    void createRequestTreatsNullManagerSeatsAsEmpty() {
+        assertEquals(Map.of(), new MockDraftController.CreateRequest(8, 3, null).managerSeats());
     }
 
     @Test

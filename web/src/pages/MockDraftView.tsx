@@ -13,7 +13,16 @@ import DraftBoard from '../components/DraftBoard'
 import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
 
-/** No fitted history exists for a mock seat -- see DraftBoard's hideProvenanceDots. */
+/**
+ * Always reports NEUTRAL/zeroed behaviour, even for a MANAGER-type seat
+ * (managerSeats lets /mock/new assign a real manager -- see MockSetup.tsx).
+ * Harmless today only because DraftBoard is rendered here with
+ * hideProvenanceDots and this view never opens a seat popover, so nothing
+ * reads these fields -- MockSessionState.SeatView doesn't carry the real
+ * reachBias/unpredictability/positionalTilt to begin with. If a click-to-
+ * inspect popover is ever added to the mock board, this needs real profile
+ * data threaded through, not this stub.
+ */
 function toBoardSeat(s: MockSeat): Seat {
   return {
     slot: s.slot,

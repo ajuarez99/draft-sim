@@ -117,6 +117,7 @@ body {
   font-size: 22px; font-weight: 700; letter-spacing: 0.02em; margin: 0;
 }
 .top h1 a { color: inherit; text-decoration: none; }
+.top-left { display: flex; align-items: center; gap: 12px; }
 /* Portal target for DraftView's settings gear (§A) -- empty, and so
    invisible, on any page that doesn't portal into it. */
 .top-slot { display: flex; align-items: center; }
@@ -530,6 +531,23 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat-form-actions button:disabled { opacity: 0.6; cursor: default; }
 .seat-form-actions button:nth-child(n+2) { background: var(--line); color: var(--text); }
 .seat-form-error { color: #e07a7a; }
+
+/* /mock/new's per-seat manager assignment -- a list, not a card grid, since
+   each row is one control (DENSITY: match the layout to the content shape). */
+.seat-assign-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.seat-assign-row { display: flex; align-items: center; gap: 10px; }
+.seat-assign-row .slot-label { width: 56px; flex-shrink: 0; }
+.seat-assign-row select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 5px 8px; font: inherit; flex: 1; min-width: 0;
+}
+
+/* /managers -- the same `.seat` card SeatPopover uses for one seat inside a
+   modal, reused as a grid of many. A neutral row (nothing entered, no
+   history) is dimmed rather than dropped, so it still reads as "checked,
+   nothing here" instead of the list looking incomplete. */
+.manager-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.seat.neutral-row { opacity: 0.65; }
 
 .reveal-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .reveal-status { display: flex; align-items: center; gap: 8px; min-width: 190px; }

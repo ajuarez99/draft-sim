@@ -73,7 +73,7 @@ class SimulationServiceTest {
         when(leagues.all()).thenReturn(List.of(league));
         when(boards.currentBoard(Sport.NFL)).thenReturn(board);
         when(profiles.fit(Sport.NFL))
-                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(), 0));
+                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(), 0, Map.of()));
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("resolvable-id", 501L));
 
         // pick 1 resolves; pick 2's sleeperId is not a known player at all.

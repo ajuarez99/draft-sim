@@ -31,14 +31,23 @@ public class MockDraftController {
         return mocks.listSessions();
     }
 
-    /** Creates a session and auto-advances any bots picking before the user's first turn. */
+    /**
+     * Creates a session and auto-advances any bots picking before the user's
+     * first turn. A slot in {@code managerSeats} is seeded with that real
+     * manager's fitted/stated profile instead of an unmodelled bot; any slot
+     * left out (besides {@code userSlot}) is still a plain bot.
+     */
     @PostMapping
     public MockSessionState create(@RequestBody CreateRequest body) {
         if (body == null) throw new IllegalArgumentException("request body is required");
-        return mocks.createSession(body.teams(), body.userSlot());
+        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats());
     }
 
-    public record CreateRequest(int teams, int userSlot) {}
+    public record CreateRequest(int teams, int userSlot, Map<Integer, Long> managerSeats) {
+        public CreateRequest {
+            if (managerSeats == null) managerSeats = Map.of();
+        }
+    }
 
     /**
      * Forks a real, {@code drafting}-status Sleeper draft into a new mock

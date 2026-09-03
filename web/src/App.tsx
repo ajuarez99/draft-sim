@@ -5,6 +5,7 @@ import DraftView from './pages/DraftView'
 import LiveDraftView from './pages/LiveDraftView'
 import MockSetup from './pages/MockSetup'
 import MockDraftView from './pages/MockDraftView'
+import ManagerTendencies from './pages/ManagerTendencies'
 import { TopSlotContext } from './topSlot'
 
 // Forces a full remount of DraftView on every draft change. Without this,
@@ -43,9 +44,16 @@ export default function App() {
   return (
     <div className="app">
       <header className="top">
-        <h1>
-          <Link to="/">draft-sim</Link>
-        </h1>
+        <div className="top-left">
+          <h1>
+            <Link to="/">draft-sim</Link>
+          </h1>
+          {/* Not scoped to one draft the way every other route is, so it
+              lives in the persistent header rather than a page-local link. */}
+          <Link to="/managers" className="chip">
+            managers
+          </Link>
+        </div>
         <div className="top-slot" ref={setTopSlot} />
       </header>
 
@@ -56,6 +64,7 @@ export default function App() {
           <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
           <Route path="/mock/new" element={<MockSetup />} />
           <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
+          <Route path="/managers" element={<ManagerTendencies />} />
         </Routes>
       </TopSlotContext.Provider>
     </div>

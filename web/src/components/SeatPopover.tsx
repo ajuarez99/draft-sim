@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getManagers, setTendencies, clearTendencies, type Seat } from '../api'
 import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
+import { behaviourText } from '../managerBehaviour'
 
 /**
  * Formerly SeatList's per-seat card, now the popover a board column header
@@ -17,21 +18,7 @@ import { PROVENANCE_LABEL } from '../provenance'
  * evidence.
  */
 function behaviour(s: Seat) {
-  const bits: string[] = []
-  if (s.reachBias > 0.5) bits.push(`reaches ~${s.reachBias.toFixed(1)} picks early`)
-  else if (s.reachBias < -0.5) bits.push(`waits ~${Math.abs(s.reachBias).toFixed(1)} picks past board`)
-  else bits.push('drafts close to the board')
-
-  if (s.unpredictability >= 1.25) bits.push('erratic')
-  else if (s.unpredictability <= 0.8) bits.push('very predictable')
-
-  const tilts = Object.entries(s.positionalTilt)
-    .filter(([, v]) => Math.abs(v - 1) > 0.05)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2)
-    .map(([pos, v]) => `${v > 1 ? 'leans' : 'fades'} ${pos}`)
-
-  return [...bits, ...tilts].join(' · ')
+  return behaviourText({ reachBias: s.reachBias, unpredictability: s.unpredictability, positionalTilt: s.positionalTilt })
 }
 
 function footnote(s: Seat) {

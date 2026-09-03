@@ -24,6 +24,9 @@ If something moves from "maybe" to "next", it leaves this folder and goes into
   and the scorer already reserves a slot for it; a shared text-embedding space for
   notes and players is the appealing wrong answer. Corpus-scale work is blocked on
   an unverified assumption about enumerating public Sleeper drafts.
+- **`ad-hoc-league-sizing.md`** — supporting a real league whose team count isn't
+  one of the four already built (8/10/12/14). Demoted from the roadmap: none of
+  Allan's actual leagues need it.
 
 ## Also parked, not yet written up
 

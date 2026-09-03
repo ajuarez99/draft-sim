@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.engine.DraftContextFactory;
 import com.ballknowers.draftsim.engine.LeagueShape;
 import com.ballknowers.draftsim.engine.MockDraftEngine;
+import com.ballknowers.draftsim.engine.SeatSpec;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.ProfileService;
@@ -70,7 +71,7 @@ class MockDraftServiceTest {
         List<BoardEntry> synthetic = board(400);
         lenient().when(boards.currentBoard(Sport.NFL)).thenReturn(synthetic);
         lenient().when(profiles.fit(Sport.NFL))
-                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(), 0));
+                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(), 0, Map.of()));
         Map<String, Long> ids = new HashMap<>();
         for (BoardEntry e : synthetic) ids.put(e.player().sleeperId(), e.player().id());
         lenient().when(players.idsBySleeperId(Sport.NFL)).thenReturn(ids);
@@ -85,7 +86,7 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionAutoAdvancesBotsBeforeTheUsersFirstTurn() {
-        MockSessionState state = service.createSession(8, 5);
+        MockSessionState state = service.createSession(8, 5, Map.of());
 
         assertEquals("IN_PROGRESS", state.status());
         assertEquals(4, state.picks().size(), "slots 1-4 must be auto-advanced before slot 5's turn");
@@ -97,18 +98,60 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionRejectsAnUnsupportedTeamSize() {
-        assertThrows(IllegalArgumentException.class, () -> service.createSession(9, 1));
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(9, 1, Map.of()));
     }
 
     @Test
     void createSessionRejectsAnOutOfRangeUserSlot() {
-        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 0));
-        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 9));
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 0, Map.of()));
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 9, Map.of()));
+    }
+
+    @Test
+    void createSessionRejectsAManagerSeatAtTheUsersOwnSlot() {
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 5, Map.of(5, 42L)));
+    }
+
+    @Test
+    void createSessionRejectsAnOutOfRangeManagerSeatSlot() {
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 1, Map.of(9, 42L)));
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 1, Map.of(0, 42L)));
+    }
+
+    @Test
+    void createSessionRejectsANullManagerIdInsteadOfNpeing() {
+        Map<Integer, Long> withNull = new HashMap<>();
+        withNull.put(2, null);
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 1, withNull));
+    }
+
+    @Test
+    void createSessionRejectsAnUnknownManagerId() {
+        lenient().when(managers.names()).thenReturn(Map.of());
+        assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 1, Map.of(2, 999L)));
+    }
+
+    @Test
+    void createSessionSeatsARealManagerInsteadOfABot() {
+        lenient().when(managers.names()).thenReturn(Map.of(42L, "Dave"));
+
+        MockSessionState state = service.createSession(8, 5, Map.of(2, 42L));
+
+        MockSessionState.SeatView seat2 = state.seats().stream()
+                .filter(s -> s.slot() == 2).findFirst().orElseThrow();
+        assertEquals(SeatSpec.Type.MANAGER, seat2.type());
+        assertEquals(42L, seat2.managerId());
+        assertEquals("Dave", seat2.manager());
+
+        // The rest of the auto-advanced field is still unmodelled bots.
+        MockSessionState.SeatView seat1 = state.seats().stream()
+                .filter(s -> s.slot() == 1).findFirst().orElseThrow();
+        assertEquals(SeatSpec.Type.BOT, seat1.type());
     }
 
     @Test
     void submitPickRecordsTheUsersChoiceAndAdvancesToTheNextUserTurn() {
-        MockSessionState created = service.createSession(8, 1);   // user picks first, no bots ahead
+        MockSessionState created = service.createSession(8, 1, Map.of());   // user picks first, no bots ahead
         assertTrue(created.isUsersTurn());
         String firstAvailable = created.available().get(0).sleeperId();
 
@@ -135,7 +178,7 @@ class MockDraftServiceTest {
      */
     @Test
     void submitPickRejectsWhenCurrentPickNoIsNotActuallyTheUsersTurn() {
-        MockSessionState created = service.createSession(8, 5);   // slots 1-4 are bots first
+        MockSessionState created = service.createSession(8, 5, Map.of());   // slots 1-4 are bots first
         repo.advanceCurrentPick(created.id(), 6, "IN_PROGRESS");  // force onto slot 6, a bot seat
 
         String someone = created.available().get(0).sleeperId();
@@ -144,14 +187,14 @@ class MockDraftServiceTest {
 
     @Test
     void submitPickRejectsAnUnknownPlayer() {
-        MockSessionState created = service.createSession(8, 1);
+        MockSessionState created = service.createSession(8, 1, Map.of());
         assertThrows(IllegalArgumentException.class,
                 () -> service.submitPick(created.id(), "no-such-sleeper-id"));
     }
 
     @Test
     void submitPickRejectsAPlayerAlreadyDraftedInThisSession() {
-        MockSessionState created = service.createSession(8, 1);
+        MockSessionState created = service.createSession(8, 1, Map.of());
         String player = created.available().get(0).sleeperId();
         MockSessionState afterFirst = service.submitPick(created.id(), player).orElseThrow();
 
@@ -173,7 +216,7 @@ class MockDraftServiceTest {
 
     @Test
     void aFullMockDraftCompletesWithNoDuplicatePlayersAcrossRepeatedSubmitPickCalls() {
-        MockSessionState state = service.createSession(8, 3);
+        MockSessionState state = service.createSession(8, 3, Map.of());
         Set<String> drafted = new HashSet<>();
         for (var p : state.picks()) assertTrue(drafted.add(p.player().sleeperId()));
 
