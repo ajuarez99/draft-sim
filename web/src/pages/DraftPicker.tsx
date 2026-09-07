@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { roundPickLabel } from '../roundPickLabel'
 import {
   getDrafts,
   getMockSessions,
@@ -47,12 +48,23 @@ export default function DraftPicker() {
     }
   }
 
+  // The field says "link or ID" now, so a pasted Sleeper URL has to work --
+  // https://sleeper.com/leagues/1391509063170293760/team is what is actually
+  // in someone's clipboard, and asking them to cut the id out of it by hand is
+  // the kind of chore this screen was full of. Sleeper ids are long digit
+  // runs; nothing else in one of these URLs is, so the first one is the id.
+  function leagueIdFrom(input: string): string {
+    const trimmed = input.trim()
+    if (/^\d+$/.test(trimmed)) return trimmed
+    return trimmed.match(/\d{6,}/)?.[0] ?? trimmed
+  }
+
   async function addDraft() {
     if (!leagueId.trim()) return
     setAdding(true)
     setError(null)
     try {
-      await ingestLeague(leagueId.trim())
+      await ingestLeague(leagueIdFrom(leagueId))
       setLeagueId('')
       refetch()
     } catch (e) {
@@ -66,13 +78,13 @@ export default function DraftPicker() {
     <div className="content">
       <section className="panel">
         <div className="panel-head">
-          <h2>Your drafts</h2>
+          <h2>Your leagues</h2>
         </div>
 
         {error && <div className="error">{error}</div>}
 
         {drafts && drafts.length === 0 && (
-          <p className="muted">No drafts ingested yet — add one below.</p>
+          <p className="muted">No leagues yet — add one below.</p>
         )}
 
         {drafts && drafts.length > 0 && (
@@ -108,11 +120,18 @@ export default function DraftPicker() {
                         // than rendering "undefined/undefined seats mapped" --
                         // verified live 2026-09-02 against a pre-restart 8080.
                         <span className="tiny track-note">
-                          tracking · {t.status ?? 'unknown'} · no seat count from this backend
+                          Following · {t.status ?? 'unknown'} · no seat count from this backend
                         </span>
                       ) : (
-                        <span className={`tiny track-note${t.seatsMapped === 0 ? ' failed' : ''}`}>
-                          {t.seatsMapped}/{t.teams} seats mapped
+                        // "12/14 seats mapped" described a data structure. What
+                        // the reader needs on draft night is whether any seat is
+                        // still an unmodelled league-average bot -- so the full
+                        // house says so quietly and anything short of it is the
+                        // thing that stands out.
+                        <span className={`tiny track-note${t.seatsMapped < t.teams ? ' failed' : ''}`}>
+                          {t.seatsMapped === t.teams
+                            ? `All ${t.teams} managers identified`
+                            : `Only ${t.seatsMapped} of ${t.teams} managers identified`}
                           {/* observed: false means Sleeper was unreachable and
                               `status` is the stale DB value -- label it rather
                               than showing it as fact. */}
@@ -123,13 +142,13 @@ export default function DraftPicker() {
                       className="chip"
                       onClick={() => track(d.sleeperDraftId)}
                       disabled={tracking === d.sleeperDraftId}
-                      title="Start live polling and refresh this draft's status"
+                      title="Follow this draft live and refresh its status"
                     >
-                      {tracking === d.sleeperDraftId ? 'tracking…' : 'track'}
+                      {tracking === d.sleeperDraftId ? 'Following…' : 'Follow'}
                     </button>
                     {(status === 'pre_draft' || status === 'drafting') && (
                       <Link className="chip live-link" to={`/drafts/${d.sleeperDraftId}/live`}>
-                        live →
+                        Follow live →
                       </Link>
                     )}
                   </div>
@@ -144,7 +163,7 @@ export default function DraftPicker() {
         <div className="panel-head">
           <h2>Mock drafts</h2>
           <Link className="chip on" to="/mock/new">
-            new mock draft
+            New mock draft
           </Link>
         </div>
 
@@ -154,12 +173,16 @@ export default function DraftPicker() {
           <div className="draft-list">
             {mocks.map((m) => (
               <Link key={m.id} to={`/mock/${m.id}`} className="draft-row">
-                <span className="draft-row-league">Mock draft #{m.id}</span>
-                <span className="muted small">
-                  {m.teams} teams &middot; slot {m.userSlot}
+                {/* "Mock draft #7" is only distinguishable from "#8" by a
+                    number the reader never chose. Size, seat and how far it
+                    got are what actually tell two saved mocks apart. */}
+                <span className="draft-row-league">
+                  {m.teams}-team mock <span className="muted small">from {roundPickLabel(m.userSlot, m.teams)}</span>
                 </span>
                 <span className={`chip status-${m.status === 'COMPLETE' ? 'complete' : 'drafting'}`}>
-                  {m.status === 'COMPLETE' ? 'complete' : `pick ${m.currentPickNo}`}
+                  {m.status === 'COMPLETE'
+                    ? 'Complete'
+                    : `through ${roundPickLabel(Math.max(1, m.currentPickNo - 1), m.teams)}`}
                 </span>
               </Link>
             ))}
@@ -168,14 +191,14 @@ export default function DraftPicker() {
       </section>
 
       <section className="panel add-draft">
-        <h2>Add a draft</h2>
+        <h2>Add a league</h2>
         <p className="muted small">
-          Paste a Sleeper league ID to add its draft history. Run a full ingest separately
-          first if the player pool and board haven't been loaded yet.
+          Paste a Sleeper league link or ID to add its draft history. Load the player pool
+          and board separately first if this is a brand new install.
         </p>
         <div className="controls">
           <label>
-            league id
+            Sleeper league link or ID
             <input
               value={leagueId}
               onChange={(e) => setLeagueId(e.target.value)}
@@ -184,7 +207,7 @@ export default function DraftPicker() {
             />
           </label>
           <button onClick={addDraft} disabled={adding || !leagueId.trim()}>
-            {adding ? 'adding…' : 'add'}
+            {adding ? 'Adding…' : 'Add league'}
           </button>
         </div>
       </section>

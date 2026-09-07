@@ -28,7 +28,7 @@ describe('MockSetup', () => {
     const user = userEvent.setup()
     render(<MockSetup />)
 
-    await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
     expect(createMockSession).toHaveBeenCalledWith(10, 1, {})
   })
@@ -38,7 +38,7 @@ describe('MockSetup', () => {
     const user = userEvent.setup()
     render(<MockSetup />)
 
-    await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
     expect(navigate).toHaveBeenCalledWith('/mock/42')
   })
@@ -48,9 +48,9 @@ describe('MockSetup', () => {
     const user = userEvent.setup()
     render(<MockSetup />)
 
-    await user.selectOptions(screen.getByLabelText('teams'), '8')
-    await user.selectOptions(screen.getByLabelText('your slot'), '5')
-    await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+    await user.selectOptions(screen.getByLabelText('Teams'), '8')
+    await user.selectOptions(screen.getByLabelText('Your slot'), '5')
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
     expect(createMockSession).toHaveBeenCalledWith(8, 5, {})
   })
@@ -60,10 +60,10 @@ describe('MockSetup', () => {
     const user = userEvent.setup()
     render(<MockSetup />)
 
-    await user.selectOptions(screen.getByLabelText('teams'), '14')
-    await user.selectOptions(screen.getByLabelText('your slot'), '12')
-    await user.selectOptions(screen.getByLabelText('teams'), '8')
-    await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+    await user.selectOptions(screen.getByLabelText('Teams'), '14')
+    await user.selectOptions(screen.getByLabelText('Your slot'), '12')
+    await user.selectOptions(screen.getByLabelText('Teams'), '8')
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
     expect(createMockSession).toHaveBeenCalledWith(8, 1, {})
   })
@@ -73,10 +73,10 @@ describe('MockSetup', () => {
     const user = userEvent.setup()
     render(<MockSetup />)
 
-    await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
     expect(await screen.findByText('board is empty — run ingest first')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start mock draft/i })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: /start the draft/i })).not.toBeDisabled()
   })
 
   describe('with real managers available', () => {
@@ -105,7 +105,7 @@ describe('MockSetup', () => {
 
       const seat2 = await screen.findByLabelText('seat 2')
       await user.selectOptions(seat2, '42')
-      await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+      await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
       expect(createMockSession).toHaveBeenCalledWith(10, 1, { 2: 42 })
     })
@@ -124,12 +124,12 @@ describe('MockSetup', () => {
 
       // teams=14, userSlot=9 puts userSlot out of range once teams shrinks to
       // 8 -- it resets to 1, which must also evict any manager on seat 1.
-      await user.selectOptions(screen.getByLabelText('teams'), '14')
-      await user.selectOptions(screen.getByLabelText('your slot'), '9')
+      await user.selectOptions(screen.getByLabelText('Teams'), '14')
+      await user.selectOptions(screen.getByLabelText('Your slot'), '9')
       const seat1 = await screen.findByLabelText('seat 1')
       await user.selectOptions(seat1, '42')
-      await user.selectOptions(screen.getByLabelText('teams'), '8')
-      await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+      await user.selectOptions(screen.getByLabelText('Teams'), '8')
+      await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
       expect(createMockSession).toHaveBeenCalledWith(8, 1, {})
     })
@@ -141,8 +141,8 @@ describe('MockSetup', () => {
 
       const seat2 = await screen.findByLabelText('seat 2')
       await user.selectOptions(seat2, '42')
-      await user.selectOptions(screen.getByLabelText('your slot'), '2')
-      await user.click(screen.getByRole('button', { name: /start mock draft/i }))
+      await user.selectOptions(screen.getByLabelText('Your slot'), '2')
+      await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
       expect(createMockSession).toHaveBeenCalledWith(10, 2, {})
     })

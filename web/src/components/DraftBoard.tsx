@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { PlayerRef, PredictedPick, Seat } from '../api'
 import { hueFor } from '../hue'
+import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
 
@@ -135,7 +136,9 @@ export default function DraftBoard({
                 const titleAttr = chosen
                   ? `Your pick — ${chosen.name}`
                   : visible
-                    ? `${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
+                    ? // The cell shows an abbreviation now, so the hover is
+                      // the only place the full name appears without a click.
+                      `${visible.player.name}\n${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
                       (visible.isModal
                         ? ''
                         : 'Not the most likely player here; the most likely one went earlier.\n') +
@@ -148,11 +151,20 @@ export default function DraftBoard({
                 // then the "yours" badge is what collapsed them), and `shown`
                 // already applies the chosen-wins-over-predicted precedence.
                 // The difference between the two lives in `cls` and `titleAttr`.
-                const inner = shown ? (
+                // Abbreviated, not truncated: at 14 teams every column sits on
+                // the 96px floor and 23 of 28 revealed names were ellipsized
+                // (measured 2026-09-07), which costs the surname -- the half
+                // that identifies the player. "J. Gibbs" fits the same cell.
+                // The full name stays in the cell's own `title` and PlayerCard.
+                const label = shown ? shortName(shown) : null
+                const inner = shown && label ? (
                   <>
                     <span className="pickno mono">{pickNo}</span>
                     <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
-                    <span className="name">{shown.name}</span>
+                    <span className="name">
+                      <span className="name-lead">{label.lead}</span>
+                      {label.rest}
+                    </span>
                     <div className="meta">
                       <span className="team-code mono">{shown.team ?? '—'}</span>
                     </div>

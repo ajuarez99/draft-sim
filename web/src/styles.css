@@ -182,7 +182,13 @@ code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px;
 .chip.status-unknown, .chip.status-offline { background: transparent; border-color: var(--line); color: var(--muted); }
 /* `.chip` is written for <button>; the picker's "live ->" is an <a>. */
 a.chip { display: inline-flex; align-items: center; text-decoration: none; }
-.depth { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); margin-left: 10px; }
+/* Was a bare `input[type=range]` and a loose integer -- the one control in the
+   app that rendered in the browser's default blue, because a range input takes
+   none of this file's styling. Now the same pill vocabulary as the position
+   filters beside it. */
+.depth { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin-left: 10px; }
+.depth-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.depth-chip { padding: 3px 8px; min-width: 26px; text-align: center; }
 
 /*
  * A list of drafts to open, not a card grid -- there's one line of real
@@ -296,8 +302,15 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    same "you" everywhere on the board, not a second visual language. */
 .board .col-head.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
 .board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
+/* 9px mono was small enough to read as texture rather than names -- nothing
+   was truncated at that size, but nothing was legible either. 11px in the body
+   face (not `.mono`, which is wider per character) trades an occasional
+   ellipsis on the longest handles for fourteen headers you can actually read;
+   the full name is in the header's own `title` and in SeatPopover. */
 .board .col-head-name {
-  font-size: 9px; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 11px; font-weight: 600;
+  color: color-mix(in oklch, var(--muted) 55%, var(--text));
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .board .col-head-meta { display: flex; align-items: center; gap: 5px; height: 8px; }
 /* A dot, not SeatList's old text chip -- fourteen "league average" chips
@@ -347,7 +360,17 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 /* outline-offset is negative because `.board-scroll` clips overflow -- a
    positive offset would get cut off at the cell's outer edge. */
 .board .cell:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
-.board .pickno { position: absolute; top: 4px; right: 6px; font-size: 8px; color: var(--muted); opacity: 0.7; }
+/* Was 8px at opacity 0.7 -- measured 2.79:1 on a position-tinted cell, which
+   fails AA outright for real content. 10px at full opacity against a slightly
+   lifted muted clears it; it is still the quietest thing in the cell. */
+.board .pickno {
+  position: absolute; top: 4px; right: 6px; font-size: 10px;
+  color: color-mix(in oklch, var(--muted) 72%, var(--text));
+}
+/* The name is abbreviated to an initial plus surname now (playerName.ts), so
+   the initial is de-emphasised: at a glance the cell should read "Gibbs", with
+   the "J." there only to separate him from another Gibbs. */
+.board .name-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
 /* The most-voted player here went earlier, so this cell is a second choice. */
 .board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
 /* Position owns the fill now (`.cell.pos-*`), so "your seat" had to become a
@@ -365,9 +388,17 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    guessed for you is this inner ring, plus the cell's own title ("Your pick --
    <name>") and the fact that the player in it is the one you took. */
 .board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--crimson), inset 0 0 0 4px color-mix(in oklch, var(--crimson) 35%, transparent); }
-.board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 20px; }
+/* The 20px right gutter is gone. It was reserving room for `.pickno`, which
+   is absolutely positioned against the *cell* and sits on the badge's line --
+   measured in the running app, its bottom edge clears the name's top by 11px,
+   so the name never shared a row with it and the reservation only ever cost
+   width. With the abbreviation (playerName.ts) and this, 0 of 28 revealed
+   names truncate at 1440x900, down from 23. The cell's own 7px of padding is
+   the gutter. */
+.board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board .meta { display: flex; align-items: baseline; margin-top: 3px; gap: 6px; }
-.board .team-code { color: var(--muted); font-size: 9px; }
+/* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
+.board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
 .board .empty { color: var(--muted); }
 
 .panel-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
@@ -549,8 +580,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .manager-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .seat.neutral-row { opacity: 0.65; }
 
-.reveal-controls { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-.reveal-status { display: flex; align-items: center; gap: 8px; min-width: 190px; }
+
 
 /* Same crimson-tinted "your pick" language as `.board .cell.mine`, so a
    paused board reads as one system rather than two different UIs. */
@@ -569,21 +599,80 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .pick-prompt-info { display: flex; flex-direction: column; gap: 2px; }
 .pick-prompt-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
-/* The mock draft room's own turn readout (claude/next-features-roadmap.md
-   §4, Phase 3) -- same banner shape as .pause-banner, teal by default and
-   crimson (matching PickPrompt's own "you're up" emphasis) when it's the
-   user's own turn. */
-.turn-indicator {
+/*
+ * ON THE CLOCK + PICK FEED
+ *
+ * The draft room's header, shared by both rooms (OnTheClock.tsx; the mock room
+ * reaches it through TurnIndicator). It replaced two things at once: this
+ * file's old `.turn-indicator` in the mock room, and the batch room's
+ * `.reveal-controls` scrubber -- two visual languages for the one question
+ * "whose turn is it". Same crimson-means-you rule as the board.
+ */
+.on-clock {
   display: flex; align-items: center; gap: 12px;
   background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--line);
-  border-radius: 8px; padding: 8px 12px; font-size: 12px; margin-bottom: 10px;
+  border-radius: 12px; padding: 9px 14px; margin-bottom: 8px;
 }
-.turn-indicator.mine {
+.on-clock.mine {
   background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
   box-shadow: inset 0 0 0 1.5px var(--crimson);
 }
-.turn-indicator .cond { font-size: 13px; }
-.turn-indicator.done { justify-content: center; }
+.on-clock-avatar { width: 30px; height: 30px; font-size: 12px; }
+.on-clock-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.on-clock-kicker {
+  font-size: 10px; letter-spacing: 0.1em; color: var(--muted);
+}
+.on-clock.mine .on-clock-kicker { color: var(--crimson); }
+.on-clock-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.on-clock-spacer { flex: 1; min-width: 0; }
+/* The right-hand readout is one number with its own label under it, not a row
+   of stats -- it is answering exactly one question at a time (see the
+   component's comment on which). */
+.on-clock-eta {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  font-size: 10px; color: var(--muted); text-align: right; flex-shrink: 0;
+  line-height: 1.25;
+}
+.on-clock-eta b { font-size: 20px; color: var(--text); letter-spacing: 0.02em; font-weight: 700; }
+.on-clock.done { justify-content: space-between; }
+.on-clock-done-label { font-size: 14px; letter-spacing: 0.03em; }
+.on-clock .chip { flex-shrink: 0; }
+
+/*
+ * The feed: three rows, newest first. Rows, not cards -- one line of content
+ * each, which is the shape `.draft-list` already uses for the same reason.
+ * The newest row carries a position-run callout when there is one, tinted with
+ * that position's own color so it reads as part of the same system as the
+ * board cells rather than a fifth kind of alert.
+ */
+.pick-feed {
+  list-style: none; margin: 0 0 10px; padding: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--line); border-radius: 10px; overflow: hidden;
+}
+.pick-feed-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 11px; background: var(--panel); font-size: 12px; min-width: 0;
+}
+.pick-feed-no { font-size: 11px; color: var(--muted); width: 34px; flex-shrink: 0; }
+.pick-feed-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-feed-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
+.pick-feed-by { margin-left: auto; font-size: 11px; color: var(--muted); flex-shrink: 0; padding-left: 8px; }
+.pick-feed-run { margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px; }
+.pick-feed-row.pos-run-QB { background: color-mix(in oklch, var(--qb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-RB { background: color-mix(in oklch, var(--rb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-WR { background: color-mix(in oklch, var(--wr) 12%, var(--panel)); }
+.pick-feed-row.pos-run-TE { background: color-mix(in oklch, var(--te) 12%, var(--panel)); }
+.pos-run-QB .pick-feed-run { color: var(--qb); }
+.pos-run-RB .pick-feed-run { color: var(--rb); }
+.pos-run-WR .pick-feed-run { color: var(--wr); }
+.pos-run-TE .pick-feed-run { color: var(--te); }
+
+/* "Simulate again", moved out of the board header into the settings modal. */
+.modal-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+}
 
 .modal-backdrop {
   position: fixed; inset: 0; z-index: 100;

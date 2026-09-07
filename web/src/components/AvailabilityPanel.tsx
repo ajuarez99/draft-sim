@@ -90,7 +90,12 @@ export default function AvailabilityPanel({
   // sliced to the live max rather than the raw depth state, or the slider's
   // value/max invert (browsers clamp display silently, `depth` itself would
   // never visibly catch up without this).
-  const maxDepth = Math.max(1, Math.min(8, myPicks.length))
+  // Capped at 6, not 8: this is a row of chips now rather than a slider, so
+  // every extra step is visible chrome, and past ~4 picks out the numbers are
+  // compounding enough model uncertainty to be worth less than they look
+  // (the panel's own doc comment above). Six columns is also about what the
+  // table has room for before the names start clipping.
+  const maxDepth = Math.max(1, Math.min(6, myPicks.length))
   const shownDepth = Math.min(depth, maxDepth)
 
   // myPicks belongs in the dependency list: it feeds `picks`, which the filter
@@ -116,7 +121,7 @@ export default function AvailabilityPanel({
             covered a whole round, which is not "giving the board back". The
             filters and the depth slider have nothing to act on while the list
             is hidden, so they go with it. */}
-        {!collapsed && <h2>Availability at your picks</h2>}
+        {!collapsed && <h2>Who's still there when you pick</h2>}
         <div className="controls-inline">
           {!collapsed &&
             POSITIONS.map((p) => (
@@ -132,19 +137,32 @@ export default function AvailabilityPanel({
                 {p}
               </button>
             ))}
+          {/* A labelled set of chips, not a range input. The slider was the
+              one control in the app rendering in the browser's default blue
+              -- `input[type=range]` has no style here -- and it paired a
+              tuning knob with a loose integer where the question is just "how
+              many of my picks ahead". Same values, same clamping. */}
           {!collapsed && (
-            <label className="depth">
-              picks shown
-              <input
-                type="range"
-                min={1}
-                max={maxDepth}
-                value={shownDepth}
-                disabled={myPicks.length === 0}
-                onChange={(e) => setDepth(Number(e.target.value))}
-              />
-              {myPicks.length === 0 ? 'none left' : shownDepth}
-            </label>
+            <span className="depth">
+              {myPicks.length === 0 ? (
+                <span className="muted">No picks left</span>
+              ) : (
+                <>
+                  <span className="depth-label">Next</span>
+                  {Array.from({ length: maxDepth }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      className={`chip depth-chip${n === shownDepth ? ' on' : ''}`}
+                      onClick={() => setDepth(n)}
+                      aria-pressed={n === shownDepth}
+                      title={`Show the next ${n} of your picks`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </>
+              )}
+            </span>
           )}
           {/* The point of the floating sheet: this puts the whole board back.
               A button, deliberately not an Escape binding -- PlayerCard and
@@ -154,9 +172,9 @@ export default function AvailabilityPanel({
             className="chip sheet-toggle"
             onClick={() => setCollapsed((c) => !c)}
             aria-expanded={!collapsed}
-            title={collapsed ? 'Show the player list' : 'Hide the player list, show the whole board'}
+            title={collapsed ? 'Show the player list' : 'Hide the player list and show the whole board'}
           >
-            {collapsed ? '▾ availability' : '▴ hide'}
+            {collapsed ? '▾ Players' : '▴ Hide'}
           </button>
         </div>
       </header>

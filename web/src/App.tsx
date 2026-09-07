@@ -51,7 +51,7 @@ export default function App() {
           {/* Not scoped to one draft the way every other route is, so it
               lives in the persistent header rather than a page-local link. */}
           <Link to="/managers" className="chip">
-            managers
+            Managers
           </Link>
         </div>
         <div className="top-slot" ref={setTopSlot} />
@@ -65,6 +65,21 @@ export default function App() {
           <Route path="/mock/new" element={<MockSetup />} />
           <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
           <Route path="/managers" element={<ManagerTendencies />} />
+          {/* React Router's own fallback renders a bare "Not Found" with no
+              way back -- on a mistyped draft id that was the whole screen. */}
+          <Route
+            path="*"
+            element={
+              <div className="content">
+                <section className="panel">
+                  <h2>Nothing here</h2>
+                  <p className="muted">
+                    No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
+                  </p>
+                </section>
+              </div>
+            }
+          />
         </Routes>
       </TopSlotContext.Provider>
     </div>

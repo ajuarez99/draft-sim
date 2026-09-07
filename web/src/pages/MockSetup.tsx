@@ -90,8 +90,8 @@ export default function MockSetup() {
       <section className="panel add-draft">
         <h2>New mock draft</h2>
         <p className="muted small">
-          Bots fill every seat but yours and auto-pick down the snake order. Take your own picks
-          on your turn -- assign a real manager to a seat below to see their tendencies play out
+          Bots fill every seat but yours and auto-pick down the snake order. You take your own
+          picks on your turn. Assign a real manager to a seat to see their tendencies play out
           instead of a league-average bot.
         </p>
 
@@ -99,7 +99,7 @@ export default function MockSetup() {
 
         <div className="controls">
           <label>
-            teams
+            Teams
             <select value={teams} onChange={(e) => handleTeamsChange(Number(e.target.value))} disabled={creating}>
               {TEAM_SIZES.map((n) => (
                 <option key={n} value={n}>
@@ -109,7 +109,7 @@ export default function MockSetup() {
             </select>
           </label>
           <label>
-            your slot
+            Your slot
             <select value={userSlot} onChange={(e) => handleUserSlotChange(Number(e.target.value))} disabled={creating}>
               {Array.from({ length: teams }, (_, i) => i + 1).map((slot) => (
                 <option key={slot} value={slot}>
@@ -119,16 +119,16 @@ export default function MockSetup() {
             </select>
           </label>
           <button onClick={start} disabled={creating}>
-            {creating ? 'starting…' : 'start mock draft'}
+            {creating ? 'Starting…' : 'Start the draft'}
           </button>
         </div>
 
         {managers && managers.length > 0 && (
           <div className="seat-assign-list">
-            <p className="muted small">Other seats (optional -- leave any on Bot)</p>
+            <p className="muted small">Other seats — leave any on Bot</p>
             {otherSlots.map((slot) => (
               <div key={slot} className="seat-assign-row">
-                <span className="slot-label small muted">seat {slot}</span>
+                <span className="slot-label small muted">Seat {slot}</span>
                 <select
                   aria-label={`seat ${slot}`}
                   value={managerSeats[slot] ?? ''}

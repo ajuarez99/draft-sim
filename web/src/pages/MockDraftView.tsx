@@ -12,6 +12,7 @@ import {
 import DraftBoard from '../components/DraftBoard'
 import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
+import PickFeed from '../components/PickFeed'
 
 /**
  * Always reports NEUTRAL/zeroed behaviour, even for a MANAGER-type seat
@@ -101,6 +102,9 @@ export default function MockDraftView() {
   const complete = state.status === 'COMPLETE'
   const round = state.onTheClockSlot != null ? Math.ceil(state.currentPickNo / state.teams) : state.rounds
   const draftedByUser = Object.values(userPicks)
+  // Every pick in a mock session is already committed -- there is no reveal
+  // cutoff to respect here the way DraftView has one, so `board` is the feed.
+  const nextOwnPick = state.myPicks.find((p) => p > state.currentPickNo) ?? null
 
   return (
     <div className="content">
@@ -114,16 +118,19 @@ export default function MockDraftView() {
           )}
           <TurnIndicator
             currentPickNo={state.currentPickNo}
-            round={round}
             onTheClockSlot={state.onTheClockSlot}
             isUsersTurn={state.isUsersTurn}
             seats={state.seats}
             complete={complete}
+            teams={state.teams}
+            rounds={state.rounds}
+            nextOwnPick={nextOwnPick}
           />
+          <PickFeed picks={board} teams={state.teams} />
           {state.isUsersTurn && !complete && (
             <div className="controls-inline">
               <button className="start-button" onClick={() => setPickerOpen(true)} disabled={submitting}>
-                {submitting ? 'submitting…' : 'make your pick'}
+                {submitting ? 'Submitting…' : 'Make your pick'}
               </button>
             </div>
           )}

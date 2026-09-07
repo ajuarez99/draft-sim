@@ -55,6 +55,25 @@ is clean on `main`, 236 backend / 18 frontend tests green as of that commit.
 There is no active in-flight roadmap item right now — see "Do this next"
 below for what's actually queued versus merely speculative.
 
+**Draft-room design pass built and verified, 2026-09-07:
+`claude/on-the-clock-and-name-abbreviation.md`.** Steps 1-3 of a six-screen
+design review Allan asked for. The board stopped ellipsizing its own content
+(23 of 28 revealed names truncated at 1440px, now 0 -- initial-plus-surname
+abbreviation in the new `web/src/playerName.ts`, plus a `padding-right: 20px`
+on `.board .name` that was reserving room for an absolutely-positioned pick
+number on a different line); three sub-10px elements came up to a 10px floor
+and two of them out of WCAG AA failure; and the reveal scrubber
+(`Pick 28 of 210 · skip · re-run`) was replaced by a shared **OnTheClock**
+strip and a **PickFeed** with position-run detection, both fed entirely from
+`SimulationResult` and revealed-board state with no backend work. The mock
+room's old `.turn-indicator` collapsed into the same strip. A copy pass took
+out the app's loudest engineer-ism -- the pre-start overlay used to print
+`POST /api/ingest/all/1391509063170293760` for the reader to run themselves.
+Frontend suite 18 -> 36 tests, `npm run build` clean. **Not built:** the
+review's steps 4-7 (home hero, mock-setup seat strip, availability survival
+strips, manager comparison axis, and the narrow-viewport bug where the
+availability sheet escapes its panel below ~700px).
+
 **Board re-skin built and verified, 2026-09-02:
 `claude/pill-board-and-player-list-on-top.md`.** Allan's board feedback, planned
 and then implemented in the same session: cells filled by position (22% tint,

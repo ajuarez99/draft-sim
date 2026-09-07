@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
   streamSimulation,
@@ -12,7 +12,8 @@ import {
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
 import SeatPopover from '../components/SeatPopover'
-import RevealScrubber from '../components/RevealScrubber'
+import OnTheClock from '../components/OnTheClock'
+import PickFeed from '../components/PickFeed'
 import PlayerCard from '../components/PlayerCard'
 import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
@@ -339,9 +340,30 @@ export default function DraftView() {
   // decided pick reads ~100% everywhere (every iteration replays it
   // identically), which is dead information that would otherwise hide the
   // genuinely new future-pick numbers this whole feature exists to produce.
-  // DraftBoard/RevealScrubber still get the full, unfiltered result.myPicks
+  // DraftBoard still gets the full, unfiltered result.myPicks
   // below -- they need every one of your slots marked, decided or not.
   const undecidedMyPicks = result ? result.myPicks.filter((p) => !(p in userPicks)) : []
+
+  // --- OnTheClock / PickFeed inputs ---------------------------------------
+  // Who is picking right now. `revealedThrough` is the last pick that has
+  // LANDED, so the seat on the clock is the one after it -- reading it
+  // directly put the pick already sitting at the top of the feed back in the
+  // header as though it hadn't happened yet. A pause is the exception: it
+  // stops *on* your pick, which is then genuinely the open one.
+  const onClockPickNo =
+    reveal.pausedAt ?? Math.min(reveal.revealedThrough + 1, Math.max(maxPickNo, 1))
+  const onClockPick = result?.board.find((p) => p.pickNo === onClockPickNo)
+  const onClockIsMine = result?.myPicks.includes(onClockPickNo) ?? false
+  const onClockSeat = seats?.seats.find((s) => s.slot === onClockPick?.slot)
+  const nextOwnPick = result?.myPicks.find((p) => p > onClockPickNo) ?? null
+
+  // Only picks that are actually settled. `decidedThrough` exists for exactly
+  // this reason (see its comment above): at a pause `revealedThrough` equals
+  // your own still-open pick, and feeding the board's *predicted* player for
+  // it into the feed would announce a pick you haven't made.
+  const feedPicks = (result?.board ?? [])
+    .filter((p) => p.pickNo <= decidedThrough)
+    .map((p) => ({ pickNo: p.pickNo, player: userPicks[p.pickNo] ?? p.player, manager: p.manager }))
 
   // The user's own roster so far -- feeds PlayerPicker's "your team" strip
   // and its "fills a need" row tags. See teamNeeds.ts's draftedSoFar().
@@ -402,13 +424,13 @@ export default function DraftView() {
 
       {/* seatsDirty's own inline re-run makes the banner actionable from
           itself, not just descriptive of an action available somewhere else
-          -- the board panel's RevealScrubber also carries a re-run chip
-          (below) for the common case where you're already looking at it. */}
+          -- "Simulate again" otherwise lives behind the gear, which is a
+          click away from a banner that is already telling you to use it. */}
       {seatsDirty && result && (
         <div className="error seats-dirty">
-          <span>Seats changed since this simulation ran — re-run to refresh the board.</span>
+          <span>Seats changed since this simulation ran — the board is out of date.</span>
           <button className="chip on" onClick={run} disabled={running || resimming}>
-            re-run
+            Simulate again
           </button>
         </div>
       )}
@@ -423,15 +445,33 @@ export default function DraftView() {
                 (DraftBoard.tsx) instead of a permanent paragraph. */}
             {started && (
               <>
-                <RevealScrubber
-                  value={reveal.revealedThrough}
-                  max={result.teams * result.rounds}
+                {/* The room's header: whose turn, how long until yours, and
+                    what just came off the board -- replacing the old
+                    `Pick 28 of 210 · skip · re-run` counter. Every value is
+                    derived from `result` and the reveal state; nothing new is
+                    fetched. `re-run` moved into the gear (it restarts the
+                    whole simulation, which is a settings-level action, not a
+                    draft action); `skip` stays here because it acts on the
+                    reveal you are watching right now. */}
+                <OnTheClock
+                  manager={onClockPick?.manager ?? null}
+                  isMine={onClockIsMine}
+                  hueSeed={String(onClockSeat?.managerId ?? onClockPick?.slot ?? 0)}
+                  pickNo={onClockPickNo}
+                  maxPickNo={maxPickNo}
                   teams={result.teams}
-                  onSkip={reveal.skip}
-                  onRerun={run}
-                  disabled={resimming}
-                  rerunDisabled={running || resimming}
-                />
+                  rounds={result.rounds}
+                  nextOwnPick={nextOwnPick}
+                  done={revealFinished}
+                  doneLabel="Every pick simulated"
+                >
+                  {reveal.revealedThrough < maxPickNo && (
+                    <button className="chip" onClick={reveal.skip} disabled={resimming}>
+                      Skip to the end
+                    </button>
+                  )}
+                </OnTheClock>
+                <PickFeed picks={feedPicks} teams={result.teams} />
                 {reveal.pausedAt != null &&
                   (resimming ? (
                     <div className="pause-banner">
@@ -441,8 +481,6 @@ export default function DraftView() {
                     </div>
                   ) : (
                     <PickPrompt
-                      pausedAt={reveal.pausedAt}
-                      teams={result.teams}
                       modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
                       bestAvailable={result.bestAvailable[String(reveal.pausedAt)]?.[0]?.player}
                       onPick={choosePick}
@@ -501,9 +539,12 @@ export default function DraftView() {
                         <button className="start-button" onClick={run}>
                           Start the mock draft
                         </button>
+                        {/* This used to print a raw `POST /api/ingest/all/...`
+                            for the reader to run themselves -- a curl command
+                            on the app's primary empty state. The board is
+                            loaded from the picker screen, so point there. */}
                         <p className="muted tiny">
-                          First time with this league? Ingest it first:{' '}
-                          <code>POST /api/ingest/all/1391509063170293760</code>
+                          Board looks empty? <Link to="/">Load this league's players</Link> first.
                         </p>
                       </div>
                     )}
@@ -613,6 +654,15 @@ export default function DraftView() {
               </label>
             </div>
             {(running || resimming) && <p className="muted tiny">Applies to the next run.</p>}
+            {/* Moved out of the board header: this discards the current board
+                and simulates the whole draft again, which belongs beside the
+                settings it re-reads rather than next to the reveal it ends. */}
+            <div className="modal-actions">
+              <button className="chip" onClick={run} disabled={running || resimming}>
+                Simulate again
+              </button>
+              <span className="muted tiny">Starts over with the settings above.</span>
+            </div>
           </div>
         </div>
       )}
