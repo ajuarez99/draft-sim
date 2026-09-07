@@ -385,7 +385,29 @@ league history and power rankings are now prominent links on every league card,
 so the only thing the header nav was actually hiding is gone. What is left of
 E5 is a judgement about global navigation, which belongs with B1.
 
-**Still open: B1, B2, B3, B5, A2, A3 + the rest of A4, A7.** A3 (the tendencies
+**Done 2026-09-07 late (four parallel worktrees, merged and verified):
+B1 + E5, B2, B3, B5, A3 + the rest of A4.** Notes worth keeping:
+
+- **B5 was only half the bug.** Containing `.avail-sheet` stopped the sheet
+  escaping, but the page still scrolled sideways at 375px — the actual
+  offender was `.pick-prompt-actions`, a second non-wrapping row whose three
+  buttons carry real player names (measured 469px of min-content at a 375px
+  viewport). Both had to be fixed before `scrollWidth === clientWidth`.
+- **`.controls button:not(.chip)` now also excludes `.segment`.** The B2 work
+  found it had to keep its `.segmented` outside any `.controls` block or every
+  option would be repainted solid teal — the same collision E2 fixed, one
+  class along. Widened the guard rather than leaving a rule to remember.
+- **B3's trailing-zero trim rarely fires**, by design: it drops a column only
+  when *every listed* player rounds to 0% there, and with 60 rows someone
+  usually has a non-zero chance. The top rows still show dead cells, which is
+  honest — those players genuinely have no chance at that pick.
+- **A3 found an unreachable branch it did not introduce**: the form's
+  "must be numbers" inline error cannot be triggered through
+  `<input type="number">`, since the browser sanitises non-numeric input to
+  `''` before React sees it. Kept as a documented backstop.
+
+**Still open: A2, A7, and the dead-CSS cleanup** the parallel-worktree rule
+deferred (`.bar`/`.bar-label`, `.seat-assign-*`, `.slot-label`). A3 (the tendencies
 form, duplicated between `SeatPopover` and `ManagerTendencies`, with `reach
 bias` as a bare −20…20 number input) is now the most conspicuous thing left:
 B4 gave the *read* side of that data a proper scale, which makes the raw
