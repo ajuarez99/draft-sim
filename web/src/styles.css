@@ -165,13 +165,19 @@ body {
  *
  * Fixed here rather than at the call site: any future chip inside any future
  * `.controls` block would hit exactly the same thing.
+ *
+ * `.segment` is excluded for the same reason, pre-emptively: the B2 seat-strip
+ * work found it had to keep its `.segmented` OUTSIDE a `.controls` block to
+ * avoid being repainted identically, which is a trap worth removing rather
+ * than a rule worth remembering. Anything carrying its own complete button
+ * treatment belongs in this list.
  */
-.controls button:not(.chip) {
+.controls button:not(.chip):not(.segment) {
   background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
   padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer;
   transition: filter 120ms ease, transform 120ms ease;
 }
-.controls button:not(.chip):hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.controls button:not(.chip):not(.segment):hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
 .controls button:disabled { opacity: 0.6; cursor: default; }
 
 .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; }

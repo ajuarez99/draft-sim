@@ -100,7 +100,11 @@ export default function DraftPicker() {
       <section className="panel home-hero">
         <div className="home-hero-body">
           <p className="home-hero-kicker cond">Practice round</p>
-          <h1 className="home-hero-title">Start a mock draft</h1>
+          {/* h2, not h1: App.tsx's wordmark is the page's h1 and there can
+              only be one. Every other section on this screen is an h2, and
+              the hero is a section like the rest -- it is sized by its own
+              class, not by outranking them in the outline. */}
+          <h2 className="home-hero-title">Start a mock draft</h2>
           <p className="home-hero-sub">
             {drafts == null ? (
               // Still fetching -- say the generic version rather than
