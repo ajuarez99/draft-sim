@@ -406,8 +406,22 @@ B1 + E5, B2, B3, B5, A3 + the rest of A4.** Notes worth keeping:
   `<input type="number">`, since the browser sanitises non-numeric input to
   `''` before React sees it. Kept as a documented backstop.
 
-**Still open: A2, A7, and the dead-CSS cleanup** the parallel-worktree rule
-deferred (`.bar`/`.bar-label`, `.seat-assign-*`, `.slot-label`). A3 (the tendencies
+**Dead-CSS cleanup done** the same evening: the nine selectors the
+parallel-worktree rule had deferred, plus two nobody had listed —
+`.chip.status-pre_draft` / `-unknown` / `-offline` (only one site still builds
+a `status-` class and its ternary can emit just `complete` or `drafting`), and
+a bare `code {}` rule orphaned since v0 by a long-deleted feature. 38 lines
+out. The four `===== =====` banner blocks stay at the end of the file: moving
+them could reorder a cascade-sensitive rule, and there is nothing to gain.
+
+Worth recording for the next sweep: **`tsc` and `vitest` prove nothing about
+CSS.** Several classes here exist only as runtime-built strings
+(`pos-${position}`, `status-${status}`, `pos-run-${position}`,
+`PROVENANCE_LABEL[...].className`), so a grep-driven deletion can strip the
+board's position colours with the suite still green. The check that matters is
+tracing each selector to a JSX site and then looking at the rendered page.
+
+**Still open: A2 and A7.** A3 (the tendencies
 form, duplicated between `SeatPopover` and `ManagerTendencies`, with `reach
 bias` as a bare −20…20 number input) is now the most conspicuous thing left:
 B4 gave the *read* side of that data a proper scale, which makes the raw
