@@ -1,14 +1,20 @@
 # draft-sim — handoff
 
-Last updated 2026-09-02 (afternoon) by a Claude session running directly on
-Allan's Windows machine, the same day and the same machine as the entries
-below it. **Read this first.** `DEPLOY.md` covers deployment; `README.md`
-covers running it. A Claude session should then read `claude/` — orientation,
-sandbox recipes and bug post-mortems that are not worth rediscovering.
-`claude/environment.md`'s recipes are written for a different (cloud-sandbox)
-environment; this machine has real internet, real JDK/Node/Postgres installs,
-and does not need most of them — see the new note at the top of that file
-before assuming something is blocked.
+Last updated 2026-09-07 by a Claude session doing a documentation-only refresh
+— no code changed. The entries below from 2026-09-02 were written across the
+same day and the same machine but stopped **before** the day's last two
+commits (`b6e6dd4` Phase 3, `646c067` fork-to-mock, `5e17b5f` manager
+tendencies page), so most of this file's "not started" / "next feature"
+language was stale by several hours. Corrected in place below rather than
+rewritten — see "**Everything below this line was still accurate as of the
+last commit**" near the top of "Where things actually stand" for the current
+one-paragraph status. **Read this first.** `DEPLOY.md` covers deployment;
+`README.md` covers running it. A Claude session should then read `claude/` —
+orientation, sandbox recipes and bug post-mortems that are not worth
+rediscovering. `claude/environment.md`'s recipes are written for a different
+(cloud-sandbox) environment; this machine has real internet, real
+JDK/Node/Postgres installs, and does not need most of them — see the new note
+at the top of that file before assuming something is blocked.
 
 **~~Time-sensitive: fantasy(heart)'s draft is 2026-08-31 21:15 CDT.~~ That draft
 has happened.** It is `complete` in the DB with all 210 picks. Nothing in this
@@ -23,13 +29,31 @@ slot auto-detection, board rendering against real landed picks, resim overlay,
 the on-the-clock indicator, the `/picks` escape hatch (400 + immediate write +
 self-heal), and the `complete`-status SSE teardown all confirmed working. One
 real bug was found and fixed in the process (`useLiveDraft.ts` never recovered
-from a backend process being killed outright — see that section). **C's
-interactive mock draft room (Phase 3) is planned in detail and not started**,
-and is the next real feature once tonight's draft is behind us; A's ad-hoc
-league sizing stays last. The roadmap's claim that Phase 4 is "pure UI polish,
-not new risk" was wrong twice now: it opened with a correctness fix in the
-ingest/poll path, and its own verification surfaced a second real bug in the
-frontend half.
+from a backend process being killed outright — see that section). **~~C's
+interactive mock draft room (Phase 3) is planned in detail and not started~~ —
+built and verified live the same day, `b6e6dd4`.** A's ad-hoc league sizing
+was subsequently demoted out of the active roadmap entirely (`5e17b5f`,
+`ideas/ad-hoc-league-sizing.md`) rather than just deprioritized — none of the
+four real leagues need a team count outside 8/10/12/14. The roadmap's claim
+that Phase 4 is "pure UI polish, not new risk" was wrong twice now: it opened
+with a correctness fix in the ingest/poll path, and its own verification
+surfaced a second real bug in the frontend half.
+
+**Everything below this line was still accurate as of the last commit
+(`5e17b5f`, 2026-09-02 evening) except where struck through and corrected.**
+Current one-paragraph status: every phase of `claude/next-features-roadmap.md`
+is built (D's poller, B's shell, C's mock room, D's live frontend; A's ad-hoc
+sizing demoted to `ideas/`) — plus two things built after that roadmap was
+written: **forking a live draft into a mock session**
+(`POST /api/mocks/from-draft/{sleeperDraftId}`, `646c067` — continues a real,
+`drafting`-status draft as a mock with the real managers' fitted profiles in
+the bot seats, not neutral ones) and a **standalone `/managers` tendencies
+page** (`5e17b5f` — set/view `reachBias`/`unpredictability`/`note` without an
+active draft, next to the newly-exposed unshrunk `empiricalReachBias`, and
+seat a real manager's profile into a from-scratch mock by slot). Working tree
+is clean on `main`, 236 backend / 18 frontend tests green as of that commit.
+There is no active in-flight roadmap item right now — see "Do this next"
+below for what's actually queued versus merely speculative.
 
 **Board re-skin built and verified, 2026-09-02:
 `claude/pill-board-and-player-list-on-top.md`.** Allan's board feedback, planned
@@ -606,7 +630,14 @@ league-average bots — actually worth simulating.
 You can set `reachBias`, `unpredictability` (a multiplier on run temperature for
 that seat alone) and a free-text `note`. Positional tilt stays fitted-only.
 
-**There is no UI for this.** Drive it with Postman or curl:
+**~~There is no UI for this.~~ There is now — `/managers` (2026-09-02,
+`5e17b5f`).** A standalone page, no active draft required, showing each
+manager's stated values next to `empiricalReachBias` (the newly-exposed
+unshrunk average of their own scoreable picks, so a stated call can be checked
+against what their history actually says) and `effectiveReachBias` (what the
+engine will use once shrunk toward that history). The seat-card editing from
+inside a draft, described below, still works the same way. Still driveable
+directly if needed:
 
     GET    /api/managers
     PUT    /api/managers/{managerId}/tendencies
@@ -692,13 +723,21 @@ it is not broken.
   template). `SimulationService` already routes through them. What is left is
   the visible half — the ad-hoc `SimulationRequest` branch and the frontend
   dropdown — deliberately last, as Phase 5.
-- **The interactive mock draft room is the next real feature.** Phase 3 of
-  `claude/next-features-roadmap.md`, not started, the largest thing left:
-  V3 migration for `mock_draft_session`/`mock_draft_pick`, extracting
-  `DraftSimulator.choose()` into a reusable decide-and-apply unit, service +
-  controller, and a frontend at the already-reserved `/mock/new`.
+- **~~The interactive mock draft room is the next real feature~~ — built,
+  verified live, and since extended.** Phase 3 of
+  `claude/next-features-roadmap.md` shipped 2026-09-02 (`b6e6dd4`): V3
+  migration for `mock_draft_session`/`mock_draft_pick`,
+  `DraftSimulator.choose()` extracted into `engine/PickDecider.java` and
+  shared with the batch `run()` loop, a row-locked service + controller, and a
+  frontend at `/mock/new` reusing the `DraftBoard` grid. Two follow-ons landed
+  the same day: forking a live draft into a mock (`646c067`) and a standalone
+  `/managers` tendencies page plus per-seat real-manager assignment in mock
+  setup (`5e17b5f`). See "Everything below this line..." above for the
+  one-paragraph summary and each commit's message for the design detail —
+  not re-narrated here.
 - **Frontend `VITE_API_BASE` + auth header.** ~20 lines. Blocks any remote deploy.
-  Not needed while running locally against `localhost`.
+  Not needed while running locally against `localhost`. Still the only
+  concretely-scoped, unstarted item in this file as of 2026-09-07.
 
 ---
 
