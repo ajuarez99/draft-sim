@@ -1148,3 +1148,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--bg); color: var(--text); border: 1px solid var(--line);
   border-radius: 6px; padding: 4px 6px;
 }
+
+/* ===== A3: shared tendencies form ===== */
+
+/* TendenciesForm.tsx's per-field caption (e.g. "Reads as ~4.8 picks early.",
+   "Wild card (1.6)") -- reusing `.muted.tiny` verbatim, which is already this
+   app's established under-a-field/under-a-row caption treatment (see
+   SeatPopover.tsx's footnote() line and the live room's freshness text), so
+   this doesn't invent a second caption style next to the one that already
+   exists. The negative margin pulls it up against the input it explains
+   instead of reading as a new field -- `.seat-form label` already puts 2px
+   between a label and its own input, and without this the 6px `.seat-form`
+   gap made the caption look like it belonged to the *next* field, not the
+   one above it. */
+.field-hint { margin: -3px 0 0; }
