@@ -198,7 +198,6 @@ body {
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .tiny { font-size: 11px; }
-code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 
 .controls-inline { display: flex; gap: 6px; align-items: center; }
 .chip {
@@ -211,13 +210,6 @@ code { background: rgba(255,255,255,0.06); padding: 1px 5px; border-radius: 4px;
 .chip.on:hover { color: var(--bg); }
 .chip.status-drafting { background: var(--teal); border-color: var(--teal); color: var(--bg); }
 .chip.status-complete { background: var(--line); border-color: var(--line); color: var(--muted); }
-/* The picker's most common chip had no rule at all and was falling through to
-   the base `.chip` -- i.e. styled like a clickable control by accident. Muted
-   tone: a draft that hasn't started is the resting state, not an event. */
-.chip.status-pre_draft { background: color-mix(in oklch, var(--muted) 12%, var(--panel)); border-color: var(--line); color: var(--muted); }
-/* Same treatment for a draft whose status column is null (DraftPicker's
-   `?? 'unknown'` fallback) -- unknown is not an event either. */
-.chip.status-unknown, .chip.status-offline { background: transparent; border-color: var(--line); color: var(--muted); }
 /* `.chip` is written for <button>; the picker's "live ->" is an <a>. */
 a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 /* Was a bare `input[type=range]` and a loose integer -- the one control in the
@@ -385,15 +377,6 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .draft-row-league { font-weight: 600; flex: 1; }
 .draft-row .chip { pointer-events: none; margin-left: auto; }
 
-/* The row's actions are siblings of the <Link>, not children: a <button>
-   cannot nest inside an <a>, and `.draft-row .chip` above is pointer-events:
-   none. The wrap carries the panel background so the actions area matches the
-   link half; the link keeps its own hover, which stops at its own edge. */
-.draft-row-wrap { display: flex; align-items: center; background: var(--panel); }
-.draft-row-wrap .draft-row { flex: 1; min-width: 0; }
-.draft-row-actions { display: flex; align-items: center; gap: 8px; padding: 0 14px 0 6px; flex-shrink: 0; }
-.draft-row-actions .chip:hover { transform: translateY(-1px); }
-.draft-row-actions .chip { transition: border-color 120ms ease, color 120ms ease, transform 120ms ease; }
 .track-note { color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Zero seats mapped, or a failed track, is the thing you most need to notice. */
 .track-note.failed { color: var(--crimson); }
@@ -473,9 +456,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .avail .player-col { width: 260px; }
 .avail .team { color: var(--muted); font-size: 11px; margin-left: 6px; }
 .avail .num { color: var(--muted); width: 60px; }
-.bar-cell { position: relative; min-width: 84px; }
-.bar { position: absolute; inset: 6px auto 6px 8px; background: var(--teal); opacity: 0.28; border-radius: 3px; }
-.bar-label { position: relative; font-variant-numeric: tabular-nums; font-size: 12px; }
 
 /*
  * Rounded tiles, not the hairline spreadsheet this used to be. The old grid
@@ -848,16 +828,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat-form-actions button:disabled { opacity: 0.6; cursor: default; }
 .seat-form-actions button:nth-child(n+2) { background: var(--line); color: var(--text); }
 .seat-form-error { color: #e07a7a; }
-
-/* /mock/new's per-seat manager assignment -- a list, not a card grid, since
-   each row is one control (DENSITY: match the layout to the content shape). */
-.seat-assign-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-.seat-assign-row { display: flex; align-items: center; gap: 10px; }
-.seat-assign-row .slot-label { width: 56px; flex-shrink: 0; }
-.seat-assign-row select {
-  background: var(--bg); color: var(--text); border: 1px solid var(--line);
-  border-radius: 6px; padding: 5px 8px; font: inherit; flex: 1; min-width: 0;
-}
 
 /* /managers -- the same `.seat` card SeatPopover uses for one seat inside a
    modal, reused as a grid of many. A neutral row (nothing entered, no
@@ -1238,8 +1208,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* ===== B2: mock setup seat strip ===== */
 /* claude/design-review-next-steps.md B2. Replaces up to thirteen identical
    full-width `<select>`s (old `.seat-assign-list`/`.seat-assign-row`/
-   `.slot-label`, now unused -- left in place above rather than edited, per
-   this block's own rule about not touching the middle of the file) with a
+   `.slot-label`, removed above once nothing rendered them any more) with a
    room of seats you click. */
 
 .mock-team-size { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
@@ -1302,12 +1271,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
  * curve at a glance instead of a run of numbers the reader has to compare by
  * eye. Fill only, never text-in-the-cell -- the exact percentage lives in
  * each tile's own `title`, the same convention DraftBoard's cells already
- * use for the full player name. `.bar` / `.bar-label` (the old per-pick
- * cell's contents) are dead now that AvailabilityPanel.tsx no longer renders
- * them, but they're left in place further up the file rather than deleted
- * here -- this block is additive-only per the parallel-branch rule above,
- * and pulling a mid-file rule is exactly the kind of edit that rule exists
- * to avoid. A follow-up pass after the four branches merge can remove them.
+ * use for the full player name. `.bar-cell` / `.bar` / `.bar-label` (the old
+ * per-pick cell's contents) are removed above -- AvailabilityPanel.tsx no
+ * longer renders them.
  */
 .strip-col { min-width: 132px; }
 .strip-cell { padding: 6px 8px; }
