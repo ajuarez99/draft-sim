@@ -297,20 +297,58 @@ export default function PowerRankings() {
 
         {error && <div className="error">{error}</div>}
 
-        <div className="controls power-controls">
-          {(['COMPUTED_MARKET_VALUE', 'COMPUTED_REALIZED', 'COMMISSIONER'] as PowerRankingKind[]).map((k) => (
-            <button key={k} className={`chip${mode === k ? ' on' : ''}`} onClick={() => setMode(k)}>
-              {KIND_LABEL[k]}
+        {/* Three jobs, three treatments -- see styles.css's control-hierarchy
+            rule. These used to be six identical chips in one strip: two
+            exclusive selectors and a write, with nothing saying which was
+            which (and, until the `.controls button` fix, nothing even saying
+            which mode was selected). */}
+        <div className="power-controls">
+          <div className="segmented" role="group" aria-label="Ranking mode">
+            {(['COMPUTED_MARKET_VALUE', 'COMPUTED_REALIZED', 'COMMISSIONER'] as PowerRankingKind[]).map((k) => (
+              <button
+                key={k}
+                type="button"
+                className={`segment${mode === k ? ' on' : ''}`}
+                aria-pressed={mode === k}
+                onClick={() => setMode(k)}
+              >
+                {KIND_LABEL[k]}
+              </button>
+            ))}
+          </div>
+
+          <div className="segmented sm" role="group" aria-label="What to show">
+            <button
+              type="button"
+              className={`segment${view === 'league' ? ' on' : ''}`}
+              aria-pressed={view === 'league'}
+              onClick={() => setView('league')}
+            >
+              All teams
             </button>
-          ))}
-          <span className="spacer" />
-          <button className={`chip${view === 'league' ? ' on' : ''}`} onClick={() => setView('league')}>
-            All teams
-          </button>
-          <button className={`chip${view === 'team' ? ' on' : ''}`} onClick={() => setView('team')} disabled={!highlighted}>
-            This team, all modes
-          </button>
-          <button className="chip" onClick={compute} disabled={computing} title="Recompute market value and realized for the current week">
+            <button
+              type="button"
+              className={`segment${view === 'team' ? ' on' : ''}`}
+              aria-pressed={view === 'team'}
+              onClick={() => setView('team')}
+              disabled={!highlighted}
+              title={highlighted ? undefined : 'Pick a team in the chart first'}
+            >
+              One team
+            </button>
+          </div>
+
+          <span className="power-controls-spacer" />
+
+          {/* A write, not a view toggle: it runs a backend job and stores new
+              snapshots. Kept away from the selectors and given the outline
+              treatment so it never reads as "the third mode". */}
+          <button
+            className="action-button"
+            onClick={compute}
+            disabled={computing}
+            title="Recompute market value and realized rankings for the current week and save them"
+          >
             {computing ? 'Computing…' : `Compute week ${currentWeek}`}
           </button>
         </div>
@@ -324,7 +362,11 @@ export default function PowerRankings() {
           </p>
         ) : view === 'league' && weeks.length === 0 ? (
           <p className="muted">
-            No {KIND_LABEL[mode].toLowerCase()} snapshots yet for this league. {mode !== 'COMMISSIONER' && 'Click “Compute” above to build one.'}
+            {/* Names the button it is pointing at, rather than a shortened
+                version of it -- "Click Compute" against a button reading
+                "Compute week 1" makes the reader look for a third control. */}
+            No {KIND_LABEL[mode].toLowerCase()} snapshots yet for this league.{' '}
+            {mode !== 'COMMISSIONER' && `Use “Compute week ${currentWeek}” above to build the first one.`}
           </p>
         ) : view === 'league' ? (
           <>

@@ -189,6 +189,13 @@ export const trackDraft = (sleeperDraftId: string) =>
 export const ingestLeague = (sleeperLeagueId: string) =>
   fetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
+// Walks a league's `previous_league_id` chain and stores each season's
+// standings. Backs the "Load past seasons" button on the history page --
+// which used to be a `POST /api/ingest/league-history/{id}` printed on screen
+// for the reader to run in a terminal.
+export const ingestLeagueHistory = (sleeperLeagueId: string) =>
+  fetch(`/api/ingest/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+
 export type ManualTendencies = {
   reachBias: number | null
   unpredictability: number | null

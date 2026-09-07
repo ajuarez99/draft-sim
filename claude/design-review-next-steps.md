@@ -250,3 +250,130 @@ Recording these so nobody re-derives them.
 - **Widening board columns past 96px at 14 teams.** Step 1 got truncation to
   zero at the existing width; spending horizontal space would undo the reason
   the abbreviation was the right fix rather than the fallback.
+
+---
+
+## E. Second pass — the league-suite flows (2026-09-07, evening)
+
+`e9211ef` added three pages after this doc was written: `/leagues/:id/history`,
+`/leagues/:id/power`, and `/managers/:id/history`. Allan looked at the leagues
+list they added actions to and said it **"doesn't look fun"** — which it isn't,
+and the pages behind those actions have the same problem in a sharper form.
+
+The pattern is the one the original review named, reproduced in new code
+because nothing stopped it: **controls generated from the data model, all at
+equal weight.** The house-style header in `styles.css` covers color, radius,
+elevation and density — it says nothing about control hierarchy, which is why
+this keeps happening. E3 should end with a rule added there.
+
+### E1. The leagues list reads as a database changelist — Allan's call
+
+Three outline chips per row now (`Follow` / `History` / `Power`), identical to
+each other and to the `complete` status chip beside them, with the league name
+1400px away at the far left. Two of the three rows are the same league in
+different years, distinguishable only by a year in 11px muted text. Nothing on
+screen says fantasy football; it says admin table with a CRUD column.
+
+**A row was the right shape when this was one line of content** — league,
+season, size, status — and this doc's own earlier reasoning (rows for lists,
+cards only for card-shaped things) was correct *then*. It is not correct now:
+each league carries identity, a season, a size, a draft, a history, a power
+ranking, and soon a champion. That is card-shaped content, and the honest thing
+is to say the shape of the content changed rather than defend the old call.
+
+What makes it a league rather than a row:
+
+- **Identity.** A `hueFor(leagueId)` crest with the league's initial, the same
+  device the board's column headers and the manager cards already use. Two
+  seasons of the same league then read as the same league.
+- **The season as a rank, not a footnote.** `2026` big and quiet, not muted
+  11px in the middle of a dead gap.
+- **Facts a person cares about**: how many managers, whether the draft is done,
+  and — once history is ingested — **who won it**. A champion's name with a
+  trophy is the single highest-value thing this list could carry, and the data
+  is already in `LeagueHistoryData.standings`.
+- **One primary destination, not three peers.** The card opens the league; the
+  draft room, history and power rankings are secondary links inside it, sized
+  and coloured accordingly.
+
+Keep the mock-drafts list as rows. That content genuinely is one line, and the
+contrast between the two sections is worth having.
+
+### E2. `.controls button` silently overrides every `.chip` inside it — BUG
+
+Measured on `/leagues/:id/power`: all six controls compute to
+`background: oklch(0.72 0.14 175)` and `border-radius: 6px`. `.chip` and
+`.chip.on` are **visually identical**, so the active mode is not indicated at
+all. The page's three-way mode selector has no selected state.
+
+Cause is a cascade collision, not intent. `PowerRankings` renders
+`<button className="chip">` inside `<div className="controls">`, and
+
+    .controls button { background: var(--teal); border-radius: 6px; ... }   /* 0,1,1 */
+    .chip           { background: transparent; border-radius: 999px; ... }  /* 0,1,0 */
+
+the container rule wins on specificity and repaints every chip as a primary
+button. It also flattens the pill to a 6px rectangle, so the app's radius-by-
+role rule is broken on that page too.
+
+This is a real bug and the cheapest item on the list. Fix `.controls button`
+to `.controls button:not(.chip)` rather than patching the call site, because
+any future `.chip` inside a `.controls` block would hit the same thing.
+
+### E3. Power Rankings: six controls of equal weight doing three different jobs
+
+Even with E2 fixed, the row is `Market value | Realized | Commissioner |
+All teams | This team, all modes | Compute week 1` — three jobs in one
+undifferentiated strip:
+
+1. **Mode** (three, exclusive) — a segmented control, one visibly selected.
+2. **Scope** (two, exclusive) — a second, smaller segmented control, and
+   "This team, all modes" is a label describing a view, not an action.
+3. **`Compute week 1`** — a *write*. It fires a backend job and changes stored
+   data, and it currently looks exactly like a view toggle. It belongs visually
+   apart from the selectors, and its empty-state copy should agree with its own
+   label (the empty state says `Click "Compute"`, the button says
+   `Compute week 1`).
+
+Finish by adding a **control-hierarchy rule to `styles.css`'s house-style
+header** — exclusive selectors are segmented, actions are buttons, navigation
+is a link, and never mix the three in one strip. Its absence is why E1 and E3
+happened at all.
+
+### E4. League history: an empty table, and the curl command came back
+
+Two things:
+
+- **`POST /api/ingest/league-history/{id}` is printed in the error state** for
+  the reader to run themselves. This is exactly what step 3 removed from the
+  draft room's pre-start overlay, back again in new code — which makes it a
+  convention problem, not a slip. Whatever replaces it should be the pattern
+  the next page copies.
+- **An empty standings table renders its headers with no rows.** There is a
+  guard for `seasons.length === 0` but none for a season whose `standings` is
+  empty, which is what the 2026 season currently is. Verified in the app: a
+  `MANAGER / W / L / T / PF / PA` header row over nothing.
+
+Also: `W / L / T / PF / PA` as bare single letters. `PF`/`PA` are fantasy
+shorthand and can stay, but the table needs `title`s or a caption at minimum.
+
+### E5. The header nav never learned about the three new pages
+
+`App.tsx` still carries exactly one nav chip, `Managers`. League history, power
+rankings and manager history are reachable only by knowing a URL or by finding
+the right chip on the right row. Whatever B1 does to the home screen has to
+answer this too — the nav is now a real question, not a wordmark and one link.
+
+### E6. The managers page got worse as it got bigger
+
+Not a new finding — this is **B4** — but the page now renders 24 cards instead
+of 14, and 15 of the 24 names are truncated (`BamAd…`, `ImReall…`, `Unlivin…`).
+The shouting green `FROM HISTORY` badge is on 23 of them, so it marks nothing.
+Raise B4's priority accordingly; it is no longer the low-value item at the
+bottom of the list.
+
+### Order
+
+E2 first — it is a bug, it is fifteen minutes, and it makes E3 assessable.
+Then E1, which is what Allan actually asked for. Then E3 with the house-style
+rule that stops the next page repeating it, then E4, then E5 folded into B1.

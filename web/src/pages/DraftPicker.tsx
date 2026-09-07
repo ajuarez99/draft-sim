@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { hueFor } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
 import { SkeletonRows } from '../components/Skeleton'
 import {
@@ -94,7 +95,13 @@ export default function DraftPicker() {
         )}
 
         {drafts && drafts.length > 0 && (
-          <div className="draft-list">
+          // Cards, not `.draft-list` rows. A row was right while a league was
+          // one line of content -- name, season, size, status. It now carries
+          // an identity, a draft, a history and a power ranking, and the row
+          // answered that by growing a column of three identical chips 1400px
+          // from the league's own name. See styles.css DENSITY: re-judge the
+          // shape when the content changes rather than defending the old call.
+          <div className="league-grid">
             {drafts.map((d) => {
               // draft.status is nullable in the DB. Reading .replace() off it
               // threw a TypeError during render, and with no error boundary
@@ -102,21 +109,69 @@ export default function DraftPicker() {
               // one unstarted draft row was enough to make the app unusable.
               const status = d.status ?? 'unknown'
               const t = tracked[d.sleeperDraftId]
-              // A <button> cannot nest inside an <a>, and `.draft-row .chip`
-              // is pointer-events: none besides -- so the actions are a
-              // sibling of the link, not a child of it. The link keeps
-              // flex: 1 and its own hover.
+              const live = status === 'pre_draft' || status === 'drafting'
+              // Hashed on the NAME, not the id: every season of a league is a
+              // separate Sleeper league id, so hashing the id gave the two
+              // "(Foot) Ball Knowers" cards different colors -- the exact
+              // opposite of what the crest is for.
+              const hue = hueFor(d.leagueName)
+              // Leading punctuation is common in league names ("(Foot) Ball
+              // Knowers" would crest as "("), so take the first character that
+              // actually carries identity.
+              const crest = (d.leagueName.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
               return (
-                <div key={d.id} className="draft-row-wrap">
-                  <Link to={`/drafts/${d.sleeperDraftId}`} className="draft-row">
-                    <span className="draft-row-league">{d.leagueName}</span>
-                    <span className="muted small">{d.season}</span>
-                    <span className="muted small">
-                      {d.teams} teams &middot; {d.rounds} rounds
+                <article key={d.id} className={`league-card${live ? ' live' : ''}`}>
+                  <header className="league-card-head">
+                    {/* Same hue-derived crest the board's column headers and
+                        the manager cards use, so two seasons of one league
+                        read as one league instead of two identical strings. */}
+                    <span
+                      className="avatar league-crest"
+                      style={{ background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` }}
+                      aria-hidden="true"
+                    >
+                      {crest}
                     </span>
-                    <span className={`chip status-${status}`}>{status.replace('_', ' ')}</span>
-                  </Link>
-                  <div className="draft-row-actions">
+                    <span className="league-card-title">
+                      <Link to={`/drafts/${d.sleeperDraftId}`} className="league-card-name">
+                        {d.leagueName}
+                      </Link>
+                      <span className="league-card-sub">
+                        {d.teams} managers &middot; {d.rounds} rounds
+                      </span>
+                    </span>
+                    <span className="league-card-season cond">{d.season}</span>
+                  </header>
+
+                  <div className="league-card-links">
+                    {/* One primary destination, then two peers -- not three
+                        identical chips. The draft is what this app is for. */}
+                    <Link className="league-link primary" to={`/drafts/${d.sleeperDraftId}`}>
+                      {live ? 'Draft room' : 'Draft board'}
+                    </Link>
+                    <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
+                      History
+                    </Link>
+                    <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
+                      Power rankings
+                    </Link>
+                  </div>
+
+                  <footer className="league-card-foot">
+                    {/* A finished draft is the resting state and says so
+                        quietly; one that is live or about to be is the only
+                        thing on this card worth an accent. */}
+                    {live ? (
+                      <Link className="league-card-live" to={`/drafts/${d.sleeperDraftId}/live`}>
+                        <span className="league-live-dot" />
+                        {status === 'drafting' ? 'Drafting now — follow live' : 'Draft not started — follow live'}
+                      </Link>
+                    ) : (
+                      <span className="league-card-status">Draft complete</span>
+                    )}
+
+                    <span className="league-card-foot-spacer" />
+
                     {t &&
                       ('failed' in t ? (
                         <span className="tiny track-note failed">{t.failed}</span>
@@ -125,9 +180,7 @@ export default function DraftPicker() {
                         // 200 with it simply absent. Say what came back rather
                         // than rendering "undefined/undefined seats mapped" --
                         // verified live 2026-09-02 against a pre-restart 8080.
-                        <span className="tiny track-note">
-                          Following · {t.status ?? 'unknown'} · no seat count from this backend
-                        </span>
+                        <span className="tiny track-note">{t.status ?? 'unknown'} · no seat count from this backend</span>
                       ) : (
                         // "12/14 seats mapped" described a data structure. What
                         // the reader needs on draft night is whether any seat is
@@ -144,27 +197,17 @@ export default function DraftPicker() {
                           {t.observed === false ? ' · stale' : ''}
                         </span>
                       ))}
+
                     <button
-                      className="chip"
+                      className="league-card-refresh"
                       onClick={() => track(d.sleeperDraftId)}
                       disabled={tracking === d.sleeperDraftId}
-                      title="Follow this draft live and refresh its status"
+                      title="Check Sleeper now and refresh this draft's status and seat mapping"
                     >
-                      {tracking === d.sleeperDraftId ? 'Following…' : 'Follow'}
+                      {tracking === d.sleeperDraftId ? 'Checking…' : 'Refresh'}
                     </button>
-                    {(status === 'pre_draft' || status === 'drafting') && (
-                      <Link className="chip live-link" to={`/drafts/${d.sleeperDraftId}/live`}>
-                        Follow live →
-                      </Link>
-                    )}
-                    <Link className="chip" to={`/leagues/${d.sleeperLeagueId}/history`} title="Standings across every ingested season">
-                      History
-                    </Link>
-                    <Link className="chip" to={`/leagues/${d.sleeperLeagueId}/power`} title="Commissioner, market-value and realized power rankings">
-                      Power
-                    </Link>
-                  </div>
-                </div>
+                  </footer>
+                </article>
               )
             })}
           </div>

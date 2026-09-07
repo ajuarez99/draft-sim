@@ -58,7 +58,27 @@
  *   Match the layout to the shape of the content: rows for lists
  *   (`.draft-list`), a grid for the board, cards only for things that are
  *   actually card-shaped. Padding a one-line record out into a card is how
- *   this stops looking hand-built.
+ *   this stops looking hand-built. The shape of the content can change --
+ *   `.league-card` was a `.draft-row` until a league grew a history, a power
+ *   ranking and a champion; re-judge rather than defend the old call.
+ *
+ * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
+ *   A strip of controls must say what kind of thing each one is. Mixing them
+ *   is how /leagues/:id/power ended up with six identical teal buttons doing
+ *   three different jobs.
+ *     exclusive choice  ->  `.segmented` + `.segment`, exactly one `.on`.
+ *                           One connected group, so it reads as one control
+ *                           with a current value rather than N buttons.
+ *     an action         ->  `.action-button` (outline) for a normal one,
+ *                           `.controls button` (solid teal) for the primary
+ *                           one on a screen. A control that WRITES must never
+ *                           share a treatment with one that only changes what
+ *                           you are looking at.
+ *     navigation        ->  a link, or `.chip` when it must sit in a control
+ *                           row. Never a filled button.
+ *   Beware `.controls button` (0,1,1): it out-specifies `.chip` (0,1,0), which
+ *   is why it carries `:not(.chip)`. Do not add another bare-element rule
+ *   inside a container class without checking what it will repaint.
  */
 
 :root {
@@ -134,12 +154,24 @@ body {
 }
 .controls .temp { min-width: 170px; }
 .temp-value { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
-.controls button {
+/*
+ * `:not(.chip)` is load-bearing, not decoration. This selector is (0,1,1) and
+ * `.chip` is (0,1,0), so a `<button class="chip">` inside a `.controls` block
+ * used to lose to it and get repainted as a solid teal 6px primary button --
+ * measured on /leagues/:id/power, where all six controls came back identical
+ * and `.chip.on` was indistinguishable from `.chip`, i.e. the three-way mode
+ * selector had no visible selected state at all. It also flattened the pill to
+ * a rectangle, breaking this file's radius-by-role rule on that page.
+ *
+ * Fixed here rather than at the call site: any future chip inside any future
+ * `.controls` block would hit exactly the same thing.
+ */
+.controls button:not(.chip) {
   background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
   padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer;
   transition: filter 120ms ease, transform 120ms ease;
 }
-.controls button:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.controls button:not(.chip):hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
 .controls button:disabled { opacity: 0.6; cursor: default; }
 
 .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
@@ -186,14 +218,156 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
    app that rendered in the browser's default blue, because a range input takes
    none of this file's styling. Now the same pill vocabulary as the position
    filters beside it. */
+/*
+ * SEGMENTED CONTROL -- one exclusive choice, not N buttons.
+ *
+ * Connected rather than gapped on purpose: a gap between the options makes
+ * them read as separate controls that happen to be adjacent, which is exactly
+ * the confusion this replaced on the power-rankings page. The group is one
+ * object with a current value.
+ */
+.segmented {
+  display: inline-flex; align-items: stretch; flex-shrink: 0;
+  background: var(--bg); border-radius: 10px; padding: 3px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.segment {
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.segment:hover:not(:disabled):not(.on) { color: var(--text); background: color-mix(in oklch, var(--teal) 8%, transparent); }
+/* Filled, because the selected option is the control's *value* -- an outline
+   or a tint would leave it competing with hover instead of clearly reading as
+   "this is the one". --teal is generic interaction, which is what a view
+   selector is; --crimson stays reserved for "you". */
+.segment.on { background: var(--teal); color: var(--bg); }
+.segment:disabled { opacity: 0.4; cursor: default; }
+.segment:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.segmented.sm .segment { font-size: 11px; padding: 5px 11px; }
+
+/* A normal action: outline, so it is clearly pressable but does not compete
+   with a screen's one primary `.controls button`. Used for writes that sit
+   next to selectors, which must never share the selectors' treatment. */
+.action-button {
+  appearance: none; -webkit-appearance: none; margin: 0;
+  background: transparent; color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line); border: 0;
+  border-radius: 10px; padding: 7px 15px;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.action-button:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--teal) 10%, transparent);
+  box-shadow: inset 0 0 0 1px var(--teal); transform: translateY(-1px);
+}
+.action-button:disabled { opacity: 0.55; cursor: default; }
+.action-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.power-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.power-controls-spacer { flex: 1; min-width: 0; }
+
 .depth { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin-left: 10px; }
 .depth-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
 .depth-chip { padding: 3px 8px; min-width: 26px; text-align: center; }
 
 /*
- * A list of drafts to open, not a card grid -- there's one line of real
- * content per row (league, season, size, status), so a row is the shape that
- * matches it rather than padding each entry out into an empty-feeling card.
+ * LEAGUE CARDS
+ *
+ * `.draft-list` below is still right for mock drafts -- one line of content
+ * each. A league is no longer one line: it has an identity, a season, a draft,
+ * a history and a power ranking, and as a row it answered that by growing a
+ * column of three identical chips a full 1400px from its own name, with the
+ * two "(Foot) Ball Knowers" seasons separated only by 11px of muted text.
+ *
+ * Not a grid of uniform boxes either, which is the other failure mode: the
+ * crest carries the league's own hue, a live draft tints the whole card and
+ * lifts on hover, and a finished one stays flat and quiet. What separates two
+ * cards is their content, not a shadow on both.
+ */
+.league-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.league-card {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel); border-radius: 14px; padding: 14px 16px 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 40%, var(--line)); }
+/* A draft that hasn't finished is the only thing in this list worth an accent
+   -- crimson stays "you", so a live draft borrows --teal, the generic
+   "something is happening" color. */
+.league-card.live {
+  background: color-mix(in oklch, var(--teal) 7%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 45%, var(--line));
+}
+
+.league-card-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.league-crest { width: 34px; height: 34px; font-size: 14px; }
+.league-card-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.league-card-name {
+  font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.league-card-name:hover { color: var(--teal); }
+.league-card-sub { font-size: 11px; color: var(--muted); }
+/* The season is what tells two cards of the same league apart, so it is a
+   figure on the card rather than a footnote inside a row. */
+.league-card-season { font-size: 20px; color: var(--muted); letter-spacing: 0.02em; flex-shrink: 0; }
+
+.league-card-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.league-link {
+  font-size: 12px; text-decoration: none; color: var(--muted);
+  padding: 5px 10px; border-radius: 8px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-link:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+/* One primary destination, not three peers: the draft is what this app is for
+   and the other two are places you go afterwards. */
+.league-link.primary {
+  color: var(--text); font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--teal); color: var(--teal); }
+
+.league-card-foot {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px;
+}
+.league-card-foot-spacer { flex: 1; min-width: 0; }
+.league-card-status { color: var(--muted); }
+.league-card-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--teal); text-decoration: none; font-weight: 600;
+}
+.league-card-live:hover { text-decoration: underline; }
+.league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .league-live-dot { animation: live-pulse 2s ease-in-out infinite; }
+  @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+}
+/* Housekeeping, so it reads as housekeeping: no fill, no border, just a quiet
+   label that lifts on hover. It used to be a `.chip` sitting alongside two
+   navigation chips, which is what made three unrelated things look alike. */
+.league-card-refresh {
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0; padding: 4px 8px;
+  background: transparent; color: var(--muted); font: inherit; font-size: 11px;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-card-refresh:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.league-card-refresh:disabled { opacity: 0.55; cursor: default; }
+.league-card-refresh:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * A list of mock drafts to open, not a card grid -- there's one line of real
+ * content per row, so a row is the shape that matches it rather than padding
+ * each entry out into an empty-feeling card. (Leagues used to live here too;
+ * see the note above for why they no longer do.)
  */
 .draft-list { display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 10px; overflow: hidden; }
 .draft-row {
@@ -903,12 +1077,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .standings tr:last-child td { border-bottom: none; }
 .standings-manager { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
 .standings-manager:hover { color: var(--teal); }
+/* The error banner carries its own recovery action now, so it needs the same
+   shape `.error.seats-dirty` already uses for the same reason. */
+.history-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
 .history-season { margin-top: 18px; }
 .history-season:first-of-type { margin-top: 6px; }
 .history-season h3 { margin: 0 0 8px; color: var(--muted); font-size: 14px; letter-spacing: 0.02em; }
 
-.power-controls { flex-wrap: wrap; }
-.power-controls .spacer { flex: 1; }
 
 .bump-chart { display: block; }
 .bump-gridline { stroke: var(--line); stroke-width: 1; }

@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getLeagueHistory, type LeagueHistory as LeagueHistoryData, type StandingRow } from '../api'
+import {
+  getLeagueHistory,
+  ingestLeagueHistory,
+  type LeagueHistory as LeagueHistoryData,
+  type StandingRow,
+} from '../api'
 import { hueFor } from '../hue'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
- * one league. Read-only, no auth -- run POST /api/ingest/league-history/{id}
- * first if a season is missing (the picker's "Follow"-style controls for this
- * live here rather than being duplicated on this page).
+ * one league. Read-only apart from the error state's own "Load past seasons"
+ * button, which fires the ingest rather than telling the reader to curl it.
  */
 
 function StandingsTable({ rows }: { rows: StandingRow[] }) {
@@ -61,6 +65,7 @@ export default function LeagueHistory() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [history, setHistory] = useState<LeagueHistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -70,6 +75,22 @@ export default function LeagueHistory() {
       .then(setHistory)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [sleeperLeagueId])
+
+  // Backs the error state's own button. Same call the page used to print as a
+  // curl line for the reader to run in a terminal.
+  async function loadHistory() {
+    if (!sleeperLeagueId) return
+    setLoading(true)
+    setError(null)
+    try {
+      await ingestLeagueHistory(sleeperLeagueId)
+      setHistory(await getLeagueHistory(sleeperLeagueId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="content">
@@ -88,17 +109,21 @@ export default function LeagueHistory() {
           separate from what actually happened.
         </p>
 
+        {/* This used to print `POST /api/ingest/league-history/{id}` for the
+            reader to run themselves. Step 3 of the design review removed
+            exactly that pattern from the draft room's pre-start overlay and it
+            came straight back in new code, so it is a convention problem: a
+            button that fires the call, never the call itself. */}
         {error && (
-          <div className="error">
-            {error}
-            {sleeperLeagueId && (
-              <>
-                {' '}
-                — try{' '}
-                <code>POST /api/ingest/league-history/{sleeperLeagueId}</code> first if this
-                league has never had its history ingested.
-              </>
-            )}
+          <div className="error history-error">
+            <span>
+              {error.toLowerCase().includes('not found') || error.includes('404')
+                ? "This league's past seasons haven't been loaded yet."
+                : error}
+            </span>
+            <button className="action-button" onClick={loadHistory} disabled={loading}>
+              {loading ? 'Loading seasons…' : 'Load past seasons'}
+            </button>
           </div>
         )}
 
@@ -118,7 +143,16 @@ export default function LeagueHistory() {
           history.seasons.map((s) => (
             <div key={s.leagueId} className="history-season">
               <h3 className="cond">{s.season}</h3>
-              <StandingsTable rows={s.standings} />
+              {/* A season with no standings rendered its headers over nothing
+                  -- verified on the 2026 season, which is ingested but hasn't
+                  been played. `seasons.length === 0` was guarded; this wasn't. */}
+              {s.standings.length === 0 ? (
+                <p className="muted small">
+                  No standings for {s.season} yet — Sleeper reports them once the season is under way.
+                </p>
+              ) : (
+                <StandingsTable rows={s.standings} />
+              )}
             </div>
           ))}
       </section>
