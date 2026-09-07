@@ -883,7 +883,15 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    at narrower widths since it's carrying more content than before. */
 .pause-banner.pick-prompt { flex-wrap: wrap; }
 .pick-prompt-info { display: flex; flex-direction: column; gap: 2px; }
-.pick-prompt-actions { display: flex; gap: 8px; flex-shrink: 0; }
+/* `flex-wrap` here, and `flex-shrink: 0` only on the buttons themselves.
+   The banner above wraps, but this row did not, and its three buttons ("Take
+   <player>", "Take <player> (best available)", "Choose a player") carry real
+   names -- measured 469px of min-content at a 375px viewport, which was the
+   actual reason the whole page scrolled sideways there. B5 contained the
+   availability sheet; this was the other element doing the same thing, and
+   the page still scrolled until both were fixed. */
+.pick-prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.pick-prompt-actions > * { flex-shrink: 0; }
 
 /*
  * ON THE CLOCK + PICK FEED
@@ -1368,3 +1376,16 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      need this. */
   .avail-sheet .avail .player-col { width: 150px; }
 }
+/* ===== A3: shared tendencies form ===== */
+
+/* TendenciesForm.tsx's per-field caption (e.g. "Reads as ~4.8 picks early.",
+   "Wild card (1.6)") -- reusing `.muted.tiny` verbatim, which is already this
+   app's established under-a-field/under-a-row caption treatment (see
+   SeatPopover.tsx's footnote() line and the live room's freshness text), so
+   this doesn't invent a second caption style next to the one that already
+   exists. The negative margin pulls it up against the input it explains
+   instead of reading as a new field -- `.seat-form label` already puts 2px
+   between a label and its own input, and without this the 6px `.seat-form`
+   gap made the caption look like it belonged to the *next* field, not the
+   one above it. */
+.field-hint { margin: -3px 0 0; }

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { getManagers, setTendencies, clearTendencies, type Seat } from '../api'
+import { getManagers, type ManualTendencies, type Seat } from '../api'
 import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
 import { behaviourText } from '../managerBehaviour'
+import TendenciesForm from './TendenciesForm'
 
 /**
  * Formerly SeatList's per-seat card, now the popover a board column header
@@ -45,11 +46,13 @@ type Props = {
 export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeMine }: Props) {
   const [editing, setEditing] = useState(false)
   const [loadingStated, setLoadingStated] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [reachBias, setReachBias] = useState('')
-  const [unpredictability, setUnpredictability] = useState('')
-  const [note, setNote] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  // What TendenciesForm hydrates from. Seat carries the *effective* numbers
+  // (post-blend), not the stated ones the form edits -- those only exist on
+  // ManagerSummary.stated, which is why this has to be fetched separately
+  // rather than read off `s` directly. ManagerTendencies.tsx doesn't need
+  // this fetch because its ManagerSummary already carries `.stated`.
+  const [stated, setStated] = useState<ManualTendencies | null>(null)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -68,52 +71,15 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
   async function startEdit() {
     setEditing(true)
     setLoadingStated(true)
-    setSaveError(null)
+    setLoadError(null)
     try {
       const managers = await getManagers()
       const mine = managers.find((m) => m.managerId === s.managerId)
-      const stated = mine?.stated ?? { reachBias: null, unpredictability: null, note: null }
-      setReachBias(stated.reachBias != null ? String(stated.reachBias) : '')
-      setUnpredictability(stated.unpredictability != null ? String(stated.unpredictability) : '')
-      setNote(stated.note ?? '')
+      setStated(mine?.stated ?? { reachBias: null, unpredictability: null, note: null })
     } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e))
+      setLoadError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoadingStated(false)
-    }
-  }
-
-  async function save() {
-    const rb = reachBias.trim() === '' ? null : Number(reachBias)
-    const up = unpredictability.trim() === '' ? null : Number(unpredictability)
-    if ((rb !== null && Number.isNaN(rb)) || (up !== null && Number.isNaN(up))) {
-      setSaveError('reach bias and unpredictability must be numbers')
-      return
-    }
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await setTendencies(s.managerId, { reachBias: rb, unpredictability: up, note: note.trim() === '' ? null : note.trim() })
-      setEditing(false)
-      onChanged()
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function clear() {
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await clearTendencies(s.managerId)
-      setEditing(false)
-      onChanged()
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -143,62 +109,33 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
                   this is me
                 </button>
               )}
-              <button className="seat-edit" onClick={() => (editing ? setEditing(false) : startEdit())}>
-                {editing ? 'cancel' : 'edit'}
+              <button
+                className="seat-edit"
+                onClick={() => (editing ? setEditing(false) : startEdit())}
+                title={editing ? 'Stop editing without saving' : "Edit this manager's stated tendencies"}
+              >
+                {editing ? 'Cancel' : 'Edit'}
               </button>
             </span>
           </div>
 
           {editing ? (
-            <div className="seat-form">
-              {loadingStated ? (
-                <p className="muted small">Loading…</p>
-              ) : (
-                <>
-                  <label className="small">
-                    reach bias
-                    <input
-                      type="number"
-                      min={-20}
-                      max={20}
-                      step={0.1}
-                      value={reachBias}
-                      onChange={(e) => setReachBias(e.target.value)}
-                    />
-                  </label>
-                  <label className="small">
-                    unpredictability
-                    <input
-                      type="number"
-                      min={0.1}
-                      max={3.0}
-                      step={0.1}
-                      value={unpredictability}
-                      onChange={(e) => setUnpredictability(e.target.value)}
-                    />
-                  </label>
-                  <label className="small">
-                    note
-                    {/* clamped to 280 by ManualTendencies -- see ManagerTendencies.tsx */}
-                    <input type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
-                  </label>
-                  {saveError && <p className="seat-form-error small">{saveError}</p>}
-                  <div className="seat-form-actions">
-                    <button onClick={save} disabled={saving}>
-                      {saving ? 'saving…' : 'save'}
-                    </button>
-                    {canClear && (
-                      <button onClick={clear} disabled={saving}>
-                        clear
-                      </button>
-                    )}
-                    <button onClick={() => setEditing(false)} disabled={saving}>
-                      cancel
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            loadingStated ? (
+              <p className="muted small">Loading…</p>
+            ) : loadError ? (
+              <p className="seat-form-error small">{loadError}</p>
+            ) : (
+              <TendenciesForm
+                managerId={s.managerId}
+                initial={stated ?? { reachBias: null, unpredictability: null, note: null }}
+                canClear={canClear}
+                onDone={() => {
+                  setEditing(false)
+                  onChanged()
+                }}
+                onCancel={() => setEditing(false)}
+              />
+            )
           ) : (
             <>
               {s.provenance === 'NEUTRAL' ? (

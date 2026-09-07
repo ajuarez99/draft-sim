@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getManagers, setTendencies, clearTendencies, type ManagerSummary } from '../api'
+import { getManagers, type ManagerSummary } from '../api'
 import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
+import TendenciesForm from '../components/TendenciesForm'
 
 /**
  * /managers -- the standalone place to declare tendencies for a real manager
@@ -87,60 +88,11 @@ type RowProps = { m: ManagerSummary; onChanged: () => void }
 
 function ManagerRow({ m, onChanged }: RowProps) {
   const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [reachBias, setReachBias] = useState(m.stated.reachBias != null ? String(m.stated.reachBias) : '')
-  const [unpredictability, setUnpredictability] = useState(
-    m.stated.unpredictability != null ? String(m.stated.unpredictability) : '',
-  )
-  const [note, setNote] = useState(m.stated.note ?? '')
 
   const label = PROVENANCE_LABEL[m.provenance]
   const hue = hueFor(String(m.managerId))
   const avatarStyle = { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
   const cmp = comparison(m)
-
-  function startEdit() {
-    setReachBias(m.stated.reachBias != null ? String(m.stated.reachBias) : '')
-    setUnpredictability(m.stated.unpredictability != null ? String(m.stated.unpredictability) : '')
-    setNote(m.stated.note ?? '')
-    setSaveError(null)
-    setEditing(true)
-  }
-
-  async function save() {
-    const rb = reachBias.trim() === '' ? null : Number(reachBias)
-    const up = unpredictability.trim() === '' ? null : Number(unpredictability)
-    if ((rb !== null && Number.isNaN(rb)) || (up !== null && Number.isNaN(up))) {
-      setSaveError('reach bias and unpredictability must be numbers')
-      return
-    }
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await setTendencies(m.managerId, { reachBias: rb, unpredictability: up, note: note.trim() === '' ? null : note.trim() })
-      setEditing(false)
-      onChanged()
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function clear() {
-    setSaving(true)
-    setSaveError(null)
-    try {
-      await clearTendencies(m.managerId)
-      setEditing(false)
-      onChanged()
-    } catch (e) {
-      setSaveError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const canClear = m.provenance === 'STATED' || m.provenance === 'BLENDED'
 
@@ -160,50 +112,27 @@ function ManagerRow({ m, onChanged }: RowProps) {
           {label.badge && (
             <span className={`prov-dot ${label.className}`} title={`Tendencies ${label.badge}`} />
           )}
-          <button className="seat-edit" onClick={() => (editing ? setEditing(false) : startEdit())}>
+          <button
+            className="seat-edit"
+            onClick={() => setEditing((v) => !v)}
+            title={editing ? 'Stop editing without saving' : "Edit this manager's stated tendencies"}
+          >
             {editing ? 'Cancel' : 'Edit'}
           </button>
         </span>
       </div>
 
       {editing ? (
-        <div className="seat-form">
-          <label className="small">
-            reach bias
-            <input type="number" min={-20} max={20} step={0.1} value={reachBias} onChange={(e) => setReachBias(e.target.value)} />
-          </label>
-          <label className="small">
-            unpredictability
-            <input
-              type="number"
-              min={0.1}
-              max={3.0}
-              step={0.1}
-              value={unpredictability}
-              onChange={(e) => setUnpredictability(e.target.value)}
-            />
-          </label>
-          <label className="small">
-            note
-            {/* ManualTendencies clamps to 280 server-side; without this the UI
-                shows text that was silently dropped on save. */}
-            <input type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          {saveError && <p className="seat-form-error small">{saveError}</p>}
-          <div className="seat-form-actions">
-            <button onClick={save} disabled={saving}>
-              {saving ? 'saving…' : 'save'}
-            </button>
-            {canClear && (
-              <button onClick={clear} disabled={saving}>
-                clear
-              </button>
-            )}
-            <button onClick={() => setEditing(false)} disabled={saving}>
-              cancel
-            </button>
-          </div>
-        </div>
+        <TendenciesForm
+          managerId={m.managerId}
+          initial={m.stated}
+          canClear={canClear}
+          onDone={() => {
+            setEditing(false)
+            onChanged()
+          }}
+          onCancel={() => setEditing(false)}
+        />
       ) : (
         <>
           {m.provenance === 'NEUTRAL' ? (
