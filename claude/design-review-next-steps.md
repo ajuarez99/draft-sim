@@ -6,8 +6,12 @@ supersedes the review's own "what I'd do first" ordering, because building
 steps 1–3 turned up seven things the review missed — including one gap that
 step 2 *created*.
 
-Nothing here is started. Every measurement was taken in the running app
-against league `1391509063170293760` at 1440×900, not read off the source.
+**A1 and the live-room half of A4 are done** (2026-09-07, same day) — struck
+through in place rather than deleted, so the reasoning stays readable. A1 also
+corrected a claim this doc got wrong; see it. Everything else is untouched.
+
+Every measurement was taken in the running app against league
+`1391509063170293760` at 1440×900, not read off the source.
 
 ---
 
@@ -17,7 +21,33 @@ These come first, ahead of the review's own steps 4–7, because two of them are
 consequences of what just landed and one is a feature the room is missing
 rather than a styling problem.
 
-### A1. The live room is now the odd one out — and that is our doing
+### A1. ~~The live room is now the odd one out~~ — DONE 2026-09-07
+
+**Built.** `LiveStatusBar` composes `OnTheClock` and keeps only what the other
+two rooms don't have; `PickFeed` landed in the live room at the same time. The
+`.live-onclock` block and its eight CSS rules are gone. `OnTheClock` grew two
+things to absorb it: `done`/`doneLabel` became `idle`/`idleLabel` (the live
+room can be complete, not-started, order-not-set, or not-connected, and those
+are four different sentences), and an optional `onManagerClick` that makes the
+identity block a real button — the live room opens SeatPopover from it, which
+is worth more there than anywhere else.
+
+**One thing below was wrong.** This doc said "`live.picks` is the landed
+prefix". There is no `picks` array on `LiveState` — it carries counts only.
+The landed prefix is `result.board` cut at `picksMade`, because the engine
+replays every completed pick out of the DB identically in every iteration, so
+those rows are the record rather than a projection. Same cut `takenPlayerIds`
+was already taking. A consequence worth knowing: the feed is empty until the
+first projection lands, which is correct — with no board there is nothing to
+name the players or managers with.
+
+**Verified:** the `drafting` branch can't be reached in a browser without a
+real in-progress Sleeper draft, so it's covered by a new
+`LiveStatusBar.test.tsx` (12 cases, including all four idle reasons and the
+seat-popover click). The complete/idle path was checked in the running app.
+
+<details>
+<summary>Original finding</summary>
 
 Step 2 unified two of the three draft rooms onto `OnTheClock`. It did not touch
 the third. `LiveDraftView` still renders `LiveStatusBar`, which carries its own
@@ -37,7 +67,8 @@ mock session's turn state.
 
 `PickFeed` should land in the live room at the same time. It is the room where
 a position run matters most, because the picks are real and you cannot rewind.
-Its inputs are already there: `live.picks` is the landed prefix.
+
+</details>
 
 ### A2. The mock room has no "who's still there when you pick"
 
@@ -76,19 +107,20 @@ piece of engineer-facing language left in the app:
   infer. It wants named stops (predictable / normal / wild card), the way the
   gear's `chaos` slider already labels its own range.
 
-### A4. The copy pass missed four files
+### A4. The copy pass missed four files — HALF DONE 2026-09-07
 
 Step 3 covered the six screens the review audited. These were never opened:
 
-| File | Still reads |
-|---|---|
-| `LiveStatusBar.tsx` | `track`, `tracking…`, `title="Re-tick the poller and refresh seat mapping"` |
-| `SeatPopover.tsx` | `save`, `saving…`, `clear`, `cancel`, `reach bias`, `unpredictability`, `note` |
-| `ManagerTendencies.tsx` | same six |
-| `LiveDraftView.tsx` | `fork to mock →`, `forking…` |
+| File | Still reads | |
+|---|---|---|
+| `LiveStatusBar.tsx` | ~~`track`, `tracking…`, "Re-tick the poller and refresh seat mapping"~~ | done |
+| `LiveDraftView.tsx` | ~~`fork to mock →`, `forking…`, `re-run`, "Board projected past pick 210"~~ | done |
+| `SeatPopover.tsx` | `save`, `saving…`, `clear`, `cancel`, `reach bias`, `unpredictability`, `note` | **open** |
+| `ManagerTendencies.tsx` | same six | **open** |
 
-"Re-tick the poller" is the single worst string left in the product. Same
-treatment as `track` → `Follow` on the picker.
+The two live-room files went along with A1, since the work was already in
+them. The remaining two are the same duplicated form as A3, so do them
+together — the labels are the substance and the button case is incidental.
 
 ### A5. 131 of 150 board cells render a placeholder em dash
 
@@ -164,19 +196,20 @@ are load-bearing for consistency.
 
 | | Item | Rough cost |
 |---|---|---|
-| 1 | A1 live room onto `OnTheClock` + `PickFeed` | ~2h |
-| 2 | A4 copy pass on the four missed files | ~1h |
-| 3 | A5 drop the placeholder dashes | ~15m |
-| 4 | A6 loading states | ~1h |
-| 5 | B1 home hero + disclosure | ~2h |
-| 6 | A3 extract the tendencies form, fix its labels | ~2h |
-| 7 | B2 mock-setup seat strip | ~3h |
-| 8 | B3 survival strips | ~3h |
-| 9 | B4 manager axis · B5 narrow viewport | ~4h |
+| ~~1~~ | ~~A1 live room onto `OnTheClock` + `PickFeed`~~ | done |
+| ~~2~~ | ~~A4 copy pass, live-room half~~ | done |
+| 1 | A5 drop the placeholder dashes | ~15m |
+| 2 | A6 loading states | ~1h |
+| 3 | B1 home hero + disclosure | ~2h |
+| 4 | A3 + the rest of A4 — extract the tendencies form, fix its labels | ~2h |
+| 5 | B2 mock-setup seat strip | ~3h |
+| 6 | B3 survival strips | ~3h |
+| 7 | B4 manager axis · B5 narrow viewport | ~4h |
 | — | A2 availability in the mock room | scope first — backend work |
 | — | A7 vertical budget | only if it bites |
 
-Items 1–4 are one session and close every loose end steps 1–3 opened.
+A5 and A6 are together under two hours and finish closing what steps 1–3
+opened.
 
 ---
 

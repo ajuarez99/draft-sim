@@ -3,7 +3,7 @@ import { hueFor } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
 
 type Props = {
-  /** Whose turn it is. Null when nobody is -- see `done`. */
+  /** Whose turn it is. Null when nobody's is -- see `idle`. */
   manager: string | null
   isMine: boolean
   /** Avatar tint seed: the manager id where there is one, the slot otherwise. */
@@ -19,26 +19,38 @@ type Props = {
    * "Pick 28 of 210" header never answered.
    */
   nextOwnPick?: number | null
-  done?: boolean
-  doneLabel?: string
-  /** Trailing controls (the reveal's `skip`). Kept out of the identity block. */
+  /**
+   * Nobody is on the clock: the draft is over, hasn't started, or we don't yet
+   * know. `idleLabel` says which -- the three are not interchangeable and the
+   * live room can be in any of them.
+   */
+  idle?: boolean
+  idleLabel?: string
+  /**
+   * Makes the identity block a real button. The live room opens SeatPopover
+   * from it (the same popover a board column header opens), which is worth
+   * more there than anywhere else -- the seat on the clock is exactly the
+   * manager whose tendencies you want to check before they pick.
+   */
+  onManagerClick?: () => void
+  /** Trailing controls: the reveal's `skip`, the live room's telemetry. */
   children?: ReactNode
 }
 
 /**
- * The draft room's header strip.
+ * The draft room's header strip, shared by all three rooms.
  *
  * Replaces the reveal scrubber's `Pick 28 of 210 · skip · re-run`, which was a
  * loop counter and two operator buttons in the room's most valuable strip of
  * pixels -- it said where the cursor was and never who was picking, what had
- * just gone, or how long until your turn. Every value here already exists in
- * `SimulationResult` and the revealed-board state; nothing new is computed
- * server-side.
+ * just gone, or how long until your turn.
  *
- * Shared by both rooms: DraftView maps the reveal state into it, TurnIndicator
- * maps the mock session's own turn state into it. Crimson-when-it's-you is the
- * same identity rule the board cells and column headers already follow -- see
- * styles.css's house-style header.
+ * Every room maps its own idea of "whose turn" into this rather than drawing
+ * its own: DraftView from reveal state, TurnIndicator from the mock session,
+ * LiveStatusBar from the SSE frame (and it wraps this in its own telemetry
+ * rather than replacing it). Crimson-when-it's-you is the same identity rule
+ * the board cells and column headers follow -- see styles.css's house-style
+ * header.
  */
 export default function OnTheClock({
   manager,
@@ -49,18 +61,23 @@ export default function OnTheClock({
   teams,
   rounds,
   nextOwnPick,
-  done,
-  doneLabel,
+  idle,
+  idleLabel,
+  onManagerClick,
   children,
 }: Props) {
-  if (done) {
+  if (idle) {
     return (
-      <div className="on-clock done">
-        <span className="cond on-clock-done-label">{doneLabel ?? 'Draft complete'}</span>
+      <div className="on-clock idle">
+        <span className="cond on-clock-idle-label">{idleLabel ?? 'Nobody on the clock'}</span>
         <span className="on-clock-spacer" />
-        <span className="muted small mono">
-          {maxPickNo} picks · {rounds} rounds
-        </span>
+        {/* Suppressed rather than rendered as "0 picks · 0 rounds" when the
+            live room has no state frame yet -- an unknown size is not zero. */}
+        {maxPickNo > 0 && (
+          <span className="muted small mono">
+            {maxPickNo} picks · {rounds} rounds
+          </span>
+        )}
         {children}
       </div>
     )
@@ -72,8 +89,8 @@ export default function OnTheClock({
   // answer is "now", which the kicker already says.
   const until = !isMine && nextOwnPick != null ? nextOwnPick - pickNo : null
 
-  return (
-    <div className={`on-clock${isMine ? ' mine' : ''}`}>
+  const identity = (
+    <>
       <span
         className="avatar on-clock-avatar"
         style={
@@ -84,7 +101,6 @@ export default function OnTheClock({
       >
         {(manager ?? '?').trim().charAt(0).toUpperCase()}
       </span>
-
       <span className="on-clock-text">
         <span className="on-clock-kicker cond">{isMine ? 'Your pick' : 'On the clock'}</span>
         <span className="on-clock-name">
@@ -92,6 +108,23 @@ export default function OnTheClock({
           <span className="muted"> — {roundPickLabel(pickNo, teams)}</span>
         </span>
       </span>
+    </>
+  )
+
+  return (
+    <div className={`on-clock${isMine ? ' mine' : ''}`}>
+      {onManagerClick ? (
+        <button
+          type="button"
+          className="on-clock-identity"
+          onClick={onManagerClick}
+          title={manager ? `${manager} — click for details` : undefined}
+        >
+          {identity}
+        </button>
+      ) : (
+        <span className="on-clock-identity">{identity}</span>
+      )}
 
       <span className="on-clock-spacer" />
 

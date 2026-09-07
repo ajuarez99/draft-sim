@@ -462,8 +462,8 @@ export default function DraftView() {
                   teams={result.teams}
                   rounds={result.rounds}
                   nextOwnPick={nextOwnPick}
-                  done={revealFinished}
-                  doneLabel="Every pick simulated"
+                  idle={revealFinished}
+                  idleLabel="Every pick simulated"
                 >
                   {reveal.revealedThrough < maxPickNo && (
                     <button className="chip" onClick={reveal.skip} disabled={resimming}>

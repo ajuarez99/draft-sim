@@ -12,8 +12,10 @@ import {
 import AvailabilityPanel from '../components/AvailabilityPanel'
 import DraftBoard from '../components/DraftBoard'
 import LiveStatusBar from '../components/LiveStatusBar'
+import PickFeed from '../components/PickFeed'
 import PlayerCard from '../components/PlayerCard'
 import SeatPopover from '../components/SeatPopover'
+import { roundPickLabel } from '../roundPickLabel'
 import { useLiveDraft } from '../useLiveDraft'
 
 // Same cap the mock view's resim uses. The iteration-count comments in
@@ -209,6 +211,20 @@ export default function LiveDraftView() {
     [result, picksMade],
   )
 
+  // The landed prefix, which is where the feed's rows come from. There is no
+  // `picks` array on LiveState -- but the engine replays every completed pick
+  // out of the DB identically in every iteration (see this file's header), so
+  // `result.board` below `picksMade` IS the record of what actually happened,
+  // not a projection of it. Same cut `takenPlayerIds` takes directly above.
+  //
+  // It follows that the feed is empty until the first projection lands. That's
+  // correct rather than unfortunate: with no board there is nothing to name
+  // the players or the managers with.
+  const landedPicks = useMemo(
+    () => (result?.board ?? []).filter((p) => p.pickNo <= picksMade),
+    [result, picksMade],
+  )
+
   // Memoized so the once-a-second freshness tick (which re-renders this page by
   // design -- it is the one reading that has to stay current) doesn't re-render
   // 210 board cells with it.
@@ -267,9 +283,15 @@ export default function LiveDraftView() {
           secondsSinceContact={secondsSinceContact}
           seats={seats?.seats ?? []}
           mySlot={slotKnown ? mySlot : undefined}
+          nextOwnPick={upcomingMyPicks[0] ?? null}
           onSeatClick={setOpenSeatSlot}
           onTracked={() => getSeats(draftId).then(setSeats).catch(() => {})}
         />
+
+        {/* The room where a position run matters most: these picks are real
+            and there is no rewinding them. Same component the other two rooms
+            use, fed from the landed prefix. */}
+        <PickFeed picks={landedPicks} teams={result?.teams ?? seats?.teams ?? 0} />
 
         <div className="board-panel">
           <section className="panel">
@@ -279,8 +301,13 @@ export default function LiveDraftView() {
                   ? `Simulating the rest of the draft… ${Math.round(resimProgress * 100)}%`
                   : result
                     ? live
-                      ? `Board projected past pick ${picksMade}`
-                      : 'Full projection — no live position to project from'
+                      ? // "projected past pick 210" is also nonsense on a
+                        // finished draft -- there is nothing past the last pick
+                        // to project, and every cell on the board is a fact.
+                        picksMade >= live.totalPicks
+                        ? 'Every pick is in — nothing left to project'
+                        : `Picks after ${roundPickLabel(picksMade + 1, live.teams)} are projected`
+                      : 'Projected from scratch — no live position to project from'
                     : 'No projection yet'}
                 {/* The crimson cells and the availability columns are both
                     "slot N", so say which N, and say when N is only a
@@ -291,9 +318,9 @@ export default function LiveDraftView() {
                 className="chip"
                 onClick={() => void resimulate()}
                 disabled={resimming || !seats}
-                title="Re-run the projection now"
+                title="Re-simulate the rest of the draft from where it stands now"
               >
-                re-run
+                Project again
               </button>
               <button
                 className="chip on"
@@ -301,7 +328,7 @@ export default function LiveDraftView() {
                 disabled={forking || live?.status !== 'drafting'}
                 title="Start an interactive mock draft picking up from where this live draft is right now"
               >
-                {forking ? 'forking…' : 'fork to mock →'}
+                {forking ? 'Forking…' : 'Continue as a mock →'}
               </button>
             </div>
             {forkError && <div className="error tiny">{forkError}</div>}

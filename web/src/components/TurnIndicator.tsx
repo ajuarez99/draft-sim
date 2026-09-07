@@ -46,8 +46,8 @@ export default function TurnIndicator({
       teams={teams}
       rounds={rounds}
       nextOwnPick={nextOwnPick}
-      done={complete}
-      doneLabel="Mock draft complete"
+      idle={complete}
+      idleLabel="Mock draft complete"
     />
   )
 }

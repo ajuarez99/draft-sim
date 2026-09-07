@@ -634,9 +634,33 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   line-height: 1.25;
 }
 .on-clock-eta b { font-size: 20px; color: var(--text); letter-spacing: 0.02em; font-weight: 700; }
-.on-clock.done { justify-content: space-between; }
-.on-clock-done-label { font-size: 14px; letter-spacing: 0.03em; }
+.on-clock.idle { justify-content: space-between; }
+.on-clock-idle-label { font-size: 14px; letter-spacing: 0.03em; color: var(--muted); }
 .on-clock .chip { flex-shrink: 0; }
+
+/* The identity block. A plain span in the batch and mock rooms; a real button
+   in the live room, where it opens the same SeatPopover a board column header
+   does -- the seat on the clock is exactly the manager you want to check
+   before they pick. Hover depth only on the button form: it is the one thing
+   in this strip that does something. */
+.on-clock-identity {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0 0 0 -6px;
+  background: transparent; color: inherit; font: inherit; text-align: left;
+  padding: 4px 6px; border-radius: 10px;
+}
+button.on-clock-identity {
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+button.on-clock-identity:hover {
+  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+}
+.on-clock.mine button.on-clock-identity:hover {
+  background: color-mix(in oklch, var(--crimson) 12%, transparent);
+}
+button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
 /*
  * The feed: three rows, newest first. Rows, not cards -- one line of content
@@ -742,44 +766,21 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
  * vertical budget, which is the whole point of the board-first layout.
  * Shallower shadow than `.panel`: it sits above the board, it isn't a panel.
  */
+/* Just a sticky wrapper now. The panel background, radius and shadow all live
+   on `.on-clock` inside it -- this used to paint its own and would otherwise
+   be a second card behind the strip. `.live-onclock` and its eight rules are
+   gone with it: the live room draws the same OnTheClock the other two rooms
+   do, and only the telemetry below is still this room's own. */
 .live-bar {
   flex: 0 0 auto; position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  background: var(--panel); border-radius: 12px; padding: 8px 14px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
 }
+.live-bar .on-clock { margin-bottom: 0; }
 
-/* The largest element in the bar, and the only one that is a real control --
-   it opens the same SeatPopover a board column header does. Hover depth lives
-   here and on the track chip, never on the static readouts. */
-.live-onclock {
-  display: flex; align-items: center; gap: 10px;
-  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
-  background: transparent; color: inherit; font: inherit; text-align: left;
-  padding: 4px 10px; border-radius: 10px; cursor: pointer;
-  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
-}
-.live-onclock:hover {
-  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
-  transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
-}
-.live-onclock:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-/* The non-clickable placeholder (nobody on the clock) gets no lift at all. */
-.live-onclock.idle { cursor: default; }
-.live-onclock.idle:hover { background: transparent; transform: none; box-shadow: none; }
-.live-avatar { width: 32px; height: 32px; font-size: 12px; }
-.live-onclock-text { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
-.live-onclock-label { font-size: 9px; letter-spacing: 0.08em; color: var(--muted); }
-.live-onclock-name { font-size: 15px; font-weight: 600; }
-/* Same crimson "you" identity as `.cell.mine` and the column header. */
-.live-onclock.mine .live-onclock-name { color: var(--crimson); }
-.live-onclock-pick { font-size: 11px; color: var(--muted); }
-
-.live-count { display: flex; flex-direction: column; gap: 5px; min-width: 110px; }
-.live-count-figure { font-size: 13px; }
 /* Reusing `.progress`/`.progress-bar` rather than inventing a second bar --
-   only the run-level margin comes off. */
-.live-progress { margin-bottom: 0; }
+   only the run-level margin comes off. Narrow, because the fraction it used to
+   spell out is now OnTheClock's own eta readout; this is the shape of the
+   draft's progress, not a number to read. */
+.live-progress { margin-bottom: 0; width: 90px; flex-shrink: 0; }
 
 .live-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .live-track { transition: border-color 120ms ease, color 120ms ease, transform 120ms ease; }

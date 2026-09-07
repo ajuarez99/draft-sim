@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { trackDraft, type LiveState, type Seat } from '../api'
-import { hueFor } from '../hue'
-import { roundPickLabel } from '../roundPickLabel'
 import { STALE_AFTER_SECONDS } from '../useLiveDraft'
+import OnTheClock from './OnTheClock'
 
 type Props = {
   draftId: string
@@ -11,6 +10,8 @@ type Props = {
   secondsSinceContact: number | null
   seats: Seat[]
   mySlot?: number
+  /** Your next pick that hasn't landed yet, for the "picks until you" readout. */
+  nextOwnPick?: number | null
   onSeatClick: (slot: number) => void
   /** Called after a manual /track so the page can refetch anything it derives from seats. */
   onTracked?: () => void
@@ -24,15 +25,18 @@ function ago(seconds: number): string {
 }
 
 /**
- * One line above the board carrying four readings: what the draft is doing,
- * whose pick it is, how far in it is, and how long ago the backend last said
- * anything.
+ * The live room's header: OnTheClock, plus the telemetry only this room has.
  *
- * A bar rather than four cards on purpose -- there is one word, one identity,
- * one fraction and one clock here, and four equal boxes would give the same
- * weight to the status word as to the thing you actually look at (whose pick
- * it is). The on-the-clock seat is the largest element; the freshness pill on
- * the right is the component's real job.
+ * It used to draw its own `.live-onclock` identity block, which meant three
+ * draft rooms carried two visual languages for "whose turn is it" once the
+ * batch and mock rooms were unified onto OnTheClock. Composition rather than
+ * deletion, because this bar genuinely does more than the other two: an SSE
+ * freshness pill, a progress bar against reality, and a manual re-poll. Those
+ * ride along as OnTheClock's `children`.
+ *
+ * The freshness pill is still this component's real job. Everything else here
+ * is a number the backend sent, and a number it sent ten minutes ago looks
+ * identical to one it sent a second ago.
  */
 export default function LiveStatusBar({
   draftId,
@@ -41,6 +45,7 @@ export default function LiveStatusBar({
   secondsSinceContact,
   seats,
   mySlot,
+  nextOwnPick,
   onSeatClick,
   onTracked,
 }: Props) {
@@ -56,8 +61,13 @@ export default function LiveStatusBar({
       // stale DB value -- say so rather than presenting it as the truth. And a
       // backend older than the seatsMapped field answers 200 without it, so
       // don't render "undefined/undefined".
-      const seats = typeof r.seatsMapped === 'number' ? `${r.seatsMapped}/${r.teams} seats · ` : ''
-      setTrackNote(`${seats}${r.status ?? 'unknown'}${r.observed === false ? ' (stale)' : ''}`)
+      const seatNote =
+        typeof r.seatsMapped === 'number'
+          ? r.seatsMapped === r.teams
+            ? `All ${r.teams} managers identified · `
+            : `Only ${r.seatsMapped} of ${r.teams} managers identified · `
+          : ''
+      setTrackNote(`${seatNote}${r.status ?? 'unknown'}${r.observed === false ? ' (stale)' : ''}`)
       onTracked?.()
     } catch (e) {
       setTrackNote(e instanceof Error ? e.message : String(e))
@@ -66,85 +76,72 @@ export default function LiveStatusBar({
     }
   }
 
-  const status = live?.status ?? (connected ? 'unknown' : 'offline')
   const onClockSlot = live?.status === 'drafting' ? live.onTheClockSlot : null
   const onClockSeat = onClockSlot != null ? seats.find((s) => s.slot === onClockSlot) : undefined
   // The pick the room is waiting on, not the last one made.
   const onClockPickNo = live ? live.picksMade + 1 : 0
-  const hue = onClockSeat ? hueFor(String(onClockSeat.managerId)) : hueFor(String(onClockSlot ?? 0))
   const isMe = onClockSlot != null && onClockSlot === mySlot
 
+  const stale = secondsSinceContact == null || secondsSinceContact >= STALE_AFTER_SECONDS
   const total = live?.totalPicks ?? 0
   const made = live?.picksMade ?? 0
   const pct = total > 0 ? Math.round((made / total) * 100) : 0
 
-  const stale = secondsSinceContact == null || secondsSinceContact >= STALE_AFTER_SECONDS
+  // Four distinct reasons nobody is on the clock, and they are not
+  // interchangeable -- "not started" and "we can't reach the backend" would be
+  // the same word if this collapsed them.
+  const idleLabel =
+    live == null
+      ? connected
+        ? 'Connecting to the draft'
+        : 'Not connected'
+      : live.status === 'complete'
+        ? 'Draft complete'
+        : live.status === 'pre_draft'
+          ? 'Draft has not started'
+          : 'Waiting for the draft order'
+
+  const telemetry = (
+    <>
+      {total > 0 && (
+        <div className="progress live-progress" title={`${made} of ${total} picks made`}>
+          <div className="progress-bar" style={{ width: `${pct}%` }} />
+        </div>
+      )}
+      <div className="live-right">
+        {trackNote && <span className="muted tiny live-track-note">{trackNote}</span>}
+        <button
+          className="chip live-track"
+          onClick={track}
+          disabled={tracking}
+          title="Check Sleeper again now and refresh which managers are in which seats"
+        >
+          {tracking ? 'Refreshing…' : 'Refresh'}
+        </button>
+        <span className={`live-fresh ${stale ? 'stale' : 'ok'}`}>
+          {secondsSinceContact == null ? 'No contact' : `${stale ? 'Stale' : 'Live'} · ${ago(secondsSinceContact)}`}
+        </span>
+      </div>
+    </>
+  )
 
   return (
     <div className="live-bar">
-      <span className={`chip status-${status}`}>{status.replace('_', ' ')}</span>
-
-      {onClockSeat ? (
-        <button
-          type="button"
-          className={`live-onclock${isMe ? ' mine' : ''}`}
-          onClick={() => onSeatClick(onClockSeat.slot)}
-          title={`${onClockSeat.manager} — click for details`}
-        >
-          <span
-            className="avatar live-avatar"
-            style={
-              isMe
-                ? { background: 'var(--crimson)', color: 'var(--bg)' }
-                : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
-            }
-          >
-            {onClockSeat.manager.trim().charAt(0).toUpperCase()}
-          </span>
-          <span className="live-onclock-text">
-            <span className="live-onclock-label cond">on the clock</span>
-            <span className="live-onclock-name">{onClockSeat.manager}</span>
-          </span>
-          <span className="live-onclock-pick mono">
-            {live ? roundPickLabel(onClockPickNo, live.teams) : ''}
-          </span>
-        </button>
-      ) : (
-        <span className="live-onclock idle">
-          <span className="live-onclock-text">
-            <span className="live-onclock-label cond">on the clock</span>
-            <span className="live-onclock-name muted">
-              {live?.status === 'complete'
-                ? 'draft over'
-                : live?.status === 'pre_draft'
-                  ? 'not started'
-                  : '—'}
-            </span>
-          </span>
-        </span>
-      )}
-
-      <div className="live-count">
-        <span className="live-count-figure mono">
-          {made}
-          <span className="muted">/{total || '—'}</span>
-        </span>
-        <div className="progress live-progress">
-          <div className="progress-bar" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-
-      <div className="live-right">
-        {trackNote && <span className="muted tiny live-track-note">{trackNote}</span>}
-        <button className="chip live-track" onClick={track} disabled={tracking} title="Re-tick the poller and refresh seat mapping">
-          {tracking ? 'tracking…' : 'track'}
-        </button>
-        <span className={`live-fresh ${stale ? 'stale' : 'ok'}`}>
-          {secondsSinceContact == null
-            ? 'no contact'
-            : `${stale ? 'stale' : 'live'} · ${ago(secondsSinceContact)}`}
-        </span>
-      </div>
+      <OnTheClock
+        manager={onClockSeat?.manager ?? null}
+        isMine={isMe}
+        hueSeed={String(onClockSeat?.managerId ?? onClockSlot ?? 0)}
+        pickNo={onClockPickNo}
+        maxPickNo={total}
+        teams={live?.teams ?? 0}
+        rounds={live?.rounds ?? 0}
+        nextOwnPick={nextOwnPick}
+        idle={onClockSeat == null}
+        idleLabel={idleLabel}
+        onManagerClick={onClockSeat ? () => onSeatClick(onClockSeat.slot) : undefined}
+      >
+        {telemetry}
+      </OnTheClock>
     </div>
   )
 }
