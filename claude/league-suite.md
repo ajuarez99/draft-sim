@@ -266,6 +266,73 @@ rank of their own team, or keep it and *show* the bias ("ranks himself 2.1 spots
 higher than the room does"), which is more fun and more in keeping with the rest
 of this app. Do not silently average it in as though it were neutral.
 
+### The page is a graph, week by week, with the mode as a toggle
+
+Requested 2026-09-07, same conversation: a chart of the league over the season,
+three selectable modes, **defaulting to the computed one because it is the only
+mode that updates on its own**. Rank on the y-axis, week on the x, one line per
+team — a bump chart.
+
+**The y-axis is forced, and it is worth knowing why.** Modes 1 and 2 produce
+*orderings only* — a commissioner ordering has no score behind it, and a set of
+ballots produces an aggregate position, not a strength. Only mode 3 produces a
+number. So the single axis all three modes share is **rank**, and score rides in
+the tooltip on the computed modes rather than on the axis. Trying to put score on
+the y-axis means two of the three toggles have nothing to draw.
+
+Consequence worth accepting up front: rank hides magnitude. First and second may
+be a coin flip or a chasm, and a bump chart cannot tell you which. The computed
+modes should say so on hover — the score is right there — rather than pretending
+the gaps are uniform.
+
+**Gaps are the real design problem, and they come straight from the cadence
+difference Allan already spotted.** The three modes do not cover the same weeks:
+
+    computed        every week, automatically, once ingest has run
+    commissioner    only weeks Allan actually sat down and ranked
+    member          only weeks enough people submitted -- and possibly 4 of 12
+
+**Do not interpolate across a missing week.** A straight line drawn from week 3 to
+week 7 is four weeks of data that does not exist, rendered indistinguishably from
+data that does. Break the line, or dot the segment, and label thin coverage
+(`4 of 12 ballots`) rather than averaging a handful of ballots into something that
+looks like league consensus. This is the same rule as everything else here: the
+chart may not look more certain than its inputs.
+
+**Fourteen lines is spaghetti, and the app already owns the fix.** `hueFor()`
+(`web/src/hue.ts`, already the identity colour on `DraftBoard` and `OnTheClock`)
+gives every manager a stable colour across the whole app, so a line means the same
+person here as on the board. Emphasise Allan's own team by default, per the
+house rule that crimson means you; hovering a line mutes the rest.
+
+**Two view states, not one.** The toggle Allan described switches *modes* and
+shows all fourteen teams. The more valuable view is the transpose: **one team,
+all three modes at once** — three lines instead of fourteen, and it is exactly the
+delta this page exists for ("the room had you 3rd all October while your roster
+ranked 1st"). Same data, same endpoint, far more readable. Build the mode toggle
+first; the per-team view is nearly free afterwards.
+
+Smaller decisions that follow:
+
+- **Switching modes preserves the highlighted team.** Losing the selection on
+  every toggle destroys the comparison the toggle is for.
+- **Default is `computed`, and which computed depends on the week.** Before week 1
+  the realized mode has nothing in it and draft capital is the only thing that
+  exists — which is the app's own draft board talking, a good default for a draft
+  simulator. After week 1, realized.
+- **One request, all modes.** Fourteen teams × ~15 weeks × 3 modes is ~630 rows;
+  send them in one payload so the toggle is instant and client-side. Do not
+  refetch per mode.
+
+**The dependency question, flagged rather than decided.** This is the first chart
+in an app with three runtime dependencies (`react`, `react-dom`,
+`react-router-dom`) and **no `<svg>` anywhere in `web/src` today**. A bump chart is
+polylines, ticks and labels — genuinely hand-rollable in SVG, consistent with a
+frontend whose visual vocabulary is already hand-built in `styles.css`, and it
+avoids a library whose default look would have to be fought back to house style.
+Recommendation: hand-roll this one; revisit if a second, materially different
+chart ever shows up.
+
 ### Storage sketch
 
 Phase A (V5, alongside the history table):
@@ -302,6 +369,13 @@ One ballot per manager per week, enforced in the schema.
    explicit, stated rule rather than by accident.
 6. None of this writes to `draft_pick`, `manager_profile`, or anything
    `ProfileService.fit()` reads — same wall as the mock tables.
+7. **The chart never draws a week it does not have.** A mode with gaps renders as
+   broken or dotted segments, never as a straight interpolation, and a partially
+   submitted week shows its ballot count.
+8. Switching modes keeps the highlighted team; a team's colour is the same
+   `hueFor()` colour it has on the draft board.
+9. The chart is readable at fourteen teams — verified by looking at it with a real
+   fourteen-team season loaded, not by asserting it in a test.
 
 ---
 
