@@ -774,10 +774,50 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
 .seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seat .who.mine-name { color: var(--crimson); }
-.seat .prov { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
-.seat .prov.neutral { color: var(--muted); background: var(--line); }
-.seat .prov.stated { color: var(--bg); background: var(--teal); }
-.seat .prov.fitted { color: var(--bg); background: var(--rb); }
+/* Was a filled uppercase badge. 23 of the 24 cards on /managers are FITTED,
+   so a bright "FROM HISTORY" chip on nearly all of them marked nothing while
+   outweighing the manager's own name -- the same "eleven identical league
+   average chips" noise provenance.ts was written to avoid on the board. Now
+   the board's own dot, which is what that module already renders there. */
+.prov-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.prov-dot.neutral { background: var(--muted); opacity: 0.5; }
+.prov-dot.stated { background: var(--teal); }
+.prov-dot.fitted { background: var(--rb); }
+
+/*
+ * REACH AXIS -- one scale across every card.
+ *
+ * The page's question is comparative ("who is the biggest reacher in my
+ * league") and it used to answer with 24 sentences. Every card draws on the
+ * same fixed +-8 picks scale, so the ranking is legible across the grid
+ * without reading any single card. Fixed rather than data-derived on purpose:
+ * a per-render max would rescale everything when one number moved.
+ */
+.reach { margin: 8px 0 6px; }
+.reach-track {
+  position: relative; height: 6px; border-radius: 3px;
+  background: oklch(24% 0.02 250); overflow: hidden;
+}
+.reach-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.reach-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+/* Two directions, two colors, because "reaches 5 early" and "waits 5 late"
+   are opposite behaviours and a single bar length cannot say which. Crimson
+   is not available here (it means "you"), so early borrows --qb's warm end
+   and late the cool --wr end. */
+.reach-fill.early { background: var(--qb); }
+.reach-fill.late { background: var(--wr); }
+.reach-caption {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-top: 4px; font-size: 10px;
+}
+.reach-caption b { font-size: 11px; font-weight: 700; }
+.reach-caption b.early { color: var(--qb); }
+.reach-caption b.late { color: var(--wr); }
+
+.tilt-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; font-size: 11px; color: var(--muted); }
+.tilt { display: inline-flex; align-items: center; gap: 5px; }
+.tilt .pos { margin-right: 0; }
+.tilt-note { font-style: italic; }
 .seat .note { color: var(--text); opacity: 0.85; font-style: italic; }
 .seat p { margin: 4px 0 0; }
 

@@ -377,3 +377,16 @@ bottom of the list.
 E2 first — it is a bug, it is fifteen minutes, and it makes E3 assessable.
 Then E1, which is what Allan actually asked for. Then E3 with the house-style
 rule that stops the next page repeating it, then E4, then E5 folded into B1.
+
+**Done 2026-09-07 evening (`f6c298b`, and B4 after it): E1, E2, E3, E4, B4.**
+
+E5 turned out to be mostly answered by E1 rather than needing its own work —
+league history and power rankings are now prominent links on every league card,
+so the only thing the header nav was actually hiding is gone. What is left of
+E5 is a judgement about global navigation, which belongs with B1.
+
+**Still open: B1, B2, B3, B5, A2, A3 + the rest of A4, A7.** A3 (the tendencies
+form, duplicated between `SeatPopover` and `ManagerTendencies`, with `reach
+bias` as a bare −20…20 number input) is now the most conspicuous thing left:
+B4 gave the *read* side of that data a proper scale, which makes the raw
+number input behind the Edit button look worse by comparison than it did.

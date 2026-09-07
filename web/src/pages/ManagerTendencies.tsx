@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { getManagers, setTendencies, clearTendencies, type ManagerSummary } from '../api'
 import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
-import { behaviourText } from '../managerBehaviour'
 
 /**
  * /managers -- the standalone place to declare tendencies for a real manager
@@ -13,16 +12,75 @@ import { behaviourText } from '../managerBehaviour'
  * plus the stated-vs-empirical comparison SeatPopover has no room for.
  */
 
-function behaviour(m: ManagerSummary) {
-  return behaviourText({ reachBias: m.effectiveReachBias, unpredictability: m.unpredictability, positionalTilt: m.positionalTilt })
-}
-
 /** The actual point of this page: does the stated number agree with history? */
 function comparison(m: ManagerSummary) {
   const stated = m.stated.reachBias
   const empirical = m.empiricalReachBias
   if (stated == null || empirical == null) return null
   return `you said ${stated > 0 ? '+' : ''}${stated.toFixed(1)} · history says ${empirical > 0 ? '+' : ''}${empirical.toFixed(1)} over ${m.draftsObserved} draft${m.draftsObserved === 1 ? '' : 's'} (${m.picksScored} picks)`
+}
+
+// Fixed, not derived from the data: a per-render max would rescale every card
+// whenever one manager's number moved, so two screenshots of this page could
+// not be compared and a bar's length would mean something different each
+// visit. +-8 picks covers every fitted value observed (widest so far ~14, which
+// clamps and is labelled as over the edge).
+const REACH_SCALE = 8
+
+/** One manager's reach bias on the scale every other card uses. */
+function ReachAxis({ reach }: { reach: number }) {
+  const clamped = Math.max(-REACH_SCALE, Math.min(REACH_SCALE, reach))
+  const half = (Math.abs(clamped) / REACH_SCALE) * 50
+  const early = clamped > 0
+  const near = Math.abs(reach) <= 0.5
+  return (
+    <div className="reach">
+      <div className="reach-track" aria-hidden="true">
+        <span className="reach-zero" />
+        {!near && (
+          <span
+            className={`reach-fill${early ? ' early' : ' late'}`}
+            // Grows out from the centre in the direction it means: early
+            // (reaching) right, late (waiting) left. A single left-anchored
+            // bar would make "waits 5 picks" and "reaches 5 picks" look the
+            // same, which is the one distinction this page is about.
+            style={early ? { left: '50%', width: `${half}%` } : { right: '50%', width: `${half}%` }}
+          />
+        )}
+      </div>
+      <div className="reach-caption">
+        <span className="muted">waits</span>
+        <b className={near ? 'muted' : early ? 'early' : 'late'}>
+          {near
+            ? 'drafts the board'
+            : `${Math.abs(reach).toFixed(1)} picks ${early ? 'early' : 'late'}`}
+          {Math.abs(reach) > REACH_SCALE ? ' +' : ''}
+        </b>
+        <span className="muted">reaches</span>
+      </div>
+    </div>
+  )
+}
+
+/** The positional leans, in the position's own color. */
+function tiltParts(m: ManagerSummary) {
+  const tilts = Object.entries(m.positionalTilt)
+    .filter(([, v]) => Math.abs(v - 1) > 0.05)
+    .sort((a, b) => Math.abs(b[1] - 1) - Math.abs(a[1] - 1))
+    .slice(0, 2)
+  if (tilts.length === 0) return <span className="muted">No strong positional lean</span>
+  return (
+    <>
+      {tilts.map(([pos, v]) => (
+        <span key={pos} className="tilt">
+          <span className={`pos ${pos}`}>{pos}</span>
+          {v > 1 ? 'early' : 'late'}
+        </span>
+      ))}
+      {m.unpredictability >= 1.25 && <span className="tilt-note">erratic</span>}
+      {m.unpredictability <= 0.8 && <span className="tilt-note">very predictable</span>}
+    </>
+  )
 }
 
 type RowProps = { m: ManagerSummary; onChanged: () => void }
@@ -94,9 +152,16 @@ function ManagerRow({ m, onChanged }: RowProps) {
         </span>
         <span className="who">{m.manager}</span>
         <span className="seat-head-right">
-          {label.badge && <span className={`prov ${label.className}`}>{label.badge}</span>}
+          {/* A dot, not the shouting badge this used to carry. 23 of the 24
+              cards on this page are FITTED, so a bright green "FROM HISTORY"
+              on every one of them marked nothing while outweighing the
+              manager's own name. Same dot vocabulary as the board's column
+              headers -- provenance.ts exists to keep those two in step. */}
+          {label.badge && (
+            <span className={`prov-dot ${label.className}`} title={`Tendencies ${label.badge}`} />
+          )}
           <button className="seat-edit" onClick={() => (editing ? setEditing(false) : startEdit())}>
-            {editing ? 'cancel' : 'edit'}
+            {editing ? 'Cancel' : 'Edit'}
           </button>
         </span>
       </div>
@@ -144,7 +209,15 @@ function ManagerRow({ m, onChanged }: RowProps) {
           {m.provenance === 'NEUTRAL' ? (
             <p className="muted small">Drafts like the room — nothing entered, no history yet.</p>
           ) : (
-            <p className="small">{behaviour(m)}</p>
+            <>
+              {/* The page's actual question is comparative -- "who is the
+                  biggest reacher in my league" -- and it used to be answered
+                  by 24 sentences you had to read and hold in your head. Every
+                  card draws on the same fixed scale, so the ranking is
+                  visible without reading any of them. */}
+              <ReachAxis reach={m.effectiveReachBias} />
+              <p className="small tilt-line">{tiltParts(m)}</p>
+            </>
           )}
           {m.note && <p className="note small">“{m.note}”</p>}
           {cmp && <p className="tiny mono">{cmp}</p>}
@@ -176,7 +249,12 @@ export default function ManagerTendencies() {
     ? [...managers].sort((a, b) => {
         const an = a.provenance === 'NEUTRAL' ? 1 : 0
         const bn = b.provenance === 'NEUTRAL' ? 1 : 0
-        return an !== bn ? an - bn : a.manager.localeCompare(b.manager)
+        if (an !== bn) return an - bn
+        // Most extreme first within the configured group, so the order down
+        // the page agrees with what the axes show across it. Alphabetical
+        // scattered the biggest reachers among the mildest ones and made the
+        // shared scale harder to read than it needed to be.
+        return Math.abs(b.effectiveReachBias) - Math.abs(a.effectiveReachBias)
       })
     : null
 
