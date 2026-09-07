@@ -6,9 +6,10 @@ supersedes the review's own "what I'd do first" ordering, because building
 steps 1–3 turned up seven things the review missed — including one gap that
 step 2 *created*.
 
-**A1 and the live-room half of A4 are done** (2026-09-07, same day) — struck
-through in place rather than deleted, so the reasoning stays readable. A1 also
-corrected a claim this doc got wrong; see it. Everything else is untouched.
+**A1, A5, A6 and the live-room half of A4 are done** (2026-09-07, same day) —
+struck through in place rather than deleted, so the reasoning stays readable.
+A1 also corrected a claim this doc got wrong; see it. Everything else is
+untouched.
 
 Every measurement was taken in the running app against league
 `1391509063170293760` at 1440×900, not read off the source.
@@ -122,30 +123,52 @@ The two live-room files went along with A1, since the work was already in
 them. The remaining two are the same duplicated form as A3, so do them
 together — the labels are the substance and the button case is incidental.
 
-### A5. 131 of 150 board cells render a placeholder em dash
+### A5. ~~131 of 150 board cells render a placeholder em dash~~ — DONE 2026-09-07
 
-Measured in a 10-team mock at pick 20. Every undrafted cell draws `—` plus its
-pick number, so the great majority of the board at any moment is two glyphs of
-nothing. The pick number alone already says "this pick hasn't happened"; the
-dash is 131 marks carrying no information, on the surface the whole app is
-built around.
+**Built.** All 131 gone; an undrafted cell is now its pick number and nothing
+else. Two things the fix needed that weren't obvious from the finding:
 
-Cheap, and it makes the drafted cells read louder without touching them.
+- **The pick number had to move into flow for that branch.** `.pickno` is
+  absolutely positioned against the cell, so with the dash removed an empty
+  cell had no flow content at all, collapsed to its own padding, and the number
+  hung out the bottom of it.
+- **The first attempt failed the contrast floor step 1 had just set.** Stacking
+  `opacity: 0.55` over a lifted muted measured **4.16:1** — under AA, two rules
+  below the fix that had raised `.pickno` out of exactly that. Plain
+  `var(--muted)` is 5.37:1, is what the dash it replaces was already using, and
+  stays quieter than a drafted cell's own number (5.6:1), which is the
+  hierarchy wanted.
 
-### A6. There is no loading state anywhere in the app
+Side effect worth knowing, and a good one: rounds with no picks in them now
+collapse to 28px against a drafted round's 70px, so the board's drafted region
+visibly dominates instead of every round being the same height.
 
-Three specific spots, all the same bug:
+### A6. ~~There is no loading state anywhere in the app~~ — DONE 2026-09-07
 
-- `MockDraftView.tsx:78` — `return <div className="content" />`. A literally
-  blank screen while the session fetches.
-- `DraftPicker.tsx:86,90` — both branches are gated on `drafts &&`, so while
-  the fetch is in flight the panel renders a heading with nothing under it,
-  then rows pop in.
-- `MockSetup.tsx:126` — the seat list is simply absent until managers load, so
-  the form changes height under the cursor.
+**Built**, but not as "one shared skeleton at three call sites" — that plan was
+wrong, and the reason is the useful part:
 
-Not a redesign: one shared skeleton row and one "loading" treatment, applied at
-three call sites.
+**A placeholder has to be the shape of what is coming, or it is a lie.** Only
+`DraftPicker` gets skeleton rows, because only its two lists are built out of
+`.draft-row`. The other two got words instead:
+
+- `MockSetup` — a seat row is a label plus a full-width select, nothing like a
+  `.draft-row`, and there is one fewer of them than there are teams. A row
+  skeleton there would have been the wrong shape *and* the wrong count. It says
+  "Loading managers you can seat…". (The original finding also overstated the
+  harm: the controls sit *above* the seat list, so they don't move when it
+  lands.)
+- `MockDraftView` — what arrives is a board and its header strip. First version
+  drew four list rows, which broke the rule that had just been written for
+  MockSetup; it is now a centred line borrowing `.start-overlay-status`'s
+  treatment, so a wait looks the same wherever the app does one.
+
+**The skeleton's own geometry was wrong on the first pass, by 15px a row.** The
+component's doc comment claimed it matched `.draft-row` exactly; measured, it
+was 34px against a real 49px, so every row would have jumped when content
+landed — the double-move a skeleton exists to prevent. The row's height comes
+from the status chip, not the text, so the placeholder now carries a chip-shaped
+element sized from it. Re-measured at 49px against 49px.
 
 ### A7. The room's vertical budget — our own regression, flagged in step 2
 
@@ -198,18 +221,19 @@ are load-bearing for consistency.
 |---|---|---|
 | ~~1~~ | ~~A1 live room onto `OnTheClock` + `PickFeed`~~ | done |
 | ~~2~~ | ~~A4 copy pass, live-room half~~ | done |
-| 1 | A5 drop the placeholder dashes | ~15m |
-| 2 | A6 loading states | ~1h |
-| 3 | B1 home hero + disclosure | ~2h |
-| 4 | A3 + the rest of A4 — extract the tendencies form, fix its labels | ~2h |
-| 5 | B2 mock-setup seat strip | ~3h |
-| 6 | B3 survival strips | ~3h |
-| 7 | B4 manager axis · B5 narrow viewport | ~4h |
+| ~~1~~ | ~~A5 drop the placeholder dashes~~ | done |
+| ~~2~~ | ~~A6 loading states~~ | done |
+| 1 | B1 home hero + disclosure | ~2h |
+| 2 | A3 + the rest of A4 — extract the tendencies form, fix its labels | ~2h |
+| 3 | B2 mock-setup seat strip | ~3h |
+| 4 | B3 survival strips | ~3h |
+| 5 | B4 manager axis · B5 narrow viewport | ~4h |
 | — | A2 availability in the mock room | scope first — backend work |
 | — | A7 vertical budget | only if it bites |
 
-A5 and A6 are together under two hours and finish closing what steps 1–3
-opened.
+Everything steps 1–3 opened is now closed. What is left is the review's own
+steps 4–7 plus the tendencies-form extraction (A3 + the rest of A4), which is
+the last place model internals are still facing the reader.
 
 ---
 

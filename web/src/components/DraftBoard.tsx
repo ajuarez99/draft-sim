@@ -170,10 +170,15 @@ export default function DraftBoard({
                     </div>
                   </>
                 ) : (
-                  <>
-                    <span className="pickno mono">{pickNo}</span>
-                    <span className="empty">—</span>
-                  </>
+                  // No em-dash placeholder. Measured 2026-09-07: 131 of 150
+                  // cells in a mid-draft board drew one, so the great majority
+                  // of the board at any moment was two glyphs saying "nothing
+                  // here" -- which the absence of a player already says. The
+                  // pick number moves into flow for this branch rather than
+                  // staying absolutely positioned: with no flow content at all
+                  // the cell collapses to its own padding and the absolute
+                  // number hangs out the bottom of it.
+                  <span className="pickno-open mono">{pickNo}</span>
                 )
                 // A visible cell is a real button (native focus + Enter/Space
                 // activation) so it can open the player card; hidden/pick-less

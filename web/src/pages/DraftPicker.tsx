@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { roundPickLabel } from '../roundPickLabel'
+import { SkeletonRows } from '../components/Skeleton'
 import {
   getDrafts,
   getMockSessions,
@@ -82,6 +83,11 @@ export default function DraftPicker() {
         </div>
 
         {error && <div className="error">{error}</div>}
+
+        {/* null is "still fetching", [] is "genuinely none" -- the two used to
+            render identically (nothing), so an empty heading sat over a fetch
+            in flight and then rows appeared under it. */}
+        {drafts == null && <SkeletonRows count={2} label="Loading your leagues" />}
 
         {drafts && drafts.length === 0 && (
           <p className="muted">No leagues yet — add one below.</p>
@@ -166,6 +172,8 @@ export default function DraftPicker() {
             New mock draft
           </Link>
         </div>
+
+        {mocks == null && <SkeletonRows count={2} label="Loading your mock drafts" />}
 
         {mocks && mocks.length === 0 && <p className="muted">No mock drafts yet — start one above.</p>}
 

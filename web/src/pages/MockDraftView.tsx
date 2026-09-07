@@ -13,6 +13,7 @@ import DraftBoard from '../components/DraftBoard'
 import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
 import PickFeed from '../components/PickFeed'
+import { LoadingScreen } from '../components/Skeleton'
 
 /**
  * Always reports NEUTRAL/zeroed behaviour, even for a MANAGER-type seat
@@ -75,7 +76,9 @@ export default function MockDraftView() {
     )
   }
   if (!state) {
-    return <div className="content" />
+    // Was `<div className="content" />` -- a blank screen for the whole fetch,
+    // indistinguishable from a route that had crashed.
+    return <LoadingScreen label="Loading this mock draft…" />
   }
 
   // Every committed pick is real, not a probability -- probability:1/isModal:true

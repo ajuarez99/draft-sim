@@ -123,6 +123,17 @@ export default function MockSetup() {
           </button>
         </div>
 
+        {/* A word, not a row skeleton. A seat row is a label plus a full-width
+            select, nothing like `.draft-row`, and there are one fewer of them
+            than there are teams -- so a placeholder here would be the wrong
+            shape AND the wrong count. It only has to say the list is coming;
+            the controls above it don't move when it lands. */}
+        {managers == null && (
+          <p className="muted small" role="status" aria-busy="true">
+            Loading managers you can seat…
+          </p>
+        )}
+
         {managers && managers.length > 0 && (
           <div className="seat-assign-list">
             <p className="muted small">Other seats — leave any on Bot</p>

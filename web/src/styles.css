@@ -218,6 +218,59 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 /* Zero seats mapped, or a failed track, is the thing you most need to notice. */
 .track-note.failed { color: var(--crimson); }
 
+/*
+ * LOADING PLACEHOLDERS
+ *
+ * `.skeleton-row` is `.draft-row`'s geometry on purpose -- same padding, same
+ * background, same 1px seam from the `.draft-list` it sits in -- so the real
+ * rows replace it without the page moving. A skeleton that is the wrong height
+ * shifts the layout twice instead of once, which is worse than no skeleton.
+ *
+ * The pulse is on the bars, not the row: a whole row breathing reads as the
+ * page doing something to itself, where a bar breathing reads as content on
+ * its way. Motion is opt-out per the file's own reduced-motion handling.
+ */
+.skeleton-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 14px; background: var(--panel);
+}
+.skeleton-bar {
+  height: 10px; border-radius: 999px;
+  background: color-mix(in oklch, var(--line) 70%, var(--panel));
+}
+/*
+ * The row's height comes from this, not from the text bar, because on a real
+ * `.draft-row` it comes from the status chip: `.chip` is 12px text at the
+ * body's 1.45 line-height (17.4px) plus 3px padding top and bottom plus its
+ * 1px border = 25px, which with `.draft-row`'s own 12px padding makes 49px.
+ * A 10px bar alone made the skeleton 34px, so every row shifted 15px when the
+ * real content landed -- the exact double-move this component's doc comment
+ * says is worse than showing no skeleton at all. Measured, not guessed.
+ * If `.chip` or `.draft-row` padding changes, this has to change with it.
+ */
+.skeleton-chip {
+  margin-left: auto; flex-shrink: 0;
+  width: 62px; height: 25px; border-radius: 999px;
+  background: color-mix(in oklch, var(--line) 55%, var(--panel));
+}
+
+/* The same shape `.start-overlay-status` gives "Simulating your draft…", so a
+   wait looks the same wherever the app does one. */
+.loading-screen {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+}
+.loading-screen .cond { font-size: 15px; letter-spacing: 0.03em; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-bar, .skeleton-chip { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+  /* Staggered so the row reads left-to-right rather than blinking as a block. */
+  .skeleton-chip { animation-delay: 0.2s; }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+}
+
 .add-draft .controls { margin-top: 6px; }
 
 .pos { display: inline-block; min-width: 30px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 7px; margin-right: 6px; letter-spacing: 0.02em; }
@@ -399,7 +452,20 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .meta { display: flex; align-items: baseline; margin-top: 3px; gap: 6px; }
 /* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
 .board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
-.board .empty { color: var(--muted); }
+/* An undrafted cell is its pick number and nothing else -- in flow, not the
+   absolute `.pickno`, so the cell has a real height to stand on. Right-aligned
+   to sit exactly where the drafted cells' own number sits, so the column of
+   numbers runs straight down the board through both kinds of cell. */
+/* Plain `--muted`, no opacity on top of it. The first pass here stacked
+   `opacity: 0.55` over a lifted muted and measured 4.16:1 -- under AA, which
+   is the exact failure the step-1 type floor had just fixed two rules up.
+   `--muted` on `--panel` is 5.37:1 and is already the app's "quiet text"
+   token; it is also what the em dash it replaced was using, so this is no
+   louder than the thing being removed. Dimmer than a drafted cell's own
+   `.pickno` (which lifts toward `--text`), which is the hierarchy wanted. */
+.board .pickno-open {
+  display: block; text-align: right; font-size: 10px; color: var(--muted);
+}
 
 .panel-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
 /* The rounded-corner clip lives here, not on `.board`, on purpose: `.board`
