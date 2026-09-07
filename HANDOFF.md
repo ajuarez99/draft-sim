@@ -736,8 +736,26 @@ it is not broken.
   one-paragraph summary and each commit's message for the design detail —
   not re-narrated here.
 - **Frontend `VITE_API_BASE` + auth header.** ~20 lines. Blocks any remote deploy.
-  Not needed while running locally against `localhost`. Still the only
-  concretely-scoped, unstarted item in this file as of 2026-09-07.
+  Not needed while running locally against `localhost`.
+- **Two plans promoted out of `ideas/` on 2026-09-07, both planned, neither
+  started.** Each was blocked on an assumption nobody had checked; both
+  assumptions were measured against the live Sleeper API that day, and the
+  answers changed the plans:
+  - **`claude/league-suite.md`** — league history, then polls. **Sleeper has no
+    OAuth** (their docs: read-only API, no authentication), so any multi-user
+    feature needs bespoke identity — that cost lands entirely on polls. The
+    history half needs no new ingest path: `/league/{id}/rosters` returns
+    wins/losses/points directly, `winners_bracket` gives placement, and
+    `SleeperClient.leagueChain` already walks seasons. Phase A (read-only, no
+    auth, one V5 table) is the recommended start and the whole validation.
+  - **`claude/player-affinity.md`** — the feasibility script that doc had asked
+    for since 2026-08-29 was finally written and run (`claude/scripts/`).
+    **Public drafts can be enumerated at volume without auth**: ~6.5× league
+    growth per crawl level, 214 calls / 43 s for two levels, picks fully
+    attributed. So archetype clustering is unblocked. **But** the seed league's
+    own twelve managers gained a *median of one* extra draft each (Allan: one),
+    which is evidence against `claude/borrowed-drafts.md`'s borrow-individual-
+    history premise — read that measurement before building its data half.
 
 ---
 

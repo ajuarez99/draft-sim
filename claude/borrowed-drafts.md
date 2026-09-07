@@ -3,6 +3,21 @@
 Design note, 2026-08-29. **Nothing built.** Recorded so tomorrow starts from the
 reasoning rather than rebuilding it.
 
+> **Amended 2026-09-07 — the central premise is now measured, and it is weaker
+> than this doc assumes.** "A leaguemate is in more leagues than yours" is true
+> but small: crawling every 2025+2024 league of all twelve (Foot) Ball Knowers
+> members found 10 usable extra drafts, distributed as
+> `[4, 3, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1]` — a **median of one** additional draft
+> per manager, and exactly one for Allan. Going from one or two drafts to two or
+> three does not fix a fit this repo already calls mostly noise. Crawling wider
+> does not help *this* idea either: deeper levels reach strangers, not the
+> fourteen people being modelled. What the same crawl *did* establish is that a
+> corpus in the thousands is reachable without auth, which is worth building for
+> **archetypes** rather than for borrowed individual history. Full numbers and
+> method: `claude/player-affinity.md`'s measured section, scripts in
+> `claude/scripts/`. The normalization half of this doc shipped in Phase 1 and
+> was worth it independently of any of this.
+
 Two topics, one spine. Widening the per-manager sample with borrowed drafts and
 letting the user mock an 8-to-16-team draft both fail the same way: anything keyed on
 absolute round number or absolute pick number breaks the moment team count varies.

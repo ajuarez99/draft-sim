@@ -19,25 +19,35 @@ If something moves from "maybe" to "next", it leaves this folder and goes into
 
 ## Contents
 
-- **`league-suite.md`** — growing this from a single-user simulator into a
-  full league suite (history, polls, and whatever gets built on top of those).
-  The new part isn't the features, it's that they need multi-user auth and
-  real write paths, which nothing here has today.
-- **`player-affinity.md`** — whether manager tendencies and players belong in a
-  vector store. Player-to-player similarity from role features is worth building
-  and the scorer already reserves a slot for it; a shared text-embedding space for
-  notes and players is the appealing wrong answer. Corpus-scale work is blocked on
-  an unverified assumption about enumerating public Sleeper drafts.
 - **`ad-hoc-league-sizing.md`** — supporting a real league whose team count isn't
   one of the four already built (8/10/12/14). Demoted from the roadmap: none of
   Allan's actual leagues need it.
+
+## Left this folder (promoted to plans, 2026-09-07)
+
+Both went to `claude/` once the assumption each was blocked on got **measured**
+instead of argued about. Neither is built; they are plans now, not maybes.
+
+- **`claude/league-suite.md`** — league history + polls. Measured: Sleeper has no
+  OAuth at all (their docs: the API is read-only and performs no authentication),
+  so multi-user auth is fully bespoke; and every league-history endpoint needed
+  for the read-only slice already works unauthenticated, making that half a small
+  extension rather than a new ingest path.
+- **`claude/player-affinity.md`** — player similarity, note extraction, archetypes.
+  Measured: public Sleeper drafts *can* be enumerated at volume without auth
+  (~6.5× league growth per crawl level, 214 calls for two levels), so the
+  archetype half is unblocked — but a seed league's own managers gain a median of
+  **one** extra draft, which undercuts the borrow-individual-history idea in
+  `claude/borrowed-drafts.md`. The feasibility scripts live in `claude/scripts/`.
 
 ## Also parked, not yet written up
 
 Carried over from the design doc's deferred list — each needs several more seasons
 of history before it is anything but noise:
 
-- Draft archetype classification (zero-RB, hero-RB, and friends)
+- Draft archetype classification (zero-RB, hero-RB, and friends) — now written up
+  as step 4 of `claude/player-affinity.md`, and no longer blocked on the corpus
+  question, though still the largest piece in that doc
 - Handcuff and stacking detection
 - Tier discipline — does a manager reach across a tier break or wait
 - Basketball as a second `SportRules` implementation (the seam exists; nothing else does)
