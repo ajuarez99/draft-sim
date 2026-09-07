@@ -225,14 +225,27 @@ unauthenticated.** Verified against Ball Knowers 2025:
 That gives two honestly different computed rankings, and they should not be
 blurred into one number:
 
-    (a) DRAFT CAPITAL   sum of board value over the roster, using the same
+    (a) MARKET VALUE    sum of board value over the roster, using the same
                         exp(-adp / valueDecay) the engine already values with.
-                        Says: whose roster looked best on draft day.
+                        Says: how the market rates the players on this roster.
                         Free -- the board is already in the database.
 
     (b) REALIZED        per-player points-per-game from players_points, summed
                         over the current starting lineup.
                         Says: whose players have actually produced.
+
+**Amended after review, 2026-09-07.** Mode (a) was written as "draft capital ...
+whose roster looked best on draft day" and that name was wrong, on measured
+evidence: only **127 of 182 rostered players (70%)** in Ball Knowers 2025, and
+**75% of starters**, were drafted in that league's draft at all. The rest arrived
+by waiver or trade and have no `adp_at_time` — that column is per *pick*, not per
+player — so a draft-capital number over a current roster is missing a third of its
+inputs and scores a waiver league-winner as an empty slot. It is computed from the
+**board** instead, which covers every player however acquired, and renamed to match.
+"Who drafted best" is a real question but a different one: it is fixed at the draft,
+would be a **flat line** on a week-by-week graph, and belongs on the history page as
+a per-season draft grade. Five further amendments in
+`claude/plan-review-league-suite.md`.
 
 **The honest caveat, and it must ship on the page, not in a comment:** neither is
 "how good is this team right now." (a) is a preseason expectation and goes stale
@@ -317,9 +330,14 @@ Smaller decisions that follow:
 - **Switching modes preserves the highlighted team.** Losing the selection on
   every toggle destroys the comparison the toggle is for.
 - **Default is `computed`, and which computed depends on the week.** Before week 1
-  the realized mode has nothing in it and draft capital is the only thing that
-  exists — which is the app's own draft board talking, a good default for a draft
-  simulator. After week 1, realized.
+  the realized mode has nothing in it and market value is the only thing that
+  exists — which is the app's own board talking, a good default for a draft
+  simulator. After week 1, realized. **This is the state today, not a hypothetical:**
+  `GET /state/nfl` returns week 1 with `season_start_date: 2026-09-09`, so on the
+  day this ships the realized mode is empty and "the season hasn't started" is the
+  screen Allan actually sees. It needs real copy, not a blank chart. That endpoint
+  is also how the page knows what week it is, and it is **not** in `SleeperClient`
+  today — see review finding 3.
 - **One request, all modes.** Fourteen teams × ~15 weeks × 3 modes is ~630 rows;
   send them in one payload so the toggle is instant and client-side. Do not
   refetch per mode.
@@ -338,8 +356,15 @@ chart ever shows up.
 Phase A (V5, alongside the history table):
 
     power_ranking(id, league_id, season, week, kind, created_at)
-        kind in ('COMMISSIONER', 'COMPUTED_DRAFT_CAPITAL', 'COMPUTED_REALIZED')
+        kind in ('COMMISSIONER', 'COMPUTED_MARKET_VALUE', 'COMPUTED_REALIZED')
     power_ranking_entry(ranking_id, roster_id, manager_id, rank, score, note)
+
+Weeks to ingest are bounded by `settings.last_scored_leg`, **not** by looping until
+a response comes back empty — measured after review: week 18 of Ball Knowers 2025
+returns populated matchup data despite `last_scored_leg: 17`, so a loop-till-empty
+ingest silently averages in a week the league never played. `playoff_week_start`
+separates regular season from playoffs. The current week is the only one worth
+refetching; everything earlier is settled.
 
 **Computed rankings are stored as weekly snapshots, not recomputed on read.**
 "Up 3 spots since last week" needs history, and the inputs move underneath you —
@@ -363,8 +388,12 @@ One ballot per manager per week, enforced in the schema.
 3. Each computed mode states what it measures and what it does not, on the page.
    "Demonstrated strength" and "draft-day expectation" are never labelled
    "strength" unqualified.
-4. A roster with an injured or IR starter does not silently score as though he
-   played.
+4. A starter carrying `injury_status` Out/Doubtful does not silently score as
+   though he played, and the page states which way it resolves (excluded, or
+   included with a flag). **Amended after review:** IR is a separate `reserve`
+   array whose players do not appear in `starters`, so the IR case this criterion
+   originally imagined mostly cannot occur through that path — `injury_status` on
+   an active starter is the real one.
 5. Mode 2 shows spread alongside the aggregate, and self-ranking is handled by an
    explicit, stated rule rather than by accident.
 6. None of this writes to `draft_pick`, `manager_profile`, or anything
@@ -376,6 +405,10 @@ One ballot per manager per week, enforced in the schema.
    `hueFor()` colour it has on the draft board.
 9. The chart is readable at fourteen teams — verified by looking at it with a real
    fourteen-team season loaded, not by asserting it in a test.
+10. Ties in a computed ranking resolve by one stated rule, applied in the service —
+    not decided independently by the ranker and the renderer.
+11. Week ingest never fetches past `last_scored_leg`, and re-running it does not
+    refetch weeks already stored except the current one.
 
 ---
 
