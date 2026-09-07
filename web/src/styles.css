@@ -1284,3 +1284,87 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    space-between so the summary and the button land at opposite ends. */
 .mock-seat-cta { justify-content: space-between; margin-top: 4px; }
 .mock-seat-summary { margin: 0; flex: 1; min-width: 0; }
+/* ===== B3 + B5: availability survival strips, narrow viewport ===== */
+
+/*
+ * B3 -- AvailabilityPanel used to give each of your next N picks its own
+ * `.bar-cell` column (a width% bar plus a "62%" label); the row read as a
+ * spreadsheet, not a curve. The strip below is the replacement: one column,
+ * one small tile per pick, shaded by survival, so a row reads as a decay
+ * curve at a glance instead of a run of numbers the reader has to compare by
+ * eye. Fill only, never text-in-the-cell -- the exact percentage lives in
+ * each tile's own `title`, the same convention DraftBoard's cells already
+ * use for the full player name. `.bar` / `.bar-label` (the old per-pick
+ * cell's contents) are dead now that AvailabilityPanel.tsx no longer renders
+ * them, but they're left in place further up the file rather than deleted
+ * here -- this block is additive-only per the parallel-branch rule above,
+ * and pulling a mid-file rule is exactly the kind of edit that rule exists
+ * to avoid. A follow-up pass after the four branches merge can remove them.
+ */
+.strip-col { min-width: 132px; }
+.strip-cell { padding: 6px 8px; }
+.survival-strip { display: flex; align-items: center; gap: 3px; }
+.survival-block {
+  /* 16x18 with a 4px radius -- proportioned to the tile itself, not lifted
+     from one of the house style's four named radii (999/10/12/14). A 999px
+     pill on something 16px wide reads as a dot, and 10px (the board-tile
+     radius, meant for ~70-96px cells) is more corner than straight edge at
+     this size. 4px is the smallest rounding that still reads as "rounded"
+     next to the `.pos` badges beside it -- checked by eye against them at
+     the same width, since none of the named roles fit a tile this small. */
+  width: 16px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  /* A hairline border so a near-zero cell (survival close to 0, background
+     close to plain --panel) still reads as an empty tile rather than a gap
+     in the row -- only the fill goes to nothing, never the tile itself. */
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.verdict { font-size: 12px; white-space: nowrap; }
+/* Weight and shade carry the three-way hierarchy, not a new hue: --crimson
+   already means "you" only and --teal already means generic interaction
+   (house-style header, above) -- a fourth "risk" color would either collide
+   with one of those meanings or need a fifth token nothing else in the app
+   uses. The words already say what a color would only repeat, so the loudest
+   verdict ("act now") gets full --text at 700 weight and the quietest
+   ("safe") gets --muted at regular weight, with "coin flip" in between. */
+.verdict-risk { color: var(--text); font-weight: 700; }
+.verdict-even { color: var(--muted); font-weight: 600; }
+.verdict-safe { color: var(--muted); font-weight: 400; }
+
+/*
+ * B5 -- `.avail-sheet` is absolutely positioned against `.board-stage` with
+ * `left` and `right` both set, which fixes the *box's* width to the stage's,
+ * exactly as intended. Nothing, though, bounded the width of what's inside
+ * it: `.controls-inline` (position chips + depth chips + the collapse
+ * toggle) is a plain flex row with no wrap, sized to its own min-content.
+ * Once that min-content exceeds the box -- five position chips and up to six
+ * depth chips easily do, well before 700px -- a non-wrapping flex row does
+ * not shrink to fit, it overflows the box outward. That overflow is what
+ * verified as "renders outside the panel, over the board and off-screen" at
+ * 375px: the chips don't clip, they spill past `.board-stage`'s right edge
+ * and off the visible page.
+ *
+ * The fix is the same one the house-style LAYOUT rule already prescribes for
+ * this kind of overflow elsewhere in the file (`.panel-head` already wraps) --
+ * let the row wrap rather than adding a hard floor under the stage's width,
+ * because a floor would just move the failure to whatever gets squeezed
+ * below it. Applied unconditionally, not inside the 700px media query below:
+ * a 14-column board is one browser-zoom step from the same min-content
+ * overflow at 1280px, and wrapping costs nothing on a row that already fits
+ * on one line -- it only ever activates when there's no room, which is
+ * exactly the laptop case too.
+ */
+.avail-sheet .controls-inline { flex-wrap: wrap; row-gap: 6px; }
+
+@media (max-width: 700px) {
+  /* Tuned to sit inline after the position chips on one row; once the row
+     wraps, that left margin reads as a stray gap in front of "Next" instead
+     of a separation from what's beside it. */
+  .avail-sheet .depth { margin-left: 0; }
+  /* `.avail .player-col`'s 260px was sized for the sheet at its normal
+     width, most of a phone-width stage on its own. Narrowed here, scoped to
+     `.avail-sheet`, rather than in the shared rule near the top of this file
+     that `PlayerPicker` and `OnTheClockPickInput` also use unmodified --
+     they don't get squeezed into a `position: absolute` sheet and don't
+     need this. */
+  .avail-sheet .avail .player-col { width: 150px; }
+}
