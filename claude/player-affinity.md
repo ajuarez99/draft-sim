@@ -180,6 +180,66 @@ the stated half of a profile (`ManagerProfile.java:32`, persisted in
 `manager_profile.manual_json`, `V1__init.sql:97`), so extraction adds a sibling
 structured field there rather than a new table.
 
+**Corrected 2026-09-07: all three examples above target levers the engine does not
+have**, and the correction is the useful part of this section. Checked against
+`PickScorer.score()` (`PickScorer.java:57-73`), which takes exactly three
+per-manager-influenced inputs — `reachBias`, `positionalTerm` (which folds in
+`profile.tilt(pos)`, `PickScorer.java:83-85`) and `runTerm` — plus
+`unpredictability` multiplying that seat's temperature outside the scorer. So:
+
+| the example | lever it needs | exists? |
+| --- | --- | --- |
+| `teamAffinity: CIN` | a team-affinity term | **no** — that *is* step 3's `w_aff` |
+| `positionFloor: {QB: 8}` | per-manager, round-gated position floor | **no** — tilt is position-only; the round gate that exists is global K/DEF |
+| `runSensitivity: 1.6` | per-manager run weight | **no** — `w_run` is global |
+
+Extraction was never the hard part. The destination is. Writing the extractor
+against attributes nothing consumes produces a tidy JSON blob that changes no
+simulation — which is exactly the "looks principled, does nothing" outcome this
+doc exists to avoid.
+
+### The process, concretely — and why v1 is a form assistant, not a signal path
+
+Define the closed attribute set **backwards from the dials that exist**, and step 2
+needs no engine change, no new provenance concept, and no new table:
+
+    Stage 0  The closed set IS the three dials: reachBias, positionalTilt[pos],
+             unpredictability. Nothing else is extractable in v1. (Making
+             positionalTilt settable is a small, separable change -- it is
+             fitted-only today by an explicit decision, see HANDOFF.)
+
+    Stage 1  Extract. One LLM call per note, temperature 0, fixed JSON schema
+             over that closed set. Output is {dial, direction} plus an explicit
+             `unmapped: [...]` list of the parts of the note it could NOT map.
+             No magnitudes invented -- see the constraints above.
+
+    Stage 2  Store as a sibling of the note in manual_json:
+             {noteHash, extractedAt, proposed: [...], unmapped: [...]}.
+             The raw note is never overwritten. The hash gates re-extraction, so
+             the pass is idempotent and only re-runs when the note changes.
+
+    Stage 3  Review. /managers renders "read as: reaches ~8 picks early" with
+             accept / edit / dismiss. NOTHING reaches the engine unaccepted.
+
+    Stage 4  Consume. Accepting writes the ordinary reachBias /
+             unpredictability fields the tendencies API already writes
+             (ManagerController PUT /api/managers/{id}/tendencies). The engine
+             sees a number Allan confirmed, through the path that already
+             exists.
+
+Two properties fall out of Stage 3/4 and they are the whole reason to build it this
+way. **The fabricated-confidence problem disappears** — the extractor proposes, a
+human disposes, and the value the engine reads is one Allan accepted, so it is
+`STATED` in the plainest sense rather than a machine guess wearing a human's
+provenance. And **`unmapped` becomes the backlog**: if six of fourteen notes say
+something team-flavoured that nothing can consume, that is the evidence for building
+step 3's affinity term — measured demand instead of a hunch. If nothing lands there,
+step 3 was never worth building.
+
+The honest cost of this framing: v1 does not make the engine smarter. It makes a
+form easier to fill in and tells you which lever to build next. That is a smaller
+claim than "notes now drive the simulation," and it is the true one.
+
 ## Where a vector store earns its place
 
 Only at corpus scale — which, per the measurement above, is now **reachable rather
