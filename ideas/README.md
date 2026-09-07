@@ -19,6 +19,10 @@ If something moves from "maybe" to "next", it leaves this folder and goes into
 
 ## Contents
 
+- **`league-suite.md`** — growing this from a single-user simulator into a
+  full league suite (history, polls, and whatever gets built on top of those).
+  The new part isn't the features, it's that they need multi-user auth and
+  real write paths, which nothing here has today.
 - **`player-affinity.md`** — whether manager tendencies and players belong in a
   vector store. Player-to-player similarity from role features is worth building
   and the scorer already reserves a slot for it; a shared text-embedding space for
