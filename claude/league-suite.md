@@ -20,7 +20,9 @@ history and polls first, with room to keep adding once those exist:
 - **Polls.** Weekly power rankings, prediction polls, "grade this draft" votes.
   This is the one genuinely new category -- it needs manager-facing input, not
   just Sleeper ingest, which means auth-for-humans (see Open questions) rather
-  than the single-user assumption the app runs on today.
+  than the single-user assumption the app runs on today. **Power rankings are the
+  concrete first one, and they are specced below** -- see "Power rankings, three
+  ways".
 - **Whatever else a league wants**, once the first two exist and there's a
   container to hang it on: side bets, trade history, a manager leaderboard for
   "biggest reach of the year." Deliberately not speccing these now.
@@ -142,9 +144,14 @@ champion per season. `GET /api/managers/{id}/history` — one manager across sea
 record plus their draft-side numbers (reach, value, positional tilt) from data
 already present.
 
-**Frontend.** One route, `/history`, alongside the six in `App.tsx:62-68`. Reuse
-the existing table/pill vocabulary in `styles.css` — read its house-style header
-first, per `HANDOFF.md`.
+**Power rankings, modes 1 and 3** — the commissioner ordering and both computed
+ones — land in this phase too, since neither needs auth. See "Power rankings,
+three ways" below; this is where `/league/{id}/matchups/{week}`'s per-player
+points get ingested.
+
+**Frontend.** Two routes, `/history` and `/power`, alongside the six in
+`App.tsx:62-68`. Reuse the existing table/pill vocabulary in `styles.css` — read
+its house-style header first, per `HANDOFF.md`.
 
 **This phase is the whole validation.** It answers "would anyone but Allan open
 this" without building auth for an audience that may not want it.
@@ -164,8 +171,139 @@ the machine-facing `/api/**` surface.
 
 One vote per manager per poll, enforced in the schema, not in the service.
 
+**The first poll to build is mode 2 of the power rankings** — a submitted ordering
+is the same machinery as a submitted vote, and it has an audience reason to exist
+that a generic poll does not. Generic polls come after it, not before.
+
 **Do not start here.** Everything in Phase B is new risk (auth, spam, moderation,
 "who can see results before close") and none of it is testable without other humans.
+
+---
+
+## Power rankings, three ways
+
+Requested 2026-09-07. One page, three independent orderings of the same league:
+
+1. **Commissioner ranking** — Allan orders the teams by hand. One opinion, signed.
+2. **League member ranking** — every manager submits their own ordering; the page
+   shows the aggregate.
+3. **Computed ranking** — roster strength from the players actually on each roster,
+   **not** wins and losses.
+
+**The page is not three lists. It is the deltas between them.** Three columns
+side by side is a table; the product is "the room ranks you 3rd and your roster
+ranks 1st." That gap is the whole reason to have more than one method, and it is
+the thing no other fantasy tool shows, because no other tool has all three.
+
+### The auth split falls out for free, and it is convenient
+
+| mode | needs multi-user auth? | phase |
+| --- | --- | --- |
+| commissioner | **no** — the commissioner is Allan, who is already the only user | **A** |
+| computed | **no** — it is a calculation over ingested data | **A** |
+| league member | **yes** — arbitrary managers submitting attributed input | **B** |
+
+So two of the three ship in the no-auth phase, and the page is useful with two
+columns before anyone else has an account. Mode 2 is also the smallest possible
+version of "polls": build ranking submission and a generic poll is mostly the same
+machinery, which is the argument for it being the first poll rather than a
+separate feature after them.
+
+### Mode 3 is the one worth thinking hardest about
+
+**Measured 2026-09-07 — the data for a real strength ranking is already there,
+unauthenticated.** Verified against Ball Knowers 2025:
+
+- `/league/{id}/rosters` carries `players` (16), `starters` (10), `owner_id`,
+  `roster_id` — so who is on whose roster is a read.
+- `/league/{id}/matchups/{week}` carries **`players_points`** — *actual fantasy
+  points, per player, per week* (`{"11786": 4.0, "12490": 8.1, ...}`) — plus
+  `starters_points`. So per-player realized production needs **no external stats
+  source**, which is what the "not wins and losses" version of this feature was
+  otherwise going to depend on.
+
+That gives two honestly different computed rankings, and they should not be
+blurred into one number:
+
+    (a) DRAFT CAPITAL   sum of board value over the roster, using the same
+                        exp(-adp / valueDecay) the engine already values with.
+                        Says: whose roster looked best on draft day.
+                        Free -- the board is already in the database.
+
+    (b) REALIZED        per-player points-per-game from players_points, summed
+                        over the current starting lineup.
+                        Says: whose players have actually produced.
+
+**The honest caveat, and it must ship on the page, not in a comment:** neither is
+"how good is this team right now." (a) is a preseason expectation and goes stale
+the moment the season starts. (b) is backward-looking — a player who scored 25 a
+week through October and tore an ACL in November still ranks high on it. Real
+current strength needs a *forward* projection, and nothing in Sleeper's public API
+provides one. So the page ranks **demonstrated** strength and says so. Per this
+project's standing rule: a number that looks more certain than it is gets flagged
+in the payload, not buried.
+
+Two smaller decisions that follow:
+
+- **Rank the starting lineup, not the whole roster.** A team stacking three elite
+  QBs on the bench is not stronger for it. Use `starters`; the engine already has
+  the lineup-slot logic in `SportRules.rosterNeed`.
+- **Injury/inactive status is on `player` already** (`status`, `injury_status`,
+  `V1__init.sql:4-16`). A strength number that silently counts an IR player is
+  the same class of lie as the two above — surface it, or exclude and say so.
+
+### Aggregating mode 2 — show the disagreement, not just the mean
+
+With twelve to fourteen ballots, the *spread* is more interesting than the average
+and this project's honesty convention effectively requires showing it: a team
+ranked 1st by half the league and 8th by the other half is a different fact from
+one everybody puts 4th. So store ballots and compute on read — average rank (or
+Borda, decide when building), plus a disagreement measure, plus the most divisive
+team as a first-class output rather than a stat somebody could derive.
+
+**Self-ranking is a real decision, not an edge case.** Either exclude a manager's
+rank of their own team, or keep it and *show* the bias ("ranks himself 2.1 spots
+higher than the room does"), which is more fun and more in keeping with the rest
+of this app. Do not silently average it in as though it were neutral.
+
+### Storage sketch
+
+Phase A (V5, alongside the history table):
+
+    power_ranking(id, league_id, season, week, kind, created_at)
+        kind in ('COMMISSIONER', 'COMPUTED_DRAFT_CAPITAL', 'COMPUTED_REALIZED')
+    power_ranking_entry(ranking_id, roster_id, manager_id, rank, score, note)
+
+**Computed rankings are stored as weekly snapshots, not recomputed on read.**
+"Up 3 spots since last week" needs history, and the inputs move underneath you —
+recomputing last week's ranking today would silently give a different answer than
+it did last week, which is a trap worth designing out rather than discovering.
+
+Phase B adds ballots:
+
+    ranking_ballot(id, league_id, season, week, manager_id, submitted_at,
+                   unique (league_id, season, week, manager_id))
+    ranking_ballot_entry(ballot_id, roster_id, rank)
+
+One ballot per manager per week, enforced in the schema.
+
+### Acceptance criteria (power rankings)
+
+1. The commissioner ordering and both computed orderings render with **no auth**
+   and no ballots present — the page is useful before mode 2 exists.
+2. A computed ranking is reproducible from its stored snapshot: reopening week 4
+   next month shows what it showed in week 4.
+3. Each computed mode states what it measures and what it does not, on the page.
+   "Demonstrated strength" and "draft-day expectation" are never labelled
+   "strength" unqualified.
+4. A roster with an injured or IR starter does not silently score as though he
+   played.
+5. Mode 2 shows spread alongside the aggregate, and self-ranking is handled by an
+   explicit, stated rule rather than by accident.
+6. None of this writes to `draft_pick`, `manager_profile`, or anything
+   `ProfileService.fit()` reads — same wall as the mock tables.
+
+---
 
 ## Explicitly not being built
 
