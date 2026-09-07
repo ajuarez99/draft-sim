@@ -1148,3 +1148,76 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--bg); color: var(--text); border: 1px solid var(--line);
   border-radius: 6px; padding: 4px 6px;
 }
+
+/* ===== B1: home hero + global nav =====
+ * design-review-next-steps.md B1 (home hero + disclosure) and the leftover
+ * of E5 (global nav). Appended here rather than edited in place among the
+ * rules above -- four parallel worktrees are touching this file this pass,
+ * and a rule added at the end can't collide with a line another branch also
+ * touched partway through the file.
+ */
+
+/* E5: two links, not a navbar redesign. Reuses `.chip`/`.chip.on` rather than
+   inventing a second "selected" language -- the app already marks a current
+   value that way (segmented controls, position filters). */
+.top-nav { display: flex; align-items: center; gap: 6px; }
+
+/*
+ * B1 hero. `.panel` alone only sets background/radius/shadow (no display),
+ * so this is the actual row layout: the sentence on the left, one pill CTA
+ * on the right, wrapping under it rather than squeezing at narrow widths --
+ * this screen has no responsive floor of its own to lean on otherwise.
+ */
+.home-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.home-hero-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
+/* 10px is the type floor this file's header sets -- not a step below it. */
+.home-hero-kicker { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin: 0; }
+.home-hero-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-size: 26px; font-weight: 700; letter-spacing: 0.01em; color: var(--text); margin: 0;
+}
+.home-hero-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+/* The recent league's name is the one piece of real data in the sentence --
+   lifted to --text so it reads as the fact, not part of the framing prose. */
+.home-hero-sub strong { color: var(--text); font-weight: 700; }
+/* This is navigation (it goes to a route, nothing on this screen changes),
+   so per the CONTROL HIERARCHY it must be a link, never `.controls button` --
+   but it also has to visibly outweigh every `.chip` on the page, which is
+   why it gets its own class instead of reusing `.chip` at a larger size. */
+.home-hero-cta {
+  flex-shrink: 0; display: inline-flex; align-items: center;
+  background: var(--teal); color: var(--bg); text-decoration: none;
+  font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 999px;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.home-hero-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.home-hero-cta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * "League data" disclosure (the old "Add a league" panel). A native
+ * <details> rather than a controlled boolean in DraftPicker -- the browser
+ * already gets open/closed state, keyboard toggling and focus handling
+ * right for free. The two rules below only replace ITS marker, a triangle
+ * whose default glyph and position differ enough across browsers to read as
+ * a rendering bug rather than a control.
+ */
+.league-data-summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.league-data-summary::-webkit-details-marker { display: none; }
+.league-data-summary::before {
+  content: '▸'; display: inline-block; color: var(--muted); font-size: 11px;
+  transition: transform 120ms ease;
+}
+.league-data[open] .league-data-summary::before { transform: rotate(90deg); }
+.league-data-summary span:first-child {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted);
+}
+/* The body only exists in flow while open, so it only needs a gap from the
+   summary then -- closed, there is nothing below to space away from. */
+.league-data[open] .league-data-summary { margin-bottom: 12px; }

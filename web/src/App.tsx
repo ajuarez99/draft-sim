@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Route, Routes, useParams } from 'react-router-dom'
+import { Link, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
 import LiveDraftView from './pages/LiveDraftView'
@@ -43,6 +43,7 @@ export default function App() {
   // a re-render -- DraftView's settings-popover portal needs to know the
   // instant this node exists, not just eventually. See topSlot.tsx.
   const [topSlot, setTopSlot] = useState<HTMLDivElement | null>(null)
+  const location = useLocation()
 
   return (
     <div className="app">
@@ -51,11 +52,25 @@ export default function App() {
           <h1>
             <Link to="/">draft-sim</Link>
           </h1>
-          {/* Not scoped to one draft the way every other route is, so it
-              lives in the persistent header rather than a page-local link. */}
-          <Link to="/managers" className="chip">
-            Managers
-          </Link>
+          {/* E5 (design-review-next-steps.md): the header carried exactly one
+              nav chip and no indication of where you were. Home and Managers
+              are the only two destinations with no other route back to them --
+              every league-scoped page (draft room, history, power rankings)
+              now hangs off a league card per E1, so this deliberately stays a
+              two-item nav rather than growing a link per route. `.startsWith`
+              on Managers so its own sub-route (/managers/:id/history) still
+              marks the chip current, the same way a browser tab would. */}
+          <nav className="top-nav" aria-label="Global">
+            <Link to="/" className={`chip${location.pathname === '/' ? ' on' : ''}`}>
+              Home
+            </Link>
+            <Link
+              to="/managers"
+              className={`chip${location.pathname.startsWith('/managers') ? ' on' : ''}`}
+            >
+              Managers
+            </Link>
+          </nav>
         </div>
         <div className="top-slot" ref={setTopSlot} />
       </header>

@@ -16,14 +16,20 @@ import {
 export default function DraftPicker() {
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
   const [mocks, setMocks] = useState<MockSessionSummary[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // Split from one shared `error` the fetch and the add-league form used to
+  // share: fetch errors render at the top of "Your leagues" same as before,
+  // but that panel is far from the "League data" disclosure the add form now
+  // lives inside (B1), and a failed add needs to surface next to the button
+  // that caused it, not scrolled away under a different heading.
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [addError, setAddError] = useState<string | null>(null)
   const [leagueId, setLeagueId] = useState('')
   const [adding, setAdding] = useState(false)
   const [tracking, setTracking] = useState<string | null>(null)
   const [tracked, setTracked] = useState<Record<string, TrackResponse | { failed: string }>>({})
 
   function refetch() {
-    getDrafts().then(setDrafts).catch((e) => setError(e.message))
+    getDrafts().then(setDrafts).catch((e) => setFetchError(e.message))
     getMockSessions().then(setMocks).catch(() => {}) // non-critical -- the picker still works without it
   }
 
@@ -35,7 +41,7 @@ export default function DraftPicker() {
   // league-average bot, and it is better to find that out here than at 8:15.
   async function track(sleeperDraftId: string) {
     setTracking(sleeperDraftId)
-    setError(null)
+    setFetchError(null)
     try {
       const r = await trackDraft(sleeperDraftId)
       setTracked((prev) => ({ ...prev, [sleeperDraftId]: r }))
@@ -64,26 +70,68 @@ export default function DraftPicker() {
   async function addDraft() {
     if (!leagueId.trim()) return
     setAdding(true)
-    setError(null)
+    setAddError(null)
     try {
       await ingestLeague(leagueIdFrom(leagueId))
       setLeagueId('')
       refetch()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      setAddError(e instanceof Error ? e.message : String(e))
     } finally {
       setAdding(false)
     }
   }
 
+  // The hero's whole point is to ground "start a mock draft" in something
+  // real instead of a generic empty-state sentence. `drafts` is already
+  // newest-first off the backend (DraftRepository.allWithLeague: start_time
+  // desc, season desc, id desc), so the first row IS "the league you were
+  // last looking at" -- no separate last-used tracking to build or fake.
+  const recentLeague = drafts && drafts.length > 0 ? drafts[0] : null
+
   return (
     <div className="content">
+      {/* B1: this screen was three panels of equal weight and no primary
+          action -- the only real CTA ("New mock draft") was a small pill
+          200px down inside the middle panel. This hero says what a visitor's
+          next click actually is and grounds it in the league they were last
+          looking at, using its real name/size/rounds rather than a generic
+          "get started" line. */}
+      <section className="panel home-hero">
+        <div className="home-hero-body">
+          <p className="home-hero-kicker cond">Practice round</p>
+          <h1 className="home-hero-title">Start a mock draft</h1>
+          <p className="home-hero-sub">
+            {drafts == null ? (
+              // Still fetching -- say the generic version rather than
+              // guessing at a league that might not be the one that lands.
+              'Bots fill every seat but yours, and you take your own picks on your turn.'
+            ) : recentLeague ? (
+              <>
+                <strong>{recentLeague.leagueName}</strong> is a {recentLeague.teams}-team,{' '}
+                {recentLeague.rounds}-round league — get more reps before its next draft, in a
+                room only you control.
+              </>
+            ) : (
+              'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
+            )}
+          </p>
+        </div>
+        {/* Same destination as the "New mock draft" pill below, on purpose --
+            that pill stays where it is because it's the right contextual
+            action once you're already looking at the mock-drafts list. This
+            is the one a first-time or returning visitor actually sees first. */}
+        <Link className="home-hero-cta" to="/mock/new">
+          Start a mock draft
+        </Link>
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           <h2>Your leagues</h2>
         </div>
 
-        {error && <div className="error">{error}</div>}
+        {fetchError && <div className="error">{fetchError}</div>}
 
         {/* null is "still fetching", [] is "genuinely none" -- the two used to
             render identically (nothing), so an empty heading sat over a fetch
@@ -247,12 +295,22 @@ export default function DraftPicker() {
         )}
       </section>
 
-      <section className="panel add-draft">
-        <h2>Add a league</h2>
+      {/* B1: "Add a league" was its own panel, a third of the front door
+          given to a chore almost nobody does more than a few times a year.
+          A native <details> gets the collapse/expand behaviour, focus
+          handling and no-JS-state cost for free -- there's no reason to
+          reach for a controlled `open` boolean when the browser already
+          does this correctly. */}
+      <details className="panel add-draft league-data">
+        <summary className="league-data-summary">
+          <span>League data</span>
+          <span className="muted small">Add a Sleeper league by link or ID</span>
+        </summary>
         <p className="muted small">
           Paste a Sleeper league link or ID to add its draft history. Load the player pool
           and board separately first if this is a brand new install.
         </p>
+        {addError && <div className="error">{addError}</div>}
         <div className="controls">
           <label>
             Sleeper league link or ID
@@ -267,7 +325,7 @@ export default function DraftPicker() {
             {adding ? 'Adding…' : 'Add league'}
           </button>
         </div>
-      </section>
+      </details>
     </div>
   )
 }
