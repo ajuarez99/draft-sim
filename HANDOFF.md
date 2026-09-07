@@ -69,10 +69,17 @@ strip and a **PickFeed** with position-run detection, both fed entirely from
 room's old `.turn-indicator` collapsed into the same strip. A copy pass took
 out the app's loudest engineer-ism -- the pre-start overlay used to print
 `POST /api/ingest/all/1391509063170293760` for the reader to run themselves.
-Frontend suite 18 -> 36 tests, `npm run build` clean. **Not built:** the
-review's steps 4-7 (home hero, mock-setup seat strip, availability survival
-strips, manager comparison axis, and the narrow-viewport bug where the
-availability sheet escapes its panel below ~700px).
+Frontend suite 18 -> 36 tests, `npm run build` clean. **What's left is
+`claude/design-review-next-steps.md`** -- the live list, which supersedes the
+review's own ordering because building steps 1-3 turned up seven things it
+missed. Two of those are consequences of step 2 and should go first: the
+**live room is now the odd one out** (two of three draft rooms share
+`OnTheClock`; `LiveStatusBar` still carries its own `.live-onclock`), and the
+copy pass **missed four files** (`LiveStatusBar`, `SeatPopover`,
+`ManagerTendencies`, `LiveDraftView` -- including
+`title="Re-tick the poller and refresh seat mapping"`). The largest gap the
+review missed entirely: **the interactive mock room has no availability
+panel** at all, and adding one is backend work, not a mount.
 
 **Board re-skin built and verified, 2026-09-02:
 `claude/pill-board-and-player-list-on-top.md`.** Allan's board feedback, planned
