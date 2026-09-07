@@ -157,6 +157,12 @@ export default function DraftPicker() {
                         Follow live →
                       </Link>
                     )}
+                    <Link className="chip" to={`/leagues/${d.sleeperLeagueId}/history`} title="Standings across every ingested season">
+                      History
+                    </Link>
+                    <Link className="chip" to={`/leagues/${d.sleeperLeagueId}/power`} title="Commissioner, market-value and realized power rankings">
+                      Power
+                    </Link>
                   </div>
                 </div>
               )

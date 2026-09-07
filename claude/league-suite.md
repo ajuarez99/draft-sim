@@ -1,5 +1,73 @@
 # A full league suite, built on top of draft-sim
 
+## Phase A — built and verified live, 2026-09-07
+
+`claude/plan-review-league-suite.md`'s six amendments are all in. Built via
+`LeagueHistoryIngestService` (four new `SleeperClient` methods, `V5` migration:
+`roster_season`, `roster_week_points`, `power_ranking`, `power_ranking_entry`)
+and `PowerRankingService`, behind `LeagueHistoryController`
+(`/api/leagues/{id}/history`, `/api/managers/{id}/history`,
+`/api/leagues/{id}/power` + `/power/compute` + `/power/commissioner`) and two
+new frontend routes, `/leagues/:id/history` and `/leagues/:id/power` (a
+hand-rolled SVG bump chart, mode toggle, per-team transpose view, and a
+commissioner-ranking form), plus `/managers/:id/history`. 16 new backend
+tests (unit + a `LeagueHistoryContaminationIT` extending
+`MockDraftContaminationIT`'s pattern); backend suite 250/250, frontend 48/48,
+`tsc -b` and `vite build` clean.
+
+**Verified against real data, not just unit tests** -- Ball Knowers 2025
+(`1254190892974084096`): standings ingested and cross-checked byte-for-byte
+against `GET /league/{id}/rosters` and `/league/{id}` directly (wins, losses,
+points, champion all match); market-value and realized rankings computed for
+week 17 and rendered in a real browser through `vite dev`; a commissioner
+ranking submitted through the real form and reflected back on refetch.
+
+**Two real bugs found by actually running it, both fixed:**
+
+1. **`starters_points` is a per-slot array, not a roster total.** The ingest
+   originally read it as a scalar, which silently produced `0.0` for every
+   roster's realized score every week -- a well-formed number (per
+   `claude/lessons.md`'s "well-formed and wrong" class of bug) that only
+   showed up once real weeks were rendered in the chart. Fixed to read
+   `points` instead, verified equal to `sum(starters_points)` against real
+   week-1 data.
+2. **`(Double) rs.getObject(...)` on a `numeric` column throws
+   `ClassCastException` at runtime** (pgjdbc returns `BigDecimal`, not
+   `Double`) -- compiled fine, 500'd on the first real request. Same bug
+   class as `claude/lessons.md`'s JDBC-bind entries, just on the read side.
+   Fixed in `RosterSeasonRepository` and `PowerRankingRepository` with
+   `rs.getObject(i) == null ? null : rs.getDouble(i)`.
+
+**Design decisions made during the build, not fully specified by the plan:**
+
+- **Market value scores the ENTIRE roster's optimal starting lineup**
+  (`SportRules.startingLineupValue`, the engine's own lineup-slot logic),
+  not Sleeper's own `starters` snapshot -- this is what actually answers "not
+  the whole roster, but don't trust a manager to have set his lineup" without
+  needing a second definition of "best lineup." An OUT/Doubtful starter is
+  excluded before scoring (Phase A AC4); a rostered player absent from this
+  app's board is excluded and both exclusions are named in the entry's `note`,
+  never silent.
+- **Realized is cumulative average of each week's own recorded starting-lineup
+  total**, including playoff/consolation weeks (`last_scored_leg`, not
+  `playoff_week_start`) -- the plan's finding 2 amendment suggested separating
+  the two; not built, since Ball Knowers 2025's playoff weeks are real
+  consolation-bracket games with real non-zero scores, not the bye-week-zero
+  case the finding worried about. Worth revisiting if a league's non-playoff
+  teams ever go genuinely idle in weeks past `playoff_week_start`.
+- **Champion only** (`metadata.latest_league_winner_roster_id`), not full
+  placement (2nd, 3rd, ...) -- the plan's own suggested shortcut. Full
+  placement needs the whole `winners_bracket` tree and Phase A's acceptance
+  criteria never asked for it.
+- **Transactions ingest was not wired up** -- `SleeperClient.transactions()`
+  exists (cheap to add, matches the plan's four-method list) but nothing
+  calls it. Still just the trade-history idea from `ideas/`, not scheduled.
+
+**Not built (Phase B, unchanged from the plan):** league-member ballots
+(mode 2), magic-link auth, generic polls.
+
+---
+
 Design note, 2026-09-07. **Promoted from `ideas/` to a real plan the same day**,
 after its two blocking open questions were measured rather than assumed.
 **Nothing here is built** — planning only, per the `AGENTS.md` convention where

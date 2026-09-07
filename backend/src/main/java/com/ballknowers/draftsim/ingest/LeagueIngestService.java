@@ -112,18 +112,7 @@ public class LeagueIngestService {
     }
 
     private long upsertLeague(Sport sport, Map<String, Object> league) {
-        @SuppressWarnings("unchecked")
-        List<String> rosterPositions = (List<String>) league.getOrDefault("roster_positions", List.of());
-        return leagues.upsert(
-                sport,
-                Integer.parseInt(str(league.get("season"))),
-                str(league.get("league_id")),
-                str(league.get("previous_league_id")),
-                str(league.get("name")),
-                asInt(league.get("total_rosters"), 0),
-                JsonUtil.write(league.getOrDefault("settings", Map.of())),
-                JsonUtil.write(league.getOrDefault("scoring_settings", Map.of())),
-                rosterPositions);
+        return LeagueMapper.upsert(leagues, sport, league);
     }
 
     private Map<String, Long> upsertManagers(String sleeperLeagueId) {

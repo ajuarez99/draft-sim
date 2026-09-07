@@ -889,3 +889,46 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .panel { padding: 22px 26px; }
   .content { gap: 16px; }
 }
+
+/* claude/league-suite.md Phase A -- league history and power rankings. Rows
+   for the standings list (matches the "grid for the board, rows for lists"
+   density rule), a hand-rolled bump chart for the rank-over-time graph. */
+.table-wrap { overflow-x: auto; }
+.standings { width: 100%; border-collapse: collapse; font-size: 13px; }
+.standings th {
+  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  font-size: 10px; letter-spacing: 0.05em; padding: 6px 10px; border-bottom: 1px solid var(--line);
+}
+.standings td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.standings tr:last-child td { border-bottom: none; }
+.standings-manager { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.standings-manager:hover { color: var(--teal); }
+.history-season { margin-top: 18px; }
+.history-season:first-of-type { margin-top: 6px; }
+.history-season h3 { margin: 0 0 8px; color: var(--muted); font-size: 14px; letter-spacing: 0.02em; }
+
+.power-controls { flex-wrap: wrap; }
+.power-controls .spacer { flex: 1; }
+
+.bump-chart { display: block; }
+.bump-gridline { stroke: var(--line); stroke-width: 1; }
+.bump-rank-label, .bump-week-label { fill: var(--muted); font-size: 9px; }
+.bump-series { cursor: pointer; }
+.bump-series.dimmed { opacity: 0.25; }
+.bump-series circle { transition: r 0.1s; }
+
+.bump-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
+.bump-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.bump-legend-swatch { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+.bump-legend-button {
+  background: none; border: none; padding: 2px 6px; border-radius: 999px; cursor: pointer;
+  color: var(--muted); font: inherit;
+}
+.bump-legend-button:hover { color: var(--text); background: var(--line); }
+.bump-legend-button.on { color: var(--text); background: color-mix(in oklch, var(--teal) 18%, var(--panel)); }
+
+.rank-input {
+  width: 48px; text-align: center; font: inherit;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px;
+}

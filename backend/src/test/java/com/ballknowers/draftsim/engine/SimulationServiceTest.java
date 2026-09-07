@@ -59,7 +59,7 @@ class SimulationServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-xyz", 2026, 1, 2, "pre_draft", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                10L, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5);
+                10L, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5, null);
         // Two entries for a 2-team, 1-round draft: DraftContextFactory rejects a
         // board shorter than the draft it is asked to run, since the last picks
         // would otherwise be chosen from an empty pool.

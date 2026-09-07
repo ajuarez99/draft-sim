@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Array;
 import java.sql.PreparedStatement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,22 +67,26 @@ public class LeagueRepository {
     }
 
     public record LeagueRow(long id, String sleeperId, String name, int season,
-                            int totalRosters, List<String> rosterPositions, double ppr) {}
+                            int totalRosters, List<String> rosterPositions, double ppr,
+                            String previousLeagueId) {}
+
+    private static final String ROW_COLUMNS = """
+            id, sleeper_id, name, season, total_rosters, roster_positions,
+            coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id
+            """;
+
+    private static LeagueRow mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Array a = rs.getArray("roster_positions");
+        List<String> slots = List.of((String[]) a.getArray());
+        return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
+                rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
+                slots, rs.getDouble("ppr"), rs.getString("previous_league_id"));
+    }
 
     public Optional<LeagueRow> bySleeperId(String sleeperId) {
-        return db.sql("""
-                select id, sleeper_id, name, season, total_rosters, roster_positions,
-                       coalesce((scoring_json->>'rec')::numeric, 0) as ppr
-                from league where sleeper_id = ?
-                """)
+        return db.sql("select " + ROW_COLUMNS + " from league where sleeper_id = ?")
                 .param(sleeperId)
-                .query((rs, i) -> {
-                    Array a = rs.getArray("roster_positions");
-                    List<String> slots = List.of((String[]) a.getArray());
-                    return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
-                            rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
-                            slots, rs.getDouble("ppr"));
-                })
+                .query((rs, i) -> mapRow(rs))
                 .optional();
     }
 
@@ -92,38 +97,39 @@ public class LeagueRepository {
      * roster_positions; bySleeperId()/all() weren't it.
      */
     public Optional<LeagueRow> byId(long id) {
-        return db.sql("""
-                select id, sleeper_id, name, season, total_rosters, roster_positions,
-                       coalesce((scoring_json->>'rec')::numeric, 0) as ppr
-                from league where id = ?
-                """)
+        return db.sql("select " + ROW_COLUMNS + " from league where id = ?")
                 .param(id)
-                .query((rs, i) -> {
-                    Array a = rs.getArray("roster_positions");
-                    List<String> slots = List.of((String[]) a.getArray());
-                    return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
-                            rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
-                            slots, rs.getDouble("ppr"));
-                })
+                .query((rs, i) -> mapRow(rs))
                 .optional();
     }
 
     public List<LeagueRow> all() {
-        return db.sql("""
-                select id, sleeper_id, name, season, total_rosters, roster_positions,
-                       coalesce((scoring_json->>'rec')::numeric, 0) as ppr
-                from league order by season desc, name
-                """)
-                .query((rs, i) -> {
-                    Array a = rs.getArray("roster_positions");
-                    return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
-                            rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
-                            List.of((String[]) a.getArray()), rs.getDouble("ppr"));
-                })
+        return db.sql("select " + ROW_COLUMNS + " from league order by season desc, name")
+                .query((rs, i) -> mapRow(rs))
                 .list();
     }
 
     public static LeagueSettings toSettings(LeagueRow row, int rounds) {
         return new LeagueSettings(row.totalRosters(), rounds, row.rosterPositions(), row.ppr());
+    }
+
+    /**
+     * Walks {@code previous_league_id} backwards from a season already in this
+     * DB, newest first -- entirely local, unlike {@code SleeperClient.leagueChain}
+     * which re-hits Sleeper. Backs the read-only history view: once
+     * {@code LeagueHistoryIngestService} has ingested a chain, rendering it
+     * again needs no network call. Stops at whatever this DB has, which may be
+     * a prefix of the real chain if an earlier season was never ingested.
+     */
+    public List<LeagueRow> chainBySleeperId(String sleeperId) {
+        List<LeagueRow> chain = new ArrayList<>();
+        String id = sleeperId;
+        while (id != null && !id.isBlank() && !"null".equals(id)) {
+            Optional<LeagueRow> row = bySleeperId(id);
+            if (row.isEmpty()) break;
+            chain.add(row.get());
+            id = row.get().previousLeagueId();
+        }
+        return chain;
     }
 }

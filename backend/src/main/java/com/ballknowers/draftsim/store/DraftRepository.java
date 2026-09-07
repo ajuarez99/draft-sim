@@ -163,19 +163,20 @@ public class DraftRepository {
     }
 
     public record DraftSummary(long id, String sleeperDraftId, long leagueId, String leagueName,
-                               int season, int teams, int rounds, String status, Instant startTime) {}
+                               int season, int teams, int rounds, String status, Instant startTime,
+                               String sleeperLeagueId) {}
 
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
     public List<DraftSummary> allWithLeague() {
         return db.sql("""
                 select d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-                       d.status, d.start_time
+                       d.status, d.start_time, l.sleeper_id
                 from draft d join league l on l.id = d.league_id
                 order by d.start_time desc nulls last, d.season desc, d.id desc
                 """)
                 .query((rs, i) -> new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
                         rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
-                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant()))
+                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(), rs.getString(10)))
                 .list();
     }
 

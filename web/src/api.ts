@@ -126,6 +126,7 @@ export type DraftSummary = {
   // the whole picker. Same stale-hand-maintained-type class as lessons.md #6.
   status: string | null
   startTime: string | null
+  sleeperLeagueId: string
 }
 
 export const getDrafts = () => fetch('/api/drafts').then(json<DraftSummary[]>)
@@ -329,6 +330,106 @@ export const submitMockPick = (id: number, sleeperPlayerId: string) =>
  * SSE framing is simple: events are separated by a blank line, and within an
  * event each line is "field: value". We only care about "event:" and "data:".
  */
+// --- claude/league-suite.md Phase A: league history + power rankings ---
+
+// Mirrors LeagueHistoryController.standingRow()'s shape. season/sleeperLeagueId
+// are only populated by getManagerHistory (a per-league standings list already
+// knows both without repeating them on every row).
+export type StandingRow = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  wins: number | null
+  losses: number | null
+  ties: number | null
+  pointsFor: number | null
+  pointsAgainst: number | null
+  champion: boolean
+  season: number | null
+  sleeperLeagueId: string | null
+}
+
+export type SeasonHistory = {
+  season: number
+  leagueId: number
+  sleeperLeagueId: string
+  name: string | null
+  standings: StandingRow[]
+}
+
+export type LeagueHistory = {
+  sleeperLeagueId: string
+  seasons: SeasonHistory[]
+}
+
+export const getLeagueHistory = (sleeperLeagueId: string) =>
+  fetch(`/api/leagues/${sleeperLeagueId}/history`).then(json<LeagueHistory>)
+
+export type ManagerHistory = {
+  managerId: number
+  manager: string | null
+  seasons: StandingRow[]
+  draftHistory: {
+    reachBias: number | null
+    positionalTilt: Record<string, number> | null
+    draftsObserved: number
+    provenance: Provenance
+  }
+}
+
+export const getManagerHistory = (managerId: number) =>
+  fetch(`/api/managers/${managerId}/history`).then(json<ManagerHistory>)
+
+export type PowerRankingKind = 'COMMISSIONER' | 'COMPUTED_MARKET_VALUE' | 'COMPUTED_REALIZED'
+
+// Mirrors LeagueHistoryController.snapshotRow()'s shape. score is null for
+// COMMISSIONER (an ordering, not a measurement -- claude/league-suite.md's
+// "only rank is shared across all three modes" argument).
+export type PowerRankingEntry = {
+  season: number
+  week: number
+  kind: PowerRankingKind
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  rank: number
+  score: number | null
+  note: string | null
+}
+
+export type NflState = {
+  week: number
+  season: string
+  seasonStartDate: string
+  started: boolean
+}
+
+export type PowerRankings = {
+  sleeperLeagueId: string
+  nflState: NflState
+  entries: PowerRankingEntry[]
+}
+
+export const getPowerRankings = (sleeperLeagueId: string) =>
+  fetch(`/api/leagues/${sleeperLeagueId}/power`).then(json<PowerRankings>)
+
+export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
+  fetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
+    method: 'POST',
+  }).then(json<{ marketValue: number; realized: number }>)
+
+export const saveCommissionerRanking = (
+  sleeperLeagueId: string,
+  season: number,
+  week: number,
+  rosterIds: number[],
+) =>
+  fetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ season, week, rosterIds }),
+  }).then(json<{ saved: number }>)
+
 export async function streamSimulation(
   req: SimRequest,
   onProgress: (fraction: number) => void,

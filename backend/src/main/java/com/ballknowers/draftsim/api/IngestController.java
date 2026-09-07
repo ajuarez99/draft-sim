@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
+import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
@@ -21,14 +22,17 @@ public class IngestController {
 
     private final PlayerIngestService playerIngest;
     private final LeagueIngestService leagueIngest;
+    private final LeagueHistoryIngestService leagueHistoryIngest;
     private final FfcAdpService ffcAdp;
     private final BoardService boards;
     private final ProfileService profiles;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
+                            LeagueHistoryIngestService leagueHistoryIngest,
                             FfcAdpService ffcAdp, BoardService boards, ProfileService profiles) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
+        this.leagueHistoryIngest = leagueHistoryIngest;
         this.ffcAdp = ffcAdp;
         this.boards = boards;
         this.profiles = profiles;
@@ -50,6 +54,17 @@ public class IngestController {
     @PostMapping("/league/{sleeperLeagueId}")
     public LeagueIngestService.Result league(@PathVariable String sleeperLeagueId) {
         return leagueIngest.ingestChain(Sport.NFL, sleeperLeagueId);
+    }
+
+    /**
+     * claude/league-suite.md Phase A: standings + weekly points for the same
+     * league chain, independent of whether a draft has ever been ingested for
+     * it. Idempotent; re-running only refetches weeks not already stored (plus
+     * the most recently scored one) -- see LeagueHistoryIngestService.
+     */
+    @PostMapping("/league-history/{sleeperLeagueId}")
+    public LeagueHistoryIngestService.Result leagueHistory(@PathVariable String sleeperLeagueId) {
+        return leagueHistoryIngest.ingestChain(Sport.NFL, sleeperLeagueId);
     }
 
     /**

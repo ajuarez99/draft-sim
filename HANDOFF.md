@@ -1,5 +1,20 @@
 # draft-sim — handoff
 
+**League suite Phase A — built and verified live, 2026-09-07 (same day, later
+session).** `claude/league-suite.md` — read its new "Phase A — built and
+verified live" section at the top for the full writeup, including two real
+bugs a live run found (a per-slot array read as a scalar, silently zeroing
+every realized score; a `BigDecimal`/`Double` JDBC-read cast that 500'd on
+the first real request) and the design calls made where the plan
+underspecified something (market value scores the whole roster's *optimal*
+starting lineup via the engine's own lineup logic, not Sleeper's own
+`starters` snapshot; realized includes playoff weeks, not just
+`playoff_week_start`). New: `/leagues/:id/history`, `/leagues/:id/power` (a
+hand-rolled SVG bump chart, three modes, per-team transpose view,
+commissioner-ranking form), `/managers/:id/history`. Backend 250/250,
+frontend 48/48, `tsc -b` and `vite build` clean. Phase B (league-member
+ballots, auth) is unchanged from the plan — not started.
+
 Last updated 2026-09-07 by a Claude session doing a documentation-only refresh
 — no code changed. The entries below from 2026-09-02 were written across the
 same day and the same machine but stopped **before** the day's last two
@@ -767,13 +782,14 @@ it is not broken.
   started.** Each was blocked on an assumption nobody had checked; both
   assumptions were measured against the live Sleeper API that day, and the
   answers changed the plans:
-  - **`claude/league-suite.md`** — league history, then polls. **Sleeper has no
-    OAuth** (their docs: read-only API, no authentication), so any multi-user
-    feature needs bespoke identity — that cost lands entirely on polls. The
-    history half needs no new ingest path: `/league/{id}/rosters` returns
-    wins/losses/points directly, `winners_bracket` gives placement, and
-    `SleeperClient.leagueChain` already walks seasons. Phase A (read-only, no
-    auth, one V5 table) is the recommended start and the whole validation.
+  - **`claude/league-suite.md`** — **Phase A now built and verified live,
+    2026-09-07 (see the top of this doc and the plan's own "Built" section)**.
+    league history, then polls. **Sleeper has no OAuth** (their docs:
+    read-only API, no authentication), so any multi-user feature needs bespoke
+    identity — that cost lands entirely on polls, which are Phase B and still
+    not started. The history half needed no new ingest path, as predicted:
+    `/league/{id}/rosters` for wins/losses/points, `metadata` for the
+    champion, `SleeperClient.leagueChain` for the season walk.
   - **`claude/player-affinity.md`** — the feasibility script that doc had asked
     for since 2026-08-29 was finally written and run (`claude/scripts/`).
     **Public drafts can be enumerated at volume without auth**: ~6.5× league

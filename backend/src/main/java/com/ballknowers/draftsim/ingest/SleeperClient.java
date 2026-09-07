@@ -73,4 +73,35 @@ public class SleeperClient {
         }
         return chain;
     }
+
+    // --- claude/league-suite.md Phase A: read-only league-history/power-rankings endpoints ---
+
+    /** roster_id, owner_id, players[], starters[], settings.{wins,losses,ties,fpts,...}. */
+    public List<Map<String, Object>> rosters(String leagueId) {
+        return http.get().uri("/league/{id}/rosters", leagueId).retrieve().body(List.class);
+    }
+
+    /** Final-placement bracket rows: m, r, w, l, t1, t2, t2_from. Empty list before a season ends. */
+    public List<Map<String, Object>> winnersBracket(String leagueId) {
+        return http.get().uri("/league/{id}/winners_bracket", leagueId).retrieve().body(List.class);
+    }
+
+    /** Per-roster points_points/starters_points/players/starters for one scored week. */
+    public List<Map<String, Object>> matchups(String leagueId, int week) {
+        return http.get().uri("/league/{id}/matchups/{week}", leagueId, week).retrieve().body(List.class);
+    }
+
+    /** Waivers/trades for one week -- not ingested by Phase A, kept for the trade-history idea. */
+    public List<Map<String, Object>> transactions(String leagueId, int week) {
+        return http.get().uri("/league/{id}/transactions/{week}", leagueId, week).retrieve().body(List.class);
+    }
+
+    /**
+     * {"week": N, "season": "YYYY", "season_start_date": "YYYY-MM-DD", ...}. The
+     * only way to know "what week is it" -- see claude/plan-review-league-suite.md
+     * finding 3. sport is Sleeper's own path segment ("nfl"), not this app's Sport enum.
+     */
+    public Map<String, Object> state(String sport) {
+        return http.get().uri("/state/{sport}", sport).retrieve().body(Map.class);
+    }
 }

@@ -6,6 +6,9 @@ import LiveDraftView from './pages/LiveDraftView'
 import MockSetup from './pages/MockSetup'
 import MockDraftView from './pages/MockDraftView'
 import ManagerTendencies from './pages/ManagerTendencies'
+import LeagueHistory from './pages/LeagueHistory'
+import PowerRankings from './pages/PowerRankings'
+import ManagerHistory from './pages/ManagerHistory'
 import { TopSlotContext } from './topSlot'
 
 // Forces a full remount of DraftView on every draft change. Without this,
@@ -65,6 +68,9 @@ export default function App() {
           <Route path="/mock/new" element={<MockSetup />} />
           <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
           <Route path="/managers" element={<ManagerTendencies />} />
+          <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
+          <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
+          <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
           {/* React Router's own fallback renders a bare "Not Found" with no
               way back -- on a mistyped draft id that was the whole screen. */}
           <Route
