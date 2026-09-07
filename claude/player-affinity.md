@@ -92,7 +92,13 @@ is affinity, and the design doc's §5 already reserves `w_aff * affinity(player,
 `player` (`V1__init.sql:4-16`) already stores four of the seven features the vector
 below wants: `positions`, `team`, `age`, `years_exp`.
 
-## The trap: one embedding space for notes and players
+## The rejected option: one embedding space for notes and players
+
+**Not a live hazard in this plan — it is the road not taken, kept written down so a
+future session doesn't rediscover it as a good idea.** Neither half of the design
+below embeds text: notes become structured attributes, players become feature
+vectors. Recorded here for the same reason `next-features-roadmap.md` §3.4 records
+the schema merge not to do.
 
 Embedding `"drafts his own Bengals"` and `"Ja'Marr Chase, WR, CIN"` and taking the
 distance produces a number that moves in plausible directions. It is measuring
@@ -102,6 +108,40 @@ There is no way, from the score alone, to tell whether it captured a real tenden
 a shared token. That is the specific failure this project keeps trying to avoid:
 output that looks more principled than it is, with no signal that it has gone wrong.
 Text-embedding a manager and a player into a shared space is not a preference model.
+
+### Where that failure actually lives now — added 2026-09-07
+
+Structured attributes solve the *lexical overlap* half and **not** the *fabricated
+confidence* half, and step 2 below reintroduces the second one a layer up. Read the
+plan's own example again:
+
+    "drafts his own Bengals"  ->  {teamAffinity: "CIN", strength: 0.8}
+
+Nobody said 0.8. Allan said "drafts his own Bengals." An LLM invented the magnitude,
+and once it is a float in `manual_json` it is indistinguishable in a payload from
+`reachBias`, which a human actually typed, or from a fitted tilt, which came off real
+picks. Same disease as the embedding version — a number that looks principled with no
+signal when it's wrong — carried by a different vector.
+
+Three constraints on step 2 that fall out of this, and they are cheap:
+
+1. **Extraction emits the categorical attribute, not the magnitude.** `teamAffinity:
+   "CIN"` is a reading of what the sentence says. `strength: 0.8` is not in the
+   sentence. If a strength is wanted, it comes from a control next to the note that
+   Allan sets himself — the same "stated is a prior, not an override" shape the
+   tendencies UI already uses — or from a single hand-set constant in
+   `weights.yml`, declared arbitrary like every other number in that file.
+2. **The extraction is shown, not just applied.** The seat card displays what the
+   note was read to mean, and lets it be corrected or dismissed. An attribute
+   nobody can see is an attribute nobody can catch being wrong.
+3. **Provenance says `STATED`, never `FITTED`.** An attribute derived from a
+   sentence Allan typed is his opinion, machine-parsed. It is not evidence, and the
+   existing `NEUTRAL`/`STATED`/`FITTED`/`BLENDED` display must not blur that — an
+   extraction failure should degrade to "no attribute", not to a confident one.
+
+Today none of this is live: `note` is stored, rendered on the seat card, and read by
+nothing (`ManualTendencies.java:18` — "not used by the engine"). Step 2 is the moment
+it stops being inert, which is the moment these constraints start mattering.
 
 ## The version that works
 
@@ -199,7 +239,10 @@ fifteen picks.
 that yields nothing structured stores nothing rather than a fabricated attribute;
 the raw note text is never overwritten by its extraction; a seat whose note produced
 an attribute shows *which* attribute in the API payload, not just a changed number
-(the `Confidence`/provenance convention in `AGENTS.md`).
+(the `Confidence`/provenance convention in `AGENTS.md`). **No magnitude the note did
+not contain is invented** — per the three constraints in "Where that failure actually
+lives now" above, a strength/weight comes from Allan or from `weights.yml`, never
+from the extractor, and the attribute's provenance reads `STATED`.
 
 **Step 3 (affinity term).** With `w_aff: 0` the engine's seeded-RNG output is
 **byte-identical** to today — the same bar the `PickDecider` extraction was held to.
