@@ -227,6 +227,18 @@ needs no engine change, no new provenance concept, and no new table:
              sees a number Allan confirmed, through the path that already
              exists.
 
+**Stage 2's storage is safe as of 2026-09-07, and it was not before.** `saveManual`
+used to assign `excluded.manual_json`, replacing the whole column from a three-field
+Java record — so the sidecar above would have been destroyed by the next save from
+either tendencies UI, silently, the same shape as the `adp_at_time` null-wipe in
+`HANDOFF.md`. It is now a jsonb merge (`manual_json || excluded.manual_json`,
+`ManagerProfileRepository.saveManual`): the three known keys are still replaced
+wholesale on every PUT, and unknown keys survive. `clearManual` is the deliberate
+exception — DELETE resets the column to `{}`, because a reading of a note that no
+longer exists is garbage rather than state worth keeping. Pinned by
+`ManagerProfileManualJsonIT` (real Postgres; verified to fail against the old
+assignment before the fix landed).
+
 Two properties fall out of Stage 3/4 and they are the whole reason to build it this
 way. **The fabricated-confidence problem disappears** — the extractor proposes, a
 human disposes, and the value the engine reads is one Allan accepted, so it is

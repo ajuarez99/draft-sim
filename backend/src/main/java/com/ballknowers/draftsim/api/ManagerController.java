@@ -41,9 +41,13 @@ public class ManagerController {
 
     /**
      * Body may set any subset. An explicit null clears that field; omitting it is
-     * the same as sending null, because the whole manual blob is replaced.
+     * the same as sending null, because all three fields are written on every call.
      *
      *   { "reachBias": 8, "unpredictability": 1.6, "note": "drafts his own Bengals" }
+     *
+     * These three are replaced wholesale; any other key stored in manual_json is
+     * preserved -- see {@link ManagerProfileRepository#saveManual}. DELETE is what
+     * drops everything.
      */
     @PutMapping("/{managerId}/tendencies")
     public ResponseEntity<Map<String, Object>> set(@PathVariable long managerId,
@@ -59,7 +63,7 @@ public class ManagerController {
 
     @DeleteMapping("/{managerId}/tendencies")
     public Map<String, Object> clear(@PathVariable long managerId) {
-        profiles.setManual(managerId, Sport.NFL, ManualTendencies.EMPTY);
+        profiles.clearManual(managerId, Sport.NFL);
         return Map.of("managerId", managerId, "cleared", true);
     }
 

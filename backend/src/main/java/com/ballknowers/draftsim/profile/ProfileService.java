@@ -199,6 +199,12 @@ public class ProfileService {
         log.info("manual tendencies set for manager {}: {}", managerId, manual);
     }
 
+    /** Drops every stated key for this seat, including any this class doesn't model. */
+    public void clearManual(long managerId, Sport sport) {
+        profiles.clearManual(managerId, sport);
+        log.info("manual tendencies cleared for manager {}", managerId);
+    }
+
     private static double round3(double d) {
         return Math.round(d * 1000.0) / 1000.0;
     }

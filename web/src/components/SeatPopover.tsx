@@ -179,7 +179,8 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
                   </label>
                   <label className="small">
                     note
-                    <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+                    {/* clamped to 280 by ManualTendencies -- see ManagerTendencies.tsx */}
+                    <input type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
                   </label>
                   {saveError && <p className="seat-form-error small">{saveError}</p>}
                   <div className="seat-form-actions">

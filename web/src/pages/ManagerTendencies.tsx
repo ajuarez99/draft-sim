@@ -120,7 +120,9 @@ function ManagerRow({ m, onChanged }: RowProps) {
           </label>
           <label className="small">
             note
-            <input type="text" value={note} onChange={(e) => setNote(e.target.value)} />
+            {/* ManualTendencies clamps to 280 server-side; without this the UI
+                shows text that was silently dropped on save. */}
+            <input type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
           </label>
           {saveError && <p className="seat-form-error small">{saveError}</p>}
           <div className="seat-form-actions">
