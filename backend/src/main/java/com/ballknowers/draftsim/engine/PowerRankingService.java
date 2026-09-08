@@ -92,9 +92,9 @@ public class PowerRankingService {
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, leagueRow.rosterPositions().size());
         SportRules rules = rulesRegistry.get(settings.sport());
 
-        Map<String, Long> playerIdBySleeperId = players.idsBySleeperId(Sport.NFL);
+        Map<String, Long> playerIdBySleeperId = players.idsBySleeperId(settings.sport());
         Map<Long, BoardEntry> boardByPlayerId = new HashMap<>();
-        boards.currentBoard(Sport.NFL).forEach(be -> boardByPlayerId.put(be.player().id(), be));
+        boards.currentBoard(settings.sport()).forEach(be -> boardByPlayerId.put(be.player().id(), be));
         Map<String, Long> managerBySleeperUserId = managers.idsBySleeperUserId();
 
         List<Scored> scored = new ArrayList<>();

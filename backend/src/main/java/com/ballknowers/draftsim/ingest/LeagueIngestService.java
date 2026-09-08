@@ -47,6 +47,27 @@ public class LeagueIngestService {
     public record Result(int seasons, int draftsIngested, int picksIngested, int adpBackfilled) {}
 
     /**
+     * Reads Sleeper's own {@code sport} field off a league, without touching the
+     * DB or ingesting anything. One GET, deliberately separate from
+     * {@link #ingestChain}'s own {@code sleeper.leagueChain} walk (which also
+     * fetches this same league as the first entry of the chain): ingestChain
+     * checks {@code players.idsBySleeperId(sport)} is non-empty before it does
+     * anything else, so it needs a {@code Sport} in hand before it can fetch
+     * anything -- there is no point inside it where the sport is knowable
+     * without already having fetched something. Kept here (rather than as a
+     * bare {@code sleeper.league(id).get("sport")} call at each caller) so every
+     * route that needs to know a league's sport before deciding what to do next
+     * reads the field the same way.
+     */
+    public Sport inferSport(String currentLeagueId) {
+        Map<String, Object> league = sleeper.league(currentLeagueId);
+        if (league == null) {
+            throw new IllegalArgumentException("no Sleeper league found for id " + currentLeagueId);
+        }
+        return Sport.fromCode(String.valueOf(league.get("sport")));
+    }
+
+    /**
      * Two transactions on purpose: the ingest, then the adp_at_time backfill.
      *
      * The backfill is a single global {@code UPDATE draft_pick} with no draft

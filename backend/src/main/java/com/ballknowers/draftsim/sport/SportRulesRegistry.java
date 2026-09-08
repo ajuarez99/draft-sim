@@ -20,7 +20,7 @@ import java.util.Map;
 @Component
 public class SportRulesRegistry {
 
-    private final Map<Sport, SportRules> byRules;
+    private final Map<Sport, SportRules> bySport;
 
     public SportRulesRegistry(List<SportRules> rules) {
         Map<Sport, SportRules> map = new EnumMap<>(Sport.class);
@@ -34,11 +34,11 @@ public class SportRulesRegistry {
                                 + r.getClass().getSimpleName());
             }
         }
-        this.byRules = map;
+        this.bySport = map;
     }
 
     public SportRules get(Sport sport) {
-        SportRules rules = byRules.get(sport);
+        SportRules rules = bySport.get(sport);
         if (rules == null) {
             throw new IllegalStateException("no SportRules registered for " + sport);
         }

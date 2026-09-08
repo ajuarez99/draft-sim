@@ -30,10 +30,11 @@ public class ManagerController {
     }
 
     @GetMapping
-    public List<Map<String, Object>> list() {
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+    public List<Map<String, Object>> list(@RequestParam(defaultValue = "nfl") String sport) {
+        Sport s = Sport.fromCode(sport);
+        ProfileService.Fit fit = profiles.fit(s);
         List<Map<String, Object>> out = new ArrayList<>();
-        fit.profiles().values().forEach(p -> out.add(describe(p, repo.manualFor(p.managerId(), Sport.NFL),
+        fit.profiles().values().forEach(p -> out.add(describe(p, repo.manualFor(p.managerId(), s),
                 fit.empiricalReachBias().get(p.managerId()))));
         out.sort(Comparator.comparing(m -> String.valueOf(m.get("manager"))));
         return out;
@@ -51,19 +52,22 @@ public class ManagerController {
      */
     @PutMapping("/{managerId}/tendencies")
     public ResponseEntity<Map<String, Object>> set(@PathVariable long managerId,
+                                                   @RequestParam(defaultValue = "nfl") String sport,
                                                    @RequestBody ManualTendencies body) {
+        Sport s = Sport.fromCode(sport);
         ManualTendencies stored = body == null ? ManualTendencies.EMPTY : body;
-        profiles.setManual(managerId, Sport.NFL, stored);
+        profiles.setManual(managerId, s, stored);
 
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        ProfileService.Fit fit = profiles.fit(s);
         return fit.profiles().get(managerId) instanceof ManagerProfile p
                 ? ResponseEntity.ok(describe(p, stored, fit.empiricalReachBias().get(managerId)))
                 : ResponseEntity.ok(Map.of("managerId", managerId, "stored", stored));
     }
 
     @DeleteMapping("/{managerId}/tendencies")
-    public Map<String, Object> clear(@PathVariable long managerId) {
-        profiles.clearManual(managerId, Sport.NFL);
+    public Map<String, Object> clear(@PathVariable long managerId,
+                                     @RequestParam(defaultValue = "nfl") String sport) {
+        profiles.clearManual(managerId, Sport.fromCode(sport));
         return Map.of("managerId", managerId, "cleared", true);
     }
 

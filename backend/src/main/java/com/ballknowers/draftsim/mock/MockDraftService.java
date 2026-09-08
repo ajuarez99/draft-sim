@@ -171,8 +171,12 @@ public class MockDraftService {
             if (p.playerId() != null) completed.put(p.pickNo(), p.playerId());
         }
 
-        List<BoardEntry> board = boards.currentBoard(Sport.NFL);
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        // settings is already built above from the real league row, so this is the
+        // one MockDraftService entry point that actually has a sport to derive --
+        // unlike createSession/submitPick below, which build a bare LeagueShape
+        // with no league row behind it at all.
+        List<BoardEntry> board = boards.currentBoard(settings.sport());
+        ProfileService.Fit fit = profiles.fit(settings.sport());
         DraftContext ctx = contexts.build(settings, seats, fit.profiles(), fit.priors(), board, completed);
 
         long rngSeed = System.nanoTime();
@@ -231,6 +235,11 @@ public class MockDraftService {
             throw new IllegalArgumentException("sleeperPlayerId is required");
         }
 
+        // Sport.NFL is hardcoded rather than derived, same as buildContext() below --
+        // this session was never seeded from a real league row (row carries only a
+        // LeagueShape), and the mock draft room is football-only by
+        // claude/multi-sport-and-rebrand.md's Non-goals, so there is no sport to
+        // read here even in principle.
         Long playerId = players.idsBySleeperId(Sport.NFL).get(sleeperPlayerId);
         if (playerId == null) {
             throw new IllegalArgumentException("unknown sleeperPlayerId: " + sleeperPlayerId);
@@ -273,6 +282,15 @@ public class MockDraftService {
         mockDrafts.advanceCurrentPick(id, adv.nextPickNo(), adv.complete() ? "COMPLETE" : "IN_PROGRESS");
     }
 
+    /**
+     * {@code shape} is a bare {@link LeagueShape} here (createSession's own
+     * from-scratch session, or submitPick's re-derivation of one), never backed
+     * by a real league row -- unlike {@link #createSessionFromDraft}, which does
+     * have one and derives its sport from it. Sport.NFL stays hardcoded rather
+     * than added as a parameter: the mock draft room is football-only by
+     * claude/multi-sport-and-rebrand.md's Non-goals, so there is no sport for a
+     * from-scratch session to disagree about.
+     */
     private DraftContext buildContext(LeagueShape shape, List<SeatSpec> seats, Map<Integer, Long> completed) {
         List<BoardEntry> board = boards.currentBoard(Sport.NFL);
         ProfileService.Fit fit = profiles.fit(Sport.NFL);

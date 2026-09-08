@@ -291,6 +291,11 @@ public class LiveDraftPoller {
         boolean complete = "complete".equals(status);
 
         List<Map<String, Object>> rawPicks = sleeper.draftPicks(draft.sleeperDraftId());
+        // Sport.NFL stays hardcoded: live draft polling/SSE tracking for basketball
+        // is a Non-goal of claude/multi-sport-and-rebrand.md, and DraftRow (the
+        // only row already in hand here) carries no sport of its own -- resolving
+        // one would mean injecting LeagueRepository and adding a lookup this loop
+        // does not otherwise need, purely to serve a sport this class never acts on.
         Map<String, Long> playerIdsBySleeperId = players.idsBySleeperId(Sport.NFL);
 
         List<DraftRepository.PickRow> rows = new ArrayList<>();

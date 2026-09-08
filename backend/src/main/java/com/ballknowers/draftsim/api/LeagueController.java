@@ -81,7 +81,13 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> draft = drafts.bySleeperId(sleeperDraftId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
 
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        // Loaded once and reused below for rosterPositions too, rather than the
+        // original two separate leagues.byId(...) calls -- this one now also
+        // supplies the sport that fit() needs, in place of the hardcoded NFL.
+        Optional<LeagueRepository.LeagueRow> league = leagues.byId(draft.get().leagueId());
+        Sport sport = league.map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
+
+        ProfileService.Fit fit = profiles.fit(sport);
         List<Map<String, Object>> seats = new ArrayList<>();
 
         // Extracted to OwnerSlot.resolve so the mock room's "fork a live draft"
@@ -112,7 +118,7 @@ public class LeagueController {
         // not null default '{}'`), including legitimately empty when a league's
         // roster settings haven't synced -- the frontend team-needs helper treats
         // [] as "hide the strip", not an error.
-        List<String> rosterPositions = leagues.byId(draft.get().leagueId())
+        List<String> rosterPositions = league
                 .map(LeagueRepository.LeagueRow::rosterPositions)
                 .orElseGet(List::of);
 
@@ -157,6 +163,7 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
+        Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
 
         // Real picks reference whatever player was on Sleeper's board the day they
         // were taken -- possibly a player long gone from today's board (retired,
@@ -164,9 +171,9 @@ public class LeagueController {
         // anyone still on it; fallbackPlayerRef covers anyone who isn't, so a pick
         // never silently disappears just because the player is no longer relevant.
         Map<Long, BoardEntry> byPlayerId = new HashMap<>();
-        for (BoardEntry e : boards.currentBoard(Sport.NFL)) byPlayerId.put(e.player().id(), e);
+        for (BoardEntry e : boards.currentBoard(sport)) byPlayerId.put(e.player().id(), e);
         Map<Long, Player> playersById = new HashMap<>();
-        for (Player p : players.findAll(Sport.NFL)) playersById.put(p.id(), p);
+        for (Player p : players.findAll(sport)) playersById.put(p.id(), p);
         Map<Long, String> managerNames = managers.names();
 
         List<Map<String, Object>> picks = new ArrayList<>();
@@ -392,10 +399,12 @@ public class LeagueController {
         if (body.sleeperPlayerId() == null || body.sleeperPlayerId().isBlank()) {
             return badRequest("sleeperPlayerId is required");
         }
+        Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
+
         // 400 rather than writing player_id null. A silent null here would look
         // like a successful pick in the UI while producing a pick row the engine
         // and the board both ignore.
-        Long playerId = players.idsBySleeperId(Sport.NFL).get(body.sleeperPlayerId());
+        Long playerId = players.idsBySleeperId(sport).get(body.sleeperPlayerId());
         if (playerId == null) {
             return badRequest("unknown sleeperPlayerId: " + body.sleeperPlayerId()
                     + " -- re-run POST /api/ingest/players if this is a new player");
@@ -473,8 +482,10 @@ public class LeagueController {
 
     /** What the engine is valuing against, so it can be eyeballed before trusting a sim. */
     @GetMapping("/board")
-    public Map<String, Object> board(@RequestParam(defaultValue = "60") int limit) {
-        var entries = boards.currentBoard(Sport.NFL).stream()
+    public Map<String, Object> board(@RequestParam(defaultValue = "60") int limit,
+                                     @RequestParam(defaultValue = "nfl") String sport) {
+        Sport s = Sport.fromCode(sport);
+        var entries = boards.currentBoard(s).stream()
                 .limit(limit)
                 .map(e -> {
                     // Map.of rejects null values, and a free agent / retired player can have
@@ -491,7 +502,7 @@ public class LeagueController {
                 })
                 .toList();
         return Map.of(
-                "capturedOn", boards.currentBoardDate(Sport.NFL).map(Object::toString).orElse("none"),
+                "capturedOn", boards.currentBoardDate(s).map(Object::toString).orElse("none"),
                 "picksWithContemporaneousBoard", boards.picksWithAdpAtTime(),
                 "entries", entries);
     }
