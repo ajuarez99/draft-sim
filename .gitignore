@@ -14,3 +14,4 @@ dist/
 !.env.example
 .env.local
 pgdata/
+claude/scripts/.cache/

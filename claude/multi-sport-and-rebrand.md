@@ -101,10 +101,44 @@ generalised to longer chains. It is: *did cardinality increase?* — and if not,
 problem than the one this doc has been describing, and the football analogy was
 actively misleading about it.
 
-What still needs deciding before code: whether the cheapest-feasible-eviction
-search is exact (max-weight matching over 9 slots, once per pick) or greedy. Do
-that one the same way — measure greedy against optimal on these same 12 rosters
-and write the number down.
+**And the follow-up question dissolved too — measured, same day.** The plan was
+to decide between an exact eviction search and a greedy one by measuring the
+gap. There is no gap. The player sets assignable to distinct starting slots form
+a **transversal matroid**, and because every starting slot is worth the same,
+picking the best lineup is maximising a weight over a matroid — where greedy is
+*exactly* optimal, by theorem, not approximately.
+
+Checked rather than asserted (`claude/scripts/nba-greedy-optimality.py`): every
+prefix of all 12 real 2025 rosters (168 states) and 4000 synthetic rosters drawn
+from the real eligibility-set distribution with **random** values, against a
+brute-force exhaustive oracle. **Zero mismatches.** The oracle was confirmed
+non-vacuous — five pure centres is genuinely infeasible (only `C` + 2 `UTIL`
+accept them) and both methods correctly cap at the best three.
+
+### So 3c is, in full
+
+- `prepareLineup`: sort the roster by value descending, keep each player whose
+  addition leaves the kept set matchable into the nine starting slots, stop at
+  nine. That lineup is provably optimal. **No matching solver, no approximation,
+  no measured error bar** — one sorted pass with a feasibility check.
+- `rosterNeed(candidate, lineup)`: either the candidate can join the kept set
+  while it stays matchable — he starts, and the delta is his own value — or he
+  cannot, and the matroid's unique-circuit property says exactly whom he may
+  replace: the lowest-valued player in the circuit his addition creates. Delta
+  is then `own - that player's value`, floored at zero. Same
+  `benchFloor + (1 - benchFloor) * captured` shape football returns.
+- Both quantities are per-eligibility-mask, so the 32-entry table stands and
+  `rosterNeed` stays an O(1) read.
+
+**3c and Phase 4 merge.** 3c has no class to live in until `BasketballRules`
+exists, and `BasketballRules` cannot be constructed without a
+`scoring.basketball` block. Splitting them would mean committing a skeleton that
+throws. They ship as one phase.
+
+Sleeper's `roster_positions` for the league was re-read live while measuring and
+is exactly `[PG,SG,G,SF,PF,F,C,UTIL,UTIL,BN,BN,BN,BN,BN]`, confirming the slot
+model. (`settings.reserve_slots = 2` exists but appears nowhere in
+`roster_positions`; it does not affect the starting lineup.)
 
 ### Two things carried forward that are easy to get wrong
 
