@@ -70,7 +70,8 @@ public final class DraftSimulator {
             int slot = DraftSlot.slot(pickNo, teams);
 
             if (pickNo <= total && myPickMask[pickNo]) {
-                snapshots.put(pickNo, topAvailable(available, round, rounds, snapshotDepth));
+                Object lineup = ctx.rules().prepareLineup(rosters[slot], ctx.settings(), ctx::valueOf);
+                snapshots.put(pickNo, topAvailable(available, lineup, round, rounds, snapshotDepth));
             }
 
             long already = ctx.completedAt(pickNo);
@@ -111,12 +112,12 @@ public final class DraftSimulator {
         return new RunResult(picked, snapshots, rosterMap);
     }
 
-    private long[] topAvailable(List<BoardEntry> available, int round, int rounds, int depth) {
+    private long[] topAvailable(List<BoardEntry> available, Object lineup, int round, int rounds, int depth) {
         long[] out = new long[Math.min(depth, available.size())];
         int n = 0;
         for (BoardEntry e : available) {
             if (n == out.length) break;
-            if (!ctx.rules().isDraftable(e, round, rounds)) continue;
+            if (!ctx.rules().isDraftable(e, lineup, round, rounds)) continue;
             out[n++] = e.player().id();
         }
         return n == out.length ? out : Arrays.copyOf(out, n);

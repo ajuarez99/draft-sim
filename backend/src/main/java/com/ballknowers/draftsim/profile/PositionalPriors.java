@@ -1,8 +1,10 @@
 package com.ballknowers.draftsim.profile;
 
 import com.ballknowers.draftsim.domain.Position;
+import com.ballknowers.draftsim.domain.Sport;
 
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -44,15 +46,18 @@ public final class PositionalPriors {
     private final Map<Position, Double> overall;
     private final int observations;
     private final int buckets;
+    private final Sport sport;
 
     PositionalPriors(Map<Integer, Map<Position, Double>> byBucket,
                      Map<Position, Double> overall,
                      int observations,
-                     int buckets) {
+                     int buckets,
+                     Sport sport) {
         this.byBucket = byBucket;
         this.overall = overall;
         this.observations = observations;
         this.buckets = buckets;
+        this.sport = sport;
     }
 
     /**
@@ -78,7 +83,11 @@ public final class PositionalPriors {
 
     public double probability(int bucket, Position pos) {
         Map<Position, Double> table = byBucket.get(bucket);
-        if (table == null) return overall.getOrDefault(pos, 1.0 / Position.values().length);
+        // This sport's own position count, not every position that exists --
+        // otherwise a football profile's fallback mass would be diluted by
+        // five basketball positions it will never see a pick for. See
+        // claude/multi-sport-and-rebrand.md Phase 3a.
+        if (table == null) return overall.getOrDefault(pos, 1.0 / Position.forSport(sport).size());
         return table.getOrDefault(pos, 1e-6);
     }
 
@@ -102,9 +111,10 @@ public final class PositionalPriors {
         return t == null ? new EnumMap<>(overall) : new EnumMap<>(t);
     }
 
-    public static PositionalPriors uniform() {
+    public static PositionalPriors uniform(Sport sport) {
+        List<Position> positions = Position.forSport(sport);
         Map<Position, Double> flat = new EnumMap<>(Position.class);
-        for (Position p : Position.values()) flat.put(p, 1.0 / Position.values().length);
-        return new PositionalPriors(Map.of(), flat, 0, DEFAULT_BUCKETS);
+        for (Position p : positions) flat.put(p, 1.0 / positions.size());
+        return new PositionalPriors(Map.of(), flat, 0, DEFAULT_BUCKETS, sport);
     }
 }

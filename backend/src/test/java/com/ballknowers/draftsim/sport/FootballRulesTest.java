@@ -62,11 +62,13 @@ class FootballRulesTest {
 
     @Test
     void kickersAndDefensesAreGatedEarly() {
-        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 5, 15));
-        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 13, 15));
-        assertFalse(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 11, 15));
-        assertTrue(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), 12, 15));
-        assertTrue(rules.isDraftable(entry(3, "WR", Position.WR, 1), 1, 15));
+        // null lineup: FootballRules.isDraftable's round gate does not read it
+        // (see its class/method comment) -- this pins that directly.
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), null, 5, 15));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), null, 13, 15));
+        assertFalse(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), null, 11, 15));
+        assertTrue(rules.isDraftable(entry(2, "DEF", Position.DEF, 190), null, 12, 15));
+        assertTrue(rules.isDraftable(entry(3, "WR", Position.WR, 1), null, 1, 15));
     }
 
     /**
@@ -78,16 +80,16 @@ class FootballRulesTest {
     @Test
     void theKickerGateFollowsTheEndOfTheDraftNotAFixedRoundNumber() {
         // 12 rounds: the last three are 10, 11, 12.
-        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 9, 12));
-        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 10, 12));
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), null, 9, 12));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), null, 10, 12));
 
         // 18 rounds: the last three are 16, 17, 18 — round 13 is far too early.
-        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), 13, 18));
-        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 16, 18));
+        assertFalse(rules.isDraftable(entry(1, "K", Position.K, 200), null, 13, 18));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), null, 16, 18));
 
         // A draft shorter than the window still lets them in, rather than
         // gating a position out of the draft entirely.
-        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), 1, 2));
+        assertTrue(rules.isDraftable(entry(1, "K", Position.K, 200), null, 1, 2));
     }
 
     @Test
@@ -136,5 +138,50 @@ class FootballRulesTest {
             assertEquals(expectedNeed, actual, 1e-9,
                     "rosterNeed mismatch for " + c.player().name());
         }
+    }
+
+    /**
+     * The §3b eligibility lock's shape: {@link FootballRules#hasOpenSlot} is
+     * not wired into {@link FootballRules#isDraftable} (see that method's
+     * comment), but it must still be correct on its own -- this is what
+     * basketball's Phase 4 implementation will lean on once FLEX/UTIL tiers
+     * make the round-only gate insufficient by itself.
+     */
+    @Test
+    void aPlayerWhoseEveryEligibleSlotIsFullIsNotDraftableButTheSameWithAVacancyIs() {
+        RosterState full = new RosterState();
+        full.add(entry(1, "QB1", Position.QB, 10));
+        full.add(entry(2, "RB1", Position.RB, 1));
+        full.add(entry(3, "RB2", Position.RB, 2));
+        full.add(entry(4, "WR1", Position.WR, 3));
+        full.add(entry(5, "WR2", Position.WR, 4));
+        full.add(entry(6, "TE1", Position.TE, 5));
+        full.add(entry(7, "RB3", Position.RB, 6));    // FLEX
+        full.add(entry(8, "WR3", Position.WR, 7));    // FLEX
+        full.add(entry(9, "K1", Position.K, 8));
+        full.add(entry(10, "DEF1", Position.DEF, 9));
+        for (int i = 11; i <= 15; i++) full.add(entry(i, "BN" + i, Position.QB, 100 + i));   // BN x5, all full
+
+        BoardEntry extraRb = entry(200, "RBextra", Position.RB, 90);
+        Object fullLineup = rules.prepareLineup(full, SETTINGS, rules::value);
+        assertFalse(rules.hasOpenSlot(extraRb.player(), fullLineup),
+                "RB, FLEX and BN are all full -- nothing left he fits");
+
+        RosterState oneBenchOpen = new RosterState();
+        oneBenchOpen.add(entry(1, "QB1", Position.QB, 10));
+        oneBenchOpen.add(entry(2, "RB1", Position.RB, 1));
+        oneBenchOpen.add(entry(3, "RB2", Position.RB, 2));
+        oneBenchOpen.add(entry(4, "WR1", Position.WR, 3));
+        oneBenchOpen.add(entry(5, "WR2", Position.WR, 4));
+        oneBenchOpen.add(entry(6, "TE1", Position.TE, 5));
+        oneBenchOpen.add(entry(7, "RB3", Position.RB, 6));
+        oneBenchOpen.add(entry(8, "WR3", Position.WR, 7));
+        oneBenchOpen.add(entry(9, "K1", Position.K, 8));
+        oneBenchOpen.add(entry(10, "DEF1", Position.DEF, 9));
+        for (int i = 11; i <= 14; i++) oneBenchOpen.add(entry(i, "BN" + i, Position.QB, 100 + i));   // only 4 of 5 BN
+
+        Object vacancyLineup = rules.prepareLineup(oneBenchOpen, SETTINGS, rules::value);
+        assertTrue(rules.hasOpenSlot(extraRb.player(), vacancyLineup),
+                "one bench slot is still open");
     }
 }

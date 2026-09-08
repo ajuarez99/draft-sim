@@ -49,8 +49,16 @@ public interface SportRules {
      * gate means the same thing in a league of any length -- "kickers go in the
      * last few rounds" is roster-filling behaviour, and a fixed round number
      * only encodes it for the one league length it was written against.
+     *
+     * @param lineup this seat's {@link #prepareLineup} result, computed once
+     *               per pick ahead of the candidate filter this gates (see
+     *               PickDecider.choose) -- so an implementation whose gate
+     *               depends on roster shape (the Sleeper eligibility lock,
+     *               claude/multi-sport-and-rebrand.md §3b) can read it in O(1)
+     *               without recomputing anything. {@code FootballRules} does
+     *               not need roster shape for its gate and ignores this.
      */
-    boolean isDraftable(BoardEntry entry, int round, int totalRounds);
+    boolean isDraftable(BoardEntry entry, Object lineup, int round, int totalRounds);
 
     boolean isEligible(Player player, String rosterSlot);
 }

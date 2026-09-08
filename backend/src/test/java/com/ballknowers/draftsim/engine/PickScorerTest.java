@@ -21,7 +21,7 @@ class PickScorerTest {
             Map.of("K", 3, "DEF", 4), 1.0, 30);
 
     private final PickScorer scorer = new PickScorer(
-            CFG, new FootballRules(new ScoringProperties(CFG)), PositionalPriors.uniform());
+            CFG, new FootballRules(new ScoringProperties(CFG)), PositionalPriors.uniform(Sport.NFL));
 
     private static BoardEntry at(double boardPosition) {
         return new BoardEntry(new Player(1, Sport.NFL, "s1", "P", List.of(Position.WR),

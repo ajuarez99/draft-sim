@@ -54,7 +54,7 @@ class DraftContextFactoryTest {
     void everySeatGetsAProfileAtEverySupportedSize(int teams) {
         LeagueShape shape = LeagueShape.standard(teams);
         DraftContext ctx = factory.build(shape, List.of(SeatSpec.user(1, null)),
-                Map.of(), PositionalPriors.uniform(), board(shape.totalPicks()), Map.of());
+                Map.of(), PositionalPriors.uniform(Sport.NFL), board(shape.totalPicks()), Map.of());
 
         assertEquals(teams, ctx.profileBySlot().size());
         for (int slot = 1; slot <= teams; slot++) {
@@ -67,7 +67,7 @@ class DraftContextFactoryTest {
     void aManagerSeatCarriesItsFittedProfileAndAnUnlistedSeatIsLeagueAverage() {
         DraftContext ctx = factory.build(LeagueShape.standard(8),
                 List.of(SeatSpec.manager(3, 77L), SeatSpec.user(1, null)),
-                Map.of(77L, fitted(77L)), PositionalPriors.uniform(), board(120), Map.of());
+                Map.of(77L, fitted(77L)), PositionalPriors.uniform(Sport.NFL), board(120), Map.of());
 
         assertEquals(Provenance.FITTED, ctx.profileFor(3).provenance());
         assertEquals(4.0, ctx.profileFor(3).reachBias(), 1e-9);
@@ -84,7 +84,7 @@ class DraftContextFactoryTest {
     void aManagerWithNoFittedProfileFallsBackToNeutralRatherThanFailing() {
         DraftContext ctx = factory.build(LeagueShape.standard(8),
                 List.of(SeatSpec.manager(2, 404L)),
-                Map.of(), PositionalPriors.uniform(), board(120), Map.of());
+                Map.of(), PositionalPriors.uniform(Sport.NFL), board(120), Map.of());
 
         assertEquals(Provenance.NEUTRAL, ctx.profileFor(2).provenance());
         assertEquals(404L, ctx.profileFor(2).managerId());
@@ -94,7 +94,7 @@ class DraftContextFactoryTest {
     void aUserSeatWithASleeperIdentityIsScoredLikeAnyOtherModelledSeat() {
         DraftContext ctx = factory.build(LeagueShape.standard(8),
                 List.of(SeatSpec.user(6, 77L)),
-                Map.of(77L, fitted(77L)), PositionalPriors.uniform(), board(120), Map.of());
+                Map.of(77L, fitted(77L)), PositionalPriors.uniform(Sport.NFL), board(120), Map.of());
 
         assertEquals(Provenance.FITTED, ctx.profileFor(6).provenance());
         assertEquals(4.0, ctx.profileFor(6).reachBias(), 1e-9);
@@ -103,7 +103,7 @@ class DraftContextFactoryTest {
     @Test
     void completedPicksArriveOnTheContextInPickOrder() {
         DraftContext ctx = factory.build(LeagueShape.standard(8), List.of(),
-                Map.of(), PositionalPriors.uniform(), board(120), Map.of(3, 30L, 1, 10L));
+                Map.of(), PositionalPriors.uniform(Sport.NFL), board(120), Map.of(3, 30L, 1, 10L));
 
         assertEquals(List.of(1, 3), ctx.completedPickNumbers());
         assertEquals(10L, ctx.completedAt(1));
@@ -115,7 +115,7 @@ class DraftContextFactoryTest {
     void aBoardShorterThanTheDraftIsRefused() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> factory.build(LeagueShape.standard(14), List.of(),
-                        Map.of(), PositionalPriors.uniform(), board(200), Map.of()));
+                        Map.of(), PositionalPriors.uniform(Sport.NFL), board(200), Map.of()));
         assertTrue(e.getMessage().contains("210"), e.getMessage());
     }
 
@@ -124,11 +124,11 @@ class DraftContextFactoryTest {
         assertThrows(IllegalArgumentException.class,
                 () -> factory.build(LeagueShape.standard(8),
                         List.of(SeatSpec.manager(4, 1L), SeatSpec.manager(4, 2L)),
-                        Map.of(), PositionalPriors.uniform(), board(120), Map.of()));
+                        Map.of(), PositionalPriors.uniform(Sport.NFL), board(120), Map.of()));
 
         assertThrows(IllegalArgumentException.class,
                 () -> factory.build(LeagueShape.standard(8), List.of(SeatSpec.manager(9, 1L)),
-                        Map.of(), PositionalPriors.uniform(), board(120), Map.of()));
+                        Map.of(), PositionalPriors.uniform(Sport.NFL), board(120), Map.of()));
     }
 
     /**
@@ -141,14 +141,14 @@ class DraftContextFactoryTest {
         assertThrows(IllegalArgumentException.class,
                 () -> factory.build(LeagueShape.standard(8),
                         List.of(SeatSpec.user(1, null), SeatSpec.user(2, null)),
-                        Map.of(), PositionalPriors.uniform(), board(120), Map.of()));
+                        Map.of(), PositionalPriors.uniform(Sport.NFL), board(120), Map.of()));
     }
 
     @Test
     void anEmptyBoardIsRefusedWithTheIngestHint() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> factory.build(LeagueShape.standard(8), List.of(),
-                        Map.of(), PositionalPriors.uniform(), List.of(), Map.of()));
+                        Map.of(), PositionalPriors.uniform(Sport.NFL), List.of(), Map.of()));
         assertTrue(e.getMessage().contains("ingest"), e.getMessage());
     }
 

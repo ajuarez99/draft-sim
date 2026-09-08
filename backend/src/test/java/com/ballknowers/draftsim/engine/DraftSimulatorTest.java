@@ -42,7 +42,7 @@ class DraftSimulatorTest {
         Map<Integer, ManagerProfile> profiles = new HashMap<>();
         for (int s = 1; s <= teams; s++) profiles.put(s, ManagerProfile.neutral(s, "seat " + s));
         return new DraftContext(
-                board(400), settings, profiles, PositionalPriors.uniform(),
+                board(400), settings, profiles, PositionalPriors.uniform(Sport.NFL),
                 new FootballRules(new ScoringProperties(CFG)), CFG,
                 completed.keySet().stream().sorted().toList(), completed);
     }
@@ -244,7 +244,7 @@ class DraftSimulatorTest {
                     ? new ManagerProfile(s, "chaos", 0.0, Map.of(), multiplier, null, 0, 0, Provenance.STATED)
                     : ManagerProfile.neutral(s, "seat " + s));
         }
-        return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(),
+        return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(Sport.NFL),
                 new FootballRules(new ScoringProperties(CFG)), CFG, List.of(), Map.of());
     }
 

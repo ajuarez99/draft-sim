@@ -336,14 +336,25 @@ What does move, and why the loops must be sport-scoped anyway:
   football profile, and `forBucket()` hands those maps out for display — phantom
   `PG`/`C` rows in a football manager's P(position | round) table.
 
-So every `Position.values()` site becomes sport-scoped: `PositionalPriors:81,107`,
-`ProfileService:220,262,268,276`, `PickDecider:38-39,108` — **and
-`FootballRules:30`**, `private static final int POSITIONS =
-Position.values().length`, which the first draft of this doc missed. That one is
-an array *width*, not a denominator, so leaving it at 11 is merely wasteful
-rather than wrong; it becomes each rules implementation's own count, and
-`BasketballRules` needs the same field. Verified 2026-09-08: those ten sites are
-still the complete set.
+**The ten sites split into two categories, and getting them backwards is how
+this phase silently breaks football.**
+
+*Denominators and iteration — these MUST be sport-scoped:* `PositionalPriors:81`
+(the `1.0 / values().length` fallback), `PositionalPriors:107`,
+`ProfileService:220`, `ProfileService:262` (the Dirichlet `k`),
+`ProfileService:268,276`, `PickDecider:108`.
+
+*Array widths — these must NOT be:* `PickDecider:38-39` (`positionalCache`,
+`runCache`) and `FootballRules:30` (`POSITIONS`), which the first draft of this
+doc missed entirely. All three size a scratch array by `values().length` and
+index it by `pos.ordinal()`. Ordinals are **global**, so a width of 11 is
+wasteful by five doubles and correct, while a per-sport width would need a dense
+per-sport index — a much larger change for no gain. Leave them global with a
+comment saying why. (An earlier version of this paragraph listed
+`PickDecider:38-39` among the sites that "become sport-scoped". That was wrong,
+and it is exactly the mistake that would rescale football's priors.)
+
+Verified 2026-09-08: those ten sites are still the complete set.
 
 #### 3b — the eligibility lock: build it, don't budget for it
 
@@ -375,8 +386,23 @@ and the implementation is a dozen lines. Do not spend a design pass on it.
   kinds still have a vacancy. O(1), no allocation. Bipartite maximum matching
   answers the stronger question Sleeper does not ask, and is out of scope *here*
   — but see 3c, where the same structure returns for a different reason.
-- `RosterState` gains slot-occupancy counters beside its existing `byPosition`
-  `EnumMap`.
+- **Where the open-slot mask lives — corrected 2026-09-08.** An earlier version
+  of this section had `RosterState` gain slot-occupancy counters beside its
+  `byPosition` `EnumMap`. That is the wrong home: maintaining the mask on
+  `add()` forces `RosterState` — which is sport-agnostic and shared — to know a
+  sport's slot model, and it forces an assignment decision at insert time.
+  `prepareLineup` already exists to compute exactly this kind of once-per-pick,
+  roster-wide structure, and its result is already threaded to every candidate.
+  So the mask is computed there and `isDraftable` takes the prepared lineup:
+
+      boolean isDraftable(BoardEntry entry, Object lineup, int round, int totalRounds)
+
+  `FootballRules` ignores the new parameter and keeps its `latestRounds` gate
+  unchanged. `RosterState` is not touched at all. The one adjustment is in
+  `PickDecider.choose`, where `prepareLineup` currently runs *after* the
+  candidate filter loop and has to move above it — it does not depend on the
+  candidates, so this is a reorder, not a behaviour change, and football's
+  output must prove it by not moving.
 
 **The eligibility data already exists and is being discarded.** `Player.positions`
 is already a `List<Position>` from the `text[]` column; `BoardEntry.position()`
@@ -573,15 +599,32 @@ green IT run can be green-by-skipping. Confirm Postgres is actually up first.
    pass a *partial* `startState`.
 
    The two baselines, both `mySlot: 5`, `iterations: 500`,
-   `startState: {"1": "9221"}`, `seed: 20260908`, `POST /api/sims`:
+   `startState: {"1": "9221"}`, `seed: 20260908`, `POST /api/sims`. Two league
+   shapes on purpose (14-team and 12-team). Proven live: the same seed
+   reproduces the hash exactly; a different seed does not.
+
+   **Hash the response with `name` and `team` stripped from every object.**
+   Learned the hard way during Phase 3a/3b: the 14-team baseline "moved", and
+   the entire diff was one player's `team` going from `"NYG"` to `null` —
+   Darius Slayton was released between two runs an hour apart, and a player
+   re-ingest picked it up. His `adp` and `positionalRank` were unchanged, so
+   nothing the engine decided had moved at all. Hashing the raw body makes a
+   football-parity check fail on real-world roster churn, which trains you to
+   ignore it — the worst possible outcome for the one check standing between
+   this refactor and a silent regression. Player identity (`id`, `sleeperId`)
+   and everything the engine computes stay in the hash; the two mutable display
+   fields come out.
 
        draft 1391509064357273600  (fantasy, 14 teams, 15 rounds)
-         sha256 db192817be6b522b33d525515b57128313bbc2746224e4c4dbcb2025be8a4b92
+         sha256 22dbc2d5a408bee4947d73d6f8c6b0ab4e073f296056cafbc2c8a10991ceaacb
        draft 1346366555776126976  ((Foot) Ball Knowers 2026, 12 teams, 15 rounds)
-         sha256 752470a8c4f4d603ae76a29da95f15a2ab584342b0da2c4bfef8eef6e1840b4a
+         sha256 6e4ce7bfdb45beb098c3bcb2b2b91d4f6e336a00b667e662d314a084c7fec7c0
 
-   Two league shapes on purpose (14-team and 12-team). Proven live: the same
-   seed reproduces the hash exactly; a different seed does not. `PickScorerTest.aPlayerWhoFellPastHisBoardSlotIsValueAndReachingIsNot`
+   Superseded raw-body hashes, valid only against the player data as it stood on
+   2026-09-08 morning: `db192817be…` and `752470a8c4…`.
+
+   **The local Postgres is shared with other sessions**, so player data can
+   change under a run. That is what happened here. `PickScorerTest.aPlayerWhoFellPastHisBoardSlotIsValueAndReachingIsNot`
    and `DraftSimulatorTest.theModalBoardStartsWithTheBestPlayerAndStaysNearTheTop`
    stay green.
 2. `curl localhost:8080/api/health` — `weightsLoaded` stays true after the

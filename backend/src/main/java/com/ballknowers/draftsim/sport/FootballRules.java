@@ -27,6 +27,13 @@ import java.util.function.ToDoubleFunction;
 @Component
 public class FootballRules implements SportRules {
 
+    // An array WIDTH, not a denominator or a display-facing iteration --
+    // Position.ordinal() is global across both sports, so this stays sized to
+    // the full Position.values().length (11) rather than football's own 6.
+    // Sizing it to forSport(NFL).size() would need a dense per-sport index
+    // instead of the ordinal directly, for five unused doubles saved; not
+    // worth it. See claude/multi-sport-and-rebrand.md Phase 3a and
+    // Position.forSport's javadoc.
     private static final int POSITIONS = Position.values().length;
 
     private final ScoringProperties.SportScoring cfg;
@@ -89,6 +96,7 @@ public class FootballRules implements SportRules {
             int[] countByPos,
             boolean flexFull,
             double weakestFlexValue,        // meaningful only if flexFull
+            boolean benchFull,               // §3b's eligibility lock; see hasOpenSlot
             ToDoubleFunction<BoardEntry> valueOf
     ) {}
 
@@ -100,6 +108,7 @@ public class FootballRules implements SportRules {
         Arrays.fill(weakestStarter, Double.NaN);
         int[] slotsByPos = new int[POSITIONS];
         int[] countByPos = new int[POSITIONS];
+        int startersFilled = 0;   // dedicated slots actually occupied; §3b's benchFull needs this
 
         for (Map.Entry<Position, Integer> e : settings.dedicatedStarters().entrySet()) {
             Position pos = e.getKey();
@@ -107,6 +116,7 @@ public class FootballRules implements SportRules {
             List<BoardEntry> have = roster.at(pos);
             slotsByPos[pos.ordinal()] = slots;
             countByPos[pos.ordinal()] = have.size();
+            startersFilled += Math.min(have.size(), slots);
             for (int i = 0; i < have.size(); i++) {
                 if (i < slots) {
                     double v = valueOf.applyAsDouble(have.get(i));
@@ -129,7 +139,16 @@ public class FootballRules implements SportRules {
                 ? valueOf.applyAsDouble(flexPool.get(flexSlots - 1))
                 : Double.NaN;
 
-        return new Lineup(total, weakestStarter, slotsByPos, countByPos, flexFull, weakestFlex, valueOf);
+        // Bench absorbs whatever dedicated + FLEX did not: everyone on the
+        // roster who isn't one of the startersFilled/flexFilled players is
+        // sitting there, whether or not their position is FLEX-eligible (a
+        // second QB has nowhere else to go). Purely additive over the fields
+        // above -- rosterNeed/lineupValue never read it, so this cannot move
+        // anything football's simulation already produces.
+        int flexFilled = Math.min(flexPool.size(), flexSlots);
+        boolean benchFull = (roster.size() - startersFilled - flexFilled) >= settings.benchSlots();
+
+        return new Lineup(total, weakestStarter, slotsByPos, countByPos, flexFull, weakestFlex, benchFull, valueOf);
     }
 
     @Override
@@ -224,7 +243,15 @@ public class FootballRules implements SportRules {
     }
 
     @Override
-    public boolean isDraftable(BoardEntry entry, int round, int totalRounds) {
+    public boolean isDraftable(BoardEntry entry, Object lineup, int round, int totalRounds) {
+        // §3b: this gate does not need roster shape -- FLEX/BN already accept
+        // anyone, so the round-window gate is what keeps kickers and defenses
+        // off an early roster, and no roster of this shape can ever exhaust
+        // every slot a non-K/DEF player is eligible for before it exhausts
+        // FLEX and BN first (see FootballRulesTest for the arithmetic, and
+        // hasOpenSlot below for the check itself). `lineup` is intentionally
+        // unread -- do not thread it in here without re-verifying the
+        // bit-identical baseline this was checked against.
         Integer window = cfg.latestRounds().get(entry.position().name());
         if (window == null) return true;
         // rounds remaining, counting this one: round 13 of 15 has 3 left.
@@ -238,5 +265,40 @@ public class FootballRules implements SportRules {
             return player.positions().stream().anyMatch(Position::isFlexEligible);
         }
         return player.positions().stream().anyMatch(p -> p.name().equals(rosterSlot));
+    }
+
+    /**
+     * Sleeper's {@code enforce_position_limits} lock
+     * (claude/multi-sport-and-rebrand.md §3b): true iff some roster slot
+     * {@code player} is eligible for, bench included, still has a vacancy in
+     * {@code lineup}. A bitmask/count test, not a matching problem -- Sleeper
+     * only asks "is there an open slot this fits", never "can a legal lineup
+     * still be fielded afterward" (the stronger question {@link #rosterNeed}
+     * answers, §3c).
+     *
+     * <p>Not called by {@link #isDraftable}: football's {@code latestRounds}
+     * gate already keeps a simulated roster from ever reaching a state this
+     * would reject, and wiring a previously-inactive gate into the real
+     * decision path is exactly the kind of change that could move which
+     * candidate gets picked -- which the bit-identical baseline this phase
+     * must not disturb cannot absorb. Exposed and tested on its own so
+     * basketball's FLEX/UTIL tiers -- where that argument stops holding --
+     * have it ready in Phase 4 instead of needing to invent it under
+     * deadline.
+     *
+     * @param lineup this seat's {@link #prepareLineup} result.
+     */
+    public boolean hasOpenSlot(Player player, Object lineup) {
+        Lineup lin = (Lineup) lineup;
+        if (!lin.benchFull() && isEligible(player, "BN")) return true;
+        for (Position p : Position.forSport(player.sport())) {
+            int ord = p.ordinal();
+            if (lin.slotsByPos()[ord] > 0
+                    && lin.countByPos()[ord] < lin.slotsByPos()[ord]
+                    && isEligible(player, p.name())) {
+                return true;
+            }
+        }
+        return !lin.flexFull() && isEligible(player, "FLEX");
     }
 }

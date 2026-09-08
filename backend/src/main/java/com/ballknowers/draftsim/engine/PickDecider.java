@@ -35,6 +35,11 @@ public final class PickDecider {
     private final int[] candidateIdxBuf;      // candidateBuf[i]'s index in `available`
     private final double[] scoresBuf;
     private final double[] weightsBuf;
+    // Array WIDTHS, not denominators or display-facing iterations -- indexed
+    // by Position.ordinal(), which is global across both sports, so these
+    // stay sized to the full Position.values().length rather than the
+    // current sport's own count. See Position.forSport's javadoc and
+    // claude/multi-sport-and-rebrand.md Phase 3a.
     private final double[] positionalCache = new double[Position.values().length];
     private final double[] runCache = new double[Position.values().length];
 
@@ -75,12 +80,23 @@ public final class PickDecider {
                        SplittableRandom rng) {
 
         int poolSize = ctx.cfg().candidatePool();
+        // `lineup` captures everything rosterNeed() needs about the roster's
+        // *current* shape once per pick (§B2a), so scoring each candidate
+        // against it is O(1) rather than a fresh roster-wide re-walk per
+        // candidate -- and it does not depend on `candidateBuf`/`available`,
+        // so computing it ahead of the filter loop below is a reorder, not a
+        // behaviour change. Moved here (was after the loop) so isDraftable
+        // (the §3b eligibility lock's seam) can read it; FootballRules
+        // ignores it, so this cannot move football's output. See
+        // claude/multi-sport-and-rebrand.md §3b.
+        Object lineup = ctx.rules().prepareLineup(roster, ctx.settings(), ctx::valueOf);
+
         candidateBuf.clear();
         int n = 0;
         int avail = available.size();
         for (int i = 0; i < avail && n < poolSize; i++) {
             BoardEntry e = available.get(i);
-            if (!ctx.rules().isDraftable(e, round, rounds)) continue;
+            if (!ctx.rules().isDraftable(e, lineup, round, rounds)) continue;
             candidateBuf.add(e);
             candidateIdxBuf[n] = i;
             n++;
@@ -92,20 +108,17 @@ public final class PickDecider {
         }
 
         var profile = ctx.profileFor(slot);
-        // Terms that only depend on a candidate's position, not the candidate
-        // itself, are computed once per position here instead of once per
-        // candidate below (§B2c) -- at most 6 positions exist, well under the
-        // pool of up to 30 candidates. `lineup` similarly captures everything
-        // rosterNeed() needs about the roster's *current* shape once per pick,
-        // so scoring each candidate against it is O(1) (§B2a) rather than a
-        // fresh roster-wide re-walk per candidate.
-        Object lineup = ctx.rules().prepareLineup(roster, ctx.settings(), ctx::valueOf);
         double reachBias = profile.reachBias();
         // The priors table is keyed on fraction-of-draft, not round, so it
         // transfers across league sizes -- bucket once per pick, not per
         // position, since every position at this pick shares it.
         int bucket = ctx.priors().bucketOf(pickNo, totalPicks);
-        for (Position p : Position.values()) {
+        // Terms that only depend on a candidate's position, not the candidate
+        // itself, are computed once per position here instead of once per
+        // candidate below (§B2c). Scoped to this league's own sport (not
+        // every Position that exists) since every candidate at this pick is
+        // one sport's board -- see Position.forSport's javadoc.
+        for (Position p : Position.forSport(ctx.settings().sport())) {
             int ord = p.ordinal();
             positionalCache[ord] = scorer.positionalTerm(bucket, p, profile);
             runCache[ord] = scorer.runPressure(recent, p);

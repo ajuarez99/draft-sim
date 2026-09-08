@@ -46,7 +46,7 @@ class MockDraftEngineTest {
                 List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "K", "DEF", "BN", "BN"), 1.0);
         Map<Integer, ManagerProfile> profiles = new HashMap<>();
         for (int s = 1; s <= teams; s++) profiles.put(s, ManagerProfile.neutral(s, "seat " + s));
-        return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(),
+        return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(Sport.NFL),
                 new FootballRules(new ScoringProperties(CFG)), CFG,
                 completed.keySet().stream().sorted().toList(), completed);
     }

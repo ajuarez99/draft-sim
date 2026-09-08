@@ -71,7 +71,7 @@ class PositionalPriorsTest {
 
     @Test
     void theUniformTableAnswersForEveryBucket() {
-        PositionalPriors flat = PositionalPriors.uniform();
+        PositionalPriors flat = PositionalPriors.uniform(com.ballknowers.draftsim.domain.Sport.NFL);
         double first = flat.probability(0, com.ballknowers.draftsim.domain.Position.WR);
         assertEquals(first, flat.probability(BUCKETS - 1, com.ballknowers.draftsim.domain.Position.WR), 1e-12);
         assertTrue(first > 0);

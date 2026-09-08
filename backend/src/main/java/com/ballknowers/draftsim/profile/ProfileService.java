@@ -79,7 +79,7 @@ public class ProfileService {
         Map<Long, String> names = managers.names();
         Map<Long, ManualTendencies> manual = profiles.manualBySport(sport);
 
-        PositionalPriors priors = fitPriors(picks, posById);
+        PositionalPriors priors = fitPriors(picks, posById, sport);
 
         // --- reach bias -------------------------------------------------
         Map<Long, List<Double>> reachByManager = new HashMap<>();
@@ -153,7 +153,7 @@ public class ProfileService {
             if (picksScored > 0) empirical.put(managerId, rawReach);
 
             Map<Position, Double> tilt = fitTilt(
-                    earlyByManager.getOrDefault(managerId, Map.of()), earlyLeague, earlyTotal, observed);
+                    earlyByManager.getOrDefault(managerId, Map.of()), earlyLeague, earlyTotal, observed, sport);
 
             boolean hasData = picksScored > 0;
             boolean hasStated = stated.affectsBehaviour();
@@ -212,12 +212,17 @@ public class ProfileService {
     private Map<Position, Double> fitTilt(Map<Position, Integer> mine,
                                           Map<Position, Integer> league,
                                           int leagueTotal,
-                                          int draftsObserved) {
+                                          int draftsObserved,
+                                          Sport sport) {
         Map<Position, Double> tilt = new EnumMap<>(Position.class);
         int myTotal = mine.values().stream().mapToInt(Integer::intValue).sum();
         if (myTotal == 0 || leagueTotal == 0) return tilt;
 
-        for (Position pos : Position.values()) {
+        // Scoped to this sport's own positions: `mine`/`league` were built
+        // from posById, which is already sport-scoped (players.findAll(sport)
+        // in fit()), but iterating every Position that exists would still
+        // hand back a tilt entry of 0 for the other sport's positions.
+        for (Position pos : Position.forSport(sport)) {
             double leagueShare = league.getOrDefault(pos, 0) / (double) leagueTotal;
             if (leagueShare <= 0) continue;
             double myShare = mine.getOrDefault(pos, 0) / (double) myTotal;
@@ -239,7 +244,8 @@ public class ProfileService {
         return priorCfg.buckets() > 0 ? priorCfg.buckets() : PositionalPriors.DEFAULT_BUCKETS;
     }
 
-    private PositionalPriors fitPriors(List<DraftRepository.CompletedPick> picks, Map<Long, Position> posById) {
+    private PositionalPriors fitPriors(List<DraftRepository.CompletedPick> picks, Map<Long, Position> posById,
+                                       Sport sport) {
         int buckets = buckets();
         Map<Integer, Map<Position, Integer>> counts = new HashMap<>();
         Map<Position, Integer> overallCounts = new EnumMap<>(Position.class);
@@ -259,13 +265,18 @@ public class ProfileService {
         }
 
         double alpha = priorCfg.alpha();
-        int k = Position.values().length;
+        // This sport's own position count, not every position that exists --
+        // the Dirichlet denominator (count + alpha) / (total + alpha * k).
+        // Going 6 -> 11 here would rescale every football prior; see
+        // claude/multi-sport-and-rebrand.md Phase 3a for the arithmetic.
+        List<Position> positions = Position.forSport(sport);
+        int k = positions.size();
 
         Map<Integer, Map<Position, Double>> byBucket = new HashMap<>();
         counts.forEach((bucket, table) -> {
             int total = table.values().stream().mapToInt(Integer::intValue).sum();
             Map<Position, Double> probs = new EnumMap<>(Position.class);
-            for (Position pos : Position.values()) {
+            for (Position pos : positions) {
                 probs.put(pos, (table.getOrDefault(pos, 0) + alpha) / (total + alpha * k));
             }
             byBucket.put(bucket, probs);
@@ -273,12 +284,12 @@ public class ProfileService {
 
         Map<Position, Double> overall = new EnumMap<>(Position.class);
         int total = Math.max(n, 1);
-        for (Position pos : Position.values()) {
+        for (Position pos : positions) {
             overall.put(pos, (overallCounts.getOrDefault(pos, 0) + alpha) / (total + alpha * k));
         }
 
         log.info("fit positional priors from {} picks across {} of {} draft-fraction buckets (alpha={})",
                 n, byBucket.size(), buckets, alpha);
-        return new PositionalPriors(byBucket, overall, n, buckets);
+        return new PositionalPriors(byBucket, overall, n, buckets, sport);
     }
 }

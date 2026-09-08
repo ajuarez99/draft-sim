@@ -72,7 +72,7 @@ class MockDraftServiceTest {
         List<BoardEntry> synthetic = board(400);
         lenient().when(boards.currentBoard(Sport.NFL)).thenReturn(synthetic);
         lenient().when(profiles.fit(Sport.NFL))
-                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(), 0, Map.of()));
+                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(Sport.NFL), 0, Map.of()));
         Map<String, Long> ids = new HashMap<>();
         for (BoardEntry e : synthetic) ids.put(e.player().sleeperId(), e.player().id());
         lenient().when(players.idsBySleeperId(Sport.NFL)).thenReturn(ids);
