@@ -37,6 +37,69 @@ Two changes, deliberately kept separable:
 
 ---
 
+---
+
+## Where this stands — 2026-09-08
+
+Branch `ball-knowers-multi-sport`, never pushed. One commit per phase, in
+order. Football's simulation output is **bit-identical through every phase so
+far**, checked live after each one rather than asserted.
+
+| Phase | State | Commit |
+|---|---|---|
+| — | Plan (this doc), reconciled | `dd98969` |
+| 0 | Branding and docs | `eca0ed3` |
+| — | Reproducible seed (prerequisite, not a phase) | `27b24d0` |
+| 1a | `Sport` resolved at runtime in the engine | `3e5664f` |
+| 1b | `Sport` resolved at every endpoint | `31494d2` |
+| 2 | V6 + the contamination fix | `8cb6843` |
+| 3a/3b | Eleven positions; the lock, built but unwired | `ba14f05` |
+| 3c | **Not started — blocked on a measurement, see below** | |
+| 4 | `BasketballRules` + per-sport config | |
+| 5 | NBA ingest, board, snake reversal | |
+| 6 | Frontend, incl. the `reversalRound` override | |
+
+Suite at the stopping point: 272 tests, 0 skipped, 10 integration tests
+against real Postgres. `/api/health` reports `weightsLoaded: true`.
+
+### The next thing to do, and it is not writing code
+
+**3c's design rests on an unmeasured assumption.** The plan is a 32-entry table
+keyed by eligibility mask, precomputed once per `prepareLineup`, so `rosterNeed`
+stays O(1) across ~25M calls per run. That works only if adding one player
+causes a *bounded* displacement cascade. Football's `rosterNeed` is O(1)
+precisely because its chain is at most two — one dedicated starter displaced
+into FLEX, one FLEX starter displaced out — which is why its `Lineup` record can
+precompute exactly those two numbers and stop.
+
+With nested `G`/`F`/`UTIL` slots and multi-eligible players, nobody has
+established that bound. Measure it against the real 2025 NBA rosters before
+writing anything:
+
+- If the cascade is short (3 is the suspicion), the mask table is right and 3c
+  is a day's work.
+- If it is not, the honest fallback is greedy assignment in most-constrained-
+  slot-first order (`C, PG, SG, SF, PF, G, F, UTIL`) with its suboptimality
+  **measured against optimal on real rosters**, not assumed to be small.
+
+Either way the number goes in this doc next to the decision it justified. This
+is the one remaining piece of the plan with real design risk in it; everything
+after it is implementation.
+
+### Two things carried forward that are easy to get wrong
+
+**The lock is deliberately not wired in.** `FootballRules.hasOpenSlot` calls
+`isEligible` — the seam's long-dead method finally has a caller — but nothing
+calls `hasOpenSlot` in production. There is no `BasketballRules` to lock yet,
+and folding it into football's gate would risk moving football's output to
+enforce a rule that, by this league's arithmetic (§3b), essentially never binds.
+Phase 4 wires it. Deciding it should never gate football at all is also a
+defensible call to make at that point.
+
+**Re-ingest can move the baseline without the engine moving.** See acceptance
+criterion 1: hash with `name` and `team` stripped. This is not hypothetical —
+it happened during 3a/3b and cost a real investigation.
+
 ## Verified against the live Sleeper API this session
 
 Everything in this section was executed, not reasoned about. Sleeper user

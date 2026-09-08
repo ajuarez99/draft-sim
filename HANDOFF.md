@@ -1,5 +1,49 @@
 # Ball Knowers — handoff
 
+**Multi-sport, phases 0 through 3b — built 2026-09-08 on branch
+`ball-knowers-multi-sport` (not pushed, not merged).** `draft-sim` is now **Ball
+Knowers**, and `Sport` is a runtime value rather than a hardcoded literal at ~35
+call sites. Read `claude/multi-sport-and-rebrand.md` — its new "Where this
+stands" section at the top has the per-phase commit table and, more importantly,
+the measurement that has to happen before Phase 3c can be written. Seven commits,
+one per phase, `dd98969` through `ba14f05`. Suite 272/272, 0 skipped, 10
+integration tests against real Postgres.
+
+What is actually different, beyond the name: `SportRulesRegistry` makes a second
+`SportRules` an implementation rather than a startup failure; `LeagueSettings`
+carries a `Sport`, which is where both the rules and the scoring block are now
+resolved from; every endpoint derives or infers its sport (ingest reads Sleeper's
+own `sport` field, so "add a draft by Sleeper link" supports basketball with no
+route change) while **refusing** any non-NFL ingest until Phase 5; `Position` has
+eleven constants; and V6 adds `draft.reversal_round` and
+`mock_draft_session.sport`.
+
+**One live bug was fixed on the way, and it was not a basketball bug.**
+`DraftRepository.allCompletedPicks()` joined picks to drafts with no sport
+filter, so the first NBA draft ingested would have inflated `observed` — the
+shrinkage N — for every manager, silently under-shrinking their **football**
+profiles toward thin fitted values. Ten of the twelve Ball Knowers managers are
+the same Sleeper user id in both leagues. `SportContaminationIT` was written
+first and observed failing (`expected: <1> but was: <2>`) before the fix.
+
+**Simulations are now reproducible on request.** `SimulationRequest` takes an
+optional `seed`; null keeps today's behaviour. Two traps if you use it to check
+that a refactor moved nothing: an *empty* `startState` is not a cold start — it
+replays every recorded pick, so against a `complete` draft (all of them locally)
+the run simulates nothing and is byte-identical under any seed. And hash the
+response with `name` and `team` stripped, or ordinary NFL roster churn from a
+player re-ingest fails the check for you. Both cost real time to discover; both
+are written up in the plan doc's acceptance criteria.
+
+**Not done, in order:** 3c (basketball's `rosterNeed` — the only piece left with
+design risk), 4 (`BasketballRules` + `scoring.basketball`), 5 (NBA ingest, board,
+snake reversal), 6 (frontend, including a user-editable `reversalRound` control).
+`reversal_round: 3` on the 2026 NBA draft was **deliberately** left as an
+assumption rather than verified — no draft in reach exercises it — and Phase 6's
+settings-popover override is what makes a wrong assumption recoverable by
+whoever is running the draft.
+
+
 **League suite Phase A — built and verified live, 2026-09-07 (same day, later
 session).** `claude/league-suite.md` — read its new "Phase A — built and
 verified live" section at the top for the full writeup, including two real
