@@ -50,10 +50,33 @@ public enum Position {
      * Sleeper uses "DEF" in fantasy_positions and "DST"/"D/ST" nowhere, but
      * other sources vary. Unknown values (LB, DB, OL, ...) are not fantasy
      * relevant in this format and are dropped rather than guessed at.
+     *
+     * Sport-aware, because the same raw string means different things per
+     * sport. Notably: Sleeper's nba player dump carries ~30 entries whose
+     * {@code fantasy_positions} is exactly {@code ["DEF"]} (verified
+     * 2026-09-08) -- nothing to do with a defense/special-teams unit, just
+     * Sleeper's archive tagging some non-fantasy-relevant nba record with a
+     * value that happens to collide with football's DEF. Those must be
+     * dropped for basketball, not mapped onto football's {@link #DEF}, which
+     * is why this cannot be sport-agnostic.
      */
-    public static Optional<Position> fromSleeper(String raw) {
+    public static Optional<Position> fromSleeper(String raw, Sport sport) {
         if (raw == null) return Optional.empty();
-        return switch (raw.trim().toUpperCase()) {
+        String v = raw.trim().toUpperCase();
+        if (sport == Sport.NBA) {
+            return switch (v) {
+                case "PG" -> Optional.of(PG);
+                case "SG" -> Optional.of(SG);
+                case "SF" -> Optional.of(SF);
+                case "PF" -> Optional.of(PF);
+                case "C" -> Optional.of(C);
+                // Includes the ~30 nba "DEF" entries above -- not fantasy
+                // relevant in this format, dropped rather than mapped onto
+                // football's DEF.
+                default -> Optional.empty();
+            };
+        }
+        return switch (v) {
             case "QB" -> Optional.of(QB);
             case "RB", "FB" -> Optional.of(RB);
             case "WR" -> Optional.of(WR);

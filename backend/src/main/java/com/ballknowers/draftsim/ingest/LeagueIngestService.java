@@ -153,6 +153,10 @@ public class LeagueIngestService {
         Map<String, Object> settings = asMap(draft.get("settings"));
         int rounds = asInt(settings.get("rounds"), 15);
         int teams = asInt(settings.get("teams"), 12);
+        // 0 means plain snake for the whole draft -- Sleeper's own default, and
+        // exactly today's behaviour for every draft ingested before this column
+        // existed. multi-sport-and-rebrand.md Phase 5; DraftSlot.isForward reads it.
+        int reversalRound = asInt(settings.get("reversal_round"), 0);
 
         // draft_order maps sleeper user id -> slot. Invert it to slot -> manager.id.
         // Shared with LiveDraftPoller, which has to redo this on every tick — see
@@ -171,7 +175,7 @@ public class LeagueIngestService {
         long id = drafts.upsert(leagueId, draftId,
                 Integer.parseInt(str(draft.get("season"))), rounds, teams,
                 str(draft.get("type")), str(draft.get("status")), start,
-                JsonUtil.write(slotToManager));
+                JsonUtil.write(slotToManager), reversalRound);
 
         List<Map<String, Object>> raw = sleeper.draftPicks(draftId);
         if (raw == null || raw.isEmpty()) return 0;

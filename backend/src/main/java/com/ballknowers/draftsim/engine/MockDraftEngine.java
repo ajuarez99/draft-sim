@@ -78,6 +78,12 @@ public final class MockDraftEngine {
         boolean complete = false;
         for (; pickNo <= total; pickNo++) {
             int round = DraftSlot.round(pickNo, teams);
+            // Plain snake overload: the mock room is football-only
+            // (multi-sport-and-rebrand.md's Non-goals) and its session storage
+            // has no reversal_round column (see MockDraftService's
+            // createSessionFromDraft/submitPick comments), so ctx here never
+            // carries a nonzero reversalRound to read even when it was built
+            // from a real, forked draft row.
             int slot = DraftSlot.slot(pickNo, teams);
 
             long already = ctx.completedAt(pickNo);

@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Position;
+import com.ballknowers.draftsim.domain.Sport;
 
 import java.text.Normalizer;
 import java.util.*;
@@ -31,18 +32,26 @@ public final class PlayerMatcher {
     private final Map<String, List<Long>> byNameOnly = new HashMap<>();
     private final Map<String, Long> byTeamForDefense = new HashMap<>();
     private final Map<String, Long> byAlias;
+    private final Sport sport;
 
-    private PlayerMatcher(Map<String, Long> alias) {
+    private PlayerMatcher(Sport sport, Map<String, Long> alias) {
+        this.sport = sport;
         this.byAlias = alias;
     }
 
-    public static PlayerMatcher build(List<Player> players) {
-        return build(players, Map.of());
+    public static PlayerMatcher build(Sport sport, List<Player> players) {
+        return build(sport, players, Map.of());
     }
 
-    /** @param alias normalized source name -> internal player id, hand-filled misses */
-    public static PlayerMatcher build(List<Player> players, Map<String, Long> alias) {
-        PlayerMatcher m = new PlayerMatcher(alias);
+    /**
+     * @param sport the sport of the raw (name, position, team) rows {@link #match}
+     *              will be asked about -- needed to parse {@code rawPosition} with
+     *              the right {@link Position#fromSleeper(String, Sport)} table,
+     *              since the same raw string means different things per sport.
+     * @param alias normalized source name -> internal player id, hand-filled misses
+     */
+    public static PlayerMatcher build(Sport sport, List<Player> players, Map<String, Long> alias) {
+        PlayerMatcher m = new PlayerMatcher(sport, alias);
         for (Player p : players) {
             String name = normalize(p.name());
             List<Position> positions = p.positions().isEmpty() ? List.of(p.primary()) : p.positions();
@@ -50,7 +59,13 @@ public final class PlayerMatcher {
                 m.byNameAndPosition.putIfAbsent(name + "|" + pos.name(), p.id());
             }
             m.byNameOnly.computeIfAbsent(name, k -> new ArrayList<>()).add(p.id());
-            if (positions.contains(Position.DEF) && p.team() != null && !p.team().isBlank()) {
+            // Football-only: DEF is an NFL-only Position (Position.DEF.sport() ==
+            // Sport.NFL), and matching a defense by team abbreviation is
+            // meaningless for basketball, which has no team-unit concept at all.
+            // Guarded explicitly rather than relying on positions.contains(DEF)
+            // alone staying accidentally false for nba callers.
+            if (p.sport() == Sport.NFL && positions.contains(Position.DEF)
+                    && p.team() != null && !p.team().isBlank()) {
                 m.byTeamForDefense.put(p.team().toUpperCase(Locale.ROOT), p.id());
             }
         }
@@ -59,7 +74,7 @@ public final class PlayerMatcher {
 
     /** Empty means unmatched. The caller is responsible for logging the miss. */
     public Optional<Long> match(String rawName, String rawPosition, String rawTeam) {
-        Position pos = Position.fromSleeper(rawPosition).orElse(null);
+        Position pos = Position.fromSleeper(rawPosition, sport).orElse(null);
 
         if (pos == Position.DEF) {
             Long byTeam = rawTeam == null ? null : byTeamForDefense.get(rawTeam.toUpperCase(Locale.ROOT));

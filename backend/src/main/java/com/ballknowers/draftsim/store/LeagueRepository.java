@@ -109,8 +109,21 @@ public class LeagueRepository {
                 .list();
     }
 
+    /** Back-compat: no reversal round to report (see the 3-arg overload) -- plain snake. */
     public static LeagueSettings toSettings(LeagueRow row, int rounds) {
-        return new LeagueSettings(row.sport(), row.totalRosters(), rounds, row.rosterPositions(), row.ppr());
+        return toSettings(row, rounds, 0);
+    }
+
+    /**
+     * @param reversalRound the persisted {@code draft.reversal_round} for the
+     *                      specific draft {@code rounds} came from --
+     *                      {@link com.ballknowers.draftsim.store.DraftRepository.DraftRow#reversalRound()}
+     *                      for a real, persisted draft; 0 for anything else
+     *                      (multi-sport-and-rebrand.md Phase 5/6).
+     */
+    public static LeagueSettings toSettings(LeagueRow row, int rounds, int reversalRound) {
+        return new LeagueSettings(row.sport(), row.totalRosters(), rounds, row.rosterPositions(), row.ppr(),
+                reversalRound);
     }
 
     /**

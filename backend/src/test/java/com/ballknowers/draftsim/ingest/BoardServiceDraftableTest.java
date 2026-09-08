@@ -49,4 +49,26 @@ class BoardServiceDraftableTest {
         assertFalse(BoardService.draftable(null, false));
         assertTrue(BoardService.draftable(null, true));
     }
+
+    /**
+     * multi-sport-and-rebrand.md Phase 5: draftable() was never NFL-specific in
+     * its logic, only in its javadoc -- Sleeper's nba player dump nulls team
+     * the same way its nfl dump does, so the same team-rostered check
+     * generalizes without a code change. There is no FFC market signal for
+     * basketball (hasMarketAdp is always false there), so an off-roster nba
+     * player has only the roster check to survive on.
+     */
+    @Test
+    void offRosterNbaPlayerIsNotDraftableEitherAndHasNoMarketSignalToFallBackOn() {
+        Player retiredNbaPlayer = new Player(1L, Sport.NBA, "sleeper-nba-1", "Retired Center",
+                List.of(Position.C), null, "Active", null, 35, 12);
+        assertFalse(BoardService.draftable(retiredNbaPlayer, false));
+    }
+
+    @Test
+    void rosteredNbaPlayerIsDraftable() {
+        Player activeNbaPlayer = new Player(1L, Sport.NBA, "sleeper-nba-2", "Active Guard",
+                List.of(Position.PG), "DEN", "Active", null, 25, 3);
+        assertTrue(BoardService.draftable(activeNbaPlayer, false));
+    }
 }

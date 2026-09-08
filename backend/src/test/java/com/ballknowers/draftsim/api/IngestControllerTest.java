@@ -16,23 +16,20 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Phase 1b's {@code requireNflForNow} guard originally covered only the three
- * league-scoped routes ({@code /league/{id}}, {@code /league-history/{id}},
- * {@code /all/{id}}), which infer their sport from Sleeper. The three
- * {@code ?sport=}-parameterised routes ({@code /adp}, {@code /players},
- * {@code /board}) were left unguarded despite each being a live corruption
- * path once basketball leagues exist -- see {@code IngestController
- * .requireNflForNow}'s own javadoc for why. This pins that all three now
- * refuse {@code ?sport=nba}, and that {@code nfl} -- explicit or the
- * {@code @RequestParam} default an omitted {@code ?sport=} resolves to --
- * still reaches the real ingest call exactly as it did before this guard
- * existed.
+ * The {@code requireNflForNow} guard these three {@code ?sport=}-parameterised
+ * routes ({@code /adp}, {@code /players}, {@code /board}) used to carry was a
+ * TEMPORARY measure, deleted per its own javadoc once
+ * claude/multi-sport-and-rebrand.md Phase 5 landed basketball ingest: FFC is
+ * now skipped for basketball inside {@link FfcAdpService} itself (rather than
+ * refused here), {@code allCompletedPicks} is sport-filtered (Phase 2), and
+ * {@code PlayerIngestService.fantasyPositions} handles basketball positions.
+ * This now pins the opposite of what the deleted guard's own test used to pin:
+ * {@code ?sport=nba} reaches the real ingest call exactly like {@code nfl}
+ * does, for all three routes.
  */
 @ExtendWith(MockitoExtension.class)
 class IngestControllerTest {
@@ -51,18 +48,20 @@ class IngestControllerTest {
     // ---- POST /api/ingest/adp ----
 
     @Test
-    void adpRefusesNbaRatherThanMatchingFootballAdpAgainstBasketballPlayers() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> controller().adp("nba"));
+    void adpWithNbaReachesFfcAdpServiceRatherThanBeingRefused() {
+        FfcAdpService.Result stub = new FfcAdpService.Result(false, 0, 0, 0, 0, false,
+                "fantasyfootballcalculator.com is football-only; skipped for sport 'nba'", List.of());
+        when(ffcAdp.ingest(Sport.NBA)).thenReturn(stub);
 
-        assertTrue(ex.getMessage().contains("POST /api/ingest/adp"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("nba"), ex.getMessage());
-        verify(ffcAdp, never()).ingest(any(Sport.class));
+        FfcAdpService.Result result = controller().adp("nba");
+
+        assertSame(stub, result);
+        verify(ffcAdp).ingest(Sport.NBA);
     }
 
     /** Covers both an omitted {@code ?sport=} (the default) and an explicit {@code ?sport=nfl}. */
     @Test
-    void adpWithNflStillIngestsExactlyAsBeforeThisGuard() {
+    void adpWithNflStillIngestsExactlyAsBefore() {
         FfcAdpService.Result stub = new FfcAdpService.Result(true, 10, 9, 1, 5, false, "ok", List.of());
         when(ffcAdp.ingest(Sport.NFL)).thenReturn(stub);
 
@@ -75,18 +74,19 @@ class IngestControllerTest {
     // ---- POST /api/ingest/players ----
 
     @Test
-    void playersRefusesNbaRatherThanDroppingOrMismappingBasketballPositions() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> controller().players("nba"));
+    void playersWithNbaReachesPlayerIngestServiceRatherThanBeingRefused() {
+        PlayerIngestService.Result stub = new PlayerIngestService.Result(2000, 1900);
+        when(playerIngest.ingest(Sport.NBA)).thenReturn(stub);
 
-        assertTrue(ex.getMessage().contains("POST /api/ingest/players"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("nba"), ex.getMessage());
-        verify(playerIngest, never()).ingest(any(Sport.class));
+        PlayerIngestService.Result result = controller().players("nba");
+
+        assertSame(stub, result);
+        verify(playerIngest).ingest(Sport.NBA);
     }
 
     /** Covers both an omitted {@code ?sport=} (the default) and an explicit {@code ?sport=nfl}. */
     @Test
-    void playersWithNflStillIngestsExactlyAsBeforeThisGuard() {
+    void playersWithNflStillIngestsExactlyAsBefore() {
         PlayerIngestService.Result stub = new PlayerIngestService.Result(500, 480);
         when(playerIngest.ingest(Sport.NFL)).thenReturn(stub);
 
@@ -99,20 +99,27 @@ class IngestControllerTest {
     // ---- POST /api/ingest/board ----
 
     @Test
-    void boardRefusesNbaRatherThanFittingProfilesFromUnfilteredFootballPicks() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> controller().board("nba"));
+    void boardWithNbaReachesBoardServiceRatherThanBeingRefused() {
+        FfcAdpService.Result adpStub = new FfcAdpService.Result(false, 0, 0, 0, 0, false,
+                "fantasyfootballcalculator.com is football-only; skipped for sport 'nba'", List.of());
+        BoardService.Result boardStub = new BoardService.Result(168, 0, 0, 0, 0);
+        when(ffcAdp.ingest(Sport.NBA)).thenReturn(adpStub);
+        when(boards.rebuild(Sport.NBA)).thenReturn(boardStub);
+        when(profiles.persistFitted(Sport.NBA)).thenReturn(12);
 
-        assertTrue(ex.getMessage().contains("POST /api/ingest/board"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("nba"), ex.getMessage());
-        verify(ffcAdp, never()).ingest(any(Sport.class));
-        verify(boards, never()).rebuild(any(Sport.class));
-        verify(profiles, never()).persistFitted(any(Sport.class));
+        Map<String, Object> response = controller().board("nba");
+
+        assertSame(adpStub, response.get("adp"));
+        assertSame(boardStub, response.get("board"));
+        assertEquals(12, response.get("profilesWritten"));
+        verify(ffcAdp).ingest(Sport.NBA);
+        verify(boards).rebuild(Sport.NBA);
+        verify(profiles).persistFitted(Sport.NBA);
     }
 
     /** Covers both an omitted {@code ?sport=} (the default) and an explicit {@code ?sport=nfl}. */
     @Test
-    void boardWithNflStillIngestsExactlyAsBeforeThisGuard() {
+    void boardWithNflStillIngestsExactlyAsBefore() {
         FfcAdpService.Result adpStub = new FfcAdpService.Result(true, 10, 9, 1, 5, false, "ok", List.of());
         BoardService.Result boardStub = new BoardService.Result(60, 40, 10, 3, 2);
         when(ffcAdp.ingest(Sport.NFL)).thenReturn(adpStub);

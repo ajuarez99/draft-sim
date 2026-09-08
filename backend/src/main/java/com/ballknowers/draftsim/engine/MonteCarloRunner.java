@@ -37,7 +37,9 @@ public class MonteCarloRunner {
 
         int teams = ctx.settings().teams();
         int rounds = ctx.settings().rounds();
-        int[] myPicks = DraftSlot.picksForSlot(mySlot, teams, rounds);
+        // Real value for a real, persisted draft; 0 (plain snake) for the mock
+        // room's ad-hoc shape -- see DraftSimulator's own comment on the same read.
+        int[] myPicks = DraftSlot.picksForSlot(mySlot, teams, rounds, ctx.settings().reversalRound());
         PickScorer scorer = new PickScorer(ctx.cfg(), ctx.rules(), ctx.priors());
 
         long loopStart = System.nanoTime();
@@ -105,7 +107,7 @@ public class MonteCarloRunner {
 
         List<SimulationResult.PredictedPick> board = new ArrayList<>(total);
         for (BoardAssembler.Assignment a : BoardAssembler.assemble(counts, iterations, ALTERNATIVES)) {
-            int slot = DraftSlot.slot(a.pickNo(), teams);
+            int slot = DraftSlot.slot(a.pickNo(), teams, ctx.settings().reversalRound());
             ManagerProfile prof = ctx.profileFor(slot);
 
             List<SimulationResult.Candidate> alts = a.alternatives().stream()

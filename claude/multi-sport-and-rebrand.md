@@ -149,6 +149,26 @@ is exactly `[PG,SG,G,SF,PF,F,C,UTIL,UTIL,BN,BN,BN,BN,BN]`, confirming the slot
 model. (`settings.reserve_slots = 2` exists but appears nowhere in
 `roster_positions`; it does not affect the starting lineup.)
 
+### Basketball has no reach signal, and never will for these two drafts
+
+**Measured live 2026-09-08, right after the first real NBA ingest.** Across all
+42 managers, NFL `picksScored` is 600 and NBA `picksScored` is **0**.
+
+That is correct behaviour, not a bug, and it is permanent for this data. Reach is
+only scored for a pick with a contemporaneous `adp_at_time`, which is only
+attached when a board snapshot exists within `board.adpFreshnessDays` of the
+draft. Both complete NBA drafts are from 2024 and 2025; the first NBA board was
+captured in 2026. `adpBackfilled: 0` in the ingest response says so. No re-ingest
+can fix it — see [[project-adp-at-time-wiped-by-ingest]] for the same trap on the
+football side.
+
+So a basketball manager profile is priors and tilt with **no reach component at
+all**, shrunk toward a league mean that itself has no reach signal. The doc
+already says this should be said out loud in the UI. **Phase 6 has to actually
+say it**, and "0 picks scored" is a much starker thing to surface than football's
+"thin data" caveat. It is the single most misleading thing about basketball
+output if left implicit.
+
 ### Two things carried forward that are easy to get wrong
 
 **The lock is deliberately not wired in.** `FootballRules.hasOpenSlot` calls
@@ -301,7 +321,7 @@ Each is independently shippable and leaves football working.
 | 3b | The Sleeper eligibility lock | Small; almost never binds |
 | 3c | Basketball's lineup and `rosterNeed` | **The hard one** |
 | 4 | `BasketballRules` + per-sport config | Moderate |
-| 5 | NBA ingest, board, snake reversal | Moderate; gated on a `reversal_round` check |
+| 5 | NBA ingest, board, snake reversal | Moderate; ships the reversal as an assumption |
 | 6 | Frontend | Moderate |
 
 ### Phase 0 — Branding and docs

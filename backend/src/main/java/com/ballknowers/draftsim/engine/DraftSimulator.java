@@ -65,9 +65,16 @@ public final class DraftSimulator {
 
         Map<Long, BoardEntry> byId = ctx.byId();   // built once on DraftContext, shared
 
+        // Real value for a real, persisted draft (SimulationService reads it
+        // off draft.reversalRound() into settings); 0 -- plain snake -- for the
+        // mock room's ad-hoc LeagueShape, which has no draft row to carry one.
+        // Either way this is the one place the parity actually gets read, since
+        // DraftSlot.isForward is where round/reversalRound turn into a slot.
+        int reversalRound = ctx.settings().reversalRound();
+
         for (int pickNo = 1; pickNo <= total; pickNo++) {
             int round = DraftSlot.round(pickNo, teams);
-            int slot = DraftSlot.slot(pickNo, teams);
+            int slot = DraftSlot.slot(pickNo, teams, reversalRound);
 
             if (pickNo <= total && myPickMask[pickNo]) {
                 Object lineup = ctx.rules().prepareLineup(rosters[slot], ctx.settings(), ctx::valueOf);

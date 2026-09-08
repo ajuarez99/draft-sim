@@ -146,6 +146,17 @@ public class MockDraftService {
         // (LeagueRepository.toSettings, mirroring SimulationService.simulate()) --
         // everything below (validation, session persistence, DraftSlot math) uses
         // settings.teams() so nothing can disagree with the DraftContext it's paired with.
+        //
+        // Deliberately the 2-arg toSettings overload (reversalRound = 0), even
+        // though draft IS a real persisted row with its own reversal_round: the
+        // mock room is football-only (multi-sport-and-rebrand.md's Non-goals --
+        // no mock draft room for basketball), and MockDraftRepository's session
+        // row has no reversal_round column of its own. Honoring the real value
+        // only for this fork's seed picks (below) while every later bot/user
+        // pick in the session rebuilds its LeagueShape from that column-less
+        // row -- see submitPick, which always gets plain snake -- would make a
+        // single session's own round-3/4 order disagree with itself mid-draft.
+        // Plain snake throughout is at least self-consistent.
         LeagueSettings settings = LeagueRepository.toSettings(league, draft.rounds());
 
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(settings.teams())) {
@@ -194,6 +205,11 @@ public class MockDraftService {
         List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
         for (Map.Entry<Integer, Long> e : completed.entrySet()) {
             int pickNo = e.getKey();
+            // Plain snake overload -- same reasoning as settings above: the mock
+            // room is football-only and reversalRound is always 0 here, so this
+            // re-derivation agrees with the real draft_pick.draft_slot Sleeper
+            // reported (PickMapper reads that column directly rather than
+            // computing it, so it is the one to trust if this ever disagreed).
             int slot = DraftSlot.slot(pickNo, settings.teams());
             int round = DraftSlot.round(pickNo, settings.teams());
             SeatSpec seat = seatAt(seats, slot);
@@ -226,6 +242,9 @@ public class MockDraftService {
         }
 
         List<SeatSpec> seats = readSeats(row.seatsJson());
+        // Plain snake overload: MockDraftRepository.SessionRow carries no
+        // reversal_round (see createSessionFromDraft's comment above) and the
+        // mock room is football-only, so there is never a reversal to honor here.
         int onTheClockSlot = DraftSlot.slot(row.currentPickNo(), row.teams());
         SeatSpec seat = seatAt(seats, onTheClockSlot);
         if (seat.type() != SeatSpec.Type.USER) {
@@ -349,6 +368,8 @@ public class MockDraftService {
                 .toList();
 
         boolean complete = "COMPLETE".equals(row.status());
+        // Plain snake overloads here too -- same reason as submitPick above:
+        // SessionRow has no reversal_round to read.
         Integer onTheClockSlot = complete ? null : DraftSlot.slot(row.currentPickNo(), row.teams());
         boolean isUsersTurn = !complete && onTheClockSlot != null && onTheClockSlot == row.userSlot();
         List<Integer> myPicks = Arrays.stream(DraftSlot.picksForSlot(row.userSlot(), row.teams(), row.rounds()))

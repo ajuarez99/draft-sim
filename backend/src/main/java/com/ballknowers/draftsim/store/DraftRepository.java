@@ -24,24 +24,40 @@ public class DraftRepository {
         this.jdbc = jdbc;
     }
 
+    /** Back-compat overload: {@code reversal_round} defaults to 0 (no reversal). */
     public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
                        String type, String status, Instant startTime, String slotToManagerJson) {
+        return upsert(leagueId, sleeperDraftId, season, rounds, teams, type, status, startTime,
+                slotToManagerJson, 0);
+    }
+
+    /**
+     * @param reversalRound Sleeper's {@code settings.reversal_round}, read by
+     *                      {@link com.ballknowers.draftsim.ingest.LeagueIngestService}
+     *                      off the draft object (multi-sport-and-rebrand.md Phase 5).
+     *                      0 means plain snake for the whole draft.
+     */
+    public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
+                       String type, String status, Instant startTime, String slotToManagerJson,
+                       int reversalRound) {
         return db.sql("""
                 insert into draft (league_id, sleeper_draft_id, season, rounds, teams,
-                                   draft_type, status, start_time, slot_to_manager)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                                   draft_type, status, start_time, slot_to_manager, reversal_round)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
                 on conflict (sleeper_draft_id) do update set
                     rounds = excluded.rounds,
                     teams = excluded.teams,
                     status = excluded.status,
                     start_time = excluded.start_time,
-                    slot_to_manager = excluded.slot_to_manager
+                    slot_to_manager = excluded.slot_to_manager,
+                    reversal_round = excluded.reversal_round
                 returning id
                 """)
                 .param(1, leagueId).param(2, sleeperDraftId).param(3, season).param(4, rounds)
                 .param(5, teams).param(6, type).param(7, status)
                 .param(8, startTime == null ? null : OffsetDateTime.ofInstant(startTime, ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE)
                 .param(9, slotToManagerJson)
+                .param(10, reversalRound)
                 .query(Long.class)
                 .single();
     }
@@ -134,18 +150,35 @@ public class DraftRepository {
         jdbc.update("update draft set slot_to_manager = ?::jsonb where id = ?", slotToManagerJson, draftId);
     }
 
+    /**
+     * @param reversalRound the persisted {@code draft.reversal_round}
+     *                      (multi-sport-and-rebrand.md Phase 5) -- 0 for
+     *                      every draft ingested before that column existed,
+     *                      and for every NFL draft in the database, since
+     *                      Sleeper's own default is 0 and football never
+     *                      reverses.
+     */
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,
-                           int rounds, int teams, String status, Map<String, Object> slotToManager) {}
+                           int rounds, int teams, String status, Map<String, Object> slotToManager,
+                           int reversalRound) {
+
+        /** Back-compat for callers/tests built before {@link #reversalRound} existed -- plain snake. */
+        public DraftRow(long id, long leagueId, String sleeperDraftId, int season,
+                        int rounds, int teams, String status, Map<String, Object> slotToManager) {
+            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, 0);
+        }
+    }
 
     public Optional<DraftRow> bySleeperId(String sleeperDraftId) {
         return db.sql("""
-                select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text
+                select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
+                       reversal_round
                 from draft where sleeper_draft_id = ?
                 """)
                 .param(sleeperDraftId)
                 .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
-                        JsonUtil.readMap(rs.getString(8))))
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9)))
                 .optional();
     }
 

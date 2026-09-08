@@ -56,7 +56,13 @@ public class SimulationService {
 
         Sport sport = leagueRow.sport();
 
-        LeagueSettings settings = LeagueRepository.toSettings(leagueRow, draft.rounds());
+        // draft.reversalRound() is the persisted Sleeper reversal_round for THIS
+        // real draft (multi-sport-and-rebrand.md Phase 5/6) -- this is the one
+        // path that simulates an actual, ingested draft, so it is the one path
+        // that must honor it. DraftContext/DraftSimulator/MonteCarloRunner read
+        // it back off settings.reversalRound() rather than taking it as a
+        // parameter of their own.
+        LeagueSettings settings = LeagueRepository.toSettings(leagueRow, draft.rounds(), draft.reversalRound());
         List<BoardEntry> board = boards.currentBoard(sport);
         if (board.isEmpty()) throw new IllegalStateException("board is empty — run ingest first");
 

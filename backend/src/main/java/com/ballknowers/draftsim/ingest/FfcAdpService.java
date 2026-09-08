@@ -40,6 +40,12 @@ public class FfcAdpService {
         static Result disabled() {
             return new Result(false, 0, 0, 0, 0, false, "FFC disabled in weights.yml", List.of());
         }
+
+        static Result skippedForSport(Sport sport) {
+            return new Result(false, 0, 0, 0, 0, false,
+                    "fantasyfootballcalculator.com is football-only; skipped for sport '"
+                            + sport.code() + "'", List.of());
+        }
     }
 
     /**
@@ -48,6 +54,22 @@ public class FfcAdpService {
      * for this run, not fail ingest for the leagues that don't depend on it.
      */
     public Result ingest(Sport sport) {
+        if (sport != Sport.NFL) {
+            // fantasyfootballcalculator.com is a football-only vendor (weights.yml's
+            // adp.ffc note) -- there is no basketball ADP to fetch. Skipped here
+            // rather than only in BoardService.loadFfc, because that guard only
+            // stops a bad READ; without this one, calling this method for nba would
+            // still fetch FFC's football payload and try to match it against
+            // players.findAll(NBA) -- Sleeper's numeric player-id space collides
+            // ~99% between the two sports (2092 of 2109 nba ids also resolve to an
+            // nfl player), so "it just won't match anything" is not a safe
+            // assumption. This used to be enforced by IngestController's
+            // requireNflForNow guard, removed once this method started enforcing
+            // it directly (multi-sport-and-rebrand.md Phase 5).
+            log.info("FFC ingest skipped for sport '{}' -- fantasyfootballcalculator.com is football-only",
+                    sport.code());
+            return Result.skippedForSport(sport);
+        }
         try {
             return ingestOrThrow(sport);
         } catch (Exception e) {
@@ -80,7 +102,7 @@ public class FfcAdpService {
         }
 
         List<Map<String, Object>> rawPlayers = (List<Map<String, Object>>) primary.get("players");
-        PlayerMatcher matcher = PlayerMatcher.build(players.findAll(sport));
+        PlayerMatcher matcher = PlayerMatcher.build(sport, players.findAll(sport));
 
         List<BoardRepository.SourceRow> rows = new ArrayList<>();
         List<Miss> misses = new ArrayList<>();

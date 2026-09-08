@@ -327,6 +327,13 @@ public class LiveDraftPoller {
     /**
      * The slot whose turn it is, or null once every pick is in. Shared with the
      * live-stream endpoint's initial DB-synthesized state so the two agree.
+     *
+     * Deliberately calls the plain (reversalRound-less) {@link DraftSlot#slot}
+     * overload rather than growing a {@code reversalRound} parameter of its
+     * own: live-draft polling/SSE tracking for basketball is a Non-goal of
+     * multi-sport-and-rebrand.md, this class hardcodes {@link Sport#NFL}
+     * elsewhere in the same spirit (see {@link #pollOnce}), and football never
+     * reverses, so there is nothing for a second parameter here to carry.
      */
     public static Integer onTheClockSlot(int picksMade, int teams, int rounds) {
         if (teams <= 0 || picksMade >= teams * rounds) return null;

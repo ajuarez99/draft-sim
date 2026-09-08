@@ -142,23 +142,32 @@ public class BoardService {
     }
 
     /**
-     * Removes players who are not on an NFL roster and not in anyone's ADP.
+     * Removes players who are not on a pro roster and not in anyone's ADP.
      *
      * Sleeper's players dump is an archive, not a roster: it keeps every player
      * it has ever seen and it never walks search_rank back when one leaves the
-     * league. Todd Gurley, out of football since 2021, still ships with
-     * search_rank 27, status "Active" and active true -- so dense-ranking
-     * search_rank put him on the board at 33 overall and the engine duly
-     * recommended him in round 2. He is not an outlier: Tom Brady, Drew Brees,
-     * Antonio Brown, Rob Gronkowski and Frank Gore are all inside the top 300,
-     * and 107 of the top 400 board slots were players nobody can draft.
+     * league. This was found and named against football specifically -- Todd
+     * Gurley, out of the league since 2021, still ships with search_rank 27,
+     * status "Active" and active true, so dense-ranking search_rank put him on
+     * the board at 33 overall and the engine duly recommended him in round 2.
+     * He is not an outlier there: Tom Brady, Drew Brees, Antonio Brown, Rob
+     * Gronkowski and Frank Gore are all inside the top 300, and 107 of the top
+     * 400 football board slots were players nobody can draft.
      *
      * status and active are useless as the discriminator, since Gurley reads
      * "Active"/true. The field Sleeper does maintain is team, which is nulled
-     * when a player is off an NFL roster. So: keep a player if he is rostered,
-     * or if the real market drafts him anyway (an FFC ADP row), which preserves
-     * a genuinely unsigned free agent that mock drafters are still taking. Both
-     * signals absent means no one is drafting him, in this league or any other.
+     * when a player is off a roster -- for either sport; nba's dump carries the
+     * same field, nulled the same way. So: keep a player if he is rostered, or
+     * if the real market drafts him anyway (an FFC ADP row -- football only,
+     * see {@link #loadFfc}), which preserves a genuinely unsigned free agent
+     * that mock drafters are still taking. Both signals absent means no one is
+     * drafting him, in this league or any other.
+     *
+     * Verified against real nba data (2026-09-08): 1508 of 2109 players have
+     * team == null and 601 survive this check, comfortably above the 168 picks
+     * a board needs to cover, so the same logic that was written for football's
+     * fossils generalizes to basketball's without a code change here -- only
+     * loadFfc (football-only) needed one.
      *
      * FFC is best-effort, so when its fetch fails this degrades to the roster
      * check alone -- weaker, but still enough to keep the fossils off the board.
@@ -199,8 +208,17 @@ public class BoardService {
      * way observed draft order is — an FFC ADP of 30 in a 14-team fetch and an
      * observed pick 30 in a 12-team draft are not the same board position, and
      * neither should be compared to sleeper_search_rank without conversion.
+     *
+     * Skipped entirely for basketball: fantasyfootballcalculator.com is a
+     * football-only vendor with no basketball data (weights.yml's adp.ffc
+     * note). {@link FfcAdpService#ingest} already refuses to write nba-tagged
+     * rows, so {@code boards.latestCapture(NBA, SOURCE_FFC)} would come back
+     * empty on its own -- this early return is belt-and-suspenders, and
+     * documents the skip at the read site rather than relying only on the
+     * write site never having produced anything.
      */
     private Map<Long, Double> loadFfc(Sport sport) {
+        if (sport != Sport.NFL) return Map.of();
         if (adpCfg.ffc() == null || !adpCfg.ffc().enabled()) return Map.of();
         Optional<LocalDate> date = boards.latestCapture(sport, BoardRepository.SOURCE_FFC);
         if (date.isEmpty()) return Map.of();

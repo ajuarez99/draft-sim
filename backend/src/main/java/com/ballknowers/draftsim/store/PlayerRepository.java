@@ -71,7 +71,7 @@ public class PlayerRepository {
                 .query((rs, i) -> {
                     String[] raw = (String[]) rs.getArray("positions").getArray();
                     List<Position> pos = Arrays.stream(raw)
-                            .map(Position::fromSleeper)
+                            .map(p -> Position.fromSleeper(p, sport))
                             .flatMap(Optional::stream)
                             .toList();
                     Integer age = rs.getObject("age") == null ? null : rs.getInt("age");

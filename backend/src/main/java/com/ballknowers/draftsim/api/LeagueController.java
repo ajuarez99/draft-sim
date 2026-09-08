@@ -412,7 +412,11 @@ public class LeagueController {
 
         int pickNo = body.pickNo();
         int round = DraftSlot.round(pickNo, draft.teams());
-        int slot = DraftSlot.slot(pickNo, draft.teams());
+        // draft.reversalRound() -- this is a real, persisted draft, and a
+        // manually-recorded pick needs the same slot math the simulator and
+        // the rest of the ingest pipeline would use for it (multi-sport-and-
+        // rebrand.md Phase 5/6). 0 for every NFL draft, unchanged from before.
+        int slot = DraftSlot.slot(pickNo, draft.teams(), draft.reversalRound());
         Long managerId = DraftOrderMapper.normalize(draft.slotToManager()).get(String.valueOf(slot));
 
         drafts.upsertPicks(draft.id(), List.of(new DraftRepository.PickRow(

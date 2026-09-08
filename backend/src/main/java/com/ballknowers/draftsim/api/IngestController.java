@@ -42,7 +42,6 @@ public class IngestController {
     @PostMapping("/adp")
     public FfcAdpService.Result adp(@RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
-        requireNflForNow(s, Route.ADP);
         return ffcAdp.ingest(s);
     }
 
@@ -50,7 +49,6 @@ public class IngestController {
     @PostMapping("/players")
     public PlayerIngestService.Result players(@RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
-        requireNflForNow(s, Route.PLAYERS);
         return playerIngest.ingest(s);
     }
 
@@ -58,7 +56,6 @@ public class IngestController {
     @PostMapping("/league/{sleeperLeagueId}")
     public LeagueIngestService.Result league(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
-        requireNflForNow(sport, sleeperLeagueId);
         return leagueIngest.ingestChain(sport, sleeperLeagueId);
     }
 
@@ -71,7 +68,6 @@ public class IngestController {
     @PostMapping("/league-history/{sleeperLeagueId}")
     public LeagueHistoryIngestService.Result leagueHistory(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
-        requireNflForNow(sport, sleeperLeagueId);
         return leagueHistoryIngest.ingestChain(sport, sleeperLeagueId);
     }
 
@@ -82,7 +78,6 @@ public class IngestController {
     @PostMapping("/board")
     public Map<String, Object> board(@RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
-        requireNflForNow(s, Route.BOARD);
         FfcAdpService.Result adp = ffcAdp.ingest(s);
         BoardService.Result result = boards.rebuild(s);
         int written = profiles.persistFitted(s);
@@ -103,7 +98,6 @@ public class IngestController {
     @PostMapping("/all/{sleeperLeagueId}")
     public Map<String, Object> all(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
-        requireNflForNow(sport, sleeperLeagueId);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("players", playerIngest.ingest(sport));
@@ -112,75 +106,5 @@ public class IngestController {
         out.put("board", boards.rebuild(sport));
         out.put("profilesWritten", profiles.persistFitted(sport));
         return out;
-    }
-
-    /**
-     * TEMPORARY GUARD -- delete this method, the {@link Route} enum, and all six
-     * call sites above once Phase 5 of claude/multi-sport-and-rebrand.md lands
-     * basketball ingest (BasketballRules, PlayerIngestService's NBA
-     * fantasyPositions cases, DraftSlot's reversal-round handling). Until then,
-     * letting an inferred or requested NBA sport past this point would corrupt
-     * data in a different way at every call site:
-     *
-     * <ul>
-     *   <li>{@link #league}/{@link #leagueHistory}/{@link #all}: sport is
-     *   inferred from Sleeper, not chosen by the caller, so there is no
-     *   "don't pass ?sport=nba" escape hatch -- the guard is the only thing
-     *   standing between a basketball league id and everything below.
-     *   <li>{@link #adp} (and the ADP step inside {@link #board}): runs
-     *   {@link FfcAdpService}, which fetches from fantasyfootballcalculator.com,
-     *   a football-only vendor, and matches the result against {@code
-     *   players.findAll(NBA)}. Sleeper reuses its numeric player-id space across
-     *   sports (2092 of 2109 NBA ids collide with an NFL id) and real people
-     *   share names across sports, so "it just won't match anything" is not a
-     *   safe assumption -- this would write real {@code adp_snapshot} rows
-     *   tagged {@code nba} built from football numbers.
-     *   <li>{@link #board}: runs {@code boards.rebuild(NBA)}, whose {@code
-     *   dropOffRoster}/{@code draftable()} reasoning ("not on an NFL roster")
-     *   and {@code loadFfc} (a football-only vendor) are football-only and
-     *   not yet given basketball cases -- that's Phase 5 work. ({@code
-     *   DraftRepository.allCompletedPicks(Sport)} itself is sport-filtered as
-     *   of Phase 2, so {@code profiles.persistFitted(NBA)} no longer fits
-     *   basketball profiles from football picks; this guard stays up for the
-     *   board/ingest reasons above, not that one.)
-     *   <li>{@link #players}: {@code PlayerIngestService.fantasyPositions()} has
-     *   no basketball cases yet (that's Phase 5 work), so NBA positions would be
-     *   dropped or mis-mapped into the {@code positions text[]} column.
-     * </ul>
-     *
-     * Refuse rather than corrupt.
-     */
-    private static void requireNflForNow(Sport sport, String sleeperLeagueId) {
-        if (sport != Sport.NFL) {
-            throw new IllegalArgumentException("league " + sleeperLeagueId + " is sport '" + sport.code()
-                    + "', but ingest only supports football for now -- basketball ingest is gated on Phase 5"
-                    + " of claude/multi-sport-and-rebrand.md");
-        }
-    }
-
-    /**
-     * Same refusal as {@link #requireNflForNow(Sport, String)}, for the three
-     * {@code ?sport=}-parameterised routes that have no league id to name --
-     * the message instead names the route so the reader knows which one
-     * refused. A distinct enum-typed overload rather than a same-erasure
-     * {@code String} overload, since {@code (Sport, String)} is already taken.
-     */
-    private static void requireNflForNow(Sport sport, Route route) {
-        if (sport != Sport.NFL) {
-            throw new IllegalArgumentException(route.path + " was called with sport '" + sport.code()
-                    + "', but ingest only supports football for now -- basketball ingest is gated on Phase 5"
-                    + " of claude/multi-sport-and-rebrand.md");
-        }
-    }
-
-    /** The three {@code ?sport=}-parameterised routes {@link #requireNflForNow(Sport, Route)} guards. */
-    private enum Route {
-        ADP("POST /api/ingest/adp"), PLAYERS("POST /api/ingest/players"), BOARD("POST /api/ingest/board");
-
-        private final String path;
-
-        Route(String path) {
-            this.path = path;
-        }
     }
 }

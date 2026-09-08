@@ -71,10 +71,14 @@ public record LeagueShape(int teams, int rounds, List<String> rosterPositions, d
     /**
      * Ad-hoc leagues are football-only by design (see the multi-sport doc's
      * Non-goals: no mock draft room for basketball) -- {@link Sport#NFL} is
-     * hardcoded here rather than added as a field on this record.
+     * hardcoded here rather than added as a field on this record. There is
+     * likewise no {@code draft} row behind a bare shape to read a
+     * {@code reversal_round} off of, so {@link LeagueSettings#reversalRound}
+     * is plain snake (0) here, same as the 5-arg {@code LeagueSettings}
+     * constructor would default it to.
      */
     public LeagueSettings toSettings() {
-        return new LeagueSettings(Sport.NFL, teams, rounds, rosterPositions, pointsPerReception);
+        return new LeagueSettings(Sport.NFL, teams, rounds, rosterPositions, pointsPerReception, 0);
     }
 
     public int totalPicks() {

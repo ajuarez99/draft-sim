@@ -49,7 +49,7 @@ public class PlayerIngestService {
 
         for (Map.Entry<String, Map<String, Object>> e : raw.entrySet()) {
             Map<String, Object> p = e.getValue();
-            List<Position> positions = fantasyPositions(p);
+            List<Position> positions = fantasyPositions(p, sport);
             if (positions.isEmpty()) continue;   // not fantasy relevant in this format
 
             String name = name(p);
@@ -97,12 +97,16 @@ public class PlayerIngestService {
     }
 
     @SuppressWarnings("unchecked")
-    private static List<Position> fantasyPositions(Map<String, Object> p) {
+    private static List<Position> fantasyPositions(Map<String, Object> p, Sport sport) {
         Object fp = p.get("fantasy_positions");
         List<String> raw = (fp instanceof List<?> l)
                 ? (List<String>) l
                 : (p.get("position") == null ? List.of() : List.of(p.get("position").toString()));
-        return raw.stream().map(Position::fromSleeper).flatMap(Optional::stream).distinct().toList();
+        // Sport-aware: the nba payload carries ~30 entries whose fantasy_positions
+        // is exactly ["DEF"] (verified 2026-09-08) -- an archive artifact, not a
+        // real basketball position. Position.fromSleeper(String, Sport) drops
+        // those for nba rather than mapping them onto football's DEF.
+        return raw.stream().map(pos -> Position.fromSleeper(pos, sport)).flatMap(Optional::stream).distinct().toList();
     }
 
     private static String name(Map<String, Object> p) {
