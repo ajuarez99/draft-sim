@@ -14,10 +14,10 @@ class FootballRulesTest {
     private static final List<String> SLOTS = List.of(
             "QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "K", "DEF",
             "BN", "BN", "BN", "BN", "BN");
-    private static final LeagueSettings SETTINGS = new LeagueSettings(14, 15, SLOTS, 1.0);
+    private static final LeagueSettings SETTINGS = new LeagueSettings(Sport.NFL, 14, 15, SLOTS, 1.0);
 
     private final FootballRules rules = new FootballRules(new ScoringProperties(
-            new ScoringProperties.Sport(
+            new ScoringProperties.SportScoring(
                     new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
                     12.0, 3.0, 60.0, 0.15, 6, 0.85,
                     Map.of("K", 3, "DEF", 4), 1.0, 30)));

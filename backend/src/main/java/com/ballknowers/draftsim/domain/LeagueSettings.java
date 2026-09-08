@@ -10,6 +10,7 @@ import java.util.Map;
  * QB/RB/RB/WR/WR/TE/FLEX/FLEX/K/DEF + 5 bench.
  */
 public record LeagueSettings(
+        Sport sport,
         int teams,
         int rounds,
         List<String> rosterPositions,   // Sleeper's raw slot list, in order

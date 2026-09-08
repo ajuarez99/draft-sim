@@ -11,6 +11,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.sport.FootballRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
@@ -41,7 +42,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class MockDraftServiceTest {
 
-    private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
+    private static final ScoringProperties.SportScoring CFG = new ScoringProperties.SportScoring(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
@@ -79,7 +80,9 @@ class MockDraftServiceTest {
 
         repo = new FakeMockDraftRepository();
         DraftContextFactory contexts =
-                new DraftContextFactory(new FootballRules(new ScoringProperties(CFG)), new ScoringProperties(CFG));
+                new DraftContextFactory(
+                        new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG)))),
+                        new ScoringProperties(CFG));
         service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers,
                 drafts, leagues, new OwnerProperties(null));
     }
@@ -246,7 +249,7 @@ class MockDraftServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 77L, 9L, "sleeper-draft-fork", 2026, 15, 8, "drafting", slotToManager);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, "sleeper-league-fork", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NFL, "sleeper-league-fork", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
         when(drafts.bySleeperId("sleeper-draft-fork")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         // board(400)'s first entry has player id 1 -- already drafted by slot 1 (managerA).
@@ -279,7 +282,7 @@ class MockDraftServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 77L, 9L, "sleeper-draft-fork-gap", 2026, 15, 8, "drafting", slotToManager);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, "sleeper-league-fork-gap", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NFL, "sleeper-league-fork-gap", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
         when(drafts.bySleeperId("sleeper-draft-fork-gap")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         when(drafts.picks(77L)).thenReturn(List.of(
@@ -311,7 +314,7 @@ class MockDraftServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 9L, "sleeper-draft-odd-size", 2026, 15, 9, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, "sleeper-league-odd-size", "League", 2026, 9, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NFL, "sleeper-league-odd-size", "League", 2026, 9, LeagueShape.STANDARD_ROSTER, 1.0, null);
         when(drafts.bySleeperId("sleeper-draft-odd-size")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 
@@ -324,7 +327,7 @@ class MockDraftServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 9L, "sleeper-draft-no-slot", 2026, 15, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, "sleeper-league-no-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NFL, "sleeper-league-no-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
         when(drafts.bySleeperId("sleeper-draft-no-slot")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         // owner is unconfigured (OwnerProperties(null) from setUp), and no override is passed.
@@ -338,7 +341,7 @@ class MockDraftServiceTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 9L, "sleeper-draft-bad-slot", 2026, 15, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, "sleeper-league-bad-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NFL, "sleeper-league-bad-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
         when(drafts.bySleeperId("sleeper-draft-bad-slot")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 

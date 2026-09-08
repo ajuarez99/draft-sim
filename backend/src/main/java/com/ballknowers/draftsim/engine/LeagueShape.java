@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.LeagueSettings;
+import com.ballknowers.draftsim.domain.Sport;
 
 import java.util.List;
 import java.util.Set;
@@ -67,8 +68,13 @@ public record LeagueShape(int teams, int rounds, List<String> rosterPositions, d
         return new LeagueShape(teams, STANDARD_ROUNDS, STANDARD_ROSTER, STANDARD_PPR);
     }
 
+    /**
+     * Ad-hoc leagues are football-only by design (see the multi-sport doc's
+     * Non-goals: no mock draft room for basketball) -- {@link Sport#NFL} is
+     * hardcoded here rather than added as a field on this record.
+     */
     public LeagueSettings toSettings() {
-        return new LeagueSettings(teams, rounds, rosterPositions, pointsPerReception);
+        return new LeagueSettings(Sport.NFL, teams, rounds, rosterPositions, pointsPerReception);
     }
 
     public int totalPicks() {

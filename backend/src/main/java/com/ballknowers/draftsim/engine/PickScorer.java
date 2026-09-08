@@ -19,7 +19,7 @@ import java.util.Deque;
  */
 public final class PickScorer {
 
-    private final ScoringProperties.Sport cfg;
+    private final ScoringProperties.SportScoring cfg;
     private final SportRules rules;
     private final PositionalPriors priors;
 
@@ -31,7 +31,7 @@ public final class PickScorer {
     // deterministic call, just made once instead of ~12.6M times.
     private final double[] decayPow;
 
-    public PickScorer(ScoringProperties.Sport cfg, SportRules rules, PositionalPriors priors) {
+    public PickScorer(ScoringProperties.SportScoring cfg, SportRules rules, PositionalPriors priors) {
         this.cfg = cfg;
         this.rules = rules;
         this.priors = priors;

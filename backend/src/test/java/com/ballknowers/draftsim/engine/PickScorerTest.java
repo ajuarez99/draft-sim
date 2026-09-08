@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PickScorerTest {
 
-    private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
+    private static final ScoringProperties.SportScoring CFG = new ScoringProperties.SportScoring(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);

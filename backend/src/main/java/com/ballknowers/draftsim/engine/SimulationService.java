@@ -44,7 +44,6 @@ public class SimulationService {
 
     public SimulationResult simulate(SimulationRequest req, IntConsumer onProgress) {
         long setupStart = System.nanoTime();
-        Sport sport = Sport.NFL;
 
         DraftRepository.DraftRow draft = drafts.bySleeperId(req.draftSleeperId())
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -54,6 +53,8 @@ public class SimulationService {
                 .filter(l -> l.id() == draft.leagueId())
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("league missing for draft"));
+
+        Sport sport = leagueRow.sport();
 
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, draft.rounds());
         List<BoardEntry> board = boards.currentBoard(sport);

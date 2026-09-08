@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.Provenance;
 import com.ballknowers.draftsim.sport.FootballRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -25,13 +26,15 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DraftContextFactoryTest {
 
-    private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
+    private static final ScoringProperties.SportScoring CFG = new ScoringProperties.SportScoring(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
 
     private final DraftContextFactory factory =
-            new DraftContextFactory(new FootballRules(new ScoringProperties(CFG)), new ScoringProperties(CFG));
+            new DraftContextFactory(
+                    new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG)))),
+                    new ScoringProperties(CFG));
 
     private static List<BoardEntry> board(int size) {
         List<BoardEntry> out = new ArrayList<>(size);

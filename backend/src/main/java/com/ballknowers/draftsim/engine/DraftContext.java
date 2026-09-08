@@ -30,7 +30,7 @@ public final class DraftContext {
     private final Map<Integer, ManagerProfile> profileBySlot;
     private final PositionalPriors priors;
     private final SportRules rules;
-    private final ScoringProperties.Sport cfg;
+    private final ScoringProperties.SportScoring cfg;
     private final List<Integer> completedPickNumbers;      // picks already made (resume mode)
     private final Map<Integer, Long> completedPicks;        // pickNo -> player id
 
@@ -55,7 +55,7 @@ public final class DraftContext {
             Map<Integer, ManagerProfile> profileBySlot,
             PositionalPriors priors,
             SportRules rules,
-            ScoringProperties.Sport cfg,
+            ScoringProperties.SportScoring cfg,
             List<Integer> completedPickNumbers,
             Map<Integer, Long> completedPicks
     ) {
@@ -95,7 +95,7 @@ public final class DraftContext {
     public Map<Integer, ManagerProfile> profileBySlot() { return profileBySlot; }
     public PositionalPriors priors() { return priors; }
     public SportRules rules() { return rules; }
-    public ScoringProperties.Sport cfg() { return cfg; }
+    public ScoringProperties.SportScoring cfg() { return cfg; }
     public List<Integer> completedPickNumbers() { return completedPickNumbers; }
     public Map<Integer, Long> completedPicks() { return completedPicks; }
 

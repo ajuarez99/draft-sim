@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.sport.SportRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,12 +40,12 @@ public class PowerRankingService {
     private final RosterSeasonRepository rosterSeasons;
     private final RosterWeekPointsRepository weekPoints;
     private final PowerRankingRepository rankings;
-    private final SportRules rules;
+    private final SportRulesRegistry rulesRegistry;
 
     public PowerRankingService(SleeperClient sleeper, BoardService boards, PlayerRepository players,
                                LeagueRepository leagues, ManagerRepository managers,
                                RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints,
-                               PowerRankingRepository rankings, SportRules rules) {
+                               PowerRankingRepository rankings, SportRulesRegistry rulesRegistry) {
         this.sleeper = sleeper;
         this.boards = boards;
         this.players = players;
@@ -53,7 +54,7 @@ public class PowerRankingService {
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
         this.rankings = rankings;
-        this.rules = rules;
+        this.rulesRegistry = rulesRegistry;
     }
 
     public record NflState(int week, String season, String seasonStartDate, boolean started) {}
@@ -89,6 +90,7 @@ public class PowerRankingService {
         LeagueRepository.LeagueRow leagueRow = leagues.byId(leagueId)
                 .orElseThrow(() -> new IllegalStateException("no league row for id " + leagueId));
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, leagueRow.rosterPositions().size());
+        SportRules rules = rulesRegistry.get(settings.sport());
 
         Map<String, Long> playerIdBySleeperId = players.idsBySleeperId(Sport.NFL);
         Map<Long, BoardEntry> boardByPlayerId = new HashMap<>();

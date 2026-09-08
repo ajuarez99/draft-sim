@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.domain.LeagueSettings;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.sport.SportRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -33,11 +34,11 @@ import java.util.Set;
 @Component
 public class DraftContextFactory {
 
-    private final SportRules rules;
+    private final SportRulesRegistry rulesRegistry;
     private final ScoringProperties scoring;
 
-    public DraftContextFactory(SportRules rules, ScoringProperties scoring) {
-        this.rules = rules;
+    public DraftContextFactory(SportRulesRegistry rulesRegistry, ScoringProperties scoring) {
+        this.rulesRegistry = rulesRegistry;
         this.scoring = scoring;
     }
 
@@ -61,6 +62,9 @@ public class DraftContextFactory {
 
         validate(settings, seats, board);
 
+        SportRules rules = rulesRegistry.get(settings.sport());
+        ScoringProperties.SportScoring cfg = scoring.forSport(settings.sport());
+
         Map<Integer, ManagerProfile> bySlot = new HashMap<>();
         for (SeatSpec seat : seats) {
             if (seat.managerId() == null) continue;   // BOT, or a USER with no Sleeper identity
@@ -77,7 +81,7 @@ public class DraftContextFactory {
 
         Map<Integer, Long> completed = completedPicks == null ? Map.of() : completedPicks;
         return new DraftContext(
-                board, settings, bySlot, priors, rules, scoring.football(),
+                board, settings, bySlot, priors, rules, cfg,
                 completed.keySet().stream().sorted().toList(), completed);
     }
 

@@ -66,19 +66,19 @@ public class LeagueRepository {
         return id;
     }
 
-    public record LeagueRow(long id, String sleeperId, String name, int season,
+    public record LeagueRow(long id, Sport sport, String sleeperId, String name, int season,
                             int totalRosters, List<String> rosterPositions, double ppr,
                             String previousLeagueId) {}
 
     private static final String ROW_COLUMNS = """
-            id, sleeper_id, name, season, total_rosters, roster_positions,
+            id, sport, sleeper_id, name, season, total_rosters, roster_positions,
             coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id
             """;
 
     private static LeagueRow mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
         Array a = rs.getArray("roster_positions");
         List<String> slots = List.of((String[]) a.getArray());
-        return new LeagueRow(rs.getLong("id"), rs.getString("sleeper_id"),
+        return new LeagueRow(rs.getLong("id"), Sport.fromCode(rs.getString("sport")), rs.getString("sleeper_id"),
                 rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
                 slots, rs.getDouble("ppr"), rs.getString("previous_league_id"));
     }
@@ -110,7 +110,7 @@ public class LeagueRepository {
     }
 
     public static LeagueSettings toSettings(LeagueRow row, int rounds) {
-        return new LeagueSettings(row.totalRosters(), rounds, row.rosterPositions(), row.ppr());
+        return new LeagueSettings(row.sport(), row.totalRosters(), rounds, row.rosterPositions(), row.ppr());
     }
 
     /**

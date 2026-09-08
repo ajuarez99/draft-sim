@@ -29,7 +29,7 @@ public class FootballRules implements SportRules {
 
     private static final int POSITIONS = Position.values().length;
 
-    private final ScoringProperties.Sport cfg;
+    private final ScoringProperties.SportScoring cfg;
 
     // value() is a pure function of (adp, valueDecay) -- valueDecay is fixed
     // for the process lifetime, so memoizing by adp removes every Math.exp()

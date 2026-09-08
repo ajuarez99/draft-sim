@@ -24,7 +24,7 @@ class MonteCarloRunnerTest {
             "QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "K", "DEF",
             "BN", "BN", "BN", "BN", "BN");
 
-    private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
+    private static final ScoringProperties.SportScoring CFG = new ScoringProperties.SportScoring(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
@@ -43,7 +43,7 @@ class MonteCarloRunnerTest {
     }
 
     private static DraftContext ctx(int teams, int rounds) {
-        LeagueSettings settings = new LeagueSettings(teams, rounds, SLOTS, 1.0);
+        LeagueSettings settings = new LeagueSettings(Sport.NFL, teams, rounds, SLOTS, 1.0);
         Map<Integer, ManagerProfile> profiles = new HashMap<>();
         for (int s = 1; s <= teams; s++) profiles.put(s, ManagerProfile.neutral(s, "seat " + s));
         return new DraftContext(

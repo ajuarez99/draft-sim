@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.sport.SportRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,8 +42,9 @@ class PowerRankingServiceTest {
 
     @BeforeEach
     void setUp() {
+        when(rules.sport()).thenReturn(Sport.NFL);
         service = new PowerRankingService(sleeper, boards, players, leagues, managers,
-                rosterSeasons, weekPoints, rankings, rules);
+                rosterSeasons, weekPoints, rankings, new SportRulesRegistry(List.of(rules)));
     }
 
     // ---- rankDescending (via computeRealized, its simplest caller) ----
@@ -87,7 +89,7 @@ class PowerRankingServiceTest {
     @Test
     void anOutStarterIsExcludedFromMarketValueNotScoredAsThoughHePlayed() {
         LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
-                1L, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null);
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null);
         when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
 
         Player healthy = player(1L, "sp1", Position.RB, null);
@@ -122,7 +124,7 @@ class PowerRankingServiceTest {
     @Test
     void aPlayerNotOnTheBoardIsExcludedAndNotedRatherThanCrashing() {
         LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
-                1L, "sleeper-league", "Test League", 2025, 1, List.of("QB", "BN"), 0.5, null);
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 1, List.of("QB", "BN"), 0.5, null);
         when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of());

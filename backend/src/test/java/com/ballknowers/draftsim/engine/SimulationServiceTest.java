@@ -7,6 +7,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.sport.SportRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -44,22 +45,23 @@ class SimulationServiceTest {
     @Mock private SportRules rules;
     @Mock private MonteCarloRunner runner;
 
-    private static final ScoringProperties.Sport CFG = new ScoringProperties.Sport(
+    private static final ScoringProperties.SportScoring CFG = new ScoringProperties.SportScoring(
             new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
 
     @Test
     void resolveStartStateDropsAnUnresolvableSleeperIdWithoutThrowing() {
+        when(rules.sport()).thenReturn(Sport.NFL);
         SimulationService service = new SimulationService(
                 boards, profiles, drafts, leagues, players,
                 new BoardProperties(0.5, List.of(), 14, 30), runner,
-                new DraftContextFactory(rules, new ScoringProperties(CFG)));
+                new DraftContextFactory(new SportRulesRegistry(List.of(rules)), new ScoringProperties(CFG)));
 
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-xyz", 2026, 1, 2, "pre_draft", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                10L, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5, null);
+                10L, Sport.NFL, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5, null);
         // Two entries for a 2-team, 1-round draft: DraftContextFactory rejects a
         // board shorter than the draft it is asked to run, since the last picks
         // would otherwise be chosen from an empty pool.
