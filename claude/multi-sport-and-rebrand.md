@@ -54,7 +54,7 @@ far**, checked live after each one rather than asserted.
 | 1b | `Sport` resolved at every endpoint | `31494d2` |
 | 2 | V6 + the contamination fix | `8cb6843` |
 | 3a/3b | Eleven positions; the lock, built but unwired | `ba14f05` |
-| 3c | **Not started — blocked on a measurement, see below** | |
+| 3c | Not started; the blocking measurement is **done** — see below | |
 | 4 | `BasketballRules` + per-sport config | |
 | 5 | NBA ingest, board, snake reversal | |
 | 6 | Frontend, incl. the `reversalRound` override | |
@@ -62,29 +62,49 @@ far**, checked live after each one rather than asserted.
 Suite at the stopping point: 272 tests, 0 skipped, 10 integration tests
 against real Postgres. `/api/health` reports `weightsLoaded: true`.
 
-### The next thing to do, and it is not writing code
+### The next thing to do — measured 2026-09-08, and the answer reframes 3c
 
-**3c's design rests on an unmeasured assumption.** The plan is a 32-entry table
-keyed by eligibility mask, precomputed once per `prepareLineup`, so `rosterNeed`
-stays O(1) across ~25M calls per run. That works only if adding one player
-causes a *bounded* displacement cascade. Football's `rosterNeed` is O(1)
-precisely because its chain is at most two — one dedicated starter displaced
-into FLEX, one FLEX starter displaced out — which is why its `Lineup` record can
-precompute exactly those two numbers and stop.
+**The cascade was measured. It is long: max 8, and 25% of placements need 3 or
+more.** `claude/scripts/nba-cascade-length.py` replays all 12 real 2025 Ball
+Knowers rosters pick by pick against the `PG,SG,G,SF,PF,F,C,UTIL,UTIL` starting
+slots and counts how many already-placed players must change slot when the next
+one arrives:
 
-With nested `G`/`F`/`UTIL` slots and multi-eligible players, nobody has
-established that bound. Measure it against the real 2025 NBA rosters before
-writing anything:
+    0 moves  45  41.7%      4 moves   8   7.4%
+    1 move   25  23.1%      5 moves   5   4.6%
+    2 moves  10   9.3%      6 moves   2   1.9%
+    3 moves  11  10.2%      7 moves   1   0.9%
+                            8 moves   1   0.9%
 
-- If the cascade is short (3 is the suspicion), the mask table is right and 3c
-  is a day's work.
-- If it is not, the honest fallback is greedy assignment in most-constrained-
-  slot-first order (`C, PG, SG, SF, PF, G, F, UTIL`) with its suboptimality
-  **measured against optimal on real rosters**, not assumed to be small.
+(108 placements into starting slots; another 60 went straight to the bench with
+the starters already full. The count is for a fixed slot-iteration order, so it
+is an upper bound on the *minimum* number of moves, not the minimum itself.)
 
-Either way the number goes in this doc next to the decision it justified. This
-is the one remaining piece of the plan with real design risk in it; everything
-after it is implementation.
+**This does not break the mask table — it relocates the cost, and it kills a
+different assumption instead.** Two separate things were being conflated:
+
+1. *Feasibility* — can this player be fitted into a starting slot at all? That
+   is what the cascade answers, and a length-8 augmenting path is still trivial
+   at 9 slots. It is computed **once per pick per seat** inside `prepareLineup`,
+   32 masks at a time. `rosterNeed` stays an O(1) table read. The table survives.
+2. *Value* — how much of his value reaches the lineup? Here the cascade is
+   **irrelevant**, and that is the real finding. Every one of the nine starting
+   slots is worth the same: value comes from the player, not the slot he
+   occupies. So shuffling eight players between `G`, `UTIL` and `SF` changes the
+   lineup total by exactly zero. Only two outcomes matter — either the matching
+   cardinality goes up and he starts (total += his value), or it does not and he
+   can only start by evicting the weakest player he can feasibly replace.
+
+So basketball's `rosterNeed` is **not** football's displacement arithmetic
+generalised to longer chains. It is: *did cardinality increase?* — and if not,
+*who is the cheapest feasible eviction?* That is a smaller and better-defined
+problem than the one this doc has been describing, and the football analogy was
+actively misleading about it.
+
+What still needs deciding before code: whether the cheapest-feasible-eviction
+search is exact (max-weight matching over 9 slots, once per pick) or greedy. Do
+that one the same way — measure greedy against optimal on these same 12 rosters
+and write the number down.
 
 ### Two things carried forward that are easy to get wrong
 
