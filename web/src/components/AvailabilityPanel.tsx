@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AvailabilityRow } from '../api'
+import type { AvailabilityRow, Sport } from '../api'
+import { filterPositions } from '../positions'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 
@@ -11,9 +12,10 @@ type Props = {
   // Whether there is a draft to have options in yet. Drives both the empty
   // copy and whether the sheet opens itself -- see the collapse note below.
   started: boolean
+  // Which sport's positions to filter by (multi-sport-and-rebrand.md Phase 6)
+  // -- the caller's own board, never a union of both sports'.
+  sport: Sport
 }
-
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
 
 // Survival at a given pick, defaulting missing entries to 0 (gone in every
 // run) rather than undefined -- every consumer below (the row filter, the
@@ -59,8 +61,10 @@ export default function AvailabilityPanel({
   teams,
   pickedPlayerIds,
   started,
+  sport,
 }: Props) {
-  const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
+  const POSITIONS = useMemo(() => filterPositions(sport), [sport])
+  const [filter, setFilter] = useState<string>('ALL')
   const [depth, setDepth] = useState(4)
   // Collapsed until there is something to look at, so the sheet never covers
   // the "Ready when you are" CTA that `.start-overlay` puts in the middle of

@@ -141,6 +141,13 @@ public class LeagueController {
         response.put("seats", seats);
         response.put("mySlot", mySlot);
         response.put("rosterPositions", rosterPositions);
+        // Added for multi-sport-and-rebrand.md Phase 6: the frontend's position
+        // lists, slot-eligibility model, and position-run detector all need to
+        // know which sport they're rendering rather than assuming football.
+        // `sport` above is already resolved (league lookup, defaulting to NFL)
+        // for fit(); this just also puts it on the wire. Sport's @JsonValue
+        // serializes it as the same lowercase code DraftSummary already uses.
+        response.put("sport", sport);
         return ResponseEntity.ok(response);
     }
 

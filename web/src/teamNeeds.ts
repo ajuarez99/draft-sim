@@ -4,20 +4,61 @@
 // drift -- see claude/plan-review-B.md's "prop-wiring" and "shared helper"
 // amendments.
 
-import type { PlayerRef, PredictedPick } from './api'
+import type { PlayerRef, PredictedPick, Sport } from './api'
+import { POSITIONS_BY_SPORT } from './positions'
 
-/** Positions a standard FLEX slot accepts -- mirrors Position.isFlexEligible()
- * / FootballRules's FLEX-eligibility rule (RB/WR/TE) on the backend. Keep in
- * sync with backend/src/main/java/.../domain/Position.java if that ever
- * changes. */
-const FLEX_ELIGIBLE = new Set(['RB', 'WR', 'TE'])
+/**
+ * Which roster slots each sport recognizes, and which positions each slot
+ * accepts -- mirrors FootballRules.isEligible / BasketballRules.isEligible on
+ * the backend (domain/sport/*.java) exactly, rather than inventing a second
+ * model that can drift out from under it:
+ *
+ *   football: QB/RB/WR/TE/K/DEF are dedicated (one position each); FLEX
+ *   accepts RB/WR/TE (Position.FLEX / isFlexEligible()).
+ *   basketball: PG/SG/SF/PF/C are dedicated; G accepts PG/SG, F accepts
+ *   SF/PF, UTIL accepts any of the five.
+ *
+ * A slot's own dedicated position is included in its own set for basketball's
+ * PG/SG/SF/PF/C (so `SLOT_ELIGIBILITY[sport][pos].has(pos)` is always true for
+ * a dedicated slot) -- keeps the "is this slot open to that position" check
+ * below (needLabel/openPositions) uniform across dedicated and pooled slots.
+ *
+ * BN/IR aren't here: computeTeamNeeds filters those out of rosterPositions
+ * before any of this runs (they accept anyone and are never "a need").
+ */
+const SLOT_ELIGIBILITY: Record<Sport, Record<string, Set<string>>> = {
+  nfl: {
+    QB: new Set(['QB']),
+    RB: new Set(['RB']),
+    WR: new Set(['WR']),
+    TE: new Set(['TE']),
+    K: new Set(['K']),
+    DEF: new Set(['DEF']),
+    FLEX: new Set(['RB', 'WR', 'TE']),
+  },
+  nba: {
+    PG: new Set(['PG']),
+    SG: new Set(['SG']),
+    SF: new Set(['SF']),
+    PF: new Set(['PF']),
+    C: new Set(['C']),
+    G: new Set(['PG', 'SG']),
+    F: new Set(['SF', 'PF']),
+    UTIL: new Set(['PG', 'SG', 'SF', 'PF', 'C']),
+  },
+}
 
-/** Slot strings this helper knows how to fill/badge. LeagueSettings on the
- * backend only recognizes literal "FLEX" today (SUPER_FLEX/REC_FLEX slot
- * strings exist in other league formats but aren't handled there either) --
- * anything else renders as a plain, always-open badge rather than being
- * silently treated as fillable. */
-const RECOGNIZED_SLOTS = new Set(['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'FLEX'])
+/**
+ * Pooled slots, per sport, in "most specific first" order -- the order
+ * needLabel walks when a position matches more than one open pooled slot
+ * (a basketball PG matches both G and UTIL; report the more specific one).
+ * Everything not listed here for a sport is a dedicated slot (one of that
+ * sport's own Position codes, from positions.ts).
+ */
+const POOLED_SLOTS: Record<Sport, readonly string[]> = {
+  nfl: ['FLEX'],
+  nba: ['G', 'F', 'UTIL'],
+}
 
 export type SlotStatus = { slot: string; player: PlayerRef | null }
 
@@ -39,7 +80,9 @@ export type SlotStatus = { slot: string; player: PlayerRef | null }
  * An unrecognized slot string (SUPER_FLEX etc.) always renders open/null --
  * informational only, never fillable, per the same gap's resolution.
  */
-export function computeTeamNeeds(rosterPositions: string[], drafted: PlayerRef[]): SlotStatus[] {
+export function computeTeamNeeds(sport: Sport, rosterPositions: string[], drafted: PlayerRef[]): SlotStatus[] {
+  const eligibility = SLOT_ELIGIBILITY[sport]
+  const dedicatedPositions = new Set<string>(POSITIONS_BY_SPORT[sport])
   const starterSlots = rosterPositions.filter((s) => s !== 'BN' && s !== 'IR')
 
   const byPosition = new Map<string, PlayerRef[]>()
@@ -51,30 +94,43 @@ export function computeTeamNeeds(rosterPositions: string[], drafted: PlayerRef[]
   for (const list of byPosition.values()) list.sort((a, b) => a.adp - b.adp)
   const nextIndex = new Map<string, number>()
 
-  // Pass 1: dedicated (non-FLEX) slots, in template order.
+  // Pass 1: dedicated slots (one of this sport's own positions), in template
+  // order. Pooled slots (FLEX; G/F/UTIL) and unrecognized slot strings are
+  // left null here and, for pooled ones, resolved in pass 2 below.
   const results: SlotStatus[] = starterSlots.map((slot) => {
-    if (slot === 'FLEX' || !RECOGNIZED_SLOTS.has(slot)) return { slot, player: null }
+    if (!dedicatedPositions.has(slot)) return { slot, player: null }
     const have = byPosition.get(slot) ?? []
     const i = nextIndex.get(slot) ?? 0
     nextIndex.set(slot, i + 1)
     return { slot, player: have[i] ?? null }
   })
 
-  // Pass 2: whatever's left at flex-eligible positions, past their dedicated
-  // slots, forms the FLEX pool -- best ADP first.
-  const flexPool: PlayerRef[] = []
-  for (const pos of FLEX_ELIGIBLE) {
-    const have = byPosition.get(pos) ?? []
-    const i = nextIndex.get(pos) ?? 0
-    flexPool.push(...have.slice(i))
-  }
-  flexPool.sort((a, b) => a.adp - b.adp)
+  // Pass 2: pooled slots, in template order -- each draws the best
+  // (lowest-ADP) remaining eligible player not already claimed by an earlier
+  // dedicated or pooled slot. `usedIds` generalizes the old FLEX-only "past
+  // its dedicated slots" cutoff (nextIndex) to any number of pooled slot
+  // kinds with overlapping eligibility (basketball's G/F/UTIL all draw from
+  // overlapping position sets, unlike football's single FLEX pool) -- a
+  // player already seated by a dedicated slot, or by an earlier pooled slot
+  // in template order, can't be drawn again by a later one.
+  const usedIds = new Set<number>()
+  for (const r of results) if (r.player) usedIds.add(r.player.id)
 
-  let flexIdx = 0
   for (const r of results) {
-    if (r.slot === 'FLEX') {
-      r.player = flexPool[flexIdx] ?? null
-      flexIdx++
+    if (dedicatedPositions.has(r.slot)) continue
+    const rule = eligibility[r.slot]
+    if (!rule) continue // genuinely unrecognized slot string -- stays open/null
+    let best: PlayerRef | null = null
+    for (const [pos, list] of byPosition) {
+      if (!rule.has(pos)) continue
+      for (const p of list) {
+        if (usedIds.has(p.id)) continue
+        if (best == null || p.adp < best.adp) best = p
+      }
+    }
+    if (best) {
+      r.player = best
+      usedIds.add(best.id)
     }
   }
 
@@ -83,20 +139,29 @@ export function computeTeamNeeds(rosterPositions: string[], drafted: PlayerRef[]
 
 /** Starting slots still open -- what a "fills a need" row tag checks against.
  * Unrecognized slot strings never appear here (never fillable). */
-export function openPositions(needs: SlotStatus[]): Set<string> {
+export function openPositions(sport: Sport, needs: SlotStatus[]): Set<string> {
+  const recognized = new Set(Object.keys(SLOT_ELIGIBILITY[sport]))
   const open = new Set<string>()
   for (const n of needs) {
-    if (n.player == null && RECOGNIZED_SLOTS.has(n.slot)) open.add(n.slot)
+    if (n.player == null && recognized.has(n.slot)) open.add(n.slot)
   }
   return open
 }
 
-/** "Fills {slot}" tag text for a player of `position`, or null when drafting
- * them wouldn't fill any open starting slot -- a dedicated match, or a
- * FLEX-eligible position when only FLEX remains open. */
-export function needLabel(position: string, open: Set<string>): string | null {
+/**
+ * "Fills {slot}" tag text for a player of `position`, or null when drafting
+ * them wouldn't fill any open starting slot. Checks the dedicated slot first,
+ * then this sport's pooled slots in "most specific" order (POOLED_SLOTS) --
+ * a basketball PG matching both an open G and an open UTIL reports "Fills G",
+ * the more informative of the two. Slot-named throughout, so basketball says
+ * "Fills G"/"Fills UTIL" rather than football's "Fills FLEX" leaking in.
+ */
+export function needLabel(sport: Sport, position: string, open: Set<string>): string | null {
   if (open.has(position)) return `Fills ${position}`
-  if (FLEX_ELIGIBLE.has(position) && open.has('FLEX')) return 'Fills FLEX'
+  const eligibility = SLOT_ELIGIBILITY[sport]
+  for (const slot of POOLED_SLOTS[sport]) {
+    if (open.has(slot) && eligibility[slot]?.has(position)) return `Fills ${slot}`
+  }
   return null
 }
 

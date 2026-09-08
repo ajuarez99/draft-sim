@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { PlayerRef } from '../api'
+import type { PlayerRef, Sport } from '../api'
+import { filterPositions } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
 
@@ -11,9 +12,13 @@ type Props = {
   draftedPlayers: PlayerRef[]
   onPick: (player: PlayerRef) => void
   onClose: () => void
+  // Always 'nfl' today: the mock draft room is football-only by
+  // multi-sport-and-rebrand.md's Non-goals (MockDraftService.buildContext
+  // hardcodes Sport.NFL), so MockDraftView has nothing else to pass. Still a
+  // real prop, not a hardcoded default here, so this component doesn't
+  // silently keep assuming football if that non-goal is ever revisited.
+  sport: Sport
 }
-
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
 
 /**
  * A new component rather than a PlayerPicker reuse (claude/next-features-roadmap.md
@@ -30,8 +35,10 @@ export default function OnTheClockPickInput({
   draftedPlayers,
   onPick,
   onClose,
+  sport,
 }: Props) {
-  const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
+  const POSITIONS = useMemo(() => filterPositions(sport), [sport])
+  const [filter, setFilter] = useState<string>('ALL')
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -47,8 +54,11 @@ export default function OnTheClockPickInput({
       .sort((a, b) => a.adp - b.adp)
   }, [available, filter])
 
-  const needs = useMemo(() => computeTeamNeeds(rosterPositions, draftedPlayers), [rosterPositions, draftedPlayers])
-  const open = useMemo(() => openPositions(needs), [needs])
+  const needs = useMemo(
+    () => computeTeamNeeds(sport, rosterPositions, draftedPlayers),
+    [sport, rosterPositions, draftedPlayers],
+  )
+  const open = useMemo(() => openPositions(sport, needs), [sport, needs])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -99,7 +109,7 @@ export default function OnTheClockPickInput({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const need = needLabel(p.position, open)
+                const need = needLabel(sport, p.position, open)
                 return (
                   <tr
                     key={p.id}

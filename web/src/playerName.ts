@@ -28,6 +28,8 @@ export type ShortName = {
   rest: string
 }
 
+import type { Sport } from './api'
+
 type Named = { name: string; position: string }
 
 /**
@@ -45,8 +47,18 @@ type Named = { name: string; position: string }
  * Sleeper gives them as "Seattle Seahawks", where an initial would produce the
  * nonsense "S. Seahawks". The mascot alone is unique across the league and the
  * cell already carries the team code, so DEF drops the city instead.
+ *
+ * `sport` guards this: "DEF" is a football-only position code (domain/
+ * Position.java), and a raw NBA player position string never legitimately
+ * reaches here as "DEF" either -- Position.fromSleeper drops the ~30 nba
+ * entries Sleeper itself mistags "DEF" rather than mapping them onto
+ * football's DEF (see that method's own comment). But that is an invariant
+ * living on the backend, one hop away from this file; checking `sport` here
+ * too means a bug in that invariant can't make a basketball name print as
+ * though it were a defense. Defaults to 'nfl' so every existing caller (and
+ * test) that predates multi-sport keeps behaving exactly as before.
  */
-export function shortName({ name, position }: Named): ShortName {
+export function shortName({ name, position }: Named, sport: Sport = 'nfl'): ShortName {
   const tokens = name.trim().split(/\s+/).filter(Boolean)
   // `rest` is what the cell renders, so it must never come back empty -- an
   // em dash is what an empty board cell already shows, which is the honest
@@ -54,7 +66,7 @@ export function shortName({ name, position }: Named): ShortName {
   if (tokens.length === 0) return { lead: '', rest: '—' }
   if (tokens.length === 1) return { lead: '', rest: tokens[0] }
 
-  if (position === 'DEF') return { lead: '', rest: tokens[tokens.length - 1] }
+  if (sport === 'nfl' && position === 'DEF') return { lead: '', rest: tokens[tokens.length - 1] }
 
   // Peel a trailing suffix off before deciding what the surname is, so the
   // "III" in "Kenneth Walker III" isn't mistaken for the surname itself.
@@ -74,7 +86,7 @@ export function shortName({ name, position }: Named): ShortName {
 }
 
 /** The same abbreviation as one string, for `title` attributes and tests. */
-export function shortNameString(p: Named): string {
-  const { lead, rest } = shortName(p)
+export function shortNameString(p: Named, sport: Sport = 'nfl'): string {
+  const { lead, rest } = shortName(p, sport)
   return `${lead}${rest}`
 }

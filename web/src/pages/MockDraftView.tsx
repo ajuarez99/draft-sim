@@ -129,7 +129,11 @@ export default function MockDraftView() {
             rounds={state.rounds}
             nextOwnPick={nextOwnPick}
           />
-          <PickFeed picks={board} teams={state.teams} />
+          {/* 'nfl' rather than threaded from anywhere: the mock draft room is
+              football-only (claude/multi-sport-and-rebrand.md's Non-goals --
+              MockDraftService.buildContext hardcodes Sport.NFL), so there is
+              no other sport this session could ever be. */}
+          <PickFeed picks={board} teams={state.teams} sport="nfl" />
           {state.isUsersTurn && !complete && (
             <div className="controls-inline">
               <button className="start-button" onClick={() => setPickerOpen(true)} disabled={submitting}>
@@ -147,6 +151,7 @@ export default function MockDraftView() {
               userPicks={userPicks}
               seats={state.seats.map(toBoardSeat)}
               mySlot={state.userSlot}
+              sport="nfl"
               hideProvenanceDots
             />
           </div>
@@ -160,6 +165,7 @@ export default function MockDraftView() {
           available={state.available}
           rosterPositions={state.rosterPositions}
           draftedPlayers={draftedByUser}
+          sport="nfl"
           onPick={pick}
           onClose={() => setPickerOpen(false)}
         />

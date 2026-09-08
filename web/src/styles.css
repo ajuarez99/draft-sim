@@ -89,9 +89,38 @@
   --muted: oklch(63% 0.02 250);
   --crimson: oklch(58% 0.19 25);
   --teal: oklch(72% 0.14 175);
+  /* provenance.ts's FITTED/BLENDED dot and border, split out from `--rb` --
+     .col-head-dot.fitted/.seat.fitted/.prov-dot.fitted all borrowed the RB
+     position token for an unrelated meaning ("this seat's tendencies came
+     from real history"), which happened to work only because RB's color was
+     never otherwise in the same view. That accident gets worse, not
+     better, with basketball's five new position tokens in the same
+     stylesheet -- a provenance color needs its own identity, not a position
+     token pressed into double duty. STATED already had its own answer,
+     `--teal` (generic interaction, see that token's own use below); this is
+     the equivalent for FITTED. Amber/gold, not a hue any position uses --
+     "earned from history" reads like a badge, not a pick. */
+  --fitted: oklch(68% 0.13 100);
   --qb: oklch(68% 0.14 45); --rb: oklch(68% 0.14 150);
   --wr: oklch(66% 0.15 235); --te: oklch(66% 0.14 300);
   --k: oklch(65% 0.02 250); --def: oklch(58% 0.03 250);
+  /* Basketball's five (multi-sport-and-rebrand.md Phase 6): an oklch ramp
+     along the guard->center continuum (PG through C), evenly spaced 36deg
+     apart so it reads as one systematic sweep rather than six-and-five
+     unrelated palettes -- cool blue at the perimeter end, warming through
+     violet and magenta to a red at the paint end. L/C held at football's own
+     skill-position envelope (66-68% / 0.14-0.15) on purpose, per the design
+     note above: these are siblings of --qb/--rb/--wr/--te, not a second,
+     quieter system bolted on next to it. Hues were chosen clear of every
+     existing token above (and of --teal/--crimson below, which carry
+     unrelated system meanings a position color must not visually collide
+     with) with at least ~15deg of separation, except --sf/--te (13deg) and
+     --sg/--wr (16deg) -- both pairs are each sport's own "hybrid/tweener"
+     role, so sitting close is more honest than forcing distance that isn't
+     there, and the two sports never share one board to confuse at a glance. */
+  --pg: oklch(67% 0.145 215); --sg: oklch(67% 0.145 251);
+  --sf: oklch(67% 0.145 287); --pf: oklch(67% 0.145 323);
+  --c: oklch(67% 0.145 359);
   color-scheme: dark;
 }
 
@@ -467,6 +496,11 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .pos.TE { background: var(--te); color: var(--bg); }
 .pos.K { background: var(--k); color: var(--bg); }
 .pos.DEF { background: var(--def); color: var(--bg); }
+.pos.PG { background: var(--pg); color: var(--bg); }
+.pos.SG { background: var(--sg); color: var(--bg); }
+.pos.SF { background: var(--sf); color: var(--bg); }
+.pos.PF { background: var(--pf); color: var(--bg); }
+.pos.C { background: var(--c); color: var(--bg); }
 
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 8px; }
@@ -551,7 +585,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .col-head-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .board .col-head-dot.neutral { background: var(--muted); opacity: 0.5; }
 .board .col-head-dot.stated { background: var(--teal); }
-.board .col-head-dot.fitted { background: var(--rb); }
+.board .col-head-dot.fitted { background: var(--fitted); }
 .board .col-head-you { font-size: 8px; color: var(--crimson); letter-spacing: 0.04em; }
 .board .rnd {
   background: var(--panel); display: flex; align-items: center; justify-content: center;
@@ -575,12 +609,22 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .cell.pos-TE { background: color-mix(in oklch, var(--te) 22%, var(--panel)); }
 .board .cell.pos-K  { background: color-mix(in oklch, var(--k) 14%, var(--panel)); }
 .board .cell.pos-DEF { background: color-mix(in oklch, var(--def) 22%, var(--panel)); }
+.board .cell.pos-PG { background: color-mix(in oklch, var(--pg) 22%, var(--panel)); }
+.board .cell.pos-SG { background: color-mix(in oklch, var(--sg) 22%, var(--panel)); }
+.board .cell.pos-SF { background: color-mix(in oklch, var(--sf) 22%, var(--panel)); }
+.board .cell.pos-PF { background: color-mix(in oklch, var(--pf) 22%, var(--panel)); }
+.board .cell.pos-C  { background: color-mix(in oklch, var(--c) 22%, var(--panel)); }
 .board .cell.pos-QB:hover { background: color-mix(in oklch, var(--qb) 34%, var(--panel)); }
 .board .cell.pos-RB:hover { background: color-mix(in oklch, var(--rb) 34%, var(--panel)); }
 .board .cell.pos-WR:hover { background: color-mix(in oklch, var(--wr) 34%, var(--panel)); }
 .board .cell.pos-TE:hover { background: color-mix(in oklch, var(--te) 34%, var(--panel)); }
 .board .cell.pos-K:hover  { background: color-mix(in oklch, var(--k) 24%, var(--panel)); }
 .board .cell.pos-DEF:hover { background: color-mix(in oklch, var(--def) 34%, var(--panel)); }
+.board .cell.pos-PG:hover { background: color-mix(in oklch, var(--pg) 34%, var(--panel)); }
+.board .cell.pos-SG:hover { background: color-mix(in oklch, var(--sg) 34%, var(--panel)); }
+.board .cell.pos-SF:hover { background: color-mix(in oklch, var(--sf) 34%, var(--panel)); }
+.board .cell.pos-PF:hover { background: color-mix(in oklch, var(--pf) 34%, var(--panel)); }
+.board .cell.pos-C:hover  { background: color-mix(in oklch, var(--c) 34%, var(--panel)); }
 /* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
    this strips the browser's default button chrome so they still read as
    plain grid cells, not form controls. */
@@ -757,10 +801,20 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .chip.pos-chip.RB { color: var(--rb); border-color: color-mix(in oklch, var(--rb) 45%, var(--line)); }
 .chip.pos-chip.WR { color: var(--wr); border-color: color-mix(in oklch, var(--wr) 45%, var(--line)); }
 .chip.pos-chip.TE { color: var(--te); border-color: color-mix(in oklch, var(--te) 45%, var(--line)); }
+.chip.pos-chip.PG { color: var(--pg); border-color: color-mix(in oklch, var(--pg) 45%, var(--line)); }
+.chip.pos-chip.SG { color: var(--sg); border-color: color-mix(in oklch, var(--sg) 45%, var(--line)); }
+.chip.pos-chip.SF { color: var(--sf); border-color: color-mix(in oklch, var(--sf) 45%, var(--line)); }
+.chip.pos-chip.PF { color: var(--pf); border-color: color-mix(in oklch, var(--pf) 45%, var(--line)); }
+.chip.pos-chip.C  { color: var(--c);  border-color: color-mix(in oklch, var(--c)  45%, var(--line)); }
 .chip.pos-chip.QB.on { background: var(--qb); border-color: var(--qb); color: var(--bg); }
 .chip.pos-chip.RB.on { background: var(--rb); border-color: var(--rb); color: var(--bg); }
 .chip.pos-chip.WR.on { background: var(--wr); border-color: var(--wr); color: var(--bg); }
 .chip.pos-chip.TE.on { background: var(--te); border-color: var(--te); color: var(--bg); }
+.chip.pos-chip.PG.on { background: var(--pg); border-color: var(--pg); color: var(--bg); }
+.chip.pos-chip.SG.on { background: var(--sg); border-color: var(--sg); color: var(--bg); }
+.chip.pos-chip.SF.on { background: var(--sf); border-color: var(--sf); color: var(--bg); }
+.chip.pos-chip.PF.on { background: var(--pf); border-color: var(--pf); color: var(--bg); }
+.chip.pos-chip.C.on  { background: var(--c);  border-color: var(--c);  color: var(--bg); }
 .chip.pos-chip:hover { color: var(--text); }
 .chip.pos-chip.on:hover { color: var(--bg); }
 
@@ -773,8 +827,10 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat.me { border-color: var(--line); box-shadow: 0 0 0 1.5px var(--crimson), 0 1px 2px rgba(0,0,0,0.22); }
 .seat.me:hover { box-shadow: 0 0 0 1.5px var(--crimson), 0 5px 12px rgba(0,0,0,0.32); }
 /* A configured seat should be visibly different from an unconfigured one. */
-.seat.stated { border-left: 3px solid var(--te); }
-.seat.fitted { border-left: 3px solid var(--rb); }
+/* var(--teal)/var(--fitted), not the TE/RB position tokens -- same accidental
+   coupling as .board .col-head-dot.fitted above, fixed the same way. */
+.seat.stated { border-left: 3px solid var(--teal); }
+.seat.fitted { border-left: 3px solid var(--fitted); }
 .seat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
 .seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -787,7 +843,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .prov-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .prov-dot.neutral { background: var(--muted); opacity: 0.5; }
 .prov-dot.stated { background: var(--teal); }
-.prov-dot.fitted { background: var(--rb); }
+.prov-dot.fitted { background: var(--fitted); }
 
 /*
  * REACH AXIS -- one scale across every card.

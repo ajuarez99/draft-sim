@@ -1,6 +1,24 @@
 # Ball Knowers — handoff
 
-**Multi-sport, phases 0 through 3b — built 2026-09-08 on branch
+**Multi-sport, phases 0 through 5 — built 2026-09-08 on branch
+`ball-knowers-multi-sport` (not pushed, not merged).** Basketball is real:
+the Ball Knowers NBA chain ingests end to end (2066 players, 336 picks, 535
+board rows), `BasketballRules` has a provably-optimal lineup model, and the
+board's top three are Wembanyama, Jokić and Dončić. Football is bit-identical
+through every phase, verified live after each one — including with all the NBA
+data sitting in the same database, which is what proves the profile-contamination
+fix. Only Phase 6 (frontend) is left. 292 tests, 0 skipped. Read
+`claude/multi-sport-and-rebrand.md`'s "Where this stands" for the commit table.
+
+**Two findings from that day worth carrying:** a green test suite said nothing
+about basketball, because a sport with no fixtures is invisible to a suite built
+around the sport that has them — the board came back empty from a live ingest
+while 289 tests passed. And basketball's `picksScored` is 0 for every manager,
+permanently, because no board snapshot exists within the freshness window of a
+2024 or 2025 draft; Phase 6 has to say that out loud rather than let a
+reach-less profile look like a fitted one.
+
+**Superseded by the above — kept for its detail.** Multi-sport, phases 0 through 3b — built 2026-09-08 on branch
 `ball-knowers-multi-sport` (not pushed, not merged).** `draft-sim` is now **Ball
 Knowers**, and `Sport` is a runtime value rather than a hardcoded literal at ~35
 call sites. Read `claude/multi-sport-and-rebrand.md` — its new "Where this

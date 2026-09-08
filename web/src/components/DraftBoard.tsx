@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import type { PlayerRef, PredictedPick, Seat } from '../api'
+import type { PlayerRef, PredictedPick, Seat, Sport } from '../api'
 import { hueFor } from '../hue'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
@@ -16,6 +16,11 @@ type Props = {
   // Undefined while the slot isn't known yet -- see DraftView's `slotKnown`.
   // Distinct from "no seats at all" (seats itself being undefined).
   mySlot?: number
+  // Defaults to 'nfl' so every existing caller keeps its pre-multi-sport
+  // behaviour; only guards playerName.ts's DEF-abbreviation special case
+  // today (multi-sport-and-rebrand.md Phase 6). Real callers should pass the
+  // draft's actual sport once they have one (e.g. SeatsResponse.sport).
+  sport?: Sport
   onCellClick?: (pick: PredictedPick) => void
   onSeatClick?: (slot: number) => void
   // The mock draft room (claude/next-features-roadmap.md §4, Phase 3) has no
@@ -48,6 +53,7 @@ export default function DraftBoard({
   revealedThrough,
   seats,
   mySlot,
+  sport = 'nfl',
   onCellClick,
   onSeatClick,
   hideProvenanceDots,
@@ -156,7 +162,7 @@ export default function DraftBoard({
                 // (measured 2026-09-07), which costs the surname -- the half
                 // that identifies the player. "J. Gibbs" fits the same cell.
                 // The full name stays in the cell's own `title` and PlayerCard.
-                const label = shown ? shortName(shown) : null
+                const label = shown ? shortName(shown, sport) : null
                 const inner = shown && label ? (
                   <>
                     <span className="pickno mono">{pickNo}</span>

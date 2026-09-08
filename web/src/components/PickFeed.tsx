@@ -1,4 +1,4 @@
-import type { PlayerRef } from '../api'
+import type { PlayerRef, Sport } from '../api'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { positionRun } from '../pickRun'
@@ -15,6 +15,10 @@ type Props = {
   picks: FeedPick[]
   teams: number
   limit?: number
+  // Defaults to 'nfl' -- pre-multi-sport callers (and MockDraftView, whose
+  // room is football-only regardless) don't need to pass anything. Drives
+  // both the run detector's runnable-position list and the DEF name guard.
+  sport?: Sport
 }
 
 /**
@@ -30,16 +34,16 @@ type Props = {
  * `revealedThrough === pausedAt`, so the board's predicted player at your own
  * still-open pick would otherwise show up here as though it had happened.
  */
-export default function PickFeed({ picks, teams, limit = 3 }: Props) {
+export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl' }: Props) {
   if (picks.length === 0) return null
 
-  const run = positionRun(picks.map((p) => p.player))
+  const run = positionRun(picks.map((p) => p.player), 6, 4, sport)
   const recent = picks.slice(-limit).reverse()
 
   return (
     <ol className="pick-feed" aria-label="Recent picks">
       {recent.map((p, i) => {
-        const { lead, rest } = shortName(p.player)
+        const { lead, rest } = shortName(p.player, sport)
         // The run belongs on the newest row only -- it describes the state the
         // last pick just created, and repeating it down the list would read as
         // three separate runs.

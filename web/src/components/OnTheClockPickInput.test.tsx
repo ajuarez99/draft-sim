@@ -34,6 +34,7 @@ describe('OnTheClockPickInput', () => {
         draftedPlayers={[]}
         onPick={vi.fn()}
         onClose={vi.fn()}
+        sport="nfl"
       />,
     )
     const rows = screen.getAllByRole('row').slice(1) // drop the header row
@@ -54,6 +55,7 @@ describe('OnTheClockPickInput', () => {
         draftedPlayers={[]}
         onPick={vi.fn()}
         onClose={vi.fn()}
+        sport="nfl"
       />,
     )
     await user.click(screen.getByRole('button', { name: 'WR' }))
@@ -75,6 +77,7 @@ describe('OnTheClockPickInput', () => {
         draftedPlayers={[]}
         onPick={onPick}
         onClose={vi.fn()}
+        sport="nfl"
       />,
     )
     await user.click(screen.getByText('Beta Wideout'))
@@ -92,6 +95,7 @@ describe('OnTheClockPickInput', () => {
         draftedPlayers={[]}
         onPick={vi.fn()}
         onClose={onClose}
+        sport="nfl"
       />,
     )
     fireEvent.keyDown(window, { key: 'Escape' })
@@ -108,6 +112,7 @@ describe('OnTheClockPickInput', () => {
         draftedPlayers={[]}
         onPick={vi.fn()}
         onClose={vi.fn()}
+        sport="nfl"
       />,
     )
     expect(screen.getByText('Fills RB')).toBeInTheDocument()

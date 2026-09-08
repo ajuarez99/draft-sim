@@ -81,6 +81,7 @@ export default function CompletedDraftBoard() {
               userPicks={{}}
               seats={seats.seats}
               mySlot={seats.mySlot ?? undefined}
+              sport={seats.sport}
               onCellClick={setOpenPick}
             />
           </div>

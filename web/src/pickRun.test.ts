@@ -38,4 +38,17 @@ describe('positionRun', () => {
   it('honours a caller-supplied window and threshold', () => {
     expect(positionRun(p('TE', 'TE', 'QB'), 3, 2)).toEqual({ position: 'TE', count: 2, window: 3 })
   })
+
+  it('scopes runnable positions to the given sport', () => {
+    // C is a real, runnable basketball position -- unlike football's K/DEF,
+    // basketball has no late-round dump position, so nothing is excluded.
+    expect(positionRun(p('C', 'C', 'C', 'C', 'PG', 'SG'), 6, 4, 'nba')).toEqual({
+      position: 'C',
+      count: 4,
+      window: 6,
+    })
+    // The same six picks read as football (default sport) never match --
+    // "C" and "PG"/"SG" aren't football positions at all.
+    expect(positionRun(p('C', 'C', 'C', 'C', 'PG', 'SG'))).toBeNull()
+  })
 })

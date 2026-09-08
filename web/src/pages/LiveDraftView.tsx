@@ -89,6 +89,11 @@ export default function LiveDraftView() {
   // fallback -- it just doesn't get drawn as fact.
   const slotKnown = slotParam != null || (seats != null && seats.mySlot != null)
 
+  // SimulationResult has no `sport` of its own (see DraftView's identical
+  // comment); `seats` does (LeagueController.seats(), Phase 6) and is fetched
+  // independently of a projection.
+  const sport = seats?.sport ?? 'nfl'
+
   // Bumped at the start of every simulation, read only for identity -- a
   // response applies itself only if it is still the newest request.
   const requestSeqRef = useRef(0)
@@ -244,11 +249,12 @@ export default function LiveDraftView() {
           revealedThrough={live ? live.picksMade : undefined}
           seats={seats.seats}
           mySlot={slotKnown ? mySlot : undefined}
+          sport={sport}
           onCellClick={setOpenPick}
           onSeatClick={setOpenSeatSlot}
         />
       ) : null,
-    [seats, result, live, mySlot, slotKnown],
+    [seats, result, live, mySlot, slotKnown, sport],
   )
 
   const waiting = live == null || live.status === 'pre_draft'
@@ -291,7 +297,7 @@ export default function LiveDraftView() {
         {/* The room where a position run matters most: these picks are real
             and there is no rewinding them. Same component the other two rooms
             use, fed from the landed prefix. */}
-        <PickFeed picks={landedPicks} teams={result?.teams ?? seats?.teams ?? 0} />
+        <PickFeed picks={landedPicks} teams={result?.teams ?? seats?.teams ?? 0} sport={sport} />
 
         <div className="board-panel">
           <section className="panel">
@@ -351,6 +357,7 @@ export default function LiveDraftView() {
                   teams={result?.teams ?? seats.teams}
                   pickedPlayerIds={takenPlayerIds}
                   started={result != null}
+                  sport={sport}
                 />
                 {waiting && !result && (
                   <div className="start-overlay">

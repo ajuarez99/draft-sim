@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { AvailabilityRow, PlayerRef } from '../api'
+import type { AvailabilityRow, PlayerRef, Sport } from '../api'
+import { filterPositions } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
@@ -13,9 +14,10 @@ type Props = {
   draftedPlayers: PlayerRef[]
   onPick: (player: PlayerRef) => void
   onClose: () => void
+  // Which sport this draft is (multi-sport-and-rebrand.md Phase 6) -- drives
+  // both the position filter chips and the team-needs slot model below.
+  sport: Sport
 }
-
-const POSITIONS = ['ALL', 'QB', 'RB', 'WR', 'TE'] as const
 
 // Same "realistic options" data AvailabilityPanel already shows below the
 // board (SimulationResult.availability's survivalByPick), scoped to exactly
@@ -43,8 +45,10 @@ export default function PlayerPicker({
   draftedPlayers,
   onPick,
   onClose,
+  sport,
 }: Props) {
-  const [filter, setFilter] = useState<(typeof POSITIONS)[number]>('ALL')
+  const POSITIONS = useMemo(() => filterPositions(sport), [sport])
+  const [filter, setFilter] = useState<string>('ALL')
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -66,8 +70,11 @@ export default function PlayerPicker({
   // that haven't synced, or a malformed ingest -- not just "no data yet".
   // Hiding the strip entirely reads honestly; a strip with zero badges would
   // look broken instead. See claude/plan-review-B.md's empty-rosterPositions gap.
-  const needs = useMemo(() => computeTeamNeeds(rosterPositions, draftedPlayers), [rosterPositions, draftedPlayers])
-  const open = useMemo(() => openPositions(needs), [needs])
+  const needs = useMemo(
+    () => computeTeamNeeds(sport, rosterPositions, draftedPlayers),
+    [sport, rosterPositions, draftedPlayers],
+  )
+  const open = useMemo(() => openPositions(sport, needs), [sport, needs])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -120,7 +127,7 @@ export default function PlayerPicker({
             </thead>
             <tbody>
               {rows.map((r) => {
-                const need = needLabel(r.player.position, open)
+                const need = needLabel(sport, r.player.position, open)
                 return (
                   <tr
                     key={r.player.id}

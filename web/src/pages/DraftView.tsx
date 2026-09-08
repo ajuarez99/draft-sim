@@ -382,6 +382,13 @@ export default function DraftView() {
   // screen (see §C's "watch out for").
   const started = result != null
 
+  // SimulationResult carries no `sport` of its own (see api.ts's comment on
+  // why); `seats` does (LeagueController.seats(), Phase 6), and it's fetched
+  // independently of a run, so this is available even on the pre-start empty
+  // board. Defaults to 'nfl' only for the render(s) before `seats` has
+  // loaded at all.
+  const sport = seats?.sport ?? 'nfl'
+
   // Whether the board headers have anything real to show as "you" yet. An
   // explicit ?slot= is known immediately (nothing to wait for). Otherwise,
   // until `seats` loads there is no way to tell "will auto-detect" from
@@ -471,7 +478,7 @@ export default function DraftView() {
                     </button>
                   )}
                 </OnTheClock>
-                <PickFeed picks={feedPicks} teams={result.teams} />
+                <PickFeed picks={feedPicks} teams={result.teams} sport={sport} />
                 {reveal.pausedAt != null &&
                   (resimming ? (
                     <div className="pause-banner">
@@ -505,6 +512,7 @@ export default function DraftView() {
                   revealedThrough={started ? reveal.revealedThrough : 0}
                   seats={seats.seats}
                   mySlot={slotKnown ? mySlot : undefined}
+                  sport={sport}
                   onCellClick={started ? setOpenPick : undefined}
                   onSeatClick={setOpenSeatSlot}
                 />
@@ -520,6 +528,7 @@ export default function DraftView() {
                   teams={result?.teams ?? seats.teams}
                   pickedPlayerIds={revealedPlayerIds}
                   started={started}
+                  sport={sport}
                 />
                 {!started && (
                   <div className="start-overlay">
@@ -580,6 +589,7 @@ export default function DraftView() {
           alreadyPicked={revealedPlayerIds}
           rosterPositions={seats?.rosterPositions ?? []}
           draftedPlayers={myDraftedPlayers}
+          sport={sport}
           onPick={choosePick}
           onClose={() => setPickerOpen(false)}
         />

@@ -54,13 +54,26 @@ far**, checked live after each one rather than asserted.
 | 1b | `Sport` resolved at every endpoint | `31494d2` |
 | 2 | V6 + the contamination fix | `8cb6843` |
 | 3a/3b | Eleven positions; the lock, built but unwired | `ba14f05` |
-| 3c | Not started; the blocking measurement is **done** — see below | |
-| 4 | `BasketballRules` + per-sport config | |
-| 5 | NBA ingest, board, snake reversal | |
-| 6 | Frontend, incl. the `reversalRound` override | |
+| — | Cascade measured; 3c reframed | `daffcf4` |
+| — | Greedy proven exactly optimal; 3c fully specified | `c6956f4` |
+| 3c+4 | `BasketballRules`, per-sport config, lock wired | `750e8b9` |
+| 5 | NBA ingest, board, snake reversal | `5d00369` |
+| 6a | Frontend types, one position list, slot model, colour tokens | `HEAD` |
+| 6b | Sport pill, `reversalRound` control, zero-reach honesty | **not started** |
 
-Suite at the stopping point: 272 tests, 0 skipped, 10 integration tests
-against real Postgres. `/api/health` reports `weightsLoaded: true`.
+Suite: 292 tests, 0 skipped, integration tests against real Postgres.
+`/api/health` reports `weightsLoaded: true`. The NBA chain is ingested for real
+— 2066 players, 336 picks, a 535-row board whose top three are Wembanyama,
+Jokić and Dončić — and football's two baselines are **still bit-identical with
+all of that in the database**, which is the contamination fix proven against
+real data rather than a fixture.
+
+**The one bug a green suite could not have caught.** `PlayerRepository.findAll`
+parsed positions with an NFL-defaulting overload, so every NBA player read back
+positionless and the entire board was silently discarded on read. 289 tests were
+green while it was live. A sport with no fixtures is invisible to a suite built
+around the sport that has them; only the live ingest found it. That is the
+argument for keeping the live ingest as this phase's acceptance test.
 
 ### The next thing to do — measured 2026-09-08, and the answer reframes 3c
 
@@ -168,6 +181,25 @@ already says this should be said out loud in the UI. **Phase 6 has to actually
 say it**, and "0 picks scored" is a much starker thing to surface than football's
 "thin data" caveat. It is the single most misleading thing about basketball
 output if left implicit.
+
+### What 6b still has to do
+
+1. **`api.ts:330`'s board helper requests `/api/board?limit=N` with no `sport`,**
+   so it always returns football. Found while eyeballing the NBA draft view,
+   which shows "Board looks empty?" as a result. The draft-scoped
+   `/api/drafts/{id}/board` (`:194`) is fine — the backend derives sport there.
+   This one call is the gap.
+2. **The sport pill on each league card** (`DraftPicker.tsx`). One mixed list,
+   both sports, no switcher — that is a decided design point, and
+   `DraftSummary.sport` has been on the wire since Phase 2.
+3. **A `reversalRound` control in the draft settings popover.** Per the Phase 5
+   decision: Sleeper's value is the default, the user may disagree with it, and
+   that is what makes an unverifiable assumption recoverable by whoever is
+   running the draft rather than only by whoever deploys it.
+4. **Say the reach problem out loud.** See the section above: every basketball
+   manager has `picksScored: 0`, permanently. Rendering that profile identically
+   to a football one fitted on 600 scored picks is the most misleading thing
+   this app could do with basketball data.
 
 ### Two things carried forward that are easy to get wrong
 

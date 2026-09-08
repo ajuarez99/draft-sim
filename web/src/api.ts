@@ -5,7 +5,13 @@ export type PlayerRef = {
   id: number
   sleeperId: string
   name: string
-  position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF'
+  // Football: QB/RB/WR/TE/K/DEF. Basketball: PG/SG/SF/PF/C (verified live via
+  // GET /api/board?sport=nba, multi-sport-and-rebrand.md Phase 6). Kept as one
+  // flat union rather than a per-sport generic -- nothing here narrows which
+  // sport's board it came from, so a caller that must not mix the two sports'
+  // positions (a filter chip row, a slot-eligibility check, the pick-run
+  // detector) needs its own sport-scoped list; see positions.ts.
+  position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
   team: string | null
   adp: number
   // 999 is Sleeper's own "no rank" sentinel (BoardService's default, never
@@ -66,6 +72,17 @@ export type SimulationResult = {
   availability: AvailabilityRow[]
   bestAvailable: Record<string, Candidate[]>
   confidence: Confidence
+  // NOT added. multi-sport-and-rebrand.md Phase 6 calls for a `sport` field
+  // here (same change as SeatsResponse below), but engine/SimulationResult.java
+  // has no such field -- verified 2026-09-08 via MonteCarloRunner.java:161, its
+  // one construction site, and by reading the record itself. Adding one would
+  // mean widening a record the Phase-1-through-3 football-parity baseline
+  // hashes the raw shape of (see that doc's Acceptance Criteria §1) for a field
+  // this task doesn't need: every call site below sources `sport` from
+  // SeatsResponse instead (fetched independently and already in hand wherever
+  // a SimulationResult is displayed), so leaving this record alone was the
+  // lower-risk path. Revisit together if the backend ever adds it for its own
+  // reasons.
 }
 
 export type Seat = {
@@ -94,6 +111,12 @@ export type SeatsResponse = {
   // read-only, league/draft-level, constant across runs. Legitimately [] when
   // a league's roster settings haven't synced; see teamNeeds.ts.
   rosterPositions: string[]
+  // Added alongside LeagueController.seats()'s `sport` (multi-sport-and-
+  // rebrand.md Phase 6) -- resolved backend-side from the league row, same
+  // lowercase code as DraftSummary.sport. This is the one place a page that
+  // only has a draftId (DraftView, LiveDraftView) can learn which sport it's
+  // showing without a second fetch; see positions.ts.
+  sport: Sport
 }
 
 export type SimRequest = {
