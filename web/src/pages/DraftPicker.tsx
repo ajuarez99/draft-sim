@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { hueFor } from '../hue'
+import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { SkeletonRows } from '../components/Skeleton'
 import {
@@ -154,7 +155,7 @@ export default function DraftPicker() {
           // from the league's own name. See styles.css DENSITY: re-judge the
           // shape when the content changes rather than defending the old call.
           <div className="league-grid">
-            {drafts.map((d) => {
+            {leagueLineages(drafts).map(({ current: d, seasons }) => {
               // draft.status is nullable in the DB. Reading .replace() off it
               // threw a TypeError during render, and with no error boundary
               // above this component that took out the entire picker screen --
@@ -172,7 +173,7 @@ export default function DraftPicker() {
               // actually carries identity.
               const crest = (d.leagueName.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
               return (
-                <article key={d.id} className={`league-card${live ? ' live' : ''}`}>
+                <article key={d.sleeperLeagueId} className={`league-card${live ? ' live' : ''}`}>
                   <header className="league-card-head">
                     {/* Same hue-derived crest the board's column headers and
                         the manager cards use, so two seasons of one league
@@ -194,6 +195,30 @@ export default function DraftPicker() {
                     </span>
                     <span className="league-card-season cond">{d.season}</span>
                   </header>
+
+                  {/* Every season of a Sleeper league is its own league object,
+                      so this list used to render one card per season -- two
+                      "West Coast Fantasy Football" cards side by side, each
+                      carrying an identical History and Power rankings link to
+                      the same two pages. Those are league-scoped and walk the
+                      whole chain themselves; only the draft board is per
+                      season. So one card per league, and the older seasons
+                      become links to their own boards. */}
+                  {seasons.length > 1 && (
+                    <div className="league-seasons">
+                      <span className="league-seasons-label">Seasons</span>
+                      {seasons.map((s) => (
+                        <Link
+                          key={s.sleeperLeagueId}
+                          to={`/drafts/${s.sleeperDraftId}`}
+                          className={`league-season-link${s.sleeperLeagueId === d.sleeperLeagueId ? ' on' : ''}`}
+                          title={`${s.season} draft board · ${s.teams} managers`}
+                        >
+                          {s.season}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="league-card-links">
                     {/* One primary destination, then two peers -- not three

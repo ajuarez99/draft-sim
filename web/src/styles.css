@@ -317,6 +317,25 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
    figure on the card rather than a footnote inside a row. */
 .league-card-season { font-size: 20px; color: var(--muted); letter-spacing: 0.02em; flex-shrink: 0; }
 
+/* The other seasons of this league. Years, not cards: History and Power
+   rankings are league-scoped and walk the whole chain themselves, so only the
+   draft board differs per season -- which makes a year exactly a link to one
+   board, and nothing more. Rendered only when there is more than one. */
+.league-seasons { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; }
+.league-seasons-label {
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+  font-size: 10px; margin-right: 2px;
+}
+.league-season-link {
+  color: var(--muted); text-decoration: none; padding: 2px 7px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-season-link:hover { background: color-mix(in oklch, var(--teal) 14%, transparent); color: var(--text); }
+/* The season the rest of the card is describing -- its managers, its status,
+   its "Draft board" link all belong to this one. */
+.league-season-link.on { color: var(--text); background: color-mix(in oklch, var(--line) 60%, transparent); font-weight: 600; }
+
 .league-card-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .league-link {
   font-size: 12px; text-decoration: none; color: var(--muted);

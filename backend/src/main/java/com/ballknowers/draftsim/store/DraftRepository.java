@@ -162,21 +162,29 @@ public class DraftRepository {
                 .list();
     }
 
+    /**
+     * {@code previousLeagueId} is Sleeper's own back-pointer to the same league's
+     * prior season, null for the earliest one ingested. The picker groups seasons
+     * into one card per league with it -- matching on {@code leagueName} instead
+     * would collapse two genuinely different leagues that share a name, and split
+     * one that got renamed between seasons.
+     */
     public record DraftSummary(long id, String sleeperDraftId, long leagueId, String leagueName,
                                int season, int teams, int rounds, String status, Instant startTime,
-                               String sleeperLeagueId) {}
+                               String sleeperLeagueId, String previousLeagueId) {}
 
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
     public List<DraftSummary> allWithLeague() {
         return db.sql("""
                 select d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-                       d.status, d.start_time, l.sleeper_id
+                       d.status, d.start_time, l.sleeper_id, l.previous_league_id
                 from draft d join league l on l.id = d.league_id
                 order by d.start_time desc nulls last, d.season desc, d.id desc
                 """)
                 .query((rs, i) -> new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
                         rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
-                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(), rs.getString(10)))
+                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
+                        rs.getString(10), rs.getString(11)))
                 .list();
     }
 
