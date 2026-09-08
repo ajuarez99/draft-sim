@@ -79,7 +79,7 @@ class SimulationServiceTest {
         // pick 1 resolves; pick 2's sleeperId is not a known player at all.
         Map<Integer, String> startState = Map.of(1, "resolvable-id", 2, "unresolvable-id");
         SimulationRequest req = new SimulationRequest(
-                "sleeper-draft-xyz", 1, 100, null, startState, null);
+                "sleeper-draft-xyz", 1, 100, null, startState, null, null);
 
         assertDoesNotThrow(() -> service.simulate(req, null));
 

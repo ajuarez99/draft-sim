@@ -74,7 +74,7 @@ public class SimulationService {
         Map<Integer, ManagerProfile> bySlot = ctx.profileBySlot();
 
         double temperature = req.temperature() != null ? req.temperature() : ctx.cfg().temperature();
-        long seed = System.nanoTime();
+        long seed = req.seed() != null ? req.seed() : System.nanoTime();
 
         long setupMs = (System.nanoTime() - setupStart) / 1_000_000;
         log.info("request setup (board + profiles + Postgres): {} ms", setupMs);

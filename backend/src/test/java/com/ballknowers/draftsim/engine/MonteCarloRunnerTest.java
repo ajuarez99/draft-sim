@@ -91,4 +91,36 @@ class MonteCarloRunnerTest {
             assertFalse(result.bestAvailable().get(pick).isEmpty(), "empty bestAvailable at pick " + pick);
         }
     }
+
+    /**
+     * multi-sport-and-rebrand.md's acceptance criterion 1 ("capture a baseline,
+     * re-run and diff, no number moves") only works if the same seed is truly
+     * deterministic end to end. Board building is seeded per-iteration off the
+     * base seed passed in here, so pinning that base seed must pin every
+     * downstream random draw -- this is the guarantee SimulationService's new
+     * optional seed field exists to expose.
+     */
+    @Test
+    void sameSeedReproducesIdenticalResult() {
+        DraftContext c1 = ctx(14, 15);
+        DraftContext c2 = ctx(14, 15);
+        SimulationResult first = new MonteCarloRunner()
+                .run(c1, 11, 100, 1.0, 42L, CONFIDENCE, null);
+        SimulationResult second = new MonteCarloRunner()
+                .run(c2, 11, 100, 1.0, 42L, CONFIDENCE, null);
+
+        assertEquals(first, second, "identical seed and inputs must produce a byte-for-byte identical result");
+    }
+
+    @Test
+    void differentSeedsProduceDifferentResults() {
+        DraftContext c1 = ctx(14, 15);
+        DraftContext c2 = ctx(14, 15);
+        SimulationResult first = new MonteCarloRunner()
+                .run(c1, 11, 100, 1.0, 42L, CONFIDENCE, null);
+        SimulationResult second = new MonteCarloRunner()
+                .run(c2, 11, 100, 1.0, 43L, CONFIDENCE, null);
+
+        assertNotEquals(first, second, "different seeds should not coincidentally produce the same result");
+    }
 }

@@ -97,6 +97,10 @@ export type SimRequest = {
   iterations: number
   temperature: number
   startState?: Record<number, string>
+  // Reproducibility escape hatch for diffing a refactor against a captured
+  // baseline (multi-sport-and-rebrand.md). Omit/undefined = fresh, non-
+  // reproducible seed, same as always. Nothing in the app sends this yet.
+  seed?: number
 }
 
 async function json<T>(res: Response): Promise<T> {
