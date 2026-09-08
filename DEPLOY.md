@@ -8,16 +8,22 @@ value has a working local default, so `./gradlew bootRun` still needs no environ
 
 ## Not done yet — read this first
 
-**The frontend cannot talk to a remote backend.** Two pieces are missing:
+**Built 2026-09-07**: `web/src/api.ts` now routes every call through an `apiFetch`
+helper that prepends `VITE_API_BASE` (blank = same-origin, unchanged from before)
+and sends `Authorization: Bearer ${VITE_API_TOKEN}` when that's set. See
+`web/.env.example`.
 
-1. `web/src/api.ts` calls `/api/...` as a relative path, which only works when the UI
-   and API share an origin. It needs a `VITE_API_BASE` env var.
-2. Nothing sends the `Authorization: Bearer` header, so once `API_TOKEN` is set the
-   frontend gets a 401 on every call.
-
-Both are small — one module, maybe twenty lines. Until they're done you can deploy
-the **backend** and drive it with curl or Postman, but the deployed UI won't work.
-Decide whether you want that before starting.
+**One gap remains, and it's structural, not an oversight:** `useLiveDraft.ts`
+subscribes to `/api/drafts/{id}/live-stream` with the browser's native
+`EventSource`, which has no way to attach a request header at all. `apiUrl()`
+still routes its URL through `VITE_API_BASE`, but there is no way to also send
+the bearer token on that one connection. **Live mode will 401 against any
+split-origin deploy that has `API_TOKEN` set** — same-origin deploys and
+auth-off deploys are both unaffected. Fixing it needs a backend-side answer
+(most likely: accept the token as a query-string parameter on that one route,
+same tradeoff as shipping it to the frontend at all — see the token note
+below) before it can be called done. Left alone for now because it's a
+one-route problem, not a reason to block deploying everything else.
 
 ## Shape of it
 
@@ -108,12 +114,11 @@ Do these in order. Each one isolates a different failure.
 
 ## 4. Frontend
 
-Only after the two changes at the top of this file exist.
-
 Vercel's **root directory must be set to `web`** — the repo root is not a Vite project
 and auto-detection will either fail or build the wrong thing. Then set `VITE_API_BASE`
-and the token variable in Vercel's environment settings, and add the resulting origin
-to the backend's `CORS_ORIGINS`.
+and `VITE_API_TOKEN` in Vercel's environment settings (see `web/.env.example`), and add
+the resulting origin to the backend's `CORS_ORIGINS`. Live mode needs the gap noted
+above resolved first if `API_TOKEN` is set.
 
 Note that any token shipped to a browser is readable by anyone who opens devtools.
 That is acceptable for a private tool you alone use and is not acceptable if you ever

@@ -194,9 +194,9 @@ export default function ManagerTendencies() {
           <h2>Manager tendencies</h2>
         </div>
         <p className="muted small">
-          What you believe about a manager versus what their own draft history says. A stated
-          reach bias is the shrinkage target the engine blends toward -- it is never overridden
-          outright, so this is the place to check whether your call and the data still agree.
+          What a manager's own draft history says, fitted by the engine -- reach bias and
+          unpredictability aren't something you type in, only something you can watch. Add a
+          note as a reminder for yourself; it never changes how a mock or live sim drafts.
         </p>
 
         {error && <div className="error">{error}</div>}

@@ -107,8 +107,38 @@ async function json<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// Blank (local default) means every call below stays a same-origin relative
+// path, exactly as it worked before this existed -- Vite's dev proxy and a
+// same-origin production deploy both need nothing set. Only a split-origin
+// deploy (DEPLOY.md: Vercel frontend + Fly/Railway backend) sets this.
+const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
+
+// Also blank locally -- API_TOKEN is unset by default, so there is no header
+// to send and every route stays open, matching the backend's own default. See
+// DEPLOY.md's warning: this ships to every browser that loads the page, which
+// is fine for a private tool and not fine for one you hand out a link to.
+const API_TOKEN = import.meta.env.VITE_API_TOKEN
+
+/** `/api/...` -> the full request URL, honoring VITE_API_BASE. */
+export const apiUrl = (path: string) => `${API_BASE}${path}`
+
+/**
+ * Every call in this file goes through here instead of bare `fetch` so a
+ * split-origin deploy and a bearer token are both a config change, not a
+ * per-call edit. Does NOT cover `useLiveDraft.ts`'s EventSource -- the
+ * browser's native EventSource can't set a request header at all, so
+ * live-mode against a token-protected backend needs its own answer (a
+ * query-string token the backend also accepts, most likely) before it can be
+ * deployed. Not needed for same-origin or auth-off deploys.
+ */
+function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (API_TOKEN) headers.set('Authorization', `Bearer ${API_TOKEN}`)
+  return fetch(apiUrl(path), { ...init, headers })
+}
+
 export const getSeats = (draftId: string) =>
-  fetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
+  apiFetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
 
 // Mirrors DraftRepository.DraftSummary (store/DraftRepository.java). Backs the picker screen.
 export type DraftSummary = {
@@ -127,9 +157,13 @@ export type DraftSummary = {
   status: string | null
   startTime: string | null
   sleeperLeagueId: string
+  // Sleeper's back-pointer to the same league's previous season; null for the
+  // earliest one ingested. The picker groups seasons into one card per league
+  // with it -- see leagueLineages() in DraftPicker.
+  previousLeagueId: string | null
 }
 
-export const getDrafts = () => fetch('/api/drafts').then(json<DraftSummary[]>)
+export const getDrafts = () => apiFetch('/api/drafts').then(json<DraftSummary[]>)
 
 /**
  * One `event: state` frame from GET /api/drafts/{id}/live-stream (SSE, native
@@ -182,19 +216,19 @@ export type TrackResponse = {
 }
 
 export const trackDraft = (sleeperDraftId: string) =>
-  fetch(`/api/drafts/${sleeperDraftId}/track`, { method: 'POST' }).then(json<TrackResponse>)
+  apiFetch(`/api/drafts/${sleeperDraftId}/track`, { method: 'POST' }).then(json<TrackResponse>)
 
 // Scoped to the one league being added -- unlike /api/ingest/all, this doesn't
 // re-download the entire player pool or rebuild the global board/profiles.
 export const ingestLeague = (sleeperLeagueId: string) =>
-  fetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 // Walks a league's `previous_league_id` chain and stores each season's
 // standings. Backs the "Load past seasons" button on the history page --
 // which used to be a `POST /api/ingest/league-history/{id}` printed on screen
 // for the reader to run in a terminal.
 export const ingestLeagueHistory = (sleeperLeagueId: string) =>
-  fetch(`/api/ingest/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/ingest/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export type ManualTendencies = {
   reachBias: number | null
@@ -223,20 +257,20 @@ export type ManagerSummary = {
   stated: ManualTendencies
 }
 
-export const getManagers = () => fetch('/api/managers').then(json<ManagerSummary[]>)
+export const getManagers = () => apiFetch('/api/managers').then(json<ManagerSummary[]>)
 
 export const setTendencies = (managerId: number, body: ManualTendencies) =>
-  fetch(`/api/managers/${managerId}/tendencies`, {
+  apiFetch(`/api/managers/${managerId}/tendencies`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(json<unknown>)
 
 export const clearTendencies = (managerId: number) =>
-  fetch(`/api/managers/${managerId}/tendencies`, { method: 'DELETE' }).then(json<unknown>)
+  apiFetch(`/api/managers/${managerId}/tendencies`, { method: 'DELETE' }).then(json<unknown>)
 
 export const getBoard = (limit = 60) =>
-  fetch(`/api/board?limit=${limit}`).then(json<{ capturedOn: string; entries: unknown[] }>)
+  apiFetch(`/api/board?limit=${limit}`).then(json<{ capturedOn: string; entries: unknown[] }>)
 
 // Mirrors engine/SeatSpec.java's 3-state shape.
 export type SeatType = 'USER' | 'MANAGER' | 'BOT'
@@ -297,14 +331,14 @@ export type MockSessionSummary = {
   createdAt: string
 }
 
-export const getMockSessions = () => fetch('/api/mocks').then(json<MockSessionSummary[]>)
+export const getMockSessions = () => apiFetch('/api/mocks').then(json<MockSessionSummary[]>)
 
 // managerSeats seats a real manager's fitted/stated profile at a slot instead
 // of an unmodelled bot -- keyed by slot number, same shape MockDraftController
 // .CreateRequest expects. Any slot besides userSlot left out of it is still a
 // plain bot.
 export const createMockSession = (teams: number, userSlot: number, managerSeats?: Record<number, number>) =>
-  fetch('/api/mocks', {
+  apiFetch('/api/mocks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ teams, userSlot, managerSeats: managerSeats ?? {} }),
@@ -315,15 +349,15 @@ export const createMockSession = (teams: number, userSlot: number, managerSeats?
 // omitted, the backend falls back to the same owner auto-detection
 // getSeats()'s mySlot already uses.
 export const createMockSessionFromDraft = (sleeperDraftId: string, mySlot?: number) =>
-  fetch(
+  apiFetch(
     `/api/mocks/from-draft/${sleeperDraftId}${mySlot != null ? `?mySlot=${mySlot}` : ''}`,
     { method: 'POST' },
   ).then(json<MockSessionState>)
 
-export const getMockSession = (id: number) => fetch(`/api/mocks/${id}`).then(json<MockSessionState>)
+export const getMockSession = (id: number) => apiFetch(`/api/mocks/${id}`).then(json<MockSessionState>)
 
 export const submitMockPick = (id: number, sleeperPlayerId: string) =>
-  fetch(`/api/mocks/${id}/pick`, {
+  apiFetch(`/api/mocks/${id}/pick`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sleeperPlayerId }),
@@ -370,7 +404,7 @@ export type LeagueHistory = {
 }
 
 export const getLeagueHistory = (sleeperLeagueId: string) =>
-  fetch(`/api/leagues/${sleeperLeagueId}/history`).then(json<LeagueHistory>)
+  apiFetch(`/api/leagues/${sleeperLeagueId}/history`).then(json<LeagueHistory>)
 
 export type ManagerHistory = {
   managerId: number
@@ -385,7 +419,7 @@ export type ManagerHistory = {
 }
 
 export const getManagerHistory = (managerId: number) =>
-  fetch(`/api/managers/${managerId}/history`).then(json<ManagerHistory>)
+  apiFetch(`/api/managers/${managerId}/history`).then(json<ManagerHistory>)
 
 export type PowerRankingKind = 'COMMISSIONER' | 'COMPUTED_MARKET_VALUE' | 'COMPUTED_REALIZED'
 
@@ -418,10 +452,10 @@ export type PowerRankings = {
 }
 
 export const getPowerRankings = (sleeperLeagueId: string) =>
-  fetch(`/api/leagues/${sleeperLeagueId}/power`).then(json<PowerRankings>)
+  apiFetch(`/api/leagues/${sleeperLeagueId}/power`).then(json<PowerRankings>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
-  fetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
   }).then(json<{ marketValue: number; realized: number }>)
 
@@ -431,7 +465,7 @@ export const saveCommissionerRanking = (
   week: number,
   rosterIds: number[],
 ) =>
-  fetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ season, week, rosterIds }),
@@ -442,7 +476,7 @@ export async function streamSimulation(
   onProgress: (fraction: number) => void,
   signal?: AbortSignal,
 ): Promise<SimulationResult> {
-  const res = await fetch('/api/sims/stream', {
+  const res = await apiFetch('/api/sims/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

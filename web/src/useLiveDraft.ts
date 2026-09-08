@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LiveState } from './api'
+import { apiUrl, type LiveState } from './api'
 
 // Past this, the freshness pill flips from "live" to "stale". Heartbeats come
 // every 15s, so 25 is one missed heartbeat plus slack -- long enough that a
@@ -88,7 +88,13 @@ export function useLiveDraft(draftId: string): LiveDraft {
         window.clearTimeout(retryTimer)
         retryTimer = undefined
       }
-      const es = new EventSource(`/api/drafts/${draftId}/live-stream`)
+      // apiUrl honors VITE_API_BASE for a split-origin deploy, but that's the
+      // only part of DEPLOY.md's auth story this can pick up -- the browser's
+      // native EventSource has no way to set a request header, so a
+      // token-protected backend needs its own answer here (most likely a
+      // query-string token the backend also accepts on this one route) before
+      // live mode works split-origin. Not needed same-origin or with auth off.
+      const es = new EventSource(apiUrl(`/api/drafts/${draftId}/live-stream`))
       source = es
 
       es.onopen = () => {
