@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
+import CompletedDraftBoard from './pages/CompletedDraftBoard'
 import LiveDraftView from './pages/LiveDraftView'
 import MockSetup from './pages/MockSetup'
 import MockDraftView from './pages/MockDraftView'
@@ -20,6 +21,13 @@ import { TopSlotContext } from './topSlot'
 function KeyedDraftView() {
   const { draftId } = useParams<{ draftId: string }>()
   return <DraftView key={draftId} />
+}
+
+// Same remount wrapper, same reason: a param-only change would keep the old
+// draft's fetched board/seats alive across the switch.
+function KeyedCompletedDraftBoard() {
+  const { draftId } = useParams<{ draftId: string }>()
+  return <CompletedDraftBoard key={draftId} />
 }
 
 // Same remount wrapper, same reason: LiveDraftView holds a simulation in
@@ -79,6 +87,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<DraftPicker />} />
           <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
+          <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
           <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
           <Route path="/mock/new" element={<MockSetup />} />
           <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />

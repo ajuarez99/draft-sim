@@ -1,8 +1,11 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.config.OwnerProperties;
+import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.DraftSlot;
+import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.DraftOrderMapper;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
@@ -133,6 +136,79 @@ public class LeagueController {
         response.put("mySlot", mySlot);
         response.put("rosterPositions", rosterPositions);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * The picks that actually happened in this draft, joined to player and manager
+     * identity -- as opposed to {@code /api/sims}, which always predicts what
+     * WOULD happen and never reads {@code draft_pick} at all. Backs the picker's
+     * "Draft board" link for a completed league (claude/board-first-layout-and-
+     * pick-latency.md never covered this case; DraftView's simulator was standing
+     * in for it, which meant "Draft board" on a finished draft opened an empty
+     * room asking you to start a mock rather than showing what the room did).
+     *
+     * Works for a draft of any status, not just `complete` -- a `drafting` draft
+     * simply comes back with however many picks {@link DraftRepository#picks}
+     * currently has (the live poller keeps that current), and the caller decides
+     * whether that's the view it wants.
+     */
+    @GetMapping("/drafts/{sleeperDraftId}/board")
+    public ResponseEntity<?> realBoard(@PathVariable String sleeperDraftId) {
+        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+        if (found.isEmpty()) return ResponseEntity.notFound().build();
+        DraftRepository.DraftRow draft = found.get();
+
+        // Real picks reference whatever player was on Sleeper's board the day they
+        // were taken -- possibly a player long gone from today's board (retired,
+        // dropped from the pool). currentBoard() gives adp/positionalRank for
+        // anyone still on it; fallbackPlayerRef covers anyone who isn't, so a pick
+        // never silently disappears just because the player is no longer relevant.
+        Map<Long, BoardEntry> byPlayerId = new HashMap<>();
+        for (BoardEntry e : boards.currentBoard(Sport.NFL)) byPlayerId.put(e.player().id(), e);
+        Map<Long, Player> playersById = new HashMap<>();
+        for (Player p : players.findAll(Sport.NFL)) playersById.put(p.id(), p);
+        Map<Long, String> managerNames = managers.names();
+
+        List<Map<String, Object>> picks = new ArrayList<>();
+        for (DraftRepository.PickRow p : drafts.picks(draft.id())) {
+            if (p.playerId() == null) continue; // pick slot with no resolved player -- nothing to show yet
+            BoardEntry entry = byPlayerId.get(p.playerId());
+            SimulationResult.PlayerRef player = entry != null
+                    ? SimulationResult.PlayerRef.from(entry)
+                    : fallbackPlayerRef(playersById.get(p.playerId()));
+            if (player == null) continue; // player row itself is gone; nothing left to render
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("pickNo", p.pickNo());
+            row.put("round", p.round());
+            row.put("slot", p.draftSlot());
+            row.put("manager", p.managerId() != null
+                    ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
+                    : "Slot " + p.draftSlot());
+            row.put("player", player);
+            picks.add(row);
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("draftId", sleeperDraftId);
+        response.put("teams", draft.teams());
+        response.put("rounds", draft.rounds());
+        response.put("status", draft.status());
+        response.put("picks", picks);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * A player who has fallen off the current board entirely still needs to
+     * render as something rather than vanishing from a real, already-completed
+     * pick. Player.primary() is the same "default to WR rather than nothing"
+     * convention BoardEntry.position() already relies on; 999 is BoardService's
+     * own "no rank" sentinel, which the frontend already special-cases.
+     */
+    private static SimulationResult.PlayerRef fallbackPlayerRef(Player p) {
+        if (p == null) return null;
+        return new SimulationResult.PlayerRef(p.id(), p.sleeperId(), p.name(),
+                p.primary().name(), p.team(), 999, 999);
     }
 
     /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */

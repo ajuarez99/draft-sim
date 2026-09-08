@@ -14,6 +14,15 @@ import {
   type TrackResponse,
 } from '../api'
 
+// A complete draft has real picks to show (CompletedDraftBoard); anything
+// else -- pre_draft, drafting, or a null/unrecognized status -- has none yet,
+// so it goes to DraftView's simulator instead, same as it always has.
+function draftRoute(d: { sleeperDraftId: string; status: string | null }): string {
+  return (d.status ?? 'unknown') === 'complete'
+    ? `/drafts/${d.sleeperDraftId}/board`
+    : `/drafts/${d.sleeperDraftId}`
+}
+
 export default function DraftPicker() {
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
   const [mocks, setMocks] = useState<MockSessionSummary[] | null>(null)
@@ -163,6 +172,7 @@ export default function DraftPicker() {
               const status = d.status ?? 'unknown'
               const t = tracked[d.sleeperDraftId]
               const live = status === 'pre_draft' || status === 'drafting'
+              const complete = status === 'complete'
               // Hashed on the NAME, not the id: every season of a league is a
               // separate Sleeper league id, so hashing the id gave the two
               // "(Foot) Ball Knowers" cards different colors -- the exact
@@ -186,7 +196,7 @@ export default function DraftPicker() {
                       {crest}
                     </span>
                     <span className="league-card-title">
-                      <Link to={`/drafts/${d.sleeperDraftId}`} className="league-card-name">
+                      <Link to={draftRoute(d)} className="league-card-name">
                         {d.leagueName}
                       </Link>
                       <span className="league-card-sub">
@@ -210,9 +220,9 @@ export default function DraftPicker() {
                       {seasons.map((s) => (
                         <Link
                           key={s.sleeperLeagueId}
-                          to={`/drafts/${s.sleeperDraftId}`}
+                          to={draftRoute(s)}
                           className={`league-season-link${s.sleeperLeagueId === d.sleeperLeagueId ? ' on' : ''}`}
-                          title={`${s.season} draft board · ${s.teams} managers`}
+                          title={`${s.season} ${s.status === 'complete' ? 'draft board' : 'mock draft'} · ${s.teams} managers`}
                         >
                           {s.season}
                         </Link>
@@ -222,9 +232,13 @@ export default function DraftPicker() {
 
                   <div className="league-card-links">
                     {/* One primary destination, then two peers -- not three
-                        identical chips. The draft is what this app is for. */}
-                    <Link className="league-link primary" to={`/drafts/${d.sleeperDraftId}`}>
-                      {live ? 'Draft room' : 'Draft board'}
+                        identical chips. The draft is what this app is for.
+                        A complete draft has real picks to show; anything else
+                        -- live or not yet drafted -- has none yet, so it opens
+                        the simulator (mock the room from its own tendencies)
+                        instead of an empty "come back later" screen. */}
+                    <Link className="league-link primary" to={draftRoute(d)}>
+                      {live ? 'Draft room' : complete ? 'Draft board' : 'Mock draft'}
                     </Link>
                     <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
                       History

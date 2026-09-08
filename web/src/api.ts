@@ -140,6 +140,27 @@ function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
 export const getSeats = (draftId: string) =>
   apiFetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
 
+// Mirrors LeagueController.realBoard's response shape. The picks that actually
+// happened -- distinct from PredictedPick, which is always the engine's guess.
+export type RealPick = {
+  pickNo: number
+  round: number
+  slot: number
+  manager: string
+  player: PlayerRef
+}
+
+export type RealDraftBoard = {
+  draftId: string
+  teams: number
+  rounds: number
+  status: string | null
+  picks: RealPick[]
+}
+
+export const getRealDraftBoard = (draftId: string) =>
+  apiFetch(`/api/drafts/${draftId}/board`).then(json<RealDraftBoard>)
+
 // Mirrors DraftRepository.DraftSummary (store/DraftRepository.java). Backs the picker screen.
 export type DraftSummary = {
   id: number
