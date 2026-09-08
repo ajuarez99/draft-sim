@@ -1,4 +1,4 @@
-# draft-sim — pick-by-pick reveal, and a UI for manager tendencies
+# Ball Knowers — pick-by-pick reveal, and a UI for manager tendencies
 
 Design note, 2026-08-29 (evening). Requested by Allan after using the app for the
 first time against real data. Two features; not otherwise related, grouped in one

@@ -1,4 +1,4 @@
-# draft-sim — multi-source ADP and mock data, 8- to 14-team leagues
+# Ball Knowers — multi-source ADP and mock data, 8- to 14-team leagues
 
 ## Verified this session (2026-08-29, evening) — §3 + §5 + §9 built, scoped down
 

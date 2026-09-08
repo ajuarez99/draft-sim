@@ -1,4 +1,4 @@
-# draft-sim — handoff
+# Ball Knowers — handoff
 
 **League suite Phase A — built and verified live, 2026-09-07 (same day, later
 session).** `claude/league-suite.md` — read its new "Phase A — built and

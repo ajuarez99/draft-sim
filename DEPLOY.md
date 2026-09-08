@@ -1,4 +1,4 @@
-# Deploying draft-sim
+# Deploying Ball Knowers
 
 Written 2026-08-29, before any deploy has happened. Nothing here has been executed;
 it is the intended order, with the things most likely to go wrong called out.

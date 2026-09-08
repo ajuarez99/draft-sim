@@ -1,4 +1,4 @@
-# draft-sim — position-colored pill cells, and the player list on top
+# Ball Knowers — position-colored pill cells, and the player list on top
 
 Design note, 2026-09-02. Allan marked up the running draft view side by side with a
 Sleeper draft room (Sleeper's board on top, its player list docked directly under it)

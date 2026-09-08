@@ -1,4 +1,4 @@
-# draft-sim — reactive resimulation: your pick changes the rest of the board
+# Ball Knowers — reactive resimulation: your pick changes the rest of the board
 
 Design note, 2026-08-30, written directly after `claude/your-pick-and-pacing.md` shipped
 and Allan reviewed it live. That doc's picker was explicit about a real limitation:

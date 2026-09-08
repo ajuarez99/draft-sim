@@ -1,0 +1,5 @@
+<svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <!-- fill= is the sRGB fallback for the bg / teal tokens (styles.css) for renderers without CSS Color 4 support; style= (oklch) wins where it's supported -->
+  <rect width="32" height="32" rx="7" fill="#03080f" style="fill: oklch(13% 0.02 250)"/>
+  <text x="16" y="22" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="15" fill="#00c0a0" style="fill: oklch(72% 0.14 175)">BK</text>
+</svg>

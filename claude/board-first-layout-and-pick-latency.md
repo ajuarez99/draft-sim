@@ -1,4 +1,4 @@
-# draft-sim — board-first layout, and making the simulation fast
+# Ball Knowers — board-first layout, and making the simulation fast
 
 Design note, 2026-09-01. Allan marked up a screenshot of the running draft view and
 gave five pieces of feedback in one message:

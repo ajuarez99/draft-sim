@@ -1,4 +1,4 @@
-# AGENTS.md — draft-sim
+# AGENTS.md — Ball Knowers
 
 Tool-agnostic entry point for any coding agent working in this repo. Distilled from
 `claude/lessons.md` (bug post-mortems), `claude/environment.md` (sandbox/verification
@@ -32,6 +32,13 @@ independent Monte Carlo draft simulations and aggregates them into a predicted
 board and, per player, an availability curve — the probability he survives to each
 of your own upcoming picks. See `README.md` for layout/running and `HANDOFF.md` for
 current state; both are kept current, this file is not a substitute for either.
+
+## Naming
+
+The **product** is written bare: **Ball Knowers**. A **league** is written as a
+quoted Sleeper name with its sport and season — "(Foot) Ball Knowers" (NFL 2026),
+"Ball Knowers" (NBA 2026) — which is what already disambiguates the rows in
+README.md's league table.
 
 ## The thing to understand before changing anything
 

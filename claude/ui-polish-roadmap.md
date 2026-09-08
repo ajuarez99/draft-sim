@@ -1,4 +1,4 @@
-# draft-sim — three UI ideas, reconciled
+# Ball Knowers — three UI ideas, reconciled
 
 Design note, 2026-08-30. Allan gave three pieces of feedback in one message and
 asked for them as "separate plans," then asked for the plans to be folded into one

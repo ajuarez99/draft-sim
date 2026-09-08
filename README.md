@@ -1,4 +1,4 @@
-# draft-sim
+# Ball Knowers
 
 Fantasy football mock drafts simulated against models of the actual managers in
 a Sleeper league, rather than generic ADP bots.

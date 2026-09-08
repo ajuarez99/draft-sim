@@ -1,4 +1,4 @@
-# draft-sim — board visual redesign, pick-by-pick pause, player card
+# Ball Knowers — board visual redesign, pick-by-pick pause, player card
 
 Design note, 2026-08-30. Requested by Allan against a screenshot of Sleeper's own
 live draft room (not this app) as the visual reference. Three asks in one message,
@@ -164,7 +164,7 @@ Same non-goal as §1.
 The reference screenshot is Sleeper's live draft room: full-bleed width, a
 compact header (league name, format line, avatar strip, icon-button row), a
 dense grid with small cells, and a two-panel lower half (player pool + a
-queue/roster/chat tab group) that also runs full width. draft-sim's `.app`
+queue/roster/chat tab group) that also runs full width. Ball Knowers' `.app`
 (`styles.css:45`) caps at `max-width: 1400px` and centers — on any screen wider
 than that (Allan's, per the squished screenshot he sent, which shows real empty
 gutter on both sides) the whole app sits in a fixed-width column while the
@@ -173,7 +173,7 @@ grid inside it still tries to fit 14+ columns, which is the actual cause of
 fenced itself out of the room that exists. **"Don't be afraid to use the whole
 screen"** — Allan's words, mid-session.
 
-draft-sim is not rebuilding Sleeper's player-pool-to-draft-from panel — that
+Ball Knowers is not rebuilding Sleeper's player-pool-to-draft-from panel — that
 panel lets you draft, which is feature C, out of scope (see top of doc). The
 redesign target is *visual family*, applied to the panels that already exist:
 predicted board, availability table, confidence note, seats.

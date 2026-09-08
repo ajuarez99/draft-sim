@@ -1,4 +1,4 @@
-# draft-sim — pick your own player at your picks, and slow the reveal down
+# Ball Knowers — pick your own player at your picks, and slow the reveal down
 
 Design note, 2026-08-30 (same day as `claude/board-redesign-pick-by-pick-playercard.md`,
 after Allan tried that build live). Two asks in one message: it wasn't obvious the

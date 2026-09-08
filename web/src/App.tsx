@@ -58,7 +58,7 @@ export default function App() {
       <header className="top">
         <div className="top-left">
           <h1>
-            <Link to="/">draft-sim</Link>
+            <Link to="/">Ball Knowers</Link>
           </h1>
           {/* E5 (design-review-next-steps.md): the header carried exactly one
               nav chip and no indication of where you were. Home and Managers
