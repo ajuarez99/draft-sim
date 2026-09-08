@@ -20,7 +20,8 @@ class FootballRulesTest {
             new ScoringProperties.SportScoring(
                     new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
                     12.0, 3.0, 60.0, 0.15, 6, 0.85,
-                    Map.of("K", 3, "DEF", 4), 1.0, 30)));
+                    Map.of("K", 3, "DEF", 4), 1.0, 30),
+            null));
 
     private static BoardEntry entry(long id, String name, Position pos, double adp) {
         return new BoardEntry(new Player(id, Sport.NFL, "s" + id, name, List.of(pos),

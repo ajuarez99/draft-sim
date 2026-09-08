@@ -67,7 +67,7 @@ public class BoardService {
         boards.load(sport, BoardRepository.SOURCE_SEARCH_RANK, srDate)
                 .forEach(r -> searchRank.put(r.playerId(), r.adp()));
 
-        Map<Long, List<Double>> observed = observedPickNumbers();
+        Map<Long, List<Double>> observed = observedPickNumbers(sport);
         Map<Long, Double> ffc = loadFfc(sport);
 
         // Three independent weights rather than one complement, since a player
@@ -211,10 +211,10 @@ public class BoardService {
         return out;
     }
 
-    /** Pick order from the configured completed drafts, rescaled to referenceTeams. */
-    private Map<Long, List<Double>> observedPickNumbers() {
+    /** Pick order from this sport's configured completed drafts, rescaled to referenceTeams. */
+    private Map<Long, List<Double>> observedPickNumbers(Sport sport) {
         Map<Long, List<Double>> out = new HashMap<>();
-        for (String sleeperDraftId : cfg.observedDrafts()) {
+        for (String sleeperDraftId : cfg.observedDrafts(sport)) {
             Optional<DraftRepository.DraftRow> maybe = drafts.bySleeperId(sleeperDraftId);
             if (maybe.isEmpty()) {
                 log.warn("observed draft {} not ingested — skipping", sleeperDraftId);

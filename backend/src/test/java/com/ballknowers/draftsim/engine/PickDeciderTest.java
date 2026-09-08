@@ -49,7 +49,7 @@ class PickDeciderTest {
         Map<Integer, ManagerProfile> profiles = new HashMap<>();
         for (int s = 1; s <= teams; s++) profiles.put(s, ManagerProfile.neutral(s, "seat " + s));
         return new DraftContext(board(400), settings, profiles, PositionalPriors.uniform(Sport.NFL),
-                new FootballRules(new ScoringProperties(CFG)), CFG, List.of(), Map.of());
+                new FootballRules(new ScoringProperties(CFG, null)), CFG, List.of(), Map.of());
     }
 
     @Test

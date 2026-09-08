@@ -130,6 +130,15 @@ accept them) and both methods correctly cap at the best three.
 - Both quantities are per-eligibility-mask, so the 32-entry table stands and
   `rosterNeed` stays an O(1) read.
 
+**Known and deliberately not optimised yet:** `BasketballRules.prepareLineup`
+builds the table by cloning a nine-int assignment array once per mask, so it
+allocates ~32 small arrays per call. It runs once per seat per pick — order
+84,000 times in a 500-iteration 14-round sim, not the ~25M that `rosterNeed`
+sees — so this is nowhere near football's hot path, and correctness came first.
+But **the first time anyone runs a basketball sim (Phase 5) the first thing they
+will notice is speed**, and this is where to look. Measure before changing it;
+`claude/optimization-ideas.md` is the home for that work.
+
 **3c and Phase 4 merge.** 3c has no class to live in until `BasketballRules`
 exists, and `BasketballRules` cannot be constructed without a
 `scoring.basketball` block. Splitting them would mean committing a skeleton that
@@ -547,9 +556,13 @@ candidate in O(1) off that. Three of its assumptions are football-only:
    the dedicated slots it competes with — the comment on `startingLineupValue`
    says exactly that. With three nested tiers and multi-eligible players the
    argument no longer holds.
-3. **`LeagueSettings.dedicatedStarters()` (`:32-41`) and `flexSlots()` hardcode
-   the six football positions outside the seam.** Both are consumed directly by
-   `FootballRules` and must move behind it.
+3. ~~**`LeagueSettings.dedicatedStarters()` and `flexSlots()` must move behind
+   the seam.**~~ **Wrong — corrected when 3c was built.** `BasketballRules`
+   never calls either: its nine-slot model is self-contained, and the only
+   `LeagueSettings` method it reads is `benchSlots()`, which is already
+   sport-agnostic. Football's calls to them are untouched. They do still
+   hardcode the six football positions outside the seam, but that is a latent
+   wart, not a blocker, and moving them would have been churn for nothing.
 
 So "what is this roster's starting lineup worth" becomes a **maximum-weight
 bipartite matching** (players to slots) rather than a greedy fill. The

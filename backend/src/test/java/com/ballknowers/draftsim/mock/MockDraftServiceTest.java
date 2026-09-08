@@ -81,8 +81,8 @@ class MockDraftServiceTest {
         repo = new FakeMockDraftRepository();
         DraftContextFactory contexts =
                 new DraftContextFactory(
-                        new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG)))),
-                        new ScoringProperties(CFG));
+                        new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG, null)))),
+                        new ScoringProperties(CFG, null));
         service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers,
                 drafts, leagues, new OwnerProperties(null));
     }

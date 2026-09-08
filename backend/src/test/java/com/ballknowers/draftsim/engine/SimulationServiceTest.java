@@ -55,8 +55,8 @@ class SimulationServiceTest {
         when(rules.sport()).thenReturn(Sport.NFL);
         SimulationService service = new SimulationService(
                 boards, profiles, drafts, leagues, players,
-                new BoardProperties(0.5, List.of(), 14, 30), runner,
-                new DraftContextFactory(new SportRulesRegistry(List.of(rules)), new ScoringProperties(CFG)));
+                new BoardProperties(0.5, Map.of(), 14, 30), runner,
+                new DraftContextFactory(new SportRulesRegistry(List.of(rules)), new ScoringProperties(CFG, null)));
 
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-xyz", 2026, 1, 2, "pre_draft", Map.of());

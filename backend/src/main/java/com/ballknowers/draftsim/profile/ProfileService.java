@@ -239,14 +239,20 @@ public class ProfileService {
         return (p.pickNo() - 1) < TILT_FRACTION * total;
     }
 
-    /** Configured bucket count, falling back if an older external weights.yml omits it. */
-    private int buckets() {
-        return priorCfg.buckets() > 0 ? priorCfg.buckets() : PositionalPriors.DEFAULT_BUCKETS;
+    /**
+     * Configured bucket count for this sport, falling back if an older
+     * external weights.yml omits it (a flat, football-only value, or no entry
+     * for this sport at all -- Phase 4 of claude/multi-sport-and-rebrand.md
+     * made this per-sport).
+     */
+    private int buckets(Sport sport) {
+        int configured = priorCfg.buckets(sport);
+        return configured > 0 ? configured : PositionalPriors.DEFAULT_BUCKETS;
     }
 
     private PositionalPriors fitPriors(List<DraftRepository.CompletedPick> picks, Map<Long, Position> posById,
                                        Sport sport) {
-        int buckets = buckets();
+        int buckets = buckets(sport);
         Map<Integer, Map<Position, Integer>> counts = new HashMap<>();
         Map<Position, Integer> overallCounts = new EnumMap<>(Position.class);
         int n = 0;

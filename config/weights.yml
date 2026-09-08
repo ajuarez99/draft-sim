@@ -53,13 +53,51 @@ draftsim:
       # How many available players get scored at each pick.
       candidatePool: 30
 
+    basketball:
+      # GUESS, copied verbatim from football's values as a starting point.
+      # NONE of this is fit to basketball data -- per this file's header rule,
+      # unfitted numbers stay labelled and are never tuned just to make a
+      # later measurement agree. claude/multi-sport-and-rebrand.md Phase 4.
+      weights:
+        adp: 1.00
+        positionalPrior: 0.35
+        rosterNeed: 0.50
+        runPressure: 0.25
+
+      adpScale: 12.0
+      valueDeltaClamp: 3.0
+      valueDecay: 60.0
+      benchFloor: 0.15
+      runWindow: 6
+      runRecencyDecay: 0.85
+
+      # No basketball equivalent of "kickers go last" -- every position is
+      # draftable from round 1, so this is empty rather than populated with a
+      # guess. Left present (not omitted) because FootballRules hard-fails
+      # when ITS OWN latestRounds is null/missing (guards against a stale
+      # weights.yml predating the earliestRound->latestRounds rename);
+      # BasketballRules does not currently read this field at all, so an
+      # empty map here is a deliberate no-op, not a placeholder for a rule
+      # that will show up later.
+      latestRounds: {}
+
+      # Softmax temperature and candidate pool width -- same meaning as football's.
+      temperature: 1.0
+      candidatePool: 30
+
   board:
     # Weight on observed draft order in the blend. 0.5 is a coin flip dressed as
     # a parameter. Change it freely. (What's left over after this and adp.ffc.weight
     # goes to sleeper_search_rank -- see BoardService.rebuild.)
     observedWeight: 0.5
+    # Per sport (Phase 4) -- was a flat, untagged list. Each sport's board only
+    # draws observed order from its own completed drafts.
     observedDrafts:
-      - "1346366555776126976"   # (Foot) Ball Knowers 2026, 12-team PPR, complete
+      nfl:
+        - "1346366555776126976"   # (Foot) Ball Knowers 2026, 12-team PPR, complete
+      nba:
+        - "1141438341108498432"   # Ball Knowers 2024 NBA, complete
+        - "1229352720230514688"   # Ball Knowers 2025 NBA, complete
     referenceTeams: 14
     # A pick is only scored for reach against a board captured within this many
     # days of the draft. Older picks stay unscored rather than being measured
@@ -73,6 +111,12 @@ draftsim:
   # across team counts on the same format (verified live, see FfcAdpService).
   # Building the full per-size matrix would model a distinction that isn't real
   # in the data yet. weight is another coin-flip parameter, same as observedWeight.
+  #
+  # Football-only: fantasyfootballcalculator.com has no basketball vendor, so
+  # there is no equivalent block for NBA and none is planned -- see
+  # claude/multi-sport-and-rebrand.md's "There is no FFC for basketball" note.
+  # BoardService skips this fetch entirely for NBA (Phase 5); this section is
+  # simply never read for that sport.
   adp:
     ffc:
       enabled: true
@@ -86,13 +130,16 @@ draftsim:
     # Dirichlet pseudo-counts per (bucket, position) cell. With 2 drafts of
     # history this is doing most of the work; it is deliberately heavy.
     alpha: 8.0
-    # How many equal slices of a draft P(position | when) is keyed on. NOT a
-    # round count -- round index does not survive a change of league size, so
-    # the table is keyed on fraction-of-draft instead. At 15 the buckets line up
-    # exactly with the rounds of a 15-round league, which is every league
-    # ingested so far, so this is identical to the old round-keyed table on
-    # today's data and correct on a league of any other shape.
-    buckets: 15
+    # How many equal slices of a draft P(position | when) is keyed on, per
+    # sport (Phase 4 -- was a flat, football-only int). NOT a round count --
+    # round index does not survive a change of league size, so the table is
+    # keyed on fraction-of-draft instead. At 15 the buckets line up exactly
+    # with the rounds of a 15-round (football) league; at 14, a 14-round
+    # (basketball) league -- both identical to the old round-keyed table on
+    # today's data, and correct on a league of any other shape.
+    buckets:
+      nfl: 15
+      nba: 14
 
   # Per-manager parameters are shrunk toward the league mean:
   #   effective = (n/(n+k))*manager + (k/(n+k))*leagueMean

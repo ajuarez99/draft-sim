@@ -11,7 +11,7 @@ import java.util.Map;
  * sane and are meant to be replaced by fitted values once enough seasons exist.
  */
 @ConfigurationProperties(prefix = "draftsim.scoring")
-public record ScoringProperties(SportScoring football) {
+public record ScoringProperties(SportScoring football, SportScoring basketball) {
 
     // Named SportScoring, not Sport -- it collides conceptually with
     // domain.Sport, and forSport(Sport) below would be unreadable if this
@@ -37,16 +37,14 @@ public record ScoringProperties(SportScoring football) {
     ) {}
 
     /**
-     * Resolves the scoring block for a sport. Basketball has none configured
-     * yet -- weights.yml gains {@code scoring.basketball} in Phase 4 -- so
-     * this throws rather than silently handing a basketball request
-     * football's valueDecay/adpScale/benchFloor/runWindow/latestRounds.
+     * Resolves the scoring block for a sport. Phase 4: {@code
+     * scoring.basketball} now exists in weights.yml, so this no longer throws
+     * for NBA -- see claude/multi-sport-and-rebrand.md Phase 4.
      */
     public SportScoring forSport(Sport sport) {
         return switch (sport) {
             case NFL -> football();
-            case NBA -> throw new IllegalStateException(
-                    "basketball scoring is not configured yet; weights.yml gains scoring.basketball in Phase 4");
+            case NBA -> basketball();
         };
     }
 }

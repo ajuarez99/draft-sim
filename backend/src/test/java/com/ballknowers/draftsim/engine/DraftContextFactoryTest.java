@@ -33,8 +33,8 @@ class DraftContextFactoryTest {
 
     private final DraftContextFactory factory =
             new DraftContextFactory(
-                    new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG)))),
-                    new ScoringProperties(CFG));
+                    new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG, null)))),
+                    new ScoringProperties(CFG, null));
 
     private static List<BoardEntry> board(int size) {
         List<BoardEntry> out = new ArrayList<>(size);
