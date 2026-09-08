@@ -73,7 +73,7 @@ public class ProfileService {
                        Map<Long, Double> empiricalReachBias) {}
 
     public Fit fit(Sport sport) {
-        List<DraftRepository.CompletedPick> picks = drafts.allCompletedPicks();
+        List<DraftRepository.CompletedPick> picks = drafts.allCompletedPicks(sport);
         Map<Long, Position> posById = new HashMap<>();
         for (Player p : players.findAll(sport)) posById.put(p.id(), p.primary());
         Map<Long, String> names = managers.names();

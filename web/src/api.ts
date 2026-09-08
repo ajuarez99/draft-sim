@@ -37,6 +37,11 @@ export type AvailabilityRow = {
 
 export type Provenance = 'NEUTRAL' | 'STATED' | 'FITTED' | 'BLENDED'
 
+// The backend's Sport enum is @JsonValue-serialized by its lowercase code, the
+// same wire form the `?sport=` query params and the `league.sport` column use
+// (multi-sport-and-rebrand.md Phase 2) -- not the Java enum name.
+export type Sport = 'nfl' | 'nba'
+
 export type Confidence = {
   draftsObserved: number
   scoreablePicks: number
@@ -186,6 +191,10 @@ export type DraftSummary = {
   // earliest one ingested. The picker groups seasons into one card per league
   // with it -- see leagueLineages() in DraftPicker.
   previousLeagueId: string | null
+  // allWithLeague() is a deliberately mixed, sport-tagged list
+  // (multi-sport-and-rebrand.md Phase 2), not one list per sport. Not yet
+  // rendered anywhere; the sport pill is Phase 6.
+  sport: Sport
 }
 
 export const getDrafts = () => apiFetch('/api/drafts').then(json<DraftSummary[]>)

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -168,23 +169,28 @@ public class DraftRepository {
      * into one card per league with it -- matching on {@code leagueName} instead
      * would collapse two genuinely different leagues that share a name, and split
      * one that got renamed between seasons.
+     *
+     * {@code sport} backs the deliberately-mixed, sport-tagged picker list --
+     * {@link #allWithLeague()} stays unfiltered by design (multi-sport-and-
+     * rebrand.md Phase 2), so the frontend needs the tag to render a pill
+     * rather than the repository ever splitting this into two lists.
      */
     public record DraftSummary(long id, String sleeperDraftId, long leagueId, String leagueName,
                                int season, int teams, int rounds, String status, Instant startTime,
-                               String sleeperLeagueId, String previousLeagueId) {}
+                               String sleeperLeagueId, String previousLeagueId, Sport sport) {}
 
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
     public List<DraftSummary> allWithLeague() {
         return db.sql("""
                 select d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-                       d.status, d.start_time, l.sleeper_id, l.previous_league_id
+                       d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport
                 from draft d join league l on l.id = d.league_id
                 order by d.start_time desc nulls last, d.season desc, d.id desc
                 """)
                 .query((rs, i) -> new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
                         rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
                         rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
-                        rs.getString(10), rs.getString(11)))
+                        rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12))))
                 .list();
     }
 
@@ -207,14 +213,29 @@ public class DraftRepository {
         }
     }
 
-    public List<CompletedPick> allCompletedPicks() {
+    /**
+     * Scoped to one sport -- multi-sport-and-rebrand.md Phase 2. Before this,
+     * the query joined {@code draft_pick -> draft} with no join to
+     * {@code league} and no sport filter, so a completed NBA draft's picks
+     * fed straight into a football {@code ProfileService.fit()}. Priors and
+     * tilt were already safe by accident (an NBA player never resolves to a
+     * football {@code Position}, so those loops {@code continue}), but
+     * {@code draftsByManager} counted the NBA draft id against a manager
+     * unconditionally, inflating the shrinkage N for every manager who also
+     * plays the other sport -- silently under-shrinking their profile in the
+     * sport actually being fit.
+     */
+    public List<CompletedPick> allCompletedPicks(Sport sport) {
         return db.sql("""
                 select p.draft_id, p.pick_no, p.round, p.draft_slot, p.manager_id, p.player_id,
                        p.adp_at_time, d.teams, d.rounds
-                from draft_pick p join draft d on d.id = p.draft_id
-                where d.status = 'complete' and p.manager_id is not null
+                from draft_pick p
+                join draft d on d.id = p.draft_id
+                join league l on l.id = d.league_id
+                where d.status = 'complete' and p.manager_id is not null and l.sport = ?
                 order by p.draft_id, p.pick_no
                 """)
+                .param(sport.code())
                 .query((rs, i) -> new CompletedPick(rs.getLong(1), rs.getInt(2), rs.getInt(3), rs.getInt(4),
                         rs.getObject(5) == null ? null : rs.getLong(5),
                         rs.getObject(6) == null ? null : rs.getLong(6),

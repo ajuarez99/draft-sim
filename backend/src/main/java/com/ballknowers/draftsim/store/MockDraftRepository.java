@@ -13,7 +13,7 @@ import java.util.Optional;
  * Feature C's own tables (claude/next-features-roadmap.md §2a, Phase 3) --
  * deliberately separate from {@link DraftRepository}, with no FK or shared id
  * space between them, so a mock session can never be picked up by
- * {@link DraftRepository#allCompletedPicks()} / profile fitting.
+ * {@link DraftRepository#allCompletedPicks(com.ballknowers.draftsim.domain.Sport)} / profile fitting.
  */
 @Repository
 public class MockDraftRepository {

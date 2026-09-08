@@ -15,6 +15,7 @@ function draft(over: Partial<DraftSummary> & Pick<DraftSummary, 'sleeperLeagueId
     status: 'complete',
     startTime: null,
     previousLeagueId: null,
+    sport: 'nfl',
     ...over,
   }
 }

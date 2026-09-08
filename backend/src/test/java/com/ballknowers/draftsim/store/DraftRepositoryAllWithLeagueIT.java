@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -89,5 +90,9 @@ class DraftRepositoryAllWithLeagueIT {
         assertEquals(12, newer.teams());
         assertEquals(15, newer.rounds());
         assertEquals(2026, newer.season());
+        // allWithLeague() is the deliberately mixed, sport-tagged picker list
+        // (multi-sport-and-rebrand.md Phase 2) -- it stays unfiltered, but
+        // now carries the tag rather than filtering by it.
+        assertEquals(Sport.NFL, newer.sport());
     }
 }

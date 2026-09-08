@@ -135,15 +135,14 @@ public class IngestController {
      *   share names across sports, so "it just won't match anything" is not a
      *   safe assumption -- this would write real {@code adp_snapshot} rows
      *   tagged {@code nba} built from football numbers.
-     *   <li>{@link #board}: after that same ADP ingest, runs {@code
-     *   boards.rebuild(NBA)} then {@code profiles.persistFitted(NBA)} before
-     *   Phase 2's contamination fix exists -- {@code DraftRepository
-     *   .allCompletedPicks()} has no sport filter, so fitting "basketball"
-     *   profiles would fit them from football picks and persist them as
-     *   {@code manager_profile} rows tagged {@code nba}, inflating {@code
-     *   observed} for every manager who also plays football (10 of the 12 Ball
-     *   Knowers managers do) and silently under-shrinking their football
-     *   profiles too.
+     *   <li>{@link #board}: runs {@code boards.rebuild(NBA)}, whose {@code
+     *   dropOffRoster}/{@code draftable()} reasoning ("not on an NFL roster")
+     *   and {@code loadFfc} (a football-only vendor) are football-only and
+     *   not yet given basketball cases -- that's Phase 5 work. ({@code
+     *   DraftRepository.allCompletedPicks(Sport)} itself is sport-filtered as
+     *   of Phase 2, so {@code profiles.persistFitted(NBA)} no longer fits
+     *   basketball profiles from football picks; this guard stays up for the
+     *   board/ingest reasons above, not that one.)
      *   <li>{@link #players}: {@code PlayerIngestService.fantasyPositions()} has
      *   no basketball cases yet (that's Phase 5 work), so NBA positions would be
      *   dropped or mis-mapped into the {@code positions text[]} column.

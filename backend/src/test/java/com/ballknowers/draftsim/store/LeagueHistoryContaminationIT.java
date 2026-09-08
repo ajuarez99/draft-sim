@@ -112,7 +112,7 @@ class LeagueHistoryContaminationIT {
                 after.profiles().get(managerId).reachBias(),
                 "this manager's fitted reachBias must be unaffected");
 
-        long leaked = drafts.allCompletedPicks().stream()
+        long leaked = drafts.allCompletedPicks(Sport.NFL).stream()
                 .filter(p -> p.playerId() != null && p.playerId() == playerId)
                 .count();
         assertEquals(1, leaked, "still exactly the one real draft_pick row, nothing from roster_season");

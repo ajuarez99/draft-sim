@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -186,7 +187,7 @@ class DraftRepositoryUpsertPicksIT {
                 new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null));
         drafts.upsertPicks(draftId, rows);
 
-        boolean leaked = drafts.allCompletedPicks().stream().anyMatch(p -> p.draftId() == draftId);
+        boolean leaked = drafts.allCompletedPicks(Sport.NFL).stream().anyMatch(p -> p.draftId() == draftId);
         assertFalse(leaked, "a pick under a 'drafting' draft must not appear in allCompletedPicks()");
     }
 }

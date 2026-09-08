@@ -102,11 +102,11 @@ class MockDraftContaminationIT {
 
     @Test
     void allCompletedPicksNeverIncludesAMockDraftPickRow() {
-        boolean leaked = drafts.allCompletedPicks().stream()
+        boolean leaked = drafts.allCompletedPicks(Sport.NFL).stream()
                 .anyMatch(p -> p.playerId() != null && p.playerId() == playerId && p.draftId() != realDraftId);
         assertFalse(leaked, "allCompletedPicks() must never surface a row that did not come from draft_pick");
 
-        long fromRealDraftOnly = drafts.allCompletedPicks().stream()
+        long fromRealDraftOnly = drafts.allCompletedPicks(Sport.NFL).stream()
                 .filter(p -> p.managerId() != null && p.managerId() == managerId)
                 .count();
         assertEquals(1, fromRealDraftOnly,
@@ -130,11 +130,11 @@ class MockDraftContaminationIT {
         mockDrafts.insertPicks(forkedSessionId, List.of(
                 new MockDraftRepository.PickRow(forkedSessionId, 3, 1, 3, "MANAGER", managerId, playerId, "LIVE")));
         try {
-            boolean leaked = drafts.allCompletedPicks().stream()
+            boolean leaked = drafts.allCompletedPicks(Sport.NFL).stream()
                     .anyMatch(p -> p.playerId() != null && p.playerId() == playerId && p.draftId() != realDraftId);
             assertFalse(leaked, "a forked session's LIVE-sourced pick must never surface from allCompletedPicks()");
 
-            long fromRealDraftOnly = drafts.allCompletedPicks().stream()
+            long fromRealDraftOnly = drafts.allCompletedPicks(Sport.NFL).stream()
                     .filter(p -> p.managerId() != null && p.managerId() == managerId)
                     .count();
             assertEquals(1, fromRealDraftOnly, "still exactly the one real pick, not a second one from the fork");
