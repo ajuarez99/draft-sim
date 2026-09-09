@@ -78,24 +78,6 @@ public class LeagueController {
     }
 
     /**
-     * The draft behind this id, if this caller may see it.
-     *
-     * Empty covers both "no such draft" and "not your league", and every caller
-     * turns it into the same 404. Deliberately not a 403: a distinct "forbidden"
-     * confirms the draft exists and which league it belongs to, which is most of
-     * what an enumeration wanted in the first place.
-     *
-     * Every draft-addressed route below goes through here rather than calling
-     * {@code drafts.bySleeperId} directly, so adding a route without scoping it
-     * is a visible omission instead of a silent default.
-     */
-    private Optional<DraftRepository.DraftRow> visibleDraft(String sleeperDraftId, String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
-        if (found.isEmpty()) return found;
-        return membership.canSee(sleeperUserId, found.get().leagueId()) ? found : Optional.empty();
-    }
-
-    /**
      * Every draft in the DB, newest first, scoped to the requesting Sleeper
      * user's own leagues when {@code X-Sleeper-User} is sent
      * (claude/user-identity-and-onboarding.md §4b/§4c). Absent header ⇒ the
@@ -113,7 +95,7 @@ public class LeagueController {
     @GetMapping("/drafts/{sleeperDraftId}/seats")
     public ResponseEntity<?> seats(@PathVariable String sleeperDraftId,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> draft = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> draft = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
 
         // Loaded once and reused below for rosterPositions too, rather than the
@@ -216,7 +198,7 @@ public class LeagueController {
     public ResponseEntity<?> setReversalRound(@PathVariable String sleeperDraftId,
                                               @RequestBody(required = false) ReversalRoundBody body,
                                               @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
 
@@ -260,7 +242,7 @@ public class LeagueController {
     @GetMapping("/drafts/{sleeperDraftId}/board")
     public ResponseEntity<?> realBoard(@PathVariable String sleeperDraftId,
                                        @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
         Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
@@ -362,7 +344,7 @@ public class LeagueController {
     @PostMapping("/drafts/{sleeperDraftId}/track")
     public ResponseEntity<?> track(@PathVariable String sleeperDraftId,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> draft = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> draft = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
         LiveDraftPoller.TrackResult r = poller.track(draft.get());
         // Map.of throws NullPointerException on a null value, and status is
@@ -423,7 +405,7 @@ public class LeagueController {
     @GetMapping(value = "/drafts/{sleeperDraftId}/live-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public ResponseEntity<SseEmitter> liveStream(@PathVariable String sleeperDraftId,
                                                  @RequestParam(name = "user", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();   // matches seats()
         DraftRepository.DraftRow draft = found.get();
 
@@ -554,7 +536,7 @@ public class LeagueController {
     public ResponseEntity<?> recordPick(@PathVariable String sleeperDraftId,
                                         @RequestBody(required = false) ManualPick body,
                                         @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
+        Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
 

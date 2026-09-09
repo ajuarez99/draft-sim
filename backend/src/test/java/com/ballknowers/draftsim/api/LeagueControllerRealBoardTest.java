@@ -26,7 +26,6 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -50,10 +49,16 @@ class LeagueControllerRealBoardTest {
 
     private LeagueController controller() {
         // These tests are about each endpoint's own behavior, not about scoping,
-        // so the caller can always see the league. LeagueMembership has its own
-        // tests; a mock left unstubbed would answer false and fail every one of
-        // these for the wrong reason.
-        lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        // so the caller can always see the draft. LeagueMembership has its own
+        // tests; a mock left unstubbed answers Optional.empty(), which would 404
+        // every one of these for the wrong reason.
+        //
+        // Delegates to the mocked DraftRepository rather than returning a fixed
+        // row, so each test's own when(drafts.bySleeperId(...)) still decides
+        // what the draft is -- and the "unknown draft is 404" cases keep working,
+        // since an id nobody stubbed comes back empty from there too.
+        lenient().when(membership.visibleDraft(any(), any()))
+                .thenAnswer(inv -> drafts.bySleeperId(inv.getArgument(1)));
         return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner,
                 membership);
     }

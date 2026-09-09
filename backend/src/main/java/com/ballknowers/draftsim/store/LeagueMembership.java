@@ -151,11 +151,19 @@ public class LeagueMembership {
      * collapsed: telling the two apart confirms that a draft exists and which
      * league owns it, which is most of what enumerating draft ids wanted.
      *
-     * <p>This is the same rule {@code LeagueController.visibleDraft} applies to
-     * every {@code /api/drafts/{id}/...} route; it lives here because
-     * {@code /api/sims} needs it too, and this project has already been bitten
-     * once by two implementations of one rule (see this class's own header).
-     * LeagueController's private copy should collapse into a call to this.
+     * <p>The single home for that rule. It briefly had a twin -- an identical
+     * private copy in LeagueController, from when {@code /api/sims} needed the
+     * same answer and that file was being edited elsewhere. Two implementations
+     * of one rule is the failure this class's own header is about, and this pair
+     * was the nastier shape of it: same name, same two {@code String}
+     * parameters, opposite order, so reaching for the wrong one compiled
+     * cleanly. Collapsed rather than left as a delegate, so there is no second
+     * {@code visibleDraft} to reach for at all.
+     *
+     * <p>Every {@code /api/drafts/{id}/...} route and {@code /api/sims} goes
+     * through here rather than calling {@code drafts.bySleeperId} directly, so
+     * adding a route without scoping it is a visible omission instead of a
+     * silent default.
      */
     public Optional<DraftRepository.DraftRow> visibleDraft(String sleeperUserId, String sleeperDraftId) {
         Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);

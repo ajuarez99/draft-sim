@@ -44,7 +44,12 @@ public class LeagueHistoryController {
     /**
      * This league, if the caller may see it -- empty for both "no such league"
      * and "not yours", which the callers turn into the same 404 for the same
-     * reason {@code LeagueController.visibleDraft} does.
+     * reason {@link LeagueMembership#visibleDraft} does.
+     *
+     * <p>Not itself a duplicate of that method: this one is addressed by a
+     * league, that one by a draft. It stays local because nothing outside this
+     * controller resolves a league this way -- the moment something does, it
+     * belongs next to visibleDraft in LeagueMembership rather than copied.
      */
     private Optional<LeagueRepository.LeagueRow> visibleLeague(String sleeperId, String sleeperUserId) {
         Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
