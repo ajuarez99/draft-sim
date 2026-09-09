@@ -178,6 +178,9 @@ body {
    invisible, on any page that doesn't portal into it. */
 .top-slot { display: flex; align-items: center; }
 .gear-chip { font-size: 14px; line-height: 1; padding: 5px 9px; }
+.top-right { display: flex; align-items: center; gap: 14px; }
+.top-user { display: flex; align-items: center; gap: 8px; }
+.top-user-name { font-size: 13px; color: var(--text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .controls {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -410,6 +413,10 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   padding: 5px 10px; border-radius: 8px;
   transition: background 120ms ease, color 120ms ease;
 }
+/* league-link is normally an <a> (navigation); the "From Sleeper" list's "Set
+   up"/"Retry" trigger an ingest instead, so they're real <button>s -- reset
+   the UA button chrome so they still read as the same control. */
+button.league-link { background: none; border: 0; font: inherit; cursor: pointer; }
 .league-link:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
 /* One primary destination, not three peers: the draft is what this app is for
    and the other two are places you go afterwards. */
@@ -1304,6 +1311,18 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .home-hero-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .home-hero-cta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* SignIn's own hero: same shape as the picker's, but it's the whole page
+   rather than one panel among several, so the form and its error need a
+   little more air above them than home-hero-body's 4px inter-line gap. */
+.signin-controls { margin-top: 10px; }
+.signin-hero .error { margin-top: 12px; margin-bottom: 0; max-width: 640px; }
+/* Inline retry inside an .error message -- text, not a control needing the
+   teal treatment `.controls button` would otherwise give it (it isn't one). */
+.link-button {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--text); text-decoration: underline; text-underline-offset: 2px;
+}
 
 /*
  * "League data" disclosure (the old "Add a league" panel). A native

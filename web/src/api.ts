@@ -1,6 +1,8 @@
 // Types mirror the Java records in engine/SimulationResult.java. They are
 // hand-maintained; if you change a record over there, change it here.
 
+import { currentUserId } from './user'
+
 export type PlayerRef = {
   id: number
   sleeperId: string
@@ -184,6 +186,11 @@ export const apiUrl = (path: string) => `${API_BASE}${path}`
 function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
   if (API_TOKEN) headers.set('Authorization', `Bearer ${API_TOKEN}`)
+  // Read synchronously off user.ts's module-level variable rather than a React
+  // hook -- this function is plain, called from outside any component. Absent
+  // when signed out, matching the backend's own no-header default.
+  const userId = currentUserId()
+  if (userId) headers.set('X-Sleeper-User', userId)
   return fetch(apiUrl(path), { ...init, headers })
 }
 
@@ -239,6 +246,40 @@ export type DraftSummary = {
 }
 
 export const getDrafts = () => apiFetch('/api/drafts').then(json<DraftSummary[]>)
+
+// --- claude/user-identity-and-onboarding.md §4a/§5: Sleeper-username identity ---
+
+/** Mirrors SleeperUserController.user's response shape. */
+export type SleeperUser = {
+  sleeperUserId: string
+  username: string
+  displayName: string
+  avatar: string | null
+}
+
+/** null (not a thrown error) when Sleeper has no such username -- the 404 case. */
+export async function getSleeperUser(usernameOrId: string): Promise<SleeperUser | null> {
+  const res = await apiFetch(`/api/sleeper/user/${encodeURIComponent(usernameOrId)}`)
+  if (res.status === 404) return null
+  return json<SleeperUser>(res)
+}
+
+/** Mirrors SleeperUserController.leagues' per-row response shape. */
+export type SleeperLeague = {
+  sleeperLeagueId: string
+  name: string
+  sport: Sport
+  season: number
+  totalRosters: number
+  draftId: string | null
+  status: string | null
+  previousLeagueId: string | null
+  /** Already has a `league` row in this app's own DB -- true means "Set up", not "start fresh". */
+  ingested: boolean
+}
+
+export const getSleeperUserLeagues = (sleeperUserId: string) =>
+  apiFetch(`/api/sleeper/users/${sleeperUserId}/leagues`).then(json<SleeperLeague[]>)
 
 /**
  * One `event: state` frame from GET /api/drafts/{id}/live-stream (SSE, native
@@ -297,6 +338,20 @@ export const trackDraft = (sleeperDraftId: string) =>
 // re-download the entire player pool or rebuild the global board/profiles.
 export const ingestLeague = (sleeperLeagueId: string) =>
   apiFetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+
+// The three other /api/ingest/* sub-routes, called individually rather than
+// through /api/ingest/all/{id} -- claude/user-identity-and-onboarding.md §5d:
+// `all` runs three sequential Sleeper crawls plus a rebuild and can exceed a
+// 30-60s platform HTTP timeout on a first-ever ingest, and these sub-routes
+// exist precisely so a caller can split it and show staged progress instead.
+export const ingestPlayers = (sport: Sport) =>
+  apiFetch(`/api/ingest/players?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+
+export const ingestAdp = (sport: Sport) =>
+  apiFetch(`/api/ingest/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+
+export const ingestBoard = (sport: Sport) =>
+  apiFetch(`/api/ingest/board?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 // Walks a league's `previous_league_id` chain and stores each season's
 // standings. Backs the "Load past seasons" button on the history page --

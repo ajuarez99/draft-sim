@@ -28,7 +28,12 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addMapping("/api/**")
                 .allowedOrigins(cors.allowedOrigins().toArray(String[]::new))
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("Authorization", "Content-Type")
+                // X-Sleeper-User: claude/user-identity-and-onboarding.md §4c --
+                // apiFetch sends it on every request once signed in, so a
+                // split-origin deploy (DEPLOY.md: Vercel frontend + Fly/Railway
+                // backend) needs it allowed here or the browser's preflight
+                // rejects every request, not just the ones that read it.
+                .allowedHeaders("Authorization", "Content-Type", "X-Sleeper-User")
                 .maxAge(3600);
     }
 

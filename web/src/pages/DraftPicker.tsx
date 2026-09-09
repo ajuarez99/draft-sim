@@ -4,15 +4,37 @@ import { hueFor } from '../hue'
 import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { SkeletonRows } from '../components/Skeleton'
+import { useUser } from '../user'
 import {
   getDrafts,
   getMockSessions,
+  getSleeperUserLeagues,
+  ingestAdp,
+  ingestBoard,
   ingestLeague,
+  ingestPlayers,
   trackDraft,
   type DraftSummary,
   type MockSessionSummary,
+  type SleeperLeague,
   type TrackResponse,
 } from '../api'
+
+// claude/user-identity-and-onboarding.md §5d: driven from the frontend rather
+// than POST /api/ingest/all/{id} so a first-ever ingest -- three sequential
+// Sleeper crawls plus a rebuild -- shows staged progress instead of a single
+// 40-second spinner, and so it can't exceed a platform's 30-60s HTTP timeout.
+// Each stage's own function closes over the league being set up.
+function setupStages(l: SleeperLeague) {
+  return [
+    { label: 'Fetching players', run: () => ingestPlayers(l.sport) },
+    { label: "Reading your league's history", run: () => ingestLeague(l.sleeperLeagueId) },
+    { label: 'Checking market prices', run: () => ingestAdp(l.sport) },
+    { label: 'Building the board', run: () => ingestBoard(l.sport) },
+  ]
+}
+
+type SetupState = { stageIndex: number; failedLabel: string | null }
 
 // A complete draft has real picks to show (CompletedDraftBoard); anything
 // else -- pre_draft, drafting, or a null/unrecognized status -- has none yet,
@@ -24,6 +46,7 @@ function draftRoute(d: { sleeperDraftId: string; status: string | null }): strin
 }
 
 export default function DraftPicker() {
+  const user = useUser()
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
   const [mocks, setMocks] = useState<MockSessionSummary[] | null>(null)
   // Split from one shared `error` the fetch and the add-league form used to
@@ -38,12 +61,54 @@ export default function DraftPicker() {
   const [tracking, setTracking] = useState<string | null>(null)
   const [tracked, setTracked] = useState<Record<string, TrackResponse | { failed: string }>>({})
 
+  // "From Sleeper": leagues this user belongs to on Sleeper that have no
+  // `league` row in this app's DB yet (§5c/§5d). null while loading, distinct
+  // from [] once it's known there's genuinely nothing to set up.
+  const [sleeperLeagues, setSleeperLeagues] = useState<SleeperLeague[] | null>(null)
+  const [setupState, setSetupState] = useState<Record<string, SetupState>>({})
+
   function refetch() {
     getDrafts().then(setDrafts).catch((e) => setFetchError(e.message))
     getMockSessions().then(setMocks).catch(() => {}) // non-critical -- the picker still works without it
   }
 
+  function refetchSleeperLeagues() {
+    if (!user) return
+    getSleeperUserLeagues(user.sleeperUserId).then(setSleeperLeagues).catch(() => {
+      // Best-effort: "Your leagues" (already-ingested) still works without this.
+    })
+  }
+
   useEffect(refetch, [])
+  useEffect(refetchSleeperLeagues, [user?.sleeperUserId])
+
+  async function setupLeague(l: SleeperLeague) {
+    const stages = setupStages(l)
+    for (let i = 0; i < stages.length; i++) {
+      setSetupState((prev) => ({ ...prev, [l.sleeperLeagueId]: { stageIndex: i, failedLabel: null } }))
+      try {
+        await stages[i].run()
+      } catch (e) {
+        setSetupState((prev) => ({
+          ...prev,
+          [l.sleeperLeagueId]: {
+            stageIndex: i,
+            failedLabel: `${stages[i].label}: ${e instanceof Error ? e.message : String(e)}`,
+          },
+        }))
+        return
+      }
+    }
+    setSetupState((prev) => {
+      const next = { ...prev }
+      delete next[l.sleeperLeagueId]
+      return next
+    })
+    // The now-ingested league should move from "From Sleeper" to "Your
+    // leagues" -- both lists have to refresh for that card to actually move.
+    refetch()
+    refetchSleeperLeagues()
+  }
 
   // /track now runs one poll tick synchronously before it answers, so this is
   // also the status refresh -- one button doing both jobs. The number that
@@ -153,7 +218,15 @@ export default function DraftPicker() {
         {drafts == null && <SkeletonRows count={2} label="Loading your leagues" />}
 
         {drafts && drafts.length === 0 && (
-          <p className="muted">No leagues yet — add one below.</p>
+          <p className="muted">
+            {/* First-run state (§5c): a genuinely empty "Your leagues" reads as
+                a failed fetch unless it says what to do next -- and when
+                "From Sleeper" already has something, the honest next step is
+                that list, not the manual add-by-id form further down. */}
+            {sleeperLeagues && sleeperLeagues.some((l) => !l.ingested)
+              ? 'No leagues set up yet — pick one from Sleeper below.'
+              : 'No leagues yet — add one below.'}
+          </p>
         )}
 
         {drafts && drafts.length > 0 && (
@@ -338,6 +411,75 @@ export default function DraftPicker() {
           </div>
         )}
       </section>
+
+      {/* §5c: leagues Sleeper says this user belongs to that have no `league`
+          row here yet. Same card shape as "Your leagues" (crest, sport pill,
+          size) so the two lists read as one thing rather than a second,
+          different-looking screen -- only omitted entirely once it's known
+          there's nothing to show, same null-vs-empty distinction as above. */}
+      {sleeperLeagues && sleeperLeagues.some((l) => !l.ingested) && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>From Sleeper</h2>
+          </div>
+          <div className="league-grid">
+            {sleeperLeagues
+              .filter((l) => !l.ingested)
+              .map((l) => {
+                const hue = hueFor(l.name)
+                const crest = (l.name.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
+                const setup = setupState[l.sleeperLeagueId]
+                return (
+                  <article key={l.sleeperLeagueId} className="league-card">
+                    <header className="league-card-head">
+                      <span
+                        className="avatar league-crest"
+                        style={{ background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` }}
+                        aria-hidden="true"
+                      >
+                        {crest}
+                      </span>
+                      <span className="league-card-title">
+                        <span className="league-card-name">{l.name}</span>
+                        <span className="league-card-sub">
+                          <span className={`sport-pill ${l.sport}`}>{l.sport.toUpperCase()}</span>
+                          {l.totalRosters} managers
+                        </span>
+                      </span>
+                      <span className="league-card-season cond">{l.season}</span>
+                    </header>
+
+                    {setup ? (
+                      // In-place progress card (§5d) rather than a spinner --
+                      // naming the stage is what turns a 2-4s wait into
+                      // something visibly working instead of a frozen button.
+                      <div className="league-card-links">
+                        {setup.failedLabel ? (
+                          <>
+                            <span className="tiny track-note failed">{setup.failedLabel}</span>
+                            <button className="league-link primary" onClick={() => setupLeague(l)}>
+                              Retry
+                            </button>
+                          </>
+                        ) : (
+                          <span className="tiny track-note">
+                            {setupStages(l)[setup.stageIndex]?.label ?? 'Setting up'}…
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="league-card-links">
+                        <button className="league-link primary" onClick={() => setupLeague(l)}>
+                          Set up
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                )
+              })}
+          </div>
+        </section>
+      )}
 
       <section className="panel">
         <div className="panel-head">

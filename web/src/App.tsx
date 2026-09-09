@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
 import CompletedDraftBoard from './pages/CompletedDraftBoard'
@@ -11,6 +12,8 @@ import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
 import ManagerHistory from './pages/ManagerHistory'
 import { TopSlotContext } from './topSlot'
+import { clearUser, useUser } from './user'
+import { hueFor } from './hue'
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -52,6 +55,7 @@ export default function App() {
   // instant this node exists, not just eventually. See topSlot.tsx.
   const [topSlot, setTopSlot] = useState<HTMLDivElement | null>(null)
   const location = useLocation()
+  const user = useUser()
 
   return (
     <div className="app">
@@ -80,12 +84,39 @@ export default function App() {
             </Link>
           </nav>
         </div>
-        <div className="top-slot" ref={setTopSlot} />
+        <div className="top-right">
+          <div className="top-slot" ref={setTopSlot} />
+          {/* Identity is a header chip, not a route -- claude/user-identity-
+              and-onboarding.md §5b. Same color-initials avatar treatment as
+              SeatPopover/ManagerHistory rather than Sleeper's own avatar
+              image, so it reads as this app's identity language everywhere.
+              "Sign out" doubles as "switch user": clearUser() drops straight
+              back to SignIn, which is the same screen a switch would need --
+              there's nothing server-side to revoke either way (§7). */}
+          {user && (
+            <div className="top-user">
+              <span
+                className="avatar"
+                style={{
+                  background: `oklch(28% 0.03 ${hueFor(user.username)})`,
+                  color: `oklch(82% 0.1 ${hueFor(user.username)})`,
+                }}
+                aria-hidden="true"
+              >
+                {(user.displayName || user.username).charAt(0).toUpperCase()}
+              </span>
+              <span className="top-user-name">{user.displayName || user.username}</span>
+              <button className="chip" onClick={clearUser}>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <TopSlotContext.Provider value={topSlot}>
         <Routes>
-          <Route path="/" element={<DraftPicker />} />
+          <Route path="/" element={user ? <DraftPicker /> : <SignIn />} />
           <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
           <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
           <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
