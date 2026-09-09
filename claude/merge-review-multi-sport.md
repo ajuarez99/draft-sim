@@ -11,6 +11,50 @@ described in comments.
 
 ---
 
+## Status — updated 2026-09-09, same day
+
+| item | state |
+|---|---|
+| B1 — NBA fork builds a football room | **open** (the sim/mock room; deliberately left while it is being tested) |
+| B2 — live poller writes null picks | **fixed**, `9c655da` |
+| S1 — manager history is football-only | **fixed**, `9c655da` |
+| S2 — football-shaped pages on an NBA card | **fixed**, `d8092f9` |
+| S3 — untested frontend mirrors | **fixed**, `d8092f9` |
+
+**B2's fix came with a measurement that makes the bug worse than this document
+first said.** Replayed against the 168 real picks of the completed 2025 NBA
+draft, resolving them through the football id map — which is exactly what the
+old code did — would have produced:
+
+    168 picks
+    103 written as player_id = null
+     65 written as a REAL, WRONG NFL PLAYER
+
+The 65 are the dangerous half and were not anticipated anywhere above. Sleeper's
+player-id namespaces are per-sport and **753 ids belong to a player in both**, so
+a miss is not the only failure mode: a hit on the wrong sport is silent, survives
+every downstream check, and feeds the profile fit. It is also why the obvious
+cheap fix — one sport-less combined id map — was rejected: it would have made all
+168 resolve to *something*.
+
+Verified after the fix by flipping the 2025 NBA draft to `drafting` and running
+one real poll tick against Sleeper: 168 of 168 picks still resolved to the right
+players, zero rows differing from a snapshot taken beforehand.
+
+**B2 also turned out to be two bugs on one screen.** `onTheClockSlot` was plain
+snake, so the live room named the wrong manager as being on the clock from round
+3 on for any draft with a reversal round — which the 2026 NBA draft has. Stored
+picks were never affected: `PickMapper` reads Sleeper's own `draft_slot`.
+
+**S1 verified live** on manager 48, who drafts in both leagues: the endpoint now
+answers with football (reach 10.77 over 15 scored picks, FITTED) *and* basketball
+(no reach signal, 0 scored, NEUTRAL, real positional tilt) instead of silently
+publishing the football numbers as the answer.
+
+Football's two baselines are still bit-identical after all of it.
+
+---
+
 ## What is good, so the list below is read in proportion
 
 - **`Sport` is a real runtime value.** `SportRulesRegistry` makes a second sport
@@ -184,7 +228,9 @@ values the running backend produced, not against a re-derivation.
 
 ## Recommendation
 
-Merge after **B1, B2 and S1**. Two guards and one parameter, with a test each.
+**Only B1 is left.** Merge after it.
+
+Original recommendation, kept as written: merge after **B1, B2 and S1**. Two guards and one parameter, with a test each.
 S1 belongs in the same pass because it is the last instance of the cross-sport
 bug class 6b spent its day removing.
 
