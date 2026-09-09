@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { PlayerRef } from './api'
-import { computeTeamNeeds, openPositions } from './teamNeeds'
+import { computeTeamNeeds, fitSlot, openPositions } from './teamNeeds'
 
 /**
  * teamNeeds.ts's SLOT_ELIGIBILITY mirrors FootballRules.isEligible and
@@ -155,5 +155,62 @@ describe('a slot nobody has modelled', () => {
     const needs = computeTeamNeeds('nfl', ['QB', 'SUPER_FLEX'], [player('QB', 1), player('QB', 2)])
     expect(needs.find((s) => s.slot === 'SUPER_FLEX')?.player).toBeNull()
     expect(openPositions('nfl', needs).has('SUPER_FLEX')).toBe(false)
+  })
+})
+
+/**
+ * fitSlot backs the live room's pick announcement ("Fills RB2"). It is the
+ * numbering that is worth pinning: the number comes from the slot's position
+ * in the TEMPLATE, not from counting what the team already has, and those two
+ * readings disagree the moment a player spills into FLEX.
+ */
+describe('naming the slot a pick fills', () => {
+  it('numbers a repeated slot by which one is still open', () => {
+    const needs = computeTeamNeeds('nfl', NFL_TEMPLATE, [player('RB', 1)])
+    expect(fitSlot('nfl', 'RB', needs)).toBe('RB2')
+  })
+
+  it('leaves a slot the template only has once unnumbered', () => {
+    const needs = computeTeamNeeds('nfl', NFL_TEMPLATE, [])
+    expect(fitSlot('nfl', 'TE', needs)).toBe('TE')
+    expect(fitSlot('nfl', 'QB', needs)).toBe('QB')
+  })
+
+  it('names FLEX once the dedicated slots at that position are full', () => {
+    // Two RBs seated at RB1/RB2 -- a third is a FLEX, and saying "RB3" would
+    // name a slot this league does not have. Numbered because this template
+    // has two flex seats, the same reason RB is: FLEX1 and FLEX2 are as real
+    // and as distinguishable as RB1 and RB2.
+    const needs = computeTeamNeeds('nfl', NFL_TEMPLATE, [player('RB', 1), player('RB', 2)])
+    expect(fitSlot('nfl', 'RB', needs)).toBe('FLEX1')
+  })
+
+  it('counts template position, not roster size, when a player has spilled into FLEX', () => {
+    // Three RBs: two dedicated slots plus FLEX1. The fourth fills FLEX2 -- a
+    // count-the-roster implementation would call it RB4.
+    const needs = computeTeamNeeds('nfl', NFL_TEMPLATE,
+      [player('RB', 1), player('RB', 2), player('RB', 3)])
+    expect(fitSlot('nfl', 'RB', needs)).toBe('FLEX2')
+  })
+
+  it('reports the most specific open slot in basketball, numbered where the template repeats', () => {
+    const full = ['PG', 'SG', 'SF', 'PF', 'C'].map((p, i) => player(p, i + 1))
+    // Every dedicated slot and both pooled G/F seats taken -- only UTIL is left.
+    const needs = computeTeamNeeds('nba', NBA_TEMPLATE, [...full, player('PG', 6), player('SF', 7)])
+    expect(fitSlot('nba', 'PG', needs)).toBe('UTIL1')
+    const early = computeTeamNeeds('nba', NBA_TEMPLATE, [player('PG', 1)])
+    expect(fitSlot('nba', 'PG', early)).toBe('G')
+  })
+
+  it('is null when the pick fills no starting slot -- the caller renders depth, not a need', () => {
+    const roster = ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'RB', 'WR', 'K', 'DEF']
+      .map((p, i) => player(p, i + 1))
+    const needs = computeTeamNeeds('nfl', NFL_TEMPLATE, roster)
+    expect(needs.every((n) => n.player != null)).toBe(true)
+    expect(fitSlot('nfl', 'RB', needs)).toBeNull()
+  })
+
+  it('is null for an empty template -- an unsynced league states nothing', () => {
+    expect(fitSlot('nfl', 'RB', computeTeamNeeds('nfl', [], []))).toBeNull()
   })
 })

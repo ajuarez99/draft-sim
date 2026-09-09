@@ -1,7 +1,11 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.config.OwnerProperties;
+import com.ballknowers.draftsim.domain.BoardEntry;
+import com.ballknowers.draftsim.domain.Player;
+import com.ballknowers.draftsim.domain.Position;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.ingest.SleeperClient;
@@ -19,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -177,4 +182,82 @@ class LeagueControllerLiveStreamTest {
         assertNotNull(response.getBody());
     }
 
+    // ---- the `state` frame's landed picks -------------------------------------
+    //
+    // These are what lets the live page name a player without waiting for a
+    // simulation. Asserted against statePayload directly; see its javadoc for
+    // why the emitter is not a usable seam here.
+
+    private static Player player(long id, String name, Position pos) {
+        return new Player(id, Sport.NFL, "s" + id, name, List.of(pos), "SEA", "Active", null, null, null);
+    }
+
+    private static LiveDraftPoller.LiveSnapshot snapshot(int picksMade) {
+        return new LiveDraftPoller.LiveSnapshot("drafting", picksMade, picksMade, 14, 1);
+    }
+
+    /** n picks, alternating between the two mapped slots, players 1..n. */
+    private List<DraftRepository.PickRow> picks(int n) {
+        List<DraftRepository.PickRow> rows = new ArrayList<>();
+        List<Player> pool = new ArrayList<>();
+        for (int i = 1; i <= n; i++) {
+            int slot = i % 2 == 1 ? 1 : 2;
+            rows.add(new DraftRepository.PickRow(1L, i, 1, slot, slot == 1 ? 101L : 102L, (long) i, null));
+            pool.add(player(i, "Player " + i, Position.RB));
+        }
+        List<BoardEntry> board = new ArrayList<>();
+        for (Player p : pool) board.add(new BoardEntry(p, p.id(), (int) p.id()));
+        when(boards.currentBoard(Sport.NFL)).thenReturn(board);
+        when(players.findAll(Sport.NFL)).thenReturn(pool);
+        when(managers.names()).thenReturn(Map.of(101L, "Allan", 102L, "Sam"));
+        return rows;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> recentPicks(int stored) {
+        LeagueController controller = controller();
+        Map<String, Object> payload = controller.statePayload(
+                "d1", row("drafting"), snapshot(stored), picks(stored),
+                controller.pickNaming(Sport.NFL));
+        return (List<Map<String, Object>>) payload.get("recentPicks");
+    }
+
+    /**
+     * The whole point of the field: a pick that just landed is nameable off the
+     * state frame, with no simulation between the poller and the reader.
+     */
+    @Test
+    void theStateFrameNamesThePicksThatLanded() {
+        List<Map<String, Object>> recent = recentPicks(3);
+
+        assertEquals(3, recent.size());
+        Map<String, Object> newest = recent.get(2);
+        assertEquals(3, newest.get("pickNo"));
+        assertEquals("Allan", newest.get("manager"));
+        assertEquals("Player 3", ((SimulationResult.PlayerRef) newest.get("player")).name());
+    }
+
+    /**
+     * Capped, and capped at the TAIL -- the newest picks are the ones the feed
+     * and the announcement row are for. Truncating the other end would leave the
+     * page permanently showing round one.
+     */
+    @Test
+    void onlyTheLastFewPicksRideAlong() {
+        List<Map<String, Object>> recent = recentPicks(30);
+
+        assertEquals(12, recent.size());
+        assertEquals(19, recent.get(0).get("pickNo"), "oldest of the tail");
+        assertEquals(30, recent.get(11).get("pickNo"), "newest pick last -- PickFeed reads oldest-first");
+    }
+
+    /** Nothing drafted yet is an empty array, not a missing field. */
+    @Test
+    void aDraftWithNoPicksSendsAnEmptyArray() {
+        LeagueController controller = controller();
+        Map<String, Object> payload = controller.statePayload(
+                "d1", row("pre_draft"), snapshot(0), List.of(), controller.pickNaming(Sport.NFL));
+
+        assertEquals(List.of(), payload.get("recentPicks"));
+    }
 }

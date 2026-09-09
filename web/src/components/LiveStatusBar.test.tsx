@@ -36,6 +36,9 @@ const live = (over: Partial<LiveState> = {}): LiveState => ({
   rounds: 15,
   seatsMapped: 14,
   onTheClockSlot: 3,
+  // Nothing in this component reads them; the field is required on LiveState
+  // because the backend always sends the array (empty before the first pick).
+  recentPicks: [],
   serverTime: '2026-09-07T12:00:00Z',
   ...over,
 })

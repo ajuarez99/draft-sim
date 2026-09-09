@@ -1087,6 +1087,20 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pos-run-RB .pick-feed-run { color: var(--rb); }
 .pos-run-WR .pick-feed-run { color: var(--wr); }
 .pos-run-TE .pick-feed-run { color: var(--te); }
+/* The announcement row: the pick that just landed. An inset left edge in the
+   player's own positional color rather than a tinted background, because the
+   background is already spoken for by a position run -- both can be true of
+   the same pick and neither should have to give way. --lead-hue is set inline
+   from the position code (PickFeed.tsx). */
+.pick-feed-row.lead {
+  box-shadow: inset 3px 0 0 var(--lead-hue, var(--line));
+  padding-top: 8px; padding-bottom: 8px;
+}
+.pick-feed-row.lead .pick-feed-name { font-size: 13px; }
+.pick-feed-fit {
+  margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px;
+  color: color-mix(in oklch, var(--lead-hue, var(--text)) 70%, var(--text));
+}
 
 /* "Simulate again", moved out of the board header into the settings modal. */
 .modal-actions {
@@ -1130,6 +1144,19 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    compact blocks, not a card grid -- there's one line of real content
    (filled or open) per slot, matching feedback_avoid_flat_uniform_cards. */
 .team-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+/* The live room's "your team" line: a label, a count, and the strip on one
+   row rather than the picker's stacked block -- this sits between the pick
+   feed and the board and has to cost as little vertical space as it can. */
+.live-team { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.live-team .team-strip { margin: 0; flex: 1 1 auto; }
+/* "Fills RB" beside a name in the availability sheet. Teal like every other
+   generic interaction cue in the house style -- this is not a positional
+   identity, it is a note about your roster. */
+.need-tag {
+  margin-left: 8px; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap;
+  padding: 1px 6px; border-radius: 999px;
+  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+}
 .team-slot {
   display: flex; align-items: center; gap: 4px; padding: 4px 8px;
   border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 11px;

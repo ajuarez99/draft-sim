@@ -4,6 +4,7 @@ import { filterPositions } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
+import TeamStrip from './TeamStrip'
 
 type Props = {
   pausedAt: number
@@ -91,22 +92,7 @@ export default function PlayerPicker({
           on what you take — may take a few seconds.
         </p>
 
-        {rosterPositions.length > 0 && (
-          <div className="team-strip">
-            {needs.map((n, i) => (
-              <div key={i} className={n.player ? 'team-slot filled' : 'team-slot open'}>
-                {n.player ? (
-                  <>
-                    <span className={`pos ${n.player.position}`}>{n.player.position}</span>
-                    <span className="team-slot-name">{n.player.name}</span>
-                  </>
-                ) : (
-                  <span className="team-slot-empty">{n.slot}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <TeamStrip needs={needs} />
 
         <div className="controls-inline picker-filters">
           {POSITIONS.map((p) => (

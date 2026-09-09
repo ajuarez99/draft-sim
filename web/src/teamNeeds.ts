@@ -149,20 +149,57 @@ export function openPositions(sport: Sport, needs: SlotStatus[]): Set<string> {
 }
 
 /**
- * "Fills {slot}" tag text for a player of `position`, or null when drafting
- * them wouldn't fill any open starting slot. Checks the dedicated slot first,
- * then this sport's pooled slots in "most specific" order (POOLED_SLOTS) --
- * a basketball PG matching both an open G and an open UTIL reports "Fills G",
- * the more informative of the two. Slot-named throughout, so basketball says
+ * The open starting slot a player of `position` would fill, or null when
+ * drafting them wouldn't fill one. Checks the dedicated slot first, then this
+ * sport's pooled slots in "most specific" order (POOLED_SLOTS) -- a basketball
+ * PG matching both an open G and an open UTIL reports G, the more informative
+ * of the two.
+ *
+ * The one definition of "does this player fill a need": `needLabel` below and
+ * `fitSlot` further down are both wording over this, so the row tag in the
+ * picker and the fit clause on a live pick announcement can never disagree
+ * about whether a pick filled anything.
+ */
+export function openSlotFor(sport: Sport, position: string, open: Set<string>): string | null {
+  if (open.has(position)) return position
+  const eligibility = SLOT_ELIGIBILITY[sport]
+  for (const slot of POOLED_SLOTS[sport]) {
+    if (open.has(slot) && eligibility[slot]?.has(position)) return slot
+  }
+  return null
+}
+
+/**
+ * "Fills {slot}" tag text, or null. Slot-named throughout, so basketball says
  * "Fills G"/"Fills UTIL" rather than football's "Fills FLEX" leaking in.
  */
 export function needLabel(sport: Sport, position: string, open: Set<string>): string | null {
-  if (open.has(position)) return `Fills ${position}`
-  const eligibility = SLOT_ELIGIBILITY[sport]
-  for (const slot of POOLED_SLOTS[sport]) {
-    if (open.has(slot) && eligibility[slot]?.has(position)) return `Fills ${slot}`
-  }
-  return null
+  const slot = openSlotFor(sport, position, open)
+  return slot == null ? null : `Fills ${slot}`
+}
+
+/**
+ * The same answer as `openSlotFor`, numbered when the template has more than
+ * one slot of that name: "RB2" for a team whose RB1 is already seated, plain
+ * "TE" or "FLEX" where there is only one.
+ *
+ * The number is the position of the slot *within the template*, not a count of
+ * what the team has -- a team holding one RB fills RB2 next, and a team holding
+ * three fills FLEX, because the third RB is already seated there by
+ * computeTeamNeeds. That is the whole reason this reads the needs list rather
+ * than counting the roster: the seating rule already exists and this must not
+ * become a second one.
+ *
+ * Returns null when nothing is open for that position, which the caller should
+ * render as depth rather than as a need -- saying "fills nothing" is louder
+ * than it deserves to be.
+ */
+export function fitSlot(sport: Sport, position: string, needs: SlotStatus[]): string | null {
+  const slot = openSlotFor(sport, position, openPositions(sport, needs))
+  if (slot == null) return null
+  const sameName = needs.filter((n) => n.slot === slot)
+  if (sameName.length <= 1) return slot
+  return `${slot}${sameName.findIndex((n) => n.player == null) + 1}`
 }
 
 /**

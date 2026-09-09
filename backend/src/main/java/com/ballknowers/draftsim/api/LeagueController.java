@@ -42,6 +42,16 @@ public class LeagueController {
     private static final long LIVE_SSE_TIMEOUT_MS = 4L * 60 * 60 * 1000L;
     private static final long LIVE_HEARTBEAT_MS = 15_000L;
 
+    // How many landed picks ride along on every `state` frame. Twelve, not the
+    // three the feed renders: the frontend merges these over the simulation's
+    // own landed prefix (which is a *projection* at any pick the last sim
+    // didn't know about yet), so this window is really "how far the poller may
+    // run ahead of a resim before a projected cell gets shown as a fact". A
+    // Sleeper autopick burst empties several seats in one tick, and a resim
+    // takes seconds; twelve covers that with room to spare and costs a dozen
+    // small objects per changed tick.
+    private static final int LIVE_RECENT_PICKS = 12;
+
     private final LeagueRepository leagues;
     private final DraftRepository drafts;
     private final ProfileService profiles;
@@ -255,36 +265,7 @@ public class LeagueController {
         DraftRepository.DraftRow draft = found.get();
         Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
 
-        // Real picks reference whatever player was on Sleeper's board the day they
-        // were taken -- possibly a player long gone from today's board (retired,
-        // dropped from the pool). currentBoard() gives adp/positionalRank for
-        // anyone still on it; fallbackPlayerRef covers anyone who isn't, so a pick
-        // never silently disappears just because the player is no longer relevant.
-        Map<Long, BoardEntry> byPlayerId = new HashMap<>();
-        for (BoardEntry e : boards.currentBoard(sport)) byPlayerId.put(e.player().id(), e);
-        Map<Long, Player> playersById = new HashMap<>();
-        for (Player p : players.findAll(sport)) playersById.put(p.id(), p);
-        Map<Long, String> managerNames = managers.names();
-
-        List<Map<String, Object>> picks = new ArrayList<>();
-        for (DraftRepository.PickRow p : drafts.picks(draft.id())) {
-            if (p.playerId() == null) continue; // pick slot with no resolved player -- nothing to show yet
-            BoardEntry entry = byPlayerId.get(p.playerId());
-            SimulationResult.PlayerRef player = entry != null
-                    ? SimulationResult.PlayerRef.from(entry)
-                    : fallbackPlayerRef(playersById.get(p.playerId()));
-            if (player == null) continue; // player row itself is gone; nothing left to render
-
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("pickNo", p.pickNo());
-            row.put("round", p.round());
-            row.put("slot", p.draftSlot());
-            row.put("manager", p.managerId() != null
-                    ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
-                    : "Slot " + p.draftSlot());
-            row.put("player", player);
-            picks.add(row);
-        }
+        List<Map<String, Object>> picks = pickNaming(sport).rows(drafts.picks(draft.id()));
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("draftId", sleeperDraftId);
@@ -306,6 +287,75 @@ public class LeagueController {
         if (p == null) return null;
         return new SimulationResult.PlayerRef(p.id(), p.sleeperId(), p.name(),
                 p.primary().name(), p.team(), 999, 999);
+    }
+
+    /**
+     * Everything needed to turn stored {@code draft_pick} rows into the
+     * render-ready shape the frontend's {@code RealPick} mirrors -- the board
+     * for adp/positionalRank, the player table for anyone who has fallen off
+     * it, and the manager names.
+     *
+     * Built once and reused, because the two callers have opposite cost
+     * profiles: {@code realBoard} resolves a whole draft in one request, while
+     * the live stream resolves a handful of picks on every changed tick for
+     * hours. Rebuilding the board and player maps per tick would re-read the
+     * entire player pool every ten seconds per open tab; none of it changes
+     * mid-draft.
+     */
+    private record PickNaming(Map<Long, BoardEntry> board, Map<Long, Player> players,
+                              Map<Long, String> managerNames) {
+
+        /** Null for a pick with no resolvable player -- an unfilled slot, or a player row that is gone. */
+        Map<String, Object> row(DraftRepository.PickRow p) {
+            if (p.playerId() == null) return null; // pick slot with no resolved player -- nothing to show yet
+            BoardEntry entry = board.get(p.playerId());
+            SimulationResult.PlayerRef player = entry != null
+                    ? SimulationResult.PlayerRef.from(entry)
+                    : fallbackPlayerRef(players.get(p.playerId()));
+            if (player == null) return null; // player row itself is gone; nothing left to render
+
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("pickNo", p.pickNo());
+            row.put("round", p.round());
+            row.put("slot", p.draftSlot());
+            row.put("manager", p.managerId() != null
+                    ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
+                    : "Slot " + p.draftSlot());
+            row.put("player", player);
+            return row;
+        }
+
+        List<Map<String, Object>> rows(List<DraftRepository.PickRow> picks) {
+            List<Map<String, Object>> out = new ArrayList<>(picks.size());
+            for (DraftRepository.PickRow p : picks) {
+                Map<String, Object> row = row(p);
+                if (row != null) out.add(row);
+            }
+            return out;
+        }
+
+        /**
+         * The last {@code limit} picks, oldest first -- the order PickFeed and
+         * its position-run detector both read in.
+         */
+        List<Map<String, Object>> tail(List<DraftRepository.PickRow> picks, int limit) {
+            return rows(picks.size() > limit ? picks.subList(picks.size() - limit, picks.size()) : picks);
+        }
+    }
+
+    /**
+     * Real picks reference whatever player was on Sleeper's board the day they
+     * were taken -- possibly a player long gone from today's board (retired,
+     * dropped from the pool). currentBoard() gives adp/positionalRank for
+     * anyone still on it; fallbackPlayerRef covers anyone who isn't, so a pick
+     * never silently disappears just because the player is no longer relevant.
+     */
+    PickNaming pickNaming(Sport sport) {   // package-private: LeagueControllerLiveStreamTest builds one
+        Map<Long, BoardEntry> byPlayerId = new HashMap<>();
+        for (BoardEntry e : boards.currentBoard(sport)) byPlayerId.put(e.player().id(), e);
+        Map<Long, Player> playersById = new HashMap<>();
+        for (Player p : players.findAll(sport)) playersById.put(p.id(), p);
+        return new PickNaming(byPlayerId, playersById, managers.names());
     }
 
     /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */
@@ -394,6 +444,12 @@ public class LeagueController {
 
         SseEmitter emitter = new SseEmitter(LIVE_SSE_TIMEOUT_MS);
 
+        // Once, for the life of this stream -- see PickNaming. The sport lookup
+        // takes seats()'s NFL fallback for the same reason it does there: a
+        // draft whose league row is missing has nothing better to assume.
+        Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
+        PickNaming namer = pickNaming(sport);
+
         // Synthesized from the DB so the page paints now rather than waiting up to
         // a full poll interval for the next tick.
         List<DraftRepository.PickRow> stored = drafts.picks(draft.id());
@@ -421,7 +477,7 @@ public class LeagueController {
         };
 
         try {
-            send(emitter, "state", statePayload(sleeperDraftId, draft, initial));
+            send(emitter, "state", statePayload(sleeperDraftId, draft, initial, stored, namer));
         } catch (Exception e) {
             // The client hung up between the request and the first write.
             emitter.completeWithError(e);
@@ -433,9 +489,14 @@ public class LeagueController {
         unsubscribe[0] = poller.subscribe(draft.id(), snapshot -> {
             String key = changeKey(snapshot);
             if (!key.equals(lastKey.getAndSet(key))) {
+                // Re-read rather than tracking the picks incrementally: the poller
+                // upserts the *whole* pick list every tick and the manual-pick
+                // endpoint writes into the same table, so the DB is the only place
+                // that knows the current truth. One indexed read per changed tick.
                 // Throws on failure, which is the contract: LiveDraftPoller.publish
                 // drops any listener that throws, so a dead tab unsubscribes itself.
-                send(emitter, "state", statePayload(sleeperDraftId, draft, snapshot));
+                send(emitter, "state",
+                        statePayload(sleeperDraftId, draft, snapshot, drafts.picks(draft.id()), namer));
             }
             if ("complete".equals(snapshot.status())) finish.run();
         });
@@ -570,8 +631,20 @@ public class LeagueController {
         return s.status() + "|" + s.picksMade() + "|" + s.seatsMapped();
     }
 
-    private Map<String, Object> statePayload(String sleeperDraftId, DraftRepository.DraftRow draft,
-                                             LiveDraftPoller.LiveSnapshot s) {
+    /**
+     * The `state` event's body. Package-private rather than private so it can be
+     * asserted directly: the emitter it is normally written to is created inside
+     * liveStream() and buffers its first send until Spring initializes the async
+     * response, so there is no seam to read the payload back out of in a unit test.
+     *
+     * @param picks  this draft's stored picks, oldest first -- the caller supplies
+     *               them because the initial frame already has the list in hand and
+     *               re-querying for it would be a second read of the same rows.
+     * @param namer  built once per stream; see {@link PickNaming}.
+     */
+    Map<String, Object> statePayload(String sleeperDraftId, DraftRepository.DraftRow draft,
+                                    LiveDraftPoller.LiveSnapshot s,
+                                    List<DraftRepository.PickRow> picks, PickNaming namer) {
         // LinkedHashMap, not Map.of: status and onTheClockSlot are both legitimately
         // null (a null status column; a finished draft).
         Map<String, Object> m = new LinkedHashMap<>();
@@ -585,6 +658,13 @@ public class LeagueController {
         m.put("rounds", draft.rounds());
         m.put("seatsMapped", s.seatsMapped());
         m.put("onTheClockSlot", s.onTheClockSlot());
+        // The picks themselves, not just how many. Without these the live page
+        // could only name a player once the *simulation* came back with him --
+        // a debounce plus a full Monte Carlo run after the pick actually
+        // landed, and nothing at all before the first projection ever returned.
+        // These are facts the poller already wrote to draft_pick; the board
+        // past picksMade stays the projection's job.
+        m.put("recentPicks", namer.tail(picks, LIVE_RECENT_PICKS));
         m.put("serverTime", nowIso());
         return m;
     }

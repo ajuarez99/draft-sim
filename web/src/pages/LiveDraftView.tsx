@@ -6,6 +6,7 @@ import {
   getSeats,
   streamSimulation,
   type PredictedPick,
+  type RealPick,
   type SeatsResponse,
   type SimulationResult,
 } from '../api'
@@ -15,8 +16,13 @@ import LiveStatusBar from '../components/LiveStatusBar'
 import PickFeed from '../components/PickFeed'
 import PlayerCard from '../components/PlayerCard'
 import SeatPopover from '../components/SeatPopover'
+import TeamStrip from '../components/TeamStrip'
 import { roundPickLabel } from '../roundPickLabel'
+import { computeTeamNeeds, fitSlot, openPositions } from '../teamNeeds'
+import { prime, readSoundPref, speechSupported, writeSoundPref } from '../sound'
+import { useAnnouncer } from '../useAnnouncer'
 import { useLiveDraft } from '../useLiveDraft'
+import type { FeedPick } from '../components/PickFeed'
 
 // Same cap the mock view's resim uses. The iteration-count comments in
 // DraftView.tsx predate the be423eb hot-path refactor and their wall-clock
@@ -73,6 +79,9 @@ export default function LiveDraftView() {
   const [openSeatSlot, setOpenSeatSlot] = useState<number | null>(null)
   const [forking, setForking] = useState(false)
   const [forkError, setForkError] = useState<string | null>(null)
+  // Read once, from the same page load's localStorage -- the *preference*
+  // persists. The browser's permission to make noise does not: see sound.ts.
+  const [sound, setSound] = useState(() => readSoundPref())
 
   // An explicit ?slot= always wins; otherwise the backend's own owner match.
   // No auto-adopt effect is needed here (unlike DraftView) because this reads
@@ -216,19 +225,102 @@ export default function LiveDraftView() {
     [result, picksMade],
   )
 
-  // The landed prefix, which is where the feed's rows come from. There is no
-  // `picks` array on LiveState -- but the engine replays every completed pick
-  // out of the DB identically in every iteration (see this file's header), so
-  // `result.board` below `picksMade` IS the record of what actually happened,
-  // not a projection of it. Same cut `takenPlayerIds` takes directly above.
+  // What has actually happened, oldest first -- two sources, and the order of
+  // preference matters.
   //
-  // It follows that the feed is empty until the first projection lands. That's
-  // correct rather than unfortunate: with no board there is nothing to name
-  // the players or the managers with.
-  const landedPicks = useMemo(
-    () => (result?.board ?? []).filter((p) => p.pickNo <= picksMade),
-    [result, picksMade],
+  // `result.board` below `picksMade` is *mostly* the record of what happened:
+  // the engine replays every completed pick out of the DB identically in every
+  // iteration (see this file's header). But `picksMade` moves the instant the
+  // poller sees a pick, and `result` is whatever the last simulation returned
+  // -- so for the handful of picks that landed since, that filter was quietly
+  // promoting the engine's *guess* at those cells to a fact and printing it in
+  // the feed as one.
+  //
+  // `live.recentPicks` is the fix and the reason the backend now sends it: the
+  // last dozen picks straight out of draft_pick, with no simulation between
+  // them and the reader. They win every overlap, and they are also what makes
+  // the feed work at all before the first projection ever returns.
+  const landedPicks = useMemo<RealPick[]>(() => {
+    const byPickNo = new Map<number, RealPick>()
+    for (const p of result?.board ?? []) {
+      if (p.pickNo > picksMade) continue
+      byPickNo.set(p.pickNo, {
+        pickNo: p.pickNo,
+        round: p.round,
+        slot: p.slot,
+        manager: p.manager,
+        player: p.player,
+      })
+    }
+    for (const p of live?.recentPicks ?? []) byPickNo.set(p.pickNo, p)
+    return [...byPickNo.values()].sort((a, b) => a.pickNo - b.pickNo)
+  }, [result, picksMade, live])
+
+  const rosterPositions = seats?.rosterPositions ?? []
+
+  // Fit is attached to the newest pick only -- it is the only row PickFeed
+  // renders it on, and working it out costs a full needs computation per pick.
+  //
+  // Gated on having the WHOLE landed list, not just the last dozen: the fit
+  // clause is a claim about the roster that took the player ("Fills RB2"), and
+  // a roster assembled from a partial history would state that confidently
+  // while being wrong about it. Before the first projection returns we have
+  // only `live.recentPicks`, so the feed shows the names -- which are facts --
+  // and says nothing about fit until it can say something true.
+  const feedPicks = useMemo<FeedPick[]>(() => {
+    if (landedPicks.length === 0) return landedPicks
+    const complete = landedPicks.length === picksMade && rosterPositions.length > 0
+    if (!complete) return landedPicks
+    const newest = landedPicks[landedPicks.length - 1]
+    const priorRoster = landedPicks
+      .filter((p) => p.slot === newest.slot && p.pickNo < newest.pickNo)
+      .map((p) => p.player)
+    const slot = fitSlot(sport, newest.player.position, computeTeamNeeds(sport, rosterPositions, priorRoster))
+    // "Depth" rather than silence when nothing is open: a fifth receiver in
+    // round 11 is a real thing to have noticed, and an absent clause reads as
+    // "we didn't work it out" rather than "this filled nothing".
+    return landedPicks.map((p, i) =>
+      i === landedPicks.length - 1 ? { ...p, fit: slot ? `Fills ${slot}` : 'Depth' } : p,
+    )
+  }, [landedPicks, picksMade, rosterPositions, sport])
+
+  // Your own roster, off the same landed list rather than through
+  // teamNeeds.draftedSoFar: that helper exists for the mock room, where the
+  // roster is your *confirmed* picks against a reveal boundary that can sit
+  // mid-board. Here there is no boundary and no confirming -- your team is
+  // whatever landed in your seat.
+  const myNeeds = useMemo(
+    () =>
+      computeTeamNeeds(
+        sport,
+        rosterPositions,
+        landedPicks.filter((p) => p.slot === mySlot).map((p) => p.player),
+      ),
+    [sport, rosterPositions, landedPicks, mySlot],
   )
+  const myOpenSlots = useMemo(() => openPositions(sport, myNeeds), [sport, myNeeds])
+  const startersSet = myNeeds.filter((n) => n.player != null).length
+
+  // Fed from `landedPicks` rather than `feedPicks` on purpose: what is spoken
+  // is the manager and the name, both of which are facts on the state frame,
+  // and none of it waits on the fit clause's "do we have the whole history"
+  // gate. The chime is gated on slotKnown for the same reason the crimson
+  // cells are -- chiming for slot 1's turn because nobody has said whose seat
+  // is whose would send someone to the board for a pick that isn't theirs.
+  useAnnouncer(
+    sound,
+    landedPicks.length > 0 ? landedPicks[landedPicks.length - 1] : null,
+    slotKnown && live?.onTheClockSlot === mySlot,
+  )
+
+  function toggleSound() {
+    const next = !sound
+    setSound(next)
+    writeSoundPref(next)
+    // Inside the click, which is the browser's condition for allowing any of
+    // this to make a sound at all.
+    if (next) prime()
+  }
 
   // Memoized so the once-a-second freshness tick (which re-renders this page by
   // design -- it is the one reading that has to stay current) doesn't re-render
@@ -298,7 +390,21 @@ export default function LiveDraftView() {
         {/* The room where a position run matters most: these picks are real
             and there is no rewinding them. Same component the other two rooms
             use, fed from the landed prefix. */}
-        <PickFeed picks={landedPicks} teams={result?.teams ?? seats?.teams ?? 0} sport={sport} />
+        <PickFeed picks={feedPicks} teams={result?.teams ?? seats?.teams ?? 0} sport={sport} />
+
+        {/* Your team, on draft night. Gated on slotKnown for the same reason
+            the crimson board cells are: painting slot 1's roster as yours
+            because nobody has said otherwise is a claim about reality that
+            might be wrong. */}
+        {slotKnown && myNeeds.length > 0 && (
+          <div className="live-team">
+            <strong className="cond">Your team</strong>
+            <span className="muted tiny">
+              {startersSet} of {myNeeds.length} starters
+            </span>
+            <TeamStrip needs={myNeeds} />
+          </div>
+        )}
 
         <div className="board-panel">
           <section className="panel">
@@ -321,6 +427,20 @@ export default function LiveDraftView() {
                     fallback rather than something anyone confirmed. */}
                 {result && ` · slot ${mySlot}${slotKnown ? '' : ' (assumed — click your seat)'}`}
               </span>
+              {speechSupported() && (
+                <button
+                  className={sound ? 'chip on' : 'chip'}
+                  onClick={toggleSound}
+                  aria-pressed={sound}
+                  title={
+                    sound
+                      ? 'Stop reading picks out loud'
+                      : 'Read each pick out loud, and chime when your turn comes up'
+                  }
+                >
+                  {sound ? '🔊 Announcing' : '🔈 Announce picks'}
+                </button>
+              )}
               <button
                 className="chip"
                 onClick={() => void resimulate()}
@@ -359,6 +479,9 @@ export default function LiveDraftView() {
                   pickedPlayerIds={takenPlayerIds}
                   started={result != null}
                   sport={sport}
+                  // Only when the seat is known -- "fills a need" against
+                  // somebody else's roster is worse than no tag at all.
+                  openSlots={slotKnown ? myOpenSlots : undefined}
                 />
                 {waiting && !result && (
                   <div className="start-overlay">

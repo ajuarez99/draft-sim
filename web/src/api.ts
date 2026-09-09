@@ -325,6 +325,18 @@ export type LiveState = {
   rounds: number
   seatsMapped: number
   onTheClockSlot: number | null
+  /**
+   * The last dozen picks that actually landed, oldest first -- the same shape
+   * `RealPick` already mirrors for GET /drafts/{id}/board, because the backend
+   * builds both through one helper (LeagueController.PickNaming).
+   *
+   * These are facts, and they are the only names on the live page that do not
+   * have to wait for a simulation: everything else there comes out of
+   * SimulationResult.board, which lands a debounce plus a full Monte Carlo run
+   * after the pick did. Merge them over the projection's landed prefix rather
+   * than beside it -- where they overlap, these win.
+   */
+  recentPicks: RealPick[]
   serverTime: string
 }
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AvailabilityRow, Sport } from '../api'
 import { filterPositions } from '../positions'
+import { needLabel } from '../teamNeeds'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 
@@ -15,6 +16,17 @@ type Props = {
   // Which sport's positions to filter by (multi-sport-and-rebrand.md Phase 6)
   // -- the caller's own board, never a union of both sports'.
   sport: Sport
+  /**
+   * The user's own open starting slots, from teamNeeds.openPositions. When
+   * given, each row picks up the same "Fills RB" tag PlayerPicker already puts
+   * on its rows -- the two answers come from one function (openSlotFor), so
+   * the sheet and the picker cannot disagree about what you need.
+   *
+   * Optional and undefined by default: the rooms that don't know whose seat is
+   * whose (or aren't showing your roster) should show no tag rather than a tag
+   * computed against somebody else's team.
+   */
+  openSlots?: Set<string>
 }
 
 // Survival at a given pick, defaulting missing entries to 0 (gone in every
@@ -62,8 +74,13 @@ export default function AvailabilityPanel({
   pickedPlayerIds,
   started,
   sport,
+  openSlots,
 }: Props) {
   const POSITIONS = useMemo(() => filterPositions(sport), [sport])
+  // Undefined openSlots means "don't tag", not "nothing is open" -- an empty
+  // set is the legitimate reading for a team whose starters are all filled,
+  // and the two must not collapse into the same render.
+  const need = (position: string) => (openSlots ? needLabel(sport, position, openSlots) : null)
   const [filter, setFilter] = useState<string>('ALL')
   const [depth, setDepth] = useState(4)
   // Collapsed until there is something to look at, so the sheet never covers
@@ -270,6 +287,7 @@ export default function AvailabilityPanel({
                       <span className={`pos ${r.player.position}`}>{posRank(r.player)}</span>
                       {r.player.name}
                       <span className="team">{r.player.team}</span>
+                      {need(r.player.position) && <span className="need-tag">{need(r.player.position)}</span>}
                     </td>
                     <td className="num">{Math.round(r.player.adp)}</td>
                     <td className="strip-cell">
