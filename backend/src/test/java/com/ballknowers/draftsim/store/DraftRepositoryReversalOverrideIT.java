@@ -117,6 +117,19 @@ class DraftRepositoryReversalOverrideIT {
     }
 
     @Test
+    void sportOfReadsTheLeaguesSportThroughTheJoin() {
+        // The league this IT seeds is nba, and that is the point: LiveDraftPoller
+        // resolves its player-id map through this method, and before it existed
+        // the poller assumed football and wrote a whole draft of null picks
+        // (claude/merge-review-multi-sport.md B2). A join that silently returned
+        // the wrong sport would be worse than the bug it replaced -- 753 sleeper
+        // ids exist in both sports.
+        long draftId = ingest(3);
+        assertEquals(com.ballknowers.draftsim.domain.Sport.NBA, drafts.sportOf(draftId).orElseThrow());
+        assertTrue(drafts.sportOf(-1L).isEmpty(), "a draft that does not exist has no sport");
+    }
+
+    @Test
     void clearingTheOverrideGoesBackToFollowingSleeper() {
         long draftId = ingest(3);
         drafts.setReversalRoundOverride(draftId, 0);

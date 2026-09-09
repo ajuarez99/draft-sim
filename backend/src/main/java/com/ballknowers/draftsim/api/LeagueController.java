@@ -360,7 +360,7 @@ public class LeagueController {
         int lastPickNo = stored.stream().mapToInt(DraftRepository.PickRow::pickNo).max().orElse(0);
         LiveDraftPoller.LiveSnapshot initial = new LiveDraftPoller.LiveSnapshot(
                 draft.status(), picksMade, lastPickNo, draft.slotToManager().size(),
-                LiveDraftPoller.onTheClockSlot(picksMade, draft.teams(), draft.rounds()));
+                LiveDraftPoller.onTheClockSlot(picksMade, draft.teams(), draft.rounds(), draft.reversalRound()));
 
         AtomicBoolean alive = new AtomicBoolean(true);
         AtomicReference<String> lastKey = new AtomicReference<>(changeKey(initial));

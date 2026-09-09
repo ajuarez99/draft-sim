@@ -94,20 +94,49 @@ public class LeagueHistoryController {
         List<RosterSeasonRepository.StandingRow> seasons = rosterSeasons.forManager(managerId);
         if (seasons.isEmpty()) return ResponseEntity.notFound().build();
 
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
-        ManagerProfile fitted = fit.profiles().get(managerId);
-
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("managerId", managerId);
         record.put("manager", seasons.get(0).managerName());
         record.put("seasons", seasons.stream().map(LeagueHistoryController::standingRow).toList());
 
-        Map<String, Object> derived = new LinkedHashMap<>();
-        derived.put("reachBias", fitted == null ? null : round2(fitted.reachBias()));
-        derived.put("positionalTilt", fitted == null ? null : fitted.positionalTilt());
-        derived.put("draftsObserved", fitted == null ? 0 : fitted.draftsObserved());
-        derived.put("provenance", fitted == null ? "NEUTRAL" : fitted.provenance().name());
-        record.put("draftHistory", derived);
+        // One entry per sport this manager has actually drafted in, rather than
+        // one object fitted from Sport.NFL unconditionally.
+        //
+        // A manager is not a football manager -- they are a manager, and
+        // profiles are fitted per (manager, sport). Ten of the twelve Ball
+        // Knowers managers are the same Sleeper user id in both leagues, so the
+        // old single object put this person's FOOTBALL reach bias and tilt on a
+        // page that a basketball league's standings row links to
+        // (claude/merge-review-multi-sport.md S1). Answering with the list
+        // means no caller has to know a sport to ask, and a manager who plays
+        // both gets both -- which is the true answer, not a chosen one.
+        //
+        // Sports with no drafts observed are omitted rather than sent as
+        // zeroes: an empty list is "nothing to say", and a caller that renders
+        // one block per entry then needs no per-sport emptiness check.
+        //
+        // Two fits per request, one per sport. ProfileService's own comment is
+        // explicit that fitting is cheap at this data size and deliberately
+        // uncached; the seats endpoint already pays for one on every call.
+        List<Map<String, Object>> draftHistory = new ArrayList<>();
+        for (Sport sport : Sport.values()) {
+            ManagerProfile fitted = profiles.fit(sport).profiles().get(managerId);
+            if (fitted == null || fitted.draftsObserved() == 0) continue;
+            Map<String, Object> derived = new LinkedHashMap<>();
+            derived.put("sport", sport);
+            derived.put("reachBias", round2(fitted.reachBias()));
+            derived.put("positionalTilt", fitted.positionalTilt());
+            derived.put("draftsObserved", fitted.draftsObserved());
+            // Carried so the client can tell "drafts the board" from "no reach
+            // signal exists" -- 0 here means reachBias is the league mean
+            // wearing this manager's name, which is every basketball manager,
+            // permanently (multi-sport-and-rebrand.md, "Basketball has no
+            // reach signal").
+            derived.put("picksScored", fitted.picksScored());
+            derived.put("provenance", fitted.provenance().name());
+            draftHistory.add(derived);
+        }
+        record.put("draftHistory", draftHistory);
 
         return ResponseEntity.ok(record);
     }

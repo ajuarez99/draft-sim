@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getManagerHistory, type ManagerHistory as ManagerHistoryData } from '../api'
 import { hueFor } from '../hue'
+import { reachGapText } from '../managerBehaviour'
 
 /**
  * claude/league-suite.md Phase A: one manager's record across every ingested
@@ -107,23 +108,43 @@ export default function ManagerHistory() {
           Fitted from their own draft history, the same numbers the simulator uses -- not the
           record above, which is what actually happened on the scoreboard.
         </p>
-        {data.draftHistory.draftsObserved === 0 ? (
+        {data.draftHistory.length === 0 ? (
           <p className="muted">No drafts observed yet -- drafts like the room, no history to fit from.</p>
         ) : (
-          <>
-            <p className="small">
-              Reach bias: <span className="mono">{data.draftHistory.reachBias?.toFixed(2) ?? '—'}</span> over{' '}
-              {data.draftHistory.draftsObserved} draft{data.draftHistory.draftsObserved === 1 ? '' : 's'} (
-              {data.draftHistory.provenance.toLowerCase()})
-            </p>
-            {data.draftHistory.positionalTilt && (
-              <p className="small mono">
-                {Object.entries(data.draftHistory.positionalTilt)
-                  .map(([pos, tilt]) => `${pos} ${tilt.toFixed(2)}×`)
-                  .join(' · ')}
+          // One block per sport. The same person can appear twice here, which
+          // is the honest answer rather than a chosen one -- these are two
+          // separate fits off two separate sets of picks.
+          data.draftHistory.map((h) => (
+            <div key={h.sport} className="manager-sport-block">
+              <p className="small">
+                <span className={`sport-pill ${h.sport}`}>{h.sport.toUpperCase()}</span>
+                {h.picksScored > 0 ? (
+                  <>
+                    Reach bias: <span className="mono">{h.reachBias?.toFixed(2) ?? '—'}</span> over{' '}
+                    {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} ({h.provenance.toLowerCase()})
+                  </>
+                ) : (
+                  // No reach number rather than a reach number of zero -- with
+                  // no scoreable picks, `reachBias` is the league mean wearing
+                  // this manager's name. Printing "0.00" there would read as a
+                  // finding. Same rule as SeatPopover and /managers.
+                  <>
+                    {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} observed, no reach number
+                  </>
+                )}
               </p>
-            )}
-          </>
+              {h.picksScored === 0 && (
+                <p className="muted tiny">{reachGapText(h)}</p>
+              )}
+              {h.positionalTilt && Object.keys(h.positionalTilt).length > 0 && (
+                <p className="small mono">
+                  {Object.entries(h.positionalTilt)
+                    .map(([pos, tilt]) => `${pos} ${tilt.toFixed(2)}×`)
+                    .join(' · ')}
+                </p>
+              )}
+            </div>
+          ))
         )}
       </section>
     </div>

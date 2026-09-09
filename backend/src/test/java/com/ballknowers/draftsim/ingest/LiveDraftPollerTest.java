@@ -117,6 +117,72 @@ class LiveDraftPollerTest {
     }
 
     @Test
+    void pollOnceResolvesTheDraftsOwnSportRatherThanAssumingFootball() {
+        // The bug this pins (claude/merge-review-multi-sport.md B2): the poller
+        // used to resolve every pick through idsBySleeperId(Sport.NFL). NBA
+        // sleeper ids miss that map, PickMapper never guesses, and the first
+        // `drafting` tick would write a full draft's worth of rows with
+        // player_id = null. It fires on NBA draft night specifically, and the
+        // 2026 NBA draft is already registered for polling.
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players);
+        DraftRepository.DraftRow draft = draftRow("drafting");
+
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(Map.of("status", "drafting"));
+        when(sleeper.draftPicks("sleeper-draft-123")).thenReturn(List.of(rawPick("nba-p1", "u1", 3, 15, 2)));
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of("u1", 100L));
+        when(drafts.sportOf(1L)).thenReturn(java.util.Optional.of(Sport.NBA));
+        when(players.idsBySleeperId(Sport.NBA)).thenReturn(Map.of("nba-p1", 77L));
+
+        poller.pollOnce(draft);
+
+        assertEquals(77L, capturedUpsert().get(0).playerId(),
+                "an NBA pick must resolve through the NBA id map, not be written as null");
+        // Never even asked for the football map -- and it matters that it did
+        // not: 753 sleeper ids exist in both sports, so a football lookup here
+        // would not merely miss, it could return the wrong player.
+        verify(players, never()).idsBySleeperId(Sport.NFL);
+    }
+
+    @Test
+    void pollOnceFallsBackToFootballOnlyWhenTheLeagueRowIsGone() {
+        // Unreachable through the foreign key; asserted so the fallback is a
+        // decision on record rather than whatever Optional.orElse happened to do.
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players);
+        DraftRepository.DraftRow draft = draftRow("drafting");
+
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(Map.of("status", "drafting"));
+        when(sleeper.draftPicks("sleeper-draft-123")).thenReturn(List.of(rawPick("p1", "u1", 3, 15, 2)));
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of("u1", 100L));
+        when(drafts.sportOf(1L)).thenReturn(java.util.Optional.empty());
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("p1", 5L));
+
+        poller.pollOnce(draft);
+
+        assertEquals(5L, capturedUpsert().get(0).playerId());
+    }
+
+    @Test
+    void onTheClockSlotHonoursTheReversalRound() {
+        // 12 teams. Plain snake: R1 forward, R2 reverse, R3 forward.
+        assertEquals(1, LiveDraftPoller.onTheClockSlot(0, 12, 14, 0));
+        assertEquals(12, LiveDraftPoller.onTheClockSlot(12, 12, 14, 0));
+        assertEquals(1, LiveDraftPoller.onTheClockSlot(24, 12, 14, 0));
+
+        // reversal_round 3 -- the 2026 Ball Knowers NBA draft. Rounds 1 and 2
+        // are untouched; round 3 repeats round 2's direction instead of
+        // switching back, so pick 25 belongs to slot 12, not slot 1. Before
+        // this parameter existed the live room named the wrong manager on the
+        // clock for rounds 3 through 14.
+        assertEquals(1, LiveDraftPoller.onTheClockSlot(0, 12, 14, 3));
+        assertEquals(12, LiveDraftPoller.onTheClockSlot(12, 12, 14, 3));
+        assertEquals(12, LiveDraftPoller.onTheClockSlot(24, 12, 14, 3));
+        assertEquals(1, LiveDraftPoller.onTheClockSlot(35, 12, 14, 3));
+
+        // Still null once the board is full, whatever the reversal round.
+        assertNull(LiveDraftPoller.onTheClockSlot(168, 12, 14, 3));
+    }
+
+    @Test
     void pollOnceWithPreDraftStatusSkipsPicksButUpdatesStatus() {
         poller = new LiveDraftPoller(sleeper, drafts, managers, players);
         DraftRepository.DraftRow draft = draftRow("pre_draft");

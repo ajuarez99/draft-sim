@@ -524,12 +524,27 @@ export type ManagerHistory = {
   managerId: number
   manager: string | null
   seasons: StandingRow[]
+  /**
+   * One entry per sport this manager has actually drafted in, newest concept
+   * first: a manager is not a football manager, they are a manager, and
+   * profiles are fitted per (manager, sport). This was a single object fitted
+   * from Sport.NFL unconditionally, which put a person's football reach bias on
+   * a page an NBA league's standings row links to -- and ten of twelve managers
+   * here are the same Sleeper id in both leagues
+   * (claude/merge-review-multi-sport.md S1).
+   *
+   * Empty when the manager has no drafts in any sport. Sports with nothing to
+   * say are omitted rather than sent as zeroes.
+   */
   draftHistory: {
+    sport: Sport
     reachBias: number | null
     positionalTilt: Record<string, number> | null
     draftsObserved: number
+    /** 0 means reachBias is the league mean, not a measurement. See managerBehaviour.ts. */
+    picksScored: number
     provenance: Provenance
-  }
+  }[]
 }
 
 export const getManagerHistory = (managerId: number) =>

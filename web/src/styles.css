@@ -367,6 +367,10 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
   vertical-align: 1px;
 }
+/* One per sport on the manager-history page -- the same person can have two,
+   fitted from two separate sets of picks, so they need separating. */
+.manager-sport-block { margin-bottom: 14px; }
+.manager-sport-block:last-child { margin-bottom: 0; }
 .sport-pill.nfl {
   color: var(--sport-nfl);
   background: color-mix(in oklch, var(--sport-nfl) 15%, transparent);

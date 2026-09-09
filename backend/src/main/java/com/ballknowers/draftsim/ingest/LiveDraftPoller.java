@@ -291,12 +291,26 @@ public class LiveDraftPoller {
         boolean complete = "complete".equals(status);
 
         List<Map<String, Object>> rawPicks = sleeper.draftPicks(draft.sleeperDraftId());
-        // Sport.NFL stays hardcoded: live draft polling/SSE tracking for basketball
-        // is a Non-goal of claude/multi-sport-and-rebrand.md, and DraftRow (the
-        // only row already in hand here) carries no sport of its own -- resolving
-        // one would mean injecting LeagueRepository and adding a lookup this loop
-        // does not otherwise need, purely to serve a sport this class never acts on.
-        Map<String, Long> playerIdsBySleeperId = players.idsBySleeperId(Sport.NFL);
+        // Resolved, not hardcoded. This used to be Sport.NFL on the reasoning
+        // that basketball live polling is a Non-goal -- but a Non-goal in a
+        // comment does not stop the picker from offering "follow live" on an
+        // NBA league card, and /track happily registers the 2026 NBA draft.
+        // With the wrong sport every NBA sleeper id misses this map, PickMapper
+        // never guesses, and the first `drafting` tick writes 168 rows with
+        // player_id = null -- picks the board and the engine both ignore.
+        // LeagueController.recordPick already refuses to write exactly that.
+        //
+        // One primary-key-ish lookup per tick (every 10s) off a repository this
+        // class already holds. NOT a sport-less combined map: 753 sleeper ids
+        // are used by a player in both sports, so that would resolve NBA picks
+        // to real NFL players -- silently wrong instead of visibly null. See
+        // DraftRepository.sportOf.
+        //
+        // The orElse is unreachable through the foreign key; a draft whose
+        // league vanished has nothing better to fall back to than the sport
+        // every draft in this database was until Phase 5.
+        Sport sport = drafts.sportOf(draft.id()).orElse(Sport.NFL);
+        Map<String, Long> playerIdsBySleeperId = players.idsBySleeperId(sport);
 
         List<DraftRepository.PickRow> rows = new ArrayList<>();
         if (rawPicks != null) {
@@ -320,7 +334,8 @@ public class LiveDraftPoller {
     private Tick publishTick(DraftRepository.DraftRow draft, Tick tick, int picksMade, int lastPickNo) {
         lastTick.put(draft.id(), tick);
         publish(draft.id(), new LiveSnapshot(tick.status(), picksMade, lastPickNo,
-                tick.seatsMapped(), onTheClockSlot(picksMade, draft.teams(), draft.rounds())));
+                tick.seatsMapped(),
+                onTheClockSlot(picksMade, draft.teams(), draft.rounds(), draft.reversalRound())));
         return tick;
     }
 
@@ -328,16 +343,20 @@ public class LiveDraftPoller {
      * The slot whose turn it is, or null once every pick is in. Shared with the
      * live-stream endpoint's initial DB-synthesized state so the two agree.
      *
-     * Deliberately calls the plain (reversalRound-less) {@link DraftSlot#slot}
-     * overload rather than growing a {@code reversalRound} parameter of its
-     * own: live-draft polling/SSE tracking for basketball is a Non-goal of
-     * multi-sport-and-rebrand.md, this class hardcodes {@link Sport#NFL}
-     * elsewhere in the same spirit (see {@link #pollOnce}), and football never
-     * reverses, so there is nothing for a second parameter here to carry.
+     * Takes {@code reversalRound} -- pass {@code draft.reversalRound()}, which
+     * is already the effective value (the user's override, else Sleeper's).
+     * It used to call the plain overload on the reasoning that football never
+     * reverses, which was true of every draft this app had. The 2026 Ball
+     * Knowers NBA draft is {@code reversal_round: 3}, so from round 3 on this
+     * named the wrong manager as being on the clock -- on the one screen a
+     * draft night is actually watched through.
+     *
+     * Persisted picks were never affected: PickMapper reads Sleeper's own
+     * {@code draft_slot} off each pick and does not compute one.
      */
-    public static Integer onTheClockSlot(int picksMade, int teams, int rounds) {
+    public static Integer onTheClockSlot(int picksMade, int teams, int rounds, int reversalRound) {
         if (teams <= 0 || picksMade >= teams * rounds) return null;
-        return DraftSlot.slot(picksMade + 1, teams);
+        return DraftSlot.slot(picksMade + 1, teams, reversalRound);
     }
 
     /**

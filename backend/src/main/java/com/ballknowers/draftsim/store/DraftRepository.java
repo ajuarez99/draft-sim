@@ -228,6 +228,31 @@ public class DraftRepository {
         jdbc.update("update draft set reversal_round_override = ? where id = ?", override, draftId);
     }
 
+    /**
+     * This draft's sport, off its league.
+     *
+     * Exists so {@link com.ballknowers.draftsim.ingest.LiveDraftPoller} can
+     * resolve a sport without taking a second repository: it already holds this
+     * one, and a poll tick that guesses the sport resolves every pick to null
+     * (or, worse, to the wrong player -- see below).
+     *
+     * The tempting cheaper fix was one sport-less {@code idsBySleeperId} map
+     * covering both sports. Measured 2026-09-09 against the real player table:
+     * **753 sleeper ids are used by a player in both sports.** A combined map
+     * would silently resolve an NBA pick to a real NFL player, which is worse
+     * than the null it replaces, because nothing downstream can tell it is
+     * wrong. Sleeper's id namespaces are per-sport and they overlap.
+     *
+     * Empty only if the league row is gone, which the schema's foreign key
+     * makes unreachable -- the caller decides what that means.
+     */
+    public Optional<Sport> sportOf(long draftId) {
+        return db.sql("select l.sport from draft d join league l on l.id = d.league_id where d.id = ?")
+                .param(draftId)
+                .query((rs, i) -> Sport.fromCode(rs.getString(1)))
+                .optional();
+    }
+
     /** Completed picks for a draft, ordered. Used both for profiles and for resume-from-state. */
     public List<PickRow> picks(long draftId) {
         return db.sql("""
