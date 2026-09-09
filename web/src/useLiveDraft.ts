@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { apiUrl, type LiveState } from './api'
+import { currentUserId } from './user'
 
 // Past this, the freshness pill flips from "live" to "stale". Heartbeats come
 // every 15s, so 25 is one missed heartbeat plus slack -- long enough that a
@@ -94,7 +95,15 @@ export function useLiveDraft(draftId: string): LiveDraft {
       // token-protected backend needs its own answer here (most likely a
       // query-string token the backend also accepts on this one route) before
       // live mode works split-origin. Not needed same-origin or with auth off.
-      const es = new EventSource(apiUrl(`/api/drafts/${draftId}/live-stream`))
+      //
+      // Identity has exactly that problem and takes exactly that answer: every
+      // other call carries X-Sleeper-User through apiFetch, and this one cannot,
+      // so the backend reads `?user=` on this route alone (see
+      // LeagueController.liveStream). Omitted when signed out, which the backend
+      // treats as the unscoped pre-identity case -- same as a missing header.
+      const userId = currentUserId()
+      const query = userId ? `?user=${encodeURIComponent(userId)}` : ''
+      const es = new EventSource(apiUrl(`/api/drafts/${draftId}/live-stream${query}`))
       source = es
 
       es.onopen = () => {

@@ -61,7 +61,7 @@ class MockDraftRepositoryIT {
     @BeforeEach
     void setUp() {
         sessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
-                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L);
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, "it-owner-mdr");
     }
 
     @AfterEach
@@ -107,7 +107,7 @@ class MockDraftRepositoryIT {
                 Long.class, leagueId, "it-draft-mdr-source-draft", 2026, 15, 8, "snake", "drafting");
 
         long forkedId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
-                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5);
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr");
         try {
             MockDraftRepository.SessionRow row = mockDrafts.find(forkedId).orElseThrow();
             assertEquals(draftId, row.sourceDraftId());
@@ -173,7 +173,7 @@ class MockDraftRepositoryIT {
 
     @Test
     void allSessionsIncludesANewlyCreatedSessionNewestFirst() {
-        List<MockDraftRepository.SessionSummary> all = mockDrafts.allSessions();
+        List<MockDraftRepository.SessionSummary> all = mockDrafts.allSessionsFor(null);
         assertTrue(all.stream().anyMatch(s -> s.id() == sessionId));
         assertEquals(sessionId, all.get(0).id(), "newest session (just created) must sort first");
     }

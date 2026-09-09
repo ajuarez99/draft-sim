@@ -65,6 +65,7 @@ export default function DraftPicker() {
   // `league` row in this app's DB yet (§5c/§5d). null while loading, distinct
   // from [] once it's known there's genuinely nothing to set up.
   const [sleeperLeagues, setSleeperLeagues] = useState<SleeperLeague[] | null>(null)
+  const [sleeperError, setSleeperError] = useState<string | null>(null)
   const [setupState, setSetupState] = useState<Record<string, SetupState>>({})
 
   function refetch() {
@@ -74,9 +75,20 @@ export default function DraftPicker() {
 
   function refetchSleeperLeagues() {
     if (!user) return
-    getSleeperUserLeagues(user.sleeperUserId).then(setSleeperLeagues).catch(() => {
-      // Best-effort: "Your leagues" (already-ingested) still works without this.
-    })
+    setSleeperError(null)
+    getSleeperUserLeagues(user.sleeperUserId)
+      .then((ls) => {
+        setSleeperLeagues(ls)
+        setSleeperError(null)
+      })
+      .catch((e) => {
+        // Was a silent no-op. "Your leagues" does still work without this, but
+        // swallowing the failure means someone whose league list is broken sees
+        // an app confidently telling them they have nothing to set up -- which
+        // is indistinguishable from the genuine empty state and gives them
+        // nothing to retry. Say it failed instead.
+        setSleeperError(e instanceof Error ? e.message : String(e))
+      })
   }
 
   useEffect(refetch, [])
@@ -411,6 +423,23 @@ export default function DraftPicker() {
           </div>
         )}
       </section>
+
+      {/* The list failed rather than came back empty. Without this the section
+          below simply doesn't render, so a broken lookup and "you have nothing
+          to set up" look identical. */}
+      {sleeperError && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>From Sleeper</h2>
+          </div>
+          <div className="error">
+            Couldn’t load your Sleeper leagues ({sleeperError}).{' '}
+            <button className="link-button" onClick={refetchSleeperLeagues}>
+              Try again
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* §5c: leagues Sleeper says this user belongs to that have no `league`
           row here yet. Same card shape as "Your leagues" (crest, sport pill,

@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.engine.SimulationRequest;
 import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.engine.SimulationService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -19,14 +20,39 @@ public class SimulationController {
     private static final long SSE_TIMEOUT_MS = 10 * 60 * 1000L;
 
     private final SimulationService sims;
+    private final LeagueMembership membership;
 
-    public SimulationController(SimulationService sims) {
+    public SimulationController(SimulationService sims, LeagueMembership membership) {
         this.sims = sims;
+        this.membership = membership;
+    }
+
+    /**
+     * The scoping every {@code /api/drafts/{id}/...} route has and this one did
+     * not.
+     *
+     * A simulation is addressed by a draft id and answers with that draft's
+     * board, its seat map and every seat's fitted manager profile -- the same
+     * data GET /api/drafts/{id}/seats and /board return, reached by a different
+     * verb. Scoping those two while leaving this open meant the boundary was
+     * decoration: anyone could read a stranger's league by POSTing its draft id
+     * here instead of GETting it there.
+     *
+     * Same message for "no such draft" and "not yours", and the same message
+     * {@link SimulationService} already throws for a genuinely missing draft, so
+     * this endpoint does not become a way to test whether a draft id exists.
+     */
+    private void requireVisible(SimulationRequest request, String sleeperUserId) {
+        if (membership.visibleDraft(sleeperUserId, request.draftSleeperId()).isEmpty()) {
+            throw new IllegalArgumentException("draft " + request.draftSleeperId() + " not ingested");
+        }
     }
 
     /** Blocking. Fine for a few hundred iterations; use the stream for more. */
     @PostMapping
-    public SimulationResult run(@RequestBody SimulationRequest request) {
+    public SimulationResult run(@RequestBody SimulationRequest request,
+                                @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        requireVisible(request, sleeperUserId);
         return sims.simulate(request, null);
     }
 
@@ -35,7 +61,12 @@ public class SimulationController {
      * The board fills in as iterations land rather than blocking on all of them.
      */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter stream(@RequestBody SimulationRequest request) {
+    public SseEmitter stream(@RequestBody SimulationRequest request,
+                             @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Before the emitter, deliberately: this is a POST, so unlike the live
+        // stream it carries a real header and can fail as an ordinary 400 rather
+        // than as an `error` event on a stream that opened successfully.
+        requireVisible(request, sleeperUserId);
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
         Thread.ofVirtual().name("sim-stream").start(() -> {

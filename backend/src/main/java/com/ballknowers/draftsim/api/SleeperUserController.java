@@ -3,7 +3,6 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.store.LeagueRepository;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -29,18 +28,33 @@ public class SleeperUserController {
         this.leagues = leagues;
     }
 
-    /** Sleeper answers 200 with a JSON null body for an unknown username -- not a 404. */
+    /**
+     * Sleeper answers 200 with a JSON null body for an unknown username -- not a 404.
+     *
+     * "No such username" is reported as 200 {@code {"found": false}} rather than
+     * a 404 on purpose. This route backs the sign-in gate, and a bare 404 there
+     * is ambiguous in the one way that matters: it is also what a browser gets
+     * when the route itself is missing -- a frontend deployed ahead of its
+     * backend, a rolled-back API, a proxy misroute. Mapping that to "check the
+     * spelling" tells a visitor with a perfectly good username that they typed
+     * it wrong, on the gate, with no way forward. Keeping the negative result
+     * inside a 200 means a 404 from here can only be an infrastructure problem,
+     * which is a distinction the client can act on.
+     */
     @GetMapping("/user/{usernameOrId}")
-    public ResponseEntity<Map<String, Object>> user(@PathVariable String usernameOrId) {
+    public Map<String, Object> user(@PathVariable String usernameOrId) {
         Map<String, Object> u = sleeper.user(usernameOrId);
-        if (u == null) return ResponseEntity.notFound().build();
-
         Map<String, Object> out = new LinkedHashMap<>();
+        if (u == null) {
+            out.put("found", false);
+            return out;
+        }
+        out.put("found", true);
         out.put("sleeperUserId", u.get("user_id"));
         out.put("username", u.get("username"));
         out.put("displayName", u.get("display_name"));
         out.put("avatar", u.get("avatar"));
-        return ResponseEntity.ok(out);
+        return out;
     }
 
     /**

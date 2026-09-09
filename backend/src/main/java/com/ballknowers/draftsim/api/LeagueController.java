@@ -13,6 +13,7 @@ import com.ballknowers.draftsim.engine.OwnerSlot;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -49,11 +50,12 @@ public class LeagueController {
     private final ManagerRepository managers;
     private final PlayerRepository players;
     private final OwnerProperties owner;
+    private final LeagueMembership membership;
 
     public LeagueController(LeagueRepository leagues, DraftRepository drafts,
                             ProfileService profiles, BoardService boards, LiveDraftPoller poller,
                             ManagerRepository managers, PlayerRepository players,
-                            OwnerProperties owner) {
+                            OwnerProperties owner, LeagueMembership membership) {
         this.leagues = leagues;
         this.drafts = drafts;
         this.profiles = profiles;
@@ -62,11 +64,25 @@ public class LeagueController {
         this.managers = managers;
         this.players = players;
         this.owner = owner;
+        this.membership = membership;
     }
 
-    @GetMapping("/leagues")
-    public List<LeagueRepository.LeagueRow> leagues() {
-        return leagues.all();
+    /**
+     * The draft behind this id, if this caller may see it.
+     *
+     * Empty covers both "no such draft" and "not your league", and every caller
+     * turns it into the same 404. Deliberately not a 403: a distinct "forbidden"
+     * confirms the draft exists and which league it belongs to, which is most of
+     * what an enumeration wanted in the first place.
+     *
+     * Every draft-addressed route below goes through here rather than calling
+     * {@code drafts.bySleeperId} directly, so adding a route without scoping it
+     * is a visible omission instead of a silent default.
+     */
+    private Optional<DraftRepository.DraftRow> visibleDraft(String sleeperDraftId, String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+        if (found.isEmpty()) return found;
+        return membership.canSee(sleeperUserId, found.get().leagueId()) ? found : Optional.empty();
     }
 
     /**
@@ -87,7 +103,7 @@ public class LeagueController {
     @GetMapping("/drafts/{sleeperDraftId}/seats")
     public ResponseEntity<?> seats(@PathVariable String sleeperDraftId,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<DraftRepository.DraftRow> draft = drafts.bySleeperId(sleeperDraftId);
+        Optional<DraftRepository.DraftRow> draft = visibleDraft(sleeperDraftId, sleeperUserId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
 
         // Loaded once and reused below for rosterPositions too, rather than the
@@ -188,8 +204,9 @@ public class LeagueController {
      */
     @PutMapping("/drafts/{sleeperDraftId}/reversal-round")
     public ResponseEntity<?> setReversalRound(@PathVariable String sleeperDraftId,
-                                              @RequestBody(required = false) ReversalRoundBody body) {
-        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+                                              @RequestBody(required = false) ReversalRoundBody body,
+                                              @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
 
@@ -231,8 +248,9 @@ public class LeagueController {
      * whether that's the view it wants.
      */
     @GetMapping("/drafts/{sleeperDraftId}/board")
-    public ResponseEntity<?> realBoard(@PathVariable String sleeperDraftId) {
-        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+    public ResponseEntity<?> realBoard(@PathVariable String sleeperDraftId,
+                                       @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
         Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
@@ -292,8 +310,9 @@ public class LeagueController {
 
     /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */
     @PostMapping("/drafts/{sleeperDraftId}/track")
-    public ResponseEntity<?> track(@PathVariable String sleeperDraftId) {
-        Optional<DraftRepository.DraftRow> draft = drafts.bySleeperId(sleeperDraftId);
+    public ResponseEntity<?> track(@PathVariable String sleeperDraftId,
+                                   @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> draft = visibleDraft(sleeperDraftId, sleeperUserId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
         LiveDraftPoller.TrackResult r = poller.track(draft.get());
         // Map.of throws NullPointerException on a null value, and status is
@@ -338,10 +357,23 @@ public class LeagueController {
      * status / picksMade / seatsMapped changed), `heartbeat` every 15s regardless
      * so the UI can render "last contact 4s ago" and a silently-dead poller is
      * visible, and `error`.
+     *
+     * <p>Identity arrives as the {@code user} query parameter here, not the
+     * {@code X-Sleeper-User} header every other route uses, because the browser's
+     * native EventSource cannot set a request header at all -- the same
+     * limitation DEPLOY.md already records for the bearer token. Scoping this
+     * route off a header it can never receive would have meant either breaking
+     * live mode for everyone or leaving the one endpoint that streams a league's
+     * board wide open. Only the transport differs: it feeds the same
+     * {@link LeagueMembership#canSee} as everything else, so there is still one
+     * definition of whose league is whose. A Sleeper user id is public and
+     * unverified either way, so putting it in a URL concedes nothing that
+     * sending it in a header did not.
      */
     @GetMapping(value = "/drafts/{sleeperDraftId}/live-stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<SseEmitter> liveStream(@PathVariable String sleeperDraftId) {
-        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+    public ResponseEntity<SseEmitter> liveStream(@PathVariable String sleeperDraftId,
+                                                 @RequestParam(name = "user", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();   // matches seats()
         DraftRepository.DraftRow draft = found.get();
 
@@ -459,8 +491,9 @@ public class LeagueController {
      */
     @PostMapping("/drafts/{sleeperDraftId}/picks")
     public ResponseEntity<?> recordPick(@PathVariable String sleeperDraftId,
-                                        @RequestBody(required = false) ManualPick body) {
-        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+                                        @RequestBody(required = false) ManualPick body,
+                                        @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> found = visibleDraft(sleeperDraftId, sleeperUserId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
 
@@ -489,6 +522,25 @@ public class LeagueController {
         // the rest of the ingest pipeline would use for it (multi-sport-and-
         // rebrand.md Phase 5/6). 0 for every NFL draft, unchanged from before.
         int slot = DraftSlot.slot(pickNo, draft.teams(), draft.reversalRound());
+
+        // Only the seat's own owner may fill it in. This endpoint writes into
+        // real draft_pick, and every league member could previously write any
+        // pick number -- so two people hand-recording the same pick differently
+        // was a silent last-writer-wins on a live board, with nobody told. The
+        // rule is the seat, not the clock: your own missed pick from two rounds
+        // ago is still yours to backfill. See OwnerSlot.mayActAsSlot for the two
+        // cases that stay open (no identity header, and a seat Sleeper has not
+        // mapped to anyone yet).
+        //
+        // 403 rather than the 404 this file uses elsewhere: those hide whether a
+        // draft exists, and this caller has already been shown the whole board,
+        // so there is nothing left to conceal and a reason they can act on is
+        // worth more.
+        if (!OwnerSlot.mayActAsSlot(draft, managers, sleeperUserId, slot)) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "pick " + pickNo + " belongs to draft slot " + slot + ", which is not your seat"));
+        }
+
         Long managerId = DraftOrderMapper.normalize(draft.slotToManager()).get(String.valueOf(slot));
 
         drafts.upsertPicks(draft.id(), List.of(new DraftRepository.PickRow(

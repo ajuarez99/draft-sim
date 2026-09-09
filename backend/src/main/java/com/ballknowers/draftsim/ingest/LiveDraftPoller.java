@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -45,11 +47,28 @@ public class LiveDraftPoller {
     // minute stale is the most we can accept mid-draft.
     private static final int MAX_BACKOFF_MULTIPLIER = 6;
 
+    // How long a poller will sit on a draft that has never started before giving
+    // up. Four hours, matching LeagueController's own SSE timeout, and that
+    // pairing is what makes giving up safe: the emitter times out at the same
+    // mark, the browser's EventSource reconnects, liveStream re-tracks, and a
+    // page someone still has open gets a fresh four hours. Nobody watching, and
+    // it stays stopped.
+    //
+    // Deliberately scoped to the pre_draft phase rather than being an absolute
+    // cap on the loop. pollOnce returns keepPolling=true forever for pre_draft,
+    // so before this a live page opened on a draft scheduled for next month left
+    // a thread hitting Sleeper every 10 seconds for the life of the process. But
+    // a draft that has actually started must never be abandoned on a timer: some
+    // leagues run slow drafts with multi-hour pick clocks, and "the poller quit
+    // three hours in" is a far worse failure than a wasted request.
+    private static final Duration PRE_DRAFT_MAX = Duration.ofHours(4);
+
     private final SleeperClient sleeper;
     private final DraftRepository drafts;
     private final ManagerRepository managers;
     private final PlayerRepository players;
     private final Duration pollInterval;
+    private final Duration preDraftMax;
 
     private final ConcurrentHashMap<Long, Thread> active = new ConcurrentHashMap<>();
 
@@ -71,7 +90,22 @@ public class LiveDraftPoller {
     // during iteration safe. Empty lists are deliberately left in the map rather
     // than pruned -- pruning races with a concurrent subscribe, and the map is
     // bounded by the number of drafts ever streamed in one process lifetime.
-    private final Map<Long, List<Consumer<LiveSnapshot>>> listeners = new ConcurrentHashMap<>();
+    private final Map<Long, List<Subscription>> listeners = new ConcurrentHashMap<>();
+
+    // Serializes the "nothing is tracking this yet, so tick and spawn" path, per
+    // draft. Without it, N browsers opening the live page in the same second all
+    // see active.containsKey == false and each runs a full synchronous tick
+    // (sleeper.draft + sleeper.draftPicks + a 210-row upsert) on its own Tomcat
+    // thread before computeIfAbsent picks one winner -- N-1 of them pure waste,
+    // aimed at Sleeper, at the exact moment everyone opens the page. This is the
+    // same herd track()'s doc comment already describes for a hand-refreshed
+    // /track; it just arrives N-wide instead of twice.
+    //
+    // A lock per draft rather than one global lock: two different drafts starting
+    // at 8:00 have no reason to wait on each other. Never removed, for the same
+    // reason the listener lists aren't -- removal races with a concurrent
+    // acquire, and the map is bounded by drafts-per-process.
+    private final ConcurrentHashMap<Long, Object> trackLocks = new ConcurrentHashMap<>();
 
     // Explicit: with two constructors Spring will not guess, and the second one
     // exists only as a test seam.
@@ -88,11 +122,23 @@ public class LiveDraftPoller {
      */
     LiveDraftPoller(SleeperClient sleeper, DraftRepository drafts,
                     ManagerRepository managers, PlayerRepository players, Duration pollInterval) {
+        this(sleeper, drafts, managers, players, pollInterval, PRE_DRAFT_MAX);
+    }
+
+    /**
+     * Test seam, second half: {@link #PRE_DRAFT_MAX} is four hours, so giving up
+     * on a draft that never starts is only observable in-process if a test can
+     * shrink it.
+     */
+    LiveDraftPoller(SleeperClient sleeper, DraftRepository drafts,
+                    ManagerRepository managers, PlayerRepository players,
+                    Duration pollInterval, Duration preDraftMax) {
         this.sleeper = sleeper;
         this.drafts = drafts;
         this.managers = managers;
         this.players = players;
         this.pollInterval = pollInterval;
+        this.preDraftMax = preDraftMax;
     }
 
     /**
@@ -135,29 +181,48 @@ public class LiveDraftPoller {
      * our Sleeper load at exactly the wrong moment.
      */
     public TrackResult track(DraftRepository.DraftRow draft) {
-        if (active.containsKey(draft.id())) {
-            Tick last = lastTick.get(draft.id());
-            if (last != null) {
-                return new TrackResult(false, last.status(), last.seatsMapped(), last.observed(), true);
-            }
-            // Tracking started but no tick has completed yet (the very first tick
-            // threw). Report the stored row and say so.
-            return new TrackResult(false, draft.status(),
-                    DraftOrderMapper.normalize(draft.slotToManager()).size(), false, true);
-        }
+        TrackResult alreadyTracking = reportExistingPoller(draft);
+        if (alreadyTracking != null) return alreadyTracking;
 
-        Tick tick = tickQuietly(draft);
-        AtomicBoolean started = new AtomicBoolean(false);
-        // A draft that is already complete needs no thread -- the synchronous tick
-        // above already ingested its picks.
-        if (tick.keepPolling()) {
-            active.computeIfAbsent(draft.id(), id -> {
-                started.set(true);
-                return spawn(draft);
-            });
+        // Everything past here runs at most once per draft at a time. The check
+        // above is repeated inside because it is only a fast path: between it and
+        // acquiring this lock, another caller may have finished starting the
+        // poller, and the whole point is that the second caller must then answer
+        // from lastTick rather than firing a tick of its own.
+        synchronized (trackLocks.computeIfAbsent(draft.id(), id -> new Object())) {
+            TrackResult raced = reportExistingPoller(draft);
+            if (raced != null) return raced;
+
+            Tick tick = tickQuietly(draft);
+            AtomicBoolean started = new AtomicBoolean(false);
+            // A draft that is already complete needs no thread -- the synchronous tick
+            // above already ingested its picks.
+            if (tick.keepPolling()) {
+                active.computeIfAbsent(draft.id(), id -> {
+                    started.set(true);
+                    return spawn(draft);
+                });
+            }
+            return new TrackResult(started.get(), tick.status(), tick.seatsMapped(),
+                    tick.observed(), tick.keepPolling());
         }
-        return new TrackResult(started.get(), tick.status(), tick.seatsMapped(),
-                tick.observed(), tick.keepPolling());
+    }
+
+    /**
+     * What to tell a caller whose draft is already being polled, or null if it
+     * isn't -- the "don't tick again" answer, shared by track()'s lock-free fast
+     * path and its re-check under the lock so the two cannot drift.
+     */
+    private TrackResult reportExistingPoller(DraftRepository.DraftRow draft) {
+        if (!active.containsKey(draft.id())) return null;
+        Tick last = lastTick.get(draft.id());
+        if (last != null) {
+            return new TrackResult(false, last.status(), last.seatsMapped(), last.observed(), true);
+        }
+        // Tracking started but no tick has completed yet (the very first tick
+        // threw). Report the stored row and say so.
+        return new TrackResult(false, draft.status(),
+                DraftOrderMapper.normalize(draft.slotToManager()).size(), false, true);
     }
 
     /** A failed first tick must not fail /track -- start polling and let the loop retry. */
@@ -175,14 +240,80 @@ public class LiveDraftPoller {
     }
 
     /**
-     * Registers a live-stream listener and returns its unsubscribe. The listener
-     * runs on the poll thread, so it must not block.
+     * One live-stream subscriber: the listener, its pending snapshots, and the
+     * virtual thread that hands them over.
+     *
+     * The thread exists because {@code listener.accept} is an
+     * {@code SseEmitter.send}, which is a BLOCKING socket write. Delivering
+     * inline on the poll thread -- which is what this used to do -- means one
+     * viewer whose TCP window has filled (the laptop that went to sleep without
+     * the connection being reset, the phone that walked out of wifi) stalls that
+     * write until the OS gives up on the socket, and for those minutes the poll
+     * loop is parked: no Sleeper ingest, and no updates for any of the other
+     * eleven people watching. The existing throwing-listener guard does not help,
+     * because a stalled write does not throw, it waits.
+     *
+     * @param queue bounded, and deliberately so. It is the definition of "this
+     *              client is beyond saving": a healthy browser drains a few
+     *              hundred bytes instantly, so a subscriber that has fallen
+     *              {@link #DELIVERY_QUEUE_DEPTH} ticks (several minutes) behind
+     *              is not slow, it is gone. Overflow drops the subscriber rather
+     *              than dropping frames, so a client that IS keeping up never
+     *              silently misses a pick -- which matters now that a state frame
+     *              carries the picks themselves and not just a count.
+     */
+    private record Subscription(Consumer<LiveSnapshot> listener,
+                                BlockingQueue<LiveSnapshot> queue,
+                                Thread worker) {}
+
+    // ~5 minutes of ticks at the 10s interval. Sized to be unreachable by any
+    // client that is merely slow, so that hitting it is diagnostic.
+    private static final int DELIVERY_QUEUE_DEPTH = 32;
+
+    /**
+     * Registers a live-stream listener and returns its unsubscribe.
+     *
+     * The listener no longer runs on the poll thread -- it gets its own virtual
+     * thread, so it MAY block (and an SseEmitter.send does). Ordering is
+     * preserved: one thread per subscriber draining one FIFO queue, so a
+     * subscriber sees every snapshot published after it subscribed, in order,
+     * until it is dropped or unsubscribes.
      */
     public Runnable subscribe(long draftId, Consumer<LiveSnapshot> listener) {
-        List<Consumer<LiveSnapshot>> ls =
+        List<Subscription> ls =
                 listeners.computeIfAbsent(draftId, id -> new CopyOnWriteArrayList<>());
-        ls.add(listener);
-        return () -> ls.remove(listener);
+        BlockingQueue<LiveSnapshot> queue = new ArrayBlockingQueue<>(DELIVERY_QUEUE_DEPTH);
+        // The worker needs to remove its own Subscription from the list when the
+        // listener throws, and the Subscription needs the worker -- built
+        // unstarted so the cycle can be closed before anything runs.
+        Subscription[] self = new Subscription[1];
+        Thread worker = Thread.ofVirtual().name("live-deliver-" + draftId).unstarted(() -> {
+            try {
+                while (true) {
+                    listener.accept(queue.take());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();   // ordinary unsubscribe
+            } catch (Throwable t) {
+                // Same contract as before, just off the poll thread: a dead tab
+                // whose emitter throws drops itself and nothing else notices.
+                // Throwable rather than Exception -- there is nothing a listener
+                // can throw that is worth keeping it subscribed for.
+                log.warn("dropped a live-stream listener for draft {} after it threw", draftId, t);
+            } finally {
+                ls.remove(self[0]);
+            }
+        });
+        Subscription sub = new Subscription(listener, queue, worker);
+        self[0] = sub;
+        // Added before start so a tick landing between the two is queued rather
+        // than missed.
+        ls.add(sub);
+        worker.start();
+        return () -> {
+            ls.remove(sub);
+            worker.interrupt();
+        };
     }
 
     /** Whether a poll loop is alive for this draft. */
@@ -192,29 +323,24 @@ public class LiveDraftPoller {
 
     /** For tests: a leaked listener grows for the whole three hours of a draft. */
     public int listenerCount(long draftId) {
-        List<Consumer<LiveSnapshot>> ls = listeners.get(draftId);
+        List<Subscription> ls = listeners.get(draftId);
         return ls == null ? 0 : ls.size();
     }
 
     /**
-     * Every accept is individually guarded and a throwing listener is dropped.
-     *
-     * This is the defensive line that matters: a dead browser tab whose SseEmitter
-     * throws must never propagate out of the poll loop. Ingest going down for the
-     * rest of draft night because a laptop went to sleep is not a trade this is
-     * willing to make, so the catch is deliberately Throwable rather than
-     * Exception -- there is nothing a listener can throw that is worth stopping
-     * ingest for.
+     * Hands the snapshot to every subscriber's queue and returns. Never blocks,
+     * never throws, and never runs listener code -- see {@link Subscription} for
+     * why the poll thread must not be the one doing the writing.
      */
     private void publish(long draftId, LiveSnapshot snapshot) {
-        List<Consumer<LiveSnapshot>> ls = listeners.get(draftId);
+        List<Subscription> ls = listeners.get(draftId);
         if (ls == null || ls.isEmpty()) return;
-        for (Consumer<LiveSnapshot> listener : ls) {
-            try {
-                listener.accept(snapshot);
-            } catch (Throwable t) {
-                ls.remove(listener);
-                log.warn("dropped a live-stream listener for draft {} after it threw", draftId, t);
+        for (Subscription sub : ls) {
+            if (!sub.queue().offer(snapshot)) {
+                ls.remove(sub);
+                sub.worker().interrupt();
+                log.warn("dropped a live-stream listener for draft {} -- {} snapshots behind,"
+                        + " so its client has stopped reading", draftId, DELIVERY_QUEUE_DEPTH);
             }
         }
     }
@@ -237,9 +363,28 @@ public class LiveDraftPoller {
 
     void loop(DraftRepository.DraftRow draft) {
         int consecutiveFailures = 0;
+        // Nanos, not wall clock: this must not be moved by an NTP correction or a
+        // DST change landing mid-draft.
+        long preDraftDeadline = System.nanoTime() + preDraftMax.toNanos();
+        boolean everStarted = false;
         while (!Thread.currentThread().isInterrupted()) {
+            // Checked before the tick rather than after, so a run of Sleeper
+            // failures -- which leave the status unknown and so never clear
+            // everStarted -- still ends rather than backing off at 60s forever.
+            if (!everStarted && System.nanoTime() > preDraftDeadline) {
+                log.info("draft {} has not started in {} -- stopping the poller."
+                                + " Reopening the live page starts it again.",
+                        draft.id(), preDraftMax);
+                break;
+            }
             try {
-                if (!pollOnce(draft).keepPolling()) break;
+                Tick tick = pollOnce(draft);
+                // Anything that is not pre_draft means the draft is underway (or
+                // over, in which case keepPolling ends this on the next line
+                // anyway). From here the loop runs until Sleeper says complete,
+                // with no deadline -- see PRE_DRAFT_MAX.
+                if (!"pre_draft".equals(tick.status())) everStarted = true;
+                if (!tick.keepPolling()) break;
                 consecutiveFailures = 0;
             } catch (Exception e) {
                 consecutiveFailures++;
@@ -448,5 +593,9 @@ public class LiveDraftPoller {
     @PreDestroy
     public void shutdown() {
         active.values().forEach(Thread::interrupt);
+        // The delivery workers too: each one parks in queue.take() forever, so
+        // without this a restart leaves one live thread per browser tab that was
+        // ever streaming, each still holding a reference to a dead emitter.
+        listeners.values().forEach(ls -> ls.forEach(sub -> sub.worker().interrupt()));
     }
 }

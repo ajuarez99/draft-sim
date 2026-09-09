@@ -7,6 +7,7 @@ import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -21,6 +22,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +45,7 @@ class LeagueControllerLiveStreamTest {
     @Mock private ManagerRepository managers;
     @Mock private PlayerRepository players;
     @Mock private OwnerProperties owner;
+    @Mock private LeagueMembership membership;
     @Mock private SleeperClient sleeper;
 
     private LiveDraftPoller poller;
@@ -54,7 +57,13 @@ class LeagueControllerLiveStreamTest {
 
     private LeagueController controller() {
         poller = new LiveDraftPoller(sleeper, drafts, managers, players);
-        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner);
+        // These tests are about each endpoint's own behavior, not about scoping,
+        // so the caller can always see the league. LeagueMembership has its own
+        // tests; a mock left unstubbed would answer false and fail every one of
+        // these for the wrong reason.
+        lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner,
+                membership);
     }
 
     private static DraftRepository.DraftRow row(String status) {
@@ -65,7 +74,7 @@ class LeagueControllerLiveStreamTest {
     @Test
     void anUnknownDraftIs404LikeSeats() {
         when(drafts.bySleeperId("nope")).thenReturn(Optional.empty());
-        assertEquals(404, controller().liveStream("nope").getStatusCode().value());
+        assertEquals(404, controller().liveStream("nope", null).getStatusCode().value());
     }
 
     /**
@@ -79,7 +88,7 @@ class LeagueControllerLiveStreamTest {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(draft));
         when(drafts.picks(1L)).thenReturn(List.of());
 
-        ResponseEntity<SseEmitter> response = controller().liveStream("d1");
+        ResponseEntity<SseEmitter> response = controller().liveStream("d1", null);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(0, poller.listenerCount(1L),
@@ -98,7 +107,7 @@ class LeagueControllerLiveStreamTest {
      * complete() on a bare emitter would prove nothing about production.
      */
     @Test
-    void aDraftGoingCompleteUnderAnOpenStreamUnsubscribes() {
+    void aDraftGoingCompleteUnderAnOpenStreamUnsubscribes() throws InterruptedException {
         DraftRepository.DraftRow draft = row("drafting");
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(draft));
         when(drafts.picks(1L)).thenReturn(List.of());
@@ -111,13 +120,27 @@ class LeagueControllerLiveStreamTest {
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
         when(sleeper.draftPicks("d1")).thenReturn(List.of());
 
-        ResponseEntity<SseEmitter> response = controller().liveStream("d1");
+        ResponseEntity<SseEmitter> response = controller().liveStream("d1", null);
         assertNotNull(response.getBody());
         assertEquals(1, poller.listenerCount(1L), "a live draft's stream subscribes");
 
         poller.track(draft);
 
-        assertEquals(0, poller.listenerCount(1L), "a leaked listener grows for three hours");
+        // Awaited rather than asserted outright: LiveDraftPoller hands each
+        // subscriber its snapshot on that subscriber's own virtual thread (so one
+        // stalled viewer cannot park the poll loop and stop ingest for the whole
+        // league), which means the unsubscribe this test is about happens just
+        // after track() returns rather than inside it. The guarantee is unchanged
+        // -- the listener must go -- only the instant it can be observed moved.
+        awaitListenerCount(0, "a leaked listener grows for three hours");
+    }
+
+    private void awaitListenerCount(int expected, String message) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline && poller.listenerCount(1L) != expected) {
+            Thread.sleep(10);
+        }
+        assertEquals(expected, poller.listenerCount(1L), message);
     }
 
     /**
@@ -135,7 +158,7 @@ class LeagueControllerLiveStreamTest {
         LeagueController controller = controller();
         assertFalse(poller.isTracking(1L));
 
-        controller.liveStream("d1");
+        controller.liveStream("d1", null);
 
         assertTrue(poller.isTracking(1L), "opening the live page must start the poller");
     }
@@ -148,9 +171,10 @@ class LeagueControllerLiveStreamTest {
         when(drafts.picks(1L)).thenReturn(List.of());
         when(sleeper.draft("d1")).thenThrow(new IllegalStateException("sleeper down"));
 
-        ResponseEntity<SseEmitter> response = controller().liveStream("d1");
+        ResponseEntity<SseEmitter> response = controller().liveStream("d1", null);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
     }
+
 }

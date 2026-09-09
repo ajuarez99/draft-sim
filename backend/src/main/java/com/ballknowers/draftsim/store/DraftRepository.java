@@ -313,33 +313,17 @@ public class DraftRepository {
      * silently falls through to "everything" looks exactly like working
      * software to the one person who is in every league.
      *
-     * Membership is the union of two paths, since either alone misses leagues
-     * the other covers: {@code roster_season} catches a league with no
-     * ingested draft at all, {@code slot_to_manager} catches a draft ingested
-     * before that manager had any scored season. Walking {@code
-     * previous_league_id} backwards (the "chain trap") pulls in predecessor
-     * seasons the picker's own {@code leagueLineages} collapses into one
-     * card -- forwards only, since a successor league you were later dropped
-     * from is genuinely not yours anymore.
+     * The membership rule itself lives in
+     * {@link LeagueMembership#MEMBER_LEAGUE_IDS_CTE} -- it was inlined here
+     * until a second caller needed the same answer, and two copies of it is
+     * how the app would start disagreeing with itself about whose league is
+     * whose. The chain walk, and why it goes backwards only, are documented
+     * there; the picker's own {@code leagueLineages} collapses the predecessor
+     * seasons it pulls in into one card.
      */
     public List<DraftSummary> allWithLeagueFor(String sleeperUserId) {
-        return db.sql("""
-                with recursive me as (select id from manager where sleeper_user_id = ?),
-                mine as (
-                    select rs.league_id from roster_season rs join me on me.id = rs.manager_id
-                    union
-                    select d.league_id from draft d, me
-                     where exists (select 1 from jsonb_each_text(d.slot_to_manager) x
-                                    where x.value = me.id::text)
-                ),
-                chain as (
-                    select l.id, l.previous_league_id
-                      from league l join mine on mine.league_id = l.id
-                    union
-                    select p.id, p.previous_league_id
-                      from league p join chain c on p.sleeper_id = c.previous_league_id
-                )
-                select\s""" + DRAFT_SUMMARY_COLUMNS + """
+        return db.sql(LeagueMembership.MEMBER_LEAGUE_IDS_CTE + "select "
+                + DRAFT_SUMMARY_COLUMNS + """
                 from draft d join league l on l.id = d.league_id
                 where l.id in (select id from chain)
                 order by d.start_time desc nulls last, d.season desc, d.id desc

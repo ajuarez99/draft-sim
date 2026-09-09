@@ -16,6 +16,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.MockDraftRepository;
@@ -49,11 +50,13 @@ public class MockDraftService {
     private final DraftRepository drafts;
     private final LeagueRepository leagues;
     private final OwnerProperties owner;
+    private final LeagueMembership membership;
 
     public MockDraftService(MockDraftRepository mockDrafts, DraftContextFactory contexts,
                             MockDraftEngine engine, BoardService boards, ProfileService profiles,
                             PlayerRepository players, ManagerRepository managers,
-                            DraftRepository drafts, LeagueRepository leagues, OwnerProperties owner) {
+                            DraftRepository drafts, LeagueRepository leagues, OwnerProperties owner,
+                            LeagueMembership membership) {
         this.mockDrafts = mockDrafts;
         this.contexts = contexts;
         this.engine = engine;
@@ -64,10 +67,18 @@ public class MockDraftService {
         this.drafts = drafts;
         this.leagues = leagues;
         this.owner = owner;
+        this.membership = membership;
     }
 
+    /**
+     * @param sleeperUserId the {@code X-Sleeper-User} identity that owns the
+     *                      resulting session (V8), or null when the caller
+     *                      sent no header -- then the session is unowned and
+     *                      visible to everyone, as all sessions were before.
+     */
     @Transactional
-    public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats) {
+    public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats,
+                                          String sleeperUserId) {
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(teams)) {
             throw new IllegalArgumentException(
                     "teams must be one of " + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
@@ -110,7 +121,7 @@ public class MockDraftService {
 
         long rngSeed = System.nanoTime();
         long id = mockDrafts.createSession(teams, shape.rounds(), shape.rosterPositions(),
-                shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed);
+                shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed, sleeperUserId);
 
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
@@ -136,6 +147,13 @@ public class MockDraftService {
     public MockSessionState createSessionFromDraft(String sleeperDraftId, Integer mySlotOverride, String sleeperUserId) {
         DraftRepository.DraftRow draft = drafts.bySleeperId(sleeperDraftId)
                 .orElseThrow(() -> new IllegalArgumentException("draft " + sleeperDraftId + " not ingested"));
+
+        // Same answer as "not ingested" for a draft in a league that isn't the
+        // caller's: forking copies that draft's picks into a session this caller
+        // then owns and reads, so it is a read of the whole board by another name.
+        if (!membership.canSee(sleeperUserId, draft.leagueId())) {
+            throw new IllegalArgumentException("draft " + sleeperDraftId + " not ingested");
+        }
 
         if (!"drafting".equals(draft.status())) {
             throw new IllegalArgumentException("draft " + sleeperDraftId + " is "
@@ -217,7 +235,8 @@ public class MockDraftService {
         int forkedAtPickNo = 1;
         while (forkedAtPickNo <= ctx.totalPicks() && completed.containsKey(forkedAtPickNo)) forkedAtPickNo++;
         long id = mockDrafts.createSession(settings.teams(), settings.rounds(), settings.rosterPositions(),
-                settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed, draft.id(), forkedAtPickNo);
+                settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed, draft.id(), forkedAtPickNo,
+                sleeperUserId);
 
         List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
         for (Map.Entry<Integer, Long> e : completed.entrySet()) {
@@ -239,17 +258,52 @@ public class MockDraftService {
         return buildState(id, ctx);
     }
 
-    /** Every mock session, newest first. Backs the picker screen's "Mock drafts" list. */
-    public List<MockDraftRepository.SessionSummary> listSessions() {
-        return mockDrafts.allSessions();
+    /**
+     * This caller's mock sessions, newest first. Backs the picker screen's
+     * "Mock drafts" list. A null {@code sleeperUserId} sees everything, as it
+     * did before sessions had owners at all (V8).
+     */
+    public List<MockDraftRepository.SessionSummary> listSessions(String sleeperUserId) {
+        return mockDrafts.allSessionsFor(sleeperUserId);
     }
 
-    public Optional<MockSessionState> get(long id) {
+    /**
+     * Empty both when the session doesn't exist and when it belongs to someone
+     * else -- the caller turns either into a 404. Deliberately not a 403: a
+     * distinct "forbidden" would confirm that session id exists, and there is
+     * nothing a visitor can do with that answer except learn how many mocks
+     * other people are running.
+     */
+    public Optional<MockSessionState> get(long id, String sleeperUserId) {
+        if (!mayUse(id, sleeperUserId)) return Optional.empty();
         return mockDrafts.find(id).isEmpty() ? Optional.empty() : Optional.of(buildState(id, null));
     }
 
+    /**
+     * Whether this caller may read or pick into this session.
+     *
+     * Three cases, and the middle one is the reason this exists: an owned
+     * session is only its owner's, an unowned session (V8's closed set of
+     * rows created before the column) is anyone's, and a caller with no
+     * identity header at all keeps the pre-V8 behavior so nothing that never
+     * signs in breaks.
+     *
+     * This is scoping, not security: {@code X-Sleeper-User} is an unverified
+     * claim, so anyone who knows a Sleeper id can present it. It stops two
+     * ordinary users from colliding -- which was a real, silent way to
+     * overwrite someone's in-progress draft -- and does not stop an attacker.
+     * Real auth is the answer to that; see DEPLOY.md's "Multiple people".
+     */
+    private boolean mayUse(long id, String sleeperUserId) {
+        if (sleeperUserId == null || sleeperUserId.isBlank()) return true;
+        Optional<Optional<String>> owner = mockDrafts.ownerOf(id);
+        if (owner.isEmpty()) return true;               // no such session; let the caller 404 it normally
+        return owner.get().map(sleeperUserId::equals).orElse(true);
+    }
+
     @Transactional
-    public Optional<MockSessionState> submitPick(long id, String sleeperPlayerId) {
+    public Optional<MockSessionState> submitPick(long id, String sleeperPlayerId, String sleeperUserId) {
+        if (!mayUse(id, sleeperUserId)) return Optional.empty();
         Optional<MockDraftRepository.SessionRow> locked = mockDrafts.lockForUpdate(id);
         if (locked.isEmpty()) return Optional.empty();
         MockDraftRepository.SessionRow row = locked.get();

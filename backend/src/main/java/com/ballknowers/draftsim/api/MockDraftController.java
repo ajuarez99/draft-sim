@@ -25,10 +25,18 @@ public class MockDraftController {
         this.mocks = mocks;
     }
 
-    /** Every mock session, newest first. Backs the picker screen's "Mock drafts" list. */
+    /**
+     * This caller's mock sessions, newest first. Backs the picker screen's
+     * "Mock drafts" list.
+     *
+     * Scoped by {@code X-Sleeper-User} (V8). Before that this returned every
+     * session in the database to every caller, which with one user was
+     * invisible and with two meant the picker listed strangers' drafts.
+     */
     @GetMapping
-    public List<MockDraftRepository.SessionSummary> list() {
-        return mocks.listSessions();
+    public List<MockDraftRepository.SessionSummary> list(
+            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        return mocks.listSessions(sleeperUserId);
     }
 
     /**
@@ -38,9 +46,10 @@ public class MockDraftController {
      * left out (besides {@code userSlot}) is still a plain bot.
      */
     @PostMapping
-    public MockSessionState create(@RequestBody CreateRequest body) {
+    public MockSessionState create(@RequestBody CreateRequest body,
+                                   @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         if (body == null) throw new IllegalArgumentException("request body is required");
-        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats());
+        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId);
     }
 
     public record CreateRequest(int teams, int userSlot, Map<Integer, Long> managerSeats) {
@@ -63,18 +72,30 @@ public class MockDraftController {
         return mocks.createSessionFromDraft(sleeperDraftId, mySlot, sleeperUserId);
     }
 
+    /** Someone else's session is a 404 here, same as one that doesn't exist -- see MockDraftService.get. */
     @GetMapping("/{id}")
-    public ResponseEntity<MockSessionState> get(@PathVariable long id) {
-        return mocks.get(id).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<MockSessionState> get(@PathVariable long id,
+                                                @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        return mocks.get(id, sleeperUserId).map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    /** Records the user's pick and auto-advances bots to the user's next turn (or the end). */
+    /**
+     * Records the user's pick and auto-advances bots to the user's next turn
+     * (or the end).
+     *
+     * The one endpoint in the app where an unscoped call did not merely read
+     * someone else's data but overwrote it: before V8 any caller could submit
+     * a pick into any in-progress session. Now a session owned by someone else
+     * 404s here exactly as it does on GET.
+     */
     @PostMapping("/{id}/pick")
-    public ResponseEntity<?> pick(@PathVariable long id, @RequestBody(required = false) PickRequest body) {
+    public ResponseEntity<?> pick(@PathVariable long id, @RequestBody(required = false) PickRequest body,
+                                  @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         if (body == null || body.sleeperPlayerId() == null || body.sleeperPlayerId().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "sleeperPlayerId is required"));
         }
-        return mocks.submitPick(id, body.sleeperPlayerId())
+        return mocks.submitPick(id, body.sleeperPlayerId(), sleeperUserId)
                 .<ResponseEntity<?>>map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

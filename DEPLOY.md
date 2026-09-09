@@ -144,6 +144,32 @@ worth knowing before that goes out to more than Allan:
   answer to a raw request. The real fix is a server-side proxy or real auth;
   the interim mitigation, if it matters, is same-origin hosting so at least
   nothing new is exposed beyond the pre-existing token-in-devtools tradeoff.
+- **What is scoped, and what still isn't.** Every league- and draft-addressed
+  route now answers 404 for a signed-in caller who isn't in that league —
+  `/api/drafts` and each `/api/drafts/{id}/…` route (seats, board, track,
+  live-stream, reversal-round, picks), `/api/leagues/{id}/history` and
+  `/power` (including its two writes), `/api/managers/{id}/history`, and
+  forking a live draft into a mock. Mock sessions are owned (V8), so
+  `/api/mocks` and its per-session routes only answer for their owner. The
+  rule itself lives in one place, `store/LeagueMembership`, and
+  `LeagueMembershipIT` pins it against the draft list it shares its SQL with.
+
+  Still unscoped, deliberately: `/api/ingest/*` (anyone can make the server
+  crawl an arbitrary Sleeper league into the shared DB), `/api/board`,
+  `/api/sims`, and `GET`/`PUT`/`DELETE /api/managers` — manager profiles are
+  a shared model layer, not a per-league resource, so "whose manager is this"
+  needs a rule this doesn't have yet.
+
+  **Treat all of it as scoping, not security.** `X-Sleeper-User` is an
+  unverified claim and Sleeper ids are public, so anyone who wants a league's
+  data can still present a member's id and get it. What this buys is that the
+  app no longer hands every visitor every league by default. A real boundary
+  needs real auth.
+
+- **`/api/drafts/{id}/live-stream` takes its identity as `?user=`,** not the
+  header — the browser's native `EventSource` cannot set one, the same
+  limitation that blocks the bearer token on that route. It feeds the same
+  membership check as everything else; only the transport differs.
 - **Live mode's EventSource still cannot send the token** (the gap noted at
   the top of this document). It bites a split-origin deploy with `API_TOKEN`
   set. If draft night matters more than the deploy shape, either keep it

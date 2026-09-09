@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.PowerRankingService;
 import com.ballknowers.draftsim.profile.ManagerProfile;
 import com.ballknowers.draftsim.profile.ProfileService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import org.springframework.http.ResponseEntity;
@@ -13,8 +14,12 @@ import java.util.*;
 
 /**
  * claude/league-suite.md Phase A: read-only league history and the power-rankings
- * page. No auth on any endpoint here -- see the plan's auth-split table (mode 2,
- * league-member ballots, is Phase B and lives nowhere in this file).
+ * page. Still no authentication here -- see the plan's auth-split table (mode 2,
+ * league-member ballots, is Phase B and lives nowhere in this file) -- but every
+ * league-addressed route is now scoped to the requesting Sleeper user's own
+ * leagues via {@link LeagueMembership}, which is a different thing: it stops the
+ * app answering for a league the caller has nothing to do with, and it does not
+ * pretend to stop anyone determined.
  */
 @RestController
 @RequestMapping("/api")
@@ -24,13 +29,27 @@ public class LeagueHistoryController {
     private final RosterSeasonRepository rosterSeasons;
     private final PowerRankingService power;
     private final ProfileService profiles;
+    private final LeagueMembership membership;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
-                                   PowerRankingService power, ProfileService profiles) {
+                                   PowerRankingService power, ProfileService profiles,
+                                   LeagueMembership membership) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
         this.profiles = profiles;
+        this.membership = membership;
+    }
+
+    /**
+     * This league, if the caller may see it -- empty for both "no such league"
+     * and "not yours", which the callers turn into the same 404 for the same
+     * reason {@code LeagueController.visibleDraft} does.
+     */
+    private Optional<LeagueRepository.LeagueRow> visibleLeague(String sleeperId, String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
+        if (league.isEmpty()) return league;
+        return membership.canSee(sleeperUserId, league.get().id()) ? league : Optional.empty();
     }
 
     /**
@@ -40,7 +59,14 @@ public class LeagueHistoryController {
      * first if a season is missing.
      */
     @GetMapping("/leagues/{sleeperId}/history")
-    public ResponseEntity<?> history(@PathVariable String sleeperId) {
+    public ResponseEntity<?> history(@PathVariable String sleeperId,
+                                     @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped on the league the caller actually asked for. The chain it
+        // expands to is by definition that league's own predecessor seasons, so
+        // membership in the head is what governs -- and LeagueMembership's own
+        // walk already treats predecessors as yours.
+        if (visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
 
@@ -90,7 +116,15 @@ public class LeagueHistoryController {
      * about it" (reach, tilt) into one flat shape.
      */
     @GetMapping("/managers/{managerId}/history")
-    public ResponseEntity<?> managerHistory(@PathVariable long managerId) {
+    public ResponseEntity<?> managerHistory(@PathVariable long managerId,
+                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped to managers the caller shares a league with. This page is only
+        // ever reached from a standings row or a seat popover, so anyone with a
+        // legitimate route here already passes -- and without it, a manager id
+        // is a small integer, which makes every person in the database walkable
+        // by counting upwards.
+        if (!membership.canSeeManager(sleeperUserId, managerId)) return ResponseEntity.notFound().build();
+
         List<RosterSeasonRepository.StandingRow> seasons = rosterSeasons.forManager(managerId);
         if (seasons.isEmpty()) return ResponseEntity.notFound().build();
 
@@ -143,8 +177,9 @@ public class LeagueHistoryController {
 
     /** nflState + every stored power-ranking snapshot for the league, one payload for the client-side toggle. */
     @GetMapping("/leagues/{sleeperId}/power")
-    public ResponseEntity<?> powerRankings(@PathVariable String sleeperId) {
-        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
+    public ResponseEntity<?> powerRankings(@PathVariable String sleeperId,
+                                           @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
         PowerRankingService.NflState state = power.nflState();
@@ -184,8 +219,9 @@ public class LeagueHistoryController {
      */
     @PostMapping("/leagues/{sleeperId}/power/compute")
     public ResponseEntity<?> compute(@PathVariable String sleeperId, @RequestParam int season,
-                                     @RequestParam int week) {
-        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
+                                     @RequestParam int week,
+                                     @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
         var marketValue = power.computeMarketValue(league.get().id(), sleeperId, season, week);
@@ -200,8 +236,9 @@ public class LeagueHistoryController {
     /** Allan's own ordering for one week -- {@code rosterIds[0]} is 1st, and so on. */
     @PostMapping("/leagues/{sleeperId}/power/commissioner")
     public ResponseEntity<?> commissioner(@PathVariable String sleeperId,
-                                          @RequestBody CommissionerRanking body) {
-        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
+                                          @RequestBody CommissionerRanking body,
+                                          @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         if (body == null || body.rosterIds() == null || body.rosterIds().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "rosterIds is required"));

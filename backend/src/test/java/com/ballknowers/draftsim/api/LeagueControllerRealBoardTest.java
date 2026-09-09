@@ -10,6 +10,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -24,6 +25,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -42,9 +46,16 @@ class LeagueControllerRealBoardTest {
     @Mock private ManagerRepository managers;
     @Mock private PlayerRepository players;
     @Mock private OwnerProperties owner;
+    @Mock private LeagueMembership membership;
 
     private LeagueController controller() {
-        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner);
+        // These tests are about each endpoint's own behavior, not about scoping,
+        // so the caller can always see the league. LeagueMembership has its own
+        // tests; a mock left unstubbed would answer false and fail every one of
+        // these for the wrong reason.
+        lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner,
+                membership);
     }
 
     private static DraftRepository.DraftRow row() {
@@ -67,7 +78,7 @@ class LeagueControllerRealBoardTest {
     @Test
     void anUnknownDraftIs404() {
         when(drafts.bySleeperId("nope")).thenReturn(Optional.empty());
-        assertEquals(404, controller().realBoard("nope").getStatusCode().value());
+        assertEquals(404, controller().realBoard("nope", null).getStatusCode().value());
     }
 
     /** The common case: the drafted player is still on today's board, so adp/positionalRank are real. */
@@ -81,7 +92,7 @@ class LeagueControllerRealBoardTest {
         when(players.findAll(Sport.NFL)).thenReturn(List.of(bijan));
         when(managers.names()).thenReturn(Map.of(101L, "Allan"));
 
-        ResponseEntity<?> response = controller().realBoard("d1");
+        ResponseEntity<?> response = controller().realBoard("d1", null);
 
         assertEquals(200, response.getStatusCode().value());
         Map<String, Object> pick = onlyPick(response);
@@ -106,7 +117,7 @@ class LeagueControllerRealBoardTest {
         when(players.findAll(Sport.NFL)).thenReturn(List.of(p));
         when(managers.names()).thenReturn(Map.of());
 
-        Map<String, Object> pick = onlyPick(controller().realBoard("d1"));
+        Map<String, Object> pick = onlyPick(controller().realBoard("d1", null));
         assertEquals("Slot 5", pick.get("manager"));
     }
 
@@ -125,7 +136,7 @@ class LeagueControllerRealBoardTest {
         when(players.findAll(Sport.NFL)).thenReturn(List.of(gone));
         when(managers.names()).thenReturn(Map.of(103L, "Sam"));
 
-        Map<String, Object> pick = onlyPick(controller().realBoard("d1"));
+        Map<String, Object> pick = onlyPick(controller().realBoard("d1", null));
         SimulationResult.PlayerRef ref = (SimulationResult.PlayerRef) pick.get("player");
         assertEquals("Long Retired", ref.name());
         assertEquals("TE", ref.position());
@@ -143,7 +154,7 @@ class LeagueControllerRealBoardTest {
         when(managers.names()).thenReturn(Map.of());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) controller().realBoard("d1").getBody();
+        Map<String, Object> body = (Map<String, Object>) controller().realBoard("d1", null).getBody();
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> picks = (List<Map<String, Object>>) body.get("picks");
         assertTrue(picks.isEmpty());

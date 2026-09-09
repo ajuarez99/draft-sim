@@ -23,7 +23,10 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -360,6 +363,68 @@ class LiveDraftPollerTest {
                 "three failing ticks took only " + elapsedMs + "ms -- the loop is busy-spinning");
     }
 
+    /**
+     * A draft that never starts must not be polled forever. pollOnce returns
+     * keepPolling=true for pre_draft, so opening the live page on a draft
+     * scheduled for next month used to leave a thread hitting Sleeper every ten
+     * seconds for the life of the process.
+     */
+    @Test
+    void aDraftThatNeverStartsStopsBeingPolled() throws InterruptedException {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players,
+                Duration.ofMillis(10), Duration.ofMillis(50));
+        DraftRepository.DraftRow draft = draftRow("pre_draft");
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "pre_draft");
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+
+        Thread t = Thread.ofVirtual().start(() -> poller.loop(draft));
+        t.join(Duration.ofSeconds(5));
+        assertFalse(t.isAlive(), "the loop should have given up on a draft that never started");
+        // Never fetched picks: pre_draft skips them, so nothing was ingested for
+        // all that polling either.
+        verify(sleeper, never()).draftPicks(any());
+    }
+
+    /**
+     * The other half of the same rule, and the more important one: once the
+     * draft is actually underway there is no deadline at all. Some leagues run
+     * slow drafts with multi-hour pick clocks, and a poller that quits three
+     * hours into a live draft is a far worse failure than a wasted request.
+     */
+    @Test
+    void aDraftThatHasStartedIsNotAbandonedOnTheDeadline() throws InterruptedException {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players,
+                Duration.ofMillis(10), Duration.ofMillis(20));
+        DraftRepository.DraftRow draft = draftRow("drafting");
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "drafting");
+        raw.put("draft_order", draftOrderOf(14));
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
+        when(managers.idsBySleeperUserId()).thenReturn(managersOf(14));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
+        CountDownLatch ticks = new CountDownLatch(5);
+        when(sleeper.draftPicks("sleeper-draft-123")).thenAnswer(inv -> {
+            ticks.countDown();
+            return List.of();
+        });
+
+        Thread t = Thread.ofVirtual().start(() -> poller.loop(draft));
+        try {
+            // Well past a 20ms deadline: if `drafting` were subject to it, the
+            // loop would be dead long before the fifth tick.
+            assertTrue(ticks.await(10, TimeUnit.SECONDS),
+                    "a live draft must keep being polled past the pre-draft deadline");
+            assertTrue(t.isAlive());
+        } finally {
+            t.interrupt();
+            t.join(Duration.ofSeconds(5));
+        }
+    }
+
     @Test
     void trackCalledTwiceStartsExactlyOnePollerAndFetchesSleeperOnlyOnce() {
         // A long interval so the spawned loop's own ticks never land during the
@@ -497,7 +562,7 @@ class LiveDraftPollerTest {
     }
 
     @Test
-    void subscribersSeeEveryTickAndUnsubscribeRemovesThem() {
+    void subscribersSeeEveryTickAndUnsubscribeRemovesThem() throws InterruptedException {
         poller = new LiveDraftPoller(sleeper, drafts, managers, players);
         DraftRepository.DraftRow draft = draftRow("drafting", Map.of());
 
@@ -509,13 +574,17 @@ class LiveDraftPollerTest {
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("p1", 5L));
         when(sleeper.draftPicks("sleeper-draft-123")).thenReturn(List.of(rawPick("p1", "", 7, 7, 1)));
 
-        List<LiveDraftPoller.LiveSnapshot> seen = new ArrayList<>();
+        // Delivery is asynchronous now -- one virtual thread per subscriber, so a
+        // viewer whose socket has stalled cannot park the poll thread and stop
+        // ingest for everyone. A blocking queue rather than a plain list, so the
+        // test waits for the handoff instead of racing it.
+        BlockingQueue<LiveDraftPoller.LiveSnapshot> seen = new LinkedBlockingQueue<>();
         Runnable unsubscribe = poller.subscribe(1L, seen::add);
         assertEquals(1, poller.listenerCount(1L));
 
         poller.pollOnce(draft);
-        assertEquals(1, seen.size());
-        LiveDraftPoller.LiveSnapshot s = seen.get(0);
+        LiveDraftPoller.LiveSnapshot s = seen.poll(5, TimeUnit.SECONDS);
+        assertNotNull(s, "the subscriber must receive the tick");
         assertEquals("drafting", s.status());
         assertEquals(1, s.picksMade());
         assertEquals(7, s.lastPickNo());
@@ -526,7 +595,8 @@ class LiveDraftPollerTest {
         unsubscribe.run();
         assertEquals(0, poller.listenerCount(1L));
         poller.pollOnce(draft);
-        assertEquals(1, seen.size(), "an unsubscribed listener must stop receiving");
+        assertNull(seen.poll(500, TimeUnit.MILLISECONDS),
+                "an unsubscribed listener must stop receiving");
     }
 
     /**
@@ -535,7 +605,7 @@ class LiveDraftPollerTest {
      * listener is dropped; the tick and every other listener carry on.
      */
     @Test
-    void aThrowingListenerIsDroppedAndDoesNotBreakTheTick() {
+    void aThrowingListenerIsDroppedAndDoesNotBreakTheTick() throws InterruptedException {
         poller = new LiveDraftPoller(sleeper, drafts, managers, players);
         DraftRepository.DraftRow draft = draftRow("pre_draft", Map.of());
 
@@ -545,7 +615,7 @@ class LiveDraftPollerTest {
         when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
         when(managers.idsBySleeperUserId()).thenReturn(managersOf(14));
 
-        List<LiveDraftPoller.LiveSnapshot> healthy = new ArrayList<>();
+        BlockingQueue<LiveDraftPoller.LiveSnapshot> healthy = new LinkedBlockingQueue<>();
         poller.subscribe(1L, s -> { throw new IllegalStateException("ResponseBodyEmitter has already completed"); });
         poller.subscribe(1L, healthy::add);
         assertEquals(2, poller.listenerCount(1L));
@@ -553,10 +623,127 @@ class LiveDraftPollerTest {
         LiveDraftPoller.Tick tick = assertDoesNotThrow(() -> poller.pollOnce(draft));
 
         assertTrue(tick.keepPolling(), "the tick must survive a listener blowing up");
-        assertEquals(1, poller.listenerCount(1L), "the throwing listener must be dropped");
-        assertEquals(1, healthy.size(), "the healthy listener still gets its snapshot");
+        assertNotNull(healthy.poll(5, TimeUnit.SECONDS), "the healthy listener still gets its snapshot");
+        // The drop now happens on the dead subscriber's own delivery thread, so
+        // it is awaited rather than asserted the instant the tick returns.
+        awaitListenerCount(1, "the throwing listener must be dropped");
 
         poller.pollOnce(draft);
-        assertEquals(2, healthy.size());
+        assertNotNull(healthy.poll(5, TimeUnit.SECONDS));
+    }
+
+    private void awaitListenerCount(int expected, String message) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            if (poller.listenerCount(1L) == expected) return;
+            Thread.sleep(10);
+        }
+        assertEquals(expected, poller.listenerCount(1L), message);
+    }
+
+    /**
+     * The multi-user failure the delivery decoupling exists for: twelve people
+     * watching the same draft, one of whose laptops has gone to sleep with the
+     * TCP connection not yet reset. That listener's send blocks rather than
+     * throwing, so inline delivery parked the poll thread inside it -- no Sleeper
+     * ingest and no updates for the other eleven, for as long as the OS took to
+     * give up on the socket. The throwing-listener guard never covered this,
+     * because a stalled write does not throw, it waits.
+     */
+    @Test
+    void aBlockedSubscriberDoesNotStallTheTickOrTheOtherSubscribers() throws InterruptedException {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players);
+        DraftRepository.DraftRow draft = draftRow("pre_draft", Map.of());
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "pre_draft");
+        raw.put("draft_order", draftOrderOf(14));
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
+        when(managers.idsBySleeperUserId()).thenReturn(managersOf(14));
+
+        CountDownLatch stuckEntered = new CountDownLatch(1);
+        CountDownLatch releaseStuck = new CountDownLatch(1);
+        BlockingQueue<LiveDraftPoller.LiveSnapshot> healthy = new LinkedBlockingQueue<>();
+        poller.subscribe(1L, s -> {
+            stuckEntered.countDown();
+            try {
+                releaseStuck.await();       // the asleep laptop: blocks, never throws
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        poller.subscribe(1L, healthy::add);
+
+        try {
+            long start = System.nanoTime();
+            poller.pollOnce(draft);
+            long tickMs = (System.nanoTime() - start) / 1_000_000;
+
+            assertTrue(stuckEntered.await(5, TimeUnit.SECONDS), "the stuck listener should have been called");
+            assertTrue(tickMs < 2_000, "the tick must not wait on a blocked subscriber, took " + tickMs + " ms");
+            assertNotNull(healthy.poll(5, TimeUnit.SECONDS),
+                    "a healthy subscriber must still be served while another is stuck");
+
+            // And ingest keeps running: a further tick neither blocks nor throws.
+            assertDoesNotThrow(() -> poller.pollOnce(draft));
+            assertNotNull(healthy.poll(5, TimeUnit.SECONDS));
+        } finally {
+            releaseStuck.countDown();
+        }
+    }
+
+    /**
+     * Twelve browsers opening the live page in the same second. Each one
+     * auto-tracks (LeagueController.liveStream), and before the per-draft lock
+     * every one of them saw active.containsKey == false and ran its own full
+     * synchronous tick -- sleeper.draft + sleeper.draftPicks + a 210-row upsert,
+     * twelve times over, aimed at Sleeper at the exact moment everyone arrives.
+     */
+    @Test
+    void concurrentTracksRunExactlyOneTickAndStartExactlyOnePoller() throws InterruptedException {
+        // An hour's interval so the spawned poll loop's own first tick cannot
+        // land inside the assertions below and turn the Sleeper call count into
+        // a race.
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players, Duration.ofHours(1));
+        DraftRepository.DraftRow draft = draftRow("pre_draft", Map.of());
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "pre_draft");
+        raw.put("draft_order", draftOrderOf(14));
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
+        when(managers.idsBySleeperUserId()).thenReturn(managersOf(14));
+
+        int callers = 12;
+        CountDownLatch go = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(callers);
+        List<LiveDraftPoller.TrackResult> results = new CopyOnWriteArrayList<>();
+        for (int i = 0; i < callers; i++) {
+            Thread.ofVirtual().start(() -> {
+                try {
+                    go.await();
+                    results.add(poller.track(draft));
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        go.countDown();
+        assertTrue(done.await(20, TimeUnit.SECONDS), "every track() call should have returned");
+
+        verify(sleeper, times(1)).draft("sleeper-draft-123");
+        assertEquals(callers, results.size());
+        assertEquals(1, results.stream().filter(LiveDraftPoller.TrackResult::started).count(),
+                "exactly one caller should report having started the poller");
+        assertTrue(results.stream().allMatch(LiveDraftPoller.TrackResult::pollerRunning),
+                "every caller should be told a poller is running");
+        // The losers must answer from the winner's observation rather than from
+        // the stale DraftRow -- that honesty is why /track ticks at all.
+        assertTrue(results.stream().allMatch(r -> "pre_draft".equals(r.status())));
+        assertTrue(results.stream().allMatch(r -> r.seatsMapped() == 14),
+                "every caller should see the freshly observed seat count");
+        assertTrue(results.stream().allMatch(LiveDraftPoller.TrackResult::observed),
+                "no caller should have to fall back to the stored status");
     }
 }

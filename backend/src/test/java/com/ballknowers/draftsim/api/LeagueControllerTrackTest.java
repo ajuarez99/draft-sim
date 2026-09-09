@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -42,9 +43,16 @@ class LeagueControllerTrackTest {
     @Mock private ManagerRepository managers;
     @Mock private PlayerRepository players;
     @Mock private OwnerProperties owner;
+    @Mock private LeagueMembership membership;
 
     private LeagueController controller() {
-        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner);
+        // These tests are about each endpoint's own behavior, not about scoping,
+        // so the caller can always see the league. LeagueMembership has its own
+        // tests; a mock left unstubbed would answer false and fail every one of
+        // these for the wrong reason.
+        lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner,
+                membership);
     }
 
     private static DraftRepository.DraftRow row(String status) {
@@ -58,7 +66,7 @@ class LeagueControllerTrackTest {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(draft));
         when(poller.track(draft)).thenReturn(new LiveDraftPoller.TrackResult(true, null, 0, true, true));
 
-        ResponseEntity<?> response = controller().track("d1");
+        ResponseEntity<?> response = controller().track("d1", null);
 
         assertEquals(200, response.getStatusCode().value());
         Map<String, Object> body = (Map<String, Object>) response.getBody();
@@ -83,7 +91,7 @@ class LeagueControllerTrackTest {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(draft));
         when(poller.track(draft)).thenReturn(new LiveDraftPoller.TrackResult(false, "drafting", 14, true, true));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1").getBody();
+        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
 
         assertNotNull(body);
         assertEquals("drafting", body.get("status"));
@@ -110,7 +118,7 @@ class LeagueControllerTrackTest {
         when(poller.track(draft))
                 .thenReturn(new LiveDraftPoller.TrackResult(false, "complete", 14, true, false));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1").getBody();
+        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
 
         assertNotNull(body);
         assertEquals(false, body.get("tracking"), "nothing polls a finished draft");
@@ -131,7 +139,7 @@ class LeagueControllerTrackTest {
         when(poller.track(draft))
                 .thenReturn(new LiveDraftPoller.TrackResult(true, "pre_draft", 0, false, true));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1").getBody();
+        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
 
         assertNotNull(body);
         assertEquals(false, body.get("observed"));
@@ -141,6 +149,6 @@ class LeagueControllerTrackTest {
     @Test
     void trackOnAnUnknownDraftIs404() {
         when(drafts.bySleeperId("nope")).thenReturn(Optional.empty());
-        assertEquals(404, controller().track("nope").getStatusCode().value());
+        assertEquals(404, controller().track("nope", null).getStatusCode().value());
     }
 }

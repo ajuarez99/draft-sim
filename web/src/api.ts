@@ -257,11 +257,29 @@ export type SleeperUser = {
   avatar: string | null
 }
 
-/** null (not a thrown error) when Sleeper has no such username -- the 404 case. */
+/**
+ * The lookup's two outcomes, kept inside one 200 rather than split across a
+ * status code -- see SleeperUserController.user's comment.
+ */
+type SleeperUserLookup = ({ found: true } & SleeperUser) | { found: false }
+
+/**
+ * null (not a thrown error) when Sleeper genuinely has no such username.
+ *
+ * A 404 is deliberately NOT that case any more. This used to read
+ * `if (res.status === 404) return null`, which conflated "Sleeper has no such
+ * name" with "this backend has no such route" -- and the second is a routine
+ * state, not an exotic one, because the frontend and backend deploy
+ * independently (DEPLOY.md: Vercel + Fly). The result was that the sign-in
+ * gate told a visitor with a perfectly valid username to check their spelling,
+ * with no way forward: the caller's retry path never fired. A 404 now throws
+ * like any other unexpected status, so SignIn reaches its `unreachable` state
+ * and offers a retry instead.
+ */
 export async function getSleeperUser(usernameOrId: string): Promise<SleeperUser | null> {
   const res = await apiFetch(`/api/sleeper/user/${encodeURIComponent(usernameOrId)}`)
-  if (res.status === 404) return null
-  return json<SleeperUser>(res)
+  const body = await json<SleeperUserLookup>(res)
+  return body.found ? body : null
 }
 
 /** Mirrors SleeperUserController.leagues' per-row response shape. */
@@ -409,17 +427,6 @@ export const setTendencies = (managerId: number, sport: Sport, body: ManualTende
 export const clearTendencies = (managerId: number, sport: Sport) =>
   apiFetch(`/api/managers/${managerId}/tendencies?sport=${sport}`, { method: 'DELETE' }).then(
     json<unknown>,
-  )
-
-// `sport` is required, not defaulted: /api/board's own `sport` param defaults
-// to nfl backend-side, so an omitted argument here silently returned the
-// football board for a basketball caller rather than failing. Nothing calls
-// this helper today -- the draft-scoped GET /api/drafts/{id}/board is what the
-// board views use, and the backend derives the sport there -- but a defaulted
-// parameter is exactly how it would go wrong the first time something did.
-export const getBoard = (sport: Sport, limit = 60) =>
-  apiFetch(`/api/board?sport=${sport}&limit=${limit}`).then(
-    json<{ capturedOn: string; entries: unknown[] }>,
   )
 
 /**

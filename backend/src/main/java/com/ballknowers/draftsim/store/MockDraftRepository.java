@@ -32,8 +32,9 @@ public class MockDraftRepository {
 
     /** An ordinary from-scratch mock: no real draft behind it. */
     public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
-                              String seatsJson, int userSlot, long rngSeed) {
-        return createSession(teams, rounds, rosterPositions, ppr, seatsJson, userSlot, rngSeed, null, null);
+                              String seatsJson, int userSlot, long rngSeed, String ownerSleeperUserId) {
+        return createSession(teams, rounds, rosterPositions, ppr, seatsJson, userSlot, rngSeed,
+                null, null, ownerSleeperUserId);
     }
 
     /**
@@ -43,17 +44,21 @@ public class MockDraftRepository {
      * @param forkedAtPickNo the first pick this session hadn't yet decided at
      *                       fork time -- meaningless (and null) when
      *                       sourceDraftId is null.
+     * @param ownerSleeperUserId the X-Sleeper-User identity that created this
+     *                       session (V8), or null when the caller sent no
+     *                       header -- an unowned session, visible to everyone,
+     *                       exactly as every session behaved before V8.
      */
     public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
                               String seatsJson, int userSlot, long rngSeed,
-                              Long sourceDraftId, Integer forkedAtPickNo) {
+                              Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId) {
         return jdbc.execute((java.sql.Connection con) -> {
             Array slots = con.createArrayOf("text", rosterPositions.toArray());
             var ps = con.prepareStatement("""
                     insert into mock_draft_session
                         (teams, rounds, roster_positions, points_per_reception, seats_json, user_slot, rng_seed,
-                         source_draft_id, forked_at_pick_no)
-                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?)
+                         source_draft_id, forked_at_pick_no, owner_sleeper_user_id)
+                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?)
                     returning id
                     """);
             ps.setInt(1, teams);
@@ -65,6 +70,8 @@ public class MockDraftRepository {
             ps.setLong(7, rngSeed);
             if (sourceDraftId == null) ps.setNull(8, Types.BIGINT); else ps.setLong(8, sourceDraftId);
             if (forkedAtPickNo == null) ps.setNull(9, Types.INTEGER); else ps.setInt(9, forkedAtPickNo);
+            if (ownerSleeperUserId == null || ownerSleeperUserId.isBlank()) ps.setNull(10, Types.VARCHAR);
+            else ps.setString(10, ownerSleeperUserId);
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
             }
@@ -171,14 +178,51 @@ public class MockDraftRepository {
     public record SessionSummary(long id, String status, int teams, int rounds, int userSlot,
                                  int currentPickNo, java.time.Instant createdAt) {}
 
-    /** Every mock session, newest first. Backs the picker screen's "Mock drafts" list. */
-    public List<SessionSummary> allSessions() {
+    /**
+     * Mock sessions visible to one caller, newest first. Backs the picker
+     * screen's "Mock drafts" list.
+     *
+     * A null {@code sleeperUserId} (no {@code X-Sleeper-User} header) returns
+     * everything, unchanged from before V8 -- the same convention
+     * {@link DraftRepository#allWithLeagueFor} follows for the draft list.
+     * A signed-in caller sees their own sessions plus the unowned ones
+     * (V8's closed set of pre-column rows), and nobody else's.
+     */
+    public List<SessionSummary> allSessionsFor(String sleeperUserId) {
+        if (sleeperUserId == null || sleeperUserId.isBlank()) {
+            return db.sql("""
+                    select id, status, teams, rounds, user_slot, current_pick_no, created_at
+                    from mock_draft_session order by created_at desc
+                    """)
+                    .query(MockDraftRepository::mapSummary)
+                    .list();
+        }
         return db.sql("""
                 select id, status, teams, rounds, user_slot, current_pick_no, created_at
-                from mock_draft_session order by created_at desc
+                from mock_draft_session
+                where owner_sleeper_user_id = ? or owner_sleeper_user_id is null
+                order by created_at desc
                 """)
-                .query((rs, i) -> new SessionSummary(rs.getLong(1), rs.getString(2), rs.getInt(3),
-                        rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getTimestamp(7).toInstant()))
+                .param(sleeperUserId)
+                .query(MockDraftRepository::mapSummary)
                 .list();
+    }
+
+    private static SessionSummary mapSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
+        return new SessionSummary(rs.getLong(1), rs.getString(2), rs.getInt(3),
+                rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getTimestamp(7).toInstant());
+    }
+
+    /**
+     * This session's owner, or empty if the session itself doesn't exist.
+     * An existing session with no owner answers {@code Optional.of(empty
+     * Optional)} -- distinguishing "no such session" from "unowned session"
+     * matters, because they authorize differently.
+     */
+    public Optional<Optional<String>> ownerOf(long id) {
+        return db.sql("select owner_sleeper_user_id from mock_draft_session where id = ?")
+                .param(id)
+                .query((rs, i) -> Optional.ofNullable(rs.getString(1)))
+                .optional();
     }
 }

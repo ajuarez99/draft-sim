@@ -9,6 +9,7 @@ import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -23,6 +24,9 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -42,9 +46,16 @@ class LeagueControllerBoardTest {
     @Mock private ManagerRepository managers;
     @Mock private PlayerRepository players;
     @Mock private OwnerProperties owner;
+    @Mock private LeagueMembership membership;
 
     private LeagueController controller() {
-        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner);
+        // These tests are about each endpoint's own behavior, not about scoping,
+        // so the caller can always see the league. LeagueMembership has its own
+        // tests; a mock left unstubbed would answer false and fail every one of
+        // these for the wrong reason.
+        lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        return new LeagueController(leagues, drafts, profiles, boards, poller, managers, players, owner,
+                membership);
     }
 
     private static Player player(long id, String name, Position pos) {

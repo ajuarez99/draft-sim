@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
 import java.util.List;
 import java.util.Map;
@@ -29,28 +27,34 @@ class SleeperUserControllerTest {
     }
 
     @Test
-    void userReturns200WithMappedFieldsForARealUsername() {
+    void userReturnsFoundTrueWithMappedFieldsForARealUsername() {
         when(sleeper.user("popsharky")).thenReturn(Map.of(
                 "user_id", "1122386008709910528", "username", "popsharky",
                 "display_name", "popsharky", "avatar", "e1d4ebf9ea0760f248119d4ec2ac5a63"));
 
-        ResponseEntity<Map<String, Object>> resp = controller().user("popsharky");
+        Map<String, Object> body = controller().user("popsharky");
 
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        assertEquals("1122386008709910528", resp.getBody().get("sleeperUserId"));
-        assertEquals("popsharky", resp.getBody().get("username"));
-        assertEquals("e1d4ebf9ea0760f248119d4ec2ac5a63", resp.getBody().get("avatar"));
+        assertEquals(true, body.get("found"));
+        assertEquals("1122386008709910528", body.get("sleeperUserId"));
+        assertEquals("popsharky", body.get("username"));
+        assertEquals("e1d4ebf9ea0760f248119d4ec2ac5a63", body.get("avatar"));
     }
 
     @Test
-    void userReturns404WhenSleeperAnswersAJsonNullBody() {
+    void anUnknownUsernameIsFoundFalseRatherThanA404() {
         // Sleeper answers HTTP 200 with a literal `null` body for an unknown
         // username, not a 404 -- verified live against api.sleeper.app.
+        //
+        // This route deliberately does NOT turn that into a 404: the sign-in
+        // gate has to tell "Sleeper has no such name" apart from "this route
+        // isn't deployed", and two bare 404s cannot be told apart. See the
+        // controller's own comment.
         when(sleeper.user("no-such-sleeper-user")).thenReturn(null);
 
-        ResponseEntity<Map<String, Object>> resp = controller().user("no-such-sleeper-user");
+        Map<String, Object> body = controller().user("no-such-sleeper-user");
 
-        assertEquals(HttpStatus.NOT_FOUND, resp.getStatusCode());
+        assertEquals(false, body.get("found"));
+        assertFalse(body.containsKey("sleeperUserId"), "nothing to identify an unknown user by");
     }
 
     @Test

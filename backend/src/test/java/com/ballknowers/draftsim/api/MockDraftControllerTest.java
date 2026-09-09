@@ -37,9 +37,9 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesTeamsAndUserSlotToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of())).thenReturn(sampleState(1));
+        when(mocks.createSession(8, 3, Map.of(), null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of()));
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of()), null);
 
         assertEquals(1, result.id());
     }
@@ -47,9 +47,9 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesManagerSeatsToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(5, 42L))).thenReturn(sampleState(1));
+        when(mocks.createSession(8, 3, Map.of(5, 42L), null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L)));
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L)), null);
 
         assertEquals(1, result.id());
     }
@@ -92,15 +92,15 @@ class MockDraftControllerTest {
     @Test
     void createRejectsAMissingBody() {
         MockDraftController controller = new MockDraftController(mocks);
-        assertThrows(IllegalArgumentException.class, () -> controller.create(null));
+        assertThrows(IllegalArgumentException.class, () -> controller.create(null, null));
     }
 
     @Test
     void getReturns200WithTheStateWhenTheSessionExists() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.get(5L)).thenReturn(Optional.of(sampleState(5)));
+        when(mocks.get(5L, null)).thenReturn(Optional.of(sampleState(5)));
 
-        ResponseEntity<MockSessionState> response = controller.get(5L);
+        ResponseEntity<MockSessionState> response = controller.get(5L, null);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(5, response.getBody().id());
@@ -109,16 +109,16 @@ class MockDraftControllerTest {
     @Test
     void getReturns404WhenTheSessionDoesNotExist() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.get(404L)).thenReturn(Optional.empty());
+        when(mocks.get(404L, null)).thenReturn(Optional.empty());
 
-        assertEquals(404, controller.get(404L).getStatusCode().value());
+        assertEquals(404, controller.get(404L, null).getStatusCode().value());
     }
 
     @Test
     void pickRejectsAMissingSleeperPlayerIdWithoutCallingTheService() {
         MockDraftController controller = new MockDraftController(mocks);
 
-        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest(""));
+        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest(""), null);
 
         assertEquals(400, response.getStatusCode().value());
         assertEquals(Map.of("error", "sleeperPlayerId is required"), response.getBody());
@@ -127,9 +127,9 @@ class MockDraftControllerTest {
     @Test
     void pickReturns404WhenTheSessionDoesNotExist() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.submitPick(1L, "abc")).thenReturn(Optional.empty());
+        when(mocks.submitPick(1L, "abc", null)).thenReturn(Optional.empty());
 
-        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"));
+        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"), null);
 
         assertEquals(404, response.getStatusCode().value());
     }
@@ -137,9 +137,9 @@ class MockDraftControllerTest {
     @Test
     void pickReturns200WithTheAdvancedStateOnSuccess() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.submitPick(1L, "abc")).thenReturn(Optional.of(sampleState(1)));
+        when(mocks.submitPick(1L, "abc", null)).thenReturn(Optional.of(sampleState(1)));
 
-        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"));
+        ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"), null);
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(1L, ((MockSessionState) response.getBody()).id());
@@ -149,8 +149,8 @@ class MockDraftControllerTest {
     void listDelegatesToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
         var summary = new MockDraftRepository.SessionSummary(1, "IN_PROGRESS", 8, 15, 1, 1, null);
-        when(mocks.listSessions()).thenReturn(List.of(summary));
+        when(mocks.listSessions(null)).thenReturn(List.of(summary));
 
-        assertEquals(List.of(summary), controller.list());
+        assertEquals(List.of(summary), controller.list(null));
     }
 }

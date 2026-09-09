@@ -62,6 +62,25 @@ describe('SignIn', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 
+  it('a backend that 404s the route is unreachable, not a misspelled username', async () => {
+    // The regression this exists for: getSleeperUser used to map any 404 to
+    // "no such user", so a frontend deployed ahead of its backend told a
+    // visitor with a perfectly valid username to check their spelling -- on
+    // the gate, with no retry offered. getSleeperUser now throws on a 404 and
+    // reserves null for "Sleeper genuinely has no such name", so the two
+    // outcomes land in different states here.
+    getSleeperUser.mockRejectedValue(new Error('HTTP 404'))
+    const user = userEvent.setup()
+    render(<SignIn />)
+
+    await user.type(screen.getByLabelText(/your sleeper username/i), 'popsharky')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+
+    expect(await screen.findByText(/couldn.t reach sleeper/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
+    expect(screen.queryByText(/check the spelling/i)).not.toBeInTheDocument()
+  })
+
   it('accepts a pasted Sleeper profile URL, extracting just the username', async () => {
     getSleeperUser.mockResolvedValue(sampleUser)
     const user = userEvent.setup()
