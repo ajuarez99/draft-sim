@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
+  setReversalRound,
   streamSimulation,
   type PlayerRef,
   type PredictedPick,
@@ -77,6 +78,10 @@ export default function DraftView() {
   // (handleSeatsChanged refetches after every edit).
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [openSeatSlot, setOpenSeatSlot] = useState<number | null>(null)
+  // The reversal-round control is the only thing in the settings popover that
+  // writes to the server, so it is the only one that can fail or be in flight.
+  const [savingReversal, setSavingReversal] = useState(false)
+  const [reversalError, setReversalError] = useState<string | null>(null)
   const topSlot = useTopSlot()
 
   // Bumped only by run() -- passed to useRevealedBoard as its resetKey, so a
@@ -387,6 +392,42 @@ export default function DraftView() {
   // independently of a run, so this is available even on the pre-start empty
   // board. Defaults to 'nfl' only for the render(s) before `seats` has
   // loaded at all.
+  /**
+   * Writes the reversal-round override for this draft and folds the answer
+   * back into `seats` rather than refetching -- the PUT returns the same three
+   * fields, and a refetch would also re-run the profile fit for no reason.
+   *
+   * `null` means "no opinion, follow Sleeper", which is a different stored
+   * state from pinning Sleeper's current number (that one survives a re-ingest
+   * that moves it). The select's own `sleeper` option is the null.
+   */
+  async function changeReversalRound(raw: string) {
+    const value = raw === 'sleeper' ? null : Number(raw)
+    setSavingReversal(true)
+    setReversalError(null)
+    try {
+      const r = await setReversalRound(draftId, value)
+      setSeats((prev) =>
+        prev
+          ? {
+              ...prev,
+              reversalRound: r.reversalRound,
+              reversalRoundFromSleeper: r.reversalRoundFromSleeper,
+              reversalRoundOverridden: r.reversalRoundOverridden,
+            }
+          : prev,
+      )
+      // The board on screen was simulated against the old pick order, so it is
+      // now stale in exactly the way a seat edit makes it stale. Same flag,
+      // same "Simulate again" affordance.
+      if (result) setSeatsDirty(true)
+    } catch (e) {
+      setReversalError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setSavingReversal(false)
+    }
+  }
+
   const sport = seats?.sport ?? 'nfl'
 
   // Whether the board headers have anything real to show as "you" yet. An
@@ -513,6 +554,7 @@ export default function DraftView() {
                   seats={seats.seats}
                   mySlot={slotKnown ? mySlot : undefined}
                   sport={sport}
+                  reversalRound={seats.reversalRound}
                   onCellClick={started ? setOpenPick : undefined}
                   onSeatClick={setOpenSeatSlot}
                 />
@@ -606,6 +648,7 @@ export default function DraftView() {
           return openSeat ? (
             <SeatPopover
               seat={openSeat}
+              sport={sport}
               isMe={openSeat.slot === mySlot}
               onChanged={handleSeatsChanged}
               onClose={() => setOpenSeatSlot(null)}
@@ -664,6 +707,66 @@ export default function DraftView() {
               </label>
             </div>
             {(running || resimming) && <p className="muted tiny">Applies to the next run.</p>}
+
+            {/* Not a simulation parameter like the two above -- this is a fact
+                about the draft, persisted, and read by the board and the live
+                room too. It lives here because this is the draft's only
+                settings surface, and it is separated by a rule for the same
+                reason.
+
+                Why it is editable at all: `reversal_round` is the one piece of
+                behaviour in this app that ships as an assumption. Every draft
+                this Sleeper account can see is `reversal_round: 0`, so the
+                semantics of a nonzero value ("flip snake parity from this
+                round on") were never executed against real data -- only
+                pinned by a test (multi-sport-and-rebrand.md, "Assumed, not
+                verified"). Whoever is running the draft can see the pick order
+                go wrong in round 3 and fix it in ten seconds; whoever deployed
+                the app cannot. Stored in its own column so the next ingest
+                does not overwrite it. */}
+            {seats && (
+              <div className="controls reversal-control">
+                <label>
+                  snake reversal
+                  <select
+                    value={seats.reversalRoundOverridden ? String(seats.reversalRound) : 'sleeper'}
+                    disabled={savingReversal}
+                    onChange={(e) => void changeReversalRound(e.target.value)}
+                  >
+                    <option value="sleeper">
+                      Follow Sleeper
+                      {seats.reversalRoundFromSleeper > 0
+                        ? ` — flips from round ${seats.reversalRoundFromSleeper}`
+                        : ' — never flips'}
+                    </option>
+                    <option value="0">Never flips</option>
+                    {/* From 2, not 1: "flip parity from round 1" inverts the
+                        whole draft rather than reversing anything, and is not
+                        a thing any league does. The backend still accepts it. */}
+                    {Array.from({ length: Math.max(0, seats.rounds - 1) }, (_, i) => i + 2).map((n) => (
+                      <option key={n} value={n}>
+                        Flips from round {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            {reversalError && <p className="seat-form-error tiny">{reversalError}</p>}
+            {seats && (
+              <p className="muted tiny">
+                {seats.reversalRound === 0
+                  ? 'Plain snake: 1…12, 12…1, 1…12. Every football draft here is this.'
+                  : `Rounds 1–${seats.reversalRound - 1} snake normally; from round ${seats.reversalRound} on, `
+                    + 'each round starts where a plain snake would have ended — Sleeper’s '
+                    + '“reversal round”. Nothing in this app has ever run against a real '
+                    + 'draft that does this.'}
+                {seats.reversalRoundOverridden && ' You set this; Sleeper said '
+                  + (seats.reversalRoundFromSleeper === 0
+                    ? 'it never flips.'
+                    : `it flips from round ${seats.reversalRoundFromSleeper}.`)}
+              </p>
+            )}
             {/* Moved out of the board header: this discards the current board
                 and simulates the whole draft again, which belongs beside the
                 settings it re-reads rather than next to the reveal it ends. */}

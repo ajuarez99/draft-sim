@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { getManagers, type ManualTendencies, type Seat } from '../api'
+import { getManagers, type ManualTendencies, type Seat, type Sport } from '../api'
 import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
-import { behaviourText } from '../managerBehaviour'
+import { behaviourText, reachGapText } from '../managerBehaviour'
 import TendenciesForm from './TendenciesForm'
 
 /**
@@ -19,15 +19,29 @@ import TendenciesForm from './TendenciesForm'
  * evidence.
  */
 function behaviour(s: Seat) {
-  return behaviourText({ reachBias: s.reachBias, unpredictability: s.unpredictability, positionalTilt: s.positionalTilt })
+  return behaviourText({
+    reachBias: s.reachBias,
+    unpredictability: s.unpredictability,
+    positionalTilt: s.positionalTilt,
+    picksScored: s.picksScored,
+  })
 }
 
 function footnote(s: Seat) {
   switch (s.provenance) {
     case 'NEUTRAL':
-      return null // the body line already says it; saying it twice is worse than once
+      // Two different seats land here. One has no history at all, and the body
+      // line already says so. The other has real drafts whose picks could not
+      // be scored for reach -- which is every basketball seat, permanently --
+      // and that seat needs the reason said out loud, because the alternative
+      // is a fitted-looking profile with an invented reach number behind it.
+      return reachGapText(s)
     case 'STATED':
-      return 'What you entered. No history to check it against.'
+      // Not "no history": a seat with drafts but no scoreable picks is STATED
+      // too (ProfileService's hasData is picksScored > 0, not draftsObserved),
+      // and telling someone there is no history when there are two seasons of
+      // it is the wrong correction to make.
+      return reachGapText(s) ?? 'What you entered. No history to check it against.'
     case 'FITTED':
       return `${s.draftsObserved} draft${s.draftsObserved === 1 ? '' : 's'} observed · ${s.picksScored} picks scoreable`
     case 'BLENDED':
@@ -37,13 +51,15 @@ function footnote(s: Seat) {
 
 type Props = {
   seat: Seat
+  /** Which sport's profile this seat is -- see TendenciesForm's `sport` prop. */
+  sport: Sport
   isMe: boolean
   onChanged: () => void
   onClose: () => void
   onMakeMine: () => void
 }
 
-export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeMine }: Props) {
+export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, onMakeMine }: Props) {
   const [editing, setEditing] = useState(false)
   const [loadingStated, setLoadingStated] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -73,7 +89,7 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
     setLoadingStated(true)
     setLoadError(null)
     try {
-      const managers = await getManagers()
+      const managers = await getManagers(sport)
       const mine = managers.find((m) => m.managerId === s.managerId)
       setStated(mine?.stated ?? { reachBias: null, unpredictability: null, note: null })
     } catch (e) {
@@ -127,6 +143,7 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
             ) : (
               <TendenciesForm
                 managerId={s.managerId}
+                sport={sport}
                 initial={stated ?? { reachBias: null, unpredictability: null, note: null }}
                 canClear={canClear}
                 onDone={() => {
@@ -138,9 +155,13 @@ export default function SeatPopover({ seat: s, isMe, onChanged, onClose, onMakeM
             )
           ) : (
             <>
-              {s.provenance === 'NEUTRAL' ? (
+              {s.provenance === 'NEUTRAL' && s.draftsObserved === 0 ? (
                 <p className="muted small">Drafts like the room — nothing entered for this seat.</p>
               ) : (
+                // A NEUTRAL seat WITH drafts observed still gets the real
+                // sentence: its positional tilt was fitted from every pick it
+                // made, and only reach is missing. Calling that "nothing
+                // entered" threw away a signal the engine is actually using.
                 <p className="small">{behaviour(s)}</p>
               )}
 

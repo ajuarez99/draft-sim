@@ -4,6 +4,7 @@ import { hueFor } from '../hue'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
+import { pickNoAt } from '../snake'
 
 type Props = {
   board: PredictedPick[]
@@ -30,6 +31,13 @@ type Props = {
   // noise PROVENANCE_LABEL's own comment says this feature exists to avoid.
   // Same additive-prop pattern D used for live mode's `landed` field.
   hideProvenanceDots?: boolean
+  /**
+   * The round from which snake parity flips; 0 (the default) is plain snake,
+   * which is every football draft and every caller that predates this prop.
+   * Comes from SeatsResponse.reversalRound, which is already the effective
+   * value -- Sleeper's, or the user's override of it.
+   */
+  reversalRound?: number
 }
 
 /**
@@ -57,6 +65,7 @@ export default function DraftBoard({
   onCellClick,
   onSeatClick,
   hideProvenanceDots,
+  reversalRound = 0,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
@@ -115,9 +124,14 @@ export default function DraftBoard({
               <div className="rnd cond">R{round}</div>
               {Array.from({ length: teams }, (_, s) => {
                 const slot = s + 1
-                // snake: even rounds run right to left
-                const indexInRound = round % 2 === 1 ? slot : teams - slot + 1
-                const pickNo = (round - 1) * teams + indexInRound
+                // snake -- even rounds run right to left, and from
+                // `reversalRound` on that parity is flipped (Sleeper's
+                // third-round reversal). Shared with the engine's own
+                // DraftSlot rather than inlined here: this used to be a bare
+                // `round % 2 === 1`, which draws the 2026 NBA draft's rounds
+                // 3-14 in the wrong direction while the simulator picks in the
+                // right one (multi-sport-and-rebrand.md Phase 6b).
+                const pickNo = pickNoAt(round, slot, teams, reversalRound)
                 const pick = byPick.get(pickNo)
                 const hidden = revealedThrough !== undefined && pickNo > revealedThrough
                 const visible = hidden ? undefined : pick

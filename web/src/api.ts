@@ -117,6 +117,24 @@ export type SeatsResponse = {
   // only has a draftId (DraftView, LiveDraftView) can learn which sport it's
   // showing without a second fetch; see positions.ts.
   sport: Sport
+  /**
+   * The round from which snake parity flips; 0 means the draft never reverses.
+   * `reversalRound` is what the engine actually uses -- the user's override if
+   * they set one, otherwise `reversalRoundFromSleeper`. The two are shown side
+   * by side rather than merged because this is the one assumption in the app
+   * that was never verified against a real draft (multi-sport-and-rebrand.md,
+   * "Assumed, not verified"): every draft this account can see is
+   * `reversal_round: 0`, so nothing here has been executed against data.
+   */
+  reversalRound: number
+  reversalRoundFromSleeper: number
+  /**
+   * True when the user has expressed an opinion at all -- not the same as
+   * `reversalRound !== reversalRoundFromSleeper`. Pinning the value Sleeper
+   * currently reports is a real choice, and it survives a re-ingest that moves
+   * Sleeper's number; simply following Sleeper does not.
+   */
+  reversalRoundOverridden: boolean
 }
 
 export type SimRequest = {
@@ -314,20 +332,59 @@ export type ManagerSummary = {
   stated: ManualTendencies
 }
 
-export const getManagers = () => apiFetch('/api/managers').then(json<ManagerSummary[]>)
+// All three manager endpoints take `sport` and default it to nfl backend-side
+// (ManagerController.java), and all three used to be called from here without
+// one -- so /managers listed only football managers, and a basketball seat's
+// popover read and then WROTE that manager's *football* stated tendencies.
+// Ten of the twelve Ball Knowers managers are the same Sleeper user id in both
+// leagues (multi-sport-and-rebrand.md), so that was not a rare edge: manual
+// tendencies are stored per (manager, sport), and editing a note on an NBA
+// seat would land on the NFL row. Required parameter, no default -- the
+// default is what hid this.
+export const getManagers = (sport: Sport) =>
+  apiFetch(`/api/managers?sport=${sport}`).then(json<ManagerSummary[]>)
 
-export const setTendencies = (managerId: number, body: ManualTendencies) =>
-  apiFetch(`/api/managers/${managerId}/tendencies`, {
+export const setTendencies = (managerId: number, sport: Sport, body: ManualTendencies) =>
+  apiFetch(`/api/managers/${managerId}/tendencies?sport=${sport}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(json<unknown>)
 
-export const clearTendencies = (managerId: number) =>
-  apiFetch(`/api/managers/${managerId}/tendencies`, { method: 'DELETE' }).then(json<unknown>)
+export const clearTendencies = (managerId: number, sport: Sport) =>
+  apiFetch(`/api/managers/${managerId}/tendencies?sport=${sport}`, { method: 'DELETE' }).then(
+    json<unknown>,
+  )
 
-export const getBoard = (limit = 60) =>
-  apiFetch(`/api/board?limit=${limit}`).then(json<{ capturedOn: string; entries: unknown[] }>)
+// `sport` is required, not defaulted: /api/board's own `sport` param defaults
+// to nfl backend-side, so an omitted argument here silently returned the
+// football board for a basketball caller rather than failing. Nothing calls
+// this helper today -- the draft-scoped GET /api/drafts/{id}/board is what the
+// board views use, and the backend derives the sport there -- but a defaulted
+// parameter is exactly how it would go wrong the first time something did.
+export const getBoard = (sport: Sport, limit = 60) =>
+  apiFetch(`/api/board?sport=${sport}&limit=${limit}`).then(
+    json<{ capturedOn: string; entries: unknown[] }>,
+  )
+
+/**
+ * Sets this draft's reversal round, or clears the override (`null`) to go back
+ * to whatever Sleeper reported. Returns the same three fields SeatsResponse
+ * carries, so the caller can re-render without refetching seats.
+ */
+export const setReversalRound = (draftId: string, reversalRound: number | null) =>
+  apiFetch(`/api/drafts/${draftId}/reversal-round`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reversalRound }),
+  }).then(
+    json<{
+      draftId: string
+      reversalRound: number
+      reversalRoundFromSleeper: number
+      reversalRoundOverridden: boolean
+    }>,
+  )
 
 // Mirrors engine/SeatSpec.java's 3-state shape.
 export type SeatType = 'USER' | 'MANAGER' | 'BOT'

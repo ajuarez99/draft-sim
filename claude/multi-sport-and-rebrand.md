@@ -58,10 +58,13 @@ far**, checked live after each one rather than asserted.
 | — | Greedy proven exactly optimal; 3c fully specified | `c6956f4` |
 | 3c+4 | `BasketballRules`, per-sport config, lock wired | `750e8b9` |
 | 5 | NBA ingest, board, snake reversal | `5d00369` |
-| 6a | Frontend types, one position list, slot model, colour tokens | `HEAD` |
-| 6b | Sport pill, `reversalRound` control, zero-reach honesty | **not started** |
+| 6a | Frontend types, one position list, slot model, colour tokens | `8b00af0` |
+| 6b | Sport pill, `reversalRound` control, zero-reach honesty | `HEAD` |
 
-Suite: 292 tests, 0 skipped, integration tests against real Postgres.
+**All seven phases are done.** Suite: 296 backend tests (0 skipped, real
+Postgres) + 80 frontend tests. Football's two baselines are still bit-identical
+after 6b, checked with `claude/scripts/football-parity-hash.py`, which is that
+check written down rather than retyped from the doc each time.
 `/api/health` reports `weightsLoaded: true`. The NBA chain is ingested for real
 — 2066 players, 336 picks, a 535-row board whose top three are Wembanyama,
 Jokić and Dončić — and football's two baselines are **still bit-identical with
@@ -182,24 +185,59 @@ say it**, and "0 picks scored" is a much starker thing to surface than football'
 "thin data" caveat. It is the single most misleading thing about basketball
 output if left implicit.
 
-### What 6b still has to do
+### What 6b did, and the three things it found that were not on the list
 
-1. **`api.ts:330`'s board helper requests `/api/board?limit=N` with no `sport`,**
-   so it always returns football. Found while eyeballing the NBA draft view,
-   which shows "Board looks empty?" as a result. The draft-scoped
-   `/api/drafts/{id}/board` (`:194`) is fine — the backend derives sport there.
-   This one call is the gap.
-2. **The sport pill on each league card** (`DraftPicker.tsx`). One mixed list,
-   both sports, no switcher — that is a decided design point, and
-   `DraftSummary.sport` has been on the wire since Phase 2.
-3. **A `reversalRound` control in the draft settings popover.** Per the Phase 5
-   decision: Sleeper's value is the default, the user may disagree with it, and
-   that is what makes an unverifiable assumption recoverable by whoever is
-   running the draft rather than only by whoever deploys it.
-4. **Say the reach problem out loud.** See the section above: every basketball
-   manager has `picksScored: 0`, permanently. Rendering that profile identically
-   to a football one fitted on 600 scored picks is the most misleading thing
-   this app could do with basketball data.
+The four planned items:
+
+1. **`api.ts`'s board helper took no `sport`** and so always returned football.
+   Now required, not defaulted — a defaulted sport is what hid this. Note the
+   helper has **no call site**; the "Board looks empty?" line that prompted the
+   original diagnosis is unconditional CTA copy under DraftView's start
+   overlay, not a symptom.
+2. **The sport pill**, on the picker's league cards and on `/managers`. Its own
+   two tokens (`--sport-nfl`, `--sport-nba`), not borrowed position colours —
+   see `--fitted`'s comment for why that borrowing is a bug.
+3. **The `reversalRound` control**, in the draft settings popover. Persisted in
+   a **new column**, `reversal_round_override` (V7), because
+   `DraftRepository.upsert` rewrites `reversal_round` from Sleeper on every
+   ingest — an in-place edit would be reverted by one press of "Add a draft",
+   which is the shape of bug that ate `adp_at_time`. `bySleeperId` coalesces,
+   so all three existing readers get the effective value with no call-site
+   change. Verified live: overriding the 2026 NBA draft to 0 moves slot 5's
+   picks from `[5, 20, 32, 41, …]` to `[5, 20, 29, 44, …]`, and clearing it
+   moves them back.
+4. **The reach gap, said out loud.** `behaviourText` no longer emits "drafts
+   close to the board" when `picksScored` is 0 — that reported a measurement
+   that was never taken, for every basketball seat, permanently — and
+   `reachGapText` names the reason instead. `/managers` shows the reason where
+   the reach axis would have been, rather than drawing a bar at zero.
+
+Three things the live pass found that the plan did not:
+
+5. **Every manager endpoint was hardcoded to football from the frontend.**
+   `getManagers`/`setTendencies`/`clearTendencies` all omitted `sport`, which
+   `ManagerController` defaults to `nfl`. Manual tendencies are stored per
+   (manager, sport) and **ten of twelve Ball Knowers managers are the same
+   Sleeper id in both leagues**, so editing a note on an NBA seat wrote to that
+   manager's NFL row. `/managers` also listed football only.
+6. **`DraftBoard` drew plain snake.** A literal `round % 2 === 1`, correct for
+   every football draft and wrong from round 3 on for the 2026 NBA draft, which
+   Sleeper reports as `reversal_round: 3`. The engine was already reversing; the
+   grid on screen was not. Fixed by `web/src/snake.ts`, mirrored from
+   `DraftSlot`, with a test pinned to the pick numbers the live engine returned.
+   A reversal-round control is pointless while the board that displays the
+   order ignores it.
+7. **An NBA seat with two seasons of history rendered as "nothing entered".**
+   `ProfileService.hasData` is `picksScored > 0`, so every basketball manager is
+   NEUTRAL — while carrying a positional tilt fitted from every pick they made,
+   which the engine uses. The old copy threw that away. Related: `fit(sport)`
+   returns a profile for every manager regardless of sport, so asking for both
+   sports turns 42 managers into 84 cards, 31 of them empty. `/managers` filters
+   those and prints the count.
+
+**Still true after all of it, and worth not forgetting:** `reversal_round: 3`
+remains **assumed**. Nothing in this app has run against a completed draft that
+reverses. The control is what makes that recoverable at the table.
 
 ### Two things carried forward that are easy to get wrong
 

@@ -43,7 +43,13 @@ export default function MockSetup() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getManagers().then(setManagers).catch(() => {}) // non-critical -- the mock still works with every seat left on Bot
+    // 'nfl' explicitly, not by omission: the mock draft room is football-only
+    // (multi-sport-and-rebrand.md Non-goals) -- MockDraftService builds its
+    // settings from a football LeagueShape and MockSessionState has no sport to
+    // seat against. Passing the sport says that is a decision rather than a
+    // default nobody revisited. Non-critical fetch: the mock still works with
+    // every seat left on Bot.
+    getManagers('nfl').then(setManagers).catch(() => {})
   }, [])
 
   function handleTeamsChange(next: number) {

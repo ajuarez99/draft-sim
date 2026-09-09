@@ -1,0 +1,13 @@
+-- claude/multi-sport-and-rebrand.md Phase 6b. Sleeper's own reversal_round
+-- (V6) is re-read and overwritten on every ingest -- DraftRepository.upsert's
+-- `on conflict` sets `reversal_round = excluded.reversal_round` -- so a value
+-- edited in place would be silently reverted by one click of the picker's
+-- "Add a draft" button. That is exactly the trap adp_at_time fell into
+-- (see DraftRepository.replacePicks' comment); a second, ingest-free column
+-- is the fix, not an `on conflict` clause.
+--
+-- Null means "no opinion, follow Sleeper", which is every existing row and
+-- every row a fresh ingest writes. 0 is a real value here and means "this
+-- draft never reverses", which a user may assert against a Sleeper draft
+-- object that says 3 -- so this column is nullable rather than defaulted.
+alter table draft add column reversal_round_override int null;

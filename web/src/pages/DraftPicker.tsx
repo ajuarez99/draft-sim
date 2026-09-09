@@ -200,6 +200,17 @@ export default function DraftPicker() {
                         {d.leagueName}
                       </Link>
                       <span className="league-card-sub">
+                        {/* The sport pill. This list is deliberately one mixed
+                            list with no switcher (multi-sport-and-rebrand.md
+                            Phase 6), which only works if each card says what
+                            it is -- "Ball Knowers" and "(Foot) Ball Knowers"
+                            are two real leagues in two different sports, and
+                            without this the reader tells them apart by
+                            spotting a parenthesis. It sits in the sub-line
+                            rather than beside the season because it qualifies
+                            the shape below it: 14 rounds means something
+                            different in each sport. */}
+                        <span className={`sport-pill ${d.sport}`}>{d.sport.toUpperCase()}</span>
                         {d.teams} managers &middot; {d.rounds} rounds
                       </span>
                     </span>

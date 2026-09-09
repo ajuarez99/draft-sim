@@ -121,6 +121,13 @@
   --pg: oklch(67% 0.145 215); --sg: oklch(67% 0.145 251);
   --sf: oklch(67% 0.145 287); --pf: oklch(67% 0.145 323);
   --c: oklch(67% 0.145 359);
+  /* "Which sport is this league" -- a card-level label, not a position. The
+     two live together on the picker screen and nowhere else, so the only
+     separation that matters is from each other (66deg) and from --teal, which
+     already means "a draft is happening" on the same card. Named for the two
+     sports' own colours rather than borrowed from anything above; see
+     --fitted's comment for what borrowing costs. */
+  --sport-nfl: oklch(70% 0.13 128); --sport-nba: oklch(72% 0.15 62);
   color-scheme: dark;
 }
 
@@ -182,6 +189,15 @@ body {
   border-radius: 6px; padding: 6px 8px; font: inherit;
 }
 .controls .temp { min-width: 170px; }
+/* The reversal round is not a knob on this run like runs/chaos above it -- it
+   is a persisted fact about the draft that the board and the live room read
+   too. The rule says so; without it the popover reads as three equivalent
+   sliders, one of which quietly writes to the database. */
+.reversal-control {
+  margin-top: 12px; padding-top: 14px;
+  border-top: 1px solid var(--line); border-radius: 0;
+  background: none;
+}
 .temp-value { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
 /*
  * `:not(.chip)` is load-bearing, not decoration. This selector is (0,1,1) and
@@ -342,6 +358,25 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 }
 .league-card-name:hover { color: var(--teal); }
 .league-card-sub { font-size: 11px; color: var(--muted); }
+/* Its own two tokens rather than borrowing a position colour -- see --fitted's
+   comment for why that borrowing is a bug and not a shortcut. These are the
+   only two hues in the app that mean "which sport", and the picker screen
+   renders no position chips, so they never share a view with --rb/--qb. */
+.sport-pill {
+  display: inline-block; margin-right: 7px; padding: 1px 6px; border-radius: 999px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
+  vertical-align: 1px;
+}
+.sport-pill.nfl {
+  color: var(--sport-nfl);
+  background: color-mix(in oklch, var(--sport-nfl) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nfl) 32%, transparent);
+}
+.sport-pill.nba {
+  color: var(--sport-nba);
+  background: color-mix(in oklch, var(--sport-nba) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nba) 32%, transparent);
+}
 /* The season is what tells two cards of the same league apart, so it is a
    figure on the card rather than a footnote inside a row. */
 .league-card-season { font-size: 20px; color: var(--muted); letter-spacing: 0.02em; flex-shrink: 0; }

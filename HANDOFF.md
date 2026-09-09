@@ -1,6 +1,45 @@
 # Ball Knowers — handoff
 
-**Multi-sport, phases 0 through 5 — built 2026-09-08 on branch
+**Multi-sport is done: phases 0 through 6b, built 2026-09-08/09 on branch
+`ball-knowers-multi-sport` (not pushed, not merged).** Basketball is real end to
+end — the Ball Knowers NBA chain ingests (2066 players, 336 picks, a 535-row
+board topped by Wembanyama, Jokić and Dončić), simulates, and renders. Football
+is bit-identical through every phase, re-checked after 6b with all the NBA data
+in the same database. 296 backend tests (0 skipped, real Postgres) + 80 frontend
+tests.
+
+**Run the parity check as `python claude/scripts/football-parity-hash.py`** with
+the backend up. It is acceptance criterion 1 written down instead of retyped:
+two captured baselines, a fixed seed, a *partial* startState, and `name`/`team`
+stripped before hashing. Both traps that cost real time are in its docstring.
+
+**Three bugs the live pass found that no test would have.** The frontend called
+every manager endpoint without a `sport`, and the backend defaults that to
+`nfl` — so editing a note on a basketball seat wrote to that manager's football
+row, and ten of the twelve Ball Knowers managers are the same Sleeper id in both
+leagues. `DraftBoard` drew plain snake from a literal `round % 2 === 1`, so the
+2026 NBA draft's board showed the wrong pick numbers from round 3 on while the
+engine simulated the right ones. And an NBA seat with two seasons of history
+rendered as "nothing entered", discarding a positional tilt the engine was
+actually using. All three are the same shape: a football-shaped default that
+nothing failed on.
+
+**The reversal round is user-editable now, and it needed its own column.**
+`draft.reversal_round` is Sleeper's and `DraftRepository.upsert` rewrites it on
+every ingest, so an in-place edit would be reverted by one press of the picker's
+"Add a draft" — the trap that ate `adp_at_time`. V7 adds
+`reversal_round_override`; `bySleeperId` coalesces, so every existing reader
+gets the effective value unchanged. `reversal_round: 3` is **still an
+assumption** — no completed draft in reach exercises it — which is exactly why
+the control exists.
+
+**One thing left on the floor, pre-existing and out of 6b's scope:**
+DraftView's `.start-overlay` covers the board's seat headers before a sim runs,
+so its own copy ("Click your name in the board above if you know your seat")
+points at something that cannot be clicked yet. The live room's headers work
+fine; this is DraftView only.
+
+**Superseded by the above — kept for its detail.** **Multi-sport, phases 0 through 5 — built 2026-09-08 on branch
 `ball-knowers-multi-sport` (not pushed, not merged).** Basketball is real:
 the Ball Knowers NBA chain ingests end to end (2066 players, 336 picks, 535
 board rows), `BasketballRules` has a provably-optimal lineup model, and the

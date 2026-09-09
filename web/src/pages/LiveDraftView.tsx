@@ -250,6 +250,7 @@ export default function LiveDraftView() {
           seats={seats.seats}
           mySlot={slotKnown ? mySlot : undefined}
           sport={sport}
+          reversalRound={seats.reversalRound}
           onCellClick={setOpenPick}
           onSeatClick={setOpenSeatSlot}
         />
@@ -399,6 +400,7 @@ export default function LiveDraftView() {
           return openSeat ? (
             <SeatPopover
               seat={openSeat}
+              sport={sport}
               isMe={openSeat.slot === mySlot}
               onChanged={() => getSeats(draftId).then(setSeats).catch(() => {})}
               onClose={() => setOpenSeatSlot(null)}

@@ -148,8 +148,64 @@ public class LeagueController {
         // for fit(); this just also puts it on the wire. Sport's @JsonValue
         // serializes it as the same lowercase code DraftSummary already uses.
         response.put("sport", sport);
+        // Phase 6b. The round from which snake parity flips is the one piece of
+        // this project's behaviour that ships as an assumption -- no completed
+        // draft in reach uses a nonzero reversal_round, so the semantics were
+        // never executed against real data. Putting both numbers on the seats
+        // response (which DraftView already fetches) is what lets the settings
+        // popover show the assumption and let whoever is running the draft
+        // disagree with it. Both are always present; they differ only when
+        // someone has overridden.
+        DraftRepository.ReversalRound reversal = drafts.reversalRound(draft.get().id())
+                .orElse(new DraftRepository.ReversalRound(draft.get().reversalRound(), null));
+        response.put("reversalRound", reversal.effective());
+        response.put("reversalRoundFromSleeper", reversal.fromSleeper());
+        response.put("reversalRoundOverridden", reversal.override() != null);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Sets (or clears) this draft's reversal-round override.
+     *
+     * Why an override column and not an edit of {@code reversal_round} itself:
+     * {@link DraftRepository#upsert} re-reads Sleeper's value on every ingest
+     * and its {@code on conflict} clause writes it back, so an in-place edit
+     * would be reverted by one press of the picker's "Add a draft" button --
+     * the same shape of bug that ate {@code adp_at_time}.
+     *
+     * A null (or omitted) {@code reversalRound} clears the override and goes
+     * back to following Sleeper. That is a distinct outcome from setting it to
+     * Sleeper's current value, and deliberately so.
+     */
+    @PutMapping("/drafts/{sleeperDraftId}/reversal-round")
+    public ResponseEntity<?> setReversalRound(@PathVariable String sleeperDraftId,
+                                              @RequestBody(required = false) ReversalRoundBody body) {
+        Optional<DraftRepository.DraftRow> found = drafts.bySleeperId(sleeperDraftId);
+        if (found.isEmpty()) return ResponseEntity.notFound().build();
+        DraftRepository.DraftRow draft = found.get();
+
+        Integer override = body == null ? null : body.reversalRound();
+        // Upper bound is `rounds`, not unbounded: a value past the last round
+        // is inert rather than wrong, and silently accepting a typo that does
+        // nothing is worse than refusing it. 0 is valid and means "never".
+        if (override != null && (override < 0 || override > draft.rounds())) {
+            return badRequest("reversalRound must be between 0 and " + draft.rounds()
+                    + " (0 means the draft never reverses), or null to follow Sleeper");
+        }
+        drafts.setReversalRoundOverride(draft.id(), override);
+
+        DraftRepository.ReversalRound after = drafts.reversalRound(draft.id())
+                .orElse(new DraftRepository.ReversalRound(draft.reversalRound(), override));
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("draftId", sleeperDraftId);
+        response.put("reversalRound", after.effective());
+        response.put("reversalRoundFromSleeper", after.fromSleeper());
+        response.put("reversalRoundOverridden", after.override() != null);
+        return ResponseEntity.ok(response);
+    }
+
+    /** Body of PUT /api/drafts/{id}/reversal-round. Null field = clear the override. */
+    public record ReversalRoundBody(Integer reversalRound) {}
 
     /**
      * The picks that actually happened in this draft, joined to player and manager

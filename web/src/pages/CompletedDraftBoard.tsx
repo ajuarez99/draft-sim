@@ -82,6 +82,7 @@ export default function CompletedDraftBoard() {
               seats={seats.seats}
               mySlot={seats.mySlot ?? undefined}
               sport={seats.sport}
+              reversalRound={seats.reversalRound}
               onCellClick={setOpenPick}
             />
           </div>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { setTendencies, clearTendencies, type ManualTendencies } from '../api'
+import { setTendencies, clearTendencies, type ManualTendencies, type Sport } from '../api'
 
 /**
  * The stated-tendencies form, previously hand-duplicated in SeatPopover.tsx
@@ -33,6 +33,14 @@ import { setTendencies, clearTendencies, type ManualTendencies } from '../api'
  */
 export type TendenciesFormProps = {
   managerId: number
+  /**
+   * Manual tendencies are stored per (manager, sport), and the same Sleeper
+   * user id is a manager in both a football and a basketball league here --
+   * ten of twelve, in Allan's own leagues. Both endpoints below default this
+   * to nfl server-side, so a missing sport is not an error, it is a write to
+   * the wrong sport's row. Required prop for that reason.
+   */
+  sport: Sport
   initial: ManualTendencies
   /** STATED/BLENDED seats have something typed-in to delete; FITTED/NEUTRAL don't. */
   canClear: boolean
@@ -42,7 +50,7 @@ export type TendenciesFormProps = {
   onCancel: () => void
 }
 
-export default function TendenciesForm({ managerId, initial, canClear, onDone, onCancel }: TendenciesFormProps) {
+export default function TendenciesForm({ managerId, sport, initial, canClear, onDone, onCancel }: TendenciesFormProps) {
   const [note, setNote] = useState(initial.note ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +59,7 @@ export default function TendenciesForm({ managerId, initial, canClear, onDone, o
     setSaving(true)
     setError(null)
     try {
-      await setTendencies(managerId, {
+      await setTendencies(managerId, sport, {
         reachBias: initial.reachBias,
         unpredictability: initial.unpredictability,
         note: note.trim() === '' ? null : note.trim(),
@@ -68,7 +76,7 @@ export default function TendenciesForm({ managerId, initial, canClear, onDone, o
     setSaving(true)
     setError(null)
     try {
-      await clearTendencies(managerId)
+      await clearTendencies(managerId, sport)
       onDone()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

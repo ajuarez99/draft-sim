@@ -151,12 +151,21 @@ public class DraftRepository {
     }
 
     /**
-     * @param reversalRound the persisted {@code draft.reversal_round}
-     *                      (multi-sport-and-rebrand.md Phase 5) -- 0 for
-     *                      every draft ingested before that column existed,
-     *                      and for every NFL draft in the database, since
-     *                      Sleeper's own default is 0 and football never
-     *                      reverses.
+     * @param reversalRound the <em>effective</em> reversal round -- the user's
+     *                      {@code reversal_round_override} when they have set
+     *                      one, otherwise the persisted {@code reversal_round}
+     *                      Sleeper reported (multi-sport-and-rebrand.md Phases
+     *                      5 and 6b). 0 for every draft ingested before that
+     *                      column existed, and for every NFL draft in the
+     *                      database, since Sleeper's own default is 0 and
+     *                      football never reverses.
+     *                      <p>
+     *                      The coalesce happens in the query rather than at the
+     *                      three call sites that read this field, so there is no
+     *                      raw-vs-effective distinction for a caller to get
+     *                      wrong. Anything that needs to tell the two apart --
+     *                      only the settings UI does -- calls
+     *                      {@link #reversalRound(long)}.
      */
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,
                            int rounds, int teams, String status, Map<String, Object> slotToManager,
@@ -172,7 +181,7 @@ public class DraftRepository {
     public Optional<DraftRow> bySleeperId(String sleeperDraftId) {
         return db.sql("""
                 select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
-                       reversal_round
+                       coalesce(reversal_round_override, reversal_round)
                 from draft where sleeper_draft_id = ?
                 """)
                 .param(sleeperDraftId)
@@ -180,6 +189,43 @@ public class DraftRepository {
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
                         JsonUtil.readMap(rs.getString(8)), rs.getInt(9)))
                 .optional();
+    }
+
+    /**
+     * Sleeper's value and the user's, unmerged.
+     *
+     * The only reason to want them apart is to show them apart: the round from
+     * which snake parity flips is an <em>assumption</em> on the one draft that
+     * uses it (multi-sport-and-rebrand.md, "Assumed, not verified" -- no
+     * completed draft in reach exercises {@code reversal_round: 3}), so the
+     * settings UI shows what Sleeper claims next to what the user asserted
+     * rather than one number with no provenance.
+     *
+     * @param override null when the user has expressed no opinion, which is
+     *                 every row until someone edits one. Note that a null
+     *                 override and an override that happens to equal
+     *                 {@code fromSleeper} are different states and stay
+     *                 different: the second survives a re-ingest that moves
+     *                 Sleeper's value, and the first does not.
+     */
+    public record ReversalRound(int fromSleeper, Integer override) {
+        public int effective() {
+            return override == null ? fromSleeper : override;
+        }
+    }
+
+    public Optional<ReversalRound> reversalRound(long draftId) {
+        return db.sql("select reversal_round, reversal_round_override from draft where id = ?")
+                .param(draftId)
+                .query((rs, i) -> new ReversalRound(
+                        rs.getInt(1),
+                        rs.getObject(2) == null ? null : rs.getInt(2)))
+                .optional();
+    }
+
+    /** {@code override == null} clears the user's opinion and goes back to following Sleeper. */
+    public void setReversalRoundOverride(long draftId, Integer override) {
+        jdbc.update("update draft set reversal_round_override = ? where id = ?", override, draftId);
     }
 
     /** Completed picks for a draft, ordered. Used both for profiles and for resume-from-state. */
