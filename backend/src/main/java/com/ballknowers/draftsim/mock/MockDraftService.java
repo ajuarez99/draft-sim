@@ -127,9 +127,13 @@ public class MockDraftService {
      * @param mySlotOverride explicit slot from the caller, or null to fall back
      *                       to {@link OwnerSlot#resolve} the same way the live
      *                       page's seats() call already does.
+     * @param sleeperUserId  {@code X-Sleeper-User} identity, or null -- passed
+     *                       through to {@link OwnerSlot#resolve} so a visiting
+     *                       user's own seat is the fallback rather than always
+     *                       the configured owner's.
      */
     @Transactional
-    public MockSessionState createSessionFromDraft(String sleeperDraftId, Integer mySlotOverride) {
+    public MockSessionState createSessionFromDraft(String sleeperDraftId, Integer mySlotOverride, String sleeperUserId) {
         DraftRepository.DraftRow draft = drafts.bySleeperId(sleeperDraftId)
                 .orElseThrow(() -> new IllegalArgumentException("draft " + sleeperDraftId + " not ingested"));
 
@@ -176,7 +180,9 @@ public class MockDraftService {
                     + " can be forked into a mock");
         }
 
-        Integer mySlot = mySlotOverride != null ? mySlotOverride : OwnerSlot.resolve(draft, managers, owner);
+        Integer mySlot = mySlotOverride != null
+                ? mySlotOverride
+                : OwnerSlot.resolve(draft, managers, owner, sleeperUserId);
         if (mySlot == null) {
             throw new IllegalArgumentException(
                     "could not determine which seat is yours -- pass ?mySlot=<slot>");

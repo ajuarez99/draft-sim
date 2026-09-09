@@ -109,7 +109,7 @@ class LeagueControllerSeatsOwnerConfiguredIT {
 
     @Test
     void configuredOwnerPresentInLeagueYieldsTheirSlot() {
-        ResponseEntity<?> response = controller.seats(draftWithOwnerId);
+        ResponseEntity<?> response = controller.seats(draftWithOwnerId, null);
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
@@ -120,7 +120,7 @@ class LeagueControllerSeatsOwnerConfiguredIT {
 
     @Test
     void configuredOwnerAbsentFromLeagueYieldsNullMySlot() {
-        ResponseEntity<?> response = controller.seats(draftWithoutOwnerId);
+        ResponseEntity<?> response = controller.seats(draftWithoutOwnerId, null);
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")

@@ -58,8 +58,9 @@ public class MockDraftController {
      */
     @PostMapping("/from-draft/{sleeperDraftId}")
     public MockSessionState createFromDraft(@PathVariable String sleeperDraftId,
-                                            @RequestParam(required = false) Integer mySlot) {
-        return mocks.createSessionFromDraft(sleeperDraftId, mySlot);
+                                            @RequestParam(required = false) Integer mySlot,
+                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        return mocks.createSessionFromDraft(sleeperDraftId, mySlot, sleeperUserId);
     }
 
     @GetMapping("/{id}")

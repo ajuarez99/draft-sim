@@ -69,15 +69,24 @@ public class LeagueController {
         return leagues.all();
     }
 
-    /** Every draft in the DB, newest first. Backs the app-shell picker screen. */
+    /**
+     * Every draft in the DB, newest first, scoped to the requesting Sleeper
+     * user's own leagues when {@code X-Sleeper-User} is sent
+     * (claude/user-identity-and-onboarding.md §4b/§4c). Absent header ⇒ the
+     * unfiltered list, unchanged from before this header existed.
+     */
     @GetMapping("/drafts")
-    public List<DraftRepository.DraftSummary> drafts() {
-        return drafts.allWithLeague();
+    public List<DraftRepository.DraftSummary> drafts(
+            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        return sleeperUserId == null || sleeperUserId.isBlank()
+                ? drafts.allWithLeague()
+                : drafts.allWithLeagueFor(sleeperUserId);
     }
 
     /** Seats with their profiles. draftsObserved is here so the UI can be honest. */
     @GetMapping("/drafts/{sleeperDraftId}/seats")
-    public ResponseEntity<?> seats(@PathVariable String sleeperDraftId) {
+    public ResponseEntity<?> seats(@PathVariable String sleeperDraftId,
+                                   @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         Optional<DraftRepository.DraftRow> draft = drafts.bySleeperId(sleeperDraftId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
 
@@ -94,7 +103,7 @@ public class LeagueController {
         // path can resolve the same default seat without a second copy of this
         // lookup. A blank/unset config value is the local-dev default, handled
         // there rather than relying on a lookup miss to behave correctly.
-        Integer mySlot = OwnerSlot.resolve(draft.get(), managers, owner);
+        Integer mySlot = OwnerSlot.resolve(draft.get(), managers, owner, sleeperUserId);
 
         draft.get().slotToManager().forEach((slot, managerId) -> {
             long id = ((Number) managerId).longValue();

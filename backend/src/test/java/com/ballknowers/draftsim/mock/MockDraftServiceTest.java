@@ -256,7 +256,7 @@ class MockDraftServiceTest {
         when(drafts.picks(77L)).thenReturn(List.of(
                 new DraftRepository.PickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
 
-        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork", 2);
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork", 2, null);
 
         assertEquals(77L, state.sourceDraftId());
         assertEquals(2, state.forkedAtPickNo());
@@ -292,7 +292,7 @@ class MockDraftServiceTest {
         // mySlot=5 (unmapped, so a bare USER seat) rather than 2 -- if the user's
         // own seat sat at slot 2, the engine would stop there for input rather
         // than deciding it, which would defeat the point of this test.
-        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork-gap", 5);
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork-gap", 5, null);
 
         assertEquals(2, state.forkedAtPickNo(), "pick 2 is the first genuinely undecided pick, not pick 4");
         var pick2 = state.picks().stream().filter(p -> p.pickNo() == 2).findFirst().orElseThrow();
@@ -306,7 +306,7 @@ class MockDraftServiceTest {
         when(drafts.bySleeperId("sleeper-draft-not-live")).thenReturn(Optional.of(draft));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-not-live", 1));
+                () -> service.createSessionFromDraft("sleeper-draft-not-live", 1, null));
     }
 
     @Test
@@ -319,7 +319,7 @@ class MockDraftServiceTest {
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-nba", 1),
+                () -> service.createSessionFromDraft("sleeper-draft-nba", 1, null),
                 "the mock room is football-only -- forking an NBA draft must be refused, not build a "
                         + "basketball room and offer football players for every pick after this one");
     }
@@ -334,7 +334,7 @@ class MockDraftServiceTest {
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-odd-size", 1));
+                () -> service.createSessionFromDraft("sleeper-draft-odd-size", 1, null));
     }
 
     @Test
@@ -348,7 +348,7 @@ class MockDraftServiceTest {
         // owner is unconfigured (OwnerProperties(null) from setUp), and no override is passed.
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-no-slot", null));
+                () -> service.createSessionFromDraft("sleeper-draft-no-slot", null, null));
     }
 
     @Test
@@ -361,7 +361,7 @@ class MockDraftServiceTest {
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-bad-slot", 9));
+                () -> service.createSessionFromDraft("sleeper-draft-bad-slot", 9, null));
     }
 
     /** In-memory stand-in for the real JdbcClient-backed repository. */

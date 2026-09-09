@@ -283,18 +283,69 @@ public class DraftRepository {
                                int season, int teams, int rounds, String status, Instant startTime,
                                String sleeperLeagueId, String previousLeagueId, Sport sport) {}
 
+    private static final String DRAFT_SUMMARY_COLUMNS = """
+            d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
+            d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport
+            """;
+
+    private static DraftSummary mapDraftSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
+        return new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
+                rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
+                rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
+                rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12)));
+    }
+
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
     public List<DraftSummary> allWithLeague() {
-        return db.sql("""
-                select d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-                       d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport
+        return db.sql("select " + DRAFT_SUMMARY_COLUMNS + """
                 from draft d join league l on l.id = d.league_id
                 order by d.start_time desc nulls last, d.season desc, d.id desc
                 """)
-                .query((rs, i) -> new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
-                        rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
-                        rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
-                        rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12))))
+                .query(DraftRepository::mapDraftSummary)
+                .list();
+    }
+
+    /**
+     * {@link #allWithLeague} scoped to the leagues a Sleeper user is actually
+     * in (claude/user-identity-and-onboarding.md §4b) -- an unknown
+     * {@code sleeperUserId} (no {@code manager} row) returns empty, not the
+     * unfiltered list, which is the failure mode that matters here: a bug that
+     * silently falls through to "everything" looks exactly like working
+     * software to the one person who is in every league.
+     *
+     * Membership is the union of two paths, since either alone misses leagues
+     * the other covers: {@code roster_season} catches a league with no
+     * ingested draft at all, {@code slot_to_manager} catches a draft ingested
+     * before that manager had any scored season. Walking {@code
+     * previous_league_id} backwards (the "chain trap") pulls in predecessor
+     * seasons the picker's own {@code leagueLineages} collapses into one
+     * card -- forwards only, since a successor league you were later dropped
+     * from is genuinely not yours anymore.
+     */
+    public List<DraftSummary> allWithLeagueFor(String sleeperUserId) {
+        return db.sql("""
+                with recursive me as (select id from manager where sleeper_user_id = ?),
+                mine as (
+                    select rs.league_id from roster_season rs join me on me.id = rs.manager_id
+                    union
+                    select d.league_id from draft d, me
+                     where exists (select 1 from jsonb_each_text(d.slot_to_manager) x
+                                    where x.value = me.id::text)
+                ),
+                chain as (
+                    select l.id, l.previous_league_id
+                      from league l join mine on mine.league_id = l.id
+                    union
+                    select p.id, p.previous_league_id
+                      from league p join chain c on p.sleeper_id = c.previous_league_id
+                )
+                select\s""" + DRAFT_SUMMARY_COLUMNS + """
+                from draft d join league l on l.id = d.league_id
+                where l.id in (select id from chain)
+                order by d.start_time desc nulls last, d.season desc, d.id desc
+                """)
+                .param(sleeperUserId)
+                .query(DraftRepository::mapDraftSummary)
                 .list();
     }
 

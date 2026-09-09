@@ -64,4 +64,42 @@ class OwnerSlotTest {
 
         assertNull(OwnerSlot.resolve(draft(Map.of("1", 999L)), managers, owner));
     }
+
+    // ---- 4-arg overload: X-Sleeper-User header vs. the configured owner fallback ----
+
+    @Test
+    void headerIdWinsOverTheConfiguredOwnerWhenBothResolve() {
+        lenient().when(managers.idsBySleeperUserId())
+                .thenReturn(Map.of("owner-user-id", 501L, "visitor-user-id", 999L));
+        OwnerProperties owner = new OwnerProperties("owner-user-id");
+
+        Integer slot = OwnerSlot.resolve(draft(Map.of("3", 999L, "7", 501L)), managers, owner, "visitor-user-id");
+
+        assertEquals(3, slot, "the visiting header identity must win, not the configured owner");
+    }
+
+    @Test
+    void configuredOwnerIsUsedWhenTheHeaderIsAbsent() {
+        lenient().when(managers.idsBySleeperUserId()).thenReturn(Map.of("owner-user-id", 501L));
+        OwnerProperties owner = new OwnerProperties("owner-user-id");
+
+        Integer slot = OwnerSlot.resolve(draft(Map.of("7", 501L)), managers, owner, null);
+
+        assertEquals(7, slot, "with no header, this must behave exactly like the 3-arg overload");
+    }
+
+    @Test
+    void bothHeaderAndConfiguredOwnerAbsentResolvesToNull() {
+        assertNull(OwnerSlot.resolve(draft(Map.of("1", 501L)), managers, new OwnerProperties(null), null));
+    }
+
+    @Test
+    void blankHeaderFallsBackToTheConfiguredOwnerRatherThanBeingTreatedAsAnIdentity() {
+        lenient().when(managers.idsBySleeperUserId()).thenReturn(Map.of("owner-user-id", 501L));
+        OwnerProperties owner = new OwnerProperties("owner-user-id");
+
+        Integer slot = OwnerSlot.resolve(draft(Map.of("7", 501L)), managers, owner, "  ");
+
+        assertEquals(7, slot);
+    }
 }

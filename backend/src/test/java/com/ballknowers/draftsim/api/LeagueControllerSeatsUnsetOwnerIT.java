@@ -106,7 +106,7 @@ class LeagueControllerSeatsUnsetOwnerIT {
 
     @Test
     void unsetOwnerConfigYieldsNullMySlotAndTheResponseActuallySerializes() throws Exception {
-        ResponseEntity<?> response = controller.seats(sleeperDraftId);
+        ResponseEntity<?> response = controller.seats(sleeperDraftId, null);
 
         assertEquals(200, response.getStatusCode().value());
         Object body = response.getBody();
@@ -137,7 +137,7 @@ class LeagueControllerSeatsUnsetOwnerIT {
         jdbc.update("update draft set status = null where sleeper_draft_id = ?", sleeperDraftId);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) controller.seats(sleeperDraftId).getBody();
+        Map<String, Object> body = (Map<String, Object>) controller.seats(sleeperDraftId, null).getBody();
         assertNotNull(body);
         assertNull(body.get("status"), "a null status column must stay null, not become \"null\"");
 

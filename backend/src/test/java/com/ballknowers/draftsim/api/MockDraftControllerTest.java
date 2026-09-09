@@ -62,9 +62,9 @@ class MockDraftControllerTest {
     @Test
     void createFromDraftDelegatesDraftIdAndOptionalMySlotToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSessionFromDraft("sleeper-draft-1", 3)).thenReturn(sampleState(1));
+        when(mocks.createSessionFromDraft("sleeper-draft-1", 3, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.createFromDraft("sleeper-draft-1", 3);
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", 3, null);
 
         assertEquals(1, result.id());
     }
@@ -72,11 +72,21 @@ class MockDraftControllerTest {
     @Test
     void createFromDraftPassesNullMySlotWhenOmitted() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSessionFromDraft("sleeper-draft-1", null)).thenReturn(sampleState(2));
+        when(mocks.createSessionFromDraft("sleeper-draft-1", null, null)).thenReturn(sampleState(2));
 
-        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null);
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null, null);
 
         assertEquals(2, result.id());
+    }
+
+    @Test
+    void createFromDraftPassesTheSleeperUserHeaderThrough() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSessionFromDraft("sleeper-draft-1", null, "1122386008709910528")).thenReturn(sampleState(3));
+
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null, "1122386008709910528");
+
+        assertEquals(3, result.id());
     }
 
     @Test
