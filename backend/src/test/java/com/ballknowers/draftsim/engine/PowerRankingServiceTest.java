@@ -66,6 +66,59 @@ class PowerRankingServiceTest {
         assertEquals(3, rankByRoster.get(30), "rank 2 is skipped after a two-way tie for 1st");
     }
 
+    /**
+     * A week nobody has played yet must not produce a snapshot.
+     *
+     * This is the bug that made "do the rankings persist?" look like a
+     * persistence problem: compute answered 200 with realized=0 and wrote an
+     * empty power_ranking row, so the page showed nothing and the DB showed a
+     * row, and neither said the real cause was that no weekly scoring had been
+     * ingested.
+     */
+    @Test
+    void nothingToRankSavesNoSnapshot() {
+        when(rosterSeasons.forLeague(1L)).thenReturn(List.of());
+        when(weekPoints.through(1L, 1)).thenReturn(List.of());
+
+        var result = service.computeRealized(1L, 2026, 1);
+
+        assertEquals(0, result.length);
+        verify(rankings, never()).save(anyLong(), anyInt(), anyInt(), any(), any());
+    }
+
+    /** The two causes are different problems and the caller can act on only one. */
+    @Test
+    void realizedGapSaysWhichWeeksExistWhenSomeDo() {
+        when(weekPoints.through(1L, 1)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(1L)).thenReturn(Set.of(3, 1, 2));
+
+        String gap = service.realizedGap(1L, 1);
+
+        assertNotNull(gap);
+        assertTrue(gap.contains("[1, 2, 3]"), gap);
+        assertTrue(gap.contains("at or before week 1"), gap);
+    }
+
+    @Test
+    void realizedGapPointsAtTheIngestWhenNoWeeksAreStoredAtAll() {
+        when(weekPoints.through(1L, 1)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(1L)).thenReturn(Set.of());
+
+        String gap = service.realizedGap(1L, 1);
+
+        assertNotNull(gap);
+        assertTrue(gap.contains("league-history"), gap);
+    }
+
+    /** Null, not a string, when there is genuinely nothing wrong. */
+    @Test
+    void realizedGapIsNullWhenThereIsScoringToRank() {
+        when(weekPoints.through(1L, 2)).thenReturn(List.of(
+                new RosterWeekPointsRepository.WeekPoint(1, 10, 80.0)));
+
+        assertNull(service.realizedGap(1L, 2));
+    }
+
     @Test
     void realizedIsTheAverageAcrossStoredWeeksNotTheSum() {
         when(rosterSeasons.forLeague(1L)).thenReturn(List.of());

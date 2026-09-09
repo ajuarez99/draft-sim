@@ -127,7 +127,9 @@ public class PowerRankingService {
         }
 
         var ranked = rankDescending(scored);
-        rankings.save(leagueId, season, week, "COMPUTED_MARKET_VALUE", ranked);
+        // Same reasoning as computeRealized: nothing to rank is not a snapshot.
+        // Reachable here when Sleeper returns no rosters for the league.
+        if (!ranked.isEmpty()) rankings.save(leagueId, season, week, "COMPUTED_MARKET_VALUE", ranked);
         return ranked.toArray(new PowerRankingRepository.Entry[0]);
     }
 
@@ -167,8 +169,36 @@ public class PowerRankingService {
         }
 
         var ranked = rankDescending(scored);
-        rankings.save(leagueId, season, week, "COMPUTED_REALIZED", ranked);
+        // Skipped rather than saved when empty -- see PowerRankingRepository.save,
+        // which refuses it anyway. Calling it regardless would work, but the call
+        // reads as though an empty ranking is a result; it isn't one.
+        if (!ranked.isEmpty()) rankings.save(leagueId, season, week, "COMPUTED_REALIZED", ranked);
         return ranked.toArray(new PowerRankingRepository.Entry[0]);
+    }
+
+    /**
+     * Why a REALIZED ranking for this league and week has nothing to rank, or
+     * null when it does.
+     *
+     * REALIZED ranks on {@code roster_week_points}, which only exists once the
+     * league-history ingest has run AND Sleeper has actually scored the week
+     * ({@code settings.last_scored_leg} bounds that ingest). Before this, the
+     * compute endpoint answered 200 with {@code "realized": 0} and no reason,
+     * which is indistinguishable from a real result of nothing -- it read as a
+     * persistence bug when it was a missing-ingest one, and cost an afternoon
+     * of looking in the wrong place.
+     */
+    public String realizedGap(long leagueId, int week) {
+        if (!weekPoints.through(leagueId, week).isEmpty()) return null;
+
+        Set<Integer> stored = weekPoints.storedWeeks(leagueId);
+        if (stored.isEmpty()) {
+            return "no weekly scoring is stored for this league -- run"
+                    + " POST /api/ingest/league-history/{sleeperLeagueId}; it ingests only weeks"
+                    + " Sleeper has already scored, so a season that has not kicked off yields none";
+        }
+        return "weekly scoring is stored for week(s) " + stored.stream().sorted().toList()
+                + ", none of them at or before week " + week;
     }
 
     /**

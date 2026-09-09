@@ -23,7 +23,23 @@ public class PowerRankingRepository {
 
     public record Entry(int rosterId, Long managerId, int rank, Double score, String note) {}
 
-    public void save(long leagueId, int season, int week, String kind, List<Entry> entries) {
+    /**
+     * @return true if a snapshot was written, false if {@code entries} was empty
+     *         and the call was refused.
+     *
+     * An empty snapshot is not a fact worth storing, and writing one was worse
+     * than merely useless. The sequence below is insert-or-touch, delete every
+     * entry, re-insert: with nothing to re-insert, a recompute that found no
+     * data DELETED a previously good snapshot's entries and left a hollow
+     * power_ranking row behind. So "we have no scoring for this week yet" could
+     * silently destroy last week's real ranking.
+     *
+     * Refusing here rather than only at the call site because the damage is a
+     * property of this method's shape, not of any one caller's judgment -- a
+     * third compute mode added later would inherit the same trap.
+     */
+    public boolean save(long leagueId, int season, int week, String kind, List<Entry> entries) {
+        if (entries == null || entries.isEmpty()) return false;
         Long rankingId = db.sql("""
                 insert into power_ranking (league_id, season, week, kind)
                 values (?, ?, ?, ?)
@@ -43,6 +59,7 @@ public class PowerRankingRepository {
                     .params(rankingId, e.rosterId(), e.managerId(), e.rank(), e.score(), e.note())
                     .update();
         }
+        return true;
     }
 
     public record SnapshotRow(int season, int week, String kind, int rosterId, Long managerId,

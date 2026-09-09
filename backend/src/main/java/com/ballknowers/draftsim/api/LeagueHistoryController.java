@@ -231,9 +231,24 @@ public class LeagueHistoryController {
 
         var marketValue = power.computeMarketValue(league.get().id(), sleeperId, season, week);
         var realized = power.computeRealized(league.get().id(), season, week);
-        return ResponseEntity.ok(Map.of(
-                "marketValue", marketValue.length,
-                "realized", realized.length));
+
+        // LinkedHashMap, not Map.of: the reason below is legitimately absent on
+        // the happy path, and Map.of throws on a null value.
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("marketValue", marketValue.length);
+        response.put("realized", realized.length);
+        // A zero that does not say why reads as a broken feature. It is almost
+        // always "this week has not been scored/ingested yet", which is a thing
+        // the caller can act on -- so say so instead of leaving them to guess
+        // whether the snapshot failed to persist.
+        if (realized.length == 0) {
+            response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
+        }
+        if (marketValue.length == 0) {
+            response.put("marketValueSkipped",
+                    "Sleeper returned no rosters for this league, so there was nothing to value");
+        }
+        return ResponseEntity.ok(response);
     }
 
     public record CommissionerRanking(Integer season, Integer week, List<Integer> rosterIds) {}
