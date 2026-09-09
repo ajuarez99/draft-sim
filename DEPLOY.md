@@ -125,6 +125,34 @@ That is acceptable for a private tool you alone use and is not acceptable if you
 share the URL. If it needs to be shareable, the token has to move server-side — at
 which point you want real auth rather than a bigger shared secret.
 
+## Multiple people
+
+claude/user-identity-and-onboarding.md: anyone can type a Sleeper username at
+`/` and see their own leagues, with their own seat highlighted. Four things
+worth knowing before that goes out to more than Allan:
+
+- **This is identification, not authentication.** Anyone can type `popsharky`
+  and get Allan's seat highlighting and Allan's league list. There is no
+  password and nothing is hidden. That is an accepted tradeoff for a
+  friends-and-league-mates tool, and it stops being acceptable the moment
+  anything private lands in the database.
+- **The API token is shared.** `VITE_API_TOKEN` is in every visitor's
+  devtools, so every visitor can call `/api/ingest/*` and `/api/drafts`
+  unscoped (`GET /api/drafts` with no `X-Sleeper-User` header still returns
+  everyone's leagues, by design — see §2 above). Signing in scopes what the
+  *app* shows a given visitor; it does not restrict what the *API* will
+  answer to a raw request. The real fix is a server-side proxy or real auth;
+  the interim mitigation, if it matters, is same-origin hosting so at least
+  nothing new is exposed beyond the pre-existing token-in-devtools tradeoff.
+- **Live mode's EventSource still cannot send the token** (the gap noted at
+  the top of this document). It bites a split-origin deploy with `API_TOKEN`
+  set. If draft night matters more than the deploy shape, either keep it
+  same-origin or accept the token as a query parameter on that one route.
+- **`APP_OWNER_SLEEPER_USER_ID` is now a fallback**, not the identity — see
+  `.env.example`. `X-Sleeper-User` (sent by every signed-in visitor's browser)
+  wins when present; the configured owner only matters for a request with no
+  header at all, which is every request until someone signs in.
+
 ## Things that will probably bite
 
 **Memory on free tiers.** `POST /api/ingest/players` pulls Sleeper's ~5MB player dump

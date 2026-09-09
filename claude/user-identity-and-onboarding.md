@@ -16,6 +16,41 @@ is not Allan. Explicitly **not** auth. The entry point is "type your Sleeper
 username", and everything downstream of that is a function of the id it resolves
 to.
 
+## Status — done same-day, 2026-09-09
+
+Steps 1-6 shipped on `main` (merged/fast-forwarded, not yet pushed to a public
+deploy). B1 also landed first, per the note above.
+
+- §4a `SleeperUserController` + season-via-`state().league_season`.
+- §4b `DraftRepository.allWithLeagueFor` (the roster_season/slot_to_manager
+  union, walked backwards through `previous_league_id`) with a real-Postgres
+  IT covering all five cases in §8's list.
+- §4c `X-Sleeper-User` header on the three endpoints listed, `OwnerSlot`'s
+  4-arg overload (header wins, configured owner falls back).
+- §5 `user.ts`, `SignIn.tsx`, the `/` gate in `App.tsx`, the header avatar/sign-out.
+- §5c/§5d `DraftPicker`'s "From Sleeper" list and staged `Set up` card.
+- §7 `.env.example` and `DEPLOY.md`'s "Multiple people" section.
+
+316 backend tests, 111 frontend tests, all real-Postgres where the existing
+suite already was. Live-verified end to end against a real Sleeper account
+(popsharky) on ad-hoc ports (8081/5174, so as not to disturb another
+session's already-running 8080/5173): sign-in, scoped picker (2 of 8 DB
+leagues), staged setup of a genuinely un-ingested league moving it into
+"Your leagues", and `mySlot` resolving on the draft room with no
+`APP_OWNER_SLEEPER_USER_ID` configured. That run found and fixed a real bug
+not in this doc: `WebConfig`'s CORS `allowedHeaders` didn't include
+`X-Sleeper-User`, so a split-origin deploy would 403 every request once
+someone signed in — same-origin dev never exercises CORS, so nothing else
+would have caught it.
+
+**Not done:** §6's 30-minute measurement was done ad hoc against local
+Postgres/network rather than written up as its own artifact (both ingest
+paths land well under any platform timeout — NFL ≈4.3s cold / ≈3.2s warm,
+NBA ≈2.4s / ≈1.9s; board rebuild's `save()` is `@Transactional` clear+insert
+per sport/source/day, so concurrent rebuilds race to last-writer-wins rather
+than corrupting). The `docker compose --profile full` rehearsal in §9 step 7
+has not been run.
+
 ## 1. What "only works for me" actually is
 
 Three separate things, not one. Worth separating because only the first two are
