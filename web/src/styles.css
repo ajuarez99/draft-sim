@@ -564,6 +564,11 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
  *   3  a focused cell, so its outline is never clipped by a neighbour
  *   4  .avail-sheet, the floating player list
  *   5  .start-overlay, which covers everything by design
+ *   6  .board-stage.pre-start .col-head -- the ONE exception to 5, and only
+ *      before a run: the overlay says "click your name in the board above"
+ *      while sitting on top of the headers that sentence points at, which
+ *      made the seat popover unreachable until a simulation had been run.
+ *      The empty grid stays dimmed and blurred underneath; the room does not.
  */
 .board {
   display: grid; gap: 4px; background: var(--bg);
@@ -598,6 +603,12 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 }
 .board .col-head:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
 .board .col-head:disabled { cursor: default; }
+/* Layer 6, scoped to the pre-start state -- see the z-index list above. Paint
+   order is hit-test order, so this is what makes the header clickable again,
+   not just legible. Deliberately not applied once the draft is running: the
+   availability sheet (layer 4) is bottom-anchored and can grow tall enough to
+   reach the headers, and it should cover them when it does. */
+.board-stage.pre-start .board .col-head { z-index: 6; }
 .board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
 /* Same crimson identity as `.cell.mine` -- your own seat should read as the
    same "you" everywhere on the board, not a second visual language. */

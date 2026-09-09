@@ -543,7 +543,12 @@ export default function DraftView() {
               // run) so the grid -- and its column headers -- exists before a
               // simulation ever has. Everything else defaults to "nothing
               // revealed yet": an empty board, not a placeholder screen.
-              <div className="board-stage">
+              // `pre-start` lifts the column headers above the start
+              // overlay (styles.css). The overlay's own copy says "click your
+              // name in the board above", and until this class existed it was
+              // covering the headers that instruction points at -- the one
+              // thing on the pre-start board that is real rather than empty.
+              <div className={`board-stage${started ? '' : ' pre-start'}`}>
                 <DraftBoard
                   board={result?.board ?? []}
                   teams={result?.teams ?? seats.teams}
