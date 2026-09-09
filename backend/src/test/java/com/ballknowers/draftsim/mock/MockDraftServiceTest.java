@@ -310,6 +310,21 @@ class MockDraftServiceTest {
     }
 
     @Test
+    void createSessionFromDraftRejectsANonNflSport() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-nba", 2026, 15, 8, "drafting", Map.of());
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+        when(drafts.bySleeperId("sleeper-draft-nba")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.createSessionFromDraft("sleeper-draft-nba", 1),
+                "the mock room is football-only -- forking an NBA draft must be refused, not build a "
+                        + "basketball room and offer football players for every pick after this one");
+    }
+
+    @Test
     void createSessionFromDraftRejectsAnUnsupportedTeamCount() {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 9L, "sleeper-draft-odd-size", 2026, 15, 9, "drafting", Map.of());

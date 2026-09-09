@@ -9,13 +9,15 @@ it is ready.** The architecture is right and does not need a refactor. What it
 needs is for its own stated boundaries to be enforced in code instead of
 described in comments.
 
+**All five items are now fixed. Ready to merge.**
+
 ---
 
 ## Status — updated 2026-09-09, same day
 
 | item | state |
 |---|---|
-| B1 — NBA fork builds a football room | **open** (the sim/mock room; deliberately left while it is being tested) |
+| B1 — NBA fork builds a football room | **fixed** — guard added to `createSessionFromDraft` |
 | B2 — live poller writes null picks | **fixed**, `9c655da` |
 | S1 — manager history is football-only | **fixed**, `9c655da` |
 | S2 — football-shaped pages on an NBA card | **fixed**, `d8092f9` |
@@ -228,7 +230,7 @@ values the running backend produced, not against a re-derivation.
 
 ## Recommendation
 
-**Only B1 is left.** Merge after it.
+**B1, B2 and S1 are all fixed.** Merge.
 
 Original recommendation, kept as written: merge after **B1, B2 and S1**. Two guards and one parameter, with a test each.
 S1 belongs in the same pass because it is the last instance of the cross-sport

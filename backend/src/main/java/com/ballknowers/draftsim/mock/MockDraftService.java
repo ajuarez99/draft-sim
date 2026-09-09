@@ -159,6 +159,17 @@ public class MockDraftService {
         // Plain snake throughout is at least self-consistent.
         LeagueSettings settings = LeagueRepository.toSettings(league, draft.rounds());
 
+        // The mock room is football-only (multi-sport-and-rebrand.md's Non-goals):
+        // buildContext/submitPick below both hardcode Sport.NFL and
+        // MockDraftRepository.SessionRow has no sport column, so a non-NFL fork
+        // would build an NBA board here and then offer football players for every
+        // pick after this one. Refuse it before any of that state exists rather
+        // than fail confusingly on the first submitPick.
+        if (settings.sport() != Sport.NFL) {
+            throw new IllegalArgumentException("draft " + sleeperDraftId + " is a "
+                    + settings.sport() + " draft -- the mock draft room only supports NFL drafts");
+        }
+
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(settings.teams())) {
             throw new IllegalArgumentException("league has " + settings.teams() + " teams, but only "
                     + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
