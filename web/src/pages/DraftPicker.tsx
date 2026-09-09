@@ -251,12 +251,35 @@ export default function DraftPicker() {
                     <Link className="league-link primary" to={draftRoute(d)}>
                       {live ? 'Draft room' : complete ? 'Draft board' : 'Mock draft'}
                     </Link>
-                    <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
-                      History
-                    </Link>
-                    <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
-                      Power rankings
-                    </Link>
+                    {/* Football only, and hidden rather than disabled -- a
+                        greyed-out link invites a click and then explains
+                        itself; an absent one just isn't a promise.
+
+                        Power rankings are football-shaped down to the wire
+                        format: /api/leagues/{id}/power returns a field
+                        literally named `nflState` carrying the NFL week and
+                        season. History is closer to sport-agnostic (standings
+                        are wins, losses and points), but its own drill-down,
+                        /api/managers/{id}/history, calls fit(Sport.NFL)
+                        unconditionally -- so an NBA standings row would link
+                        to that manager's FOOTBALL reach bias and tilt, and ten
+                        of twelve managers here are the same Sleeper id in both
+                        leagues. Both come back the moment that endpoint takes
+                        a sport; see claude/merge-review-multi-sport.md S1/S2.
+
+                        Today the NBA league also has no ingested standings, so
+                        these two led to three empty season headers and an
+                        empty table. */}
+                    {d.sport === 'nfl' && (
+                      <>
+                        <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
+                          History
+                        </Link>
+                        <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
+                          Power rankings
+                        </Link>
+                      </>
+                    )}
                   </div>
 
                   <footer className="league-card-foot">
