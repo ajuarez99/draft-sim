@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
@@ -28,6 +29,7 @@ class LeagueHistoryIngestServiceTest {
     @Mock private SleeperClient sleeper;
     @Mock private LeagueRepository leagues;
     @Mock private ManagerRepository managers;
+    @Mock private LeagueMemberRepository leagueMembers;
     @Mock private RosterSeasonRepository rosterSeasons;
     @Mock private RosterWeekPointsRepository weekPoints;
 
@@ -35,7 +37,7 @@ class LeagueHistoryIngestServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new LeagueHistoryIngestService(sleeper, leagues, managers, rosterSeasons, weekPoints);
+        service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons, weekPoints);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any()))
                 .thenReturn(55L);
     }

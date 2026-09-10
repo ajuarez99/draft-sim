@@ -624,11 +624,33 @@ export type ManagerHistory = {
 export const getManagerHistory = (managerId: number) =>
   apiFetch(`/api/managers/${managerId}/history`).then(json<ManagerHistory>)
 
-export type PowerRankingKind = 'COMMISSIONER' | 'COMPUTED_MARKET_VALUE' | 'COMPUTED_REALIZED'
+/**
+ * The one place the mode list is written down.
+ *
+ * It used to be written down four times -- the Record types below plus three
+ * `as PowerRankingKind[]` array literals in PowerRankings.tsx (the mode
+ * selector, the per-team transpose's mode list, and the per-team legend). The
+ * Records fail to compile when a mode is added, which is what you want; the
+ * casts silently do not, which is how adding MEMBER would have shipped a mode
+ * selector with four segments and a comparison view still drawing three lines
+ * under copy reading "across all three modes"
+ * (claude/plan-review-power-rankings-ballots.md finding 9d).
+ *
+ * Order is display order, and MEMBER is last on purpose -- it is never the
+ * default mode (finding 20).
+ */
+export const ALL_POWER_RANKING_KINDS = [
+  'COMPUTED_MARKET_VALUE',
+  'COMPUTED_REALIZED',
+  'COMMISSIONER',
+  'MEMBER',
+] as const
+
+export type PowerRankingKind = (typeof ALL_POWER_RANKING_KINDS)[number]
 
 // Mirrors LeagueHistoryController.snapshotRow()'s shape. score is null for
 // COMMISSIONER (an ordering, not a measurement -- claude/league-suite.md's
-// "only rank is shared across all three modes" argument).
+// "only rank is shared across all four modes" argument).
 export type PowerRankingEntry = {
   season: number
   week: number
@@ -639,6 +661,27 @@ export type PowerRankingEntry = {
   rank: number
   score: number | null
   note: string | null
+
+  // MEMBER only, null on every stored mode. The spread is a first-class output
+  // rather than something the client derives, and it cannot be parsed back out
+  // of `note` -- the note is prose for humans and the spread bar is a drawing
+  // (claude/power-rankings-ballots.md, finding 7).
+  //
+  // ballotCount is per-ROSTER, not per-week: a roster ranked 1st by the only
+  // manager who bothered would otherwise average 1.00 and win the week outright
+  // over a roster averaging 1.4 across seven ballots (finding 8).
+  bestRank?: number | null
+  worstRank?: number | null
+  stdev?: number | null
+  ballotCount?: number | null
+
+  // MEMBER only: this roster's own owner's rank of themselves, minus the room's
+  // average of them. Negative = ranks himself higher than the room does. Kept
+  // per-entry rather than as its own endpoint because it is exactly a property
+  // of this entry -- and it is the only place one member's individual vote
+  // surfaces at all, which is why it is a single derived integer rather than
+  // the ballot it came from.
+  selfRankBias?: number | null
 }
 
 export type NflState = {
@@ -733,3 +776,50 @@ export async function streamSimulation(
   if (!result) throw new Error('stream ended without a result')
   return result
 }
+
+// --- claude/power-rankings-ballots.md: member ballots (power-ranking mode 2) ---
+
+export type BallotMember = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  /** Sleeper's metadata.team_name, already resolved -- the backend applies the
+   *  team_name -> display_name -> null chain and treats the literal "TBD" as
+   *  absent (design doc finding 19), so this is renderable as-is. */
+  teamName: string | null
+  isMe: boolean
+}
+
+/**
+ * Mirrors LeagueHistoryController.ballot(). `canSubmit` folds together every
+ * reason a ballot might be refused -- signed out, not a member of this league,
+ * a non-NFL league (mode 2 is NFL-only by construction while nflState is), and
+ * a week that is not the current one -- so the client never has to re-derive
+ * the rule and disagree with the server about it.
+ */
+export type BallotState = {
+  season: number
+  week: number
+  canSubmit: boolean
+  canCommission: boolean
+  /** False when no league_member row carries is_commissioner -- i.e. this
+   *  league predates the flag and needs a re-ingest. The page says so rather
+   *  than silently showing nobody an editor. */
+  commissionerKnown: boolean
+  memberCount: number
+  ballotCount: number
+  members: BallotMember[]
+  mine: { rosterIds: number[]; submittedAt: string } | null
+}
+
+export const getBallot = (sleeperLeagueId: string, week?: number) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/ballot${week == null ? '' : `?week=${week}`}`).then(json<BallotState>)
+
+/** rosterIds[0] is 1st. The season is read from league.season server-side and
+ *  nothing here is trusted for it, so it is deliberately not a parameter. */
+export const submitBallot = (sleeperLeagueId: string, week: number, rosterIds: number[]) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/ballot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ week, rosterIds }),
+  }).then(json<{ saved: number }>)

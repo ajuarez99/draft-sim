@@ -41,4 +41,29 @@ final class LeagueMapper {
             return fallback;
         }
     }
+
+    /**
+     * The fallback chain claude/power-rankings-ballots.md's finding 19 names:
+     * {@code metadata.team_name}, falling back to the display name Sleeper
+     * already gave this user. Measured live against a real 12-user league:
+     * 3 of 12 have no {@code team_name} at all, and one has the literal
+     * string {@code "TBD"} -- rendering that on a ranking board would be
+     * worse than the display name it displaced, so it is treated as absent
+     * exactly like a missing key. The further fallback to "roster N" is NOT
+     * done here -- this method runs inside the {@code leagueUsers()} walk,
+     * which has no roster id at all -- it belongs to whichever caller already
+     * knows which roster this manager currently owns.
+     */
+    @SuppressWarnings("unchecked")
+    static String teamName(Map<String, Object> user, String displayName) {
+        Object metadata = user.get("metadata");
+        if (metadata instanceof Map<?, ?> md) {
+            Object raw = ((Map<String, Object>) md).get("team_name");
+            if (raw != null) {
+                String s = String.valueOf(raw).trim();
+                if (!s.isEmpty() && !"TBD".equals(s)) return s;
+            }
+        }
+        return displayName;
+    }
 }

@@ -43,10 +43,14 @@ public class LeagueMembership {
     /**
      * The membership walk, minus the {@code me} clause that names whose it is.
      *
-     * Membership is the union of two paths, since either alone misses leagues
-     * the other covers: {@code roster_season} catches a league with no ingested
-     * draft at all, {@code slot_to_manager} catches a draft ingested before that
-     * manager had any scored season. The {@code chain} step then walks
+     * Membership is the union of three paths, since each alone misses leagues
+     * the others cover: {@code roster_season} catches a league with no
+     * ingested draft at all, {@code slot_to_manager} catches a draft ingested
+     * before that manager had any scored season, and {@code league_member}
+     * (claude/power-rankings-ballots.md, added for the ballots feature)
+     * catches a league with NEITHER -- which is every league on the day it is
+     * created, since both of the other two paths need a whole ingest run to
+     * have happened first. The {@code chain} step then walks
      * {@code previous_league_id} backwards to pull in predecessor seasons --
      * forwards only, since a successor league you were later dropped from is
      * genuinely not yours any more.
@@ -58,6 +62,8 @@ public class LeagueMembership {
                 select d.league_id from draft d, me
                  where exists (select 1 from jsonb_each_text(d.slot_to_manager) x
                                 where x.value = me.id::text)
+                union
+                select lm.league_id from league_member lm join me on me.id = lm.manager_id
             ),
             chain as (
                 select l.id, l.previous_league_id

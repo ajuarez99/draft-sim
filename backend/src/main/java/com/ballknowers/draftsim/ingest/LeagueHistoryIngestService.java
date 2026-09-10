@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
@@ -32,15 +33,17 @@ public class LeagueHistoryIngestService {
     private final SleeperClient sleeper;
     private final LeagueRepository leagues;
     private final ManagerRepository managers;
+    private final LeagueMemberRepository leagueMembers;
     private final RosterSeasonRepository rosterSeasons;
     private final RosterWeekPointsRepository weekPoints;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
-                                      ManagerRepository managers, RosterSeasonRepository rosterSeasons,
-                                      RosterWeekPointsRepository weekPoints) {
+                                      ManagerRepository managers, LeagueMemberRepository leagueMembers,
+                                      RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
+        this.leagueMembers = leagueMembers;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
     }
@@ -56,7 +59,7 @@ public class LeagueHistoryIngestService {
             String sleeperLeagueId = String.valueOf(league.get("league_id"));
             int season = Integer.parseInt(String.valueOf(league.get("season")));
 
-            Map<String, Long> managerByUserId = upsertManagers(sleeperLeagueId);
+            Map<String, Long> managerByUserId = upsertManagers(leagueId, sleeperLeagueId);
             rosterCount += ingestStandings(leagueId, sleeperLeagueId, league, managerByUserId);
             weekCount += ingestWeeklyPoints(leagueId, season, sleeperLeagueId, league);
         }
@@ -65,12 +68,22 @@ public class LeagueHistoryIngestService {
         return new Result(seasons, rosterCount, weekCount);
     }
 
-    private Map<String, Long> upsertManagers(String sleeperLeagueId) {
+    /**
+     * claude/power-rankings-ballots.md: the same {@code leagueUsers()} walk
+     * this method already ran before the ballots feature existed now also
+     * upserts {@code league_member} -- see LeagueIngestService's own copy of
+     * this method for why it is not a third read of the payload.
+     */
+    private Map<String, Long> upsertManagers(long leagueId, String sleeperLeagueId) {
         Map<String, Long> out = new HashMap<>();
         for (Map<String, Object> u : sleeper.leagueUsers(sleeperLeagueId)) {
             String userId = String.valueOf(u.get("user_id"));
             String display = u.get("display_name") == null ? null : String.valueOf(u.get("display_name"));
-            out.put(userId, managers.upsert(userId, display));
+            long managerId = managers.upsert(userId, display);
+            out.put(userId, managerId);
+
+            boolean isCommissioner = Boolean.TRUE.equals(u.get("is_owner"));
+            leagueMembers.upsert(leagueId, managerId, isCommissioner, LeagueMapper.teamName(u, display));
         }
         return out;
     }

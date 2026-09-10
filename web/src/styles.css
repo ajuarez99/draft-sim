@@ -54,6 +54,15 @@
  *   0 cells · 1 sticky headers (2 for the corner) · 3 a focused cell ·
  *   4 `.avail-sheet` · 5 `.start-overlay`. Add a layer here, not inline.
  *
+ * STACKING (page-level `position: fixed` layers, not scoped to `.board-stage`)
+ *   `.modal-backdrop` is the only other one, at z-index 100. RankBoard's
+ *   drag ghost (`.rankboard-ghost`) is 50 -- comfortably above ordinary
+ *   in-flow page content (which creates no stacking context of its own) and
+ *   deliberately still below a modal, even though the two can never be open
+ *   at once in practice (an active drag holds pointer capture, and nothing
+ *   that opens a modal can fire while it does). Add the next page-level
+ *   fixed layer here, not inline.
+ *
  * DENSITY
  *   Match the layout to the shape of the content: rows for lists
  *   (`.draft-list`), a grid for the board, cards only for things that are
@@ -1286,12 +1295,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .bump-legend-button:hover { color: var(--text); background: var(--line); }
 .bump-legend-button.on { color: var(--text); background: color-mix(in oklch, var(--teal) 18%, var(--panel)); }
 
-.rank-input {
-  width: 48px; text-align: center; font: inherit;
-  background: var(--bg); color: var(--text); border: 1px solid var(--line);
-  border-radius: 6px; padding: 4px 6px;
-}
-
 /* ===== B1: home hero + global nav =====
  * design-review-next-steps.md B1 (home hero + disclosure) and the leftover
  * of E5 (global nav). Appended here rather than edited in place among the
@@ -1526,3 +1529,142 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    gap made the caption look like it belonged to the *next* field, not the
    one above it. */
 .field-hint { margin: -3px 0 0; }
+
+/* ---------------------------------------------------------------------------
+   RankBoard -- the drag-to-rank board (claude/power-rankings-ballots.md).
+   Two lists that trade chips: an unordered tray, and numbered slots. Both are
+   ROWS, not cards -- a manager is a one-line record (avatar, name, team) and
+   padding that out into a card is the failure the DENSITY rule names.
+
+   Nothing here carries a shadow. The board is on the plane; what separates a
+   slot from its neighbours is tint and border, and what separates the drag
+   ghost is that it genuinely floats (see STACKING above, z-index 50).
+   --------------------------------------------------------------------------- */
+
+.rankboard { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+/* Kills the text selection a slow desktop drag would otherwise paint across
+   every chip label. Scoped to the dragging state so ordinary reading, and
+   copying a manager's name, still work. */
+.rankboard.dragging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+
+/* Visually hidden, still announced -- the aria-live region. First one in this
+   app; the clip-rect idiom rather than display:none, which screen readers skip. */
+.rankboard-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* The tray. min-height holds its footprint steady as it empties, so the slots
+   below do not walk up the page mid-drag and invalidate their own measured
+   rects (finding 10) -- the layout reason, not just a cosmetic one. */
+.rankboard-tray {
+  display: flex; flex-wrap: wrap; gap: 6px; min-height: 96px; align-content: flex-start;
+  padding: 8px; border: 1px dashed var(--line); border-radius: 10px;
+  background: color-mix(in oklch, var(--panel) 60%, var(--bg));
+}
+.rankboard-tray-empty { margin: auto; }
+
+.rankboard-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.rankboard-slot {
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  padding: 3px 8px 3px 4px; border: 1px solid transparent; border-radius: 10px;
+  background: color-mix(in oklch, var(--panel) 70%, var(--bg));
+}
+/* The drop target. A tint and a ring, never a lift -- grid tiles are on the
+   plane, and a slot that rises to meet the cursor reads as a card. */
+.rankboard-slot.drop-target {
+  border-color: var(--teal);
+  background: color-mix(in oklch, var(--teal) 14%, var(--panel));
+}
+.rankboard-slot-index { width: 22px; text-align: right; color: var(--muted); font-size: 12px; flex-shrink: 0; }
+
+.rankboard-slot-empty {
+  flex: 1; min-height: 38px; border: 1px dashed var(--line); border-radius: 8px;
+  background: none; color: var(--muted); cursor: pointer; text-align: left; padding: 0 10px;
+}
+.rankboard-slot-empty:hover { border-color: var(--teal); color: var(--text); }
+.rankboard-slot-empty:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* The chip. 999px because it is a badge-shaped thing carrying an identity, and
+   min-height 44px because it is the drag handle -- the 24px .avatar inside is
+   the ornament, not the target (finding 10). */
+.rankboard-chip {
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  padding: 4px 14px 4px 4px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font: inherit; text-align: left;
+  cursor: grab; touch-action: none; max-width: 100%; min-width: 0;
+}
+.rankboard-chip:hover { border-color: color-mix(in oklch, var(--teal) 55%, var(--line)); }
+.rankboard-chip:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+/* Selected is the click-to-place path's held state -- teal, because it is
+   interaction, not identity. */
+.rankboard-chip.selected { border-color: var(--teal); background: color-mix(in oklch, var(--teal) 16%, var(--panel)); }
+/* Crimson means you, and here nothing else owns the background, so it fills. */
+.rankboard-chip.mine { border-color: var(--crimson); background: color-mix(in oklch, var(--crimson) 15%, var(--panel)); }
+/* The chip left behind while its ghost is under the pointer. */
+.rankboard-chip.drag-source { opacity: 0.32; }
+
+.rankboard-chip-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.rankboard-chip-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rankboard-chip-team { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The one genuinely floating thing here, so the one thing with a shadow.
+   Positioned by transform from JS; pointer-events:none so hit-testing reads
+   the slot underneath it rather than the ghost itself. */
+.rankboard-ghost {
+  position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 14px 4px 4px; border: 1px solid var(--teal); border-radius: 999px;
+  background: var(--panel); box-shadow: 0 8px 24px oklch(0% 0 0 / 0.45);
+  font-size: 13px; font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  /* At 375px a 12-slot board is the whole screen twice over, so the tray gets
+     shorter and the chips lose their team line's width claim -- but nothing
+     loses its 44px touch target, which is the one dimension that must not
+     shrink on the device where dragging is hardest. */
+  .rankboard-tray { min-height: 76px; }
+  .rankboard-chip { padding-right: 10px; }
+  .rankboard-slot { padding-left: 2px; }
+  .rankboard-slot-index { width: 18px; }
+}
+
+/* Spread bar -- the min..max of ranks a team received, dot at the mean. A track
+   plus two absolutely-positioned children; the range is tinted rather than
+   solid so the mean dot stays readable on top of it. */
+.spread-bar { position: relative; display: block; width: 120px; height: 10px; border-radius: 999px; background: var(--line); }
+.spread-bar-range { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: color-mix(in oklch, var(--teal) 45%, var(--panel)); }
+.spread-bar-mean { position: absolute; top: 1px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text); }
+
+/* `.content` is a flex column with no overflow of its own -- fine for the
+   single-screen pages this app started as, where one panel fills the viewport
+   and scrolls internally via `.panel-body`. Power rankings is the first page
+   that is genuinely TALLER than the viewport: a chart plus a ballot board plus
+   two tables, stacked. Without this the bottom of it is simply unreachable on a
+   phone (claude/plan-review-power-rankings-ballots.md finding 10).
+
+   Scoped rather than applied to `.content` itself: the other pages rely on not
+   scrolling here, and turning it on globally would change the scroll owner on
+   every screen at once. Other stacked pages (LeagueHistory, ManagerTendencies)
+   likely want this too -- they can opt in the same way. */
+.content.scrolls { overflow-y: auto; overflow-x: hidden; }
+@media (max-width: 700px) {
+  .content.scrolls { -webkit-overflow-scrolling: touch; }
+}
+
+@media (max-width: 700px) {
+  /* A fourth mode ("The room") pushed this control past a 375px viewport, and
+     because `.segmented` is `flex-shrink: 0` with `white-space: nowrap`
+     segments, it did not shrink, wrap or scroll -- it simply overflowed, and
+     the new mode was unreachable on a phone. Found by driving the real page at
+     375px, not by inspection: at desktop width all four fit and nothing looked
+     wrong.
+
+     Wrapping rather than `overflow-x: auto` on purpose. A horizontally
+     scrolling four-item control hides options behind a gesture with nothing to
+     suggest it; two rows of two shows every mode at once, which is what a mode
+     selector is for. */
+  .segmented { flex-wrap: wrap; flex-shrink: 1; max-width: 100%; }
+  .segmented .segment { flex: 1 1 auto; text-align: center; }
+}

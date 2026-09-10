@@ -26,18 +26,20 @@ public class LeagueIngestService {
     private final SleeperClient sleeper;
     private final LeagueRepository leagues;
     private final ManagerRepository managers;
+    private final LeagueMemberRepository leagueMembers;
     private final DraftRepository drafts;
     private final PlayerRepository players;
     private final BoardService boards;
     private final TransactionTemplate tx;
 
     public LeagueIngestService(SleeperClient sleeper, LeagueRepository leagues,
-                               ManagerRepository managers, DraftRepository drafts,
-                               PlayerRepository players, BoardService boards,
+                               ManagerRepository managers, LeagueMemberRepository leagueMembers,
+                               DraftRepository drafts, PlayerRepository players, BoardService boards,
                                PlatformTransactionManager txManager) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
+        this.leagueMembers = leagueMembers;
         this.drafts = drafts;
         this.players = players;
         this.boards = boards;
@@ -120,7 +122,7 @@ public class LeagueIngestService {
             long leagueId = upsertLeague(sport, league);
             String sleeperLeagueId = str(league.get("league_id"));
 
-            Map<String, Long> managerByUserId = upsertManagers(sleeperLeagueId);
+            Map<String, Long> managerByUserId = upsertManagers(leagueId, sleeperLeagueId);
 
             for (Map<String, Object> d : sleeper.drafts(sleeperLeagueId)) {
                 draftCount++;
@@ -136,12 +138,27 @@ public class LeagueIngestService {
         return LeagueMapper.upsert(leagues, sport, league);
     }
 
-    private Map<String, Long> upsertManagers(String sleeperLeagueId) {
+    /**
+     * claude/power-rankings-ballots.md: the same {@code leagueUsers()} walk
+     * this method already ran before the ballots feature existed now also
+     * upserts {@code league_member} -- the commissioner flag and team name
+     * ride on the exact payload this loop was already iterating, so this is
+     * the whole read, not a second one (plan-review finding 1).
+     */
+    private Map<String, Long> upsertManagers(long leagueId, String sleeperLeagueId) {
         Map<String, Long> out = new HashMap<>();
         for (Map<String, Object> u : sleeper.leagueUsers(sleeperLeagueId)) {
             String userId = str(u.get("user_id"));
             String display = str(u.get("display_name"));
-            out.put(userId, managers.upsert(userId, display));
+            long managerId = managers.upsert(userId, display);
+            out.put(userId, managerId);
+
+            // Not a cast: measured live against a real 12-user league,
+            // is_owner is present-and-true on the commissioner and ABSENT --
+            // not false -- on everyone else. (boolean) u.get("is_owner") NPEs
+            // on every non-commissioner.
+            boolean isCommissioner = Boolean.TRUE.equals(u.get("is_owner"));
+            leagueMembers.upsert(leagueId, managerId, isCommissioner, LeagueMapper.teamName(u, display));
         }
         return out;
     }

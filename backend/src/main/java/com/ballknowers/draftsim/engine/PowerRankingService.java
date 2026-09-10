@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.ingest.BoardService;
+import com.ballknowers.draftsim.ingest.RosterOwnerMapper;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
@@ -206,11 +207,22 @@ public class PowerRankingService {
      * is 1st, and so on -- per claude/league-suite.md's y-axis argument: modes
      * 1 and 2 produce orderings only, so rank is the one axis all three modes
      * share.
+     *
+     * <p><b>claude/plan-review-power-rankings-ballots.md finding 16.</b>
+     * {@code managerByRoster} used to come from {@code rosterSeasons.forLeague},
+     * i.e. from league-history ingest -- on the very no-history league
+     * claude/power-rankings-ballots.md's AC11 targets, that map is empty,
+     * every entry gets {@code manager_id = null}, and the chart legend and
+     * tooltip both render "roster 3". It is read live off
+     * {@code sleeper.rosters(sleeperLeagueId)}'s own {@code owner_id}
+     * instead -- the same join the ballot endpoint's {@code members[]} list
+     * uses, and the same reason: it works before any history ingest has run.
      */
-    public PowerRankingRepository.Entry[] saveCommissionerRanking(long leagueId, int season, int week,
+    public PowerRankingRepository.Entry[] saveCommissionerRanking(long leagueId, String sleeperLeagueId,
+                                                                  int season, int week,
                                                                   List<Integer> orderedRosterIds) {
-        Map<Integer, Long> managerByRoster = new HashMap<>();
-        rosterSeasons.forLeague(leagueId).forEach(r -> managerByRoster.put(r.rosterId(), r.managerId()));
+        Map<Integer, Long> managerByRoster = RosterOwnerMapper.rosterToManager(
+                sleeper.rosters(sleeperLeagueId), managers.idsBySleeperUserId());
 
         List<PowerRankingRepository.Entry> entries = new ArrayList<>(orderedRosterIds.size());
         for (int i = 0; i < orderedRosterIds.size(); i++) {
@@ -229,25 +241,22 @@ public class PowerRankingService {
      * Standard competition ranking (1, 2, 2, 4): equal scores share the lower
      * rank and the next rank is skipped -- claude/plan-review-league-suite.md
      * finding 4, decided once here rather than left to whichever renderer
-     * draws the chart. Scores are rounded to the stored precision (4dp)
-     * before comparing, so two doubles that are "equal" up to float noise but
-     * would print identically don't get spuriously separate ranks.
+     * draws the chart.
+     *
+     * <p>Delegates to {@link Ranker}, extracted for
+     * claude/power-rankings-ballots.md's member-ballot aggregate, which needs
+     * the identical tie rule in the opposite (ascending) direction -- see
+     * {@link Ranker}'s own header for why that extraction is a
+     * sign-inversion trap if the tie test is not equality-based.
      */
     private static List<PowerRankingRepository.Entry> rankDescending(List<Scored> scored) {
-        List<Scored> sorted = new ArrayList<>(scored);
-        sorted.sort((a, b) -> Double.compare(b.score(), a.score()));
+        List<Ranker.Ranked<Scored>> ranked = Ranker.rank(scored,
+                Comparator.comparingDouble(Scored::score).reversed(), Scored::score);
 
-        List<PowerRankingRepository.Entry> out = new ArrayList<>(sorted.size());
-        int rank = 0, seen = 0;
-        Double prevRounded = null;
-        for (Scored s : sorted) {
-            seen++;
-            double rounded = Math.round(s.score() * 10000.0) / 10000.0;
-            if (prevRounded == null || rounded < prevRounded) {
-                rank = seen;
-                prevRounded = rounded;
-            }
-            out.add(new PowerRankingRepository.Entry(s.rosterId(), s.managerId(), rank, rounded, s.note()));
+        List<PowerRankingRepository.Entry> out = new ArrayList<>(ranked.size());
+        for (Ranker.Ranked<Scored> r : ranked) {
+            out.add(new PowerRankingRepository.Entry(
+                    r.item().rosterId(), r.item().managerId(), r.rank(), r.score(), r.item().note()));
         }
         return out;
     }
