@@ -875,6 +875,18 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer;
 }
 .board .cell:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+/* A revealed cell is a fresh DOM node the instant it mounts (the hidden ->
+   revealed switch is a <div> -> <button> swap, not a class toggle, so this
+   fires exactly once per pick). At the reveal's 450ms tick
+   (useRevealedBoard.ts) that reads as a stutter -- picks landing one at a
+   time -- instead of the flat pop a class-only change would give. */
+@media (prefers-reduced-motion: no-preference) {
+  .board button.cell { animation: cell-reveal 200ms ease-out; }
+  @keyframes cell-reveal {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+}
 /* outline-offset is negative because `.board-scroll` clips overflow -- a
    positive offset would get cut off at the cell's outer edge. */
 .board .cell:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
