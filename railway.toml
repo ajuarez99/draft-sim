@@ -1,0 +1,12 @@
+# Backend service. Root Directory = repo root (the Dockerfile needs both
+# backend/ and config/ in its build context).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
