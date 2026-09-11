@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, Route, Routes, useLocation, useParams } from 'react-router-dom'
+import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
@@ -55,7 +55,13 @@ export default function App() {
   // instant this node exists, not just eventually. See topSlot.tsx.
   const [topSlot, setTopSlot] = useState<HTMLDivElement | null>(null)
   const location = useLocation()
+  const navigate = useNavigate()
   const user = useUser()
+
+  function signOut() {
+    clearUser()
+    navigate('/', { replace: true })
+  }
 
   return (
     <div className="app">
@@ -71,18 +77,24 @@ export default function App() {
               now hangs off a league card per E1, so this deliberately stays a
               two-item nav rather than growing a link per route. `.startsWith`
               on Managers so its own sub-route (/managers/:id/history) still
-              marks the chip current, the same way a browser tab would. */}
-          <nav className="top-nav" aria-label="Global">
-            <Link to="/" className={`chip${location.pathname === '/' ? ' on' : ''}`}>
-              Home
-            </Link>
-            <Link
-              to="/managers"
-              className={`chip${location.pathname.startsWith('/managers') ? ' on' : ''}`}
-            >
-              Managers
-            </Link>
-          </nav>
+              marks the chip current, the same way a browser tab would.
+              Signed-out visitors get neither chip: both lead to the same
+              gated screen once the whole route table is user-gated below, so
+              showing them would make the sign-in page look like it has
+              working navigation. */}
+          {user && (
+            <nav className="top-nav" aria-label="Global">
+              <Link to="/" className={`chip${location.pathname === '/' ? ' on' : ''}`}>
+                Home
+              </Link>
+              <Link
+                to="/managers"
+                className={`chip${location.pathname.startsWith('/managers') ? ' on' : ''}`}
+              >
+                Managers
+              </Link>
+            </nav>
+          )}
         </div>
         <div className="top-right">
           <div className="top-slot" ref={setTopSlot} />
@@ -90,9 +102,13 @@ export default function App() {
               and-onboarding.md §5b. Same color-initials avatar treatment as
               SeatPopover/ManagerHistory rather than Sleeper's own avatar
               image, so it reads as this app's identity language everywhere.
-              "Sign out" doubles as "switch user": clearUser() drops straight
-              back to SignIn, which is the same screen a switch would need --
-              there's nothing server-side to revoke either way (§7). */}
+              The gate lives on the whole route table below, not just "/", so
+              Sign out unmounts whatever page was showing (its EventSource, a
+              resim in flight, a mock poller) no matter where it's clicked
+              from, and returns to that same screen either way. The explicit
+              navigate('/') here is what makes this an intentional sign out
+              rather than the same "no user" state a deep link renders in
+              place -- §7. */}
           {user && (
             <div className="top-user">
               <span
@@ -106,7 +122,7 @@ export default function App() {
                 {(user.displayName || user.username).charAt(0).toUpperCase()}
               </span>
               <span className="top-user-name">{user.displayName || user.username}</span>
-              <button className="chip" onClick={clearUser}>
+              <button className="chip" onClick={signOut}>
                 Sign out
               </button>
             </div>
@@ -115,33 +131,37 @@ export default function App() {
       </header>
 
       <TopSlotContext.Provider value={topSlot}>
-        <Routes>
-          <Route path="/" element={user ? <DraftPicker /> : <SignIn />} />
-          <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
-          <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
-          <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
-          <Route path="/mock/new" element={<MockSetup />} />
-          <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
-          <Route path="/managers" element={<ManagerTendencies />} />
-          <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
-          <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
-          <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
-          {/* React Router's own fallback renders a bare "Not Found" with no
-              way back -- on a mistyped draft id that was the whole screen. */}
-          <Route
-            path="*"
-            element={
-              <div className="content">
-                <section className="panel">
-                  <h2>Nothing here</h2>
-                  <p className="muted">
-                    No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
-                  </p>
-                </section>
-              </div>
-            }
-          />
-        </Routes>
+        {user ? (
+          <Routes>
+            <Route path="/" element={<DraftPicker />} />
+            <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
+            <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
+            <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
+            <Route path="/mock/new" element={<MockSetup />} />
+            <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
+            <Route path="/managers" element={<ManagerTendencies />} />
+            <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
+            <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
+            <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
+            {/* React Router's own fallback renders a bare "Not Found" with no
+                way back -- on a mistyped draft id that was the whole screen. */}
+            <Route
+              path="*"
+              element={
+                <div className="content">
+                  <section className="panel">
+                    <h2>Nothing here</h2>
+                    <p className="muted">
+                      No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
+                    </p>
+                  </section>
+                </div>
+              }
+            />
+          </Routes>
+        ) : (
+          <SignIn />
+        )}
       </TopSlotContext.Provider>
     </div>
   )
