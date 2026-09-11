@@ -1862,74 +1862,96 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 
 /* ---------------------------------------------------------------------------
- * POWER RANKINGS -- page layout (redesign)
+ * POWER RANKINGS -- page layout (power-rankings-reskin.md)
  *
  * Append verbatim to the END of web/src/styles.css. Nothing above is edited.
  *
  * Why these rules exist rather than more `.standings`: a ranking row is no
  * longer one line of numbers. It carries an identity (avatar + manager + team
- * name), a movement delta, a score and a shape (the spread), and a table cell
- * cannot hold the two-line identity without the row growing past 44px. So the
- * rows are a grid with ONE column definition shared by the header and the
- * rows -- if those two strings ever drift, the labels stop sitting over their
- * values, which is the specific defect this comment exists to prevent.
- *
- * The widths are fixed, not fluid, except the bar. On a 1900px monitor a
- * `1fr` team column puts 700px of dead space between a name and its numbers;
- * the bar is the only column that genuinely reads better wider.
+ * name), a record, a movement delta, a playoff-odds bar and a note, and a
+ * table cell cannot hold the two-line identity without the row growing past
+ * 44px. So the rows are a grid with ONE column definition shared by the
+ * header and the rows -- if those two strings ever drift, the labels stop
+ * sitting over their values, which is the specific defect this comment exists
+ * to prevent. The movement column is genuinely absent from that shared
+ * definition (not just visually hidden) when the reference mode has no
+ * snapshot for the week -- `.pr-list.no-reference` is the narrower template,
+ * applied to header and rows alike, never one without the other.
  * ------------------------------------------------------------------------ */
 
-.pr-page { gap: 10px; }
+.pr-page { gap: 14px; }
 
-.pr-head { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.pr-eyebrow-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pr-eyebrow {
   font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 11px; letter-spacing: 0.14em; color: var(--muted); margin-bottom: 3px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--teal);
 }
-.pr-title {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 30px; font-weight: 700; letter-spacing: 0.02em; margin: 0; line-height: 1;
-  color: var(--text);
+
+/* --- hero: headline + #1 card --- */
+
+.pr-hero { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
+.pr-hero-copy { flex: 1 1 360px; min-width: 0; }
+.pr-headline {
+  margin: 10px 0 8px; font-size: 38px; font-weight: 700; line-height: 1.02;
+  max-width: 20ch; text-wrap: balance; color: var(--text);
 }
-.pr-head-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.pr-deck { margin: 0; max-width: 58ch; font-size: 13.5px; color: var(--muted); }
+.pr-hero-pills { display: flex; gap: 8px; margin-top: 14px; }
 
-/* Modes are this page's primary axis, so they are tabs -- a `.segmented` pill
-   put them at the same weight as the view toggle beside them, which is what
-   made six controls read as one undifferentiated strip. */
-.pr-tabs { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
-.pr-tablist { display: flex; gap: 2px; }
-.pr-tab {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  letter-spacing: 0.06em; font-size: 13px; padding: 10px 15px;
-  background: none; border: 0; border-bottom: 2px solid transparent;
-  color: var(--muted); cursor: pointer; transition: color 120ms ease, border-color 120ms ease;
+.pr-number-one { flex: none; width: 292px; padding: 16px 18px; }
+.pr-number-one-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted);
 }
-.pr-tab:hover { color: var(--text); }
-.pr-tab.on { color: var(--text); border-bottom-color: var(--teal); }
-.pr-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-.pr-tabs .segmented { margin-left: auto; margin-bottom: 8px; }
+.pr-number-one-body { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+.pr-number-one-rank { font-size: 56px; line-height: 0.8; font-weight: 700; color: var(--teal); }
+.pr-number-one-id { min-width: 0; }
+.pr-number-one-name { font-size: 16px; font-weight: 600; }
+.pr-number-one-meta { font-size: 12px; color: var(--muted); }
+.pr-number-one-rule { height: 1px; margin: 14px 0; background: var(--line); }
+.pr-number-one-stats { display: flex; gap: 20px; }
+.pr-stat-label { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
+.pr-stat-value { font-size: 15px; font-weight: 600; margin-top: 2px; }
 
-.pr-caveat { font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 82ch; margin: 4px 0 8px; text-wrap: pretty; }
+/* --- your team strip --- */
 
-.pr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
-/* The two computed modes have no editor, so there is no sidebar to leave a
-   360px hole for. */
-.pr-grid.solo { grid-template-columns: minmax(0, 1fr); }
-.pr-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.pr-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; min-width: 0; }
+.pr-your-team {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 12px 16px; border-radius: 14px;
+  background: color-mix(in oklch, var(--crimson) 12%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--crimson);
+}
+.pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--crimson); }
+.pr-your-team-name { font-size: 16px; font-weight: 600; }
+.pr-your-team-detail { font-size: 13px; color: var(--muted); }
+.pr-your-team-vote { margin-left: auto; font-size: 12px; color: var(--muted); }
 
-/* --- the ranking list --- */
+/* --- story cards --- */
 
-.pr-list { max-width: 1100px; }
+.pr-stories { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pr-story { padding: 14px 16px; }
+.pr-story h2 { margin: 0; }
+.pr-story-name { font-size: 15px; font-weight: 600; margin-top: 8px; }
+.pr-story-note { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* --- the ladder --- */
+
+.pr-ladder-head { gap: 14px; margin-bottom: 4px; }
+.pr-ladder-modes { margin-left: auto; }
+.pr-compute-trigger { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+.pr-list { max-width: 1180px; }
 .pr-row-head, .pr-row {
   display: grid;
-  grid-template-columns: 30px 260px 58px 88px minmax(120px, 1fr) 84px;
-  gap: 12px; align-items: center;
+  grid-template-columns: 30px minmax(0, 1fr) 64px 70px 150px minmax(150px, 1fr);
+  gap: 0 14px; align-items: center;
+}
+.pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row {
+  grid-template-columns: 30px minmax(0, 1fr) 64px 150px minmax(150px, 1fr);
 }
 .pr-row-head {
-  padding: 0 6px 7px; border-bottom: 1px solid var(--line);
+  padding: 0 6px 8px; border-bottom: 1px solid var(--line);
   font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 10.5px; letter-spacing: 0.09em; color: var(--muted);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: var(--muted);
 }
 .pr-move-head { text-align: center; }
 .pr-score-head, .pr-source-head { text-align: right; }
@@ -1939,12 +1961,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    can paint a stray rule of its own. */
 .pr-row {
   width: 100%; text-align: left; font: inherit; color: inherit;
-  background: none; border: 0; border-bottom: 1px solid var(--line);
-  padding: 8px 6px; cursor: pointer; border-radius: 0;
+  background: none; border: 0;
+  border-bottom: 1px solid color-mix(in oklch, var(--line) 55%, transparent);
+  padding: 9px 6px; cursor: pointer; border-radius: 10px;
   transition: background 100ms ease;
 }
 .pr-row:hover { background: color-mix(in oklch, var(--teal) 6%, transparent); }
 .pr-row.on { background: color-mix(in oklch, var(--teal) 12%, transparent); box-shadow: inset 2px 0 0 var(--teal); }
+.pr-row.mine { background: color-mix(in oklch, var(--crimson) 12%, transparent); box-shadow: inset 2px 0 0 var(--crimson); }
+.pr-row.mine.on { box-shadow: inset 2px 0 0 var(--crimson); }
 .pr-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 
 .pr-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
@@ -1954,32 +1979,35 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pr-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .pr-team-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-you-tag { margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--crimson); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.pr-record { font-size: 13px; }
 
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
 .pr-move.up { color: oklch(72% 0.14 150); }
 .pr-move.down { color: var(--crimson); }
 .pr-move.flat { color: oklch(52% 0.02 250); }
 
-.pr-score { font-size: 13px; text-align: right; }
-.pr-source { font-size: 11px; text-align: right; color: var(--muted); }
+.pr-playoff-cell { display: flex; align-items: center; gap: 8px; }
+.pr-playoff-pct { font-size: 12px; color: var(--muted); flex: none; }
+.pr-note { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-note.notable { color: var(--teal); }
 
-/* Score bar for the modes with a score but no spread. Scaled between the
-   week's own min and max (see ScoreBar) -- a 0-based scale makes twelve
-   similar scores render as twelve near-identical full bars. */
-.pr-bar { position: relative; display: block; height: 8px; border-radius: 999px; background: var(--line); }
+/* Playoff-odds bar. Scaled 0-100 against `pct` directly (unlike the old
+   min/max-scaled score bar it replaces) -- a percentage is already on a fixed
+   scale, so re-scaling it against the week's own min/max would misrepresent
+   it. Empty (0% width, no fill color) rather than a fake sliver when `pct` is
+   null -- see PowerRankingEntry.makesPlayoffsPct's own TODO. */
+.pr-bar { position: relative; display: block; flex: 1; height: 8px; border-radius: 999px; background: var(--line); }
 .pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklch, var(--teal) 55%, var(--panel)); }
 .pr-bar-fill.mine { background: var(--crimson); }
 
 .pr-foot { margin: 10px 6px 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+.pr-how { margin: 6px 6px 0; padding-top: 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 
 /* --- trend --- */
 
-.pr-trend-count { margin-left: auto; }
-/* Coverage strip, not a chart: one tick per week of the season, full height and
-   teal for a week this mode has, a 6px stub for one it doesn't. Deliberately
-   not `flex: 1` boxes with a visible fill -- twelve grey rectangles read as
-   twelve empty containers, which is what the chart void looked like. */
 .pr-ticks { display: flex; align-items: flex-end; gap: 4px; height: 30px; margin-top: 12px; }
 .pr-tick { flex: 1; height: 6px; border-radius: 3px; background: oklch(22% 0.02 250); }
 .pr-tick.on { height: 100%; background: var(--teal); }
@@ -2021,13 +2049,84 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-homer-fill.up { background: oklch(72% 0.14 150); }
 .pr-homer-value { font-size: 12px; text-align: right; color: var(--muted); }
 
-/* --- rankboard in a 360px sidebar --- */
+/* --- sidebar (from 2c) --- */
 
 .pr-side .rankboard-chip { padding-right: 10px; }
+.pr-homers-compact { max-width: none; }
+.pr-homers-compact .pr-homer { grid-template-columns: 48px minmax(0, 1fr) 26px; padding: 4px 0; }
+.pr-homer-of-week-name { font-size: 16px; font-weight: 600; margin-top: 2px; }
+.pr-commish-quote { margin: 0 0 6px; font-size: 14px; line-height: 1.45; }
+.pr-ballot-cta { display: block; width: 100%; text-align: center; margin-top: 10px; }
+
+/* --- ballot / commissioner modal (2d) --- */
+
+.pr-ballot-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+.pr-ballot-modal-title { font-size: 18px; font-weight: 700; }
 
 @media (max-width: 1180px) {
   /* The sidebar stops being a sidebar before the rows start truncating. */
   .pr-grid { grid-template-columns: minmax(0, 1fr); }
   .pr-side { position: static; }
-  .pr-row-head, .pr-row { grid-template-columns: 30px minmax(0, 1fr) 52px 76px minmax(90px, 0.8fr) 74px; }
+  .pr-row-head, .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 56px 110px minmax(120px, 1fr); }
+  .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 110px minmax(120px, 1fr); }
 }
+
+@media (max-width: 720px) {
+  .pr-headline { font-size: 25px; line-height: 1.05; max-width: none; }
+  /* `flex: 1 1 360px` on `.pr-hero-copy` sets a preferred HEIGHT once the
+     container's main axis turns vertical here, not a width floor -- without
+     resetting it, the copy block claims 360px of height it doesn't need and
+     leaves a dead gap above the #1 card. */
+  .pr-hero { flex-direction: column; align-items: stretch; gap: 14px; }
+  .pr-hero-copy { flex: none; }
+  .pr-number-one { width: auto; }
+  .pr-stories { grid-template-columns: 1fr; }
+  .pr-your-team { flex-wrap: wrap; }
+  .pr-your-team-vote { margin-left: 0; flex-basis: 100%; }
+
+  /* Compact ladder row: rank, team, movement (when present), playoff bar.
+     Record and the note sentence are dropped rather than ellipsis-truncated
+     -- a second bespoke mobile row layout matching 2b's color-rail treatment
+     is a further pass; see the reskin handoff note. Column count in the
+     template must equal the count of children NOT display:none, since grid
+     hands explicit tracks to whichever children remain in DOM order. */
+  .pr-row-head, .pr-row {
+    grid-template-columns: 26px minmax(0, 1fr) 50px 90px;
+    gap: 0 10px;
+  }
+  .pr-row-head span:nth-child(3), .pr-row span:nth-child(3),
+  .pr-row-head span:nth-child(6), .pr-row span:nth-child(6) { display: none; }
+  .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row {
+    grid-template-columns: 26px minmax(0, 1fr) 90px;
+  }
+  .pr-list.no-reference .pr-row-head span:nth-child(3), .pr-list.no-reference .pr-row span:nth-child(3),
+  .pr-list.no-reference .pr-row-head span:nth-child(5), .pr-list.no-reference .pr-row span:nth-child(5) { display: none; }
+  .pr-playoff-pct { display: none; }
+
+  .pr-ladder-head { flex-direction: column; align-items: stretch; }
+  .pr-ladder-modes { margin-left: 0; }
+  .pr-ladder-head .action-button { width: 100%; }
+}
+
+/* ---------------------------------------------------------------------------
+ * POWER RANKINGS -- verify harness (dev-only, PowerRankings.verify.tsx)
+ * ------------------------------------------------------------------------ */
+
+.verify-swatches { display: flex; flex-wrap: wrap; gap: 14px; }
+.verify-swatch { display: flex; flex-direction: column; gap: 4px; width: 120px; }
+.verify-swatch-box { height: 40px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line); }
+
+.verify-checklist { display: flex; flex-direction: column; gap: 6px; }
+.verify-check-row {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) 110px minmax(0, 260px);
+  gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line);
+}
+.verify-check-row select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
+
+.verify-states { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.verify-state-card { padding: 12px 14px; }
+
+.verify-breakpoint-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.verify-iframe-wrap { max-height: 900px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+.verify-iframe-wrap iframe { border: 0; display: block; }
+.verify-mockup-img { border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18); display: block; }

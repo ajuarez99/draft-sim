@@ -682,6 +682,16 @@ export type PowerRankingEntry = {
   // surfaces at all, which is why it is a single derived integer rather than
   // the ballot it came from.
   selfRankBias?: number | null
+
+  // TODO(power-rankings-reskin): not populated by the backend yet. The
+  // power-rankings-reskin.md mockups surface a "makes playoffs NN%" stat as a
+  // headline number (hero card, your-team strip, ladder column) that needs a
+  // rest-of-season Monte Carlo simulation against the real schedule -- a
+  // backend feature this presentation-only reskin explicitly does not add
+  // (see that doc's own "stop and report" rule). The UI is wired to this
+  // field so it lights up the moment a backend PR populates it; until then it
+  // is always undefined and every call site renders its own "--" fallback.
+  makesPlayoffsPct?: number | null
 }
 
 export type NflState = {

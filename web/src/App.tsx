@@ -10,6 +10,7 @@ import MockDraftView from './pages/MockDraftView'
 import ManagerTendencies from './pages/ManagerTendencies'
 import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
+import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import { TopSlotContext } from './topSlot'
 import { clearUser, useUser } from './user'
@@ -143,6 +144,11 @@ export default function App() {
             <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
             <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
             <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
+            {/* power-rankings-reskin.md §7: a self-check harness, not a page
+                real users should ever reach -- dev-only. */}
+            {import.meta.env.DEV && (
+              <Route path="/leagues/:sleeperLeagueId/power/verify" element={<PowerRankingsVerify />} />
+            )}
             {/* React Router's own fallback renders a bare "Not Found" with no
                 way back -- on a mistyped draft id that was the whole screen. */}
             <Route
