@@ -14,55 +14,67 @@ import {
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
 import { hueFor } from '../hue'
+import { useUser } from '../user'
 
 /**
- * claude/league-suite.md "Power rankings, three ways", now four -- one page,
- * four independent orderings of the same league, the deltas between them being
- * the actual point. Only rank is drawn on the shared axis: COMMISSIONER
- * produces an ordering with no score behind it, so score rides in the tooltip
- * rather than on the axis (see the plan's "y-axis is forced"). MEMBER, added by
- * claude/power-rankings-ballots.md, turns out to have a score after all -- the
- * average ballot rank -- which is why it carries spread fields the other three
- * leave null.
+ * claude/league-suite.md "Power rankings, three ways" -- one page, three
+ * independent orderings of the same league, the deltas between them being
+ * the actual point.
  *
- * Hand-rolled SVG rather than a charting library -- this is the first chart in
- * an app with no `<svg>` in web/src today, and a bump chart is polylines, ticks
- * and labels, cheap enough to keep in this file's own visual vocabulary rather
- * than fighting a library's default look back to house style.
+ * REDESIGN NOTE (an earlier pass). The page used to open on a full-height bump
+ * chart that, in week 1, is a single column of dots, plus a twelve-item legend
+ * -- roughly 700px of vertical space before the reader reached the ordering
+ * they came for. The ordering is now the hero; the chart is demoted into a
+ * Trend panel that renders the tick strip until a mode actually HAS two
+ * weeks, and the ballot board moves into a sticky sidebar.
+ *
+ * MARKET VALUE MERGE (this pass). COMPUTED_MARKET_VALUE used to be a fourth,
+ * separate mode -- a forward-looking "board value right now" recomputed at
+ * whatever week you happened to click Compute, sitting alongside a
+ * backward-looking REALIZED at the very same week number, which read as two
+ * different answers to "how good is this team". It is now week 0 of
+ * REALIZED: a one-time preseason baseline (this app's board value on the
+ * roster it saw at the FIRST compute, never overwritten by a later one -- see
+ * the backend's `PowerRankingService#computeWeek0IfMissing`), and week 1
+ * onward is purely "cumulative average starting-lineup points per week, from
+ * games actually played" -- no market-value blending at any played week.
  */
 
 const KIND_LABEL: Record<PowerRankingKind, string> = {
-  COMPUTED_MARKET_VALUE: 'Market value',
   COMPUTED_REALIZED: 'Realized',
   COMMISSIONER: 'Commissioner',
   MEMBER: 'The room',
 }
 
-// Fixed, not hueFor(kind) -- the three mode names hash close enough together
-// (hueFor is built for a large, arbitrary manager-id space, not three fixed
-// strings) that two of them read as the same color. Chosen to sit clear of
-// --crimson (~25, reserved for "you") and --teal (~175, reserved for generic
-// interaction) per styles.css's house rule.
+// Fixed, not hueFor(kind) -- the mode names hash close enough together that two
+// of them read as the same color. Clear of --crimson (~25, "you") and --teal
+// (~175, generic interaction) per styles.css's house rule.
 const KIND_HUE: Record<PowerRankingKind, number> = {
-  COMPUTED_MARKET_VALUE: 60,
   COMPUTED_REALIZED: 210,
   COMMISSIONER: 290,
-  // 130 rather than anything nearer the existing three: spacings of 70/80/80/130
-  // are the most even four-way split available under the constraint above, and
-  // it clears --teal (~175) by 45, which is the tightest gap but the least
-  // costly one -- teal is generic interaction, never an identity color, so the
-  // two never appear as peers competing to be read as the same thing.
   MEMBER: 130,
 }
 
 const KIND_CAVEAT: Record<PowerRankingKind, string> = {
-  COMPUTED_MARKET_VALUE:
-    "Preseason-flavoured: this app's board value on each roster's best starting lineup, right now. Goes stale the moment real games are played.",
   COMPUTED_REALIZED:
-    'Backward-looking: cumulative average starting-lineup points per week, from games already played. A hot start survives an injury it should not.',
+    'Backward-looking: cumulative average starting-lineup points per week, from games already played. A hot start survives an injury it should not. Week 0 is the exception -- a one-time preseason baseline (this app\'s board value on each roster\'s best starting lineup, at first compute), not a played week.',
   COMMISSIONER: "Allan's own ordering. An opinion, signed -- not a measurement.",
   MEMBER:
     'The room: every manager who submitted a ballot this week, averaged. Managers rank their own team too, and the bias that produces is shown below rather than quietly removed.',
+}
+
+/** The mode each mode's movement column is measured against. Week 1 has no
+ *  prior week, so a "movement" column can only honestly compare modes -- and
+ *  the column header says which one. */
+const REFERENCE_KIND: Record<PowerRankingKind, PowerRankingKind> = {
+  MEMBER: 'COMPUTED_REALIZED',
+  COMPUTED_REALIZED: 'MEMBER',
+  COMMISSIONER: 'MEMBER',
+}
+const REFERENCE_LABEL: Record<PowerRankingKind, string> = {
+  MEMBER: 'vs realized',
+  COMPUTED_REALIZED: 'vs room',
+  COMMISSIONER: 'vs room',
 }
 
 // thin: this week's aggregate rests on fewer than half the league's ballots, so
@@ -77,11 +89,6 @@ export type SeriesPoint = {
   ballotCount: number | null
   thin: boolean
 }
-// hue is what actually draws the line -- the manager's own color in the
-// all-teams view (hueFor over the whole manager-id space, spread wide enough
-// to stay distinct), but a fixed per-mode color in the per-team view, where
-// coloring by manager would draw all three lines in the same color since
-// it's one manager's data three times (see KIND_HUE).
 type Series = { rosterId: number; managerId: number | null; manager: string | null; hue: number; points: SeriesPoint[] }
 
 function buildSeries(
@@ -117,19 +124,7 @@ type Segment = { points: SeriesPoint[]; thin: boolean }
 /**
  * Contiguous runs of equal coverage -- claude/league-suite.md AC7 (never draw a
  * week a mode does not have) plus the coverage split this feature adds.
- *
- * Two rules, and the second one has a trap in it. A break in weeks starts a new
- * segment and the two do NOT share a point: that gap is real, and an undrawn
- * gap is what "no data" looks like everywhere else on this chart. A change in
- * coverage also starts a new segment, but there the boundary point IS
- * duplicated into both -- weeks 3 and 4 both exist, so leaving 3->4 undrawn
- * would say "no data" about a week that has data, just thinner
- * (claude/plan-review-power-rankings-ballots.md finding 9c).
- *
- * The duplicated point goes to the THIN side, so a boundary link is drawn
- * dotted. Drawing it solid would claim the step into thin coverage was as
- * well-supported as the weeks before it, which is the direction this page is
- * not allowed to round in.
+ * Unchanged by the redesign; PowerRankings.chart.test.ts covers it.
  */
 export function segmentsOf(points: SeriesPoint[]): Segment[] {
   const segments: Segment[] = []
@@ -167,17 +162,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
   const xStep = 56
   const yStep = 22
 
-  /**
-   * Linear in week number, not ordinal in the weeks that happen to be present.
-   *
-   * This used to be `weeks.indexOf(week) * xStep`, which is the same thing for
-   * a mode that has every week -- so the three computed/commissioner modes
-   * never showed the difference. A ballot mode does: ballots in weeks 2 and 5
-   * would sit one column apart, labelled "2" and "5", compressing four missing
-   * weeks into one column's width. Nothing is interpolated, so AC7 is still
-   * satisfied -- it is the subtler failure of a chart that is correct and still
-   * says the wrong thing (claude/lessons.md #5).
-   */
   const minWeek = weeks.length > 0 ? weeks[0] : 1
   const maxWeek = weeks.length > 0 ? weeks[weeks.length - 1] : 1
   const weekSpan = Math.max(1, maxWeek - minWeek)
@@ -190,7 +174,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
   return (
     <div className="table-wrap">
       <svg viewBox={`0 0 ${width} ${height}`} width={width} height={height} className="bump-chart">
-        {/* Rank gridlines + labels, 1 at top -- this is the one axis every mode shares. */}
         {Array.from({ length: teamCount }, (_, i) => i + 1).map((rank) => (
           <g key={rank}>
             <line x1={marginLeft} y1={yOf(rank)} x2={width - marginRight} y2={yOf(rank)} className="bump-gridline" />
@@ -199,7 +182,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
             </text>
           </g>
         ))}
-        {/* Week ticks. */}
         {weeks.map((w) => (
           <text key={w} x={xOf(w)} y={height - marginBottom + 18} className="bump-week-label mono" textAnchor="middle">
             {w}
@@ -217,12 +199,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
               onClick={() => onHighlight(isHighlighted ? null : s.rosterId)}
             >
               {segmentsOf(s.points).map((seg, i) =>
-                // A one-point segment draws no stroke at all -- <polyline> with
-                // a single vertex renders nothing, and only the <circle> below
-                // survives. Harmless for the modes that have every week; for a
-                // ballot mode with one submitted week it is the whole chart. So
-                // a lone point gets an explicit ring instead of silently
-                // becoming a dot indistinguishable from a data marker.
                 seg.points.length === 1 ? (
                   <circle
                     key={i}
@@ -241,9 +217,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
                     fill="none"
                     stroke={`oklch(70% 0.14 ${hue})`}
                     strokeWidth={isHighlighted ? 3 : 1.75}
-                    // Thin coverage is drawn, but never drawn as confidently as
-                    // a full week. The chart may not look more certain than its
-                    // inputs -- claude/league-suite.md's rule for this page.
                     strokeDasharray={seg.thin ? '4 3' : undefined}
                   />
                 ),
@@ -268,11 +241,8 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
 
 /**
  * min..max of the ranks a team actually received, with a dot at the mean.
- *
- * A column of numbers cannot show "half the league has him 1st and half has him
- * 8th" -- that is the single most interesting fact this mode produces, and it
- * is a shape, not a statistic (claude/power-rankings-ballots.md, "The room").
- * Scaled against the league size so bars are comparable down the column.
+ * Scaled against league size, so the bars are comparable down the column --
+ * a full-width bar on every row is the bug this scaling exists to prevent.
  */
 function SpreadBar({ entry, teamCount }: { entry: PowerRankingEntry; teamCount: number }) {
   const best = entry.bestRank
@@ -292,14 +262,42 @@ function SpreadBar({ entry, teamCount }: { entry: PowerRankingEntry; teamCount: 
   )
 }
 
+/** A score bar for the modes that have a score but no spread: scaled between
+ *  the week's own min and max, never 0-based, so twelve similar scores read as
+ *  twelve similar bars rather than twelve full ones. */
+function ScoreBar({ score, min, max, mine }: { score: number | null; min: number; max: number; mine: boolean }) {
+  if (score == null || !(max > min)) return <span className="tiny muted">--</span>
+  const width = 18 + ((score - min) / (max - min)) * 82
+  return (
+    <span className="pr-bar" title={`${score.toFixed(2)} on this mode's scale`}>
+      <span className={`pr-bar-fill${mine ? ' mine' : ''}`} style={{ width: `${width}%` }} />
+    </span>
+  )
+}
+
+function avatarStyleFor(managerId: number | null, rosterId: number, isMe: boolean) {
+  if (isMe) return { background: 'var(--crimson)', color: 'var(--bg)' }
+  const hue = hueFor(String(managerId ?? rosterId))
+  return { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
+}
+
+const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
+
+// Week 0 is an app-invented concept -- Sleeper's own week numbering starts at
+// 1 -- so it never reads as a number in the UI, only as "Preseason".
+const weekPhrase = (week: number) => (week === 0 ? 'Preseason' : `week ${week}`)
+const weekShort = (week: number) => (week === 0 ? 'preseason' : `wk ${week}`)
+const weekRangeLabel = (ws: number[]) => {
+  const first = ws[0]
+  const last = ws[ws.length - 1]
+  if (first === last) return weekPhrase(first)
+  return `weeks ${first === 0 ? 'preseason' : first}–${last}`
+}
+
 export default function PowerRankings() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
+  const user = useUser()
   const [data, setData] = useState<PowerRankingsData | null>(null)
-  // Replaces the old getLeagueHistory() standings fetch, which came from
-  // roster_season and so was empty on a league whose history had never been
-  // ingested -- the editor simply never rendered there (design doc AC14).
-  // /ballot sources its members from league_member + Sleeper's rosters, which
-  // exist from the day a league does.
   const [ballot, setBallot] = useState<BallotState | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<PowerRankingKind | null>(null)
@@ -315,18 +313,23 @@ export default function PowerRankings() {
       .then((d) => {
         setData(d)
         setError(null)
-        // Default depends on the week, not a fixed mode -- before the season
-        // starts REALIZED has nothing in it and MARKET_VALUE is the only thing
-        // that can render, per claude/league-suite.md.
-        setMode((prev) => prev ?? (d.nflState.started ? 'COMPUTED_REALIZED' : 'COMPUTED_MARKET_VALUE'))
+        setMode((prev) => prev ?? 'COMPUTED_REALIZED')
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
     getBallot(sleeperLeagueId)
       .then(setBallot)
-      .catch(() => {}) // editors only; the chart works without it
+      // Cleared, not left stale -- a failure here (signed out, not a member of
+      // this league, a 403 for the newly-switched-to identity) must not leave
+      // the PREVIOUS identity's ballot on screen. Editors only; the page works
+      // without it.
+      .catch(() => setBallot(null))
   }
 
-  useEffect(refetch, [sleeperLeagueId])
+  // Depends on the signed-in identity, not just the league -- switching
+  // accounts (Sign out -> sign in as someone else) without leaving this page
+  // used to leave `ballot` exactly as the old identity had fetched it, since
+  // this effect never re-ran.
+  useEffect(refetch, [sleeperLeagueId, user?.sleeperUserId])
 
   const season = useMemo(() => {
     if (!data || data.entries.length === 0) return Number(data?.nflState.season ?? new Date().getFullYear())
@@ -392,21 +395,14 @@ export default function PowerRankings() {
     )
   }
 
-  // Computed before the series, because it is also the denominator for "is this
-  // week's aggregate thin?". Roster count stands in for member count on purpose:
-  // it needs no extra field on this payload, and the two differ only where a
-  // roster is co-owned (two voters, one roster) or orphaned (no voter) -- neither
-  // of which exists in any league this app has data for. If that stops being
-  // true, this is the line to replace with a real memberCount from the wire.
+  // Roster count stands in for member count, same reasoning as before: the two
+  // differ only for a co-owned or orphaned roster, neither of which exists in
+  // any league this app has data for.
   const teamCount = new Set(data.entries.filter((e) => e.season === season).map((e) => e.rosterId)).size
 
   const series = buildSeries(data.entries, mode, season, teamCount)
-  // Gridline count only: falls back to the drawn series when the season filter
-  // above matched nothing, which is the pre-existing `|| series.length` guard.
   const gridRows = teamCount || series.length
 
-  // The board's chips. `members` comes from /ballot, so it exists on a league
-  // with no ingested history -- which is the whole point of AC14.
   const boardMembers: RankBoardMember[] = (ballot?.members ?? []).map((m) => ({
     rosterId: m.rosterId,
     managerId: m.managerId,
@@ -415,44 +411,96 @@ export default function PowerRankings() {
     isMe: m.isMe,
   }))
 
-  // Seed the commissioner board from the ordering already stored for this week,
-  // so re-opening it edits rather than starts over.
   const commissionerOrder = data.entries
     .filter((e) => e.kind === 'COMMISSIONER' && e.season === season && e.week === currentWeek)
     .sort((a, b) => a.rank - b.rank)
     .map((e) => e.rosterId)
 
-  const memberEntries = data.entries
-    .filter((e) => e.kind === 'MEMBER' && e.season === season && e.week === currentWeek)
-    .sort((a, b) => a.rank - b.rank)
+  const weeks = [...new Set(data.entries.filter((e) => e.kind === mode && e.season === season).map((e) => e.week))].sort(
+    (a, b) => a - b,
+  )
 
-  // Suppressed below three ballots upstream, so a null stdev is "not enough to
-  // say", not "no disagreement" -- and it must not be able to win this.
+  /** Entries for one mode, this season, one week -- the shape every panel below
+   *  is built from. */
+  const entriesFor = (kind: PowerRankingKind, week: number) =>
+    data.entries.filter((e) => e.kind === kind && e.season === season && e.week === week).sort((a, b) => a.rank - b.rank)
+
+  /** The roster-id order of the LATEST week a mode has anything for -- no new
+   *  request, just re-slicing entries the page already fetched. Used only as a
+   *  seed fallback below, never rendered as if it were this mode's own table. */
+  const rankedBy = (kind: PowerRankingKind): number[] => {
+    const modeWeeks = [...new Set(data.entries.filter((e) => e.kind === kind && e.season === season).map((e) => e.week))]
+    const latest = modeWeeks.sort((a, b) => a - b).pop()
+    return latest == null ? [] : entriesFor(kind, latest).map((e) => e.rosterId)
+  }
+  const memberIds = boardMembers.map((m) => m.rosterId)
+
+  /**
+   * What a board opens on. A stored ordering (a real, previously saved
+   * commissioner ranking or submitted ballot) wins outright -- that's a fact,
+   * not a seed. Failing that, the board is seeded from the best ordering the
+   * page already has, so a FIRST commissioner ranking or ballot opens already
+   * ranked instead of with all twelve chips in the tray: the user's job is to
+   * disagree with a starting order, not assemble one from parts. `seededFrom`
+   * is null exactly when `stored` was used, so the caller can tell "restored"
+   * from "seeded" and copy the hint under the board accordingly.
+   */
+  function seedOrder(
+    stored: number[] | undefined,
+    fallbacks: { label: string; order: number[] }[],
+  ): { order: number[]; seededFrom: string | null } {
+    if (stored && stored.length > 0) return { order: stored, seededFrom: null }
+    for (const f of fallbacks) if (f.order.length > 0) return { order: f.order, seededFrom: f.label }
+    return { order: memberIds, seededFrom: 'the member list' }
+  }
+
+  // The member ballot's own seed deliberately excludes MEMBER as a fallback --
+  // that mode is the average of everyone's ballots including the user's own,
+  // so seeding a fresh ballot from it would feed the aggregate back into one
+  // of its own inputs.
+  const commissionerSeed = seedOrder(commissionerOrder, [
+    { label: 'realized', order: rankedBy('COMPUTED_REALIZED') },
+    { label: 'the room', order: rankedBy('MEMBER') },
+  ])
+  const ballotSeed = seedOrder(ballot?.mine?.rosterIds, [{ label: 'realized', order: rankedBy('COMPUTED_REALIZED') }])
+
+  // The week the table shows: the latest week this mode actually has, not
+  // necessarily the current NFL week.
+  const tableWeek = weeks.length > 0 ? weeks[weeks.length - 1] : currentWeek
+  const rows = entriesFor(mode, tableWeek)
+
+  // Movement. rank(reference) - rank(current), both from the SAME season+week,
+  // so a positive number means this mode is higher on the team than the
+  // reference is. If the reference mode has no snapshot for this week there is
+  // no honest delta to show -- the column goes to dashes and says so.
+  const referenceKind = REFERENCE_KIND[mode]
+  const referenceRows = entriesFor(referenceKind, tableWeek)
+  const referenceRank = new Map(referenceRows.map((e) => [e.rosterId, e.rank]))
+  const hasReference = referenceRows.length > 0
+  const moveHeader = hasReference ? REFERENCE_LABEL[mode] : `${REFERENCE_LABEL[mode]} (n/a)`
+
+  const scores = rows.map((e) => e.score).filter((s): s is number => s != null)
+  const minScore = scores.length > 0 ? Math.min(...scores) : 0
+  const maxScore = scores.length > 0 ? Math.max(...scores) : 0
+
+  const memberEntries = entriesFor('MEMBER', currentWeek)
+
   const mostDivisive = memberEntries.reduce<PowerRankingEntry | null>(
     (best, e) => (e.stdev != null && (best == null || e.stdev > best.stdev!) ? e : best),
     null,
   )
 
-  const homers = memberEntries
-    .filter((e) => e.selfRankBias != null)
-    .sort((a, b) => a.selfRankBias! - b.selfRankBias!)
-  const weeks = [...new Set(data.entries.filter((e) => e.kind === mode && e.season === season).map((e) => e.week))].sort(
-    (a, b) => a - b,
-  )
+  const homers = memberEntries.filter((e) => e.selfRankBias != null).sort((a, b) => a.selfRankBias! - b.selfRankBias!)
 
-  // Team (transpose) view: one manager, all four modes -- "the room had you
-  // 3rd all October while your roster ranked 1st" is the delta this page
-  // exists for, and it's the same data as the league view, differently sliced.
+  // Team (transpose) view.
   const teamViewOptions = [...new Map(data.entries.map((e) => [e.rosterId, e.manager ?? `roster ${e.rosterId}`])).entries()]
   const teamViewRosterId = highlighted ?? teamViewOptions[0]?.[0] ?? null
   const teamSeries: Series[] =
     view === 'team' && teamViewRosterId != null
-      ? ALL_POWER_RANKING_KINDS
-          .map((k) => {
-            const s = buildSeries(data.entries, k, season, teamCount).find((s) => s.rosterId === teamViewRosterId)
-            return s && { ...s, hue: KIND_HUE[k] } // color by mode here, not by manager -- see the Series comment
-          })
-          .filter((s): s is Series => !!s)
+      ? ALL_POWER_RANKING_KINDS.map((k) => {
+          const s = buildSeries(data.entries, k, season, teamCount).find((s) => s.rosterId === teamViewRosterId)
+          return s && { ...s, hue: KIND_HUE[k] }
+        }).filter((s): s is Series => !!s)
       : []
   const teamViewWeeks =
     view === 'team'
@@ -461,299 +509,465 @@ export default function PowerRankings() {
         )
       : []
 
-  const seasonHasNoWeeksYet = mode === 'COMPUTED_REALIZED' && !data.nflState.started
+  /** One row per mode for the pinned team: rank, a dot on the shared 1..N axis,
+   *  and that mode's score. This is what the per-team view shows in a week the
+   *  bump chart cannot draw (one week of data is not a line). */
+  const focusRows =
+    teamViewRosterId == null
+      ? []
+      : ALL_POWER_RANKING_KINDS.map((k) => {
+          const week = [...new Set(data.entries.filter((e) => e.kind === k && e.season === season).map((e) => e.week))].sort(
+            (a, b) => a - b,
+          ).pop()
+          const entry = week == null ? undefined : entriesFor(k, week).find((e) => e.rosterId === teamViewRosterId)
+          return { kind: k, entry, week }
+        })
+  const focusRanks = focusRows.map((f) => f.entry?.rank).filter((r): r is number => r != null)
+  const focusSpread = focusRanks.length > 1 ? Math.max(...focusRanks) - Math.min(...focusRanks) : 0
+  const focusName = teamViewOptions.find(([id]) => id === teamViewRosterId)?.[1] ?? 'This team'
+  const focusEntry = focusRows.find((f) => f.entry)?.entry
+
+  // The chart is a line chart: below two weeks there is no line to draw, so the
+  // Trend panel shows the coverage strip instead of 500px of empty gridlines.
+  const chartReady = weeks.length >= 2
+  const totalWeeks = Math.max(17, ...weeks)
+  const hasSide = mode === 'MEMBER' || mode === 'COMMISSIONER'
+  const scoreHeader = mode === 'MEMBER' ? 'Avg' : mode === 'COMPUTED_REALIZED' ? (tableWeek === 0 ? 'Value' : 'Pts/wk') : '--'
+
+  // Keyed off the ROW's own week, not the mode -- REALIZED spans both week 0
+  // (a market-value-shaped number) and weeks 1+ (points-per-week), so a
+  // mode-level check would format every row the same regardless of which one
+  // it actually is.
+  function scoreLabel(e: PowerRankingEntry): string {
+    if (e.score == null) return '--'
+    if (e.week === 0) return String(Math.round(e.score))
+    return e.score.toFixed(2)
+  }
+
+  function sourceLabel(e: PowerRankingEntry): string {
+    if (mode === 'MEMBER') return `${e.ballotCount ?? 0}${e.stdev != null ? ` (o ${e.stdev.toFixed(1)})` : ''}`
+    if (mode === 'COMMISSIONER') return 'signed'
+    return weekShort(e.week)
+  }
 
   return (
-    <div className="content scrolls">
-      <section className="panel">
-        <div className="panel-head">
-          <h2>Power rankings</h2>
+    <div className="content scrolls pr-page">
+      <div className="pr-head">
+        <div>
+          <div className="pr-eyebrow">
+            {season} · {weekPhrase(tableWeek)}
+          </div>
+          <h2 className="pr-title">Power rankings</h2>
+        </div>
+        <div className="pr-head-actions">
           {sleeperLeagueId && (
             <Link className="chip" to={`/leagues/${sleeperLeagueId}/history`}>
               ← League history
             </Link>
           )}
-        </div>
-
-        {error && <div className="error">{error}</div>}
-
-        {/* Three jobs, three treatments -- see styles.css's control-hierarchy
-            rule. These used to be six identical chips in one strip: two
-            exclusive selectors and a write, with nothing saying which was
-            which (and, until the `.controls button` fix, nothing even saying
-            which mode was selected). */}
-        <div className="power-controls">
-          <div className="segmented" role="group" aria-label="Ranking mode">
-            {ALL_POWER_RANKING_KINDS.map((k) => (
-              <button
-                key={k}
-                type="button"
-                className={`segment${mode === k ? ' on' : ''}`}
-                aria-pressed={mode === k}
-                onClick={() => setMode(k)}
-              >
-                {KIND_LABEL[k]}
-              </button>
-            ))}
-          </div>
-
-          <div className="segmented sm" role="group" aria-label="What to show">
-            <button
-              type="button"
-              className={`segment${view === 'league' ? ' on' : ''}`}
-              aria-pressed={view === 'league'}
-              onClick={() => setView('league')}
-            >
-              All teams
-            </button>
-            <button
-              type="button"
-              className={`segment${view === 'team' ? ' on' : ''}`}
-              aria-pressed={view === 'team'}
-              onClick={() => setView('team')}
-              disabled={!highlighted}
-              title={highlighted ? undefined : 'Pick a team in the chart first'}
-            >
-              One team
-            </button>
-          </div>
-
-          <span className="power-controls-spacer" />
-
           {/* A write, not a view toggle: it runs a backend job and stores new
-              snapshots. Kept away from the selectors and given the outline
-              treatment so it never reads as "the third mode". */}
+              snapshots, so it keeps the outline treatment and stays away from
+              the selectors. */}
           <button
             className="action-button"
             onClick={compute}
             disabled={computing}
-            title="Recompute market value and realized rankings for the current week and save them"
+            title="Recompute realized rankings for the current week (and the preseason baseline, the first time) and save them"
           >
             {computing ? 'Computing…' : `Compute week ${currentWeek}`}
           </button>
         </div>
+      </div>
 
-        <p className="muted small">{KIND_CAVEAT[mode]}</p>
+      {error && <div className="error">{error}</div>}
 
-        {seasonHasNoWeeksYet && weeks.length === 0 ? (
-          <p className="muted">
-            The {data.nflState.season} season hasn't started yet (kicks off {data.nflState.seasonStartDate}) -- realized
-            power rankings need games actually played. Market value is the only mode with anything to show right now.
-          </p>
-        ) : view === 'league' && weeks.length === 0 ? (
-          <p className="muted">
-            {/* Names the control it is pointing at, rather than a shortened
-                version of it -- "Click Compute" against a button reading
-                "Compute week 1" makes the reader look for a third control.
-                And each mode is filled by a DIFFERENT control: the two computed
-                modes by the Compute button, MEMBER by twelve people submitting
-                ballots, COMMISSIONER by one person's board. Pointing all three
-                at Compute would be pointing two of them at a button that cannot
-                produce them. */}
-            No {KIND_LABEL[mode].toLowerCase()} snapshots yet for this league.{' '}
-            {mode === 'COMPUTED_MARKET_VALUE' || mode === 'COMPUTED_REALIZED'
-              ? `Use “Compute week ${currentWeek}” above to build the first one.`
-              : mode === 'MEMBER'
-                ? 'Ballots build this one -- submit yours below, and the room fills in as others do.'
-                : ''}
-          </p>
-        ) : view === 'league' ? (
-          <>
-            <div className="bump-legend">
-              {series.map((s) => {
-                const hue = s.hue
-                const isHighlighted = highlighted === s.rosterId
-                return (
-                  <button
-                    key={s.rosterId}
-                    className={`bump-legend-item bump-legend-button${isHighlighted ? ' on' : ''}`}
-                    onClick={() => setHighlighted(isHighlighted ? null : s.rosterId)}
-                  >
-                    <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${hue})` }} />
-                    {s.manager ?? `roster ${s.rosterId}`}
-                  </button>
-                )
-              })}
-            </div>
-            <BumpChart series={series} weeks={weeks} teamCount={gridRows} highlighted={highlighted} onHighlight={setHighlighted} />
-          </>
-        ) : teamViewWeeks.length === 0 ? (
-          <p className="muted">No snapshots yet for this team in any mode.</p>
-        ) : (
-          <>
-            <p className="small">
-              {teamSeries[0]?.manager ?? 'This team'} across all four modes. Each line is one mode, not one manager.
-            </p>
-            <div className="bump-legend">
-              {ALL_POWER_RANKING_KINDS.map((k) => (
-                <span key={k} className="bump-legend-item">
-                  <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${KIND_HUE[k]})` }} />
-                  {KIND_LABEL[k]}
-                </span>
-              ))}
-            </div>
-            <BumpChart series={teamSeries} weeks={teamViewWeeks} teamCount={gridRows} highlighted={null} onHighlight={() => {}} />
-          </>
-        )}
+      {/* Modes are the page's primary axis, so they read as tabs rather than as
+          one pill among several controls -- the six-controls-of-equal-weight
+          problem this replaced. */}
+      <div className="pr-tabs">
+        <div className="pr-tablist" role="group" aria-label="Ranking mode">
+          {ALL_POWER_RANKING_KINDS.map((k) => (
+            <button
+              key={k}
+              type="button"
+              className={`pr-tab${mode === k ? ' on' : ''}`}
+              aria-pressed={mode === k}
+              onClick={() => setMode(k)}
+            >
+              {KIND_LABEL[k]}
+            </button>
+          ))}
+        </div>
+        <div className="segmented sm" role="group" aria-label="What to show">
+          <button
+            type="button"
+            className={`segment${view === 'league' ? ' on' : ''}`}
+            aria-pressed={view === 'league'}
+            onClick={() => setView('league')}
+          >
+            All teams
+          </button>
+          <button
+            type="button"
+            className={`segment${view === 'team' ? ' on' : ''}`}
+            aria-pressed={view === 'team'}
+            onClick={() => setView('team')}
+            disabled={!highlighted}
+            title={highlighted ? undefined : 'Pin a team in the table first'}
+          >
+            {highlighted ? `${focusName} only` : 'One team'}
+          </button>
+        </div>
+      </div>
 
-        {view === 'league' && series.length > 0 && (
-          <p className="tiny muted">Click a line to highlight it and unlock the per-team view.</p>
-        )}
-      </section>
+      <p className="pr-caveat">{KIND_CAVEAT[mode]}</p>
 
-      {/* The drag board, used twice: one signed ordering, or one ballot among
-          twelve. Same component, different copy and a different onSubmit --
-          which is all "commissioner is a bit simpler" amounts to in code. */}
-      {mode === 'COMMISSIONER' && ballot && (
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Set week {currentWeek}'s commissioner ranking</h2>
-          </div>
-          {ballot.canCommission ? (
-            <>
-              <p className="muted small">Your own ordering. An opinion, signed -- not a measurement.</p>
-              <RankBoard
-                key={`commissioner-${currentWeek}-${ballot.members.length}`}
-                members={boardMembers}
-                ariaLabel="Commissioner ranking"
-                initialOrder={commissionerOrder}
-                onSubmit={saveCommissioner}
-                submitLabel="Save ranking"
-                submitting={saving}
-              />
-              {saveMessage && <p className="small muted">{saveMessage}</p>}
-            </>
-          ) : (
-            <p className="muted small">
-              {/* Fails closed, and names the fix rather than just refusing. An
-                  empty commissioner set means this league was ingested before
-                  league_member existed, not that nobody commissions it. */}
-              {ballot.commissionerKnown
-                ? "Only this league's commissioner can set this ranking."
-                : 'No commissioner detected for this league -- re-run league ingest to pick one up from Sleeper.'}
-            </p>
-          )}
-        </section>
-      )}
-
-      {mode === 'MEMBER' && ballot && (
-        <>
-          <section className="panel">
-            <div className="panel-head">
-              <h2>Your ballot -- week {currentWeek}</h2>
-              <span className="chip">
-                {ballot.ballotCount} of {ballot.memberCount} in
-              </span>
-            </div>
-            {ballot.canSubmit ? (
-              <>
-                <p className="muted small">
-                  Rank all {ballot.members.length}, your own team included -- the bias that produces is shown below
-                  rather than quietly removed. You can resubmit this week's ballot; you cannot backdate one.
-                </p>
-                <RankBoard
-                  key={`ballot-${currentWeek}-${ballot.mine?.submittedAt ?? 'new'}`}
-                  members={boardMembers}
-                  ariaLabel="Your ballot"
-                  initialOrder={ballot.mine?.rosterIds}
-                  onSubmit={sendBallot}
-                  submitLabel={ballot.mine ? 'Resubmit ballot' : 'Submit ballot'}
-                  submitting={saving}
-                />
-                {saveMessage && <p className="small muted">{saveMessage}</p>}
-              </>
-            ) : (
-              <p className="muted small">
-                {/* canSubmit folds together signed-out, not-a-member, non-NFL
-                    and not-the-current-week. Naming which one applies needs the
-                    same rule twice; naming the common one and being honest
-                    about the rest does not. */}
-                Sign in as a member of this league to submit a ballot for the current week.
-              </p>
-            )}
-          </section>
-
-          {memberEntries.length > 0 && (
+      <div className={`pr-grid${hasSide ? '' : ' solo'}`}>
+        <div className="pr-main">
+          {view === 'league' ? (
             <section className="panel">
               <div className="panel-head">
-                <h2>The room</h2>
-                {mostDivisive && (
+                <h2>{KIND_LABEL[mode]}</h2>
+                <span className="small muted">
+                  {weekPhrase(tableWeek)}
+                  {mode === 'MEMBER' && ballot ? ` · ${ballot.ballotCount} ballots averaged` : ''}
+                </span>
+                {mode === 'MEMBER' && mostDivisive && (
                   <span className="chip">Most divisive: {mostDivisive.manager ?? `roster ${mostDivisive.rosterId}`}</span>
                 )}
               </div>
-              <div className="table-wrap">
-                <table className="standings">
-                  <thead>
-                    <tr>
-                      <th className="mono">#</th>
-                      <th>Team</th>
-                      <th className="mono">Avg</th>
-                      <th>Spread</th>
-                      <th className="mono">Ballots</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {memberEntries.map((e) => (
-                      <tr key={e.rosterId}>
-                        <td className="mono">{e.rank}</td>
-                        <td>{e.manager ?? `roster ${e.rosterId}`}</td>
-                        <td className="mono">{e.score?.toFixed(2) ?? '--'}</td>
-                        <td>
+
+              {rows.length === 0 ? (
+                <p className="muted">
+                  No {KIND_LABEL[mode].toLowerCase()} snapshots yet for this league.{' '}
+                  {mode === 'COMPUTED_REALIZED'
+                    ? `Use "Compute week ${currentWeek}" above to build the first one.`
+                    : mode === 'MEMBER'
+                      ? 'Ballots build this one -- submit yours below, and the room fills in as others do.'
+                      : ''}
+                </p>
+              ) : (
+                <div className="pr-list">
+                  <div className="pr-row-head">
+                    <span>#</span>
+                    <span>Team</span>
+                    <span className="pr-move-head">{moveHeader}</span>
+                    <span className="pr-score-head">{scoreHeader}</span>
+                    <span>{mode === 'MEMBER' ? 'Spread' : 'Score'}</span>
+                    <span className="pr-source-head">{mode === 'MEMBER' ? 'Ballots' : 'Source'}</span>
+                  </div>
+
+                  {rows.map((e) => {
+                    const isMe = ballot?.members.some((m) => m.isMe && m.rosterId === e.rosterId) ?? false
+                    const pinned = highlighted === e.rosterId
+                    const refRank = referenceRank.get(e.rosterId)
+                    const delta = refRank == null ? null : refRank - e.rank
+                    if (delta != null && Math.abs(delta) > Math.max(1, gridRows - 1)) {
+                      // Impossible by construction: both ranks are 1..N for the
+                      // same week. If this fires, the two sides came from
+                      // different weeks or different orderings.
+                      console.warn('[power] implausible movement delta', { rosterId: e.rosterId, rank: e.rank, refRank })
+                    }
+                    const member = ballot?.members.find((m) => m.rosterId === e.rosterId)
+                    return (
+                      <button
+                        type="button"
+                        key={e.rosterId}
+                        className={`pr-row${pinned ? ' on' : ''}`}
+                        aria-pressed={pinned}
+                        onClick={() => setHighlighted(pinned ? null : e.rosterId)}
+                      >
+                        <span className={`pr-rank mono${isMe ? ' mine' : e.rank <= 3 ? ' top' : ''}`}>{e.rank}</span>
+                        <span className="pr-team">
+                          <span className="avatar" style={avatarStyleFor(e.managerId, e.rosterId, isMe)} aria-hidden="true">
+                            {(e.manager ?? `R${e.rosterId}`).charAt(0).toUpperCase()}
+                          </span>
+                          <span className="pr-team-text">
+                            <span className="pr-team-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                            {member?.teamName && member.teamName.toUpperCase() !== 'TBD' && (
+                              <span className="pr-team-sub">{member.teamName}</span>
+                            )}
+                          </span>
+                        </span>
+                        <span className={`pr-move mono ${delta == null ? 'flat' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}`}>
+                          {delta == null ? '–' : delta === 0 ? '–' : `${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}`}
+                        </span>
+                        <span className="pr-score mono">{scoreLabel(e)}</span>
+                        {mode === 'MEMBER' ? (
                           <SpreadBar entry={e} teamCount={gridRows} />
-                        </td>
-                        <td className="mono">
-                          {e.ballotCount ?? 0}
-                          {/* Below three ballots sigma is suppressed upstream -- a
-                              population sigma of 0.0 from one vote renders as
-                              perfect consensus, the most misleading output here. */}
-                          {e.stdev != null ? ` (o ${e.stdev.toFixed(1)})` : ''}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        ) : (
+                          <ScoreBar score={e.score} min={minScore} max={maxScore} mine={isMe} />
+                        )}
+                        <span className="pr-source mono">{sourceLabel(e)}</span>
+                      </button>
+                    )
+                  })}
+
+                  {mode === 'MEMBER' && (
+                    <p className="pr-foot">
+                      A team ranked by fewer than half this week's ballots is placed after every team that cleared that bar,
+                      rather than winning the week on one enthusiastic vote.
+                    </p>
+                  )}
+                  <p className="pr-foot">
+                    {chartReady
+                      ? 'Click a line in Trend to highlight it, or click a row to pin a team and unlock the per-team view.'
+                      : 'Click a row to pin a team, then switch to the per-team view.'}
+                  </p>
+                </div>
+              )}
+            </section>
+          ) : (
+            <section className="panel">
+              <div className="panel-head pr-focus-head">
+                {focusEntry && (
+                  <span
+                    className="avatar"
+                    style={avatarStyleFor(focusEntry.managerId, focusEntry.rosterId, false)}
+                    aria-hidden="true"
+                  >
+                    {focusName.charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <h2>{focusName}</h2>
+                <span className="small muted">all four modes</span>
               </div>
-              <p className="tiny muted">
-                A team ranked by fewer than half this week's ballots is placed after every team that cleared that bar,
-                rather than winning the week on one enthusiastic vote.
-              </p>
+
+              {focusRanks.length === 0 ? (
+                <p className="muted">No snapshots yet for this team in any mode.</p>
+              ) : (
+                <>
+                  <p className="muted small">
+                    {focusSpread === 0
+                      ? `Every mode with data has ${focusName} ${ordinal(focusRanks[0])}.`
+                      : `${focusSpread} places between the highest and lowest read on ${focusName}. ` +
+                        focusRows
+                          .filter((f) => f.entry)
+                          .map((f) => `${KIND_LABEL[f.kind].toLowerCase()} ${ordinal(f.entry!.rank)}`)
+                          .join(', ') +
+                        '.'}
+                  </p>
+
+                  <div className="pr-focus-list">
+                    <div className="pr-focus-row head">
+                      <span>Mode</span>
+                      <span className="pr-score-head">Rank</span>
+                      <span>Placement, 1st → {gridRows}th</span>
+                      <span className="pr-score-head">Score</span>
+                    </div>
+                    {focusRows.map((f) => (
+                      <div className="pr-focus-row" key={f.kind}>
+                        <span className="pr-focus-mode">
+                          <span className="pr-dot" style={{ background: `oklch(70% 0.14 ${KIND_HUE[f.kind]})` }} />
+                          {KIND_LABEL[f.kind]}
+                        </span>
+                        <span className="pr-score mono">{f.entry ? f.entry.rank : '--'}</span>
+                        <span className="pr-axis">
+                          <span className="pr-axis-line" />
+                          {f.entry && (
+                            <span
+                              className="pr-axis-dot"
+                              style={{
+                                left: `${((f.entry.rank - 1) / Math.max(1, gridRows - 1)) * 100}%`,
+                                background: `oklch(70% 0.14 ${KIND_HUE[f.kind]})`,
+                              }}
+                              title={`${KIND_LABEL[f.kind]} · ${f.week == null ? 'no week' : weekPhrase(f.week)} · rank ${f.entry.rank}`}
+                            />
+                          )}
+                        </span>
+                        <span className="pr-score mono">
+                          {f.entry?.score == null ? 'no score' : f.week === 0 ? Math.round(f.entry.score) : f.entry.score.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                    <div className="pr-axis-ends mono">
+                      <span>1st</span>
+                      <span>{gridRows}th</span>
+                    </div>
+                  </div>
+
+                  {teamViewWeeks.length >= 2 && (
+                    <>
+                      <div className="bump-legend">
+                        {ALL_POWER_RANKING_KINDS.map((k) => (
+                          <span key={k} className="bump-legend-item">
+                            <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${KIND_HUE[k]})` }} />
+                            {KIND_LABEL[k]}
+                          </span>
+                        ))}
+                      </div>
+                      <BumpChart series={teamSeries} weeks={teamViewWeeks} teamCount={gridRows} highlighted={null} onHighlight={() => {}} />
+                    </>
+                  )}
+                </>
+              )}
             </section>
           )}
 
-          {homers.length > 0 && (
+          <section className="panel">
+            <div className="panel-head">
+              <h2>Trend</h2>
+              <span className="small muted">
+                {chartReady
+                  ? `${KIND_LABEL[mode].toLowerCase()}, ${weekRangeLabel(weeks)}`
+                  : weeks.length === 1
+                    ? 'One week of data. The week-over-week bump chart appears once week 2 is computed.'
+                    : 'No weeks yet for this mode.'}
+              </span>
+              <span className="mono tiny muted pr-trend-count">
+                wk {weeks.length} / {totalWeeks + 1}
+              </span>
+            </div>
+
+            {chartReady ? (
+              <>
+                <div className="bump-legend">
+                  {series.map((s) => {
+                    const isHighlighted = highlighted === s.rosterId
+                    return (
+                      <button
+                        key={s.rosterId}
+                        className={`bump-legend-item bump-legend-button${isHighlighted ? ' on' : ''}`}
+                        onClick={() => setHighlighted(isHighlighted ? null : s.rosterId)}
+                      >
+                        <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${s.hue})` }} />
+                        {s.manager ?? `roster ${s.rosterId}`}
+                      </button>
+                    )
+                  })}
+                </div>
+                <BumpChart series={series} weeks={weeks} teamCount={gridRows} highlighted={highlighted} onHighlight={setHighlighted} />
+              </>
+            ) : (
+              <div className="pr-ticks" aria-hidden="true">
+                {/* Starts at 0, not 1 -- the preseason baseline is a real tick
+                    this strip must be able to light up, not just weeks 1..N. */}
+                {Array.from({ length: totalWeeks + 1 }, (_, i) => i).map((w) => (
+                  <span key={w} className={`pr-tick${weeks.includes(w) ? ' on' : ''}`} />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {mode === 'MEMBER' && homers.length > 0 && (
             <section className="panel">
               <div className="panel-head">
                 <h2>Homers</h2>
+                <span className="small muted">self vs room</span>
               </div>
               <p className="muted small">
                 Where a manager put their own team, against where the room put it. Negative means they rank themselves
                 higher than everyone else does. With this many ballots your own vote moves your own average by a
                 fraction of a rank, so this is commentary, not a correction being applied.
               </p>
-              <div className="table-wrap">
-                <table className="standings">
-                  <thead>
-                    <tr>
-                      <th>Manager</th>
-                      <th className="mono">Self vs room</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {homers.map((e) => (
-                      <tr key={e.rosterId}>
-                        <td>{e.manager ?? `roster ${e.rosterId}`}</td>
-                        <td className="mono">
-                          {e.selfRankBias! > 0 ? `+${e.selfRankBias}` : e.selfRankBias}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="pr-homers">
+                {homers.map((e) => {
+                  const bias = e.selfRankBias!
+                  const pct = Math.min(50, Math.abs(bias) * 6)
+                  return (
+                    <div className="pr-homer" key={e.rosterId}>
+                      <span className="pr-homer-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                      <span className="pr-homer-track">
+                        <span className="pr-homer-mid" />
+                        <span
+                          className={`pr-homer-fill${bias < 0 ? ' down' : ' up'}`}
+                          style={bias < 0 ? { right: '50%', width: `${pct}%` } : { left: '50%', width: `${Math.max(1, pct)}%` }}
+                        />
+                      </span>
+                      <span className="pr-homer-value mono">{bias > 0 ? `+${bias}` : bias}</span>
+                    </div>
+                  )
+                })}
               </div>
             </section>
           )}
-        </>
-      )}
+        </div>
+
+        {hasSide && (
+          <aside className="pr-side">
+            {mode === 'COMMISSIONER' && ballot && (
+              <section className="panel">
+                <div className="panel-head">
+                  <h2>Week {currentWeek}'s commissioner ranking</h2>
+                </div>
+                {ballot.canCommission ? (
+                  <>
+                    <p className="muted small">Your own ordering. An opinion, signed -- not a measurement.</p>
+                    <RankBoard
+                      key={`commissioner-${currentWeek}-${ballot.members.length}`}
+                      members={boardMembers}
+                      ariaLabel="Commissioner ranking"
+                      initialOrder={commissionerSeed.order}
+                      onSubmit={saveCommissioner}
+                      submitLabel="Save ranking"
+                      submitting={saving}
+                    />
+                    {commissionerSeed.seededFrom && (
+                      <p className="tiny muted">
+                        Starting order: {commissionerSeed.seededFrom}. Drag to disagree -- nothing is saved until you submit.
+                      </p>
+                    )}
+                    {saveMessage && <p className="small muted">{saveMessage}</p>}
+                  </>
+                ) : (
+                  <p className="muted small">
+                    {ballot.commissionerKnown
+                      ? "Only this league's commissioner can set this ranking."
+                      : 'No commissioner detected for this league -- re-run league ingest to pick one up from Sleeper.'}
+                  </p>
+                )}
+              </section>
+            )}
+
+            {mode === 'MEMBER' && ballot && (
+              <section className="panel">
+                <div className="panel-head">
+                  <h2>Your ballot -- week {currentWeek}</h2>
+                  <span className="chip">
+                    {ballot.ballotCount} of {ballot.memberCount} in
+                  </span>
+                </div>
+                {ballot.canSubmit ? (
+                  <>
+                    <p className="muted small">
+                      Rank all {ballot.members.length}, your own team included -- the bias that produces is shown below
+                      rather than quietly removed. You can resubmit this week's ballot; you cannot backdate one.
+                    </p>
+                    <RankBoard
+                      // The signed-in user's own id is part of this key, not just
+                      // week + submittedAt -- two different users who both haven't
+                      // submitted yet otherwise produce the identical key, so
+                      // switching accounts wouldn't remount the board even once
+                      // `ballot` itself was correctly refetched for the new
+                      // identity (RankBoard seeds its order once, on mount).
+                      key={`ballot-${currentWeek}-${user?.sleeperUserId ?? 'anon'}-${ballot.mine?.submittedAt ?? 'new'}`}
+                      members={boardMembers}
+                      ariaLabel="Your ballot"
+                      initialOrder={ballotSeed.order}
+                      onSubmit={sendBallot}
+                      submitLabel={ballot.mine ? 'Resubmit ballot' : 'Submit ballot'}
+                      submitting={saving}
+                    />
+                    {ballotSeed.seededFrom && (
+                      <p className="tiny muted">
+                        Starting order: {ballotSeed.seededFrom}. Drag to disagree -- nothing is saved until you submit.
+                      </p>
+                    )}
+                    <p className="tiny muted">
+                      Drag a chip, or click one and use ↑ / ↓ to move it. Escape drops the selection.
+                    </p>
+                    {saveMessage && <p className="small muted">{saveMessage}</p>}
+                  </>
+                ) : (
+                  <p className="muted small">
+                    Sign in as a member of this league to submit a ballot for the current week.
+                  </p>
+                )}
+              </section>
+            )}
+          </aside>
+        )}
+      </div>
     </div>
   )
 }

@@ -16,16 +16,18 @@ import java.util.*;
 
 /**
  * claude/league-suite.md "Power rankings, three ways" -- COMMISSIONER (Allan's
- * own ordering), COMPUTED_MARKET_VALUE and COMPUTED_REALIZED. Modes 1 and 3
- * need no auth (Phase A); the third mode, league-member ballots, is Phase B
- * and not built here.
+ * own ordering) and COMPUTED_REALIZED. Needs no auth (Phase A); the third
+ * mode, league-member ballots, is Phase B and not built here.
  *
- * Neither computed mode claims to answer "how good is this team right now" --
- * see claude/league-suite.md's "honest caveat" and Phase A acceptance
- * criterion 3. MARKET_VALUE is a preseason-flavoured expectation that goes
- * stale the moment real games are played; REALIZED is backward-looking and a
- * hot start survives an injury it shouldn't. Both facts ride in each entry's
- * {@code note}, not just in this comment.
+ * COMPUTED_REALIZED no longer claims to answer "how good is this team right
+ * now" for a played week -- see claude/league-suite.md's "honest caveat" and
+ * Phase A acceptance criterion 3, a hot start survives an injury it
+ * shouldn't. Week 0 is the exception: a one-time preseason baseline (this
+ * app's board value on each roster's best starting lineup, at the moment
+ * someone first asked), written once via {@link #computeWeek0IfMissing} and
+ * never overwritten by a later compute the way weeks 1+ are -- see that
+ * method's own doc for why. Both facts ride in each entry's {@code note}, not
+ * just in this comment.
  */
 @Service
 public class PowerRankingService {
@@ -78,6 +80,22 @@ public class PowerRankingService {
     private record Scored(int rosterId, Long managerId, double score, String note) {}
 
     /**
+     * Computes and saves the week-0 preseason baseline, but ONLY if one
+     * doesn't already exist for this league+season -- unlike every other
+     * week, week 0 is written once and then frozen. It exists to answer "what
+     * did this roster look like before any games were played", and a manager
+     * trading players in week 5 must not be able to silently rewrite that
+     * answer just by someone clicking "Compute" again. Returns an empty array
+     * (a no-op) when week 0 is already set.
+     */
+    public PowerRankingRepository.Entry[] computeWeek0IfMissing(long leagueId, String sleeperLeagueId, int season) {
+        if (rankings.exists(leagueId, season, 0, "COMPUTED_REALIZED")) {
+            return new PowerRankingRepository.Entry[0];
+        }
+        return computePreseasonBaseline(leagueId, sleeperLeagueId, season);
+    }
+
+    /**
      * Sum of {@link SportRules#startingLineupValue} over each roster's ENTIRE
      * player pool (not Sleeper's own {@code starters} snapshot) -- the engine
      * picks the best-value starting lineup itself, which is what actually
@@ -85,9 +103,13 @@ public class PowerRankingService {
      * count) without trusting a manager to have remembered to set his lineup.
      * A rostered player who is OUT/Doubtful, or who isn't on this app's board
      * at all, is excluded before scoring -- Phase A acceptance criterion 4.
+     *
+     * Always saves at week 0 under kind COMPUTED_REALIZED -- callers wanting
+     * the "write once" behaviour should go through
+     * {@link #computeWeek0IfMissing} instead of calling this directly.
      */
-    public PowerRankingRepository.Entry[] computeMarketValue(long leagueId, String sleeperLeagueId,
-                                                             int season, int week) {
+    private PowerRankingRepository.Entry[] computePreseasonBaseline(long leagueId, String sleeperLeagueId,
+                                                                     int season) {
         LeagueRepository.LeagueRow leagueRow = leagues.byId(leagueId)
                 .orElseThrow(() -> new IllegalStateException("no league row for id " + leagueId));
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, leagueRow.rosterPositions().size());
@@ -130,7 +152,7 @@ public class PowerRankingService {
         var ranked = rankDescending(scored);
         // Same reasoning as computeRealized: nothing to rank is not a snapshot.
         // Reachable here when Sleeper returns no rosters for the league.
-        if (!ranked.isEmpty()) rankings.save(leagueId, season, week, "COMPUTED_MARKET_VALUE", ranked);
+        if (!ranked.isEmpty()) rankings.save(leagueId, season, 0, "COMPUTED_REALIZED", ranked);
         return ranked.toArray(new PowerRankingRepository.Entry[0]);
     }
 
@@ -142,7 +164,7 @@ public class PowerRankingService {
         if (excludedOffBoard > 0) {
             parts.add(excludedOffBoard + " rostered player(s) not on the board, excluded");
         }
-        return parts.isEmpty() ? "market value: this app's board, current roster" : String.join("; ", parts);
+        return parts.isEmpty() ? "preseason baseline: this app's board, roster at first compute" : String.join("; ", parts);
     }
 
     /**

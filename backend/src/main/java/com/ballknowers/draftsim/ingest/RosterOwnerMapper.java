@@ -9,7 +9,7 @@ import java.util.Set;
 /**
  * roster_id -> manager.id off {@code sleeper.rosters()}'s own {@code owner_id},
  * read live rather than off {@code roster_season} (which needs league-history
- * ingest to exist at all). {@link com.ballknowers.draftsim.engine.PowerRankingService#computeMarketValue}
+ * ingest to exist at all). {@link com.ballknowers.draftsim.engine.PowerRankingService#computeWeek0IfMissing}
  * and {@code LeagueHistoryIngestService.ingestStandings} each already inline
  * this same three-line lookup; this is the version the ballot feature's new
  * code (member ballots, the ballot endpoint's own roster-id validation) shares

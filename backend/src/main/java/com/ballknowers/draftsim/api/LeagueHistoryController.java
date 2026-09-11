@@ -457,9 +457,13 @@ public class LeagueHistoryController {
     }
 
     /**
-     * (Re)computes both no-auth computed modes for one week and stores them as
-     * a snapshot -- safe to re-run; only the current week's snapshot is meant
-     * to move (claude/league-suite.md's storage sketch).
+     * (Re)computes the current week's REALIZED snapshot and stores it -- safe
+     * to re-run; only the current week's snapshot is meant to move
+     * (claude/league-suite.md's storage sketch). Also seeds week 0, this
+     * league's one-time preseason baseline, the first time anyone computes at
+     * all -- see {@link PowerRankingService#computeWeek0IfMissing} for why
+     * that's write-once rather than refreshed on every call like {@code week}
+     * itself is.
      */
     @PostMapping("/leagues/{sleeperId}/power/compute")
     public ResponseEntity<?> compute(@PathVariable String sleeperId, @RequestParam int season,
@@ -468,24 +472,22 @@ public class LeagueHistoryController {
         Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
-        var marketValue = power.computeMarketValue(league.get().id(), sleeperId, season, week);
+        var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
         var realized = power.computeRealized(league.get().id(), season, week);
 
         // LinkedHashMap, not Map.of: the reason below is legitimately absent on
         // the happy path, and Map.of throws on a null value.
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("marketValue", marketValue.length);
+        response.put("week0", week0.length);
         response.put("realized", realized.length);
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess
-        // whether the snapshot failed to persist.
+        // whether the snapshot failed to persist. Week 0 has no equivalent gap
+        // message: a zero there just means it was already set (write-once), not
+        // that anything is missing.
         if (realized.length == 0) {
             response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
-        }
-        if (marketValue.length == 0) {
-            response.put("marketValueSkipped",
-                    "Sleeper returned no rosters for this league, so there was nothing to value");
         }
         return ResponseEntity.ok(response);
     }

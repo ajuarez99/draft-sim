@@ -638,19 +638,19 @@ export const getManagerHistory = (managerId: number) =>
  *
  * Order is display order, and MEMBER is last on purpose -- it is never the
  * default mode (finding 20).
+ *
+ * COMPUTED_MARKET_VALUE stopped being its own mode once it was demoted to
+ * week 0 of COMPUTED_REALIZED (the one-time preseason baseline that weeks 1+,
+ * built purely from games played, walk forward from) -- see the backend's
+ * PowerRankingService#computeWeek0IfMissing.
  */
-export const ALL_POWER_RANKING_KINDS = [
-  'COMPUTED_MARKET_VALUE',
-  'COMPUTED_REALIZED',
-  'COMMISSIONER',
-  'MEMBER',
-] as const
+export const ALL_POWER_RANKING_KINDS = ['COMPUTED_REALIZED', 'COMMISSIONER', 'MEMBER'] as const
 
 export type PowerRankingKind = (typeof ALL_POWER_RANKING_KINDS)[number]
 
 // Mirrors LeagueHistoryController.snapshotRow()'s shape. score is null for
 // COMMISSIONER (an ordering, not a measurement -- claude/league-suite.md's
-// "only rank is shared across all four modes" argument).
+// "only rank is shared across every mode" argument).
 export type PowerRankingEntry = {
   season: number
   week: number
@@ -703,7 +703,7 @@ export const getPowerRankings = (sleeperLeagueId: string) =>
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
-  }).then(json<{ marketValue: number; realized: number }>)
+  }).then(json<{ week0: number; realized: number; realizedSkipped?: string }>)
 
 export const saveCommissionerRanking = (
   sleeperLeagueId: string,

@@ -162,7 +162,7 @@ class PowerRankingServiceTest {
         ArgumentCaptor<RosterState> stateCaptor = ArgumentCaptor.forClass(RosterState.class);
         when(rules.startingLineupValue(stateCaptor.capture(), any())).thenReturn(42.0);
 
-        var result = service.computeMarketValue(1L, "SL", 2025, 1);
+        var result = service.computeWeek0IfMissing(1L, "SL", 2025);
 
         RosterState builtState = stateCaptor.getValue();
         assertEquals(1, builtState.size(), "the OUT player must not be in the lineup fed to the engine");
@@ -190,7 +190,7 @@ class PowerRankingServiceTest {
         when(sleeper.rosters("SL")).thenReturn(List.of(roster));
         when(rules.startingLineupValue(any(), any())).thenReturn(0.0);
 
-        var result = service.computeMarketValue(1L, "SL", 2025, 1);
+        var result = service.computeWeek0IfMissing(1L, "SL", 2025);
 
         assertEquals(1, result.length);
         assertTrue(result[0].note().contains("not on the board"));

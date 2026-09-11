@@ -62,6 +62,19 @@ public class PowerRankingRepository {
         return true;
     }
 
+    /**
+     * Whether a snapshot already exists at this exact (league, season, week,
+     * kind) -- used to seed week 0 (the preseason baseline) write-once rather
+     * than recomputing and silently overwriting it on every later "Compute"
+     * click, the way every other week's snapshot is meant to move.
+     */
+    public boolean exists(long leagueId, int season, int week, String kind) {
+        return db.sql("select count(*) from power_ranking where league_id = ? and season = ? and week = ? and kind = ?")
+                .params(leagueId, season, week, kind)
+                .query(Integer.class)
+                .single() > 0;
+    }
+
     public record SnapshotRow(int season, int week, String kind, int rosterId, Long managerId,
                               String managerName, int rank, Double score, String note) {}
 

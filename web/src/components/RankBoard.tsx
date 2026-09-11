@@ -495,13 +495,19 @@ export default function RankBoard({
         {liveMessage}
       </div>
 
-      <div className="rankboard-tray" ref={trayRef}>
-        {unplaced.length === 0 ? (
-          <p className="tiny muted rankboard-tray-empty">Every team is ranked.</p>
-        ) : (
-          unplaced.map((id) => renderChip(membersById.get(id)!, null))
-        )}
-      </div>
+      {/* Rendered only while something is actually unplaced. A seeded or
+          restored board opens complete (see PowerRankings.tsx's seedOrder),
+          and submission requires every slot filled anyway -- there is no
+          reason to keep a drop target around for "send a chip back to
+          unranked" once nothing benefits from it, and reordering is already
+          fully covered by dragging one slot onto another. This does mean a
+          chip can never be unplaced once the board is complete; that's
+          intentional, not a gap -- see the effort of getting back here. */}
+      {unplaced.length > 0 && (
+        <div className="rankboard-tray" ref={trayRef}>
+          {unplaced.map((id) => renderChip(membersById.get(id)!, null))}
+        </div>
+      )}
 
       <ol className="rankboard-slots">
         {order.map((chipId, i) => (
