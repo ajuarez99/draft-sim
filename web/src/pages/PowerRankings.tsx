@@ -306,6 +306,9 @@ export default function PowerRankings() {
   const [computing, setComputing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  // 2026-09-11 feedback: "Realized" is meaningless on a cold open, so it's no
+  // longer a top-level tab -- it's a popup off a manager's row instead.
+  const [realizedFor, setRealizedFor] = useState<number | null>(null)
 
   function refetch() {
     if (!sleeperLeagueId) return
@@ -313,7 +316,7 @@ export default function PowerRankings() {
       .then((d) => {
         setData(d)
         setError(null)
-        setMode((prev) => prev ?? 'COMPUTED_REALIZED')
+        setMode((prev) => prev ?? 'MEMBER')
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
     getBallot(sleeperLeagueId)
@@ -586,7 +589,11 @@ export default function PowerRankings() {
           problem this replaced. */}
       <div className="pr-tabs">
         <div className="pr-tablist" role="group" aria-label="Ranking mode">
-          {ALL_POWER_RANKING_KINDS.map((k) => (
+          {/* Realized is deliberately excluded here -- it's a per-manager
+              popup (click a row's avatar), not a top-level mode. It's still a
+              real PowerRankingKind everywhere else (Trend legend, per-team
+              view, movement reference). */}
+          {ALL_POWER_RANKING_KINDS.filter((k) => k !== 'COMPUTED_REALIZED').map((k) => (
             <button
               key={k}
               type="button"
@@ -679,9 +686,21 @@ export default function PowerRankings() {
                       >
                         <span className={`pr-rank mono${isMe ? ' mine' : e.rank <= 3 ? ' top' : ''}`}>{e.rank}</span>
                         <span className="pr-team">
-                          <span className="avatar" style={avatarStyleFor(e.managerId, e.rosterId, isMe)} aria-hidden="true">
+                          {/* Nested inside the row's own button on purpose --
+                              stopPropagation keeps it from also toggling pin.
+                              Opens the Realized popup for this manager. */}
+                          <button
+                            type="button"
+                            className="avatar pr-realized-trigger"
+                            style={avatarStyleFor(e.managerId, e.rosterId, isMe)}
+                            title="See this team's Realized ranking"
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              setRealizedFor(e.rosterId)
+                            }}
+                          >
                             {(e.manager ?? `R${e.rosterId}`).charAt(0).toUpperCase()}
-                          </span>
+                          </button>
                           <span className="pr-team-text">
                             <span className="pr-team-name">{e.manager ?? `roster ${e.rosterId}`}</span>
                             {member?.teamName && member.teamName.toUpperCase() !== 'TBD' && (
@@ -968,6 +987,48 @@ export default function PowerRankings() {
           </aside>
         )}
       </div>
+
+      {realizedFor != null &&
+        (() => {
+          const rosterId = realizedFor
+          const history = data.entries
+            .filter((r) => r.kind === 'COMPUTED_REALIZED' && r.season === season && r.rosterId === rosterId)
+            .sort((a, b) => b.week - a.week)
+          const latest = history[0]
+          const name = (rows.find((r) => r.rosterId === rosterId) ?? history[0])?.manager ?? `roster ${rosterId}`
+          const managerId = (rows.find((r) => r.rosterId === rosterId) ?? history[0])?.managerId ?? null
+          return (
+            <div className="modal-backdrop" onClick={() => setRealizedFor(null)}>
+              <div className="modal-card" onClick={(ev) => ev.stopPropagation()}>
+                <button className="modal-close" onClick={() => setRealizedFor(null)} aria-label="Close">
+                  ✕
+                </button>
+                <div className="panel-head">
+                  <span className="avatar" style={avatarStyleFor(managerId, rosterId, false)} aria-hidden="true">
+                    {name.charAt(0).toUpperCase()}
+                  </span>
+                  <h2>{name} -- Realized</h2>
+                </div>
+                {latest ? (
+                  <>
+                    <p className="small">
+                      {ordinal(latest.rank)} of {gridRows}, {weekPhrase(latest.week)} ({scoreLabel(latest)}
+                      {latest.week === 0 ? ' value' : ' pts/wk'}).
+                    </p>
+                    {history.length > 1 && (
+                      <p className="tiny muted">
+                        Earlier: {history.slice(1, 5).map((h) => `${weekShort(h.week)} ${ordinal(h.rank)}`).join(', ')}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="muted small">No Realized snapshot yet for this team.</p>
+                )}
+                <p className="tiny muted">{KIND_CAVEAT.COMPUTED_REALIZED}</p>
+              </div>
+            </div>
+          )
+        })()}
     </div>
   )
 }
