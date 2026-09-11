@@ -105,6 +105,33 @@ public class MonteCarloRunner {
             }
         }
 
+        // A player locked in by startState (a real pick already made, not a
+        // guess) can still get drafted EARLY in a minority of iterations --
+        // DraftSimulator's own duplicate guard then skips him at his real,
+        // locked pick in exactly those iterations (he's already off that
+        // iteration's `available`). If he's common enough in that minority to
+        // also win an earlier slot's modal vote, the aggregate board shows the
+        // same player twice: once for real at his locked pick, once as a
+        // "prediction" at an earlier one he never actually reached in the
+        // iterations that count. Scrub every locked player out of every OTHER
+        // slot's tally before picking a modal winner -- a real, already-decided
+        // pick should never lose ground to a hypothetical earlier one.
+        Map<Long, Integer> lockedPickOf = new HashMap<>();
+        for (int p = 1; p <= total; p++) {
+            long id = ctx.completedAt(p);
+            if (id != 0) lockedPickOf.put(id, p);
+        }
+        if (!lockedPickOf.isEmpty()) {
+            for (int p = 1; p <= total; p++) {
+                int pickNo = p;
+                Map<Long, Integer> c = counts.get(p);
+                c.keySet().removeIf(id -> {
+                    Integer lockedAt = lockedPickOf.get(id);
+                    return lockedAt != null && lockedAt != pickNo;
+                });
+            }
+        }
+
         List<SimulationResult.PredictedPick> board = new ArrayList<>(total);
         for (BoardAssembler.Assignment a : BoardAssembler.assemble(counts, iterations, ALTERNATIVES)) {
             int slot = DraftSlot.slot(a.pickNo(), teams, ctx.settings().reversalRound());

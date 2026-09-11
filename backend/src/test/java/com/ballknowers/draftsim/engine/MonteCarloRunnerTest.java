@@ -42,12 +42,16 @@ class MonteCarloRunnerTest {
         return out;
     }
 
-    private static DraftContext ctx(int teams, int rounds) {
-        LeagueSettings settings = new LeagueSettings(Sport.NFL, teams, rounds, SLOTS, 1.0);
+    private static Map<Integer, ManagerProfile> profilesFor(int teams) {
         Map<Integer, ManagerProfile> profiles = new HashMap<>();
         for (int s = 1; s <= teams; s++) profiles.put(s, ManagerProfile.neutral(s, "seat " + s));
+        return profiles;
+    }
+
+    private static DraftContext ctx(int teams, int rounds) {
+        LeagueSettings settings = new LeagueSettings(Sport.NFL, teams, rounds, SLOTS, 1.0);
         return new DraftContext(
-                board(400), settings, profiles, PositionalPriors.uniform(Sport.NFL),
+                board(400), settings, profilesFor(teams), PositionalPriors.uniform(Sport.NFL),
                 new FootballRules(new ScoringProperties(CFG, null)), CFG,
                 List.of(), Map.of());
     }
@@ -110,6 +114,42 @@ class MonteCarloRunnerTest {
                 .run(c2, 11, 100, 1.0, 42L, CONFIDENCE, null);
 
         assertEquals(first, second, "identical seed and inputs must produce a byte-for-byte identical result");
+    }
+
+    /**
+     * A locked (startState) pick is a real, already-decided fact -- but it's
+     * only removed from `available` WITHIN each iteration, at the point that
+     * iteration's own sequential loop reaches it. In whichever minority of
+     * iterations an earlier, unlocked slot independently drafts the same
+     * player first, DraftSimulator's own duplicate guard then skips him at his
+     * real locked pick for THAT iteration -- so if he's common enough in that
+     * minority to also win the earlier slot's modal vote, the aggregate board
+     * used to show him twice. MonteCarloRunner.aggregate() now scrubs every
+     * locked player out of every other slot's tally before picking a winner.
+     */
+    @Test
+    void lockedPickNeverAlsoAppearsAsAnEarlierPrediction() {
+        int teams = 12, rounds = 14;
+        // Board's own #1 overall (lowest adp) -- the player every iteration
+        // would draft almost immediately if he weren't locked away, so this
+        // maximizes the chance an early slot's modal vote lands on him too.
+        long topPlayerId = 1L;
+        int lockedAt = 20; // round 2, nowhere near where he'd naturally go
+        DraftContext locked = new DraftContext(
+                board(400), new LeagueSettings(Sport.NFL, teams, rounds, SLOTS, 1.0),
+                profilesFor(teams), PositionalPriors.uniform(Sport.NFL),
+                new FootballRules(new ScoringProperties(CFG, null)), CFG,
+                List.of(lockedAt), Map.of(lockedAt, topPlayerId));
+
+        SimulationResult result = new MonteCarloRunner()
+                .run(locked, 11, 400, 1.0, 7L, CONFIDENCE, null);
+
+        List<Integer> picksNamingHim = result.board().stream()
+                .filter(p -> p.player() != null && p.player().id() == topPlayerId)
+                .map(SimulationResult.PredictedPick::pickNo)
+                .toList();
+        assertEquals(List.of(lockedAt), picksNamingHim,
+                "a locked player must appear on the board at his real pick only, not also as an earlier prediction");
     }
 
     @Test
