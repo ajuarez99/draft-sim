@@ -184,17 +184,28 @@ export default function LiveDraftView() {
     }
   }
 
-  // Reality moved (or you changed which seat is yours) -> the board past it is
-  // out of date. Gated on `seats` rather than on `live` so the page is still
-  // worth something when the stream is down: the engine reads the completed
-  // picks out of the DB either way, so a projection is available even with no
-  // live state at all -- it just can't say where the draft has got to.
+  // One baseline projection per seat, not one per pick. A full 500-iteration
+  // resim used to refire on every `live.picksMade` change, which put a
+  // ~1.5s debounce + ~5s Monte Carlo run between a real pick landing and the
+  // board reflecting it -- on top of the poller's own latency. It shouldn't
+  // have been on that critical path at all: landed picks are facts (replayed
+  // out of the DB, not guessed), and `boardWithLive`/`landedPicks`/
+  // `takenPlayerIds` above already overlay them onto `result` the instant SSE
+  // delivers them, with no resim involved. What a resim actually produces --
+  // the *predicted* players for picks that haven't happened -- is a mock-room
+  // concern, not a live-room one; this page needs exactly one to have
+  // something to show for the not-yet-drafted cells, and re-running it here
+  // for every real pick only bought staleness for the numbers that matter.
+  // Gated on `seats` rather than on `live` so the page is still worth
+  // something when the stream is down: the engine reads the completed picks
+  // out of the DB either way, so a projection is available even with no live
+  // state at all -- it just can't say where the draft has got to.
   useEffect(() => {
     if (!seats) return
     const id = window.setTimeout(() => void resimulate(), RESIM_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live?.picksMade, seats, mySlot])
+  }, [seats, mySlot])
 
   async function forkToMock() {
     setForking(true)
@@ -219,11 +230,17 @@ export default function LiveDraftView() {
   )
 
   // Everyone actually off the board, straight off the landed prefix -- no
-  // reveal-boundary subtlety here, because the boundary is reality.
-  const takenPlayerIds = useMemo(
-    () => new Set((result?.board ?? []).filter((p) => p.pickNo <= picksMade).map((p) => p.player.id)),
-    [result, picksMade],
-  )
+  // reveal-boundary subtlety here, because the boundary is reality. Unioned
+  // with `live.recentPicks` for the same reason `landedPicks` below overlays
+  // it: `result` is the last resim, so a pick that landed since it started
+  // would otherwise still read "available" here until the next one finishes.
+  const takenPlayerIds = useMemo(() => {
+    const ids = new Set(
+      (result?.board ?? []).filter((p) => p.pickNo <= picksMade).map((p) => p.player.id),
+    )
+    for (const p of live?.recentPicks ?? []) ids.add(p.player.id)
+    return ids
+  }, [result, picksMade, live])
 
   // What has actually happened, oldest first -- two sources, and the order of
   // preference matters.
@@ -255,6 +272,19 @@ export default function LiveDraftView() {
     for (const p of live?.recentPicks ?? []) byPickNo.set(p.pickNo, p)
     return [...byPickNo.values()].sort((a, b) => a.pickNo - b.pickNo)
   }, [result, picksMade, live])
+
+  // Same overlay `landedPicks` does, but kept as PredictedPick[] for the grid:
+  // a landed real pick shown before the next resim lands is a fact, not a
+  // guess, so it gets `isModal: true` (keeps the cell out of the "uncertain"
+  // fade) and no alternatives rather than carrying over a stale projection's.
+  const boardWithLive = useMemo<PredictedPick[]>(() => {
+    if (!live?.recentPicks.length) return result?.board ?? []
+    const byPickNo = new Map((result?.board ?? []).map((p) => [p.pickNo, p]))
+    for (const p of live.recentPicks) {
+      byPickNo.set(p.pickNo, { ...p, probability: 1, isModal: true, alternatives: [] })
+    }
+    return [...byPickNo.values()].sort((a, b) => a.pickNo - b.pickNo)
+  }, [result, live])
 
   const rosterPositions = seats?.rosterPositions ?? []
 
@@ -329,7 +359,7 @@ export default function LiveDraftView() {
     () =>
       seats ? (
         <DraftBoard
-          board={result?.board ?? []}
+          board={boardWithLive}
           teams={result?.teams ?? seats.teams}
           rounds={result?.rounds ?? seats.rounds}
           myPicks={result?.myPicks ?? []}

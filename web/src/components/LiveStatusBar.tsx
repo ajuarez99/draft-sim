@@ -58,16 +58,11 @@ export default function LiveStatusBar({
     try {
       const r = await trackDraft(draftId)
       // observed === false means Sleeper was unreachable and `status` is the
-      // stale DB value -- say so rather than presenting it as the truth. And a
-      // backend older than the seatsMapped field answers 200 without it, so
-      // don't render "undefined/undefined".
-      const seatNote =
-        typeof r.seatsMapped === 'number'
-          ? r.seatsMapped === r.teams
-            ? `All ${r.teams} managers identified · `
-            : `Only ${r.seatsMapped} of ${r.teams} managers identified · `
-          : ''
-      setTrackNote(`${seatNote}${r.status ?? 'unknown'}${r.observed === false ? ' (stale)' : ''}`)
+      // stale DB value -- worth surfacing since the SSE stream can't tell the
+      // difference. Everything else (seat count, status) already arrives live
+      // over SSE every ~10s -- see `liveSeatNote` below -- so don't duplicate
+      // it here, or this note goes stale the moment the next tick lands.
+      setTrackNote(r.observed === false ? `${r.status ?? 'unknown'} (stale)` : null)
       onTracked?.()
     } catch (e) {
       setTrackNote(e instanceof Error ? e.message : String(e))
@@ -75,6 +70,16 @@ export default function LiveStatusBar({
       setTracking(false)
     }
   }
+
+  // Reactive: `live` is pushed over SSE roughly every 10s, including during
+  // pre_draft, so this keeps counting up on its own -- the manual Refresh
+  // button below is a force-check, not the only way this number moves.
+  const liveSeatNote =
+    live && live.teams > 0
+      ? live.seatsMapped === live.teams
+        ? `All ${live.teams} managers identified`
+        : `Only ${live.seatsMapped} of ${live.teams} managers identified`
+      : null
 
   const onClockSlot = live?.status === 'drafting' ? live.onTheClockSlot : null
   const onClockSeat = onClockSlot != null ? seats.find((s) => s.slot === onClockSlot) : undefined
@@ -109,7 +114,11 @@ export default function LiveStatusBar({
         </div>
       )}
       <div className="live-right">
-        {trackNote && <span className="muted tiny live-track-note">{trackNote}</span>}
+        {(liveSeatNote || trackNote) && (
+          <span className="muted tiny live-track-note">
+            {[liveSeatNote, trackNote].filter(Boolean).join(' · ')}
+          </span>
+        )}
         <button
           className="chip live-track"
           onClick={track}
