@@ -291,6 +291,64 @@ function ladderNoteFor(mode: PowerRankingKind, e: PowerRankingEntry, teamCount: 
   return `As of ${weekShort(e.week)}`
 }
 
+export type SpaceStats = {
+  barLeft: string
+  barWidth: string
+  railGradient: string
+  medianPos: string
+  medianColor: string
+  minePos: string | null
+  agreePct: number | null
+  agreeLabel: string
+  deltaLabel: string | null
+  deltaClass: 'up' | 'down' | 'flat' | null
+}
+
+/** Four bands (best quartile..worst quartile) of the 1..N axis, colored like
+ *  the ranking-space-optimization mockup's tierColor() -- teal is also the
+ *  app's own --teal, the other three are local to this one visualization
+ *  (same precedent as KIND_HUE below: extra hues for a data encoding, not a
+ *  brand color). Kept off crimson's hue on purpose -- crimson means "you"
+ *  everywhere else on this page, and a bottom-quartile dot is not that. */
+function tierColor(rank: number, teamCount: number): string {
+  const q = Math.max(1, teamCount) / 4
+  if (rank <= q) return 'var(--teal)'
+  if (rank <= q * 2) return 'oklch(72% 0.12 230)'
+  if (rank <= q * 3) return 'oklch(80% 0.12 85)'
+  return 'oklch(75% 0.13 50)'
+}
+
+/** Ranking-space stats for the League-vote ladder row (ranking-space-optimization
+ *  handoff): where this team's ballots ranged on the 1..N axis, an approximate
+ *  median, and how the viewer's own ballot (when they have one) compares to it.
+ *  There is no exact-median field from the backend -- only avg/best/worst/stdev
+ *  -- so the median marker is the rounded average rank, which is close enough
+ *  to place a dot and cheap to keep in sync if a real median ever ships. */
+export function spaceStatsFor(e: PowerRankingEntry, teamCount: number, myRank: number | null): SpaceStats {
+  const n = Math.max(1, teamCount)
+  const lo = e.bestRank ?? e.rank
+  const hi = e.worstRank ?? e.rank
+  const pos = (rank: number) => `${(((rank - 0.5) / n) * 100).toFixed(2)}%`
+  const med = e.score != null ? Math.round(e.score) : e.rank
+  const range = hi - lo
+  const agreePct = n > 1 ? Math.max(0, ((n - 1 - range) / (n - 1)) * 100) : null
+  const delta = myRank == null ? null : med - myRank
+  return {
+    barLeft: `${(((lo - 1) / n) * 100).toFixed(2)}%`,
+    barWidth: `${(((hi - lo + 1) / n) * 100).toFixed(2)}%`,
+    // Wider disagreement shifts the gradient further from teal -- a visual
+    // echo of the Agreement number, not just a flat fill.
+    railGradient: `linear-gradient(90deg, oklch(68% 0.14 180) 0%, oklch(66% 0.15 ${180 + range * 14}) 100%)`,
+    medianPos: pos(med),
+    medianColor: tierColor(e.rank, n),
+    minePos: myRank == null ? null : pos(myRank),
+    agreePct,
+    agreeLabel: agreePct == null ? '--' : `${Math.round(agreePct)}% · ${range}`,
+    deltaLabel: delta == null ? null : delta === 0 ? 'even' : delta > 0 ? `+${delta}` : String(delta),
+    deltaClass: delta == null ? null : delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down',
+  }
+}
+
 // --- headline / deck / story cards (§5) -------------------------------------
 //
 // Deterministic, not an LLM call: exactly the rule order in
@@ -596,6 +654,13 @@ export default function PowerRankings() {
   const hasReference = referenceRows.length > 0
   const sinceLabel = tableWeek > 0 ? `Since ${weekShort(tableWeek - 1)}` : 'Since —'
 
+  // League vote gets the ranking-space row (range bar + your ballot +
+  // agreement) instead of the movement/playoff/note columns -- the spread
+  // data behind it (bestRank/worstRank/stdev) is MEMBER-only, and Box
+  // score/Commissioner keep today's row untouched.
+  const memberSpace = ladderMode === 'MEMBER'
+  const myRankByRoster = new Map<number, number>(ballot?.mine?.rosterIds.map((rosterId, i) => [rosterId, i + 1]) ?? [])
+
   // ---- the hero (headline / #1 / your-team strip / story cards) is always
   // League vote, independent of which ladder tab is selected -- it is "state
   // of the league", not "state of the current tab" (2a/2c both keep the
@@ -850,14 +915,28 @@ export default function PowerRankings() {
                     : ''}
               </p>
             ) : (
-              <div className={`pr-list${hasReference ? '' : ' no-reference'}`}>
+              <div className={`pr-list${memberSpace ? ' member-space' : hasReference ? '' : ' no-reference'}`}>
                 <div className="pr-row-head">
                   <span>#</span>
                   <span>Team</span>
                   <span>Record</span>
-                  {hasReference && <span className="pr-move-head">{sinceLabel}</span>}
-                  <span className="pr-score-head">Makes playoffs</span>
-                  <span>Where the room had them</span>
+                  {memberSpace ? (
+                    <>
+                      <span className="pr-score-head">Avg</span>
+                      <span className="pr-score-head">Your ballot</span>
+                      <span className="pr-space-head">
+                        <span>Where the room had them</span>
+                        <span className="pr-space-head-ends">1st → {ordinal(gridRows)}</span>
+                      </span>
+                      <span className="pr-score-head">Agreement</span>
+                    </>
+                  ) : (
+                    <>
+                      {hasReference && <span className="pr-move-head">{sinceLabel}</span>}
+                      <span className="pr-score-head">Makes playoffs</span>
+                      <span>Where the room had them</span>
+                    </>
+                  )}
                 </div>
 
                 {rows.map((e) => {
@@ -873,6 +952,8 @@ export default function PowerRankings() {
                   }
                   const member = ballot?.members.find((m) => m.rosterId === e.rosterId)
                   const pct = e.makesPlayoffsPct
+                  const myRank = myRankByRoster.get(e.rosterId) ?? null
+                  const space = memberSpace ? spaceStatsFor(e, gridRows, myRank) : null
                   return (
                     <button
                       type="button"
@@ -900,20 +981,54 @@ export default function PowerRankings() {
                         </span>
                       </span>
                       <span className="mono pr-record">{recordLabel(standings?.get(e.rosterId))}</span>
-                      {hasReference && (
-                        <span className={`pr-move mono ${delta == null ? 'flat' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}`}>
-                          {delta == null ? '–' : delta === 0 ? '–' : `${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}`}
-                        </span>
+                      {space ? (
+                        <>
+                          <span className="mono pr-avg">{scoreLabel(e)}</span>
+                          <span className="pr-your-ballot">
+                            {myRank == null ? (
+                              <span className="tiny muted">{ballot?.mine ? '—' : 'No ballot'}</span>
+                            ) : (
+                              <>
+                                <span className="mono">{ordinal(myRank)}</span>
+                                {space.deltaLabel && (
+                                  <span className={`pr-move mono ${space.deltaClass}`}>{space.deltaLabel}</span>
+                                )}
+                              </>
+                            )}
+                          </span>
+                          <span className="pr-space-cell" title={roomTakeSentence(e, gridRows)}>
+                            <span className="spread-bar">
+                              <span
+                                className="spread-bar-range"
+                                style={{ left: space.barLeft, width: space.barWidth, backgroundImage: space.railGradient }}
+                              />
+                              <span className="spread-bar-mean" style={{ left: space.medianPos, background: space.medianColor }} />
+                              {space.minePos != null && <span className="spread-bar-mine" style={{ left: space.minePos }} />}
+                            </span>
+                          </span>
+                          <span className="pr-playoff-cell">
+                            <span className="pr-bar">
+                              <span className="pr-bar-fill" style={{ width: space.agreePct == null ? '0%' : `${space.agreePct}%` }} />
+                            </span>
+                            <span className="mono pr-playoff-pct">{space.agreeLabel}</span>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {hasReference && (
+                            <span className={`pr-move mono ${delta == null ? 'flat' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'}`}>
+                              {delta == null ? '–' : delta === 0 ? '–' : `${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}`}
+                            </span>
+                          )}
+                          <span className="pr-playoff-cell">
+                            <span className="pr-bar">
+                              <span className={`pr-bar-fill${isMe ? ' mine' : ''}`} style={{ width: pct == null ? '0%' : `${pct}%` }} />
+                            </span>
+                            <span className="mono pr-playoff-pct">{pctLabel(pct)}</span>
+                          </span>
+                          <span className="pr-note">{ladderNoteFor(ladderMode, e, gridRows)}</span>
+                        </>
                       )}
-                      <span className="pr-playoff-cell">
-                        <span className="pr-bar">
-                          <span className={`pr-bar-fill${isMe ? ' mine' : ''}`} style={{ width: pct == null ? '0%' : `${pct}%` }} />
-                        </span>
-                        <span className="mono pr-playoff-pct">{pctLabel(pct)}</span>
-                      </span>
-                      <span className={`pr-note${ladderMode === 'MEMBER' && e.stdev != null && e.stdev > 1.5 ? ' notable' : ''}`}>
-                        {ladderNoteFor(ladderMode, e, gridRows)}
-                      </span>
                     </button>
                   )
                 })}
@@ -923,6 +1038,22 @@ export default function PowerRankings() {
                     A team ranked by fewer than half this week's ballots is placed after every team that cleared that bar,
                     rather than winning the week on one enthusiastic vote.
                   </p>
+                )}
+                {memberSpace && (
+                  <div className="pr-space-legend">
+                    <span className="pr-space-legend-item">
+                      <span className="pr-space-legend-swatch range" /> ballot range, high to low
+                    </span>
+                    <span className="pr-space-legend-item">
+                      <span className="pr-space-legend-swatch median" /> room median
+                    </span>
+                    <span className="pr-space-legend-item">
+                      <span className="pr-space-legend-swatch playoff" /> playoff half
+                    </span>
+                    <span className="pr-space-legend-item">
+                      <span className="pr-space-legend-swatch mine" /> your ballot
+                    </span>
+                  </div>
                 )}
                 <p className="pr-foot">
                   Ranks are manager ballots, averaged. Playoff odds come from simulating the rest of the season.{' '}

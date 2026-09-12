@@ -2003,6 +2003,62 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklch, var(--teal) 55%, var(--panel)); }
 .pr-bar-fill.mine { background: var(--crimson); }
 
+/* --- League-vote ladder row: ranking space (ranking-space-optimization
+   handoff) -- a range bar (ballot low..high) instead of the "Where the room
+   had them" sentence, plus "Your ballot" and "Agreement" columns. Box score
+   and Commissioner modes are untouched: the spread data behind this row
+   (bestRank/worstRank/stdev) only exists for MEMBER snapshots. Reuses the
+   existing spread-bar primitives (`.spread-bar` etc., defined above) rather
+   than a new bar, stretched to fill the column instead of a fixed 120px. */
+/* No 1180px cap here (unlike the other two modes' .pr-list): the range bar is
+   the point of this row, and on a wide monitor capping it left a few hundred
+   dead px to the right of the panel -- let the bar column's `1fr` claim
+   whatever the panel actually has. Team gets a capped range instead of an
+   open `1fr` so it doesn't win that space back from the bar. */
+.pr-list.member-space { max-width: none; }
+.pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
+  grid-template-columns: 30px minmax(140px, 260px) 60px 56px 88px minmax(200px, 1fr) 96px;
+}
+.pr-space-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pr-space-head-ends { color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
+.pr-avg { text-align: right; font-size: 13px; color: var(--text); }
+.pr-your-ballot { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 13px; }
+/* Tinted pill, not bare colored text -- matches the app's usual "tinted
+   pill" treatment for a status chip, and reads better at this data density
+   than the plain-text +/- the movement column uses elsewhere. */
+.pr-your-ballot .pr-move { padding: 2px 6px; border-radius: 999px; font-size: 11px; }
+.pr-your-ballot .pr-move.up { background: color-mix(in oklch, var(--teal) 16%, transparent); }
+.pr-your-ballot .pr-move.down { background: color-mix(in oklch, var(--crimson) 16%, transparent); }
+.pr-your-ballot .pr-move.flat { background: color-mix(in oklch, var(--muted) 16%, transparent); }
+.pr-space-cell .spread-bar {
+  width: 100%;
+  /* "Playoff half" backdrop from the mockup's legend: the top half of the
+     axis tinted teal, the bottom half a warm amber -- the range/median/mine
+     markers draw on top of it. */
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--teal) 10%, var(--line)) 0%,
+    color-mix(in oklch, var(--teal) 10%, var(--line)) 50%,
+    color-mix(in oklch, oklch(75% 0.13 50) 10%, var(--line)) 50%,
+    color-mix(in oklch, oklch(75% 0.13 50) 10%, var(--line)) 100%
+  );
+}
+/* The viewer's own ballot position on the range bar -- a neutral ring, not
+   crimson: crimson is reserved for "this row is my team" (`.pr-row.mine`),
+   while this marker appears on every row (it is where I ranked THAT team). */
+.spread-bar-mine {
+  position: absolute; top: -2px; width: 16px; height: 16px; margin-left: -8px;
+  border-radius: 50%; border: 2px solid var(--text); background: transparent;
+}
+
+.pr-space-legend { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 12px 6px 0; margin-top: 4px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
+.pr-space-legend-item { display: flex; align-items: center; gap: 6px; }
+.pr-space-legend-swatch { display: inline-block; flex: none; }
+.pr-space-legend-swatch.range { width: 22px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, oklch(68% 0.14 180), oklch(66% 0.15 300)); }
+.pr-space-legend-swatch.median { width: 10px; height: 10px; border-radius: 50%; background: var(--teal); }
+.pr-space-legend-swatch.playoff { width: 20px; height: 9px; border-radius: 3px; background: color-mix(in oklch, var(--teal) 18%, transparent); }
+.pr-space-legend-swatch.mine { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--text); }
+
 .pr-foot { margin: 10px 6px 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
 .pr-how { margin: 6px 6px 0; padding-top: 8px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 
@@ -2069,6 +2125,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .pr-side { position: static; }
   .pr-row-head, .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 56px 110px minmax(120px, 1fr); }
   .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 110px minmax(120px, 1fr); }
+  .pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
+    grid-template-columns: 26px minmax(120px, 200px) 52px 50px 78px minmax(150px, 1fr) 84px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -2102,6 +2161,21 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .pr-list.no-reference .pr-row-head span:nth-child(3), .pr-list.no-reference .pr-row span:nth-child(3),
   .pr-list.no-reference .pr-row-head span:nth-child(5), .pr-list.no-reference .pr-row span:nth-child(5) { display: none; }
   .pr-playoff-pct { display: none; }
+
+  /* Ranking-space row at mobile: rank, team, your ballot, range bar. Record,
+     Avg and Agreement drop rather than truncate -- the range bar plus your
+     own ballot marker on it already carries the agreement story visually. */
+  .pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
+    grid-template-columns: 24px minmax(0, 1.6fr) 56px minmax(64px, 1fr);
+    gap: 0 8px;
+  }
+  .pr-list.member-space .pr-row-head span:nth-child(3), .pr-list.member-space .pr-row span:nth-child(3),
+  .pr-list.member-space .pr-row-head span:nth-child(4), .pr-list.member-space .pr-row span:nth-child(4),
+  .pr-list.member-space .pr-row-head span:nth-child(7), .pr-list.member-space .pr-row span:nth-child(7) { display: none; }
+  /* nth-child(6) is the range bar here, not the note column the base mobile
+     rule above means to hide -- undo that hide for member-space specifically. */
+  .pr-list.member-space .pr-row-head span:nth-child(6), .pr-list.member-space .pr-row span:nth-child(6) { display: flex; }
+  .pr-list.member-space .pr-space-head-ends { display: none; }
 
   .pr-ladder-head { flex-direction: column; align-items: stretch; }
   .pr-ladder-modes { margin-left: 0; }
