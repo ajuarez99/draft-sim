@@ -1,7 +1,9 @@
 # Propagating the home shell to the rest of the site
 
-**Status:** Phases 1 and 2 implemented 2026-09-14. Phases 3-5 still open.
-Written against `main` @ `1543c3d`.
+**Status:** DONE — all five phases implemented 2026-09-14, in four commits
+(`e9f2d70`, `b0ed7b2`, `6174958`, and this one). Written against `main` @
+`1543c3d`. The "How it actually landed" notes under each phase are the record
+of where the built thing differs from the plan, and why.
 
 **Supersedes the scoping decision in** `0c6f0ab` ("this is a Home-only layout swap,
 not a site-wide nav redesign") and the comments in `App.tsx:76-79`,
@@ -162,7 +164,7 @@ and the route defaults (`/mock/new` expanded, `/mock/4` collapsed). The board
 measures 865px visible with the icon rail against 736px with the full one at
 1024px — the 129px the §B argument was about. 191 frontend tests pass.
 
-### Phase 3 — League context in the rail
+### Phase 3 — League context in the rail — DONE
 
 This is where the redesign starts paying for itself on pages other than Home.
 
@@ -189,7 +191,7 @@ carries them, rather than having the same navigation in two places.
 
 `/managers/:id/history` gets the analogous manager context block.
 
-### Phase 4 — The page header pattern
+### Phase 4 — The page header pattern — DONE
 
 Home and Power rankings independently invented the same three-part header:
 
@@ -213,7 +215,7 @@ Home and Power rankings independently invented the same three-part header:
 | `/mock/new` | New mock | **Mock draft setup** | `MockSetup.tsx:133` |
 | `/drafts/:id/board` | *league · season* | **Draft board** | keeps "What actually happened" |
 
-### Phase 5 — Content shape, page by page
+### Phase 5 — Content shape, page by page — DONE
 
 The rail alone will not make `/managers` look like it belongs to the new home. It
 is currently a four-across grid of identically-shaped cards — precisely the failure
@@ -232,6 +234,51 @@ Second: `/managers` shows an NFL/NBA badge per card but has **no sport filter**,
 while the rail on Home has one that is doing nothing on this route. Wire the rail's
 existing Sports section to filter this page too — same component, same persisted
 key, one more page it applies to.
+
+### How Phases 3-5 actually landed
+
+- **League context is resolved from the path, manager context is portaled by
+  the page.** Six routes share two URL shapes, so the rail matches the path
+  itself (`railLeague.ts`, hand-written because the rail sits outside
+  `<Routes>` and `useParams` returns nothing there). A manager's name is not
+  in the URL and `ManagerHistory` has already fetched it, so that one portals
+  in. The rule that fell out: the rail resolves what the path can tell it; a
+  page hands over only what the page alone knows.
+- **Board-first routes deliberately got no page header.** Phase 4's table
+  listed one for `/drafts/:id/board`. An eyebrow, a 28px title and a sub cost
+  the board ~70px of height — the same trade §B refused when it gave draft
+  rooms a 56px rail instead of a 200px one. The panel head already names the
+  page and the rail already names the league. The code says so where the
+  header would have gone.
+- **Power rankings kept its scale.** `.page-title.hero` (38px) and
+  `.page-eyebrow.accent` are variants of the one vocabulary rather than a
+  second one: a story headline that changes with the week is a different thing
+  from a page title, and flattening it to 28px would erase a real distinction.
+- **The phone scroll model changed.** League context took the mobile bar to
+  252px of 812 — a third of the viewport, permanently. Below 860px the chrome
+  now scrolls away with the page, with `.board-scroll` given a 60vh floor
+  because it was the one thing relying on the pane's fixed height for its own.
+  The rail also never collapses below 860px: collapsed picks *content* (a "BK"
+  mark), not just layout, so a phone in a draft room was getting the
+  abbreviation in a bar with room for the whole name.
+- **Two bugs surfaced while testing the seeded "Mock it".** `StartMockModal`
+  derived its selection in a `useState` initializer, so opening it before
+  `/api/drafts` resolved settled on null and never recovered — which is
+  exactly what the rail's "Mock it" does, since it navigates and opens in the
+  same tick. The selection is derived per render now. And the seeded league
+  scrolls into view: the list scrolls at 220px, so a league below the fold
+  enabled "Start NFL mock" for something you could not see.
+- **`/managers` rows, and why it mattered more than taste.** The four-across
+  card grid was breaking the reach axis: the page's own code comment says its
+  question is comparative ("who is the biggest reacher in my league"), and
+  bars sitting in three or four different columns share no baseline, so the
+  one comparison the axis exists for could not be made with it. One column,
+  one scale. The no-reach explanation is clamped to two lines with the full
+  text on hover — every basketball manager gets a near-identical one, and
+  thirteen four-line paragraphs said the same thing thirteen times.
+- **The sport filter is shared, not duplicated.** `sportFilter.ts` holds the
+  hook and the one `bk-sport-filter` key, so the choice follows you between
+  Home and `/managers` instead of each page remembering its own.
 
 ---
 

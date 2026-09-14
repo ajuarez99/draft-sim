@@ -1,6 +1,4 @@
-import type { Sport } from '../api'
-
-export type SportFilter = 'all' | Sport
+import type { SportFilter } from '../sportFilter'
 
 type Props = {
   sportFilter: SportFilter

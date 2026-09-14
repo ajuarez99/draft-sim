@@ -1175,7 +1175,81 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    modal, reused as a grid of many. A neutral row (nothing entered, no
    history) is dimmed rather than dropped, so it still reads as "checked,
    nothing here" instead of the list looking incomplete. */
-.manager-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+/*
+ * MANAGER TENDENCIES -- rows, not a card grid
+ * This was `repeat(auto-fill, minmax(260px, 1fr))`: four identical cards
+ * across, each holding a name, a pill, one bar and two tilt pills. Two things
+ * were wrong with that. It is the shape DENSITY at the top of this file warns
+ * about -- a one-line record padded out into a card. And it broke the bar:
+ * the axis exists so the reader can rank the room at a glance, and bars in
+ * three or four different columns share no baseline, so the comparison the
+ * page is built around could not actually be made. One column, one scale.
+ */
+.mgr-list { display: flex; flex-direction: column; }
+
+.mgr-row {
+  border-top: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+.mgr-row:first-child { border-top: 0; }
+.mgr-row:hover { background: color-mix(in oklch, var(--teal) 5%, transparent); }
+
+/* Provenance as a left edge, the same vocabulary `.seat` used when these were
+   cards -- it reads down a list of rows better than it ever did across a
+   grid, because the marks line up. */
+.mgr-row.stated { box-shadow: inset 3px 0 0 var(--teal); }
+.mgr-row.fitted { box-shadow: inset 3px 0 0 var(--fitted); }
+.mgr-row.neutral-row { opacity: 0.72; }
+
+.mgr-row-main {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.3fr) minmax(190px, 1.6fr) minmax(120px, 0.9fr) auto;
+  align-items: center; gap: 16px; padding: 9px 12px;
+}
+
+.mgr-identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.mgr-identity-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mgr-identity .who { font-size: 13.5px; }
+.mgr-note {
+  font-size: 11px; font-style: italic; color: var(--text); opacity: 0.8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mgr-cmp { font-size: 10px; color: var(--muted); }
+.mgr-identity .sport-pill { flex-shrink: 0; margin-left: auto; }
+
+/* The meter cell owns the axis' own margins now that it is a grid cell rather
+   than a stacked block inside a card. */
+.mgr-meter { min-width: 0; }
+.mgr-meter .reach { margin: 0; }
+.mgr-meter p { margin: 0; }
+/* Two lines, not four: the leading clause is the part that differs between
+   managers, and the rest repeats verbatim down the whole basketball list. */
+.mgr-meter .reach-gap {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.35;
+}
+
+.mgr-tilt { margin: 0; min-width: 0; }
+.mgr-actions { display: flex; align-items: center; gap: 8px; justify-self: end; }
+
+/* The form spans the row, so it needs the row's own padding back. */
+.mgr-row .seat-form { padding: 0 12px 12px; }
+
+/* Four columns stop being four columns well before phone width -- the tilt
+   pills and the axis caption are the first things to run out of room. */
+@media (max-width: 1000px) {
+  .mgr-row-main { grid-template-columns: minmax(150px, 1fr) minmax(170px, 1.4fr) auto; }
+  .mgr-tilt { grid-column: 1 / -1; margin-top: -4px; }
+}
+@media (max-width: 640px) {
+  .mgr-row-main { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .mgr-meter { grid-column: 1 / -1; }
+  .mgr-tilt { grid-column: 1 / -1; margin-top: 0; }
+  /* Pinned to the name row. Left to flow, the two full-width cells above push
+     it onto a fourth row of its own, where a lone Edit button reads as if it
+     belongs to the row below. */
+  .mgr-actions { grid-row: 1; grid-column: 2; }
+}
 .seat.neutral-row { opacity: 0.65; }
 
 

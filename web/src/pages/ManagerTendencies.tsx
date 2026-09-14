@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { getManagers, type ManagerSummary, type Sport } from '../api'
 import { PROVENANCE_LABEL } from '../provenance'
 import { reachGapText } from '../managerBehaviour'
 import TendenciesForm from '../components/TendenciesForm'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
+import SportFilterRail from '../components/SportFilterRail'
+import { useRailContextSlot } from '../appSlots'
+import { useSportFilter } from '../sportFilter'
 
 /**
  * A manager profile is per (manager, sport) all the way down -- separate fits,
@@ -116,21 +120,76 @@ function ManagerRow({ m, onChanged }: RowProps) {
   const gap = reachGapText(m)
 
   return (
-    <div className={`seat ${label.className}${m.provenance === 'NEUTRAL' ? ' neutral-row' : ''}`}>
-      <div className="seat-head">
-        <Avatar avatarId={m.avatarId} seed={String(m.managerId)} label={m.manager} />
-        <span className="who">{m.manager}</span>
-        {/* Same pill as the picker's league cards, same reason: this is one
-            mixed list with no switcher, and two of these cards can carry the
-            same person's name because they are the same person in two
-            leagues. Without the pill they are indistinguishable. */}
-        <span className={`sport-pill ${m.sport}`}>{m.sport.toUpperCase()}</span>
-        <span className="seat-head-right">
-          {/* A dot, not the shouting badge this used to carry. 23 of the 24
-              cards on this page are FITTED, so a bright green "FROM HISTORY"
-              on every one of them marked nothing while outweighing the
-              manager's own name. Same dot vocabulary as the board's column
-              headers -- provenance.ts exists to keep those two in step. */}
+    <div className={`mgr-row ${label.className}${m.provenance === 'NEUTRAL' ? ' neutral-row' : ''}`}>
+      <div className="mgr-row-main">
+        <div className="mgr-identity">
+          <Avatar avatarId={m.avatarId} seed={String(m.managerId)} label={m.manager} />
+          <span className="mgr-identity-text">
+            <span className="who">{m.manager}</span>
+            {/* Note and comparison ride under the name rather than taking
+                columns of their own: both are optional and only a handful of
+                managers have either, so a column for them would be mostly
+                empty width taken from the meter, which every row has. */}
+            {m.note && (
+              // Truncated to one line in a 170px column, so the full note has to
+              // be reachable somehow -- it is the one field here a human typed.
+              <span className="mgr-note" title={m.note}>
+                “{m.note}”
+              </span>
+            )}
+            {cmp && <span className="mgr-cmp mono">{cmp}</span>}
+          </span>
+          {/* Same pill as the picker's league cards, same reason: this is one
+              mixed list, and two of these rows can carry the same person's
+              name because they are the same person in two leagues. Without
+              the pill they are indistinguishable. */}
+          <span className={`sport-pill ${m.sport}`}>{m.sport.toUpperCase()}</span>
+        </div>
+
+        <div className="mgr-meter">
+          {m.provenance === 'NEUTRAL' && m.draftsObserved === 0 ? (
+            <p className="muted small">Drafts like the room — nothing entered, no history yet.</p>
+          ) : (
+            /* The page's actual question is comparative -- "who is the
+               biggest reacher in my league" -- and every row draws on the
+               same fixed scale so the ranking is visible without reading any
+               of them. That only works if the scales line up, which is what
+               the four-across card grid this replaced was quietly breaking:
+               bars sitting in three or four different columns share no
+               baseline, so the one comparison the axis exists for could not
+               actually be made with it. See styles.css DENSITY -- rows for
+               lists, and re-judge the shape when the content changes.
+
+               A row with no reach number gets the reason in the bar's place,
+               not a bar at zero. */
+            <>
+              {hasReachNumber ? (
+                <ReachAxis reach={m.effectiveReachBias} />
+              ) : (
+                // Clamped, with the full sentence on hover. Every basketball
+                // manager gets one of these and they are near-identical, so
+                // thirteen four-line paragraphs down a list said the same
+                // thing thirteen times and buried the rows that had a number
+                // -- the same reason the provenance badge became a dot.
+                <p className="muted tiny reach-gap" title={gap ?? undefined}>
+                  {gap ?? 'No history and no stated value — there is no reach number to show.'}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Positional lean is fitted from every pick, so it survives the
+            absence of the board snapshot that kills reach -- its own column
+            rather than a line under a meter that may not be there. */}
+        <p className="small tilt-line mgr-tilt">{tiltParts(m)}</p>
+
+        <div className="mgr-actions">
+          {/* A dot, not the shouting badge this used to carry. Nearly every
+              row on this page is FITTED, so a bright green "FROM HISTORY" on
+              all of them marked nothing while outweighing the manager's own
+              name. Same dot vocabulary as the board's column headers --
+              provenance.ts exists to keep those two in step. */}
           {label.badge && (
             <span className={`prov-dot ${label.className}`} title={`Tendencies ${label.badge}`} />
           )}
@@ -141,10 +200,12 @@ function ManagerRow({ m, onChanged }: RowProps) {
           >
             {editing ? 'Cancel' : 'Edit'}
           </button>
-        </span>
+        </div>
       </div>
 
-      {editing ? (
+      {/* Full width under the row, not inside a cell: the form is several
+          fields wide and would otherwise have to fit the meter's column. */}
+      {editing && (
         <TendenciesForm
           managerId={m.managerId}
           sport={m.sport}
@@ -156,35 +217,6 @@ function ManagerRow({ m, onChanged }: RowProps) {
           }}
           onCancel={() => setEditing(false)}
         />
-      ) : (
-        <>
-          {m.provenance === 'NEUTRAL' && m.draftsObserved === 0 ? (
-            <p className="muted small">Drafts like the room — nothing entered, no history yet.</p>
-          ) : (
-            <>
-              {/* The page's actual question is comparative -- "who is the
-                  biggest reacher in my league" -- and it used to be answered
-                  by 24 sentences you had to read and hold in your head. Every
-                  card draws on the same fixed scale, so the ranking is
-                  visible without reading any of them.
-
-                  A card with no reach number gets the reason in its place,
-                  not a bar at zero. The tilt line still renders under it:
-                  positional lean is fitted from every pick, so it survives
-                  the absence of a board snapshot that kills reach. */}
-              {hasReachNumber ? (
-                <ReachAxis reach={m.effectiveReachBias} />
-              ) : (
-                <p className="muted tiny reach-gap">
-                  {gap ?? 'No history and no stated value — there is no reach number to show.'}
-                </p>
-              )}
-              <p className="small tilt-line">{tiltParts(m)}</p>
-            </>
-          )}
-          {m.note && <p className="note small">“{m.note}”</p>}
-          {cmp && <p className="tiny mono">{cmp}</p>}
-        </>
       )}
     </div>
   )
@@ -236,6 +268,12 @@ function rank(m: SportManager): number {
 export default function ManagerTendencies() {
   const [managers, setManagers] = useState<SportManager[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // The same filter Home uses, on the same key (sportFilter.ts). This page
+  // already printed a per-row NFL/NBA pill *because* the list is mixed, and
+  // had no way to narrow it -- while the rail carried a sport filter that did
+  // nothing here. claude/site-wide-shell-propagation.md Phase 5.
+  const [sportFilter, setSportFilter] = useSportFilter()
+  const rail = useRailContextSlot()
 
   function refetch() {
     Promise.all(
@@ -253,8 +291,24 @@ export default function ManagerTendencies() {
   // Configured seats first (real signal, worth reading), neutral ones after --
   // eleven identical "nothing entered" cards burying the three that matter is
   // exactly the noise provenance.ts already avoids on the board's own headers.
-  const visible = managers ? managers.filter(hasAnythingToSay) : null
-  const hidden = managers && visible ? managers.length - visible.length : 0
+  const withSomethingToSay = managers ? managers.filter(hasAnythingToSay) : null
+
+  // Counted before the filter, not after -- a count that changed to match
+  // whatever you had already selected would be useless for deciding what to
+  // select. Same rule as the league counts on Home.
+  const counts = {
+    all: withSomethingToSay?.length ?? 0,
+    nfl: withSomethingToSay?.filter((m) => m.sport === 'nfl').length ?? 0,
+    nba: withSomethingToSay?.filter((m) => m.sport === 'nba').length ?? 0,
+  }
+
+  const visible = withSomethingToSay
+    ? withSomethingToSay.filter((m) => sportFilter === 'all' || m.sport === sportFilter)
+    : null
+  // Still counted against the whole fetch, so this stays "profiles with
+  // nothing to say", not "profiles the sport filter also removed" -- those
+  // are different claims and the sentence below makes the first one.
+  const hidden = managers && withSomethingToSay ? managers.length - withSomethingToSay.length : 0
 
   const sorted = visible
     ? [...visible].sort((a, b) => {
@@ -275,6 +329,17 @@ export default function ManagerTendencies() {
 
   return (
     <div className="content">
+      {rail.node &&
+        createPortal(
+          <SportFilterRail
+            sportFilter={sportFilter}
+            onSportFilterChange={setSportFilter}
+            counts={counts}
+            collapsed={rail.collapsed}
+          />,
+          rail.node,
+        )}
+
       {/* The heading and this paragraph used to live inside the panel below,
           which made the page's own name read as a caption for its first box.
           claude/site-wide-shell-propagation.md Phase 4. */}
@@ -292,7 +357,13 @@ export default function ManagerTendencies() {
 
         {error && <div className="error">{error}</div>}
 
-        {sorted && sorted.length === 0 && <p className="muted">No managers ingested yet.</p>}
+        {sorted && sorted.length === 0 && (
+          <p className="muted">
+            {sportFilter === 'all'
+              ? 'No managers ingested yet.'
+              : `No ${sportFilter.toUpperCase()} managers with anything to show yet.`}
+          </p>
+        )}
 
         {hidden > 0 && (
           <p className="muted tiny">
@@ -303,7 +374,7 @@ export default function ManagerTendencies() {
         )}
 
         {sorted && sorted.length > 0 && (
-          <div className="manager-grid">
+          <div className="mgr-list">
             {sorted.map((m) => (
               <ManagerRow key={`${m.sport}-${m.managerId}`} m={m} onChanged={refetch} />
             ))}

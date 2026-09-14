@@ -6,7 +6,8 @@ import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { relativeTime } from '../relativeTime'
 import { SkeletonRows } from '../components/Skeleton'
-import SportFilterRail, { type SportFilter } from '../components/SportFilterRail'
+import SportFilterRail from '../components/SportFilterRail'
+import { useSportFilter, type SportFilter } from '../sportFilter'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
 import PageHeader from '../components/PageHeader'
 import { useRailContextSlot } from '../appSlots'
@@ -42,8 +43,6 @@ function setupStages(l: SleeperLeague) {
 }
 
 type SetupState = { stageIndex: number; failedLabel: string | null }
-
-const SPORT_FILTER_KEY = 'bk-sport-filter'
 
 // A complete draft has real picks to show (CompletedDraftBoard); anything
 // else -- pre_draft, drafting, or a null/unrecognized status -- has none yet,
@@ -101,22 +100,9 @@ export default function DraftPicker() {
   const [sleeperError, setSleeperError] = useState<string | null>(null)
   const [setupState, setSetupState] = useState<Record<string, SetupState>>({})
 
-  // Persisted so a refresh doesn't snap back to "All sports" mid-session.
-  const [sportFilter, setSportFilter] = useState<SportFilter>(() => {
-    try {
-      const saved = localStorage.getItem(SPORT_FILTER_KEY)
-      return saved === 'nfl' || saved === 'nba' ? saved : 'all'
-    } catch {
-      return 'all'
-    }
-  })
-  useEffect(() => {
-    try {
-      localStorage.setItem(SPORT_FILTER_KEY, sportFilter)
-    } catch {
-      // Private-mode/blocked storage: the filter still works for this visit.
-    }
-  }, [sportFilter])
+  // Shared with /managers, the other page that lists both sports at once --
+  // one key, so the choice follows you between them (sportFilter.ts).
+  const [sportFilter, setSportFilter] = useSportFilter()
 
   const [modalSeed, setModalSeed] = useState<{ sport: Sport; leagueId: string | null } | null>(null)
 
