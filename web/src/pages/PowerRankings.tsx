@@ -971,7 +971,7 @@ export default function PowerRankings() {
                         />
                         <span className="pr-team-text">
                           <span className="pr-team-name">
-                            {e.manager ?? `roster ${e.rosterId}`}
+                            <span className="pr-team-name-text">{e.manager ?? `roster ${e.rosterId}`}</span>
                             {isMe && <span className="cond pr-you-tag">You</span>}
                           </span>
                           <span className="pr-team-sub">
