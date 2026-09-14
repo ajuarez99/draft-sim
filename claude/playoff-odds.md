@@ -152,18 +152,17 @@ is now real:
 The League-vote ladder is at seven columns and was just cleaned up precisely
 because its right end was unreadable; an eighth column undoes that work.
 
-**Recommended:** odds ride in the **Record** cell, on all three tabs — `0-0`
-with a small tinted odds pill under it. Record and odds are both "how this
-team's season is going", neither is about the ranking mode, the column already
-exists on every tab, and it costs zero horizontal space. The standalone
-"Makes playoffs" column on Box score/Commissioner then goes away rather than
-being a second place the same number lives (the multi-sport lesson from
+**Decided (Allan, 2026-09-14):** odds ride in the **Record** cell, on all three
+tabs — `0-0` with a small tinted odds pill under it. Record and odds are both
+"how this team's season is going", neither is about the ranking mode, the column
+already exists on every tab, and it costs zero horizontal space. The standalone
+"Makes playoffs" column on Box score/Commissioner **goes away** rather than being
+a second place the same number lives (the multi-sport lesson from
 `claude/multi-sport-landmines.md`: two implementations of one rule is the class
 of bug to avoid, and two renderings of one number is the same shape).
 
-**Alternative:** keep the dedicated column on Box score/Commissioner, show
-nothing on League vote. Cheaper, but then the page's most-used tab is the one
-tab without the number.
+That frees a ~150px track on the Box score and Commissioner templates. It goes
+back to the note column ("Where the room had them"), which truncates today.
 
 Either way the hero stat and the your-team strip (`-- to make it`) light up for
 free — they already read the field.
@@ -200,10 +199,13 @@ odds path for NBA.
 6. Backend suite passes with Postgres actually up — `claude/lessons.md`: BUILD
    SUCCESSFUL with 52 skipped means the ITs never ran.
 
-## Open decisions for Allan
+## Decisions (Allan, 2026-09-14)
 
-1. **Record cell vs dedicated column** (recommendation above).
-2. **`k = 4`** for the shrinkage. Higher = odds move slower early; lower = week 2
-   already has opinions.
-3. **Division leagues:** dash them (recommended), or model them and accept that
-   the tiebreak is a guess?
+1. **Record cell, not a dedicated column** — and the standalone "Makes playoffs"
+   column comes out of Box score/Commissioner when this lands.
+2. **Division and non-default-seed leagues get `--`.** No snapshot is stored for
+   them at all, so there is never a stale wrong number to explain later.
+3. **`k = 4`** stands as the shrinkage default — it is one constant in one place
+   and the model tag (`shrunk-normal-v1`) exists so a retune is a new snapshot,
+   not a silent rewrite of history. Revisit once there is a real mid-season
+   league to look at.
