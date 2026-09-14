@@ -107,7 +107,7 @@ class MockDraftRepositoryIT {
                 Long.class, leagueId, "it-draft-mdr-source-draft", 2026, 15, 8, "snake", "drafting");
 
         long forkedId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
-                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr");
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr", null);
         try {
             MockDraftRepository.SessionRow row = mockDrafts.find(forkedId).orElseThrow();
             assertEquals(draftId, row.sourceDraftId());

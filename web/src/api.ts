@@ -527,6 +527,12 @@ export type MockSessionSummary = {
   userSlot: number
   currentPickNo: number
   createdAt: string
+  // The real league whose team count this mock borrowed via the home
+  // screen's "use settings from" step (V12) -- null for a mock started with
+  // no league in mind, same as every mock before this column existed. The
+  // mock draft room itself is still NFL-only (multi-sport-and-rebrand.md's
+  // Non-goals), so this is a display label, not a sport signal.
+  sourceLeagueName: string | null
 }
 
 export const getMockSessions = () => apiFetch('/api/mocks').then(json<MockSessionSummary[]>)
@@ -534,12 +540,18 @@ export const getMockSessions = () => apiFetch('/api/mocks').then(json<MockSessio
 // managerSeats seats a real manager's fitted/stated profile at a slot instead
 // of an unmodelled bot -- keyed by slot number, same shape MockDraftController
 // .CreateRequest expects. Any slot besides userSlot left out of it is still a
-// plain bot.
-export const createMockSession = (teams: number, userSlot: number, managerSeats?: Record<number, number>) =>
+// plain bot. sourceLeagueName is purely a display label for the mock-drafts
+// list (V12) -- omit it for a mock started with no league in mind.
+export const createMockSession = (
+  teams: number,
+  userSlot: number,
+  managerSeats?: Record<number, number>,
+  sourceLeagueName?: string,
+) =>
   apiFetch('/api/mocks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teams, userSlot, managerSeats: managerSeats ?? {} }),
+    body: JSON.stringify({ teams, userSlot, managerSeats: managerSeats ?? {}, sourceLeagueName: sourceLeagueName ?? null }),
   }).then(json<MockSessionState>)
 
 // Forks a real, drafting-status Sleeper draft into a new mock session seeded

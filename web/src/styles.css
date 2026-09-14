@@ -183,6 +183,11 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
   height: 100vh; max-width: none; margin: 0 auto; padding: 16px 20px;
   display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
 }
+/* The redesigned home screen (design_handoff_multisport_mock_drafts) supplies
+   its own edge-to-edge sidebar instead of sitting inside .app's padded
+   column -- App.tsx also suppresses .top on this route, so .home-shell is
+   .app's only child whenever it's showing. */
+.app:has(> .home-shell) { padding: 0; gap: 0; }
 
 .top {
   display: flex; align-items: center; justify-content: space-between; gap: 16px;
@@ -618,14 +623,22 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--teal); color: var(--teal); }
 
 .league-card-foot {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  /* nowrap, not wrap: flex-wrap's own line-breaking runs on items' natural
+     (unshrunk) width, so with `wrap` the live-status sentence's full length
+     decided whether Mock it fit *before* either one's flex-shrink ever got a
+     say -- which is what pushed Mock it onto its own line the moment the
+     grid went from two cards per row to three. `nowrap` forces genuine
+     shrinking: the live text (the only variable-length thing here) gives up
+     space to the two fixed-size actions instead of displacing them. */
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
   padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px;
 }
-.league-card-foot-spacer { flex: 1; min-width: 0; }
+.league-card-foot-spacer { flex: 1 1 auto; min-width: 0; }
 .league-card-status { color: var(--muted); }
 .league-card-live {
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--teal); text-decoration: none; font-weight: 600;
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .league-card-live:hover { text-decoration: underline; }
 .league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
@@ -639,7 +652,7 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .league-card-refresh {
   appearance: none; -webkit-appearance: none; border: 0; margin: 0; padding: 4px 8px;
   background: transparent; color: var(--muted); font: inherit; font-size: 11px;
-  border-radius: 8px; cursor: pointer; flex-shrink: 0;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
 .league-card-refresh:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
@@ -1536,6 +1549,152 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .home-hero-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .home-hero-cta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 
+/*
+ * ============================================================================
+ * HOME REDESIGN (design_handoff_multisport_mock_drafts, 2026-09-13)
+ * A sidebar + main-pane layout, scoped to "/" only -- App.tsx suppresses .top
+ * on this one route and this sidebar carries the wordmark/nav/account chrome
+ * instead. Colors and type reuse this file's own tokens/fonts rather than the
+ * handoff's Barlow palette, so the screen still reads as one app rather than
+ * a second design system bolted onto the front door.
+ * ============================================================================
+ */
+.home-shell { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
+
+.home-sidebar {
+  flex: 0 0 200px; display: flex; flex-direction: column; gap: 22px;
+  padding: 18px 14px; background: var(--panel); border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.home-wordmark {
+  font-size: 21px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.05;
+  padding: 0 6px;
+}
+.home-sidebar-section { display: flex; flex-direction: column; gap: 2px; }
+.home-sidebar-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); padding: 0 6px 6px;
+}
+.home-sport-row, .home-menu-row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
+  font-size: 14px; font: inherit; color: var(--muted); font-weight: 500;
+  background: none; border: 0; text-decoration: none; cursor: pointer; text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+.home-sport-row:hover, .home-menu-row:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
+.home-sport-row.on, .home-menu-row.on {
+  color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--line) 55%, transparent);
+}
+.home-sport-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+.home-sport-dot.on.all { background: var(--teal); }
+.home-sport-dot.on.nfl { background: var(--sport-nfl); }
+.home-sport-dot.on.nba { background: var(--sport-nba); }
+.home-sport-count {
+  margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.home-sport-row.on .home-sport-count { color: var(--text); }
+.home-sidebar-spacer { flex: 1 1 auto; min-height: 8px; }
+.home-account { display: flex; align-items: center; gap: 8px; padding: 8px 6px 4px; border-top: 1px solid var(--line); }
+.home-account-name {
+  font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.home-signout {
+  background: none; border: 0; font: inherit; cursor: pointer; text-align: left;
+  padding: 0 6px; font-size: 12.5px; color: var(--muted);
+}
+.home-signout:hover { color: var(--text); }
+
+.home-main { flex: 1 1 0; min-width: 0; overflow-y: auto; padding: 20px 24px 40px; gap: 16px; }
+
+.home-header {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.home-header-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
+.home-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.home-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
+.home-header-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+.home-header-sub strong { color: var(--text); font-weight: 700; }
+
+/* Rounded-square, not a circle -- a league's own crest reads as an app icon,
+   distinct from the circular per-manager avatars everywhere else. */
+.league-crest { border-radius: 10px; }
+
+.league-card-mockit {
+  appearance: none; -webkit-appearance: none; border: 1px solid var(--sport-nfl); margin: 0;
+  padding: 4px 10px; background: color-mix(in oklch, var(--sport-nfl) 12%, transparent);
+  color: var(--sport-nfl); font: inherit; font-size: 11px; font-weight: 600;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  transition: background 120ms ease;
+}
+.league-card-mockit:hover:not(:disabled) { background: color-mix(in oklch, var(--sport-nfl) 22%, transparent); }
+.league-card-mockit:disabled { opacity: 0.45; cursor: default; border-color: var(--line); color: var(--muted); background: none; }
+
+/* Mock drafts list: sport badge, identity, a progress bar, recency, one CTA --
+   design_handoff_multisport_mock_drafts's fix for every row looking identical. */
+.mock-row { gap: 14px; flex-wrap: wrap; }
+.mock-row-sport { flex-shrink: 0; margin-right: 0; }
+.mock-row-identity { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 180px; }
+.mock-row-progress { display: flex; flex-direction: column; gap: 3px; min-width: 120px; flex-shrink: 0; }
+.mock-row-progress-track { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.mock-row-progress-fill { display: block; height: 100%; border-radius: 999px; background: var(--sport-nfl); }
+.mock-row-progress-fill.complete { background: var(--muted); }
+.mock-row-time { flex-shrink: 0; min-width: 90px; text-align: right; }
+.mock-row-cta { flex-shrink: 0; }
+
+/* "Start a mock draft" modal -- reuses .modal-backdrop/.modal-card (the same
+   pattern SeatPopover and the power-rankings ballot modal already use). */
+.start-mock-modal { max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+.start-mock-kicker { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin: 0; }
+.start-mock-title { font-size: 24px; font-weight: 700; margin: 2px 0 0; }
+.start-mock-step { display: flex; flex-direction: column; gap: 8px; }
+.start-mock-step-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.start-mock-sport-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.start-mock-sport-chip {
+  position: relative; padding: 9px 18px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em; background: var(--bg); color: var(--muted); border: 1px solid var(--line); cursor: pointer;
+}
+.start-mock-sport-chip.nfl.on { color: var(--sport-nfl); background: color-mix(in oklch, var(--sport-nfl) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nfl) 45%, transparent); }
+.start-mock-sport-chip.nba.on { color: var(--sport-nba); background: color-mix(in oklch, var(--sport-nba) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nba) 45%, transparent); }
+.start-mock-sport-chip.disabled { cursor: not-allowed; opacity: 0.55; }
+.start-mock-soon {
+  margin-left: 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted); vertical-align: 1px;
+}
+.start-mock-league-list { display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; }
+.start-mock-league-option {
+  display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer;
+}
+.start-mock-league-option.selected { border-color: color-mix(in oklch, var(--teal) 45%, var(--line)); background: color-mix(in oklch, var(--teal) 8%, var(--bg)); }
+.start-mock-league-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.start-mock-league-radio {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; box-sizing: border-box;
+}
+.start-mock-league-option.selected .start-mock-league-radio {
+  border-color: var(--teal); background: var(--teal); box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--teal) 8%, var(--bg));
+}
+.start-mock-league-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.start-mock-league-name { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.start-mock-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.start-mock-cta:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Below the sidebar's own comfortable width, stack it above the content as a
+   horizontal bar instead of squeezing a 200px rail beside a narrow main pane. */
+@media (max-width: 860px) {
+  .home-shell { flex-direction: column; }
+  .home-sidebar {
+    flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+    border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible; gap: 10px 16px;
+  }
+  .home-wordmark { padding: 0; margin-right: auto; }
+  .home-sidebar-section { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .home-sidebar-label { display: none; }
+  .home-sidebar-spacer { display: none; }
+  .home-account { border-top: 0; padding: 0; }
+}
+
 /* SignIn's own hero: same shape as the picker's, but it's the whole page
    rather than one panel among several, so the form and its error need a
    little more air above them than home-hero-body's 4px inter-line gap. */
@@ -1984,8 +2143,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 .pr-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pr-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.pr-team-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pr-you-tag { margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--crimson); }
+/* A flex row, not the truncating box itself -- `.pr-you-tag` sits outside the
+   ellipsis so it never gets chopped into an unreadable "popsharky…" on a
+   narrow mobile column (measured: "popsharky" alone fits a 78px mobile team
+   column at 67px, but "popsharkyYou" as one nowrap string needs 90px and
+   used to truncate the tag away entirely on the viewer's own row). */
+.pr-team-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; }
+.pr-team-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .pr-record { font-size: 13px; }

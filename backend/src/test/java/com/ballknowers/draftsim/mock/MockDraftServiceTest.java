@@ -509,6 +509,7 @@ class MockDraftServiceTest {
         private final AtomicLong nextId = new AtomicLong(1);
         private final Map<Long, SessionRow> sessions = new HashMap<>();
         private final Map<Long, Optional<String>> owners = new HashMap<>();
+        private final Map<Long, String> sourceLeagueNames = new HashMap<>();
         private final Map<Long, List<PickRow>> picksBySession = new HashMap<>();
 
         FakeMockDraftRepository() {
@@ -517,20 +518,24 @@ class MockDraftServiceTest {
 
         // Only the widest overload is overridden here: MockDraftRepository's own
         // shorter createSession is a delegate to it (`this.createSession(..., null,
-        // null, ownerSleeperUserId)`), so overriding just this one covers both
-        // callers via ordinary virtual dispatch -- no need for a second override.
+        // null, ownerSleeperUserId, null)`), so overriding just this one covers
+        // every caller via ordinary virtual dispatch -- no need for a second
+        // override.
         //
-        // owners is kept alongside sessions rather than on SessionRow: the real
-        // row type doesn't carry the owner either (nothing that reads a session
-        // needs it), and ownerOf is its own query there for the same reason.
+        // owners/sourceLeagueNames are kept alongside sessions rather than on
+        // SessionRow: the real row type doesn't carry either (nothing that reads
+        // a session needs them), and ownerOf is its own query there for the same
+        // reason.
         @Override
         public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
                                   String seatsJson, int userSlot, long rngSeed,
-                                  Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId) {
+                                  Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId,
+                                  String sourceLeagueName) {
             long id = nextId.getAndIncrement();
             sessions.put(id, new SessionRow(id, "IN_PROGRESS", teams, rounds, rosterPositions, ppr,
                     seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo));
             owners.put(id, Optional.ofNullable(ownerSleeperUserId));
+            sourceLeagueNames.put(id, sourceLeagueName);
             picksBySession.put(id, new ArrayList<>());
             return id;
         }
@@ -577,7 +582,7 @@ class MockDraftServiceTest {
                         return owner.map(sleeperUserId::equals).orElse(true);
                     })
                     .map(r -> new SessionSummary(r.id(), r.status(), r.teams(), r.rounds(), r.userSlot(),
-                            r.currentPickNo(), Instant.now()))
+                            r.currentPickNo(), Instant.now(), sourceLeagueNames.get(r.id())))
                     .toList();
         }
     }

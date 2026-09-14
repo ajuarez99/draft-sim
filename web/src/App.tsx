@@ -64,8 +64,15 @@ export default function App() {
     navigate('/', { replace: true })
   }
 
+  // The redesigned home screen (design_handoff_multisport_mock_drafts) has its
+  // own sidebar wordmark, nav and account footer -- rendering this header on
+  // top of it would duplicate every one of those. Every other route is
+  // unchanged: this is a Home-only layout swap, not a site-wide nav redesign.
+  const isHome = !!user && location.pathname === '/'
+
   return (
     <div className="app">
+      {!isHome && (
       <header className="top">
         <div className="top-left">
           <h1>
@@ -121,6 +128,7 @@ export default function App() {
           )}
         </div>
       </header>
+      )}
 
       <TopSlotContext.Provider value={topSlot}>
         {user ? (

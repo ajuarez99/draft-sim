@@ -34,7 +34,7 @@ public class MockDraftRepository {
     public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
                               String seatsJson, int userSlot, long rngSeed, String ownerSleeperUserId) {
         return createSession(teams, rounds, rosterPositions, ppr, seatsJson, userSlot, rngSeed,
-                null, null, ownerSleeperUserId);
+                null, null, ownerSleeperUserId, null);
     }
 
     /**
@@ -48,17 +48,25 @@ public class MockDraftRepository {
      *                       session (V8), or null when the caller sent no
      *                       header -- an unowned session, visible to everyone,
      *                       exactly as every session behaved before V8.
+     * @param sourceLeagueName the real league whose team count/settings this
+     *                       from-scratch mock borrowed (the redesigned home
+     *                       screen's "use settings from" step, V12), or null
+     *                       when the mock wasn't started from a specific
+     *                       league. Distinct from sourceDraftId: that is a fork
+     *                       of an actual draft's picks, this is only a
+     *                       display label copied at creation time.
      */
     public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
                               String seatsJson, int userSlot, long rngSeed,
-                              Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId) {
+                              Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId,
+                              String sourceLeagueName) {
         return jdbc.execute((java.sql.Connection con) -> {
             Array slots = con.createArrayOf("text", rosterPositions.toArray());
             var ps = con.prepareStatement("""
                     insert into mock_draft_session
                         (teams, rounds, roster_positions, points_per_reception, seats_json, user_slot, rng_seed,
-                         source_draft_id, forked_at_pick_no, owner_sleeper_user_id)
-                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?)
+                         source_draft_id, forked_at_pick_no, owner_sleeper_user_id, source_league_name)
+                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?)
                     returning id
                     """);
             ps.setInt(1, teams);
@@ -72,6 +80,8 @@ public class MockDraftRepository {
             if (forkedAtPickNo == null) ps.setNull(9, Types.INTEGER); else ps.setInt(9, forkedAtPickNo);
             if (ownerSleeperUserId == null || ownerSleeperUserId.isBlank()) ps.setNull(10, Types.VARCHAR);
             else ps.setString(10, ownerSleeperUserId);
+            if (sourceLeagueName == null || sourceLeagueName.isBlank()) ps.setNull(11, Types.VARCHAR);
+            else ps.setString(11, sourceLeagueName);
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
             }
@@ -176,7 +186,7 @@ public class MockDraftRepository {
     }
 
     public record SessionSummary(long id, String status, int teams, int rounds, int userSlot,
-                                 int currentPickNo, java.time.Instant createdAt) {}
+                                 int currentPickNo, java.time.Instant createdAt, String sourceLeagueName) {}
 
     /**
      * Mock sessions visible to one caller, newest first. Backs the picker
@@ -191,14 +201,14 @@ public class MockDraftRepository {
     public List<SessionSummary> allSessionsFor(String sleeperUserId) {
         if (sleeperUserId == null || sleeperUserId.isBlank()) {
             return db.sql("""
-                    select id, status, teams, rounds, user_slot, current_pick_no, created_at
+                    select id, status, teams, rounds, user_slot, current_pick_no, created_at, source_league_name
                     from mock_draft_session order by created_at desc
                     """)
                     .query(MockDraftRepository::mapSummary)
                     .list();
         }
         return db.sql("""
-                select id, status, teams, rounds, user_slot, current_pick_no, created_at
+                select id, status, teams, rounds, user_slot, current_pick_no, created_at, source_league_name
                 from mock_draft_session
                 where owner_sleeper_user_id = ? or owner_sleeper_user_id is null
                 order by created_at desc
@@ -210,7 +220,7 @@ public class MockDraftRepository {
 
     private static SessionSummary mapSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new SessionSummary(rs.getLong(1), rs.getString(2), rs.getInt(3),
-                rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getTimestamp(7).toInstant());
+                rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getTimestamp(7).toInstant(), rs.getString(8));
     }
 
     /**

@@ -76,9 +76,20 @@ public class MockDraftService {
      *                      sent no header -- then the session is unowned and
      *                      visible to everyone, as all sessions were before.
      */
-    @Transactional
     public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats,
                                           String sleeperUserId) {
+        return createSession(teams, userSlot, managerSeats, sleeperUserId, null);
+    }
+
+    /**
+     * @param sourceLeagueName the real league whose team count the redesigned
+     *                      home screen's "use settings from" step borrowed
+     *                      (V12), purely a display label -- null for a mock
+     *                      started with no league in mind, same as before.
+     */
+    @Transactional
+    public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats,
+                                          String sleeperUserId, String sourceLeagueName) {
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(teams)) {
             throw new IllegalArgumentException(
                     "teams must be one of " + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
@@ -121,7 +132,8 @@ public class MockDraftService {
 
         long rngSeed = System.nanoTime();
         long id = mockDrafts.createSession(teams, shape.rounds(), shape.rosterPositions(),
-                shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed, sleeperUserId);
+                shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed,
+                null, null, sleeperUserId, sourceLeagueName);
 
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
@@ -236,7 +248,7 @@ public class MockDraftService {
         while (forkedAtPickNo <= ctx.totalPicks() && completed.containsKey(forkedAtPickNo)) forkedAtPickNo++;
         long id = mockDrafts.createSession(settings.teams(), settings.rounds(), settings.rosterPositions(),
                 settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed, draft.id(), forkedAtPickNo,
-                sleeperUserId);
+                sleeperUserId, league.name());
 
         List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
         for (Map.Entry<Integer, Long> e : completed.entrySet()) {

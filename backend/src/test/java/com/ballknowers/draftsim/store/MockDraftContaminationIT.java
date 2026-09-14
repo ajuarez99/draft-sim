@@ -126,7 +126,7 @@ class MockDraftContaminationIT {
     void aForkedSessionsLivePicksNeverLeakIntoAllCompletedPicksEither() {
         long forkedSessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
                 "[{\"slot\":3,\"type\":\"MANAGER\",\"managerId\":" + managerId + "}]", 1, 100L,
-                realDraftId, 2, null);
+                realDraftId, 2, null, null);
         mockDrafts.insertPicks(forkedSessionId, List.of(
                 new MockDraftRepository.PickRow(forkedSessionId, 3, 1, 3, "MANAGER", managerId, playerId, "LIVE")));
         try {

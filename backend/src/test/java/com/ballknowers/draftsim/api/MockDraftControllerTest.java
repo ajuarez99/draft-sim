@@ -37,9 +37,9 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesTeamsAndUserSlotToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(), null)).thenReturn(sampleState(1));
+        when(mocks.createSession(8, 3, Map.of(), null, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of()), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(), null), null);
 
         assertEquals(1, result.id());
     }
@@ -47,16 +47,27 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesManagerSeatsToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(5, 42L), null)).thenReturn(sampleState(1));
+        when(mocks.createSession(8, 3, Map.of(5, 42L), null, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L)), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L), null), null);
+
+        assertEquals(1, result.id());
+    }
+
+    @Test
+    void createDelegatesSourceLeagueNameToTheService() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSession(8, 3, Map.of(), null, "Ball Knowers")).thenReturn(sampleState(1));
+
+        MockSessionState result = controller.create(
+                new MockDraftController.CreateRequest(8, 3, Map.of(), "Ball Knowers"), null);
 
         assertEquals(1, result.id());
     }
 
     @Test
     void createRequestTreatsNullManagerSeatsAsEmpty() {
-        assertEquals(Map.of(), new MockDraftController.CreateRequest(8, 3, null).managerSeats());
+        assertEquals(Map.of(), new MockDraftController.CreateRequest(8, 3, null, null).managerSeats());
     }
 
     @Test
@@ -148,7 +159,7 @@ class MockDraftControllerTest {
     @Test
     void listDelegatesToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        var summary = new MockDraftRepository.SessionSummary(1, "IN_PROGRESS", 8, 15, 1, 1, null);
+        var summary = new MockDraftRepository.SessionSummary(1, "IN_PROGRESS", 8, 15, 1, 1, null, null);
         when(mocks.listSessions(null)).thenReturn(List.of(summary));
 
         assertEquals(List.of(summary), controller.list(null));

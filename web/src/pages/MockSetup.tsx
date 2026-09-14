@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { createMockSession, getManagers, type ManagerSummary } from '../api'
 import { hueFor } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
@@ -33,9 +33,20 @@ function provenanceHint(p: ManagerSummary['provenance']) {
  * on every other seat to hand it to a real manager, and the CTA at the
  * bottom next to a one-line summary of what you're about to start.
  */
+// What StartMockModal hands off in router state after its own sport/league
+// choice -- optional, so a direct visit to /mock/new (still linked from a
+// couple of places) keeps its old plain defaults.
+type StartMockHandoff = { teams?: number; sourceLeagueName?: string }
+
 export default function MockSetup() {
   const navigate = useNavigate()
-  const [teams, setTeams] = useState<(typeof TEAM_SIZES)[number]>(10)
+  const location = useLocation()
+  const handoff = (location.state as StartMockHandoff | null) ?? null
+  const initialTeams =
+    handoff?.teams && (TEAM_SIZES as readonly number[]).includes(handoff.teams)
+      ? (handoff.teams as (typeof TEAM_SIZES)[number])
+      : 10
+  const [teams, setTeams] = useState<(typeof TEAM_SIZES)[number]>(initialTeams)
   const [userSlot, setUserSlot] = useState(1)
   const [managers, setManagers] = useState<ManagerSummary[] | null>(null)
   const [managerSeats, setManagerSeats] = useState<Record<number, number>>({})
@@ -91,7 +102,9 @@ export default function MockSetup() {
     setCreating(true)
     setError(null)
     try {
-      const session = await createMockSession(teams, userSlot, managerSeats)
+      const session = handoff?.sourceLeagueName
+        ? await createMockSession(teams, userSlot, managerSeats, handoff.sourceLeagueName)
+        : await createMockSession(teams, userSlot, managerSeats)
       navigate(`/mock/${session.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -110,6 +123,11 @@ export default function MockSetup() {
     <div className="content">
       <section className="panel add-draft">
         <h2>New mock draft</h2>
+        {handoff?.sourceLeagueName && (
+          <p className="muted small">
+            Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams.
+          </p>
+        )}
         <p className="muted small">
           Bots fill every seat but yours and auto-pick down the snake order. You take your own
           picks on your turn. Assign a real manager to a seat to see their tendencies play out
