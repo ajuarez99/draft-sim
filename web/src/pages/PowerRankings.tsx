@@ -738,7 +738,7 @@ export default function PowerRankings() {
           hand-rolled back link in the app, and keeping it would mean the same
           navigation in two places, which is how the two drift apart. */}
       <div className="pr-eyebrow-row">
-        <span className="pr-eyebrow">
+        <span className="page-eyebrow accent">
           {weekTitle(heroWeek)} · {leagueName ?? 'League'} · {teamCount} teams
         </span>
       </div>
@@ -746,8 +746,8 @@ export default function PowerRankings() {
       {/* ---- hero: headline + deck + #1 card ---- */}
       <div className="pr-hero">
         <div className="pr-hero-copy">
-          <h1 className="pr-headline cond">{headline}</h1>
-          <p className="pr-deck">{deck}</p>
+          <h1 className="page-title hero cond">{headline}</h1>
+          <p className="page-sub wide">{deck}</p>
           {ballot && (
             <div className="pr-hero-pills">
               <span className="chip on">

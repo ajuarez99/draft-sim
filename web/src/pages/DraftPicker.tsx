@@ -8,6 +8,7 @@ import { relativeTime } from '../relativeTime'
 import { SkeletonRows } from '../components/Skeleton'
 import SportFilterRail, { type SportFilter } from '../components/SportFilterRail'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
+import PageHeader from '../components/PageHeader'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
 import {
@@ -308,28 +309,28 @@ export default function DraftPicker() {
         )}
 
       <div className="content home-content">
-        <header className="home-header">
-          <div className="home-header-text">
-            <p className="home-eyebrow">Viewing</p>
-            <h1 className="home-title cond">{sportTitle(sportFilter)}</h1>
-            <p className="home-header-sub">
-              {drafts == null ? (
-                'Bots fill every seat but yours, and you take your own picks on your turn.'
-              ) : recentLeague ? (
-                <>
-                  <strong>{recentLeague.leagueName}</strong> is a {recentLeague.teams}-team,{' '}
-                  {recentLeague.rounds}-round league — get more reps before its next draft, in a
-                  room only you control.
-                </>
-              ) : (
-                'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
-              )}
-            </p>
-          </div>
-          <button type="button" className="home-hero-cta" onClick={() => openMockModal()}>
-            Start a mock draft
-          </button>
-        </header>
+        <PageHeader
+          eyebrow="Viewing"
+          title={sportTitle(sportFilter)}
+          sub={
+            drafts == null ? (
+              'Bots fill every seat but yours, and you take your own picks on your turn.'
+            ) : recentLeague ? (
+              <>
+                <strong>{recentLeague.leagueName}</strong> is a {recentLeague.teams}-team,{' '}
+                {recentLeague.rounds}-round league — get more reps before its next draft, in a
+                room only you control.
+              </>
+            ) : (
+              'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
+            )
+          }
+          actions={
+            <button type="button" className="home-hero-cta" onClick={() => openMockModal()}>
+              Start a mock draft
+            </button>
+          }
+        />
 
         <section className="panel">
           <div className="panel-head">

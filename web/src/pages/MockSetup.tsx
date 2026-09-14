@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import PageHeader from '../components/PageHeader'
 import { createMockSession, getManagers, type ManagerSummary } from '../api'
 import { hueFor } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
@@ -121,18 +122,23 @@ export default function MockSetup() {
 
   return (
     <div className="content">
+      <PageHeader
+        eyebrow="New mock"
+        title="Mock draft setup"
+        sub={
+          handoff?.sourceLeagueName ? (
+            <>
+              Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams. Bots
+              fill every seat but yours and auto-pick down the snake order; assign a real manager
+              to a seat to see their tendencies play out instead of a league-average bot.
+            </>
+          ) : (
+            'Bots fill every seat but yours and auto-pick down the snake order. You take your own picks on your turn. Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
+          )
+        }
+      />
+
       <section className="panel add-draft">
-        <h2>New mock draft</h2>
-        {handoff?.sourceLeagueName && (
-          <p className="muted small">
-            Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams.
-          </p>
-        )}
-        <p className="muted small">
-          Bots fill every seat but yours and auto-pick down the snake order. You take your own
-          picks on your turn. Assign a real manager to a seat to see their tendencies play out
-          instead of a league-average bot.
-        </p>
 
         {error && <div className="error">{error}</div>}
 

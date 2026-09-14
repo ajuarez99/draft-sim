@@ -4,6 +4,7 @@ import { PROVENANCE_LABEL } from '../provenance'
 import { reachGapText } from '../managerBehaviour'
 import TendenciesForm from '../components/TendenciesForm'
 import Avatar from '../components/Avatar'
+import PageHeader from '../components/PageHeader'
 
 /**
  * A manager profile is per (manager, sport) all the way down -- separate fits,
@@ -274,14 +275,17 @@ export default function ManagerTendencies() {
 
   return (
     <div className="content">
+      {/* The heading and this paragraph used to live inside the panel below,
+          which made the page's own name read as a caption for its first box.
+          claude/site-wide-shell-propagation.md Phase 4. */}
+      <PageHeader
+        eyebrow="Across your leagues"
+        title="Manager tendencies"
+        sub="What a manager's own draft history says, fitted by the engine — reach bias and unpredictability aren't something you type in, only something you can watch. A note is a reminder for yourself; it never changes how a mock or live sim drafts."
+      />
+
       <section className="panel">
-        <div className="panel-head">
-          <h2>Manager tendencies</h2>
-        </div>
         <p className="muted small">
-          What a manager's own draft history says, fitted by the engine -- reach bias and
-          unpredictability aren't something you type in, only something you can watch. Add a
-          note as a reminder for yourself; it never changes how a mock or live sim drafts.
           Football and basketball are fitted separately and listed together; the same person
           appears once per sport.
         </p>

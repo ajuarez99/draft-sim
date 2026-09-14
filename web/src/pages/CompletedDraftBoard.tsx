@@ -67,6 +67,14 @@ export default function CompletedDraftBoard() {
 
   return (
     <div className="content">
+      {/* No `PageHeader` here, deliberately -- claude/site-wide-shell-
+          propagation.md Phase 4 applies to content-shaped pages, and this is
+          board-first: `.board-panel` is `flex: 1 1 0` and the grid takes the
+          whole pane. An eyebrow, a 28px title and a sub would cost the board
+          about 70px of height, which is the same trade §B already refused
+          when it gave draft rooms a 56px rail instead of a 200px one. The
+          panel head names the page, and the rail names the league. Same
+          reasoning in DraftView, LiveDraftView and MockDraftView. */}
       <div className="board-panel">
         <section className="panel">
           <div className="panel-head">

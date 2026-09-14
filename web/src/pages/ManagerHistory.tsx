@@ -5,6 +5,7 @@ import { getManagerHistory, type ManagerHistory as ManagerHistoryData } from '..
 import { reachGapText } from '../managerBehaviour'
 import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
+import PageHeader from '../components/PageHeader'
 
 /**
  * claude/league-suite.md Phase A: one manager's record across every ingested
@@ -85,18 +86,25 @@ export default function ManagerHistory() {
         )}
 
       <div className="content">
-      <section className="panel">
-        <div className="panel-head">
-          <h2>
-            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} />{' '}
-            {name}
-          </h2>
-        </div>
-        <p className="small">
-          {totalWins}-{totalLosses} across {data.seasons.length} season{data.seasons.length === 1 ? '' : 's'}
-          {championships > 0 && ` · ${championships} title${championships === 1 ? '' : 's'}`}
-        </p>
+      <PageHeader
+        eyebrow="Manager"
+        title={
+          <span className="page-title-avatar">
+            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} /> {name}
+          </span>
+        }
+        sub={
+          <>
+            {totalWins}-{totalLosses} across {data.seasons.length} season
+            {data.seasons.length === 1 ? '' : 's'}
+            {championships > 0 && ` · ${championships} title${championships === 1 ? '' : 's'}`}
+          </>
+        }
+      />
 
+      <section className="panel">
+        {/* The career line that used to open this panel is the page header's
+            sub now -- it describes the manager, not the standings table. */}
         <div className="table-wrap">
           <table className="standings">
             <thead>

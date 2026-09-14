@@ -1721,14 +1721,37 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .app-main-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .app-main-head:empty { display: none; }
 
-.home-header {
+/*
+ * THE PAGE HEADER (components/PageHeader.tsx)
+ * Home and Power rankings each grew this same eyebrow/title/sub shape under
+ * their own class names, and every other page had no page title at all -- a
+ * `.panel h2` inside the first box was standing in for one. One definition
+ * now, with two scales: the default is a page title, `.hero` is Power
+ * rankings' editorial headline. See PageHeader.tsx for why that variant
+ * exists rather than one flattened size.
+ */
+.page-head {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
 }
-.home-header-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
-.home-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0; }
-.home-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
-.home-header-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
-.home-header-sub strong { color: var(--text); font-weight: 700; }
+.page-head-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
+.page-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+/* Power rankings' eyebrow names the week and the league rather than the
+   section, and carries the accent that marks this page as the live one. */
+.page-eyebrow.accent {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.1em; color: var(--teal);
+}
+.page-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
+.page-title.hero {
+  font-size: 38px; line-height: 1.02; letter-spacing: 0; margin: 10px 0 8px;
+  max-width: 20ch; text-wrap: balance; color: var(--text);
+}
+.page-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+.page-sub strong { color: var(--text); font-weight: 700; }
+.page-sub.wide { max-width: 58ch; font-size: 13.5px; }
+/* A manager's page is titled with their face as well as their name -- the
+   avatar is how this app says "which manager" on every other screen. */
+.page-title-avatar { display: inline-flex; align-items: center; gap: 9px; }
 
 /* Rounded-square, not a circle -- a league's own crest reads as an app icon,
    distinct from the circular per-manager avatars everywhere else. */
@@ -2201,20 +2224,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-page { gap: 14px; }
 
 .pr-eyebrow-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pr-eyebrow {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; color: var(--teal);
-}
+/* `.pr-eyebrow`/`.pr-headline`/`.pr-deck` are gone -- they were a second
+   spelling of the page-header type above, and this page now uses
+   `.page-eyebrow.accent`, `.page-title.hero` and `.page-sub.wide`. Only the
+   layout that is genuinely this page's own (the hero row, the Number-one
+   card beside it) is still defined here. */
 
 /* --- hero: headline + #1 card --- */
 
 .pr-hero { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
 .pr-hero-copy { flex: 1 1 360px; min-width: 0; }
-.pr-headline {
-  margin: 10px 0 8px; font-size: 38px; font-weight: 700; line-height: 1.02;
-  max-width: 20ch; text-wrap: balance; color: var(--text);
-}
-.pr-deck { margin: 0; max-width: 58ch; font-size: 13.5px; color: var(--muted); }
+
 .pr-hero-pills { display: flex; gap: 8px; margin-top: 14px; }
 
 .pr-number-one { flex: none; width: 292px; padding: 16px 18px; }
@@ -2518,7 +2538,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 
 @media (max-width: 720px) {
-  .pr-headline { font-size: 25px; line-height: 1.05; max-width: none; }
+  .page-title.hero { font-size: 25px; line-height: 1.05; max-width: none; }
   /* `flex: 1 1 360px` on `.pr-hero-copy` sets a preferred HEIGHT once the
      container's main axis turns vertical here, not a width floor -- without
      resetting it, the copy block claims 360px of height it doesn't need and

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import PageHeader from '../components/PageHeader'
 import {
   getLeagueHistory,
   ingestLeagueHistory,
@@ -91,19 +92,16 @@ export default function LeagueHistory() {
 
   return (
     <div className="content">
+      {/* Was a `.panel h2` with the explainer stuffed under it, and a
+          `Power rankings →` chip beside it -- the chip moved to the rail
+          (Phase 3) and the title out of the box (Phase 4). */}
+      <PageHeader
+        eyebrow="League"
+        title={history?.seasons[0]?.name ?? 'League history'}
+        sub="Standings as Sleeper reports them — wins, losses, points, the champion. What this app thinks about a draft (reach, value) lives on a manager's own history page, kept visually separate from what actually happened."
+      />
+
       <section className="panel">
-        {/* The `Power rankings →` chip that used to sit beside this heading is
-            gone -- the rail carries it now, on this route and every other
-            league-scoped one (claude/site-wide-shell-propagation.md Phase 3).
-            Same navigation in one place instead of two. */}
-        <div className="panel-head">
-          <h2>{history?.seasons[0]?.name ?? 'League history'}</h2>
-        </div>
-        <p className="muted small">
-          Standings as Sleeper reports them -- wins, losses, points, the champion. What this app
-          thinks about a draft (reach, value) lives on a manager's own history page, kept visually
-          separate from what actually happened.
-        </p>
 
         {/* This used to print `POST /api/ingest/league-history/{id}` for the
             reader to run themselves. Step 3 of the design review removed
