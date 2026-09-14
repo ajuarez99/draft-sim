@@ -623,14 +623,22 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--teal); color: var(--teal); }
 
 .league-card-foot {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  /* nowrap, not wrap: flex-wrap's own line-breaking runs on items' natural
+     (unshrunk) width, so with `wrap` the live-status sentence's full length
+     decided whether Mock it fit *before* either one's flex-shrink ever got a
+     say -- which is what pushed Mock it onto its own line the moment the
+     grid went from two cards per row to three. `nowrap` forces genuine
+     shrinking: the live text (the only variable-length thing here) gives up
+     space to the two fixed-size actions instead of displacing them. */
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
   padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px;
 }
-.league-card-foot-spacer { flex: 1; min-width: 0; }
+.league-card-foot-spacer { flex: 1 1 auto; min-width: 0; }
 .league-card-status { color: var(--muted); }
 .league-card-live {
   display: inline-flex; align-items: center; gap: 6px;
   color: var(--teal); text-decoration: none; font-weight: 600;
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .league-card-live:hover { text-decoration: underline; }
 .league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
@@ -644,7 +652,7 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .league-card-refresh {
   appearance: none; -webkit-appearance: none; border: 0; margin: 0; padding: 4px 8px;
   background: transparent; color: var(--muted); font: inherit; font-size: 11px;
-  border-radius: 8px; cursor: pointer; flex-shrink: 0;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
 .league-card-refresh:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
@@ -2135,8 +2143,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 .pr-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pr-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.pr-team-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pr-you-tag { margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--crimson); }
+/* A flex row, not the truncating box itself -- `.pr-you-tag` sits outside the
+   ellipsis so it never gets chopped into an unreadable "popsharky…" on a
+   narrow mobile column (measured: "popsharky" alone fits a 78px mobile team
+   column at 67px, but "popsharkyYou" as one nowrap string needs 90px and
+   used to truncate the tag away entirely on the viewer's own row). */
+.pr-team-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; }
+.pr-team-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .pr-record { font-size: 13px; }
