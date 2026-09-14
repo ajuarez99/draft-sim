@@ -92,13 +92,12 @@ export default function LeagueHistory() {
   return (
     <div className="content">
       <section className="panel">
+        {/* The `Power rankings →` chip that used to sit beside this heading is
+            gone -- the rail carries it now, on this route and every other
+            league-scoped one (claude/site-wide-shell-propagation.md Phase 3).
+            Same navigation in one place instead of two. */}
         <div className="panel-head">
           <h2>{history?.seasons[0]?.name ?? 'League history'}</h2>
-          {sleeperLeagueId && (
-            <Link className="chip" to={`/leagues/${sleeperLeagueId}/power`}>
-              Power rankings →
-            </Link>
-          )}
         </div>
         <p className="muted small">
           Standings as Sleeper reports them -- wins, losses, points, the champion. What this app

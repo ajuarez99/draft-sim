@@ -731,15 +731,16 @@ export default function PowerRankings() {
       {error && <div className="error">{error}</div>}
 
       {/* ---- eyebrow ---- */}
+      {/* The `← League history` chip that used to sit here is gone: the rail
+          now carries this league's whole menu (History, Power rankings, the
+          draft board, Mock it) on every league-scoped route --
+          claude/site-wide-shell-propagation.md Phase 3. It was the only
+          hand-rolled back link in the app, and keeping it would mean the same
+          navigation in two places, which is how the two drift apart. */}
       <div className="pr-eyebrow-row">
         <span className="pr-eyebrow">
           {weekTitle(heroWeek)} · {leagueName ?? 'League'} · {teamCount} teams
         </span>
-        {sleeperLeagueId && (
-          <Link className="chip" to={`/leagues/${sleeperLeagueId}/history`}>
-            ← League history
-          </Link>
-        )}
       </div>
 
       {/* ---- hero: headline + deck + #1 card ---- */}

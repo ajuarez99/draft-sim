@@ -1632,6 +1632,44 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .app-signout-glyph { display: none; }
 
 /*
+ * LEAGUE CONTEXT IN THE RAIL
+ * The home league card's menu -- draft, history, power rankings, mock -- used
+ * to vanish the moment you used it. It lives here now on every league-scoped
+ * route (claude/site-wide-shell-propagation.md Phase 3), which is also what
+ * finally gives the draft board and the mock room a way back that isn't the
+ * browser's Back button.
+ */
+.app-rail-league { gap: 2px; }
+
+.rail-league-id {
+  display: flex; align-items: center; gap: 9px; padding: 4px 6px 8px;
+  text-decoration: none; color: inherit; border-radius: 9px; min-width: 0;
+}
+.rail-league-id:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.rail-league-crest { width: 26px; height: 26px; font-size: 12px; flex-shrink: 0; }
+.rail-league-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rail-league-name {
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-league-sub {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10.5px; color: var(--muted); white-space: nowrap;
+}
+/* The sport pill is sized for a card here, not a rail -- a 200px column can't
+   spend a card's padding on a three-letter badge. */
+.rail-league-sub .sport-pill { font-size: 8.5px; padding: 1px 4px; }
+
+.rail-league-seasons { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 8px; }
+
+/* The live dot stands in for a glyph on the Follow-live row, so it has to
+   occupy the same 7px optical slot the glyphs do or that one row's label
+   would sit a pixel off every other row's. */
+.app-rail-row .league-live-dot { width: 7px; height: 7px; }
+.app-rail-row.live { color: var(--teal); }
+.app-rail-row.live:hover { color: var(--teal); }
+
+/*
  * THE ICON RAIL (56px)
  * Draft rooms default to it because they measurably have no horizontal room
  * to give: at 1440px a 14-team board already overflows its scroller by 99px
@@ -1655,6 +1693,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* The dots carry the whole filter once the labels are gone, so they need to
    be a target rather than a decoration. */
 .app-rail.collapsed .app-rail-dot { width: 9px; height: 9px; }
+/* The crest survives the collapse and the name does not: a 56px rail has room
+   for the league's mark, and that mark is already how this app says "which
+   league" on the home grid and the board's column heads. */
+.app-rail.collapsed .rail-league-id { justify-content: center; padding: 4px 0 8px; gap: 0; }
+/* The section LABELS are what separate League from Menu in the full rail, and
+   they are the first thing the icon rail hides -- so the groups need a line
+   instead, or eight identical glyphs read as one undifferentiated list.
+   `~` not `+`: the page-portal div sits between the two sections in the DOM
+   (display:none when empty, which adjacency still counts). */
+.app-rail.collapsed .app-rail-league ~ .app-rail-section { border-top: 1px solid var(--line); padding-top: 12px; }
+.app-rail.collapsed .app-rail-row .league-live-dot { width: 9px; height: 9px; }
 
 /*
  * .app-main -- the one scrolling pane. It owns the page padding that `.app`
@@ -1754,26 +1803,46 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    either way and the toggle hides rather than doing nothing visible. */
 @media (max-width: 860px) {
   .app-shell { flex-direction: column; }
-  .app-rail, .app-rail.collapsed {
+  /* No `.collapsed` variants anywhere in here: AppShell forces the rail
+     expanded below this width (useNarrow), because in a horizontal bar there
+     is no column to save and the collapsed state also swaps the wordmark for
+     a "BK" mark. Handling it in CSS alone left a phone in a draft room with
+     the abbreviation in a bar wide enough for the whole name. */
+  .app-rail {
     flex: 0 0 auto; flex-basis: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
     border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible;
     gap: 10px 16px; padding: 12px 16px;
   }
   .app-rail-top { flex: 0 0 auto; margin-right: auto; }
-  .app-rail.collapsed .app-rail-top { flex-direction: row; }
-  .app-wordmark, .app-rail.collapsed .app-wordmark { padding: 0; font-size: 19px; }
-  /* One line, not two: the bar never scrolls away, so every line it spends is
-     a line the page doesn't get. Measured 149px -> 128px at 375x812. */
+  .app-wordmark { padding: 0; font-size: 19px; }
+  /* One line, not two: every line the bar spends is a line the page doesn't
+     get. Measured 149px -> 128px at 375x812. */
   .app-wordmark-line { display: inline; }
   .app-rail-toggle { display: none; }
-  .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .rail-league-id { padding: 0 6px 0 0; }
+  .rail-league-seasons { padding: 0; }
   .app-rail-label { display: none; }
   .app-rail-spacer { display: none; }
-  .app-rail.collapsed .app-rail-row-label { display: inline; }
-  .app-rail.collapsed .app-rail-row { justify-content: flex-start; padding: 8px 10px; gap: 9px; }
-  .app-rail.collapsed .app-signout-glyph { display: none; }
-  .app-account, .app-rail.collapsed .app-account { border-top: 0; padding: 0; }
+  .app-account { border-top: 0; padding: 0; }
   .app-main { padding: 16px 16px 32px; }
+
+  /*
+   * On a phone the chrome scrolls away with the page instead of pinning a
+   * band above a shorter pane. The app is a 100vh single screen on desktop
+   * (see LAYOUT at the top of this file) and that is right there -- but this
+   * bar carries the wordmark, the league's identity, its four actions, Menu
+   * and the account, and once league context landed that measured 252px of
+   * 812 on an iPhone-sized screen. A third of the viewport spent permanently
+   * on navigation is worse than navigation you scroll back up to reach.
+   */
+  .app { height: auto; min-height: 100vh; }
+  .app-shell { min-height: 100vh; }
+  .app-main { overflow-y: visible; }
+  /* The board is the one thing that was relying on the pane's fixed height
+     for its own: `.board-scroll`'s 200px floor is a floor, not a size, and
+     with the page scrolling it would have become the board's whole height. */
+  .board-scroll { min-height: 60vh; }
 }
 
 /* SignIn's own hero: same shape as the picker's, but it's the whole page

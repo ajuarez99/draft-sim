@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
 import { getManagerHistory, type ManagerHistory as ManagerHistoryData } from '../api'
 import { reachGapText } from '../managerBehaviour'
+import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
 
 /**
@@ -13,6 +15,7 @@ import Avatar from '../components/Avatar'
  */
 export default function ManagerHistory() {
   const { managerId } = useParams<{ managerId: string }>()
+  const rail = useRailContextSlot()
   const [data, setData] = useState<ManagerHistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,13 +52,44 @@ export default function ManagerHistory() {
   const totalLosses = data.seasons.reduce((sum, s) => sum + (s.losses ?? 0), 0)
   const championships = data.seasons.filter((s) => s.champion).length
 
+  const name = data.manager ?? `manager ${data.managerId}`
+
   return (
-    <div className="content">
+    <>
+      {/* Portaled, not resolved by AppShell the way league context is: a
+          manager's name isn't in the URL, and this page has already fetched
+          it. The rail resolves what the path alone can tell it; a page hands
+          over what only the page knows. claude/site-wide-shell-propagation.md
+          Phase 3. */}
+      {rail.node &&
+        createPortal(
+          <div className="app-rail-section">
+            <span className="app-rail-label">Manager</span>
+            <div className="rail-league-id" title={name}>
+              <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} />
+              <span className="rail-league-text app-rail-row-label">
+                <span className="rail-league-name">{name}</span>
+                <span className="rail-league-sub">
+                  {data.seasons.length} {data.seasons.length === 1 ? 'season' : 'seasons'}
+                </span>
+              </span>
+            </div>
+            <Link to="/managers" className="app-rail-row" title="All managers" aria-label="All managers">
+              <span className="app-rail-glyph" aria-hidden="true">
+                ●
+              </span>
+              <span className="app-rail-row-label">All managers</span>
+            </Link>
+          </div>,
+          rail.node,
+        )}
+
+      <div className="content">
       <section className="panel">
         <div className="panel-head">
           <h2>
-            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={data.manager} />{' '}
-            {data.manager ?? `manager ${data.managerId}`}
+            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} />{' '}
+            {name}
           </h2>
         </div>
         <p className="small">
@@ -144,6 +178,7 @@ export default function ManagerHistory() {
           ))
         )}
       </section>
-    </div>
+      </div>
+    </>
   )
 }

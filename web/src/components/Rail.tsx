@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Avatar from './Avatar'
 
@@ -16,6 +17,12 @@ type Props = {
   /** Filled by AppShell with the ref callback for the page-context region.
    *  See appSlots.tsx: the current page portals into it. */
   contextSlotRef: (el: HTMLDivElement | null) => void
+  /** Context AppShell can render itself because it is derivable from the URL
+   *  -- league context today (railLeague.ts). A sibling of the portal target
+   *  rather than its content: React owns the portal node's children, so
+   *  rendering into it here would fight the portal for it. The two never
+   *  apply at once anyway -- Home is not a league route. */
+  children?: ReactNode
 }
 
 /**
@@ -47,6 +54,7 @@ export default function Rail({
   onSignOut,
   onOpenMockModal,
   contextSlotRef,
+  children,
 }: Props) {
   const location = useLocation()
   const name = displayName || username
@@ -89,8 +97,11 @@ export default function Rail({
         </button>
       </div>
 
-      {/* Page-supplied. Empty on most routes today, and `:empty` collapses its
-          own margin so those routes don't pay for it. */}
+      {/* URL-derived (league context). */}
+      {children}
+
+      {/* Page-portaled. Empty on most routes, and `:empty` collapses it so
+          those routes don't spend the rail's gap on a hole. */}
       <div className="app-rail-context" ref={contextSlotRef} />
 
       <div className="app-rail-section">
@@ -115,7 +126,7 @@ export default function Rail({
         <button
           type="button"
           className="app-rail-row"
-          onClick={onOpenMockModal}
+          onClick={() => onOpenMockModal()}
           title="Mock drafts"
           aria-label="Mock drafts"
         >

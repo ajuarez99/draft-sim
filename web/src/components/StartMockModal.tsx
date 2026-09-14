@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Sport } from '../api'
 
 export type MockableLeague = {
@@ -39,11 +39,24 @@ const MOCKABLE_SPORTS: Sport[] = ['nfl']
 export default function StartMockModal({ leagues, initialSport, initialLeagueId, onClose, onStart }: Props) {
   const [sport, setSport] = useState<Sport>(MOCKABLE_SPORTS.includes(initialSport) ? initialSport : 'nfl')
   const leaguesForSport = leagues.filter((l) => l.sport === sport)
-  const [leagueId, setLeagueId] = useState<string | null>(
-    initialLeagueId && leagues.find((l) => l.sleeperLeagueId === initialLeagueId)?.sport === sport
+
+  // Derived per render, not seeded once into state. `leagues` can be empty
+  // when this mounts -- the rail's "Mock it" navigates to Home and opens the
+  // modal in the same tick, while getDrafts() is still in flight -- and a
+  // useState initializer that ran against an empty list would settle on null
+  // and never recover once the leagues arrived. Storing only the *explicit*
+  // choice and falling back to the seed (then to the first league of the
+  // sport) makes the selection heal itself the moment the list lands, and
+  // makes `changeSport` a one-line reset rather than a second copy of this
+  // same defaulting rule.
+  const [picked, setPicked] = useState<string | null>(null)
+  const leagueId =
+    (picked && leaguesForSport.some((l) => l.sleeperLeagueId === picked) ? picked : null) ??
+    (initialLeagueId && leaguesForSport.some((l) => l.sleeperLeagueId === initialLeagueId)
       ? initialLeagueId
-      : (leaguesForSport[0]?.sleeperLeagueId ?? null),
-  )
+      : null) ??
+    leaguesForSport[0]?.sleeperLeagueId ??
+    null
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -53,11 +66,21 @@ export default function StartMockModal({ leagues, initialSport, initialLeagueId,
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // The list scrolls at 220px, so a seeded league further down it was selected
+  // and enabled the CTA while staying out of sight -- "Start NFL mock" for a
+  // league the reader can't see. `block: 'nearest'` makes this a no-op when
+  // the option is already visible, so a plain click never yanks the list.
+  const selectedRef = useRef<HTMLLabelElement | null>(null)
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [leagueId])
+
   function changeSport(next: Sport) {
     setSport(next)
     // Never leave a cross-sport league selected -- the design's own rule.
-    const firstOfSport = leagues.find((l) => l.sport === next)
-    setLeagueId(firstOfSport?.sleeperLeagueId ?? null)
+    // Clearing the explicit pick is enough: `leagueId` above re-defaults
+    // within the new sport on the very next render.
+    setPicked(null)
   }
 
   const selected = leagueId ? leagues.find((l) => l.sleeperLeagueId === leagueId) : undefined
@@ -115,13 +138,14 @@ export default function StartMockModal({ leagues, initialSport, initialLeagueId,
               {leaguesForSport.map((l) => (
                 <label
                   key={l.sleeperLeagueId}
+                  ref={leagueId === l.sleeperLeagueId ? selectedRef : undefined}
                   className={`start-mock-league-option${leagueId === l.sleeperLeagueId ? ' selected' : ''}`}
                 >
                   <input
                     type="radio"
                     name="start-mock-league"
                     checked={leagueId === l.sleeperLeagueId}
-                    onChange={() => setLeagueId(l.sleeperLeagueId)}
+                    onChange={() => setPicked(l.sleeperLeagueId)}
                   />
                   <span className="start-mock-league-radio" aria-hidden="true" />
                   <span className="start-mock-league-text">

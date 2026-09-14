@@ -126,8 +126,15 @@ export default function DraftPicker() {
   // while already on Home, and cleared immediately so a reload or a Back into
   // this entry doesn't reopen a modal nobody asked for a second time.
   useEffect(() => {
-    if ((location.state as { openMock?: boolean } | null)?.openMock) {
-      openMockModal()
+    const st = location.state as
+      | { openMock?: boolean; mockSeed?: { sport: Sport; leagueId: string } | null }
+      | null
+    if (st?.openMock) {
+      // The seed is set when the request came from a league's own rail ("Mock
+      // it" on /leagues/:id/power, say) rather than from the global Menu row,
+      // so the modal opens on that league instead of making someone pick the
+      // one they were already looking at.
+      openMockModal(st.mockSeed ?? undefined)
       navigate('/', { replace: true, state: null })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

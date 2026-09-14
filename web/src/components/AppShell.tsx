@@ -1,8 +1,11 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Rail from './Rail'
+import LeagueRailSection from './LeagueRailSection'
 import { PageActionSlotContext, RailContextSlotContext } from '../appSlots'
+import { useRailLeague } from '../railLeague'
 import { clearUser, useUser } from '../user'
+import type { Sport } from '../api'
 
 const RAIL_KEY = 'bk-rail'
 
@@ -19,6 +22,36 @@ const RAIL_KEY = 'bk-rail'
 export function railDefaultCollapsed(pathname: string): boolean {
   if (pathname.startsWith('/drafts/')) return true
   return /^\/mock\/[^/]+$/.test(pathname) && pathname !== '/mock/new'
+}
+
+const NARROW = '(max-width: 860px)'
+
+/**
+ * Below 860px the rail is not a rail -- it's the horizontal bar across the
+ * top (styles.css's own media query), where there is no column to save and
+ * "collapsed" means nothing. Tracked in JS rather than left to CSS because
+ * the collapsed state also decides *content*, not just layout: the rail
+ * renders a "BK" mark instead of the wordmark. Left to CSS alone, a phone
+ * visiting a draft room got the abbreviation in a bar with room for the
+ * whole name.
+ *
+ * `matchMedia` is guarded: jsdom doesn't implement it, and the component
+ * mounts in every App test.
+ */
+function useNarrow(): boolean {
+  const supported = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+  const [narrow, setNarrow] = useState(() => (supported ? window.matchMedia(NARROW).matches : false))
+
+  useEffect(() => {
+    if (!supported) return
+    const mq = window.matchMedia(NARROW)
+    const sync = () => setNarrow(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [supported])
+
+  return narrow
 }
 
 function readOverride(): 'expanded' | 'collapsed' | null {
@@ -51,12 +84,19 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const [pageActionSlot, setPageActionSlot] = useState<HTMLDivElement | null>(null)
   const [railContextSlot, setRailContextSlot] = useState<HTMLDivElement | null>(null)
 
+  // Resolved from the path, not from the page -- six league-scoped routes
+  // share two URL shapes, and the rail would otherwise need the same block
+  // portaled from six components. See railLeague.ts.
+  const railLeague = useRailLeague(location.pathname)
+
   // null = follow the route's own default. Once someone has chosen, the
   // choice sticks across routes and reloads -- a 13" laptop wants the icon
   // rail everywhere, a 27" monitor wants the full one even in a draft room.
   const [override, setOverride] = useState<'expanded' | 'collapsed' | null>(readOverride)
 
-  const collapsed = override ? override === 'collapsed' : railDefaultCollapsed(location.pathname)
+  const narrow = useNarrow()
+  const collapsed =
+    narrow ? false : override ? override === 'collapsed' : railDefaultCollapsed(location.pathname)
 
   const toggleCollapsed = useCallback(() => {
     const next = collapsed ? 'expanded' : 'collapsed'
@@ -79,8 +119,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // DraftPicker reads the flag off location.state and opens on arrival.
   // Navigating to "/" while already on "/" still produces a fresh location
   // key, which is what makes the request fire from Home too.
-  function openMockModal() {
-    navigate('/', { state: { openMock: true } })
+  function openMockModal(seed?: { sport: Sport; leagueId: string }) {
+    navigate('/', { state: { openMock: true, mockSeed: seed ?? null } })
   }
 
   const railContextValue = useMemo(
@@ -104,7 +144,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onSignOut={signOut}
         onOpenMockModal={openMockModal}
         contextSlotRef={setRailContextSlot}
-      />
+      >
+        {railLeague && (
+          <LeagueRailSection
+            league={railLeague}
+            pathname={location.pathname}
+            collapsed={collapsed}
+            onMockIt={(leagueId, sport) => openMockModal({ leagueId, sport })}
+          />
+        )}
+      </Rail>
 
       <main className="app-main">
         {/* Page-scoped actions (DraftView's settings gear today). `:empty`
