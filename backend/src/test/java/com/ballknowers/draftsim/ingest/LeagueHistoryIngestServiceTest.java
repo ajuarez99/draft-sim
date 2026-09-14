@@ -74,8 +74,8 @@ class LeagueHistoryIngestServiceTest {
         when(sleeper.leagueChain("L1")).thenReturn(List.of(league));
         when(sleeper.leagueUsers("L1")).thenReturn(List.of(Map.of("user_id", "u1", "display_name", "Alice"),
                 Map.of("user_id", "u2", "display_name", "Bob")));
-        when(managers.upsert("u1", "Alice")).thenReturn(101L);
-        when(managers.upsert("u2", "Bob")).thenReturn(102L);
+        when(managers.upsert("u1", "Alice", null)).thenReturn(101L);
+        when(managers.upsert("u2", "Bob", null)).thenReturn(102L);
         when(sleeper.rosters("L1")).thenReturn(List.of(
                 rosterObject(1, "u1", 8, 6, 1500, 42),
                 rosterObject(2, "u2", 10, 4, 1600, 5)));

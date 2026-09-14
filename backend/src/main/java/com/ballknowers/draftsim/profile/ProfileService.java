@@ -77,6 +77,7 @@ public class ProfileService {
         Map<Long, Position> posById = new HashMap<>();
         for (Player p : players.findAll(sport)) posById.put(p.id(), p.primary());
         Map<Long, String> names = managers.names();
+        Map<Long, String> avatars = managers.avatarIds();
         Map<Long, ManualTendencies> manual = profiles.manualBySport(sport);
 
         PositionalPriors priors = fitPriors(picks, posById, sport);
@@ -165,7 +166,7 @@ public class ProfileService {
             out.put(managerId, new ManagerProfile(
                     managerId, names.getOrDefault(managerId, "?"), reach, tilt,
                     stated.unpredictability() == null ? 1.0 : stated.unpredictability(),
-                    stated.note(), observed, picksScored, provenance));
+                    stated.note(), observed, picksScored, provenance, avatars.get(managerId)));
         }
 
         log.info("profiles: {} managers, {} scoreable picks, league mean reach {}, {} with stated tendencies",

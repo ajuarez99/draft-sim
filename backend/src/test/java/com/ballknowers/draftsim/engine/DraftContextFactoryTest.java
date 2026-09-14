@@ -46,7 +46,7 @@ class DraftContextFactoryTest {
     }
 
     private static ManagerProfile fitted(long id) {
-        return new ManagerProfile(id, "manager " + id, 4.0, Map.of(), 1.0, null, 2, 30, Provenance.FITTED);
+        return new ManagerProfile(id, "manager " + id, 4.0, Map.of(), 1.0, null, 2, 30, Provenance.FITTED, null);
     }
 
     @ParameterizedTest

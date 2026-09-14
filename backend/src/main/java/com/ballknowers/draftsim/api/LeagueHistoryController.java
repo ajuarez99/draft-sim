@@ -117,6 +117,7 @@ public class LeagueHistoryController {
         m.put("rosterId", r.rosterId());
         m.put("managerId", r.managerId());
         m.put("manager", r.managerName());
+        m.put("avatarId", r.avatarId());
         m.put("wins", r.wins());
         m.put("losses", r.losses());
         m.put("ties", r.ties());
@@ -157,6 +158,7 @@ public class LeagueHistoryController {
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("managerId", managerId);
         record.put("manager", seasons.get(0).managerName());
+        record.put("avatarId", seasons.get(0).avatarId());
         record.put("seasons", seasons.stream().map(LeagueHistoryController::standingRow).toList());
 
         // One entry per sport this manager has actually drafted in, rather than
@@ -228,9 +230,10 @@ public class LeagueHistoryController {
 
         if (row.sport() == Sport.NFL) {
             Map<Long, String> managerNames = managers.names();
+            Map<Long, String> managerAvatars = managers.avatarIds();
             for (int week : memberRankings.weeksWithBallots(row.id())) {
                 memberRankings.forWeek(row.id(), sleeperId, week).ifPresent(wr ->
-                        wr.entries().forEach(e -> entries.add(memberRow(row.season(), week, e, managerNames))));
+                        wr.entries().forEach(e -> entries.add(memberRow(row.season(), week, e, managerNames, managerAvatars))));
             }
         }
 
@@ -248,14 +251,15 @@ public class LeagueHistoryController {
     }
 
     private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {
-        return entryRow(r.season(), r.week(), r.kind(), r.rosterId(), r.managerId(), r.managerName(),
+        return entryRow(r.season(), r.week(), r.kind(), r.rosterId(), r.managerId(), r.managerName(), r.avatarId(),
                 r.rank(), r.score(), r.note(), null, null, null, null, null);
     }
 
     private static Map<String, Object> memberRow(int season, int week, MemberRankingService.Entry e,
-                                                  Map<Long, String> managerNames) {
+                                                  Map<Long, String> managerNames, Map<Long, String> managerAvatars) {
         String manager = e.managerId() == null ? null : managerNames.get(e.managerId());
-        return entryRow(season, week, "MEMBER", e.rosterId(), e.managerId(), manager, e.rank(), e.avgRank(),
+        String avatarId = e.managerId() == null ? null : managerAvatars.get(e.managerId());
+        return entryRow(season, week, "MEMBER", e.rosterId(), e.managerId(), manager, avatarId, e.rank(), e.avgRank(),
                 e.note(), e.bestRank(), e.worstRank(), e.stdev(), e.ballotCount(), e.selfRankBias());
     }
 
@@ -273,7 +277,7 @@ public class LeagueHistoryController {
      * individual ballot is ever exposed to compute it.
      */
     private static Map<String, Object> entryRow(int season, int week, String kind, int rosterId, Long managerId,
-                                                 String manager, int rank, Double score, String note,
+                                                 String manager, String avatarId, int rank, Double score, String note,
                                                  Integer bestRank, Integer worstRank, Double stdev,
                                                  Integer ballotCount, Integer selfRankBias) {
         Map<String, Object> m = new LinkedHashMap<>();
@@ -283,6 +287,7 @@ public class LeagueHistoryController {
         m.put("rosterId", rosterId);
         m.put("managerId", managerId);
         m.put("manager", manager);
+        m.put("avatarId", avatarId);
         m.put("rank", rank);
         m.put("score", score);
         m.put("note", note);
@@ -369,6 +374,7 @@ public class LeagueHistoryController {
         row.put("rosterId", m.rosterId());
         row.put("managerId", m.managerId());
         row.put("manager", m.manager());
+        row.put("avatarId", m.avatarId());
         row.put("teamName", m.teamName());
         row.put("isMe", m.isMe());
         return row;

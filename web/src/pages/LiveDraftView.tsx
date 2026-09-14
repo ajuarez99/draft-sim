@@ -266,6 +266,7 @@ export default function LiveDraftView() {
         round: p.round,
         slot: p.slot,
         manager: p.manager,
+        avatarId: p.avatarId,
         player: p.player,
       })
     }

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getManagers, type ManualTendencies, type Seat, type Sport } from '../api'
-import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
 import { behaviourText, reachGapText } from '../managerBehaviour'
 import TendenciesForm from './TendenciesForm'
+import Avatar from './Avatar'
 
 /**
  * Formerly SeatList's per-seat card, now the popover a board column header
@@ -79,10 +79,6 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
   }, [onClose])
 
   const label = PROVENANCE_LABEL[s.provenance]
-  const hue = hueFor(String(s.managerId))
-  const avatarStyle = isMe
-    ? { background: 'var(--crimson)', color: 'var(--bg)' }
-    : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
 
   async function startEdit() {
     setEditing(true)
@@ -112,9 +108,7 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
         <div className={`seat ${label.className}${isMe ? ' me' : ''}`}>
           <div className="seat-head">
             <span className="slot">{s.slot}</span>
-            <span className="avatar" style={avatarStyle}>
-              {s.manager.trim().charAt(0).toUpperCase()}
-            </span>
+            <Avatar avatarId={s.avatarId} seed={String(s.managerId)} label={s.manager} isMe={isMe} />
             <span className={`who${isMe ? ' mine-name' : ''}`}>{s.manager}</span>
             <span className="seat-head-right">
               {label.badge && <span className={`prov ${label.className}`}>{label.badge}</span>}

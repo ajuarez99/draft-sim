@@ -34,7 +34,7 @@ public record MockSessionState(
         /** The first pick this session hadn't yet decided at fork time. Null when sourceDraftId is null. */
         Integer forkedAtPickNo
 ) {
-    public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager) {}
+    public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager, String avatarId) {}
 
     public record PickView(int pickNo, int round, int draftSlot, SeatSpec.Type seatType,
                            String source, SimulationResult.PlayerRef player) {}

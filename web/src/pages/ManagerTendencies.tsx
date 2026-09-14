@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { getManagers, type ManagerSummary, type Sport } from '../api'
-import { hueFor } from '../hue'
 import { PROVENANCE_LABEL } from '../provenance'
 import { reachGapText } from '../managerBehaviour'
 import TendenciesForm from '../components/TendenciesForm'
+import Avatar from '../components/Avatar'
 
 /**
  * A manager profile is per (manager, sport) all the way down -- separate fits,
@@ -99,8 +99,6 @@ function ManagerRow({ m, onChanged }: RowProps) {
   const [editing, setEditing] = useState(false)
 
   const label = PROVENANCE_LABEL[m.provenance]
-  const hue = hueFor(String(m.managerId))
-  const avatarStyle = { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
   const cmp = comparison(m)
 
   const canClear = m.provenance === 'STATED' || m.provenance === 'BLENDED'
@@ -119,9 +117,7 @@ function ManagerRow({ m, onChanged }: RowProps) {
   return (
     <div className={`seat ${label.className}${m.provenance === 'NEUTRAL' ? ' neutral-row' : ''}`}>
       <div className="seat-head">
-        <span className="avatar" style={avatarStyle}>
-          {m.manager.trim().charAt(0).toUpperCase()}
-        </span>
+        <Avatar avatarId={m.avatarId} seed={String(m.managerId)} label={m.manager} />
         <span className="who">{m.manager}</span>
         {/* Same pill as the picker's league cards, same reason: this is one
             mixed list with no switcher, and two of these cards can carry the

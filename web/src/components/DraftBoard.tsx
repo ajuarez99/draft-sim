@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import type { PlayerRef, PredictedPick, Seat, Sport } from '../api'
-import { hueFor } from '../hue'
+import Avatar from './Avatar'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
@@ -79,7 +79,6 @@ export default function DraftBoard({
           const slot = i + 1
           const seat = seatBySlot.get(slot)
           const isMe = mySlot === slot
-          const hue = seat ? hueFor(String(seat.managerId)) : hueFor(String(slot))
           const label = seat ? PROVENANCE_LABEL[seat.provenance] : null
           // The header carries what SeatList used to show in its own band
           // (avatar, name, provenance, "you") -- see
@@ -97,16 +96,12 @@ export default function DraftBoard({
               disabled={!seat}
               title={seat ? `${seat.manager} — click for details` : undefined}
             >
-              <span
-                className="avatar"
-                style={
-                  isMe
-                    ? { background: 'var(--crimson)', color: 'var(--bg)' }
-                    : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
-                }
-              >
-                {seat ? seat.manager.trim().charAt(0).toUpperCase() : slot}
-              </span>
+              <Avatar
+                avatarId={seat?.avatarId}
+                seed={String(seat ? seat.managerId : slot)}
+                label={seat ? seat.manager : String(slot)}
+                isMe={isMe}
+              />
               <span className="col-head-name mono">{seat ? seat.manager : slot}</span>
               <span className="col-head-meta">
                 {!hideProvenanceDots && label && (

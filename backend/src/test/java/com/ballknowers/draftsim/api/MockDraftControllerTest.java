@@ -30,7 +30,7 @@ class MockDraftControllerTest {
 
     private MockSessionState sampleState(long id) {
         return new MockSessionState(id, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
-                List.of(new MockSessionState.SeatView(1, SeatSpec.Type.USER, null, "You")),
+                List.of(new MockSessionState.SeatView(1, SeatSpec.Type.USER, null, "You", null)),
                 List.of(), List.of(), 1, 1, true, null, null);
     }
 

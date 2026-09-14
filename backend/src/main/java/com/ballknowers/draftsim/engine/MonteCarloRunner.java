@@ -143,7 +143,7 @@ public class MonteCarloRunner {
                     .toList();
 
             board.add(new SimulationResult.PredictedPick(
-                    a.pickNo(), DraftSlot.round(a.pickNo(), teams), slot, prof.displayName(),
+                    a.pickNo(), DraftSlot.round(a.pickNo(), teams), slot, prof.displayName(), prof.avatarId(),
                     ref(byId.get(a.playerId())), a.probability(), a.isModal(), alts));
         }
 

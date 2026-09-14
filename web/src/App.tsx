@@ -14,7 +14,7 @@ import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import { TopSlotContext } from './topSlot'
 import { clearUser, useUser } from './user'
-import { hueFor } from './hue'
+import Avatar from './components/Avatar'
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -100,28 +100,19 @@ export default function App() {
         <div className="top-right">
           <div className="top-slot" ref={setTopSlot} />
           {/* Identity is a header chip, not a route -- claude/user-identity-
-              and-onboarding.md §5b. Same color-initials avatar treatment as
-              SeatPopover/ManagerHistory rather than Sleeper's own avatar
-              image, so it reads as this app's identity language everywhere.
-              The gate lives on the whole route table below, not just "/", so
-              Sign out unmounts whatever page was showing (its EventSource, a
-              resim in flight, a mock poller) no matter where it's clicked
-              from, and returns to that same screen either way. The explicit
-              navigate('/') here is what makes this an intentional sign out
-              rather than the same "no user" state a deep link renders in
-              place -- §7. */}
+              and-onboarding.md §5b. Sleeper's own avatar image now replaces
+              the color-initials treatment here and everywhere else that used
+              it (superseding this comment's original "app's identity
+              language" call). The gate lives on the whole route table below,
+              not just "/", so Sign out unmounts whatever page was showing
+              (its EventSource, a resim in flight, a mock poller) no matter
+              where it's clicked from, and returns to that same screen either
+              way. The explicit navigate('/') here is what makes this an
+              intentional sign out rather than the same "no user" state a deep
+              link renders in place -- §7. */}
           {user && (
             <div className="top-user">
-              <span
-                className="avatar"
-                style={{
-                  background: `oklch(28% 0.03 ${hueFor(user.username)})`,
-                  color: `oklch(82% 0.1 ${hueFor(user.username)})`,
-                }}
-                aria-hidden="true"
-              >
-                {(user.displayName || user.username).charAt(0).toUpperCase()}
-              </span>
+              <Avatar avatarId={user.avatar} seed={user.username} label={user.displayName || user.username} />
               <span className="top-user-name">{user.displayName || user.username}</span>
               <button className="chip" onClick={signOut}>
                 Sign out

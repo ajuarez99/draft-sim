@@ -4,8 +4,8 @@ import TurnIndicator from './TurnIndicator'
 import type { MockSeat } from '../api'
 
 const seats: MockSeat[] = [
-  { slot: 1, type: 'USER', managerId: null, manager: 'You' },
-  { slot: 2, type: 'BOT', managerId: null, manager: 'Bot 2' },
+  { slot: 1, type: 'USER', managerId: null, manager: 'You', avatarId: null },
+  { slot: 2, type: 'BOT', managerId: null, manager: 'Bot 2', avatarId: null },
 ]
 
 // TurnIndicator is now a thin adapter over OnTheClock, so these assert the

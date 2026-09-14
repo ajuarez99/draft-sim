@@ -41,6 +41,7 @@ export default function TurnIndicator({
       // Bot seats carry no manager id, so the slot is the only stable tint
       // seed for them -- same fallback DraftBoard's column headers use.
       hueSeed={String(seat?.managerId ?? onTheClockSlot ?? 0)}
+      avatarId={seat?.avatarId}
       pickNo={currentPickNo}
       maxPickNo={teams * rounds}
       teams={teams}

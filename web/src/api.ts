@@ -29,6 +29,7 @@ export type PredictedPick = {
   round: number
   slot: number
   manager: string
+  avatarId: string | null
   player: PlayerRef
   /** Marginal: share of runs this player went at this pick. Not the board's probability. */
   probability: number
@@ -91,6 +92,7 @@ export type Seat = {
   slot: number
   managerId: number
   manager: string
+  avatarId: string | null
   provenance: Provenance
   reachBias: number
   unpredictability: number
@@ -204,6 +206,7 @@ export type RealPick = {
   round: number
   slot: number
   manager: string
+  avatarId: string | null
   player: PlayerRef
 }
 
@@ -402,6 +405,7 @@ export type ManualTendencies = {
 export type ManagerSummary = {
   managerId: number
   manager: string
+  avatarId: string | null
   provenance: Provenance
   effectiveReachBias: number
   // The unshrunk average of this manager's own scoreable picks -- "what they
@@ -464,7 +468,13 @@ export const setReversalRound = (draftId: string, reversalRound: number | null) 
 export type SeatType = 'USER' | 'MANAGER' | 'BOT'
 
 // Mirrors mock/MockSessionState.java field-for-field.
-export type MockSeat = { slot: number; type: SeatType; managerId: number | null; manager: string }
+export type MockSeat = {
+  slot: number
+  type: SeatType
+  managerId: number | null
+  manager: string
+  avatarId: string | null
+}
 
 export type MockPick = {
   pickNo: number
@@ -568,6 +578,7 @@ export type StandingRow = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  avatarId: string | null
   wins: number | null
   losses: number | null
   ties: number | null
@@ -597,6 +608,7 @@ export const getLeagueHistory = (sleeperLeagueId: string) =>
 export type ManagerHistory = {
   managerId: number
   manager: string | null
+  avatarId: string | null
   seasons: StandingRow[]
   /**
    * One entry per sport this manager has actually drafted in, newest concept
@@ -658,6 +670,7 @@ export type PowerRankingEntry = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  avatarId: string | null
   rank: number
   score: number | null
   note: string | null
@@ -793,6 +806,7 @@ export type BallotMember = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  avatarId: string | null
   /** Sleeper's metadata.team_name, already resolved -- the backend applies the
    *  team_name -> display_name -> null chain and treats the literal "TBD" as
    *  absent (design doc finding 19), so this is renderable as-is. */

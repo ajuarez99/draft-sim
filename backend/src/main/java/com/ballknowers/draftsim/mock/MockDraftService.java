@@ -412,6 +412,7 @@ public class MockDraftService {
         }
 
         Map<Long, String> managerNames = managers.names();
+        Map<Long, String> managerAvatars = managers.avatarIds();
         List<MockSessionState.SeatView> seatViews = new ArrayList<>();
         for (int slot = 1; slot <= row.teams(); slot++) {
             SeatSpec seat = seatAt(seats, slot);
@@ -420,7 +421,8 @@ public class MockDraftService {
                 case MANAGER -> managerNames.getOrDefault(seat.managerId(), "?");
                 case BOT -> "Bot " + slot;
             };
-            seatViews.add(new MockSessionState.SeatView(slot, seat.type(), seat.managerId(), name));
+            String avatarId = seat.type() == SeatSpec.Type.MANAGER ? managerAvatars.get(seat.managerId()) : null;
+            seatViews.add(new MockSessionState.SeatView(slot, seat.type(), seat.managerId(), name, avatarId));
         }
 
         Set<Long> pickedIds = new HashSet<>();

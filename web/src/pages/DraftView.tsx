@@ -505,6 +505,7 @@ export default function DraftView() {
                   manager={onClockPick?.manager ?? null}
                   isMine={onClockIsMine}
                   hueSeed={String(onClockSeat?.managerId ?? onClockPick?.slot ?? 0)}
+                  avatarId={onClockPick?.avatarId}
                   pickNo={onClockPickNo}
                   maxPickNo={maxPickNo}
                   teams={result.teams}

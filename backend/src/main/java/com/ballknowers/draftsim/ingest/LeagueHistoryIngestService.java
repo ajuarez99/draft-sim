@@ -79,7 +79,8 @@ public class LeagueHistoryIngestService {
         for (Map<String, Object> u : sleeper.leagueUsers(sleeperLeagueId)) {
             String userId = String.valueOf(u.get("user_id"));
             String display = u.get("display_name") == null ? null : String.valueOf(u.get("display_name"));
-            long managerId = managers.upsert(userId, display);
+            String avatar = u.get("avatar") == null ? null : String.valueOf(u.get("avatar"));
+            long managerId = managers.upsert(userId, display, avatar);
             out.put(userId, managerId);
 
             boolean isCommissioner = Boolean.TRUE.equals(u.get("is_owner"));

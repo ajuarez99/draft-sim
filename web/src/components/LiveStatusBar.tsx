@@ -140,6 +140,7 @@ export default function LiveStatusBar({
         manager={onClockSeat?.manager ?? null}
         isMine={isMe}
         hueSeed={String(onClockSeat?.managerId ?? onClockSlot ?? 0)}
+        avatarId={onClockSeat?.avatarId}
         pickNo={onClockPickNo}
         maxPickNo={total}
         teams={live?.teams ?? 0}

@@ -120,6 +120,7 @@ public class LeagueController {
             seat.put("slot", Integer.parseInt(slot));
             seat.put("managerId", p.managerId());
             seat.put("manager", p.displayName());
+            seat.put("avatarId", p.avatarId());
             seat.put("provenance", p.provenance().name());
             seat.put("reachBias", round2(p.reachBias()));
             seat.put("unpredictability", p.unpredictability());
@@ -285,7 +286,7 @@ public class LeagueController {
      * mid-draft.
      */
     private record PickNaming(Map<Long, BoardEntry> board, Map<Long, Player> players,
-                              Map<Long, String> managerNames) {
+                              Map<Long, String> managerNames, Map<Long, String> managerAvatars) {
 
         /** Null for a pick with no resolvable player -- an unfilled slot, or a player row that is gone. */
         Map<String, Object> row(DraftRepository.PickRow p) {
@@ -303,6 +304,7 @@ public class LeagueController {
             row.put("manager", p.managerId() != null
                     ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
                     : "Slot " + p.draftSlot());
+            row.put("avatarId", p.managerId() != null ? managerAvatars.get(p.managerId()) : null);
             row.put("player", player);
             return row;
         }
@@ -337,7 +339,7 @@ public class LeagueController {
         for (BoardEntry e : boards.currentBoard(sport)) byPlayerId.put(e.player().id(), e);
         Map<Long, Player> playersById = new HashMap<>();
         for (Player p : players.findAll(sport)) playersById.put(p.id(), p);
-        return new PickNaming(byPlayerId, playersById, managers.names());
+        return new PickNaming(byPlayerId, playersById, managers.names(), managers.avatarIds());
     }
 
     /** Starts (or confirms) live polling for a draft. Safe to call any time before it goes live. */

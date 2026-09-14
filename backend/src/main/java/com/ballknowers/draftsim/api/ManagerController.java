@@ -75,6 +75,7 @@ public class ManagerController {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("managerId", p.managerId());
         m.put("manager", p.displayName());
+        m.put("avatarId", p.avatarId());
         m.put("provenance", p.provenance().name());
         // The value the engine will actually use, after blending.
         m.put("effectiveReachBias", Math.round(p.reachBias() * 100) / 100.0);

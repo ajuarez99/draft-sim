@@ -6,7 +6,7 @@ import {
   type LeagueHistory as LeagueHistoryData,
   type StandingRow,
 } from '../api'
-import { hueFor } from '../hue'
+import Avatar from '../components/Avatar'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -31,16 +31,13 @@ function StandingsTable({ rows }: { rows: StandingRow[] }) {
         </thead>
         <tbody>
           {rows.map((r) => {
-            const hue = r.managerId != null ? hueFor(String(r.managerId)) : 220
             return (
               <tr key={r.rosterId}>
                 <td>{r.champion && <span title="Champion">🏆</span>}</td>
                 <td>
                   {r.managerId != null ? (
                     <Link to={`/managers/${r.managerId}/history`} className="standings-manager">
-                      <span className="avatar" style={{ background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }}>
-                        {(r.manager ?? '?').trim().charAt(0).toUpperCase()}
-                      </span>
+                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.manager} />
                       {r.manager ?? `roster ${r.rosterId}`}
                     </Link>
                   ) : (

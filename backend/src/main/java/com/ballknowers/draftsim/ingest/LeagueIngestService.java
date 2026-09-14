@@ -150,7 +150,8 @@ public class LeagueIngestService {
         for (Map<String, Object> u : sleeper.leagueUsers(sleeperLeagueId)) {
             String userId = str(u.get("user_id"));
             String display = str(u.get("display_name"));
-            long managerId = managers.upsert(userId, display);
+            String avatar = str(u.get("avatar"));
+            long managerId = managers.upsert(userId, display, avatar);
             out.put(userId, managerId);
 
             // Not a cast: measured live against a real 12-user league,

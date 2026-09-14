@@ -193,7 +193,7 @@ public class MemberRankingService {
      * this league already knows. Live off Sleeper, not stored history, for
      * the same no-ingest-required reason as {@link #forWeek}.
      */
-    public record BallotMember(int rosterId, Long managerId, String manager, String teamName, boolean isMe) {}
+    public record BallotMember(int rosterId, Long managerId, String manager, String avatarId, String teamName, boolean isMe) {}
 
     public List<BallotMember> members(long leagueId, String sleeperLeagueId, String callerSleeperUserId) {
         Map<String, Long> managerBySleeperUserId = managers.idsBySleeperUserId();
@@ -214,10 +214,11 @@ public class MemberRankingService {
             LeagueMemberRepository.MemberRow row = managerId == null ? null : byManager.get(managerId);
 
             String manager = row != null ? row.managerName() : null;
+            String avatarId = row != null ? row.avatarId() : null;
             String teamName = row != null ? row.teamName() : null;
             if (teamName == null) teamName = manager != null ? manager : "roster " + rosterId;
 
-            out.add(new BallotMember(rosterId, managerId, manager, teamName,
+            out.add(new BallotMember(rosterId, managerId, manager, avatarId, teamName,
                     managerId != null && managerId.equals(callerManagerId)));
         }
         return out;

@@ -15,6 +15,7 @@ const seats: Seat[] = [
     slot: 3,
     managerId: 77,
     manager: 'allieOOP',
+    avatarId: null,
     provenance: 'FITTED',
     reachBias: 4.8,
     unpredictability: 1,

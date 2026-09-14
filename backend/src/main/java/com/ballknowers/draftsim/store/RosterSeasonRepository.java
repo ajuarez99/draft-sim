@@ -52,7 +52,7 @@ public class RosterSeasonRepository {
      * {@link #forManager}, which spans several leagues/seasons and has no
      * other way to tell its rows apart or link back to one.
      */
-    public record StandingRow(long leagueId, int rosterId, Long managerId, String managerName,
+    public record StandingRow(long leagueId, int rosterId, Long managerId, String managerName, String avatarId,
                               Integer wins, Integer losses, Integer ties, Double pointsFor,
                               Double pointsAgainst, Integer finalPlacement, Integer season,
                               String sleeperLeagueId) {}
@@ -60,7 +60,7 @@ public class RosterSeasonRepository {
     /** One league's standings, best placement (or most wins, if no bracket yet) first. */
     public List<StandingRow> forLeague(long leagueId) {
         return db.sql("""
-                select rs.league_id, rs.roster_id, rs.manager_id, m.display_name,
+                select rs.league_id, rs.roster_id, rs.manager_id, m.display_name, m.avatar_id,
                        rs.wins, rs.losses, rs.ties, rs.points_for, rs.points_against, rs.final_placement
                 from roster_season rs
                 left join manager m on m.id = rs.manager_id
@@ -76,7 +76,7 @@ public class RosterSeasonRepository {
     /** One manager's record across every ingested season, newest first. */
     public List<StandingRow> forManager(long managerId) {
         return db.sql("""
-                select rs.league_id, rs.roster_id, rs.manager_id, m.display_name,
+                select rs.league_id, rs.roster_id, rs.manager_id, m.display_name, m.avatar_id,
                        rs.wins, rs.losses, rs.ties, rs.points_for, rs.points_against, rs.final_placement,
                        l.season, l.sleeper_id
                 from roster_season rs
@@ -99,14 +99,14 @@ public class RosterSeasonRepository {
      */
     private static StandingRow mapRow(java.sql.ResultSet rs, boolean withSeason) throws java.sql.SQLException {
         return new StandingRow(rs.getLong(1), rs.getInt(2),
-                rs.getObject(3) == null ? null : rs.getLong(3), rs.getString(4),
-                rs.getObject(5) == null ? null : rs.getInt(5),
+                rs.getObject(3) == null ? null : rs.getLong(3), rs.getString(4), rs.getString(5),
                 rs.getObject(6) == null ? null : rs.getInt(6),
                 rs.getObject(7) == null ? null : rs.getInt(7),
-                rs.getObject(8) == null ? null : rs.getDouble(8),
+                rs.getObject(8) == null ? null : rs.getInt(8),
                 rs.getObject(9) == null ? null : rs.getDouble(9),
-                rs.getObject(10) == null ? null : rs.getInt(10),
-                withSeason ? rs.getInt(11) : null,
-                withSeason ? rs.getString(12) : null);
+                rs.getObject(10) == null ? null : rs.getDouble(10),
+                rs.getObject(11) == null ? null : rs.getInt(11),
+                withSeason ? rs.getInt(12) : null,
+                withSeason ? rs.getString(13) : null);
     }
 }

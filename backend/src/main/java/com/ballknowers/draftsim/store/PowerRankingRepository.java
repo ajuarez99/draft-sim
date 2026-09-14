@@ -76,12 +76,12 @@ public class PowerRankingRepository {
     }
 
     public record SnapshotRow(int season, int week, String kind, int rosterId, Long managerId,
-                              String managerName, int rank, Double score, String note) {}
+                              String managerName, String avatarId, int rank, Double score, String note) {}
 
     /** Every snapshot for a league, across every season/week/kind ingested -- one payload, client-side toggle. */
     public List<SnapshotRow> forLeague(long leagueId) {
         return db.sql("""
-                select pr.season, pr.week, pr.kind, e.roster_id, e.manager_id, m.display_name,
+                select pr.season, pr.week, pr.kind, e.roster_id, e.manager_id, m.display_name, m.avatar_id,
                        e.rank, e.score, e.note
                 from power_ranking pr
                 join power_ranking_entry e on e.ranking_id = pr.id
@@ -91,8 +91,8 @@ public class PowerRankingRepository {
                 """)
                 .param(leagueId)
                 .query((rs, i) -> new SnapshotRow(rs.getInt(1), rs.getInt(2), rs.getString(3),
-                        rs.getInt(4), rs.getObject(5) == null ? null : rs.getLong(5), rs.getString(6),
-                        rs.getInt(7), rs.getObject(8) == null ? null : rs.getDouble(8), rs.getString(9)))
+                        rs.getInt(4), rs.getObject(5) == null ? null : rs.getLong(5), rs.getString(6), rs.getString(7),
+                        rs.getInt(8), rs.getObject(9) == null ? null : rs.getDouble(9), rs.getString(10)))
                 .list();
     }
 }

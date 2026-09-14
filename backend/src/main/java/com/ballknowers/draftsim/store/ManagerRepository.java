@@ -15,15 +15,17 @@ public class ManagerRepository {
         this.db = db;
     }
 
-    /** Keyed on Sleeper user id. Display name is refreshed but never identifying. */
-    public long upsert(String sleeperUserId, String displayName) {
+    /** Keyed on Sleeper user id. Display name and avatar are refreshed but never identifying. */
+    public long upsert(String sleeperUserId, String displayName, String avatarId) {
         return db.sql("""
-                insert into manager (sleeper_user_id, display_name)
-                values (?, ?)
-                on conflict (sleeper_user_id) do update set display_name = excluded.display_name
+                insert into manager (sleeper_user_id, display_name, avatar_id)
+                values (?, ?, ?)
+                on conflict (sleeper_user_id) do update set
+                    display_name = excluded.display_name,
+                    avatar_id = excluded.avatar_id
                 returning id
                 """)
-                .params(sleeperUserId, displayName)
+                .params(sleeperUserId, displayName, avatarId)
                 .query(Long.class)
                 .single();
     }
@@ -38,6 +40,16 @@ public class ManagerRepository {
                 .query((rs, i) -> Map.entry(rs.getLong(1), rs.getString(2) == null ? "?" : rs.getString(2)))
                 .list().stream()
                 .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+
+    /** Sleeper avatar id per manager, same wire form SleeperUserController resolves at sign-in. Absent (not empty string) where Sleeper has none. */
+    public Map<Long, String> avatarIds() {
+        Map<Long, String> out = new java.util.HashMap<>();
+        db.sql("select id, avatar_id from manager where avatar_id is not null")
+                .query((rs, i) -> Map.entry(rs.getLong(1), rs.getString(2)))
+                .list()
+                .forEach(e -> out.put(e.getKey(), e.getValue()));
+        return out;
     }
 
     /** Keyed on Sleeper user id, same shape as {@link PlayerRepository#idsBySleeperId}. */

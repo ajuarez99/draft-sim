@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getManagerHistory, type ManagerHistory as ManagerHistoryData } from '../api'
-import { hueFor } from '../hue'
 import { reachGapText } from '../managerBehaviour'
+import Avatar from '../components/Avatar'
 
 /**
  * claude/league-suite.md Phase A: one manager's record across every ingested
@@ -45,7 +45,6 @@ export default function ManagerHistory() {
     )
   }
 
-  const hue = hueFor(String(data.managerId))
   const totalWins = data.seasons.reduce((sum, s) => sum + (s.wins ?? 0), 0)
   const totalLosses = data.seasons.reduce((sum, s) => sum + (s.losses ?? 0), 0)
   const championships = data.seasons.filter((s) => s.champion).length
@@ -55,9 +54,7 @@ export default function ManagerHistory() {
       <section className="panel">
         <div className="panel-head">
           <h2>
-            <span className="avatar" style={{ background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }}>
-              {(data.manager ?? '?').trim().charAt(0).toUpperCase()}
-            </span>{' '}
+            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={data.manager} />{' '}
             {data.manager ?? `manager ${data.managerId}`}
           </h2>
         </div>

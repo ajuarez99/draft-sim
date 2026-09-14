@@ -56,6 +56,7 @@ export default function CompletedDraftBoard() {
     round: p.round,
     slot: p.slot,
     manager: p.manager,
+    avatarId: p.avatarId,
     player: p.player,
     probability: 1,
     isModal: true,

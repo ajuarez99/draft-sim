@@ -15,6 +15,7 @@ import {
   type StandingRow,
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
+import Avatar from '../components/Avatar'
 import { hueFor } from '../hue'
 import { useUser } from '../user'
 
@@ -233,12 +234,6 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
       </svg>
     </div>
   )
-}
-
-function avatarStyleFor(managerId: number | null, rosterId: number, isMe: boolean) {
-  if (isMe) return { background: 'var(--crimson)', color: 'var(--bg)' }
-  const hue = hueFor(String(managerId ?? rosterId))
-  return { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
 }
 
 export const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
@@ -588,6 +583,7 @@ export default function PowerRankings() {
     rosterId: m.rosterId,
     managerId: m.managerId,
     manager: m.manager,
+    avatarId: m.avatarId,
     teamName: m.teamName,
     isMe: m.isMe,
   }))
@@ -967,9 +963,12 @@ export default function PowerRankings() {
                     >
                       <span className={`pr-rank mono${isMe ? ' mine' : e.rank <= 3 ? ' top' : ''}`}>{e.rank}</span>
                       <span className="pr-team">
-                        <span className="avatar" style={avatarStyleFor(e.managerId, e.rosterId, isMe)} aria-hidden="true">
-                          {(e.manager ?? `R${e.rosterId}`).charAt(0).toUpperCase()}
-                        </span>
+                        <Avatar
+                          avatarId={e.avatarId}
+                          seed={String(e.managerId ?? e.rosterId)}
+                          label={e.manager ?? `R${e.rosterId}`}
+                          isMe={isMe}
+                        />
                         <span className="pr-team-text">
                           <span className="pr-team-name">
                             {e.manager ?? `roster ${e.rosterId}`}
@@ -1079,13 +1078,11 @@ export default function PowerRankings() {
           {highlighted != null && (
             <section className="panel">
               <div className="panel-head pr-focus-head">
-                <span
-                  className="avatar"
-                  style={avatarStyleFor(focusRows.find((f) => f.entry)?.entry?.managerId ?? null, highlighted, false)}
-                  aria-hidden="true"
-                >
-                  {focusName.charAt(0).toUpperCase()}
-                </span>
+                <Avatar
+                  avatarId={focusRows.find((f) => f.entry)?.entry?.avatarId ?? null}
+                  seed={String(focusRows.find((f) => f.entry)?.entry?.managerId ?? highlighted)}
+                  label={focusName}
+                />
                 <h2>{focusName}</h2>
                 <button type="button" className="link-button" onClick={() => setCompareOpen((v) => !v)}>
                   {compareOpen ? 'Hide' : 'Compare across modes'} ↓

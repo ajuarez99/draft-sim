@@ -30,6 +30,7 @@ function toBoardSeat(s: MockSeat): Seat {
     slot: s.slot,
     managerId: s.managerId ?? -s.slot, // synthetic per-slot id so bot headers still get distinct colors
     manager: s.manager,
+    avatarId: s.avatarId,
     provenance: 'NEUTRAL',
     reachBias: 0,
     unpredictability: 1,
@@ -91,6 +92,7 @@ export default function MockDraftView() {
       round: p.round,
       slot: p.draftSlot,
       manager: state.seats.find((s) => s.slot === p.draftSlot)?.manager ?? String(p.draftSlot),
+      avatarId: state.seats.find((s) => s.slot === p.draftSlot)?.avatarId ?? null,
       player: p.player,
       probability: 1,
       isModal: true,

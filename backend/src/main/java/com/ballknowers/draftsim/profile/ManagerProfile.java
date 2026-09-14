@@ -32,7 +32,9 @@ public record ManagerProfile(
         String note,
         int draftsObserved,
         int picksScored,
-        Provenance provenance
+        Provenance provenance,
+        /** Sleeper's own avatar id (resolves via sleepercdn.com), or null when Sleeper has none on file. */
+        String avatarId
 ) {
     public double tilt(Position pos) {
         return positionalTilt.getOrDefault(pos, 1.0);
@@ -41,6 +43,6 @@ public record ManagerProfile(
     /** The league-average drafter. Every seat with no history and no stated opinion. */
     public static ManagerProfile neutral(long managerId, String displayName) {
         return new ManagerProfile(managerId, displayName, 0.0, Map.of(), 1.0, null,
-                0, 0, Provenance.NEUTRAL);
+                0, 0, Provenance.NEUTRAL, null);
     }
 }

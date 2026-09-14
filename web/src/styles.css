@@ -153,7 +153,13 @@ body {
 
 .cond { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; }
 .mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
-.avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; }
+.avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+/* Crimson ring, not fill, once a real photo replaces the initial -- the
+   "crimson-when-it's-you" identity rule stays visible without covering the
+   photo. Inset so the parent's overflow:hidden (which clips the image to the
+   circle) doesn't also clip an outward ring. */
+.avatar-me:has(img) { box-shadow: inset 0 0 0 2px var(--crimson); }
 /* An avatar that's also a button (e.g. the Realized popup trigger in
    PowerRankings) needs the UA button chrome stripped back to plain .avatar. */
 button.avatar { border: 0; padding: 0; font-family: inherit; cursor: pointer; }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { hueFor } from '../hue'
+import Avatar from './Avatar'
 import {
   isComplete,
   makeEmptyOrder,
@@ -48,6 +48,7 @@ export type RankBoardMember = {
   /** Display name -- already resolved (Sleeper display name, or better),
    *  same convention as `StandingRow.manager` in api.ts. */
   manager: string | null
+  avatarId?: string | null
   /** Sleeper's `metadata.team_name`, resolved by the caller. Rendered only
    *  when present and not the literal string "TBD" (design doc finding 19) --
    *  checked again here defensively, since a caller could pass it through
@@ -114,17 +115,6 @@ function chipTeam(m: RankBoardMember | undefined): string | null {
   const t = m?.teamName?.trim()
   if (!t || t.toUpperCase() === 'TBD') return null
   return t
-}
-
-/** Same seed/formula as SeatPopover's `avatarStyle` and DraftBoard's `hue` --
- *  `hueFor(String(managerId))`, matching the chart (design doc finding 17).
- *  `?? rosterId` is the same defensive fallback PowerRankings.tsx:96 already
- *  uses; `league_member`'s FK means a null `managerId` shouldn't occur here,
- *  but this stays consistent with the rest of the app if it ever does. */
-function avatarStyleFor(m: RankBoardMember): { background: string; color: string } {
-  if (m.isMe) return { background: 'var(--crimson)', color: 'var(--bg)' }
-  const hue = hueFor(String(m.managerId ?? m.rosterId))
-  return { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
 }
 
 function buildInitialOrder(members: RankBoardMember[], initialOrder: number[] | undefined): RankOrder {
@@ -433,7 +423,6 @@ export default function RankBoard({
 
   function renderChip(m: RankBoardMember, slotIndex: number | null) {
     const chipId = m.rosterId
-    const avatarStyle = avatarStyleFor(m)
     const name = chipName(m, chipId)
     const team = chipTeam(m)
     const isSelected = selected === chipId
@@ -466,9 +455,7 @@ export default function RankBoard({
         onClick={() => handleChipClick(chipId, slotIndex)}
         onKeyDown={(e) => handleChipKeyDown(e, chipId, slotIndex)}
       >
-        <span className="avatar" style={avatarStyle} aria-hidden="true">
-          {name.charAt(0).toUpperCase()}
-        </span>
+        <Avatar avatarId={m.avatarId} seed={String(m.managerId ?? m.rosterId)} label={name} isMe={m.isMe} />
         <span className="rankboard-chip-text">
           <span className="rankboard-chip-name">{name}</span>
           {team && <span className="rankboard-chip-team tiny muted">{team}</span>}
@@ -534,9 +521,12 @@ export default function RankBoard({
 
       {draggingChipId != null && draggingMember && (
         <div className="rankboard-ghost" ref={ghostElRef} aria-hidden="true">
-          <span className="avatar" style={avatarStyleFor(draggingMember)}>
-            {chipName(draggingMember, draggingMember.rosterId).charAt(0).toUpperCase()}
-          </span>
+          <Avatar
+            avatarId={draggingMember.avatarId}
+            seed={String(draggingMember.managerId ?? draggingMember.rosterId)}
+            label={chipName(draggingMember, draggingMember.rosterId)}
+            isMe={draggingMember.isMe}
+          />
           <span className="rankboard-chip-name">{chipName(draggingMember, draggingMember.rosterId)}</span>
         </div>
       )}

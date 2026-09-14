@@ -48,7 +48,7 @@ public record SimulationResult(
      *                    assigned earlier. Those cells are the least certain.
      */
     public record PredictedPick(
-            int pickNo, int round, int slot, String manager,
+            int pickNo, int round, int slot, String manager, String avatarId,
             PlayerRef player, double probability, boolean isModal,
             List<Candidate> alternatives) {}
 

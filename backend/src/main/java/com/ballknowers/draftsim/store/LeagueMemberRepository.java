@@ -44,18 +44,18 @@ public class LeagueMemberRepository {
                 .update();
     }
 
-    public record MemberRow(long managerId, String managerName, boolean isCommissioner, String teamName) {}
+    public record MemberRow(long managerId, String managerName, String avatarId, boolean isCommissioner, String teamName) {}
 
     public List<MemberRow> forLeague(long leagueId) {
         return db.sql("""
-                select lm.manager_id, m.display_name, lm.is_commissioner, lm.team_name
+                select lm.manager_id, m.display_name, m.avatar_id, lm.is_commissioner, lm.team_name
                 from league_member lm
                 join manager m on m.id = lm.manager_id
                 where lm.league_id = ?
                 order by m.display_name
                 """)
                 .param(leagueId)
-                .query((rs, i) -> new MemberRow(rs.getLong(1), rs.getString(2), rs.getBoolean(3), rs.getString(4)))
+                .query((rs, i) -> new MemberRow(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getBoolean(4), rs.getString(5)))
                 .list();
     }
 

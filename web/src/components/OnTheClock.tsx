@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { hueFor } from '../hue'
+import Avatar from './Avatar'
 import { roundPickLabel } from '../roundPickLabel'
 
 type Props = {
@@ -8,6 +8,8 @@ type Props = {
   isMine: boolean
   /** Avatar tint seed: the manager id where there is one, the slot otherwise. */
   hueSeed: string
+  /** Sleeper's avatar id for whoever's on the clock, or null/undefined with none on file. */
+  avatarId?: string | null
   pickNo: number
   maxPickNo: number
   teams: number
@@ -56,6 +58,7 @@ export default function OnTheClock({
   manager,
   isMine,
   hueSeed,
+  avatarId,
   pickNo,
   maxPickNo,
   teams,
@@ -83,7 +86,6 @@ export default function OnTheClock({
     )
   }
 
-  const hue = hueFor(hueSeed)
   const round = Math.ceil(pickNo / teams)
   // Only meaningful while someone else is picking: during your own turn the
   // answer is "now", which the kicker already says.
@@ -91,16 +93,7 @@ export default function OnTheClock({
 
   const identity = (
     <>
-      <span
-        className="avatar on-clock-avatar"
-        style={
-          isMine
-            ? { background: 'var(--crimson)', color: 'var(--bg)' }
-            : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
-        }
-      >
-        {(manager ?? '?').trim().charAt(0).toUpperCase()}
-      </span>
+      <Avatar avatarId={avatarId} seed={hueSeed} label={manager ?? '?'} isMe={isMine} className="on-clock-avatar" />
       <span className="on-clock-text">
         <span className="on-clock-kicker cond">{isMine ? 'Your pick' : 'On the clock'}</span>
         <span className="on-clock-name">
