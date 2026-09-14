@@ -2290,6 +2290,16 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-ballot-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .pr-ballot-modal-title { font-size: 18px; font-weight: 700; }
 
+/* A 12+ team board's tray+slots can outgrow the modal's 80vh cap (see
+   .modal-card.wide). Without this, the overflow spilled the submit button
+   out past the card's rounded bottom edge instead of scrolling with it --
+   shrink the board itself and let its slot list scroll internally, so the
+   submit control stays inside the card no matter the league size. */
+.modal-card.wide .rankboard { flex: 1; min-height: 0; overflow: hidden; }
+.modal-card.wide .rankboard-tray,
+.modal-card.wide .rankboard .controls { flex-shrink: 0; }
+.modal-card.wide .rankboard-slots { flex: 1; min-height: 0; overflow-y: auto; }
+
 @media (max-width: 1180px) {
   /* The sidebar stops being a sidebar before the rows start truncating. */
   .pr-grid { grid-template-columns: minmax(0, 1fr); }
