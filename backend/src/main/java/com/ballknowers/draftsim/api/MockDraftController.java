@@ -49,10 +49,11 @@ public class MockDraftController {
     public MockSessionState create(@RequestBody CreateRequest body,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         if (body == null) throw new IllegalArgumentException("request body is required");
-        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId);
+        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId,
+                body.sourceLeagueName());
     }
 
-    public record CreateRequest(int teams, int userSlot, Map<Integer, Long> managerSeats) {
+    public record CreateRequest(int teams, int userSlot, Map<Integer, Long> managerSeats, String sourceLeagueName) {
         public CreateRequest {
             if (managerSeats == null) managerSeats = Map.of();
         }

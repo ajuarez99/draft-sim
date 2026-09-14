@@ -4,8 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import MockSetup from './MockSetup'
 
 const navigate = vi.fn()
+let mockLocationState: unknown = null
 vi.mock('react-router-dom', () => ({
   useNavigate: () => navigate,
+  useLocation: () => ({ state: mockLocationState }),
 }))
 
 const createMockSession = vi.fn()
@@ -20,6 +22,7 @@ beforeEach(() => {
   createMockSession.mockReset()
   getManagers.mockReset()
   getManagers.mockResolvedValue([])
+  mockLocationState = null
 })
 
 // The seat strip labels a seat by its round-1 pick, not by "seat N" -- e.g.
@@ -108,6 +111,28 @@ describe('MockSetup', () => {
 
     expect(await screen.findByText('board is empty — run ingest first')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /start the draft/i })).not.toBeDisabled()
+  })
+
+  describe('handed off from the Start a mock draft modal', () => {
+    it('preselects the team count StartMockModal passed through router state', async () => {
+      mockLocationState = { teams: 14, sourceLeagueName: 'West Coast Fantasy Football' }
+      createMockSession.mockResolvedValue({ id: 5 })
+      const user = userEvent.setup()
+      render(<MockSetup />)
+
+      expect(screen.getByRole('button', { name: '14' })).toHaveAttribute('aria-pressed', 'true')
+
+      await user.click(screen.getByRole('button', { name: /start the draft/i }))
+
+      expect(createMockSession).toHaveBeenCalledWith(14, 1, {}, 'West Coast Fantasy Football')
+    })
+
+    it('ignores an out-of-range handed-off team count and falls back to 10', () => {
+      mockLocationState = { teams: 9, sourceLeagueName: 'Bad Count League' }
+      render(<MockSetup />)
+
+      expect(screen.getByRole('button', { name: '10' })).toHaveAttribute('aria-pressed', 'true')
+    })
   })
 
   describe('with real managers available', () => {

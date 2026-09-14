@@ -103,9 +103,13 @@ describe('App sign-out gating', () => {
     expect(await screen.findByText('draft picker')).toBeInTheDocument()
   })
 
+  // Not "/": the redesigned home screen (design_handoff_multisport_mock_drafts)
+  // supplies its own sidebar nav instead of the app-wide header's chips --
+  // App.tsx suppresses .top on that one route. Every other route still shows
+  // it, which is what this test actually guards.
   it('hides the Home/Managers nav chips when signed out and shows them when signed in', async () => {
     const { rerender } = render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
         <App />
       </MemoryRouter>,
     )
@@ -114,11 +118,24 @@ describe('App sign-out gating', () => {
 
     setUser(sampleUser)
     rerender(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
         <App />
       </MemoryRouter>,
     )
     expect(await screen.findByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Managers' })).toBeInTheDocument()
+  })
+
+  it('does not render the app-wide header chrome on the redesigned home screen', async () => {
+    setUser(sampleUser)
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('draft picker')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
   })
 })

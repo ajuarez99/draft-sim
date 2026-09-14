@@ -6,13 +6,15 @@ import DraftPicker from './DraftPicker'
 import type { SleeperLeague } from '../api'
 
 vi.mock('react-router-dom', () => ({
-  // DraftPicker only ever uses <Link>, never navigate/params -- a plain <a>
-  // passthrough is enough, same convention as MockSetup.test.tsx's narrower mock.
+  // A plain <a> passthrough is enough for <Link> -- same convention as
+  // MockSetup.test.tsx's narrower mock. useNavigate backs the "Start a mock
+  // draft" modal's handoff to /mock/new; unused by these From-Sleeper-only tests.
   Link: ({ to, children, ...rest }: { to: string; children: ReactNode }) => (
     <a href={to} {...rest}>
       {children}
     </a>
   ),
+  useNavigate: () => vi.fn(),
 }))
 
 const getDrafts = vi.fn()
@@ -34,6 +36,7 @@ vi.mock('../api', () => ({
 
 vi.mock('../user', () => ({
   useUser: () => ({ sleeperUserId: '42', username: 'tester', displayName: 'Tester', avatar: null }),
+  clearUser: vi.fn(),
 }))
 
 const nbaLeague: SleeperLeague = {
