@@ -708,14 +708,10 @@ export type PowerRankingEntry = {
   // the ballot it came from.
   selfRankBias?: number | null
 
-  // TODO(power-rankings-reskin): not populated by the backend yet. The
-  // power-rankings-reskin.md mockups surface a "makes playoffs NN%" stat as a
-  // headline number (hero card, your-team strip, ladder column) that needs a
-  // rest-of-season Monte Carlo simulation against the real schedule -- a
-  // backend feature this presentation-only reskin explicitly does not add
-  // (see that doc's own "stop and report" rule). The UI is wired to this
-  // field so it lights up the moment a backend PR populates it; until then it
-  // is always undefined and every call site renders its own "--" fallback.
+  // Rest-of-season Monte Carlo, real as of claude/playoff-odds.md. Null for
+  // any week with no stored odds snapshot -- weeks that predate the feature,
+  // and leagues whose seeding this app refuses to model (divisions, a
+  // non-default playoff_seed_type). Null means "no answer", never "0%".
   makesPlayoffsPct?: number | null
 }
 
@@ -726,10 +722,21 @@ export type NflState = {
   started: boolean
 }
 
+/** How the odds on these entries were produced, so the page can say so out loud. */
+export type PlayoffOddsSummary = {
+  week: number
+  iterations: number
+  model: string
+  weeksOfScoring: number
+}
+
 export type PowerRankings = {
   sleeperLeagueId: string
   nflState: NflState
   entries: PowerRankingEntry[]
+  // Null when this league has no odds at all; the page then says nothing about
+  // a simulation rather than describing one that never ran.
+  playoffOdds?: PlayoffOddsSummary | null
 }
 
 export const getPowerRankings = (sleeperLeagueId: string) =>

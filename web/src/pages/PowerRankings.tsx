@@ -30,9 +30,11 @@ import { useUser } from '../user'
  *
  * Two deliberate gaps vs. the approved mockups, both because the brief they
  * shipped with is explicit that this is a presentation-only pass:
- *  - `PowerRankingEntry.makesPlayoffsPct` is real API surface but always
- *    undefined today -- there is no playoff-odds simulation anywhere in this
- *    codebase yet. Every render site below degrades to "--" rather than
+ *  - `PowerRankingEntry.makesPlayoffsPct` is populated as of
+ *    claude/playoff-odds.md (a rest-of-season Monte Carlo, stored per week).
+ *    It is still null for weeks with no odds snapshot -- weeks that predate
+ *    the feature, and leagues whose seeding the backend refuses to model --
+ *    so every render site below still degrades to "--" rather than
  *    fabricating a number; wiring the backend is a separate piece of work.
  *  - "Commissioner's take" does not reproduce the mockup's free-text quote
  *    ("Kittle Caesars at 4th is a gift...") -- there is no field anywhere
@@ -261,6 +263,13 @@ export function recordLabel(r: StandingRow | undefined | null): string {
  *  "0%" can never be confused. */
 export function pctLabel(pct: number | null | undefined): string {
   return pct == null ? '--' : `${Math.round(pct)}%`
+}
+
+/** Long odds, a coin flip, or all but locked in -- the pill's tint, nothing else. */
+export function oddsTone(pct: number): 'in' | 'live' | 'out' {
+  if (pct >= 75) return 'in'
+  if (pct >= 25) return 'live'
+  return 'out'
 }
 
 /** The ladder's rightmost "note" column, one sentence, mode-dependent. MEMBER
@@ -667,6 +676,14 @@ export default function PowerRankings() {
   const myEntry = heroRows.find((e) => ballot?.members.some((m) => m.isMe && m.rosterId === e.rosterId))
   const myBallotRank = ballot?.mine ? ballot.mine.rosterIds.indexOf(myEntry?.rosterId ?? -1) : -1
 
+  // The footnote's second sentence, built from the snapshot that actually
+  // produced the numbers. When there is no snapshot the sentence is absent --
+  // it used to claim a simulation that did not exist anywhere in the codebase.
+  const oddsSummary = data?.playoffOdds ?? null
+  const oddsNote = oddsSummary
+    ? `Playoff odds are ${oddsSummary.iterations.toLocaleString()} simulated seasons against the real remaining schedule, from ${oddsSummary.weeksOfScoring} week${oddsSummary.weeksOfScoring === 1 ? '' : 's'} of scoring.`
+    : null
+
   const memberEntries = entriesFor('MEMBER', currentWeek)
   const homers = memberEntries.filter((e) => e.selfRankBias != null).sort((a, b) => a.selfRankBias! - b.selfRankBias!)
   const topHomer = homers[0] ?? null
@@ -803,8 +820,12 @@ export default function PowerRankings() {
             {(() => {
               const d = deltaVs(myEntry, heroReferenceRank)
               return d != null && d !== 0 ? ` · the room moved you ${d > 0 ? 'up' : 'down'} ${Math.abs(d)}` : ''
-            })()}{' '}
-            · <span className="mono">{pctLabel(myEntry.makesPlayoffsPct)}</span> to make it
+            })()}
+            {myEntry.makesPlayoffsPct != null && (
+              <>
+                {' '}· <span className="mono">{pctLabel(myEntry.makesPlayoffsPct)}</span> to make it
+              </>
+            )}
           </span>
           {myBallotRank != null && myBallotRank >= 0 && (
             <span className="pr-your-team-vote">You voted yourself {ordinal(myBallotRank + 1)}.</span>
@@ -926,7 +947,6 @@ export default function PowerRankings() {
                   ) : (
                     <>
                       {hasReference && <span className="pr-move-head">{sinceLabel}</span>}
-                      <span className="pr-score-head">Makes playoffs</span>
                       <span>Where the room had them</span>
                     </>
                   )}
@@ -976,7 +996,19 @@ export default function PowerRankings() {
                           </span>
                         </span>
                       </span>
-                      <span className="mono pr-record">{recordLabel(standings?.get(e.rosterId))}</span>
+                      {/* Record and odds are one cell on purpose: both are
+                          "how this team's season is going", neither is about
+                          the ranking mode, and it costs the row no width. The
+                          pill is simply absent when there is no answer -- a
+                          dash under every record is noise. */}
+                      <span className="pr-record-cell">
+                        <span className="mono pr-record">{recordLabel(standings?.get(e.rosterId))}</span>
+                        {pct != null && (
+                          <span className={`mono pr-odds ${oddsTone(pct)}`} title={`${pctLabel(pct)} to make the playoffs`}>
+                            {pctLabel(pct)}
+                          </span>
+                        )}
+                      </span>
                       {space ? (
                         <>
                           <span className="mono pr-avg">{scoreLabel(e)}</span>
@@ -1016,12 +1048,6 @@ export default function PowerRankings() {
                               {delta == null ? '–' : delta === 0 ? '–' : `${delta > 0 ? '▲' : '▼'}${Math.abs(delta)}`}
                             </span>
                           )}
-                          <span className="pr-playoff-cell">
-                            <span className="pr-bar">
-                              <span className={`pr-bar-fill${isMe ? ' mine' : ''}`} style={{ width: pct == null ? '0%' : `${pct}%` }} />
-                            </span>
-                            <span className="mono pr-playoff-pct">{pctLabel(pct)}</span>
-                          </span>
                           <span className="pr-note">{ladderNoteFor(ladderMode, e, gridRows)}</span>
                         </>
                       )}
@@ -1052,7 +1078,7 @@ export default function PowerRankings() {
                   </div>
                 )}
                 <p className="pr-foot">
-                  Ranks are manager ballots, averaged. Playoff odds come from simulating the rest of the season.{' '}
+                  Ranks are manager ballots, averaged. {oddsNote}{' '}
                   <button type="button" className="link-button" onClick={() => setHowOpen((v) => !v)}>
                     How this works →
                   </button>
@@ -1062,8 +1088,11 @@ export default function PowerRankings() {
                     <p className="tiny muted">{KIND_CAVEAT[ladderMode]}</p>
                     <p className="tiny muted">
                       Movement compares this mode against {KIND_LABEL[referenceKind]} for the same week, when that mode has a
-                      snapshot for it -- otherwise the column is hidden rather than showing a fake zero. "Makes playoffs" is not
-                      wired to a simulation yet; every team shows "--" until it is.
+                      snapshot for it -- otherwise the column is hidden rather than showing a fake zero. Playoff odds are a
+                      team-level simulation: each roster's weekly scoring, shrunk toward the league average by how few games
+                      it stands on, played out over the real remaining schedule. It knows nothing about injuries, byes or
+                      trades, and a league whose playoff seeding this app does not model (divisions, a custom seed type)
+                      shows "--" rather than a number that would be quietly wrong.
                     </p>
                   </div>
                 )}
@@ -1358,7 +1387,7 @@ export default function PowerRankings() {
           </section>
 
           <p className="pr-foot">
-            Ranks are manager ballots, averaged. Playoff odds come from simulating the rest of the season.{' '}
+            Ranks are manager ballots, averaged. {oddsNote}{' '}
             <button type="button" className="link-button" onClick={() => setHowOpen((v) => !v)}>
               How this works →
             </button>

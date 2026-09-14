@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.MemberRankingService;
+import com.ballknowers.draftsim.engine.PlayoffOddsService;
 import com.ballknowers.draftsim.engine.PowerRankingService;
 import com.ballknowers.draftsim.ingest.RosterOwnerMapper;
 import com.ballknowers.draftsim.ingest.SleeperClient;
@@ -43,12 +44,14 @@ public class LeagueHistoryController {
     private final RankingBallotRepository ballots;
     private final MemberRankingService memberRankings;
     private final OwnerProperties ownerProperties;
+    private final PlayoffOddsService playoffOdds;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                    PowerRankingService power, ProfileService profiles,
                                    LeagueMembership membership, SleeperClient sleeper, ManagerRepository managers,
                                    LeagueMemberRepository leagueMembers, RankingBallotRepository ballots,
-                                   MemberRankingService memberRankings, OwnerProperties ownerProperties) {
+                                   MemberRankingService memberRankings, OwnerProperties ownerProperties,
+                                   PlayoffOddsService playoffOdds) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
@@ -59,6 +62,7 @@ public class LeagueHistoryController {
         this.leagueMembers = leagueMembers;
         this.ballots = ballots;
         this.memberRankings = memberRankings;
+        this.playoffOdds = playoffOdds;
         this.ownerProperties = ownerProperties;
     }
 
@@ -237,6 +241,13 @@ public class LeagueHistoryController {
             }
         }
 
+        // Playoff odds ride on the entries rather than a parallel structure:
+        // the client reads makesPlayoffsPct off the entry it is already
+        // rendering. A week with no stored snapshot keeps the null it was born
+        // with, and the client renders "--" for it -- the odds shown against a
+        // week are the odds AS OF that week, never last week's borrowed.
+        attachPlayoffOdds(entries, playoffOdds.madePctByWeek(row.id(), row.season()));
+
         Map<String, Object> nflState = new LinkedHashMap<>();
         nflState.put("week", state.week());
         nflState.put("season", state.season());
@@ -247,7 +258,30 @@ public class LeagueHistoryController {
         response.put("sleeperLeagueId", sleeperId);
         response.put("nflState", nflState);
         response.put("entries", entries);
+        // Null when this league has no odds at all -- the page then says nothing
+        // about a simulation instead of describing one that never ran.
+        playoffOdds.summary(row.id(), row.season()).ifPresentOrElse(
+                s -> {
+                    Map<String, Object> odds = new LinkedHashMap<>();
+                    odds.put("week", s.week());
+                    odds.put("iterations", s.iterations());
+                    odds.put("model", s.model());
+                    odds.put("weeksOfScoring", s.weeksOfScoring());
+                    response.put("playoffOdds", odds);
+                },
+                () -> response.put("playoffOdds", null));
         return ResponseEntity.ok(response);
+    }
+
+    private static void attachPlayoffOdds(List<Map<String, Object>> entries,
+                                          Map<Integer, Map<Integer, Double>> byWeek) {
+        if (byWeek.isEmpty()) return;
+        for (Map<String, Object> entry : entries) {
+            Map<Integer, Double> week = byWeek.get((Integer) entry.get("week"));
+            if (week == null) continue;
+            Double pct = week.get((Integer) entry.get("rosterId"));
+            if (pct != null) entry.put("makesPlayoffsPct", pct);
+        }
     }
 
     private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {
@@ -296,6 +330,10 @@ public class LeagueHistoryController {
         m.put("stdev", stdev);
         m.put("ballotCount", ballotCount);
         m.put("selfRankBias", selfRankBias);
+        // Always present, null until a stored odds snapshot fills it in
+        // (attachPlayoffOdds). Same discipline as bestRank/stdev above: the
+        // client's type is one shape, not one shape per kind.
+        m.put("makesPlayoffsPct", null);
         return m;
     }
 
@@ -480,12 +518,16 @@ public class LeagueHistoryController {
 
         var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
         var realized = power.computeRealized(league.get().id(), season, week);
+        // Same trigger as the box-score snapshot, deliberately: odds are never
+        // computed on a page load (claude/playoff-odds.md).
+        var odds = playoffOdds.compute(league.get().id(), season, week);
 
         // LinkedHashMap, not Map.of: the reason below is legitimately absent on
         // the happy path, and Map.of throws on a null value.
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("week0", week0.length);
         response.put("realized", realized.length);
+        response.put("playoffOdds", odds.size());
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess

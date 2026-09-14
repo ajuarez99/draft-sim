@@ -2353,13 +2353,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-compute-trigger { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
 .pr-list { max-width: 1180px; }
+/* Record carries the playoff odds now (claude/playoff-odds.md), so there is no
+   separate odds column on any tab -- one number, one rendering. */
 .pr-row-head, .pr-row {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) 64px 70px 150px minmax(150px, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr) 78px 70px minmax(150px, 1fr);
   gap: 0 14px; align-items: center;
 }
 .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row {
-  grid-template-columns: 30px minmax(0, 1fr) 64px 150px minmax(150px, 1fr);
+  grid-template-columns: 30px minmax(0, 1fr) 78px minmax(150px, 1fr);
 }
 .pr-row-head {
   padding: 0 6px 8px; border-bottom: 1px solid var(--line);
@@ -2401,7 +2403,20 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* Record over odds: two lines in the width one line used to take, so adding
+   the number cost the row nothing. */
+.pr-record-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
 .pr-record { font-size: 13px; }
+.pr-odds {
+  padding: 1px 6px; border-radius: 999px; font-size: 11px; line-height: 1.5;
+  background: color-mix(in oklch, var(--muted) 16%, transparent); color: var(--muted);
+}
+/* All but in / still alive / long odds. Teal is "good" everywhere else on this
+   page, and the warm end deliberately stops short of crimson -- crimson means
+   "this row is you". */
+.pr-odds.in { background: color-mix(in oklch, var(--teal) 16%, transparent); color: var(--teal); }
+.pr-odds.live { background: color-mix(in oklch, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
+.pr-odds.out { background: color-mix(in oklch, oklch(75% 0.13 50) 14%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
 .pr-move.up { color: oklch(72% 0.14 150); }
@@ -2436,7 +2451,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    open `1fr` so it doesn't win that space back from the bar. */
 .pr-list.member-space { max-width: none; }
 .pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
-  grid-template-columns: 30px minmax(140px, 260px) 60px 56px 88px minmax(200px, 1fr) 104px;
+  grid-template-columns: 30px minmax(140px, 260px) 74px 56px 88px minmax(200px, 1fr) 104px;
 }
 /* Title over a scale, both inside the bar's own grid track, so the axis
    labels sit over the ends of the bar they describe instead of drifting
@@ -2600,13 +2615,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   /* The sidebar stops being a sidebar before the rows start truncating. */
   .pr-grid { grid-template-columns: minmax(0, 1fr); }
   .pr-side { position: static; }
-  .pr-row-head, .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 56px 110px minmax(120px, 1fr); }
-  .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row { grid-template-columns: 26px minmax(0, 1fr) 52px 110px minmax(120px, 1fr); }
+  .pr-row-head, .pr-row { grid-template-columns: 26px minmax(0, 1fr) 68px 56px minmax(120px, 1fr); }
+  .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row { grid-template-columns: 26px minmax(0, 1fr) 68px minmax(120px, 1fr); }
   /* Tuned to FIT, not just to shrink: at ~900px these tracks used to total
      ~60px more than the list's own width, and the overflow came out of the
      range bar -- the one column whose whole job is its length. */
   .pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
-    grid-template-columns: 26px minmax(100px, 200px) 46px 46px 66px minmax(120px, 1fr) 88px;
+    grid-template-columns: 26px minmax(100px, 200px) 62px 46px 66px minmax(120px, 1fr) 88px;
     gap: 0 10px;
   }
 }
@@ -2630,18 +2645,18 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      is a further pass; see the reskin handoff note. Column count in the
      template must equal the count of children NOT display:none, since grid
      hands explicit tracks to whichever children remain in DOM order. */
+  /* Rank, team, record+odds, note. Movement is what drops here now: record
+     carries the playoff number, which is worth more than an arrow. */
   .pr-row-head, .pr-row {
-    grid-template-columns: 26px minmax(0, 1fr) 50px 90px;
+    grid-template-columns: 26px minmax(0, 1fr) 62px minmax(90px, 1fr);
     gap: 0 10px;
   }
-  .pr-row-head span:nth-child(3), .pr-row span:nth-child(3),
-  .pr-row-head span:nth-child(6), .pr-row span:nth-child(6) { display: none; }
+  .pr-row-head span:nth-child(4), .pr-row span:nth-child(4) { display: none; }
   .pr-list.no-reference .pr-row-head, .pr-list.no-reference .pr-row {
-    grid-template-columns: 26px minmax(0, 1fr) 90px;
+    grid-template-columns: 26px minmax(0, 1fr) 62px minmax(90px, 1fr);
   }
-  .pr-list.no-reference .pr-row-head span:nth-child(3), .pr-list.no-reference .pr-row span:nth-child(3),
-  .pr-list.no-reference .pr-row-head span:nth-child(5), .pr-list.no-reference .pr-row span:nth-child(5) { display: none; }
-  .pr-playoff-pct { display: none; }
+  /* no-reference has no movement column to drop -- its 4th child IS the note. */
+  .pr-list.no-reference .pr-row-head span:nth-child(4), .pr-list.no-reference .pr-row span:nth-child(4) { display: revert; }
 
   /* Ranking-space row at mobile: rank, team, your ballot, the range in
      words. Record and Avg drop rather than truncate -- and so does the range
@@ -2649,12 +2664,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      it is a smudge, while "3rd-10th" is exact at any width. The bar is back
      the moment the row has room for it. */
   .pr-list.member-space .pr-row-head, .pr-list.member-space .pr-row {
-    grid-template-columns: 24px minmax(0, 1.4fr) 56px minmax(82px, 1fr);
+    grid-template-columns: 24px minmax(0, 1.2fr) 58px 56px minmax(82px, 1fr);
     gap: 0 8px;
   }
   /* Sized for the widest label this column can hold ("10th-12th"). */
   .pr-range-pill { padding: 3px 6px; }
-  .pr-list.member-space .pr-row-head span:nth-child(3), .pr-list.member-space .pr-row span:nth-child(3),
+  /* Record+odds survives at mobile here too; Avg and the range bar are what go. */
+  .pr-list.member-space .pr-row-head span:nth-child(3), .pr-list.member-space .pr-row span:nth-child(3) { display: flex; }
   .pr-list.member-space .pr-row-head span:nth-child(4), .pr-list.member-space .pr-row span:nth-child(4),
   .pr-list.member-space .pr-row-head span:nth-child(6), .pr-list.member-space .pr-row span:nth-child(6) { display: none; }
   /* nth-child(7) is the range pill, which the base mobile rule leaves alone

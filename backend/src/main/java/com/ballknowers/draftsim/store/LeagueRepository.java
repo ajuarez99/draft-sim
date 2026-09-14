@@ -134,6 +134,44 @@ public class LeagueRepository {
      * again needs no network call. Stops at whatever this DB has, which may be
      * a prefix of the real chain if an earlier season was never ingested.
      */
+    /**
+     * The league's playoff format, read straight out of {@code settings_json}
+     * (claude/playoff-odds.md). Every field here is one Sleeper setting, read
+     * in SQL rather than by parsing the blob in Java -- there is no mapping
+     * step to get wrong.
+     *
+     * @param seedType       Sleeper's {@code playoff_seed_type}. 0 is the plain
+     *                       "best record seeds first" ladder this app models;
+     *                       anything else is a format whose seeding we do not
+     *                       reproduce, and odds are withheld rather than guessed.
+     * @param hasDivisions   division seeding is likewise not modeled.
+     * @param medianMatch    {@code league_average_match}: every team also plays
+     *                       the weekly median, which silently doubles the games.
+     */
+    public record PlayoffFormat(int playoffTeams, int playoffWeekStart, int seedType,
+                                boolean hasDivisions, boolean medianMatch) {
+
+        /** claude/playoff-odds.md "Honesty rules": no snapshot at all for a format we cannot seed. */
+        public boolean modelable() {
+            return playoffTeams > 0 && playoffWeekStart > 1 && seedType == 0 && !hasDivisions;
+        }
+    }
+
+    public Optional<PlayoffFormat> playoffFormat(long leagueId) {
+        return db.sql("""
+                select coalesce((settings_json->>'playoff_teams')::int, 0),
+                       coalesce((settings_json->>'playoff_week_start')::int, 0),
+                       coalesce((settings_json->>'playoff_seed_type')::int, 0),
+                       coalesce((settings_json->>'divisions')::int, 0) > 0,
+                       coalesce((settings_json->>'league_average_match')::int, 0) > 0
+                from league where id = ?
+                """)
+                .param(leagueId)
+                .query((rs, i) -> new PlayoffFormat(rs.getInt(1), rs.getInt(2), rs.getInt(3),
+                        rs.getBoolean(4), rs.getBoolean(5)))
+                .optional();
+    }
+
     public List<LeagueRow> chainBySleeperId(String sleeperId) {
         List<LeagueRow> chain = new ArrayList<>();
         String id = sleeperId;

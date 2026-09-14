@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.LeagueMatchupRepository;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
@@ -36,22 +37,25 @@ public class LeagueHistoryIngestService {
     private final LeagueMemberRepository leagueMembers;
     private final RosterSeasonRepository rosterSeasons;
     private final RosterWeekPointsRepository weekPoints;
+    private final LeagueMatchupRepository fixtures;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                       ManagerRepository managers, LeagueMemberRepository leagueMembers,
-                                      RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints) {
+                                      RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints,
+                                      LeagueMatchupRepository fixtures) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
         this.leagueMembers = leagueMembers;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
+        this.fixtures = fixtures;
     }
 
-    public record Result(int seasons, int rostersUpserted, int weeksIngested) {}
+    public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested) {}
 
     public Result ingestChain(Sport sport, String currentLeagueId) {
-        int seasons = 0, rosterCount = 0, weekCount = 0;
+        int seasons = 0, rosterCount = 0, weekCount = 0, fixtureCount = 0;
 
         for (Map<String, Object> league : sleeper.leagueChain(currentLeagueId)) {
             seasons++;
@@ -62,10 +66,11 @@ public class LeagueHistoryIngestService {
             Map<String, Long> managerByUserId = upsertManagers(leagueId, sleeperLeagueId);
             rosterCount += ingestStandings(leagueId, sleeperLeagueId, league, managerByUserId);
             weekCount += ingestWeeklyPoints(leagueId, season, sleeperLeagueId, league);
+            fixtureCount += ingestRemainingFixtures(leagueId, season, sleeperLeagueId, league);
         }
-        log.info("league history: {} seasons, {} roster-seasons, {} roster-weeks ingested",
-                seasons, rosterCount, weekCount);
-        return new Result(seasons, rosterCount, weekCount);
+        log.info("league history: {} seasons, {} roster-seasons, {} roster-weeks, {} future fixtures ingested",
+                seasons, rosterCount, weekCount, fixtureCount);
+        return new Result(seasons, rosterCount, weekCount, fixtureCount);
     }
 
     /**
@@ -151,6 +156,51 @@ public class LeagueHistoryIngestService {
                 String playersPointsJson = JsonUtil.write(m.getOrDefault("players_points", Map.of()));
                 weekPoints.upsert(new RosterWeekPointsRepository.Row(
                         leagueId, season, week, rosterId, startersPoints, playersPointsJson));
+                // The pairing rides along free here -- this payload has it and
+                // roster_week_points has nowhere to put it (claude/playoff-odds.md).
+                fixtures.upsert(new LeagueMatchupRepository.Row(
+                        leagueId, season, week, rosterId, asIntOrNull(m.get("matchup_id"))));
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * The rest of the regular season's pairings -- the weeks nobody has played
+     * yet, which {@link #ingestWeeklyPoints} can never reach because it stops
+     * at {@code last_scored_leg} (claude/playoff-odds.md: without this, the app
+     * knows what every team scored and not who they play next).
+     *
+     * Bounded by {@code playoff_week_start}, a real league setting, rather than
+     * by looping until Sleeper answers empty -- the same discipline finding 2
+     * forced on the results walk, for the same reason: past the regular season
+     * Sleeper keeps answering with real-looking rows.
+     *
+     * Verified 2026-09-14 on (Foot) Ball Knowers: an unplayed week comes back
+     * with every roster present, {@code matchup_id} set and {@code points: 0.0}.
+     * A week Sleeper has not scheduled yet answers with null matchup_ids, which
+     * {@link LeagueMatchupRepository#scheduledWeeks} deliberately does not count
+     * as cached, so the real pairings still arrive on a later run.
+     */
+    private int ingestRemainingFixtures(long leagueId, int season, String sleeperLeagueId,
+                                        Map<String, Object> league) {
+        Map<String, Object> settings = asMap(league.get("settings"));
+        int lastScoredLeg = LeagueMapper.asInt(settings.get("last_scored_leg"), 0);
+        int playoffWeekStart = LeagueMapper.asInt(settings.get("playoff_week_start"), 0);
+        if (playoffWeekStart < 2) return 0;
+
+        Set<Integer> scheduled = fixtures.scheduledWeeks(leagueId, season);
+        int count = 0;
+        for (int week = Math.max(1, lastScoredLeg + 1); week < playoffWeekStart; week++) {
+            if (scheduled.contains(week)) continue;
+            List<Map<String, Object>> rows = sleeper.matchups(sleeperLeagueId, week);
+            if (rows == null) continue;
+            for (Map<String, Object> m : rows) {
+                int rosterId = LeagueMapper.asInt(m.get("roster_id"), -1);
+                if (rosterId < 0) continue;
+                fixtures.upsert(new LeagueMatchupRepository.Row(
+                        leagueId, season, week, rosterId, asIntOrNull(m.get("matchup_id"))));
                 count++;
             }
         }

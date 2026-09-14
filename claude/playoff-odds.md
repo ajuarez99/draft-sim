@@ -1,11 +1,12 @@
 # Playoff odds: making `makesPlayoffsPct` real
 
-Status: **planned, not built** (2026-09-14). The wire field, three render sites
-and a ladder column already exist and have always shown `--`; this brief is the
-backend that fills them in, and the UI decisions that come with a number that is
-finally not null.
+Status: **built 2026-09-14** (V13 + `PlayoffOddsSimulator` / `PlayoffOddsService`,
+verified live). The wire field, three render sites and a ladder column had existed
+since the reskin and had always shown `--`; this brief is the backend that fills
+them in, the UI decisions that came with a number that is finally not null, and
+(at the bottom) the two things live verification found that no test would have.
 
-## What is there now
+## What was there before this shipped
 
 | Piece | Where | State |
 |---|---|---|
@@ -99,10 +100,17 @@ because not every league has a bye.
   (a 1-2 game sample has a meaningless stdev of its own).
 
 `k = 4` is the knob: at n=4 a team is half its own average, at n=12 it is 75% its
-own. **At n=0 every team is the league average and the odds differ only by
-schedule and standings — which is the truth, not a placeholder.** No mapping from
-the week-0 board baseline into points-per-week; that mapping would be invented,
-and inventing it is exactly the kind of thing this page refuses to do elsewhere.
+own. No mapping from the week-0 board baseline into points-per-week; that mapping
+would be invented, and inventing it is exactly the kind of thing this page refuses
+to do elsewhere.
+
+**A league with no scored games at all gets no snapshot.** The original plan here
+said n=0 would leave every team at the league average and let schedule and
+standings do the talking. Run against a real preseason league, that is wrong: with
+no scoring there is no mean and no variance either, every simulated game ends 0-0,
+every team finishes identical, and the tiebreak hands the playoff spots to whoever
+sorted first. The honest answer before week 1 is scored is no answer -- see
+[What live verification found](#what-live-verification-found).
 
 **Simulation.** Per iteration:
 
@@ -123,9 +131,10 @@ and inventing it is exactly the kind of thing this page refuses to do elsewhere.
 
 **Cost.** 10k iterations x 12 rosters x ~13 weeks is about 1.6M draws — tens of ms
 in Java, nothing like the draft sim's 500-iteration cap
-(`claude/reactive-resimulation.md`). Compute on the existing commissioner
-`POST /power/compute` path and on first read of a week with no snapshot; never on
-every page load.
+(`claude/reactive-resimulation.md`). Computed on the existing commissioner
+`POST /power/compute` path only -- never on a page load, and never lazily on read:
+a GET that writes a snapshot is a GET that can disagree with itself under two
+concurrent readers, and this page is read far more than it is recomputed.
 
 ## Honesty rules
 
@@ -145,7 +154,12 @@ is now real:
   must not be confused with the dash's job — `pctLabel` already keeps them
   distinct.
 - Regular season over (`currentWeek >= playoff_week_start`): the question is
-  answered, not simulated. Store the actual outcome as 0/100.
+  answered, not simulated. This falls out for free -- there are no remaining
+  fixtures, so the standings decide every iteration and the stored numbers are
+  0/100. Verified on the 2025 season.
+- **Refusing also deletes.** Whatever a week is refused for -- an unmodelable
+  format, no scoring yet -- any snapshot already stored for that week is removed.
+  A stale answer outlives every reason it was written.
 
 ## Where the number goes
 
@@ -185,6 +199,31 @@ odds path for NBA.
   stored so it can come later without a migration.
 - Backfilling odds for past weeks/seasons — snapshots start the day it ships.
 
+## What live verification found
+
+Two bugs, both invisible to the unit tests, both caught by pointing the thing at a
+real league (the pattern `claude/power-rankings-ballots.md` ends on, for the same
+reason):
+
+1. **100% and 0%, from nothing.** The first real run was against a preseason
+   league whose week 1 is not scored yet. Every roster got `mu = 0, sigma = 0`, so
+   every simulated game was a 0-0 tie, all twelve teams finished identical, and the
+   comparator handed six of them 100% and six 0% -- stated with total confidence,
+   from zero games of evidence. The percentages even summed to 600, so acceptance
+   criterion 2 passed while the output was meaningless. Fixed by refusing to write
+   a snapshot when no week has been scored; pinned by
+   `PlayoffOddsServiceTest.aLeagueWithNoScoredGamesGetsNoSnapshot`.
+2. **`BigDecimal` is not `Double`.** `numeric` columns come back as `BigDecimal`,
+   and `(Double) rs.getObject(...)` on the nullable `bye_pct`/`seed_one_pct`
+   columns threw `ClassCastException` -- which took out the entire power-rankings
+   endpoint (500 on every league, not just leagues with odds) the moment the first
+   snapshot existed to read back.
+
+A third, smaller: the odds summary was looked up with the CURRENT NFL week, so a
+past season's page asked "any odds at or before week 1?" about a season whose odds
+it was displaying, and answered no. It now asks for the newest snapshot in that
+season, unbounded.
+
 ## Acceptance criteria
 
 1. `GET /leagues/{id}/power` returns a real `makesPlayoffsPct` per entry for an
@@ -198,6 +237,11 @@ odds path for NBA.
 5. The footnote names the iteration count and the weeks of scoring behind it.
 6. Backend suite passes with Postgres actually up — `claude/lessons.md`: BUILD
    SUCCESSFUL with 52 skipped means the ITs never ran.
+
+All six hold as of 2026-09-14: 372 backend tests, 0 skipped, 0 failures, and 206
+web tests; odds for (Foot) Ball Knowers 2025 summed to exactly 600.0 across 12
+rosters with 6 playoff spots; the 2026 league (no scored week yet) stores nothing,
+renders `--`, and says nothing about a simulation.
 
 ## Decisions (Allan, 2026-09-14)
 
