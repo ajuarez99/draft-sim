@@ -289,28 +289,16 @@ function ladderNoteFor(mode: PowerRankingKind, e: PowerRankingEntry, teamCount: 
 export type SpaceStats = {
   barLeft: string
   barWidth: string
-  railGradient: string
   medianPos: string
-  medianColor: string
   minePos: string | null
   agreePct: number | null
-  agreeLabel: string
+  /** The same interval the bar draws, spelled out ("3rd-9th") so the number
+   *  column teaches the reader how to read the bar instead of competing with
+   *  it -- this replaced an "Agreement 45% - 6" cell nobody could decode. */
+  rangeLabel: string
+  consensus: 'tight' | 'mixed' | 'split' | null
   deltaLabel: string | null
   deltaClass: 'up' | 'down' | 'flat' | null
-}
-
-/** Four bands (best quartile..worst quartile) of the 1..N axis, colored like
- *  the ranking-space-optimization mockup's tierColor() -- teal is also the
- *  app's own --teal, the other three are local to this one visualization
- *  (same precedent as KIND_HUE below: extra hues for a data encoding, not a
- *  brand color). Kept off crimson's hue on purpose -- crimson means "you"
- *  everywhere else on this page, and a bottom-quartile dot is not that. */
-function tierColor(rank: number, teamCount: number): string {
-  const q = Math.max(1, teamCount) / 4
-  if (rank <= q) return 'var(--teal)'
-  if (rank <= q * 2) return 'oklch(72% 0.12 230)'
-  if (rank <= q * 3) return 'oklch(80% 0.12 85)'
-  return 'oklch(75% 0.13 50)'
 }
 
 /** Ranking-space stats for the League-vote ladder row (ranking-space-optimization
@@ -331,14 +319,13 @@ export function spaceStatsFor(e: PowerRankingEntry, teamCount: number, myRank: n
   return {
     barLeft: `${(((lo - 1) / n) * 100).toFixed(2)}%`,
     barWidth: `${(((hi - lo + 1) / n) * 100).toFixed(2)}%`,
-    // Wider disagreement shifts the gradient further from teal -- a visual
-    // echo of the Agreement number, not just a flat fill.
-    railGradient: `linear-gradient(90deg, oklch(68% 0.14 180) 0%, oklch(66% 0.15 ${180 + range * 14}) 100%)`,
     medianPos: pos(med),
-    medianColor: tierColor(e.rank, n),
     minePos: myRank == null ? null : pos(myRank),
     agreePct,
-    agreeLabel: agreePct == null ? '--' : `${Math.round(agreePct)}% · ${range}`,
+    rangeLabel: lo === hi ? ordinal(lo) : `${ordinal(lo)}–${ordinal(hi)}`,
+    // Only ever the pill's tint, never a word of its own: the range text is
+    // the content, the tint is how loud it is.
+    consensus: agreePct == null ? null : agreePct >= 70 ? 'tight' : agreePct >= 40 ? 'mixed' : 'split',
     deltaLabel: delta == null ? null : delta === 0 ? 'even' : delta > 0 ? `+${delta}` : String(delta),
     deltaClass: delta == null ? null : delta === 0 ? 'flat' : delta > 0 ? 'up' : 'down',
   }
@@ -920,11 +907,20 @@ export default function PowerRankings() {
                     <>
                       <span className="pr-score-head">Avg</span>
                       <span className="pr-score-head">Your ballot</span>
+                      {/* The axis lives under the column title and inside the
+                          bar's own grid track, so "1st" and "12th" sit over the
+                          ends of the bar they scale. (They used to float at the
+                          right of the header, where they read as a label for
+                          the next column over.) */}
                       <span className="pr-space-head">
                         <span>Where the room had them</span>
-                        <span className="pr-space-head-ends">1st → {ordinal(gridRows)}</span>
+                        <span className="pr-axis" aria-hidden="true">
+                          <span className="pr-axis-tick start">1st</span>
+                          <span className="pr-axis-tick mid">halfway</span>
+                          <span className="pr-axis-tick end">{ordinal(gridRows)}</span>
+                        </span>
                       </span>
-                      <span className="pr-score-head">Agreement</span>
+                      <span className="pr-score-head">Ballot range</span>
                     </>
                   ) : (
                     <>
@@ -997,19 +993,19 @@ export default function PowerRankings() {
                           </span>
                           <span className="pr-space-cell" title={roomTakeSentence(e, gridRows)}>
                             <span className="spread-bar">
-                              <span
-                                className="spread-bar-range"
-                                style={{ left: space.barLeft, width: space.barWidth, backgroundImage: space.railGradient }}
-                              />
-                              <span className="spread-bar-mean" style={{ left: space.medianPos, background: space.medianColor }} />
+                              <span className="spread-bar-mid" />
+                              <span className="spread-bar-range" style={{ left: space.barLeft, width: space.barWidth }} />
+                              <span className="spread-bar-mean" style={{ left: space.medianPos }} />
                               {space.minePos != null && <span className="spread-bar-mine" style={{ left: space.minePos }} />}
                             </span>
                           </span>
-                          <span className="pr-playoff-cell">
-                            <span className="pr-bar">
-                              <span className="pr-bar-fill" style={{ width: space.agreePct == null ? '0%' : `${space.agreePct}%` }} />
+                          <span className="pr-range-cell">
+                            <span
+                              className={`mono pr-range-pill${space.consensus ? ` ${space.consensus}` : ''}`}
+                              title={roomTakeSentence(e, gridRows)}
+                            >
+                              {space.rangeLabel}
                             </span>
-                            <span className="mono pr-playoff-pct">{space.agreeLabel}</span>
                           </span>
                         </>
                       ) : (
@@ -1041,16 +1037,16 @@ export default function PowerRankings() {
                 {memberSpace && (
                   <div className="pr-space-legend">
                     <span className="pr-space-legend-item">
-                      <span className="pr-space-legend-swatch range" /> ballot range, high to low
+                      <span className="pr-space-legend-swatch range" /> ballot range, best to worst
                     </span>
                     <span className="pr-space-legend-item">
                       <span className="pr-space-legend-swatch median" /> room median
                     </span>
                     <span className="pr-space-legend-item">
-                      <span className="pr-space-legend-swatch playoff" /> playoff half
+                      <span className="pr-space-legend-swatch mine" /> your ballot
                     </span>
                     <span className="pr-space-legend-item">
-                      <span className="pr-space-legend-swatch mine" /> your ballot
+                      <span className="pr-space-legend-swatch halfway" /> halfway line
                     </span>
                   </div>
                 )}
