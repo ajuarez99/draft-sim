@@ -17,6 +17,10 @@ vi.mock('./pages/DraftPicker', () => ({
 vi.mock('./pages/PowerRankings', () => ({
   default: () => <div>power rankings</div>,
 }))
+// Mounted by the rail-collapse test below; the real one fetches on mount.
+vi.mock('./pages/DraftView', () => ({
+  default: () => <div>draft view</div>,
+}))
 
 // SignIn imports getSleeperUser from here; the real module would hit the
 // network the instant a click on Continue happened. Not exercised in these
@@ -103,39 +107,82 @@ describe('App sign-out gating', () => {
     expect(await screen.findByText('draft picker')).toBeInTheDocument()
   })
 
-  // Not "/": the redesigned home screen (design_handoff_multisport_mock_drafts)
-  // supplies its own sidebar nav instead of the app-wide header's chips --
-  // App.tsx suppresses .top on that one route. Every other route still shows
-  // it, which is what this test actually guards.
-  it('hides the Home/Managers nav chips when signed out and shows them when signed in', async () => {
-    const { rerender } = render(
-      <MemoryRouter initialEntries={['/leagues/1/power']}>
-        <App />
-      </MemoryRouter>,
-    )
-    expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Managers' })).not.toBeInTheDocument()
-
-    setUser(sampleUser)
-    rerender(
-      <MemoryRouter initialEntries={['/leagues/1/power']}>
-        <App />
-      </MemoryRouter>,
-    )
-    expect(await screen.findByRole('link', { name: 'Home' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Managers' })).toBeInTheDocument()
-  })
-
-  it('does not render the app-wide header chrome on the redesigned home screen', async () => {
-    setUser(sampleUser)
+  // These two replace a pair that guarded the opposite arrangement: the rail
+  // shipped Home-only, so the old tests asserted that "/" had no nav chrome
+  // and every other route did. That split is the thing
+  // claude/site-wide-shell-propagation.md removed -- there is one shell now,
+  // and these assert the new invariant rather than the old one.
+  it('renders no rail while signed out -- SignIn is the whole screen', () => {
     render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
         <App />
       </MemoryRouter>,
     )
-
-    expect(await screen.findByText('draft picker')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
+  })
+
+  it.each([['/'], ['/leagues/1/power']])(
+    'renders exactly one rail, with the same nav, on %s',
+    async (path) => {
+      setUser(sampleUser)
+      render(
+        <MemoryRouter initialEntries={[path]}>
+          <App />
+        </MemoryRouter>,
+      )
+
+      // getAllBy + length, not getBy: getBy already throws on a duplicate, but
+      // the failure this guards (a rail from the shell AND a rail from the
+      // page) reads as "found multiple elements" rather than as the two-shell
+      // regression it would actually be.
+      expect(await screen.findAllByRole('navigation', { name: 'Main' })).toHaveLength(1)
+      expect(screen.getByRole('link', { name: 'Managers' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+    },
+  )
+
+  it('collapses the rail by default in a draft room and not on a content page', async () => {
+    setUser(sampleUser)
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/drafts/abc']}>
+        <App />
+      </MemoryRouter>,
+    )
+    // aria-expanded on the toggle is the collapsed state made observable --
+    // asserting on the class would just restate the implementation.
+    expect(await screen.findByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+    unmount()
+
+    render(
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
+  })
+
+  it('an explicit collapse choice outranks the route default and survives a remount', async () => {
+    setUser(sampleUser)
+    const user = userEvent.setup()
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
+        <App />
+      </MemoryRouter>,
+    )
+
+    await user.click(await screen.findByRole('button', { name: /collapse navigation/i }))
+    expect(screen.getByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+    unmount()
+
+    // Same content route, which defaults to expanded -- so an expanded rail
+    // here would mean the stored choice was ignored, not that nothing broke.
+    render(
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
   })
 })

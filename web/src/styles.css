@@ -183,29 +183,20 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
   height: 100vh; max-width: none; margin: 0 auto; padding: 16px 20px;
   display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
 }
-/* The redesigned home screen (design_handoff_multisport_mock_drafts) supplies
-   its own edge-to-edge sidebar instead of sitting inside .app's padded
-   column -- App.tsx also suppresses .top on this route, so .home-shell is
-   .app's only child whenever it's showing. */
-.app:has(> .home-shell) { padding: 0; gap: 0; }
+/* The shell is edge-to-edge on every route now, so .app contributes no
+   padding of its own -- .app-main carries it instead. This used to be a
+   `:has(> .home-shell)` special case for the one redesigned route; see
+   claude/site-wide-shell-propagation.md §C step 4. Signed out there is no
+   shell at all and SignIn is .app's only child, which is why the padding
+   lives on .app-main rather than being dropped entirely. */
+.app { padding: 0; gap: 0; }
+.app > .content { padding: 16px 20px; }
 
-.top {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  flex-wrap: wrap; flex: 0 0 auto; padding-bottom: 10px; border-bottom: 1px solid var(--line);
-}
-.top h1 {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 22px; font-weight: 700; letter-spacing: 0.02em; margin: 0;
-}
-.top h1 a { color: inherit; text-decoration: none; }
-.top-left { display: flex; align-items: center; gap: 12px; }
-/* Portal target for DraftView's settings gear (§A) -- empty, and so
-   invisible, on any page that doesn't portal into it. */
-.top-slot { display: flex; align-items: center; }
+/* The app-wide horizontal `.top` header lived here. It is gone: the rail is
+   the site's navigation on every route now (claude/site-wide-shell-
+   propagation.md). `.gear-chip` survives it -- DraftView's settings gear now
+   portals into `.app-main-head` instead of `.top-slot`. */
 .gear-chip { font-size: 14px; line-height: 1; padding: 5px 9px; }
-.top-right { display: flex; align-items: center; gap: 14px; }
-.top-user { display: flex; align-items: center; gap: 8px; }
-.top-user-name { font-size: 13px; color: var(--text); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .controls {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
@@ -976,7 +967,10 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    this doesn't fit, the page scrolls -- better than an invisible board. */
 .board-scroll { border-radius: 10px; min-height: 200px; }
 
-.content { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+/* Every page's vertical stack, inside .app-main. The gap was 12px while
+   pages sat in `.app`'s own column and the redesigned home pane used 16px;
+   one shell means one rhythm, and 16px is the one that was designed. */
+.content { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 
 /* min-width: 0 matters here for exactly the reason the file-level comment
    above gives for min-height: 0 -- without it, the board grid's own intrinsic
@@ -1551,60 +1545,132 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 /*
  * ============================================================================
- * HOME REDESIGN (design_handoff_multisport_mock_drafts, 2026-09-13)
- * A sidebar + main-pane layout, scoped to "/" only -- App.tsx suppresses .top
- * on this one route and this sidebar carries the wordmark/nav/account chrome
- * instead. Colors and type reuse this file's own tokens/fonts rather than the
- * handoff's Barlow palette, so the screen still reads as one app rather than
- * a second design system bolted onto the front door.
+ * THE APP SHELL -- rail + main pane
+ * Shipped 2026-09-13 (design_handoff_multisport_mock_drafts) as a Home-only
+ * `.home-shell`, with every other route still on the horizontal `.top`
+ * header. Promoted to the whole site 2026-09-14; see
+ * claude/site-wide-shell-propagation.md for why and for the measurements
+ * behind the collapsed rail. Colors and type reuse this file's own tokens and
+ * fonts rather than the handoff's Barlow palette, so the app still reads as
+ * one design rather than two bolted together.
  * ============================================================================
  */
-.home-shell { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
+.app-shell { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
 
-.home-sidebar {
+.app-rail {
   flex: 0 0 200px; display: flex; flex-direction: column; gap: 22px;
   padding: 18px 14px; background: var(--panel); border-right: 1px solid var(--line);
-  overflow-y: auto;
+  overflow-y: auto; box-sizing: border-box;
+  transition: flex-basis 140ms ease;
 }
-.home-wordmark {
+
+.app-rail-top { display: flex; align-items: flex-start; gap: 6px; }
+.app-wordmark {
   font-size: 21px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.05;
-  padding: 0 6px;
+  padding: 0 6px; color: var(--text); text-decoration: none; flex: 1 1 auto; min-width: 0;
 }
-.home-sidebar-section { display: flex; flex-direction: column; gap: 2px; }
-.home-sidebar-label {
+.app-wordmark:hover { color: var(--teal); }
+.app-wordmark-line { display: block; }
+.app-rail-toggle {
+  appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0;
+  padding: 2px 5px; border-radius: 7px; cursor: pointer; flex-shrink: 0;
+  font: inherit; font-size: 13px; line-height: 1; color: var(--muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-rail-toggle:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.app-rail-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Page-supplied (appSlots.tsx). Most routes portal nothing into it today, and
+   an empty flex child would still spend the rail's 22px gap -- so collapse it
+   rather than leaving a hole above Menu. */
+.app-rail-context:empty { display: none; }
+
+.app-rail-section { display: flex; flex-direction: column; gap: 2px; }
+.app-rail-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); padding: 0 6px 6px;
 }
-.home-sport-row, .home-menu-row {
+.app-rail-row {
   display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
   font-size: 14px; font: inherit; color: var(--muted); font-weight: 500;
   background: none; border: 0; text-decoration: none; cursor: pointer; text-align: left;
   transition: background 120ms ease, color 120ms ease;
 }
-.home-sport-row:hover, .home-menu-row:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
-.home-sport-row.on, .home-menu-row.on {
+.app-rail-row:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
+.app-rail-row.on {
   color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--line) 55%, transparent);
 }
-.home-sport-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-.home-sport-dot.on.all { background: var(--teal); }
-.home-sport-dot.on.nfl { background: var(--sport-nfl); }
-.home-sport-dot.on.nba { background: var(--sport-nba); }
-.home-sport-count {
+.app-rail-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+.app-rail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+.app-rail-dot.on.all { background: var(--teal); }
+.app-rail-dot.on.nfl { background: var(--sport-nfl); }
+.app-rail-dot.on.nba { background: var(--sport-nba); }
+/* Menu rows get a glyph where sport rows get a color dot -- same 7px optical
+   slot, so the two sections align down one edge whether the rail is full or
+   collapsed. Not an icon font for four marks (§C step 7). */
+.app-rail-glyph {
+  width: 7px; flex-shrink: 0; font-size: 8px; line-height: 1; text-align: center; color: var(--muted);
+}
+.app-rail-row.on .app-rail-glyph { color: var(--teal); }
+.app-rail-count {
   margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
 }
-.home-sport-row.on .home-sport-count { color: var(--text); }
-.home-sidebar-spacer { flex: 1 1 auto; min-height: 8px; }
-.home-account { display: flex; align-items: center; gap: 8px; padding: 8px 6px 4px; border-top: 1px solid var(--line); }
-.home-account-name {
+.app-rail-row.on .app-rail-count { color: var(--text); }
+
+.app-rail-spacer { flex: 1 1 auto; min-height: 8px; }
+.app-account { display: flex; align-items: center; gap: 8px; padding: 8px 6px 4px; border-top: 1px solid var(--line); }
+.app-account-name {
   font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.home-signout {
+.app-signout {
+  display: flex; align-items: center; gap: 8px;
   background: none; border: 0; font: inherit; cursor: pointer; text-align: left;
   padding: 0 6px; font-size: 12.5px; color: var(--muted);
 }
-.home-signout:hover { color: var(--text); }
+.app-signout:hover { color: var(--text); }
+.app-signout-glyph { display: none; }
 
-.home-main { flex: 1 1 0; min-width: 0; overflow-y: auto; padding: 20px 24px 40px; gap: 16px; }
+/*
+ * THE ICON RAIL (56px)
+ * Draft rooms default to it because they measurably have no horizontal room
+ * to give: at 1440px a 14-team board already overflows its scroller by 99px
+ * with no rail at all, and a column is 96px -- so 200px of permanent rail
+ * costs two columns (§B). Everything stays in place and only the text goes,
+ * which is why every row's label is its own span: hiding a span is a rule,
+ * re-laying-out a rail is a second component.
+ */
+.app-rail.collapsed { flex-basis: 56px; padding: 18px 8px; align-items: stretch; }
+.app-rail.collapsed .app-rail-row-label { display: none; }
+.app-rail.collapsed .app-rail-label { display: none; }
+.app-rail.collapsed .app-rail-row { justify-content: center; padding: 9px 0; gap: 0; }
+.app-rail.collapsed .app-rail-top { flex-direction: column; align-items: center; gap: 8px; }
+.app-rail.collapsed .app-wordmark { padding: 0; flex: 0 0 auto; }
+.app-wordmark-mark {
+  display: block; font-size: 17px; letter-spacing: 0.04em;
+}
+.app-rail.collapsed .app-account { justify-content: center; padding: 8px 0 4px; }
+.app-rail.collapsed .app-signout { justify-content: center; padding: 0; font-size: 14px; }
+.app-rail.collapsed .app-signout-glyph { display: block; }
+/* The dots carry the whole filter once the labels are gone, so they need to
+   be a target rather than a decoration. */
+.app-rail.collapsed .app-rail-dot { width: 9px; height: 9px; }
+
+/*
+ * .app-main -- the one scrolling pane. It owns the page padding that `.app`
+ * used to apply, so every route sits in the same column the redesigned home
+ * screen established instead of two different insets.
+ */
+.app-main {
+  flex: 1 1 0; min-width: 0; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; padding: 20px 24px 40px; gap: 16px;
+}
+
+/* Portal target for page-scoped actions -- DraftView's settings gear is the
+   only one today (appSlots.tsx). Empty on every other route, and an empty
+   flex child would still spend .app-main's 16px gap. */
+.app-main-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.app-main-head:empty { display: none; }
 
 .home-header {
   display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
@@ -1680,19 +1746,34 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .start-mock-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .start-mock-cta:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Below the sidebar's own comfortable width, stack it above the content as a
-   horizontal bar instead of squeezing a 200px rail beside a narrow main pane. */
+/* Below the rail's own comfortable width, stack it above the content as a
+   horizontal bar instead of squeezing a 200px rail beside a narrow main pane.
+   Shipped for Home only; it applies on every route now, which is the whole
+   point of the promotion. The collapsed/expanded distinction is meaningless
+   here -- there is no column to save -- so the bar wins over `.collapsed`
+   either way and the toggle hides rather than doing nothing visible. */
 @media (max-width: 860px) {
-  .home-shell { flex-direction: column; }
-  .home-sidebar {
-    flex: 0 0 auto; flex-direction: row; flex-wrap: wrap; align-items: center;
-    border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible; gap: 10px 16px;
+  .app-shell { flex-direction: column; }
+  .app-rail, .app-rail.collapsed {
+    flex: 0 0 auto; flex-basis: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+    border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible;
+    gap: 10px 16px; padding: 12px 16px;
   }
-  .home-wordmark { padding: 0; margin-right: auto; }
-  .home-sidebar-section { flex-direction: row; flex-wrap: wrap; gap: 4px; }
-  .home-sidebar-label { display: none; }
-  .home-sidebar-spacer { display: none; }
-  .home-account { border-top: 0; padding: 0; }
+  .app-rail-top { flex: 0 0 auto; margin-right: auto; }
+  .app-rail.collapsed .app-rail-top { flex-direction: row; }
+  .app-wordmark, .app-rail.collapsed .app-wordmark { padding: 0; font-size: 19px; }
+  /* One line, not two: the bar never scrolls away, so every line it spends is
+     a line the page doesn't get. Measured 149px -> 128px at 375x812. */
+  .app-wordmark-line { display: inline; }
+  .app-rail-toggle { display: none; }
+  .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .app-rail-label { display: none; }
+  .app-rail-spacer { display: none; }
+  .app-rail.collapsed .app-rail-row-label { display: inline; }
+  .app-rail.collapsed .app-rail-row { justify-content: flex-start; padding: 8px 10px; gap: 9px; }
+  .app-rail.collapsed .app-signout-glyph { display: none; }
+  .app-account, .app-rail.collapsed .app-account { border-top: 0; padding: 0; }
+  .app-main { padding: 16px 16px 32px; }
 }
 
 /* SignIn's own hero: same shape as the picker's, but it's the whole page
@@ -2005,7 +2086,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    scrolling here, and turning it on globally would change the scroll owner on
    every screen at once. Other stacked pages (LeagueHistory, ManagerTendencies)
    likely want this too -- they can opt in the same way. */
-.content.scrolls { overflow-y: auto; overflow-x: hidden; }
+/* `.app-main` is the scrolling pane now, so this no longer needs to be one --
+   a nested scroller here put a second scrollbar inside the first and stranded
+   the pane's bottom padding. `overflow-x` stays: PowerRankings' wide rows
+   still must not push the page sideways. */
+.content.scrolls { overflow-x: hidden; }
 @media (max-width: 700px) {
   .content.scrolls { -webkit-overflow-scrolling: touch; }
 }

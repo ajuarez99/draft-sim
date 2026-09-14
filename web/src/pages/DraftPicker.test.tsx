@@ -15,7 +15,15 @@ vi.mock('react-router-dom', () => ({
     </a>
   ),
   useNavigate: () => vi.fn(),
+  // DraftPicker reads location.state to know whether the rail's "Mock drafts"
+  // row asked it to open the modal on arrival (AppShell.openMockModal). These
+  // tests never make that request, so a stable empty location is enough -- but
+  // it has to be stable: a fresh object each call would give the effect a new
+  // `key` every render and reopen the modal forever.
+  useLocation: () => EMPTY_LOCATION,
 }))
+
+const EMPTY_LOCATION = { key: 'test', pathname: '/', search: '', hash: '', state: null }
 
 const getDrafts = vi.fn()
 const getMockSessions = vi.fn()

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { hueFor } from '../hue'
 import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { relativeTime } from '../relativeTime'
 import { SkeletonRows } from '../components/Skeleton'
-import Sidebar, { type SportFilter } from '../components/Sidebar'
+import SportFilterRail, { type SportFilter } from '../components/SportFilterRail'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
-import { clearUser, useUser } from '../user'
+import { useRailContextSlot } from '../appSlots'
+import { useUser } from '../user'
 import {
   getDrafts,
   getMockSessions,
@@ -75,6 +77,8 @@ function sportTitle(f: SportFilter): string {
 export default function DraftPicker() {
   const user = useUser()
   const navigate = useNavigate()
+  const location = useLocation()
+  const rail = useRailContextSlot()
   const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
   const [mocks, setMocks] = useState<MockSessionSummary[] | null>(null)
   // Split from one shared `error` the fetch and the add-league form used to
@@ -115,10 +119,19 @@ export default function DraftPicker() {
 
   const [modalSeed, setModalSeed] = useState<{ sport: Sport; leagueId: string | null } | null>(null)
 
-  function signOut() {
-    clearUser()
-    navigate('/', { replace: true })
-  }
+  // The rail's "Mock drafts" row is global but the modal is not -- it needs
+  // the league list this page has already fetched. So the rail navigates here
+  // carrying a request (AppShell.openMockModal) and this opens it on arrival.
+  // Keyed on location.key so the same request fires when the row is clicked
+  // while already on Home, and cleared immediately so a reload or a Back into
+  // this entry doesn't reopen a modal nobody asked for a second time.
+  useEffect(() => {
+    if ((location.state as { openMock?: boolean } | null)?.openMock) {
+      openMockModal()
+      navigate('/', { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
 
   function refetch() {
     getDrafts().then(setDrafts).catch((e) => setFetchError(e.message))
@@ -268,19 +281,26 @@ export default function DraftPicker() {
   const recentLeague = drafts && drafts.length > 0 ? drafts[0] : null
 
   return (
-    <div className="home-shell">
-      <Sidebar
-        sportFilter={sportFilter}
-        onSportFilterChange={setSportFilter}
-        counts={counts}
-        username={user?.username ?? ''}
-        displayName={user?.displayName ?? null}
-        avatarId={user?.avatar ?? null}
-        onSignOut={signOut}
-        onOpenMockModal={() => openMockModal()}
-      />
+    <>
+      {/* The sport filter was part of the rail's own markup while the rail was
+          Home-only. It is a page control living in global chrome, so the
+          promotion (claude/site-wide-shell-propagation.md §C step 2) moved it
+          out: the rail exposes a context region and Home portals into it. The
+          counts come from `drafts`, which only this page fetches -- pushing
+          that fetch up into the shell so the rail could own the filter is the
+          trade this avoids. */}
+      {rail.node &&
+        createPortal(
+          <SportFilterRail
+            sportFilter={sportFilter}
+            onSportFilterChange={setSportFilter}
+            counts={counts}
+            collapsed={rail.collapsed}
+          />,
+          rail.node,
+        )}
 
-      <div className="home-main content">
+      <div className="content home-content">
         <header className="home-header">
           <div className="home-header-text">
             <p className="home-eyebrow">Viewing</p>
@@ -699,6 +719,6 @@ export default function DraftPicker() {
           onStart={startMock}
         />
       )}
-    </div>
+    </>
   )
 }

@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
@@ -12,9 +11,8 @@ import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
-import { TopSlotContext } from './topSlot'
-import { clearUser, useUser } from './user'
-import Avatar from './components/Avatar'
+import AppShell from './components/AppShell'
+import { useUser } from './user'
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -51,86 +49,20 @@ function KeyedMockDraftView() {
 }
 
 export default function App() {
-  // Ref callback (not useRef) because a plain ref's mutation doesn't trigger
-  // a re-render -- DraftView's settings-popover portal needs to know the
-  // instant this node exists, not just eventually. See topSlot.tsx.
-  const [topSlot, setTopSlot] = useState<HTMLDivElement | null>(null)
-  const location = useLocation()
-  const navigate = useNavigate()
   const user = useUser()
 
-  function signOut() {
-    clearUser()
-    navigate('/', { replace: true })
-  }
-
-  // The redesigned home screen (design_handoff_multisport_mock_drafts) has its
-  // own sidebar wordmark, nav and account footer -- rendering this header on
-  // top of it would duplicate every one of those. Every other route is
-  // unchanged: this is a Home-only layout swap, not a site-wide nav redesign.
-  const isHome = !!user && location.pathname === '/'
-
+  // One shell for the whole site. The horizontal `.top` header this replaced
+  // was suppressed on "/" only (`0c6f0ab`), which left the app with two
+  // different chromes split one route wide -- see
+  // claude/site-wide-shell-propagation.md §A. AppShell renders nothing but
+  // its children while signed out, so SignIn is still the whole screen.
+  //
+  // AppShell wraps `<Routes>` rather than sitting inside a route element: the
+  // four Keyed* wrappers below exist to force remounts, and the shell must
+  // not be caught up in them.
   return (
     <div className="app">
-      {!isHome && (
-      <header className="top">
-        <div className="top-left">
-          <h1>
-            <Link to="/">Ball Knowers</Link>
-          </h1>
-          {/* E5 (design-review-next-steps.md): the header carried exactly one
-              nav chip and no indication of where you were. Home and Managers
-              are the only two destinations with no other route back to them --
-              every league-scoped page (draft room, history, power rankings)
-              now hangs off a league card per E1, so this deliberately stays a
-              two-item nav rather than growing a link per route. `.startsWith`
-              on Managers so its own sub-route (/managers/:id/history) still
-              marks the chip current, the same way a browser tab would.
-              Signed-out visitors get neither chip: both lead to the same
-              gated screen once the whole route table is user-gated below, so
-              showing them would make the sign-in page look like it has
-              working navigation. */}
-          {user && (
-            <nav className="top-nav" aria-label="Global">
-              <Link to="/" className={`chip${location.pathname === '/' ? ' on' : ''}`}>
-                Home
-              </Link>
-              <Link
-                to="/managers"
-                className={`chip${location.pathname.startsWith('/managers') ? ' on' : ''}`}
-              >
-                Managers
-              </Link>
-            </nav>
-          )}
-        </div>
-        <div className="top-right">
-          <div className="top-slot" ref={setTopSlot} />
-          {/* Identity is a header chip, not a route -- claude/user-identity-
-              and-onboarding.md §5b. Sleeper's own avatar image now replaces
-              the color-initials treatment here and everywhere else that used
-              it (superseding this comment's original "app's identity
-              language" call). The gate lives on the whole route table below,
-              not just "/", so Sign out unmounts whatever page was showing
-              (its EventSource, a resim in flight, a mock poller) no matter
-              where it's clicked from, and returns to that same screen either
-              way. The explicit navigate('/') here is what makes this an
-              intentional sign out rather than the same "no user" state a deep
-              link renders in place -- §7. */}
-          {user && (
-            <div className="top-user">
-              <Avatar avatarId={user.avatar} seed={user.username} label={user.displayName || user.username} />
-              <span className="top-user-name">{user.displayName || user.username}</span>
-              <button className="chip" onClick={signOut}>
-                Sign out
-              </button>
-            </div>
-          )}
-        </div>
-      </header>
-      )}
-
-      <TopSlotContext.Provider value={topSlot}>
+      <AppShell>
         {user ? (
           <Routes>
             <Route path="/" element={<DraftPicker />} />
@@ -167,7 +99,7 @@ export default function App() {
         ) : (
           <SignIn />
         )}
-      </TopSlotContext.Provider>
+      </AppShell>
     </div>
   )
 }

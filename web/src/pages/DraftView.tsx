@@ -20,7 +20,7 @@ import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
 import { useRevealedBoard } from '../useRevealedBoard'
 import { draftedSoFar } from '../teamNeeds'
-import { useTopSlot } from '../topSlot'
+import { usePageActionSlot } from '../appSlots'
 
 // Every league, of any size, has a slot 1 -- unlike the single-league app's old
 // hardcoded 11, this stays a valid seat no matter which draft the picker opens.
@@ -82,7 +82,7 @@ export default function DraftView() {
   // writes to the server, so it is the only one that can fail or be in flight.
   const [savingReversal, setSavingReversal] = useState(false)
   const [reversalError, setReversalError] = useState<string | null>(null)
-  const topSlot = useTopSlot()
+  const pageActionSlot = usePageActionSlot()
 
   // Bumped only by run() -- passed to useRevealedBoard as its resetKey, so a
   // resim's setResult() (which changes `board`'s identity but not this) does
@@ -441,12 +441,14 @@ export default function DraftView() {
   return (
     <>
       {/* §A: the deleted top strip's `runs`/`chaos` live behind this gear
-          instead of a permanent toolbar -- portaled into App's persistent
-          `.top` header (the one region that isn't part of any single draft's
-          own content) rather than duplicated inside every DraftView. The
-          popover itself doesn't need portaling: `.modal-backdrop` is
-          `position: fixed`, so it already escapes wherever it's mounted. */}
-      {topSlot &&
+          instead of a permanent toolbar. It used to portal into the app-wide
+          `.top` header; that header is gone (claude/site-wide-shell-
+          propagation.md §C step 3) and this now portals into `.app-main-head`
+          -- still chrome rather than draft content, but page-scoped, which is
+          what the gear actually is. The popover itself doesn't need
+          portaling: `.modal-backdrop` is `position: fixed`, so it already
+          escapes wherever it's mounted. */}
+      {pageActionSlot &&
         createPortal(
           <button
             type="button"
@@ -457,7 +459,7 @@ export default function DraftView() {
           >
             ⚙
           </button>,
-          topSlot,
+          pageActionSlot,
         )}
 
       {error && <div className="error">{error}</div>}
