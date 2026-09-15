@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#06090d; }
+  a { color:#2ee6c5; text-decoration:none; }
+  a:hover { color:#5ff2d9; }
+  ::selection { background:#2ee6c5; color:#06090d; }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#06090d;color:#e7edf3;font-family:Barlow,Helvetica,Arial,sans-serif;display:flex;align-items:stretch">
+
+  <div style="width:196px;flex:0 0 196px;border-right:1px solid #141c26;background:#080c12;display:flex;flex-direction:column;gap:22px;padding:18px 14px;position:sticky;top:0;height:100vh;box-sizing:border-box">
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:23px;letter-spacing:.04em;text-transform:uppercase;line-height:1.05;padding:0 6px">Ball<br>Knowers</div>
+
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#4d5a69;font-weight:700;padding:0 6px 6px">Sports</div>
+      <sc-for list="{{ sportTabs }}" as="tab" hint-placeholder-count="3">
+        <div onClick="{{ tab.onClick }}" style="{{ tab.style }}">
+          <div style="{{ tab.dotStyle }}"></div>
+          <div style="flex:1">{{ tab.label }}</div>
+          <div style="{{ tab.countStyle }}">{{ tab.count }}</div>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#4d5a69;font-weight:700;padding:0 6px 6px">Menu</div>
+      <div style="display:flex;align-items:center;padding:8px 10px;border-radius:9px;font-size:14px;font-weight:600;color:#e7edf3;background:#101821;cursor:pointer">Home</div>
+      <div style="display:flex;align-items:center;padding:8px 10px;border-radius:9px;font-size:14px;font-weight:500;color:#7b8a9b;cursor:pointer" style-hover="color:#e7edf3;background:#0d141c">Managers</div>
+      <div onClick="{{ openNewMock }}" style="display:flex;align-items:center;padding:8px 10px;border-radius:9px;font-size:14px;font-weight:500;color:#7b8a9b;cursor:pointer" style-hover="color:#e7edf3;background:#0d141c">Mock drafts</div>
+    </div>
+
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:9px;padding:8px 6px;border-top:1px solid #141c26">
+      <div style="width:26px;height:26px;border-radius:999px;background:#6b3fa0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:0 0 26px">P</div>
+      <div style="flex:1;min-width:0;font-size:13.5px;color:#c6d2de;overflow:hidden;text-overflow:ellipsis">popsharky</div>
+    </div>
+    <div style="font-size:12.5px;color:#5a6878;padding:0 6px;cursor:pointer" style-hover="color:#e7edf3">Sign out</div>
+  </div>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:26px;padding:24px 26px 70px">
+
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5a6878;font-weight:700">Viewing</div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:34px;font-weight:700;line-height:1.1;letter-spacing:.01em">{{ headerTitle }}</div>
+      </div>
+      <div style="flex:1"></div>
+      <div onClick="{{ openNewMock }}" style="padding:10px 20px;border-radius:999px;background:#2ee6c5;color:#06231f;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#5ff2d9">Start a mock draft</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8b9aab;font-weight:700">Your leagues</div>
+        <div style="font-size:12.5px;color:#4d5a69">{{ leagueCountLabel }}</div>
+        <div style="flex:1;height:1px;background:#121a23"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:12px">
+        <sc-for list="{{ leagues }}" as="lg" hint-placeholder-count="4">
+          <div style="{{ lg.cardStyle }}">
+            <div style="display:flex;align-items:flex-start;gap:11px">
+              <div style="{{ lg.avatarStyle }}">{{ lg.initial }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:16px;font-weight:700;color:#f1f6fa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ lg.name }}</div>
+                <div style="display:flex;align-items:center;gap:7px;margin-top:4px">
+                  <div style="{{ lg.badgeStyle }}">{{ lg.sport }}</div>
+                  <div style="font-size:12.5px;color:#7b8a9b">{{ lg.meta }}</div>
+                </div>
+              </div>
+              <div style="font-family:'Barlow Condensed',sans-serif;font-size:21px;font-weight:700;color:#2b3a4b">{{ lg.season }}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:14px;flex-wrap:wrap">
+              <sc-for list="{{ lg.actions }}" as="act" hint-placeholder-count="3">
+                <div style="{{ act.style }}">{{ act.label }}</div>
+              </sc-for>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:13px;padding-top:12px;border-top:1px solid #141c26">
+              <div style="{{ lg.dotStyle }}"></div>
+              <div style="{{ lg.statusStyle }}">{{ lg.status }}</div>
+              <div style="flex:1"></div>
+              <div onClick="{{ lg.onMock }}" style="font-size:12.5px;font-weight:600;color:#2ee6c5;cursor:pointer;padding:4px 10px;border-radius:8px;border:1px solid #17493f;white-space:nowrap" style-hover="background:#0d2f2a">Mock it</div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-if value="{{ showSleeper }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:center;gap:11px;padding:13px 15px;border-radius:12px;border:1px dashed #1d2833;background:#080d13;max-width:520px">
+          <div style="width:30px;height:30px;border-radius:8px;background:#7a4a1e;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">T</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14.5px;font-weight:700;color:#c6d2de">test <span style="font-weight:500;color:#5a6878">— from Sleeper</span></div>
+            <div style="font-size:12.5px;color:#7b8a9b">NFL · 8 managers · needs setup</div>
+          </div>
+          <div style="padding:6px 13px;border-radius:8px;border:1px solid #2b3a4b;font-size:13px;font-weight:600;cursor:pointer" style-hover="border-color:#2ee6c5;color:#2ee6c5">Set up</div>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#8b9aab;font-weight:700">Mock drafts</div>
+        <div style="font-size:12.5px;color:#4d5a69">{{ mockCountLabel }}</div>
+        <div style="flex:1;height:1px;background:#121a23"></div>
+        <div onClick="{{ openNewMock }}" style="font-size:13px;font-weight:600;color:#2ee6c5;cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid #17493f" style-hover="background:#0d2f2a">New mock</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <sc-for list="{{ mocks }}" as="m" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-radius:12px;background:#0a1017;border:1px solid #141c26;flex-wrap:wrap" style-hover="border-color:#233040">
+            <div style="{{ m.badgeStyle }}">{{ m.sport }}</div>
+            <div style="flex:1;min-width:180px">
+              <div style="font-size:15px;font-weight:700;color:#f1f6fa">{{ m.title }}</div>
+              <div style="font-size:12.5px;color:#7b8a9b;margin-top:2px">{{ m.subtitle }}</div>
+            </div>
+            <div style="min-width:130px">
+              <div style="height:5px;border-radius:999px;background:#141c26;overflow:hidden">
+                <div style="{{ m.barStyle }}"></div>
+              </div>
+              <div style="font-size:11.5px;color:#7b8a9b;margin-top:5px">{{ m.progressLabel }}</div>
+            </div>
+            <div style="font-size:12.5px;color:#5a6878;min-width:96px;text-align:right">{{ m.when }}</div>
+            <div style="{{ m.ctaStyle }}">{{ m.cta }}</div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ noMocks }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px;border-radius:12px;border:1px dashed #1d2833;text-align:center;color:#5a6878;font-size:14px">No {{ sportWord }} mocks yet — start one to get reps before the real draft.</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ modalOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeModal }}" style="position:fixed;inset:0;background:rgba(3,6,9,.78);backdropFilter:blur(3px);display:flex;align-items:center;justify-content:center;padding:24px;zIndex:60">
+      <div onClick="{{ stop }}" style="width:100%;max-width:520px;background:#0b1119;border:1px solid #1d2833;border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:18px">
+        <div>
+          <div style="font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#5a6878;font-weight:700">Practice round</div>
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:700;line-height:1.15">Start a mock draft</div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#8b9aab;font-weight:700">1 · Sport</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <sc-for list="{{ modalSports }}" as="s" hint-placeholder-count="2">
+              <div onClick="{{ s.onClick }}" style="{{ s.style }}">{{ s.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:9px">
+          <div style="font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#8b9aab;font-weight:700">2 · Use settings from</div>
+          <div style="display:flex;flex-direction:column;gap:7px;max-height:220px;overflow:auto">
+            <sc-for list="{{ modalLeagues }}" as="l" hint-placeholder-count="3">
+              <div onClick="{{ l.onClick }}" style="{{ l.style }}">
+                <div style="{{ l.radioStyle }}"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:14.5px;font-weight:600;color:#eef4f9">{{ l.name }}</div>
+                  <div style="font-size:12.5px;color:#7b8a9b">{{ l.meta }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px">
+          <div onClick="{{ closeModal }}" style="padding:10px 18px;border-radius:999px;border:1px solid #2b3a4b;font-size:14px;font-weight:600;color:#9fb0c0;cursor:pointer" style-hover="color:#e7edf3">Cancel</div>
+          <div style="flex:1"></div>
+          <div onClick="{{ createMock }}" style="padding:10px 22px;border-radius:999px;background:#2ee6c5;color:#06231f;font-size:14px;font-weight:700;cursor:pointer" style-hover="background:#5ff2d9">{{ createLabel }}</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860}}">
+const SPORTS = {
+  NBA: { color: "#f0803c", bg: "#2a1509", border: "#4a2a12" },
+  NFL: { color: "#7ec96b", bg: "#12240e", border: "#25401d" },
+  MLB: { color: "#6aa8f5", bg: "#0d1a2c", border: "#1c3350" }
+};
+
+const LEAGUES = [
+  { id:"bk", name:"Ball Knowers", sport:"NBA", initial:"B", avatar:"#1c4f8a", managers:12, rounds:14, season:2026, status:"Draft not started — follow live", live:true, actions:["Draft room"] },
+  { id:"test", name:"Test", sport:"NBA", initial:"T", avatar:"#7a2f2f", managers:10, rounds:14, season:2026, status:"Draft complete", live:false, actions:["Draft board"] },
+  { id:"wc", name:"West Coast Fantasy Football", sport:"NFL", initial:"W", avatar:"#6b3fa0", managers:14, rounds:15, season:2026, status:"Draft complete", live:false, actions:["Draft board","History","Power rankings"] },
+  { id:"fan", name:"fantasy 🤩", sport:"NFL", initial:"F", avatar:"#1f5e52", managers:14, rounds:15, season:2026, status:"Draft complete", live:false, actions:["Draft board","History","Power rankings"] },
+  { id:"fbk", name:"(Foot) Ball Knowers", sport:"NFL", initial:"F", avatar:"#8a6a1c", managers:12, rounds:15, season:2026, status:"Draft complete", live:false, actions:["Draft board","History","Power rankings"] }
+];
+
+const MOCKS = [
+  { id:"m1", sport:"NBA", league:"Ball Knowers", teams:12, rounds:14, pick:"1.05", through:"1.04", picksMade:4, when:"2 hours ago", done:false },
+  { id:"m2", sport:"NFL", league:"West Coast Fantasy Football", teams:14, rounds:15, pick:"1.09", through:"3.02", picksMade:30, when:"Yesterday", done:false },
+  { id:"m3", sport:"NFL", league:"(Foot) Ball Knowers", teams:12, rounds:15, pick:"1.01", through:"15.12", picksMade:180, when:"Sep 6", done:true },
+  { id:"m4", sport:"NBA", league:"Test", teams:10, rounds:14, pick:"1.07", through:"2.03", picksMade:13, when:"Sep 2", done:false }
+];
+
+class Component extends DCLogic {
+  state = { sport: "All", modalOpen: false, modalSport: "NBA", modalLeague: "bk" };
+
+  pill(active, extra) {
+    return `display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:9px;font-size:14px;cursor:pointer;font-weight:${active?600:500};color:${active?"#eef4f9":"#7b8a9b"};background:${active?"#101821":"transparent"}` + (extra||"");
+  }
+
+  badge(sport, size) {
+    const s = SPORTS[sport] || SPORTS.NBA;
+    const pad = size === "lg" ? "5px 11px" : "2px 7px";
+    const fs = size === "lg" ? "12.5px" : "11px";
+    return `display:inline-flex;align-items:center;justify-content:center;padding:${pad};border-radius:6px;font-size:${fs};font-weight:700;letter-spacing:.08em;color:${s.color};background:${s.bg};border:1px solid ${s.border};flex:0 0 auto`;
+  }
+
+  setSport(sport) { this.setState({ sport }); }
+
+  renderVals() {
+    const { sport, modalOpen, modalSport, modalLeague } = this.state;
+    const sportNames = ["NBA", "NFL"];
+    const visible = sport === "All" ? LEAGUES : LEAGUES.filter(l => l.sport === sport);
+    const visibleMocks = sport === "All" ? MOCKS : MOCKS.filter(m => m.sport === sport);
+
+    const sportTabs = [{ key:"All", label:"All sports", count: LEAGUES.length }]
+      .concat(sportNames.map(s => ({ key:s, label:s, count: LEAGUES.filter(l => l.sport===s).length })))
+      .map(t => {
+        const active = sport === t.key;
+        const c = SPORTS[t.key] ? SPORTS[t.key].color : "#2ee6c5";
+        return {
+          label: t.label, count: t.count,
+          onClick: () => this.setSport(t.key),
+          style: this.pill(active),
+          dotStyle: `width:7px;height:7px;border-radius:999px;flex:0 0 7px;background:${active?c:"#2b3a4b"}`,
+          countStyle: `font-size:11.5px;color:${active?"#8b9aab":"#4d5a69"};font-variant-numeric:tabular-nums`
+        };
+      });
+
+    const leagues = visible.map(l => ({
+      initial: l.initial, name: l.name, sport: l.sport, season: l.season,
+      meta: `${l.managers} managers · ${l.rounds} rounds`,
+      status: l.status,
+      cardStyle: `background:#0a1017;border:1px solid ${l.live?"#17493f":"#141c26"};border-radius:14px;padding:15px`,
+      avatarStyle: `width:34px;height:34px;border-radius:10px;flex:0 0 34px;background:${l.avatar};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700`,
+      badgeStyle: this.badge(l.sport),
+      dotStyle: `width:6px;height:6px;border-radius:999px;background:${l.live?"#2ee6c5":"#2b3a4b"}`,
+      statusStyle: `font-size:12.5px;font-weight:${l.live?600:500};color:${l.live?"#2ee6c5":"#5a6878"}`,
+      actions: l.actions.map((a, i) => ({
+        label: a,
+        style: `padding:5px 11px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;color:${i===0?"#eef4f9":"#8b9aab"};border:1px solid ${i===0?"#2b3a4b":"transparent"};background:${i===0?"#101821":"transparent"}`
+      })),
+      onMock: () => this.setState({ modalOpen:true, modalSport:l.sport, modalLeague:l.id })
+    }));
+
+    const mocks = visibleMocks.map(m => {
+      const total = m.teams * m.rounds;
+      const pct = Math.round((m.picksMade / total) * 100);
+      const s = SPORTS[m.sport];
+      return {
+        sport: m.sport,
+        badgeStyle: this.badge(m.sport, "lg"),
+        title: `${m.teams}-team ${m.sport} mock · ${m.league}`,
+        subtitle: `${m.rounds} rounds · your pick ${m.pick} · ${m.done?"finished":"paused"} at ${m.through}`,
+        barStyle: `height:100%;width:${Math.max(pct,3)}%;background:${m.done?"#2b3a4b":s.color};border-radius:999px`,
+        progressLabel: `${m.picksMade}/${total} picks · ${pct}%`,
+        when: m.when,
+        cta: m.done ? "View board" : "Resume",
+        ctaStyle: `padding:7px 15px;border-radius:999px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;` + (m.done
+          ? "border:1px solid #2b3a4b;color:#c6d2de"
+          : "background:#2ee6c5;color:#06231f")
+      };
+    });
+
+    const modalLeagueList = LEAGUES.filter(l => l.sport === modalSport);
+    const chosen = modalLeagueList.find(l => l.id === modalLeague) || modalLeagueList[0];
+
+    return {
+      sportTabs, leagues, mocks,
+      headerTitle: sport === "All" ? "All sports" : `${sport} leagues`,
+      sportWord: sport === "All" ? "" : sport,
+      leagueCountLabel: `${visible.length} · ${sport === "All" ? "NBA + NFL" : sport}`,
+      mockCountLabel: `${visibleMocks.length} in ${sport === "All" ? "all sports" : sport}`,
+      noMocks: visibleMocks.length === 0,
+      showSleeper: sport === "All" || sport === "NFL",
+      modalOpen,
+      openNewMock: () => this.setState({ modalOpen:true, modalSport: sport === "All" ? "NBA" : sport }),
+      closeModal: () => this.setState({ modalOpen:false }),
+      stop: (e) => e.stopPropagation(),
+      createMock: () => this.setState({ modalOpen:false }),
+      createLabel: chosen ? `Start ${modalSport} mock` : "Start mock",
+      modalSports: sportNames.map(s => {
+        const active = modalSport === s;
+        const c = SPORTS[s];
+        return {
+          label: s,
+          onClick: () => this.setState({ modalSport:s, modalLeague: LEAGUES.filter(l=>l.sport===s)[0].id }),
+          style: `padding:9px 20px;border-radius:10px;font-size:14px;font-weight:700;letter-spacing:.06em;cursor:pointer;color:${active?c.color:"#7b8a9b"};background:${active?c.bg:"#0d141c"};border:1px solid ${active?c.border:"#1a2532"}`
+        };
+      }),
+      modalLeagues: modalLeagueList.map(l => {
+        const active = chosen && chosen.id === l.id;
+        return {
+          name: l.name,
+          meta: `${l.managers} teams · ${l.rounds} rounds · ${l.season}`,
+          onClick: () => this.setState({ modalLeague:l.id }),
+          style: `display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;cursor:pointer;border:1px solid ${active?"#17493f":"#1a2532"};background:${active?"#0b1f1c":"#0a0f16"}`,
+          radioStyle: `width:15px;height:15px;border-radius:999px;flex:0 0 15px;border:2px solid ${active?"#2ee6c5":"#2b3a4b"};background:${active?"#2ee6c5":"transparent"};box-shadow:${active?"inset 0 0 0 2.5px #0b1f1c":"none"}`
+        };
+      })
+    };
+  }
+}
+
+</script>
+</body>
+</html>

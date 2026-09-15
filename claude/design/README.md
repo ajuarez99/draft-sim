@@ -1,4 +1,20 @@
-# claude/design/ — chosen visual direction, not yet implemented
+# claude/design/ — design source material
+
+Two kinds of thing live here, and they are not the same kind:
+
+- **`design_handoff_multisport_mock_drafts/`** — a full design handoff for the
+  multi-sport home screen and mock drafts (sidebar sport filter, league/mock
+  cards, the two-step "Start a mock draft" modal), with screenshots and an
+  interactive `.dc.html` prototype. **Built**, in `0c6f0ab` and `1611ba1`; its
+  own README carries the archive banner and the two deliberate deviations. This
+  is the document the ~7 `design_handoff_multisport_mock_drafts` citations
+  scattered through `web/src/` and `MockDraftService` actually refer to — it sat
+  outside the repo until 2026-09-14, so those references pointed at nothing.
+- **The board re-skin reference below** — style direction, described next.
+
+---
+
+## The board re-skin direction (2026-08-29)
 
 2026-08-29. Five mockup directions for the draft board screen were explored on a
 design canvas (interactive, pans/zooms): https://claude.ai/code/artifact/997a39a3-b6ef-4881-be52-e37d6f9f2ca1
@@ -21,7 +37,13 @@ straight from the design-canvas source, not a real page, so treat them as
 *style* reference (colors, shapes, type, spacing), not markup to copy.
 `web/src/*` is the real source of truth for actual components/logic.
 
-**Not yet built.** This is the spec for whoever does the re-skin next.
+**Long since built, and then some.** This line read "Not yet built" until
+2026-09-14, three weeks and several redesigns after it stopped being true — the
+re-skin shipped, and the UI has moved past this spec more than once since. The
+root `README.md`'s "Status update" section is the current state; treat
+everything below as the *origin* of the app's visual DNA (dark, rounded,
+card-based, avatar-driven, mint accent), not as a description of the UI or a
+list of work outstanding.
 
 ## Tokens to adopt (from `reference-synthesis.html`)
 
