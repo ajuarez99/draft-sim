@@ -377,3 +377,56 @@ passed a real `DraftContext` and behaved perfectly. A basketball draft room
 offered Jahmyr Gibbs. **When you delete a guard, grep for what the guard was
 making redundant**; three of the four hardcoded sports were found by reading,
 and the fourth only by driving the thing.
+
+---
+
+## 17. A field the frontend shipped and the backend didn't took the whole site to a white page
+
+2026-09-14, in production. The home screen of ballknowers.co rendered nothing at
+all:
+
+```
+Uncaught TypeError: Cannot read properties of undefined (reading 'toUpperCase')
+  at Array.map (<anonymous>)
+```
+
+`MockSessionSummary` gained a `sport` field, and the mock-drafts list rendered
+`{m.sport.toUpperCase()}` on every row. Correct against the backend it was
+written with. The frontend and backend are **separate Railway services that
+deploy independently**, the frontend auto-deployed and the backend did not, and
+for the whole window in between the list mapped over rows with no `sport` on
+them. One absent string, one dead site — not a broken badge, the *entire page*,
+because an exception in render unmounts the tree.
+
+**The class: a wire contract that changes on both sides of an independent
+deploy boundary.** The failure is not in either version. It is in the state
+between them, which every rollout passes through and which nothing in the
+repo's tests can reach, because tests only ever see both halves at the same
+commit.
+
+Worse, the risk *was* flagged before the push — as "deploy both services, or an
+NBA mock's board will draw plain snake." That is the harmless direction, and
+naming it created a false sense of having thought it through. The fatal
+direction is the other one:
+
+| rollout state | symptom |
+|---|---|
+| old frontend + new backend | extra JSON fields ignored; app fine |
+| **new frontend + old backend** | **unguarded read of an absent field; white page** |
+
+**The rule:** when a frontend starts reading a field a backend release adds,
+that read must tolerate the field's absence until the backend release is
+everywhere. Not forever, and not as a shrug about API contracts — for the
+length of one rollout. Do it at the boundary the data enters (one
+normalizer in `api.ts`), not at each of the N call sites that read it.
+
+**Deploy order follows from the same asymmetry:** backend first, then frontend.
+Additive backend fields are invisible to an old frontend; new frontend reads are
+fatal against an old backend. If both are one push, the tolerance is what buys
+the gap.
+
+**What caught it:** Allan opening the site. Not 379 backend tests, not 211
+frontend tests, not a typecheck — TypeScript believed the field was there,
+because in the repo it *is*. `src/api.mockSport.test.ts` now pins the tolerance
+using a response body copied verbatim from the old backend while it was still
+serving.

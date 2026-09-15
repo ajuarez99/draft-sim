@@ -543,7 +543,36 @@ export type MockSessionSummary = {
   sourceLeagueName: string | null
 }
 
-export const getMockSessions = () => apiFetch('/api/mocks').then(json<MockSessionSummary[]>)
+/**
+ * Backfills `sport`/`reversalRound` when the backend answering is older than
+ * this bundle.
+ *
+ * The frontend and the backend are separate Railway services that deploy
+ * independently, so "new frontend, old backend" is a real state the app passes
+ * through on every rollout -- not a hypothetical. It happened on 2026-09-14:
+ * the frontend shipped, the backend didn't, and `m.sport.toUpperCase()` on a
+ * row with no `sport` threw during render and took the entire home screen to a
+ * white page. A missing field should degrade one badge, never the page.
+ *
+ * `nfl` is the honest default rather than a guess: every mock written before
+ * V14's column existed was football, which is exactly why the column shipped
+ * with `default 'nfl'`. `reversalRound` 0 is plain snake, likewise what those
+ * sessions actually ran.
+ *
+ * Applied here, at the one boundary the data enters, rather than at each of the
+ * ~6 places that read it -- the repo's own two-implementations-of-one-rule
+ * lesson (claude/multi-sport-landmines.md).
+ */
+const withSportDefaults = <T extends { sport?: Sport; reversalRound?: number }>(row: T) => ({
+  ...row,
+  sport: row.sport ?? ('nfl' as Sport),
+  reversalRound: row.reversalRound ?? 0,
+})
+
+export const getMockSessions = () =>
+  apiFetch('/api/mocks')
+    .then(json<MockSessionSummary[]>)
+    .then((rows) => rows.map(withSportDefaults))
 
 // managerSeats seats a real manager's fitted/stated profile at a slot instead
 // of an unmodelled bot -- keyed by slot number, same shape MockDraftController
@@ -576,7 +605,9 @@ export const createMockSession = (
       managerSeats: managerSeats ?? {},
       sourceSleeperLeagueId: sourceSleeperLeagueId ?? null,
     }),
-  }).then(json<MockSessionState>)
+  })
+    .then(json<MockSessionState>)
+    .then(withSportDefaults)
 
 // Forks a real, drafting-status Sleeper draft into a new mock session seeded
 // with its picks so far -- the live-draft-to-mock bridge. mySlot is optional;
@@ -586,16 +617,21 @@ export const createMockSessionFromDraft = (sleeperDraftId: string, mySlot?: numb
   apiFetch(
     `/api/mocks/from-draft/${sleeperDraftId}${mySlot != null ? `?mySlot=${mySlot}` : ''}`,
     { method: 'POST' },
-  ).then(json<MockSessionState>)
+  )
+    .then(json<MockSessionState>)
+    .then(withSportDefaults)
 
-export const getMockSession = (id: number) => apiFetch(`/api/mocks/${id}`).then(json<MockSessionState>)
+export const getMockSession = (id: number) =>
+  apiFetch(`/api/mocks/${id}`).then(json<MockSessionState>).then(withSportDefaults)
 
 export const submitMockPick = (id: number, sleeperPlayerId: string) =>
   apiFetch(`/api/mocks/${id}/pick`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sleeperPlayerId }),
-  }).then(json<MockSessionState>)
+  })
+    .then(json<MockSessionState>)
+    .then(withSportDefaults)
 
 /**
  * The backend streams Server-Sent Events, but the request is a POST and the
