@@ -192,6 +192,32 @@ public class DraftRepository {
     }
 
     /**
+     * That league's draft, newest season first.
+     *
+     * A league row and a draft row are one-to-one in practice (each Sleeper
+     * season is its own league id, carrying its own draft), but nothing in the
+     * schema enforces it, so this orders rather than assuming a single row.
+     *
+     * Exists for the mock room's "use settings from &lt;league&gt;" step
+     * (claude/nba-mock-drafts.md): rounds and the reversal round live on the
+     * draft, not the league, and a from-scratch mock cloning a league's settings
+     * needs both. Returns the same effective (override-aware) reversal round
+     * {@link #bySleeperId} does.
+     */
+    public Optional<DraftRow> forLeague(long leagueId) {
+        return db.sql("""
+                select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
+                       coalesce(reversal_round_override, reversal_round)
+                from draft where league_id = ? order by season desc limit 1
+                """)
+                .param(leagueId)
+                .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
+                        rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9)))
+                .optional();
+    }
+
+    /**
      * Sleeper's value and the user's, unmerged.
      *
      * The only reason to want them apart is to show them apart: the round from

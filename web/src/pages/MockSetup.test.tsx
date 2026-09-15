@@ -52,7 +52,7 @@ describe('MockSetup', () => {
 
     await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-    expect(createMockSession).toHaveBeenCalledWith(10, 1, {})
+    expect(createMockSession).toHaveBeenCalledWith('nfl', 10, 1, {}, undefined)
   })
 
   it('navigates to the new session on success', async () => {
@@ -74,7 +74,7 @@ describe('MockSetup', () => {
     await claimSeat(user, 5, 8)
     await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-    expect(createMockSession).toHaveBeenCalledWith(8, 5, {})
+    expect(createMockSession).toHaveBeenCalledWith('nfl', 8, 5, {}, undefined)
   })
 
   it('marks the claimed seat as pressed and shows "You" on its face', async () => {
@@ -99,7 +99,7 @@ describe('MockSetup', () => {
     await setTeams(user, 8)
     await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-    expect(createMockSession).toHaveBeenCalledWith(8, 1, {})
+    expect(createMockSession).toHaveBeenCalledWith('nfl', 8, 1, {}, undefined)
   })
 
   it('shows an error message and re-enables the form when creation fails', async () => {
@@ -115,7 +115,12 @@ describe('MockSetup', () => {
 
   describe('handed off from the Start a mock draft modal', () => {
     it('preselects the team count StartMockModal passed through router state', async () => {
-      mockLocationState = { teams: 14, sourceLeagueName: 'West Coast Fantasy Football' }
+      mockLocationState = {
+        sport: 'nfl',
+        teams: 14,
+        sourceSleeperLeagueId: 'wcff-2026',
+        sourceLeagueName: 'West Coast Fantasy Football',
+      }
       createMockSession.mockResolvedValue({ id: 5 })
       const user = userEvent.setup()
       render(<MockSetup />)
@@ -124,11 +129,11 @@ describe('MockSetup', () => {
 
       await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-      expect(createMockSession).toHaveBeenCalledWith(14, 1, {}, 'West Coast Fantasy Football')
+      expect(createMockSession).toHaveBeenCalledWith('nfl', 14, 1, {}, 'wcff-2026')
     })
 
     it('ignores an out-of-range handed-off team count and falls back to 10', () => {
-      mockLocationState = { teams: 9, sourceLeagueName: 'Bad Count League' }
+      mockLocationState = { sport: 'nfl', teams: 9, sourceLeagueName: 'Bad Count League' }
       render(<MockSetup />)
 
       expect(screen.getByRole('button', { name: '10' })).toHaveAttribute('aria-pressed', 'true')
@@ -163,7 +168,7 @@ describe('MockSetup', () => {
       await user.selectOptions(seat2, '42')
       await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-      expect(createMockSession).toHaveBeenCalledWith(10, 1, { 2: 42 })
+      expect(createMockSession).toHaveBeenCalledWith('nfl', 10, 1, { 2: 42 }, undefined)
     })
 
     it('shows the assigned manager\'s name on the seat face', async () => {
@@ -198,7 +203,7 @@ describe('MockSetup', () => {
       await setTeams(user, 8)
       await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-      expect(createMockSession).toHaveBeenCalledWith(8, 1, {})
+      expect(createMockSession).toHaveBeenCalledWith('nfl', 8, 1, {}, undefined)
     })
 
     it('drops an assigned manager seat when the user claims that slot instead', async () => {
@@ -211,7 +216,7 @@ describe('MockSetup', () => {
       await claimSeat(user, 2, 10)
       await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-      expect(createMockSession).toHaveBeenCalledWith(10, 2, {})
+      expect(createMockSession).toHaveBeenCalledWith('nfl', 10, 2, {}, undefined)
     })
   })
 })

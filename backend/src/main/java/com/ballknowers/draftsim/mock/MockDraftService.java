@@ -71,6 +71,9 @@ public class MockDraftService {
     }
 
     /**
+     * A football mock with no league behind it -- the plain {@code /mock/new}
+     * default, and what every caller meant before the room learned basketball.
+     *
      * @param sleeperUserId the {@code X-Sleeper-User} identity that owns the
      *                      resulting session (V8), or null when the caller
      *                      sent no header -- then the session is unowned and
@@ -78,18 +81,34 @@ public class MockDraftService {
      */
     public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats,
                                           String sleeperUserId) {
-        return createSession(teams, userSlot, managerSeats, sleeperUserId, null);
+        return createSession(Sport.NFL, teams, userSlot, managerSeats, sleeperUserId, null);
     }
 
     /**
-     * @param sourceLeagueName the real league whose team count the redesigned
-     *                      home screen's "use settings from" step borrowed
-     *                      (V12), purely a display label -- null for a mock
-     *                      started with no league in mind, same as before.
+     * @param sport         the sport this mock drafts in, always explicit --
+     *                      never defaulted to football, which is the entire
+     *                      point of the home screen's two-step modal
+     *                      (design_handoff_multisport_mock_drafts). Must agree
+     *                      with {@code sourceSleeperLeagueId}'s own sport when
+     *                      one is given.
+     * @param sourceSleeperLeagueId the real league whose settings the home
+     *                      screen's "use settings from" step borrowed, or null
+     *                      for a mock started with no league in mind.
+     *                      <p>Replaces V12's {@code sourceLeagueName}, which was
+     *                      a display string the caller passed alongside a team
+     *                      count it had already read off the same league. That
+     *                      was survivable while every mock was football and the
+     *                      roster template was a constant; basketball needs the
+     *                      roster, the round count and the reversal round off
+     *                      that league too, and deriving five things from an id
+     *                      beats trusting five fields to arrive consistent.
+     *                      The stored column is unchanged -- the name is looked
+     *                      up here and snapshotted, as before.
      */
     @Transactional
-    public MockSessionState createSession(int teams, int userSlot, Map<Integer, Long> managerSeats,
-                                          String sleeperUserId, String sourceLeagueName) {
+    public MockSessionState createSession(Sport sport, int teams, int userSlot, Map<Integer, Long> managerSeats,
+                                          String sleeperUserId, String sourceSleeperLeagueId) {
+        if (sport == null) throw new IllegalArgumentException("sport is required");
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(teams)) {
             throw new IllegalArgumentException(
                     "teams must be one of " + LeagueShape.SUPPORTED_TEAM_COUNTS.stream().sorted().toList()
@@ -119,7 +138,50 @@ public class MockDraftService {
             }
         }
 
-        LeagueShape shape = LeagueShape.standard(teams);
+        // "Use settings from <league>" means all of them, not just the team
+        // count: the roster template, the round count and -- the one that
+        // silently breaks a basketball mock otherwise -- the reversal round.
+        LeagueShape shape = LeagueShape.standard(sport, teams);
+        String sourceLeagueName = null;
+        if (sourceSleeperLeagueId != null && !sourceSleeperLeagueId.isBlank()) {
+            LeagueRepository.LeagueRow league = leagues.bySleeperId(sourceSleeperLeagueId)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "league " + sourceSleeperLeagueId + " not ingested"));
+            // Same answer as "not ingested" for a league that isn't the
+            // caller's, matching createSessionFromDraft's own membership check.
+            if (!membership.canSee(sleeperUserId, league.id())) {
+                throw new IllegalArgumentException("league " + sourceSleeperLeagueId + " not ingested");
+            }
+            // The sport arrives explicitly AND is implied by the league. If they
+            // disagree, something upstream picked one of them wrongly -- and a
+            // silent winner here is exactly the "mock is always football" bug
+            // this feature exists to kill, just with the other sport on top.
+            if (league.sport() != sport) {
+                throw new IllegalArgumentException("league " + sourceSleeperLeagueId + " is "
+                        + league.sport().code() + ", but the requested sport is " + sport.code());
+            }
+            sourceLeagueName = league.name();
+            // rounds and reversal_round live on the draft, not the league. A
+            // league ingested without its draft keeps this sport's defaults
+            // rather than failing -- the roster and the name are still worth
+            // cloning on their own.
+            int rounds = LeagueShape.standardRounds(sport);
+            int reversalRound = 0;
+            Optional<DraftRepository.DraftRow> sourceDraft = drafts.forLeague(league.id());
+            if (sourceDraft.isPresent()) {
+                rounds = sourceDraft.get().rounds();
+                reversalRound = sourceDraft.get().reversalRound();
+            }
+            List<String> roster = league.rosterPositions().isEmpty()
+                    ? LeagueShape.standardRoster(sport)
+                    : league.rosterPositions();
+            // A reversal past this mock's own round count can't fire and is
+            // rejected by LeagueShape; clamp to plain snake rather than refusing
+            // to start a mock over a setting the user never chose here.
+            if (reversalRound > rounds) reversalRound = 0;
+            shape = new LeagueShape(sport, teams, rounds, roster, league.ppr(), reversalRound);
+        }
+
         List<SeatSpec> seats = new ArrayList<>();
         seats.add(SeatSpec.user(userSlot, null));
         managerSeats.forEach((slot, managerId) -> seats.add(SeatSpec.manager(slot, managerId)));
@@ -131,9 +193,9 @@ public class MockDraftService {
         DraftContext ctx = buildContext(shape, seats, Map.of());
 
         long rngSeed = System.nanoTime();
-        long id = mockDrafts.createSession(teams, shape.rounds(), shape.rosterPositions(),
+        long id = mockDrafts.createSession(shape.sport(), teams, shape.rounds(), shape.rosterPositions(),
                 shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed,
-                null, null, sleeperUserId, sourceLeagueName);
+                null, null, sleeperUserId, sourceLeagueName, shape.reversalRound());
 
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
@@ -181,28 +243,21 @@ public class MockDraftService {
         // everything below (validation, session persistence, DraftSlot math) uses
         // settings.teams() so nothing can disagree with the DraftContext it's paired with.
         //
-        // Deliberately the 2-arg toSettings overload (reversalRound = 0), even
-        // though draft IS a real persisted row with its own reversal_round: the
-        // mock room is football-only (multi-sport-and-rebrand.md's Non-goals --
-        // no mock draft room for basketball), and MockDraftRepository's session
-        // row has no reversal_round column of its own. Honoring the real value
-        // only for this fork's seed picks (below) while every later bot/user
-        // pick in the session rebuilds its LeagueShape from that column-less
-        // row -- see submitPick, which always gets plain snake -- would make a
-        // single session's own round-3/4 order disagree with itself mid-draft.
-        // Plain snake throughout is at least self-consistent.
-        LeagueSettings settings = LeagueRepository.toSettings(league, draft.rounds());
-
-        // The mock room is football-only (multi-sport-and-rebrand.md's Non-goals):
-        // buildContext/submitPick below both hardcode Sport.NFL and
-        // MockDraftRepository.SessionRow has no sport column, so a non-NFL fork
-        // would build an NBA board here and then offer football players for every
-        // pick after this one. Refuse it before any of that state exists rather
-        // than fail confusingly on the first submitPick.
-        if (settings.sport() != Sport.NFL) {
-            throw new IllegalArgumentException("draft " + sleeperDraftId + " is a "
-                    + settings.sport() + " draft -- the mock draft room only supports NFL drafts");
-        }
+        // The real draft's own reversal round, not plain snake.
+        //
+        // This used to pass the 2-arg overload (reversalRound = 0) on purpose:
+        // V14 had not happened, so MockDraftRepository's session row had nowhere
+        // to keep the value, and honoring it for this fork's seed picks while
+        // every later pick rebuilt a column-less plain-snake shape would have
+        // made one session's round-3 order disagree with itself mid-draft.
+        // Self-consistently wrong beat inconsistently right. The column exists
+        // now (claude/nba-mock-drafts.md), submitPick reads it back, and so the
+        // honest value is also the consistent one.
+        //
+        // draft.reversalRound() is already override-aware -- DraftRepository
+        // .bySleeperId coalesces reversal_round_override over Sleeper's value --
+        // so a user correction to the setting is what gets forked.
+        LeagueSettings settings = LeagueRepository.toSettings(league, draft.rounds(), draft.reversalRound());
 
         if (!LeagueShape.SUPPORTED_TEAM_COUNTS.contains(settings.teams())) {
             throw new IllegalArgumentException("league has " + settings.teams() + " teams, but only "
@@ -229,10 +284,6 @@ public class MockDraftService {
             if (p.playerId() != null) completed.put(p.pickNo(), p.playerId());
         }
 
-        // settings is already built above from the real league row, so this is the
-        // one MockDraftService entry point that actually has a sport to derive --
-        // unlike createSession/submitPick below, which build a bare LeagueShape
-        // with no league row behind it at all.
         List<BoardEntry> board = boards.currentBoard(settings.sport());
         ProfileService.Fit fit = profiles.fit(settings.sport());
         DraftContext ctx = contexts.build(settings, seats, fit.profiles(), fit.priors(), board, completed);
@@ -246,19 +297,18 @@ public class MockDraftService {
         // regardless, so the banner this feeds must not claim it was real.
         int forkedAtPickNo = 1;
         while (forkedAtPickNo <= ctx.totalPicks() && completed.containsKey(forkedAtPickNo)) forkedAtPickNo++;
-        long id = mockDrafts.createSession(settings.teams(), settings.rounds(), settings.rosterPositions(),
-                settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed, draft.id(), forkedAtPickNo,
-                sleeperUserId, league.name());
+        long id = mockDrafts.createSession(settings.sport(), settings.teams(), settings.rounds(),
+                settings.rosterPositions(), settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed,
+                draft.id(), forkedAtPickNo, sleeperUserId, league.name(), settings.reversalRound());
 
         List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
         for (Map.Entry<Integer, Long> e : completed.entrySet()) {
             int pickNo = e.getKey();
-            // Plain snake overload -- same reasoning as settings above: the mock
-            // room is football-only and reversalRound is always 0 here, so this
-            // re-derivation agrees with the real draft_pick.draft_slot Sleeper
-            // reported (PickMapper reads that column directly rather than
-            // computing it, so it is the one to trust if this ever disagreed).
-            int slot = DraftSlot.slot(pickNo, settings.teams());
+            // The forked draft's own reversal round, so this re-derivation
+            // agrees with the real draft_pick.draft_slot Sleeper reported
+            // (PickMapper reads that column directly rather than computing it,
+            // so it is the one to trust if this ever disagreed).
+            int slot = DraftSlot.slot(pickNo, settings.teams(), settings.reversalRound());
             int round = DraftSlot.round(pickNo, settings.teams());
             SeatSpec seat = seatAt(seats, slot);
             seedRows.add(new MockDraftRepository.PickRow(
@@ -325,10 +375,12 @@ public class MockDraftService {
         }
 
         List<SeatSpec> seats = readSeats(row.seatsJson());
-        // Plain snake overload: MockDraftRepository.SessionRow carries no
-        // reversal_round (see createSessionFromDraft's comment above) and the
-        // mock room is football-only, so there is never a reversal to honor here.
-        int onTheClockSlot = DraftSlot.slot(row.currentPickNo(), row.teams());
+        // The session's own reversal round (V14), not plain snake. This is the
+        // call that decides WHOSE turn pick N is, so a session that reverses in
+        // round 3 and a DraftSlot call that doesn't would hand the pick to the
+        // wrong seat -- and then reject the user's own pick as "not your turn"
+        // for the rest of the draft.
+        int onTheClockSlot = DraftSlot.slot(row.currentPickNo(), row.teams(), row.reversalRound());
         SeatSpec seat = seatAt(seats, onTheClockSlot);
         if (seat.type() != SeatSpec.Type.USER) {
             throw new IllegalStateException("pick " + row.currentPickNo() + " is not the user's turn");
@@ -337,12 +389,10 @@ public class MockDraftService {
             throw new IllegalArgumentException("sleeperPlayerId is required");
         }
 
-        // Sport.NFL is hardcoded rather than derived, same as buildContext() below --
-        // this session was never seeded from a real league row (row carries only a
-        // LeagueShape), and the mock draft room is football-only by
-        // claude/multi-sport-and-rebrand.md's Non-goals, so there is no sport to
-        // read here even in principle.
-        Long playerId = players.idsBySleeperId(Sport.NFL).get(sleeperPlayerId);
+        // The session's own sport. Sleeper player ids are unique per sport, not
+        // globally, so looking a basketball pick up in the football index finds
+        // nothing -- every NBA pick would 400 as "unknown sleeperPlayerId".
+        Long playerId = players.idsBySleeperId(row.sport()).get(sleeperPlayerId);
         if (playerId == null) {
             throw new IllegalArgumentException("unknown sleeperPlayerId: " + sleeperPlayerId);
         }
@@ -360,7 +410,8 @@ public class MockDraftService {
                 id, row.currentPickNo(), round, onTheClockSlot, "USER", seat.managerId(), playerId, "USER")));
         completed.put(row.currentPickNo(), playerId);
 
-        LeagueShape shape = new LeagueShape(row.teams(), row.rounds(), row.rosterPositions(), row.pointsPerReception());
+        LeagueShape shape = new LeagueShape(row.sport(), row.teams(), row.rounds(), row.rosterPositions(),
+                row.pointsPerReception(), row.reversalRound());
         DraftContext ctx = buildContext(shape, seats, completed);
         advanceAndPersist(id, ctx, seats, row.rngSeed());
         return Optional.of(buildState(id, ctx));
@@ -387,15 +438,22 @@ public class MockDraftService {
     /**
      * {@code shape} is a bare {@link LeagueShape} here (createSession's own
      * from-scratch session, or submitPick's re-derivation of one), never backed
-     * by a real league row -- unlike {@link #createSessionFromDraft}, which does
-     * have one and derives its sport from it. Sport.NFL stays hardcoded rather
-     * than added as a parameter: the mock draft room is football-only by
-     * claude/multi-sport-and-rebrand.md's Non-goals, so there is no sport for a
-     * from-scratch session to disagree about.
+     * by a real league row -- unlike {@link #createSessionFromDraft}, which has
+     * one. The shape now carries its own sport, so both paths agree on which
+     * board and which fitted profiles a session drafts against.
      */
     private DraftContext buildContext(LeagueShape shape, List<SeatSpec> seats, Map<Integer, Long> completed) {
-        List<BoardEntry> board = boards.currentBoard(Sport.NFL);
-        ProfileService.Fit fit = profiles.fit(Sport.NFL);
+        List<BoardEntry> board = boards.currentBoard(shape.sport());
+        // Replaces the "NFL only" refusal this method's hardcoded sport used to
+        // make redundant. An empty board is the one way a sport can be
+        // structurally unable to hold a draft -- the session would start, and
+        // then every pick would have nothing to choose from. Fail here, before
+        // any row is written, rather than confusingly on the first pick.
+        if (board.isEmpty()) {
+            throw new IllegalArgumentException("no " + shape.sport().code()
+                    + " board has been built yet -- ingest players and rebuild the board first");
+        }
+        ProfileService.Fit fit = profiles.fit(shape.sport());
         return contexts.build(shape, seats, fit.profiles(), fit.priors(), board, completed);
     }
 
@@ -414,7 +472,13 @@ public class MockDraftService {
         List<SeatSpec> seats = readSeats(row.seatsJson());
         List<MockDraftRepository.PickRow> pickRows = mockDrafts.picks(id);
 
-        List<BoardEntry> board = ctx != null ? ctx.board() : boards.currentBoard(Sport.NFL);
+        // The session's own sport on the bare-GET path too. This is the fourth
+        // and least obvious of the hardcoded-football sites: it only fires when
+        // ctx is null (a plain GET /api/mocks/{id}, i.e. every page load of the
+        // room), and its symptom is an NBA mock whose player picker lists
+        // football players -- while create and pick, which pass a real ctx,
+        // behave perfectly.
+        List<BoardEntry> board = ctx != null ? ctx.board() : boards.currentBoard(row.sport());
         Map<Long, BoardEntry> byId;
         if (ctx != null) {
             byId = ctx.byId();
@@ -453,16 +517,21 @@ public class MockDraftService {
                 .toList();
 
         boolean complete = "COMPLETE".equals(row.status());
-        // Plain snake overloads here too -- same reason as submitPick above:
-        // SessionRow has no reversal_round to read.
-        Integer onTheClockSlot = complete ? null : DraftSlot.slot(row.currentPickNo(), row.teams());
+        // The session's own reversal round in both calls. These two feed the
+        // room's "it's your turn" state and the "your picks" highlight on the
+        // board, so a plain-snake answer here would contradict the seat
+        // submitPick actually accepts a pick from.
+        Integer onTheClockSlot = complete
+                ? null : DraftSlot.slot(row.currentPickNo(), row.teams(), row.reversalRound());
         boolean isUsersTurn = !complete && onTheClockSlot != null && onTheClockSlot == row.userSlot();
-        List<Integer> myPicks = Arrays.stream(DraftSlot.picksForSlot(row.userSlot(), row.teams(), row.rounds()))
+        List<Integer> myPicks = Arrays.stream(
+                        DraftSlot.picksForSlot(row.userSlot(), row.teams(), row.rounds(), row.reversalRound()))
                 .boxed().toList();
 
-        return new MockSessionState(row.id(), row.status(), row.teams(), row.rounds(), row.rosterPositions(),
-                row.userSlot(), myPicks, seatViews, pickViews, available, row.currentPickNo(), onTheClockSlot,
-                isUsersTurn, row.sourceDraftId(), row.forkedAtPickNo());
+        return new MockSessionState(row.id(), row.sport(), row.status(), row.teams(), row.rounds(),
+                row.rosterPositions(), row.userSlot(), myPicks, seatViews, pickViews, available,
+                row.currentPickNo(), onTheClockSlot, isUsersTurn, row.sourceDraftId(), row.forkedAtPickNo(),
+                row.reversalRound());
     }
 
     /** A slot missing from `seats` is a BOT -- same convention DraftContextFactory.build() uses. */

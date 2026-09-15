@@ -1,5 +1,23 @@
 # Ball Knowers — handoff
 
+**NBA mock drafts ship 2026-09-14 — the app has no "Soon" left in it.**
+`claude/nba-mock-drafts.md` is the brief. The mock room was multi-sport's last
+Non-goal; almost everything it needed already existed (the sport column since V6,
+a 535-row NBA board, `BasketballRules`, sport-keyed frontend components), so the
+work was deleting four hardcoded `Sport.NFL`s and one `MOCKABLE_SPORTS`
+constant. The one real addition is **V14 `mock_draft_session.reversal_round`**:
+the 2026 NBA draft reverses at round 3, and without it a mock of the draft this
+project exists to rehearse hands every pick from 3.01 on to the wrong manager.
+
+Read that brief's "What live verification found" before trusting the test count.
+Two bugs got past a green suite, and the second is the third time this repo has
+shipped a plain-snake default in a *second* implementation of the pick order
+(see "Three bugs the live pass found" below for the first). Also recorded there:
+**all 42 NBA managers are NEUTRAL and cannot be fitted** — zero of 336 basketball
+picks carry an `adp_at_time`, and the board snapshots do not reach back to
+2024/2025 to backfill them. Seating a real manager in an NBA mock currently gets
+a league-average bot with their name on it, and `MockSetup` now says so.
+
 **Multi-sport is done: phases 0 through 6b, built 2026-09-08/09 on branch
 `ball-knowers-multi-sport` (not pushed, not merged).** Basketball is real end to
 end — the Ball Knowers NBA chain ingests (2066 players, 336 picks, a 535-row

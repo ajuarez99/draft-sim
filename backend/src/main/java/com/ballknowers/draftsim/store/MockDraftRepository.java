@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -26,15 +27,23 @@ public class MockDraftRepository {
         this.jdbc = jdbc;
     }
 
-    public record SessionRow(long id, String status, int teams, int rounds, List<String> rosterPositions,
-                             double pointsPerReception, String seatsJson, int userSlot, long rngSeed,
-                             int currentPickNo, Long sourceDraftId, Integer forkedAtPickNo) {}
+    /**
+     * {@code sport} and {@code reversalRound} are what let a session be
+     * basketball (claude/nba-mock-drafts.md). The sport column has existed since
+     * V6 but was never written or read while the room refused anything but
+     * football; reversalRound is V14's, and is the field that keeps an NBA
+     * mock's pick order matching the real 2026 draft's third-round reversal.
+     */
+    public record SessionRow(long id, Sport sport, String status, int teams, int rounds,
+                             List<String> rosterPositions, double pointsPerReception, String seatsJson,
+                             int userSlot, long rngSeed, int currentPickNo, Long sourceDraftId,
+                             Integer forkedAtPickNo, int reversalRound) {}
 
     /** An ordinary from-scratch mock: no real draft behind it. */
-    public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
+    public long createSession(Sport sport, int teams, int rounds, List<String> rosterPositions, double ppr,
                               String seatsJson, int userSlot, long rngSeed, String ownerSleeperUserId) {
-        return createSession(teams, rounds, rosterPositions, ppr, seatsJson, userSlot, rngSeed,
-                null, null, ownerSleeperUserId, null);
+        return createSession(sport, teams, rounds, rosterPositions, ppr, seatsJson, userSlot, rngSeed,
+                null, null, ownerSleeperUserId, null, 0);
     }
 
     /**
@@ -55,18 +64,26 @@ public class MockDraftRepository {
      *                       league. Distinct from sourceDraftId: that is a fork
      *                       of an actual draft's picks, this is only a
      *                       display label copied at creation time.
+     * @param reversalRound  Sleeper's {@code settings.reversal_round} for the
+     *                       draft this session is standing in for (V14), or 0
+     *                       for plain snake. Snapshotted here rather than read
+     *                       back off {@code sourceDraftId}: a from-scratch NBA
+     *                       mock has no source draft at all, and a forked one
+     *                       must keep drafting the order it started under even
+     *                       if the real draft's setting is later overridden.
      */
-    public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
+    public long createSession(Sport sport, int teams, int rounds, List<String> rosterPositions, double ppr,
                               String seatsJson, int userSlot, long rngSeed,
                               Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId,
-                              String sourceLeagueName) {
+                              String sourceLeagueName, int reversalRound) {
         return jdbc.execute((java.sql.Connection con) -> {
             Array slots = con.createArrayOf("text", rosterPositions.toArray());
             var ps = con.prepareStatement("""
                     insert into mock_draft_session
                         (teams, rounds, roster_positions, points_per_reception, seats_json, user_slot, rng_seed,
-                         source_draft_id, forked_at_pick_no, owner_sleeper_user_id, source_league_name)
-                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?)
+                         source_draft_id, forked_at_pick_no, owner_sleeper_user_id, source_league_name,
+                         sport, reversal_round)
+                    values (?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
                     returning id
                     """);
             ps.setInt(1, teams);
@@ -82,6 +99,8 @@ public class MockDraftRepository {
             else ps.setString(10, ownerSleeperUserId);
             if (sourceLeagueName == null || sourceLeagueName.isBlank()) ps.setNull(11, Types.VARCHAR);
             else ps.setString(11, sourceLeagueName);
+            ps.setString(12, sport.code());
+            ps.setInt(13, reversalRound);
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
             }
@@ -90,9 +109,9 @@ public class MockDraftRepository {
 
     public Optional<SessionRow> find(long id) {
         return db.sql("""
-                select id, status, teams, rounds, roster_positions, points_per_reception,
+                select id, sport, status, teams, rounds, roster_positions, points_per_reception,
                        seats_json::text, user_slot, rng_seed, current_pick_no,
-                       source_draft_id, forked_at_pick_no
+                       source_draft_id, forked_at_pick_no, reversal_round
                 from mock_draft_session where id = ?
                 """)
                 .param(id)
@@ -119,9 +138,9 @@ public class MockDraftRepository {
      */
     public Optional<SessionRow> lockForUpdate(long id) {
         return db.sql("""
-                select id, status, teams, rounds, roster_positions, points_per_reception,
+                select id, sport, status, teams, rounds, roster_positions, points_per_reception,
                        seats_json::text, user_slot, rng_seed, current_pick_no,
-                       source_draft_id, forked_at_pick_no
+                       source_draft_id, forked_at_pick_no, reversal_round
                 from mock_draft_session where id = ? for update
                 """)
                 .param(id)
@@ -136,10 +155,12 @@ public class MockDraftRepository {
         Long sourceDraftIdBoxed = rs.wasNull() ? null : sourceDraftId;
         int forkedAtPickNo = rs.getInt("forked_at_pick_no");
         Integer forkedAtPickNoBoxed = rs.wasNull() ? null : forkedAtPickNo;
-        return new SessionRow(rs.getLong("id"), rs.getString("status"), rs.getInt("teams"),
+        return new SessionRow(rs.getLong("id"), Sport.fromCode(rs.getString("sport")),
+                rs.getString("status"), rs.getInt("teams"),
                 rs.getInt("rounds"), slots, rs.getDouble("points_per_reception"),
                 rs.getString("seats_json"), rs.getInt("user_slot"), rs.getLong("rng_seed"),
-                rs.getInt("current_pick_no"), sourceDraftIdBoxed, forkedAtPickNoBoxed);
+                rs.getInt("current_pick_no"), sourceDraftIdBoxed, forkedAtPickNoBoxed,
+                rs.getInt("reversal_round"));
     }
 
     public void advanceCurrentPick(long id, int currentPickNo, String status) {
@@ -185,7 +206,13 @@ public class MockDraftRepository {
                 .list();
     }
 
-    public record SessionSummary(long id, String status, int teams, int rounds, int userSlot,
+    /**
+     * {@code sport} is what lets the mock-drafts list put a sport badge on every
+     * row -- the design handoff's "every mock row is uniquely identifiable at a
+     * glance (sport, source league, size, progress, recency)" requirement, which
+     * could not be met while nothing on the wire carried the sport.
+     */
+    public record SessionSummary(long id, Sport sport, String status, int teams, int rounds, int userSlot,
                                  int currentPickNo, java.time.Instant createdAt, String sourceLeagueName) {}
 
     /**
@@ -201,14 +228,16 @@ public class MockDraftRepository {
     public List<SessionSummary> allSessionsFor(String sleeperUserId) {
         if (sleeperUserId == null || sleeperUserId.isBlank()) {
             return db.sql("""
-                    select id, status, teams, rounds, user_slot, current_pick_no, created_at, source_league_name
+                    select id, sport, status, teams, rounds, user_slot, current_pick_no, created_at,
+                           source_league_name
                     from mock_draft_session order by created_at desc
                     """)
                     .query(MockDraftRepository::mapSummary)
                     .list();
         }
         return db.sql("""
-                select id, status, teams, rounds, user_slot, current_pick_no, created_at, source_league_name
+                select id, sport, status, teams, rounds, user_slot, current_pick_no, created_at,
+                       source_league_name
                 from mock_draft_session
                 where owner_sleeper_user_id = ? or owner_sleeper_user_id is null
                 order by created_at desc
@@ -219,8 +248,9 @@ public class MockDraftRepository {
     }
 
     private static SessionSummary mapSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
-        return new SessionSummary(rs.getLong(1), rs.getString(2), rs.getInt(3),
-                rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getTimestamp(7).toInstant(), rs.getString(8));
+        return new SessionSummary(rs.getLong(1), Sport.fromCode(rs.getString(2)), rs.getString(3),
+                rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getInt(7),
+                rs.getTimestamp(8).toInstant(), rs.getString(9));
     }
 
     /**

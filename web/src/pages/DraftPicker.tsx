@@ -67,12 +67,10 @@ function sportTitle(f: SportFilter): string {
  * list; "Start a mock draft" opens a two-step sport-then-league modal instead
  * of jumping straight to /mock/new.
  *
- * NBA mock drafts are a real backend gap, not a frontend oversight --
- * MockDraftService refuses anything but Sport.NFL (multi-sport-and-rebrand.md
- * Non-goals). Allan's call (2026-09-13): ship this redesign now with the NBA
- * sport chip visible but disabled ("Soon") rather than wait on that feature
- * or hide the gap. StartMockModal enforces this; "Mock it" on an NBA league
- * card is disabled here for the same reason.
+ * Both sports are mockable as of claude/nba-mock-drafts.md. This comment used
+ * to explain why NBA was shipped visible-but-disabled ("Soon"): the backend
+ * refused anything but Sport.NFL. It no longer does, so the gate is gone from
+ * here, from the league cards' "Mock it" and from StartMockModal.
  */
 export default function DraftPicker() {
   const user = useUser()
@@ -239,7 +237,13 @@ export default function DraftPicker() {
   // creating the session directly -- MockSetup's per-seat real-manager
   // assignment (claude/next-features-roadmap.md's manager-tendencies-and-
   // mock-seating work) is valued functionality this redesign must not skip.
-  function startMock(opts: { teams: number; sourceLeagueName: string }) {
+  function startMock(opts: {
+    sport: Sport
+    teams: number
+    rounds: number
+    sourceSleeperLeagueId: string
+    sourceLeagueName: string
+  }) {
     setModalSeed(null)
     navigate('/mock/new', { state: opts })
   }
@@ -260,10 +264,12 @@ export default function DraftPicker() {
     season: l.current.season,
   }))
 
-  // Every mock ever created is an NFL mock today (MockDraftService refuses
-  // anything else) -- an honest reflection of that, not a stand-in for a
-  // sport field the backend doesn't have yet.
-  const visibleMocks = sportFilter === 'nba' ? [] : mocks
+  // Mocks now carry their own sport, so the sidebar filter scopes them the
+  // same way it scopes the leagues grid. This used to blank the whole list
+  // under the NBA filter, because every mock was football and there was no
+  // field to filter on.
+  const visibleMocks =
+    sportFilter === 'all' ? mocks : mocks?.filter((m) => m.sport === sportFilter)
   const visibleSleeperLeagues =
     sportFilter === 'nba' ? [] : sleeperLeagues?.filter((l) => sportFilter === 'all' || l.sport === sportFilter)
 
@@ -502,13 +508,10 @@ export default function DraftPicker() {
                       {/* Every league's own fast path into the modal, preset to
                           its sport and itself -- design_handoff_multisport_
                           mock_drafts's "fastest correct path" for starting a
-                          mock. Disabled for NBA until the backend supports it
-                          (see this file's own doc comment). */}
+                          mock. */}
                       <button
                         type="button"
                         className="league-card-mockit"
-                        disabled={d.sport !== 'nfl'}
-                        title={d.sport === 'nfl' ? undefined : 'NBA mock drafts are coming soon'}
                         onClick={() => openMockModal({ sport: d.sport, leagueId: d.sleeperLeagueId })}
                       >
                         Mock it
@@ -636,10 +639,10 @@ export default function DraftPicker() {
                 const barPct = Math.max(pct, picksMade > 0 || m.status === 'COMPLETE' ? 3 : 0)
                 return (
                   <Link key={m.id} to={`/mock/${m.id}`} className="draft-row mock-row">
-                    <span className="sport-pill nfl mock-row-sport">NFL</span>
+                    <span className={`sport-pill ${m.sport} mock-row-sport`}>{m.sport.toUpperCase()}</span>
                     <span className="mock-row-identity">
                       <span className="draft-row-league">
-                        {m.teams}-team NFL mock
+                        {m.teams}-team {m.sport.toUpperCase()} mock
                         {m.sourceLeagueName ? ` · ${m.sourceLeagueName}` : ''}
                       </span>
                       <span className="muted small">

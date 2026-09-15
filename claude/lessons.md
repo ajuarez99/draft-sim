@@ -331,3 +331,49 @@ double-counted in `rosterNeed`. Same shape as #1: structurally valid, silently
 wrong, and it surfaced only as an opaque downstream error message. **A
 collection mutator that returns a boolean is telling you something; dropping it
 is a decision, and it should be an explicit one.**
+
+---
+
+## 16. A second implementation of the pick order defaulted to plain snake — for the third time
+
+Found while building NBA mock drafts (`claude/nba-mock-drafts.md`), by opening
+the room in a browser. The board grid rendered the user's own highlighted picks
+**in Bot 12's column** from round 3 on.
+
+Nothing was wrong with either piece. `DraftBoard` takes a `reversalRound` prop
+and computes cell pick numbers with it — that was itself the fix for the same
+bug one round earlier (HANDOFF's "Three bugs the live pass found", where
+`DraftBoard` had drawn plain snake from a literal `round % 2 === 1`).
+`MockDraftView` simply never passed it, so it took the prop's default of `0`
+while `myPicks`, computed on the backend, was reversal-aware. Two correct
+implementations, one silent default between them.
+
+**The class: an optional parameter that encodes a rule.** `reversalRound = 0`
+reads like "no opinion" and means "plain snake" — a real, specific claim about
+pick order. Every caller that omits it is asserting that claim without knowing
+it. The same shape produced #6 (a football-shaped default nothing failed on) and
+the `?sport=` default that wrote basketball notes onto football managers.
+
+This is the third time the pick order has been re-implemented and defaulted
+wrong, which says the problem is not carelessness but the shape:
+
+- `DraftSlot.slot(pickNo, teams)` and `picksForSlot(slot, teams, rounds)` exist
+  as plain-snake convenience overloads, and they are what a caller reaches for.
+- **Before adding one, ask what the no-argument version silently asserts.** A
+  convenience overload that guesses a *rule* is different from one that guesses
+  a *value*.
+
+**What caught it:** a browser, in about four seconds of looking. What did not:
+379 backend tests and 211 frontend tests, including tests written that same hour
+specifically about the reversal round — because they asserted the numbers
+(`myPicks == [1, 24, 36, 37]`), and the numbers were right. The bug was in where
+those numbers were *drawn*. **An assertion about data does not cover a layout
+that reads the same data through a second path.**
+
+**Found in the same pass, same lesson from the other end:** `buildState` loaded
+the board with a hardcoded `Sport.NFL` on the one branch no test exercised —
+the plain `GET`, which is every page load of the room. Create and pick both
+passed a real `DraftContext` and behaved perfectly. A basketball draft room
+offered Jahmyr Gibbs. **When you delete a guard, grep for what the guard was
+making redundant**; three of the four hardcoded sports were found by reading,
+and the fourth only by driving the thing.

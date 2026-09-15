@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.LeagueSettings;
 import com.ballknowers.draftsim.domain.Position;
+import com.ballknowers.draftsim.domain.Sport;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -46,7 +47,7 @@ class LeagueShapeTest {
     @Test
     void aShapeIsImmutableEvenIfItsCallerKeepsTheList() {
         List<String> mutable = new java.util.ArrayList<>(LeagueShape.STANDARD_ROSTER);
-        LeagueShape shape = new LeagueShape(12, 15, mutable, 1.0);
+        LeagueShape shape = new LeagueShape(Sport.NFL, 12, 15, mutable, 1.0, 0);
         mutable.clear();
         assertEquals(15, shape.rosterPositions().size());
         assertThrows(UnsupportedOperationException.class, () -> shape.rosterPositions().add("QB"));

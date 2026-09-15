@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
-import { createMockSession, getManagers, type ManagerSummary } from '../api'
+import { createMockSession, getManagers, type ManagerSummary, type Sport } from '../api'
 import { hueFor } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
 
@@ -36,8 +36,18 @@ function provenanceHint(p: ManagerSummary['provenance']) {
  */
 // What StartMockModal hands off in router state after its own sport/league
 // choice -- optional, so a direct visit to /mock/new (still linked from a
-// couple of places) keeps its old plain defaults.
-type StartMockHandoff = { teams?: number; sourceLeagueName?: string }
+// couple of places) keeps its old plain football defaults.
+//
+// The sport rides along rather than being re-derived here: this screen has no
+// league list of its own to look it up in, and re-deriving it would be a
+// second implementation of a choice the modal already made explicitly.
+type StartMockHandoff = {
+  sport?: Sport
+  teams?: number
+  rounds?: number
+  sourceSleeperLeagueId?: string
+  sourceLeagueName?: string
+}
 
 export default function MockSetup() {
   const navigate = useNavigate()
@@ -47,6 +57,9 @@ export default function MockSetup() {
     handoff?.teams && (TEAM_SIZES as readonly number[]).includes(handoff.teams)
       ? (handoff.teams as (typeof TEAM_SIZES)[number])
       : 10
+  // A direct visit to /mock/new with no handoff is football, same as it has
+  // always been -- not a sport picker this screen never had.
+  const sport: Sport = handoff?.sport ?? 'nfl'
   const [teams, setTeams] = useState<(typeof TEAM_SIZES)[number]>(initialTeams)
   const [userSlot, setUserSlot] = useState(1)
   const [managers, setManagers] = useState<ManagerSummary[] | null>(null)
@@ -55,14 +68,12 @@ export default function MockSetup() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // 'nfl' explicitly, not by omission: the mock draft room is football-only
-    // (multi-sport-and-rebrand.md Non-goals) -- MockDraftService builds its
-    // settings from a football LeagueShape and MockSessionState has no sport to
-    // seat against. Passing the sport says that is a decision rather than a
-    // default nobody revisited. Non-critical fetch: the mock still works with
-    // every seat left on Bot.
-    getManagers('nfl').then(setManagers).catch(() => {})
-  }, [])
+    // This session's own sport. Seating an NFL manager in an NBA mock would be
+    // seating a profile fitted against a different board entirely -- and there
+    // are 42 fitted NBA profiles waiting that the hardcoded 'nfl' hid.
+    // Non-critical fetch: the mock still works with every seat left on Bot.
+    getManagers(sport).then(setManagers).catch(() => {})
+  }, [sport])
 
   function handleTeamsChange(next: number) {
     setTeams(next as (typeof TEAM_SIZES)[number])
@@ -103,9 +114,13 @@ export default function MockSetup() {
     setCreating(true)
     setError(null)
     try {
-      const session = handoff?.sourceLeagueName
-        ? await createMockSession(teams, userSlot, managerSeats, handoff.sourceLeagueName)
-        : await createMockSession(teams, userSlot, managerSeats)
+      const session = await createMockSession(
+        sport,
+        teams,
+        userSlot,
+        managerSeats,
+        handoff?.sourceSleeperLeagueId,
+      )
       navigate(`/mock/${session.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -113,6 +128,14 @@ export default function MockSetup() {
     }
   }
 
+  // "Assign a real manager to see their tendencies play out" is only true of a
+  // manager we actually fitted something from. Every NBA manager is NEUTRAL
+  // today -- none of the 336 basketball picks in the database carry an
+  // adp_at_time, so ProfileService has nothing to score them against (see
+  // claude/nba-mock-drafts.md, and the adp_at_time note in claude/lessons.md).
+  // The per-seat hint has always said "(no data -- same as a bot)"; this stops
+  // the header above it from promising the opposite.
+  const anyFitted = !!managers?.some((m) => m.provenance !== 'NEUTRAL')
   const assignedCount = Object.keys(managerSeats).length
   const botCount = teams - 1 - assignedCount
   // "3 real managers · 6 bots · you at 1.01" -- lets the whole room be
@@ -122,19 +145,33 @@ export default function MockSetup() {
 
   return (
     <div className="content">
+      {/* The eyebrow names the sport for the same reason the modal's CTA reads
+          "Start NBA mock": this screen sits between that confirmation and the
+          draft room, and it is the last place to notice you are about to
+          rehearse the wrong draft. */}
       <PageHeader
-        eyebrow="New mock"
+        eyebrow={`New ${sport.toUpperCase()} mock`}
         title="Mock draft setup"
         sub={
-          handoff?.sourceLeagueName ? (
-            <>
-              Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams. Bots
-              fill every seat but yours and auto-pick down the snake order; assign a real manager
-              to a seat to see their tendencies play out instead of a league-average bot.
-            </>
-          ) : (
-            'Bots fill every seat but yours and auto-pick down the snake order. You take your own picks on your turn. Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
-          )
+          <>
+            {handoff?.sourceLeagueName ? (
+              <>
+                Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams
+                {handoff.rounds ? `, ${handoff.rounds} rounds` : ''}. Bots fill every seat but
+                yours and auto-pick down the draft order.
+              </>
+            ) : (
+              'Bots fill every seat but yours and auto-pick down the draft order. You take your own picks on your turn.'
+            )}{' '}
+            {anyFitted ? (
+              'Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
+            ) : (
+              <>
+                No {sport.toUpperCase()} manager has enough drafted history to model yet, so every
+                seat drafts league-average either way.
+              </>
+            )}
+          </>
         }
       />
 

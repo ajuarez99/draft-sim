@@ -15,29 +15,37 @@ type Props = {
   initialSport: Sport
   initialLeagueId?: string | null
   onClose: () => void
-  onStart: (opts: { teams: number; sourceLeagueName: string }) => void
+  onStart: (opts: {
+    sport: Sport
+    teams: number
+    rounds: number
+    sourceSleeperLeagueId: string
+    sourceLeagueName: string
+  }) => void
 }
 
 const SPORTS: Sport[] = ['nfl', 'nba']
 
-// NBA mock drafts don't exist on the backend yet -- MockDraftService refuses
-// anything but Sport.NFL (multi-sport-and-rebrand.md's Non-goals). The design
-// this modal implements assumed both sports were mockable; Allan's call
-// (2026-09-13) was to keep the NBA chip visible rather than hide it, so the
-// gap reads as "not yet" rather than as a missing sport nobody explains.
-const MOCKABLE_SPORTS: Sport[] = ['nfl']
-
 /**
  * "Start a mock draft" (design_handoff_multisport_mock_drafts). Forces an
- * explicit sport choice, then a specific league's team count/rounds to clone
- * -- the fix for mocks always defaulting to football. Submitting navigates to
- * the existing seat-setup screen (`/mock/new`) rather than creating the
- * session directly: that screen's per-seat manager assignment
- * (claude/next-features-roadmap.md's manager-tendencies-and-mock-seating
- * work) is a real, valued step this modal must not skip.
+ * explicit sport choice, then a specific league whose settings to clone -- the
+ * fix for mocks always defaulting to football. Submitting navigates to the
+ * existing seat-setup screen (`/mock/new`) rather than creating the session
+ * directly: that screen's per-seat manager assignment
+ * (claude/next-features-roadmap.md's manager-tendencies-and-mock-seating work)
+ * is a real, valued step this modal must not skip.
+ *
+ * Both sports are startable as of claude/nba-mock-drafts.md. This file used to
+ * carry a `MOCKABLE_SPORTS = ['nfl']` constant, a disabled NBA chip with a
+ * "Soon" badge, and a step-2 message explaining the gap; the backend that
+ * refusal described now supports basketball, so all three are gone.
+ *
+ * The league's id goes to the backend, not just its team count: rounds, the
+ * roster template and the reversal round are cloned server-side off that one
+ * id (see MockDraftController.CreateRequest).
  */
 export default function StartMockModal({ leagues, initialSport, initialLeagueId, onClose, onStart }: Props) {
-  const [sport, setSport] = useState<Sport>(MOCKABLE_SPORTS.includes(initialSport) ? initialSport : 'nfl')
+  const [sport, setSport] = useState<Sport>(initialSport)
   const leaguesForSport = leagues.filter((l) => l.sport === sport)
 
   // Derived per render, not seeded once into state. `leagues` can be empty
@@ -84,7 +92,7 @@ export default function StartMockModal({ leagues, initialSport, initialLeagueId,
   }
 
   const selected = leagueId ? leagues.find((l) => l.sleeperLeagueId === leagueId) : undefined
-  const canStart = MOCKABLE_SPORTS.includes(sport) && !!selected
+  const canStart = !!selected
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -105,33 +113,23 @@ export default function StartMockModal({ leagues, initialSport, initialLeagueId,
         <div className="start-mock-step">
           <span className="start-mock-step-label">1 · Sport</span>
           <div className="start-mock-sport-chips">
-            {SPORTS.map((s) => {
-              const mockable = MOCKABLE_SPORTS.includes(s)
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  className={`start-mock-sport-chip ${s}${sport === s ? ' on' : ''}${mockable ? '' : ' disabled'}`}
-                  aria-pressed={sport === s}
-                  disabled={!mockable}
-                  title={mockable ? undefined : 'NBA mock drafts are coming soon'}
-                  onClick={() => changeSport(s)}
-                >
-                  {s.toUpperCase()}
-                  {!mockable && <span className="start-mock-soon">Soon</span>}
-                </button>
-              )
-            })}
+            {SPORTS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`start-mock-sport-chip ${s}${sport === s ? ' on' : ''}`}
+                aria-pressed={sport === s}
+                onClick={() => changeSport(s)}
+              >
+                {s.toUpperCase()}
+              </button>
+            ))}
           </div>
         </div>
 
         <div className="start-mock-step">
           <span className="start-mock-step-label">2 · Use settings from</span>
-          {!canStart && sport !== 'nfl' ? (
-            <p className="muted small">
-              NBA mock drafts aren't available yet — pick NFL above to start one.
-            </p>
-          ) : leaguesForSport.length === 0 ? (
+          {leaguesForSport.length === 0 ? (
             <p className="muted small">No {sport.toUpperCase()} leagues to clone yet — add one from Home first.</p>
           ) : (
             <div className="start-mock-league-list" role="radiogroup" aria-label="League settings to use">
@@ -168,7 +166,16 @@ export default function StartMockModal({ leagues, initialSport, initialLeagueId,
             type="button"
             className="home-hero-cta start-mock-cta"
             disabled={!canStart}
-            onClick={() => selected && onStart({ teams: selected.teams, sourceLeagueName: selected.leagueName })}
+            onClick={() =>
+              selected &&
+              onStart({
+                sport,
+                teams: selected.teams,
+                rounds: selected.rounds,
+                sourceSleeperLeagueId: selected.sleeperLeagueId,
+                sourceLeagueName: selected.leagueName,
+              })
+            }
           >
             Start {sport.toUpperCase()} mock
           </button>

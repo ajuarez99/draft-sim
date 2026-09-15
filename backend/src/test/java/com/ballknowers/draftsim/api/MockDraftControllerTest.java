@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.SeatSpec;
 import com.ballknowers.draftsim.mock.MockDraftService;
 import com.ballknowers.draftsim.mock.MockSessionState;
@@ -29,17 +30,17 @@ class MockDraftControllerTest {
     @Mock private MockDraftService mocks;
 
     private MockSessionState sampleState(long id) {
-        return new MockSessionState(id, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
+        return new MockSessionState(id, Sport.NFL, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
                 List.of(new MockSessionState.SeatView(1, SeatSpec.Type.USER, null, "You", null)),
-                List.of(), List.of(), 1, 1, true, null, null);
+                List.of(), List.of(), 1, 1, true, null, null, 0);
     }
 
     @Test
     void createDelegatesTeamsAndUserSlotToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(), null, null)).thenReturn(sampleState(1));
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), null, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(), null), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(null, 8, 3, Map.of(), null), null);
 
         assertEquals(1, result.id());
     }
@@ -47,27 +48,47 @@ class MockDraftControllerTest {
     @Test
     void createDelegatesManagerSeatsToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(5, 42L), null, null)).thenReturn(sampleState(1));
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(5, 42L), null, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(8, 3, Map.of(5, 42L), null), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(5, 42L), null), null);
 
         assertEquals(1, result.id());
     }
 
     @Test
-    void createDelegatesSourceLeagueNameToTheService() {
+    void createDelegatesSourceLeagueIdToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(8, 3, Map.of(), null, "Ball Knowers")).thenReturn(sampleState(1));
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), null, "123456")).thenReturn(sampleState(1));
 
         MockSessionState result = controller.create(
-                new MockDraftController.CreateRequest(8, 3, Map.of(), "Ball Knowers"), null);
+                new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(), "123456"), null);
 
         assertEquals(1, result.id());
+    }
+
+    @Test
+    void createPassesTheRequestedSportThroughRatherThanAssumingFootball() {
+        MockDraftController controller = new MockDraftController(mocks);
+        when(mocks.createSession(Sport.NBA, 12, 3, Map.of(), null, "nba-league")).thenReturn(sampleState(7));
+
+        MockSessionState result = controller.create(
+                new MockDraftController.CreateRequest(Sport.NBA, 12, 3, Map.of(), "nba-league"), null);
+
+        assertEquals(7, result.id());
     }
 
     @Test
     void createRequestTreatsNullManagerSeatsAsEmpty() {
-        assertEquals(Map.of(), new MockDraftController.CreateRequest(8, 3, null, null).managerSeats());
+        assertEquals(Map.of(), new MockDraftController.CreateRequest(null, 8, 3, null, null).managerSeats());
+    }
+
+    /**
+     * Only an omitted sport falls back to football -- a pre-multi-sport client
+     * that never sent the field. The home screen's modal always states it.
+     */
+    @Test
+    void createRequestTreatsAnOmittedSportAsFootball() {
+        assertEquals(Sport.NFL, new MockDraftController.CreateRequest(null, 8, 3, null, null).sport());
     }
 
     @Test
@@ -159,7 +180,7 @@ class MockDraftControllerTest {
     @Test
     void listDelegatesToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        var summary = new MockDraftRepository.SessionSummary(1, "IN_PROGRESS", 8, 15, 1, 1, null, null);
+        var summary = new MockDraftRepository.SessionSummary(1, Sport.NFL, "IN_PROGRESS", 8, 15, 1, 1, null, null);
         when(mocks.listSessions(null)).thenReturn(List.of(summary));
 
         assertEquals(List.of(summary), controller.list(null));

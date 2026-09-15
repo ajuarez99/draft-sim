@@ -78,13 +78,15 @@ public final class MockDraftEngine {
         boolean complete = false;
         for (; pickNo <= total; pickNo++) {
             int round = DraftSlot.round(pickNo, teams);
-            // Plain snake overload: the mock room is football-only
-            // (multi-sport-and-rebrand.md's Non-goals) and its session storage
-            // has no reversal_round column (see MockDraftService's
-            // createSessionFromDraft/submitPick comments), so ctx here never
-            // carries a nonzero reversalRound to read even when it was built
-            // from a real, forked draft row.
-            int slot = DraftSlot.slot(pickNo, teams);
+            // The context's own reversal round, exactly as DraftSimulator's hot
+            // loop reads it. This used to be the plain-snake overload because a
+            // mock session had nowhere to persist a reversal round; it does now
+            // (V14, claude/nba-mock-drafts.md), and this is the loop that decides
+            // which seat every BOT pick belongs to. Left on plain snake it would
+            // disagree with MockDraftService.submitPick -- which reads the stored
+            // value -- from round 3 of an NBA mock onward: bots filling one seat
+            // order while the user is told it is someone else's turn.
+            int slot = DraftSlot.slot(pickNo, teams, ctx.settings().reversalRound());
 
             long already = ctx.completedAt(pickNo);
             if (already != 0L) {

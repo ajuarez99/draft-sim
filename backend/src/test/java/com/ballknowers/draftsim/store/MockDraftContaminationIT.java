@@ -86,7 +86,7 @@ class MockDraftContaminationIT {
         // A mock session, with the SAME manager id recorded on one of its picks
         // (a MANAGER seat) -- the scenario that would expose a leak if
         // allCompletedPicks()/fit() ever started reading mock_draft_pick.
-        mockSessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
+        mockSessionId = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
                 "[{\"slot\":2,\"type\":\"MANAGER\",\"managerId\":" + managerId + "}]", 1, 99L, null);
         mockDrafts.insertPicks(mockSessionId, List.of(
                 new MockDraftRepository.PickRow(mockSessionId, 2, 1, 2, "MANAGER", managerId, playerId, "BOT")));
@@ -124,9 +124,9 @@ class MockDraftContaminationIT {
      */
     @Test
     void aForkedSessionsLivePicksNeverLeakIntoAllCompletedPicksEither() {
-        long forkedSessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
+        long forkedSessionId = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
                 "[{\"slot\":3,\"type\":\"MANAGER\",\"managerId\":" + managerId + "}]", 1, 100L,
-                realDraftId, 2, null, null);
+                realDraftId, 2, null, null, 0);
         mockDrafts.insertPicks(forkedSessionId, List.of(
                 new MockDraftRepository.PickRow(forkedSessionId, 3, 1, 3, "MANAGER", managerId, playerId, "LIVE")));
         try {

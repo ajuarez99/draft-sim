@@ -10,6 +10,7 @@ import com.ballknowers.draftsim.engine.SeatSpec;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.PositionalPriors;
 import com.ballknowers.draftsim.profile.ProfileService;
+import com.ballknowers.draftsim.sport.BasketballRules;
 import com.ballknowers.draftsim.sport.FootballRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.DraftRepository;
@@ -52,6 +53,14 @@ class MockDraftServiceTest {
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
 
+    /** Basketball has no "kickers go last" equivalent, so no latestRounds. */
+    private static final ScoringProperties.SportScoring NBA_CFG = new ScoringProperties.SportScoring(
+            new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
+            12.0, 3.0, 60.0, 0.15, 6, 0.85,
+            Map.of(), 1.0, 30);
+
+    private static final ScoringProperties BOTH = new ScoringProperties(CFG, NBA_CFG);
+
     @Mock private BoardService boards;
     @Mock private ProfileService profiles;
     @Mock private PlayerRepository players;
@@ -73,6 +82,23 @@ class MockDraftServiceTest {
         return out;
     }
 
+    /**
+     * A basketball board. Every entry is multi-position on purpose -- 66% of
+     * players actually drafted in the real NBA league are, and single-position
+     * entries would exercise none of BasketballRules' matroid logic.
+     */
+    private static List<BoardEntry> nbaBoard(int n) {
+        List<List<Position>> cycle = List.of(
+                List.of(Position.PG), List.of(Position.SG, Position.SF), List.of(Position.SF, Position.PF),
+                List.of(Position.C), List.of(Position.PG, Position.SG), List.of(Position.PF, Position.C));
+        List<BoardEntry> out = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            out.add(new BoardEntry(new Player(10_000L + i, Sport.NBA, "nba-s" + i, "Hooper " + i,
+                    cycle.get(i % cycle.size()), "LAL", "Active", null, null, null), i + 1.0, i / 6 + 1));
+        }
+        return out;
+    }
+
     @BeforeEach
     void setUp() {
         List<BoardEntry> synthetic = board(400);
@@ -84,11 +110,19 @@ class MockDraftServiceTest {
         lenient().when(players.idsBySleeperId(Sport.NFL)).thenReturn(ids);
         lenient().when(managers.names()).thenReturn(Map.of());
 
+        List<BoardEntry> nba = nbaBoard(400);
+        lenient().when(boards.currentBoard(Sport.NBA)).thenReturn(nba);
+        lenient().when(profiles.fit(Sport.NBA))
+                .thenReturn(new ProfileService.Fit(Map.of(), PositionalPriors.uniform(Sport.NBA), 0, Map.of()));
+        Map<String, Long> nbaIds = new HashMap<>();
+        for (BoardEntry e : nba) nbaIds.put(e.player().sleeperId(), e.player().id());
+        lenient().when(players.idsBySleeperId(Sport.NBA)).thenReturn(nbaIds);
+
         repo = new FakeMockDraftRepository();
         DraftContextFactory contexts =
                 new DraftContextFactory(
-                        new SportRulesRegistry(List.of(new FootballRules(new ScoringProperties(CFG, null)))),
-                        new ScoringProperties(CFG, null));
+                        new SportRulesRegistry(List.of(new FootballRules(BOTH), new BasketballRules(BOTH))),
+                        BOTH);
         // Only createSessionFromDraft consults membership, and nothing in this
         // class exercises that path -- these tests are all from-scratch mocks.
         // Stubbed permissive rather than left to answer false so a fork test
@@ -449,19 +483,133 @@ class MockDraftServiceTest {
                 () -> service.createSessionFromDraft("sleeper-draft-not-live", 1, null));
     }
 
+    /**
+     * The inverse of the test that used to live here, which asserted an NBA
+     * fork was refused. claude/nba-mock-drafts.md.
+     */
     @Test
-    void createSessionFromDraftRejectsANonNflSport() {
+    void createSessionFromDraftForksAnNbaDraftAndDraftsOffTheNbaBoard() {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
-                1L, 9L, "sleeper-draft-nba", 2026, 15, 8, "drafting", Map.of());
+                1L, 9L, "sleeper-draft-nba", 2026, 14, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null);
+                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null);
         when(drafts.bySleeperId("sleeper-draft-nba")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
 
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-nba", 3, null);
+
+        assertEquals(Sport.NBA, state.sport());
+        assertFalse(state.picks().isEmpty(), "bots before slot 3 must have picked");
+        // Every pick is a basketball player -- the failure this guards is the
+        // one the old refusal existed to prevent: an NBA room offering football
+        // players. Board ids start at 10_000 for NBA and at 1 for NFL.
+        for (var p : state.picks()) {
+            assertTrue(p.player().id() >= 10_000L,
+                    "an NBA mock must draft off the NBA board, got player id " + p.player().id());
+        }
+    }
+
+    /**
+     * The reversal round is the whole reason V14 exists: the real 2026 NBA
+     * draft reverses at round 3, and a mock that snakes plainly hands every
+     * pick from 3.01 on to the wrong seat while looking entirely correct.
+     */
+    @Test
+    void anNbaForkKeepsTheRealDraftsReversalRoundInsteadOfPlainSnake() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-nba-rev", 2026, 14, 8, "drafting", Map.of(), 3);
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null);
+        when(drafts.bySleeperId("sleeper-draft-nba-rev")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-nba-rev", 1, null);
+
+        MockDraftRepository.SessionRow row = repo.find(state.id()).orElseThrow();
+        assertEquals(3, row.reversalRound(), "the session must persist the real draft's reversal round");
+
+        // Slot 1 in an 8-team draft: 1, then 16 (round 2 reverses under plain
+        // snake too), then -- because round 3 is flipped -- 24 rather than the
+        // 17 plain snake would give it. This is the list the room highlights as
+        // "your picks", so getting it wrong is visible on the board itself.
+        assertEquals(List.of(1, 16, 24, 25), state.myPicks().subList(0, 4));
+
+        // And the engine's own bot-advance loop must agree. Walk to round 3 by
+        // taking slot 1's first two picks; the bots then fill 17-23 and stop at
+        // 24. Pick 17 belongs to slot 8 under the reversal, to slot 1 without it
+        // -- and slot 1 is the user, so a plain-snake engine would not even stop
+        // here for the user's third pick.
+        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), null).orElseThrow();
+        assertEquals(16, state.currentPickNo());
+        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), null).orElseThrow();
+        assertEquals(24, state.currentPickNo(), "round 3 must open on slot 8, not slot 1");
+
+        var pick17 = state.picks().stream().filter(p -> p.pickNo() == 17).findFirst().orElseThrow();
+        assertEquals(8, pick17.draftSlot());
+        assertEquals(8, DraftSlot.slot(17, 8, 3), "and it agrees with DraftSlot itself");
+    }
+
+    /**
+     * A plain GET builds no DraftContext, so it loads the board itself -- and
+     * that load was the fourth hardcoded-football site, missed because create
+     * and pick both pass a real context and behave perfectly without it.
+     * Found by driving the real API, not by these tests; this is the test that
+     * should have caught it.
+     */
+    @Test
+    void gettingAnNbaSessionListsNbaPlayersAsAvailable() {
+        MockSessionState created = service.createSession(Sport.NBA, 8, 1, Map.of(), null, null);
+
+        MockSessionState fetched = service.get(created.id(), null).orElseThrow();
+
+        assertEquals(Sport.NBA, fetched.sport());
+        assertFalse(fetched.available().isEmpty());
+        // NBA fixture ids start at 10_000; the football board's start at 1.
+        for (var p : fetched.available()) {
+            assertTrue(p.id() >= 10_000L,
+                    "a GET of an NBA session must offer NBA players, got player id " + p.id());
+        }
+    }
+
+    @Test
+    void createSessionRefusesASportWithNoBoard() {
+        when(boards.currentBoard(Sport.NBA)).thenReturn(List.of());
+
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> service.createSession(Sport.NBA, 8, 1, Map.of(), null, null));
+        assertTrue(e.getMessage().contains("board"),
+                "an empty board must fail before a session exists, not on the first pick: " + e.getMessage());
+        assertTrue(repo.sessions.isEmpty(), "no session row may be left behind by a refused create");
+    }
+
+    @Test
+    void createSessionRefusesALeagueWhoseSportDisagreesWithTheRequestedOne() {
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null);
+        when(leagues.bySleeperId("sleeper-league-nba")).thenReturn(Optional.of(league));
+
         assertThrows(IllegalArgumentException.class,
-                () -> service.createSessionFromDraft("sleeper-draft-nba", 1, null),
-                "the mock room is football-only -- forking an NBA draft must be refused, not build a "
-                        + "basketball room and offer football players for every pick after this one");
+                () -> service.createSession(Sport.NFL, 8, 1, Map.of(), null, "sleeper-league-nba"),
+                "a silent winner between the stated sport and the league's own is the same class of bug "
+                        + "as defaulting every mock to football");
+    }
+
+    @Test
+    void createSessionClonesTheSourceLeaguesRosterRoundsAndReversalRound() {
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, Sport.NBA, "sleeper-league-nba", "Ball Knowers", 2026, 12, LeagueShape.NBA_ROSTER, 0.0, null);
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-nba", 2026, 14, 12, "pre_draft", Map.of(), 3);
+        when(leagues.bySleeperId("sleeper-league-nba")).thenReturn(Optional.of(league));
+        when(drafts.forLeague(9L)).thenReturn(Optional.of(draft));
+
+        MockSessionState state = service.createSession(Sport.NBA, 12, 1, Map.of(), null, "sleeper-league-nba");
+
+        MockDraftRepository.SessionRow row = repo.find(state.id()).orElseThrow();
+        assertEquals(Sport.NBA, row.sport());
+        assertEquals(14, row.rounds(), "rounds come from the league's draft, not football's 15");
+        assertEquals(LeagueShape.NBA_ROSTER, row.rosterPositions());
+        assertEquals(3, row.reversalRound());
     }
 
     @Test
@@ -527,13 +675,13 @@ class MockDraftServiceTest {
         // a session needs them), and ownerOf is its own query there for the same
         // reason.
         @Override
-        public long createSession(int teams, int rounds, List<String> rosterPositions, double ppr,
+        public long createSession(Sport sport, int teams, int rounds, List<String> rosterPositions, double ppr,
                                   String seatsJson, int userSlot, long rngSeed,
                                   Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId,
-                                  String sourceLeagueName) {
+                                  String sourceLeagueName, int reversalRound) {
             long id = nextId.getAndIncrement();
-            sessions.put(id, new SessionRow(id, "IN_PROGRESS", teams, rounds, rosterPositions, ppr,
-                    seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo));
+            sessions.put(id, new SessionRow(id, sport, "IN_PROGRESS", teams, rounds, rosterPositions, ppr,
+                    seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo, reversalRound));
             owners.put(id, Optional.ofNullable(ownerSleeperUserId));
             sourceLeagueNames.put(id, sourceLeagueName);
             picksBySession.put(id, new ArrayList<>());
@@ -558,9 +706,9 @@ class MockDraftServiceTest {
         @Override
         public void advanceCurrentPick(long id, int currentPickNo, String status) {
             SessionRow r = sessions.get(id);
-            sessions.put(id, new SessionRow(r.id(), status, r.teams(), r.rounds(), r.rosterPositions(),
+            sessions.put(id, new SessionRow(r.id(), r.sport(), status, r.teams(), r.rounds(), r.rosterPositions(),
                     r.pointsPerReception(), r.seatsJson(), r.userSlot(), r.rngSeed(), currentPickNo,
-                    r.sourceDraftId(), r.forkedAtPickNo()));
+                    r.sourceDraftId(), r.forkedAtPickNo(), r.reversalRound()));
         }
 
         @Override
@@ -581,8 +729,8 @@ class MockDraftServiceTest {
                         Optional<String> owner = owners.getOrDefault(r.id(), Optional.empty());
                         return owner.map(sleeperUserId::equals).orElse(true);
                     })
-                    .map(r -> new SessionSummary(r.id(), r.status(), r.teams(), r.rounds(), r.userSlot(),
-                            r.currentPickNo(), Instant.now(), sourceLeagueNames.get(r.id())))
+                    .map(r -> new SessionSummary(r.id(), r.sport(), r.status(), r.teams(), r.rounds(),
+                            r.userSlot(), r.currentPickNo(), Instant.now(), sourceLeagueNames.get(r.id())))
                     .toList();
         }
     }

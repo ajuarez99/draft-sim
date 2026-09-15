@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.mock.MockDraftService;
 import com.ballknowers.draftsim.mock.MockSessionState;
 import com.ballknowers.draftsim.store.MockDraftRepository;
@@ -49,13 +50,31 @@ public class MockDraftController {
     public MockSessionState create(@RequestBody CreateRequest body,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         if (body == null) throw new IllegalArgumentException("request body is required");
-        return mocks.createSession(body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId,
-                body.sourceLeagueName());
+        return mocks.createSession(body.sport(), body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId,
+                body.sourceSleeperLeagueId());
     }
 
-    public record CreateRequest(int teams, int userSlot, Map<Integer, Long> managerSeats, String sourceLeagueName) {
+    /**
+     * @param sport                 which sport to draft. Defaults to football
+     *                              only when omitted entirely, which is what a
+     *                              pre-multi-sport client sends; the home
+     *                              screen's modal always states it, because "the
+     *                              sport of a mock draft is always chosen
+     *                              explicitly, never defaulted to football" is
+     *                              the requirement that feature exists to meet.
+     * @param sourceSleeperLeagueId the Sleeper league whose settings to clone --
+     *                              roster template, round count, scoring and
+     *                              reversal round. Null starts a mock on this
+     *                              sport's defaults. Replaces V12's
+     *                              {@code sourceLeagueName}: see
+     *                              {@link MockDraftService#createSession} for
+     *                              why an id beats a hand-passed display string.
+     */
+    public record CreateRequest(Sport sport, int teams, int userSlot, Map<Integer, Long> managerSeats,
+                                String sourceSleeperLeagueId) {
         public CreateRequest {
             if (managerSeats == null) managerSeats = Map.of();
+            if (sport == null) sport = Sport.NFL;
         }
     }
 

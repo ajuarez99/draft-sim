@@ -131,11 +131,12 @@ export default function MockDraftView() {
             rounds={state.rounds}
             nextOwnPick={nextOwnPick}
           />
-          {/* 'nfl' rather than threaded from anywhere: the mock draft room is
-              football-only (claude/multi-sport-and-rebrand.md's Non-goals --
-              MockDraftService.buildContext hardcodes Sport.NFL), so there is
-              no other sport this session could ever be. */}
-          <PickFeed picks={board} teams={state.teams} sport="nfl" />
+          {/* The session's own sport (claude/nba-mock-drafts.md). These three
+              components were already sport-keyed -- position filters, name
+              abbreviation, pick-run detection -- and were being handed a
+              hardcoded 'nfl' only because MockSessionState had no sport field
+              to read. It does now. */}
+          <PickFeed picks={board} teams={state.teams} sport={state.sport} />
           {state.isUsersTurn && !complete && (
             <div className="controls-inline">
               <button className="start-button" onClick={() => setPickerOpen(true)} disabled={submitting}>
@@ -153,7 +154,8 @@ export default function MockDraftView() {
               userPicks={userPicks}
               seats={state.seats.map(toBoardSeat)}
               mySlot={state.userSlot}
-              sport="nfl"
+              sport={state.sport}
+              reversalRound={state.reversalRound}
               hideProvenanceDots
             />
           </div>
@@ -167,7 +169,7 @@ export default function MockDraftView() {
           available={state.available}
           rosterPositions={state.rosterPositions}
           draftedPlayers={draftedByUser}
-          sport="nfl"
+          sport={state.sport}
           onPick={pick}
           onClose={() => setPickerOpen(false)}
         />

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,7 +61,7 @@ class MockDraftRepositoryIT {
 
     @BeforeEach
     void setUp() {
-        sessionId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
+        sessionId = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
                 "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, "it-owner-mdr");
     }
 
@@ -106,8 +107,8 @@ class MockDraftRepositoryIT {
                         + "values (?, ?, ?, ?, ?, ?, ?) returning id",
                 Long.class, leagueId, "it-draft-mdr-source-draft", 2026, 15, 8, "snake", "drafting");
 
-        long forkedId = mockDrafts.createSession(8, 15, List.of("QB", "BN"), 1.0,
-                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr", null);
+        long forkedId = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr", null, 0);
         try {
             MockDraftRepository.SessionRow row = mockDrafts.find(forkedId).orElseThrow();
             assertEquals(draftId, row.sourceDraftId());

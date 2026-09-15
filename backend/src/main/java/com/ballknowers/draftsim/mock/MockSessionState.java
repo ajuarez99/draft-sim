@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.mock;
 
+import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.SeatSpec;
 import com.ballknowers.draftsim.engine.SimulationResult;
 
@@ -13,6 +14,13 @@ import java.util.List;
  */
 public record MockSessionState(
         long id,
+        /**
+         * The sport this session drafts in. The room reads it to pick the right
+         * position filters, name abbreviations and pick-run detector -- all of
+         * which were already sport-keyed on the frontend and were being handed a
+         * hardcoded {@code "nfl"} for want of this field.
+         */
+        Sport sport,
         String status,
         int teams,
         int rounds,
@@ -32,7 +40,15 @@ public record MockSessionState(
         /** The real draft this session was forked from, or null for an ordinary from-scratch mock. */
         Long sourceDraftId,
         /** The first pick this session hadn't yet decided at fork time. Null when sourceDraftId is null. */
-        Integer forkedAtPickNo
+        Integer forkedAtPickNo,
+        /**
+         * The round from which snake parity flips; 0 is plain snake (V14).
+         * The board grid needs this to draw the same pick order {@link #myPicks}
+         * was computed against -- without it a reversed session renders a
+         * plain-snake grid, and the user's own highlighted picks land in another
+         * seat's column.
+         */
+        int reversalRound
 ) {
     public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager, String avatarId) {}
 

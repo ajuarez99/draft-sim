@@ -1839,7 +1839,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   transition: background 120ms ease;
 }
 .league-card-mockit:hover:not(:disabled) { background: color-mix(in oklch, var(--sport-nfl) 22%, transparent); }
-.league-card-mockit:disabled { opacity: 0.45; cursor: default; border-color: var(--line); color: var(--muted); background: none; }
 
 /* Mock drafts list: sport badge, identity, a progress bar, recency, one CTA --
    design_handoff_multisport_mock_drafts's fix for every row looking identical. */
@@ -1869,11 +1868,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .start-mock-sport-chip.nfl.on { color: var(--sport-nfl); background: color-mix(in oklch, var(--sport-nfl) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nfl) 45%, transparent); }
 .start-mock-sport-chip.nba.on { color: var(--sport-nba); background: color-mix(in oklch, var(--sport-nba) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nba) 45%, transparent); }
-.start-mock-sport-chip.disabled { cursor: not-allowed; opacity: 0.55; }
-.start-mock-soon {
-  margin-left: 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
-  color: var(--muted); vertical-align: 1px;
-}
 .start-mock-league-list { display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; }
 .start-mock-league-option {
   display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;

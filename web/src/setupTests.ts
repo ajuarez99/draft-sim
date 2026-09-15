@@ -8,3 +8,13 @@ import { cleanup } from '@testing-library/react'
 afterEach(() => {
   cleanup()
 })
+
+// jsdom implements no layout, so it ships no scrollIntoView at all -- calling
+// it throws rather than being a no-op. StartMockModal calls it to keep a
+// seeded league visible in its 220px scrolling list. A no-op stub is the
+// honest stand-in: there is no scrolling to assert on in jsdom either way, and
+// the alternative is a component guarding a browser API that always exists in
+// the browser.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}

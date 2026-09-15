@@ -494,6 +494,10 @@ export type MockPick = {
 
 export type MockSessionState = {
   id: number
+  // The sport this session drafts in. The room passes it to the position
+  // filters, name abbreviation and pick-run detector -- all of which were
+  // already sport-keyed and were being handed a hardcoded 'nfl'.
+  sport: Sport
   status: 'IN_PROGRESS' | 'COMPLETE'
   teams: number
   rounds: number
@@ -515,23 +519,27 @@ export type MockSessionState = {
   // The first pick this session hadn't yet decided at fork time. Null when
   // sourceDraftId is null.
   forkedAtPickNo: number | null
+  // The round from which snake parity flips; 0 is plain snake. DraftBoard needs
+  // it to draw the same order myPicks was computed against -- the real 2026 NBA
+  // draft reverses at round 3, and a plain-snake grid puts your own highlighted
+  // picks in another seat's column.
+  reversalRound: number
 }
 
 // Mirrors store/MockDraftRepository.SessionSummary. Backs the picker screen's
 // "Mock drafts" list.
 export type MockSessionSummary = {
   id: number
+  sport: Sport
   status: 'IN_PROGRESS' | 'COMPLETE'
   teams: number
   rounds: number
   userSlot: number
   currentPickNo: number
   createdAt: string
-  // The real league whose team count this mock borrowed via the home
-  // screen's "use settings from" step (V12) -- null for a mock started with
-  // no league in mind, same as every mock before this column existed. The
-  // mock draft room itself is still NFL-only (multi-sport-and-rebrand.md's
-  // Non-goals), so this is a display label, not a sport signal.
+  // The real league whose settings this mock borrowed via the home screen's
+  // "use settings from" step (V12) -- null for a mock started with no league
+  // in mind. A display label; the sport is its own field above.
   sourceLeagueName: string | null
 }
 
@@ -540,18 +548,34 @@ export const getMockSessions = () => apiFetch('/api/mocks').then(json<MockSessio
 // managerSeats seats a real manager's fitted/stated profile at a slot instead
 // of an unmodelled bot -- keyed by slot number, same shape MockDraftController
 // .CreateRequest expects. Any slot besides userSlot left out of it is still a
-// plain bot. sourceLeagueName is purely a display label for the mock-drafts
-// list (V12) -- omit it for a mock started with no league in mind.
+// plain bot.
+//
+// sourceSleeperLeagueId replaces V12's sourceLeagueName: the backend clones
+// that league's roster template, round count, scoring and reversal round off
+// the id, and looks the display name up itself. Omit it for a mock started
+// with no league in mind, which then runs on the sport's own defaults.
+//
+// `sport` is always sent explicitly. The backend does default a missing one to
+// football, but only for a pre-multi-sport client -- letting this function
+// omit it would reintroduce exactly the silent football default the two-step
+// modal exists to remove.
 export const createMockSession = (
+  sport: Sport,
   teams: number,
   userSlot: number,
   managerSeats?: Record<number, number>,
-  sourceLeagueName?: string,
+  sourceSleeperLeagueId?: string,
 ) =>
   apiFetch('/api/mocks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ teams, userSlot, managerSeats: managerSeats ?? {}, sourceLeagueName: sourceLeagueName ?? null }),
+    body: JSON.stringify({
+      sport,
+      teams,
+      userSlot,
+      managerSeats: managerSeats ?? {},
+      sourceSleeperLeagueId: sourceSleeperLeagueId ?? null,
+    }),
   }).then(json<MockSessionState>)
 
 // Forks a real, drafting-status Sleeper draft into a new mock session seeded
