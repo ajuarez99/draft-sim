@@ -18,11 +18,16 @@ import java.util.function.ToDoubleFunction;
  * marginal improvement to expected starting-lineup value from adding a player,
  * expressed as a fraction of that player's own value.
  *
- * Value is derived from board position, not from projected points: we have no
- * projection source wired up. That is a real approximation — the board encodes
- * the market's cross-positional view, which is close to but not the same as
- * expected fantasy points. Swap {@link #value} for a projection lookup when one
- * exists and nothing else here has to change.
+ * Value is derived from board position, not from projected points. That is a
+ * real approximation — the board encodes the market's cross-positional view,
+ * which is close to but not the same as expected fantasy points.
+ *
+ * A projection source now exists ({@code player_projection},
+ * claude/league-analysis.md) but is deliberately NOT wired into {@link #value}:
+ * these are draft-time decisions, and a projection for week 9 says nothing
+ * about what a manager would take at 3.07 in August. {@link #startingLineup}
+ * is where projections enter, as a value function a caller supplies — so the
+ * two live side by side instead of one quietly becoming the other.
  */
 @Component
 public class FootballRules implements SportRules {
@@ -219,27 +224,62 @@ public class FootballRules implements SportRules {
     @Override
     public double startingLineupValue(RosterState roster, LeagueSettings settings) {
         double total = 0;
+        for (SportRules.Assigned a : startingLineup(roster, settings, this::value)) {
+            total += a.value();
+        }
+        return total;
+    }
+
+    /**
+     * The same greedy assignment, valued by a caller-supplied function and
+     * reporting WHO it started rather than only what they were worth
+     * (claude/league-analysis.md Phase 3).
+     *
+     * <p>Two callers, one rule. Power rankings passes {@link #value} and wants
+     * the sum; League analysis passes a projected-points lookup and wants the
+     * per-position breakdown. Writing the second one separately would be two
+     * implementations of "what is this roster's starting lineup", which is the
+     * shape of bug that has shipped three times in this repo under a different
+     * name each time.
+     *
+     * <p><b>The sort is not decoration.</b> {@link RosterState#at} returns a
+     * position's players ordered by ADP, and the version of this method that
+     * only ever ran on {@link #value} could therefore take the first
+     * {@code slots} of that list as "the best ones" -- true only because board
+     * value is monotone in ADP. It is not true of projected points: a WR
+     * drafted in the 3rd round can outproject one drafted in the 2nd. So the
+     * candidates are sorted by {@code valueOf} before any slot is filled.
+     * Passing {@link #value} sorts an already-ADP-sorted list by a function
+     * monotone in ADP, which is a no-op -- which is what makes
+     * {@link #startingLineupValue} above provably unchanged rather than merely
+     * probably unchanged.
+     */
+    @Override
+    public List<SportRules.Assigned> startingLineup(RosterState roster, LeagueSettings settings,
+                                                    ToDoubleFunction<BoardEntry> valueOf) {
+        List<SportRules.Assigned> out = new ArrayList<>();
         List<BoardEntry> flexPool = new ArrayList<>();
 
         for (Map.Entry<Position, Integer> e : settings.dedicatedStarters().entrySet()) {
             Position pos = e.getKey();
             int slots = e.getValue();
-            List<BoardEntry> have = roster.at(pos);
+            List<BoardEntry> have = new ArrayList<>(roster.at(pos));
+            have.sort((a, b) -> Double.compare(valueOf.applyAsDouble(b), valueOf.applyAsDouble(a)));
             for (int i = 0; i < have.size(); i++) {
                 if (i < slots) {
-                    total += value(have.get(i));
+                    out.add(new SportRules.Assigned(have.get(i), pos.name(), valueOf.applyAsDouble(have.get(i))));
                 } else if (pos.isFlexEligible()) {
                     flexPool.add(have.get(i));
                 }
             }
         }
 
-        flexPool.sort((a, b) -> Double.compare(value(b), value(a)));
+        flexPool.sort((a, b) -> Double.compare(valueOf.applyAsDouble(b), valueOf.applyAsDouble(a)));
         int flex = settings.flexSlots();
         for (int i = 0; i < Math.min(flex, flexPool.size()); i++) {
-            total += value(flexPool.get(i));
+            out.add(new SportRules.Assigned(flexPool.get(i), "FLEX", valueOf.applyAsDouble(flexPool.get(i))));
         }
-        return total;
+        return out;
     }
 
     @Override

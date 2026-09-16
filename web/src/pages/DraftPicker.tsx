@@ -448,6 +448,17 @@ export default function DraftPicker() {
                       <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
                         Power rankings
                       </Link>
+                      {/* claude/league-analysis.md, and football-only unlike its
+                          two neighbours: this page's roster projections read
+                          Sleeper's pts_ppr, which has no basketball equivalent.
+                          A third peer rather than a fourth chip competing with
+                          the primary -- Analysis is the other half of Power
+                          rankings and belongs beside it. */}
+                      {d.sport === 'nfl' && (
+                        <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/analysis`}>
+                          Analysis
+                        </Link>
+                      )}
                     </div>
 
                     <footer className="league-card-foot">

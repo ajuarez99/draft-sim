@@ -2700,3 +2700,107 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .verify-iframe-wrap { max-height: 900px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
 .verify-iframe-wrap iframe { border: 0; display: block; }
 .verify-mockup-img { border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18); display: block; }
+
+/* --- claude/league-analysis.md: the League analysis page ---------------------
+ *
+ * Three blocks, three different shapes, deliberately: a ranked table where the
+ * content is tabular, proportional bars where the content is a composition,
+ * and a matrix where the content is teams crossed with positions. One flat
+ * card treatment over all three would hide that they answer different
+ * questions.
+ *
+ * Position color stays the system it is everywhere else -- the bar segments
+ * and the matrix columns use the same six tokens, and every one of them is
+ * labelled in text as well, because six hues are not memorizable.
+ */
+
+.analysis-notyet { margin: 4px 0 0; }
+.analysis-formula { margin: 10px 0 0; font-size: 11px; color: var(--muted); opacity: 0.8; }
+.analysis-rank { color: var(--muted); font-size: 12px; }
+
+/* The 1-100 score reads as the headline number of its row; the raw formula
+   output sits under it in muted small, so the scaled number never has to be
+   taken on trust. */
+.analysis-score-pill {
+  display: inline-block; min-width: 46px; text-align: center;
+  padding: 3px 8px; border-radius: 999px;
+  background: color-mix(in oklch, var(--teal) 18%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 35%, transparent);
+  font-weight: 600;
+}
+.analysis-raw { display: block; margin-top: 2px; }
+
+/* --- roster projections --------------------------------------------------- */
+
+.analysis-bars { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+
+/* Four columns: who, the bar, the total, and the spelled-out breakdown. The
+   bar's own width is the roster's share of the league leader, so the rows are
+   comparable to each other and not just internally. */
+.analysis-bar-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) 84px;
+  grid-template-areas: 'who track total' 'who legend legend';
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+}
+.analysis-bar-row:hover { background: color-mix(in oklch, var(--teal) 6%, var(--bg)); }
+
+.analysis-bar-who { grid-area: who; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.analysis-bar-who .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.analysis-track {
+  grid-area: track;
+  display: flex; height: 16px; border-radius: 999px; overflow: hidden;
+  background: var(--line); min-width: 2px;
+}
+.analysis-seg { display: block; min-width: 2px; }
+.analysis-seg.pos-QB { background: var(--qb); }
+.analysis-seg.pos-RB { background: var(--rb); }
+.analysis-seg.pos-WR { background: var(--wr); }
+.analysis-seg.pos-TE { background: var(--te); }
+.analysis-seg.pos-K { background: var(--k); }
+.analysis-seg.pos-DEF { background: var(--def); }
+
+.analysis-bar-total { grid-area: total; text-align: right; font-weight: 600; }
+
+.analysis-legend {
+  grid-area: legend;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  font-size: 11px;
+}
+.analysis-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.analysis-legend-item .pos { font-size: 9px; padding: 1px 5px; }
+
+/* --- position group matrix ------------------------------------------------ */
+
+.analysis-matrix-head { text-align: center; }
+.analysis-matrix td { vertical-align: middle; }
+
+/* Tint strength is the rank, set per cell as --tint; the rank is printed in
+   the cell and so are the points behind it, so colour is never carrying the
+   value on its own. 26% is the same ceiling the board's .cell.pos-* uses --
+   past it the text on top starts losing contrast. */
+.analysis-cell {
+  text-align: center; border-radius: 8px; padding: 4px 6px;
+  background: color-mix(in oklch, var(--panel) 100%, transparent);
+}
+.analysis-cell.pos-QB { background: color-mix(in oklch, var(--qb) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-RB { background: color-mix(in oklch, var(--rb) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-WR { background: color-mix(in oklch, var(--wr) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-TE { background: color-mix(in oklch, var(--te) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-K { background: color-mix(in oklch, var(--k) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-DEF { background: color-mix(in oklch, var(--def) var(--tint, 0%), var(--panel)); }
+
+.analysis-cell-rank { display: block; font-size: 15px; font-weight: 600; }
+.analysis-cell-points { display: block; font-size: 10px; color: var(--muted); }
+
+@media (max-width: 720px) {
+  .analysis-bar-row {
+    grid-template-columns: minmax(0, 1fr) 84px;
+    grid-template-areas: 'who total' 'track track' 'legend legend';
+  }
+}

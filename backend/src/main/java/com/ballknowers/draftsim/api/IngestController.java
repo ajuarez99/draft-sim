@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.ingest.ProjectionIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,16 +27,19 @@ public class IngestController {
     private final FfcAdpService ffcAdp;
     private final BoardService boards;
     private final ProfileService profiles;
+    private final ProjectionIngestService projectionIngest;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
-                            FfcAdpService ffcAdp, BoardService boards, ProfileService profiles) {
+                            FfcAdpService ffcAdp, BoardService boards, ProfileService profiles,
+                            ProjectionIngestService projectionIngest) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
         this.ffcAdp = ffcAdp;
         this.boards = boards;
         this.profiles = profiles;
+        this.projectionIngest = projectionIngest;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -69,6 +73,37 @@ public class IngestController {
     public LeagueHistoryIngestService.Result leagueHistory(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
         return leagueHistoryIngest.ingestChain(sport, sleeperLeagueId);
+    }
+
+    /**
+     * claude/league-analysis.md Phase 1: weekly projections for a window of
+     * weeks, the one source the League analysis page's roster projections read.
+     *
+     * A full rest-of-season refresh is ~13 calls and ~27 MB, which is why it
+     * lives here rather than behind the page's own GET. Weeks refreshed within
+     * the staleness window are skipped unless {@code force}.
+     *
+     * {@code sport} is required and rejected unless it is football, rather than
+     * defaulted to nfl like the older routes on this controller. Those default
+     * a *value*; this one would be defaulting a *rule* -- the stat keys here
+     * (pts_ppr and friends) are football's, and a basketball caller silently
+     * getting football projections is the shape of bug that has now shipped
+     * three times in this repo.
+     */
+    @PostMapping("/projections")
+    public ProjectionIngestService.Result projections(@RequestParam String sport,
+                                                      @RequestParam int season,
+                                                      @RequestParam int fromWeek,
+                                                      @RequestParam int toWeek,
+                                                      @RequestParam(defaultValue = "false") boolean force) {
+        Sport s = Sport.fromCode(sport);
+        if (s != Sport.NFL) {
+            throw new IllegalArgumentException(
+                    "projections are football-only: the stat keys Sleeper returns (pts_ppr, "
+                            + "pts_half_ppr, pts_std) have no basketball equivalent. See "
+                            + "claude/league-analysis.md's non-goals.");
+        }
+        return projectionIngest.refresh(s.code(), season, fromWeek, toWeek, force);
     }
 
     /**
