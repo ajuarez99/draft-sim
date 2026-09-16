@@ -45,7 +45,8 @@ function roster(rosterId: number, manager: string, rank: number, total: number,
   return {
     rosterId, managerId: rosterId, manager, avatarId: null, rank, isMe: over.isMe ?? false, total,
     byPosition, rankByPosition, starters: over.starters ?? LINEUP, bench: BENCH,
-    byWeek: [{ week: 2, points: 120 }, { week: 3, points: 96 }, { week: 4, points: 130 }], missing,
+    byWeek: [{ week: 2, points: 120, rank: 1 }, { week: 3, points: 96, rank: 2 },
+      { week: 4, points: 130, rank: 1 }], missing,
   }
 }
 
@@ -57,6 +58,15 @@ function side(rosterId: number, manager: string, projected: number, isMe = false
 }
 
 const GROUPS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
+
+/** The page draws two bump charts now, so every chart assertion names one. */
+function panelNamed(title: string): HTMLElement {
+  const panel = [...document.querySelectorAll('.panel')].find(
+    (p) => p.querySelector('h2')?.textContent === title,
+  )
+  if (!panel) throw new Error(`no panel titled ${title}`)
+  return panel as HTMLElement
+}
 
 function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
   return {
@@ -438,6 +448,42 @@ describe('LeagueAnalysis', () => {
     await waitFor(() => expect(bars.getByText('Bijan Robinson')).toBeInTheDocument())
   })
 
+  /**
+   * The chart that exists because the scored-week one cannot: a live season in
+   * week 2 has one played week and thirteen projected ones, so without this the
+   * page draws no chart at all for most of September.
+   */
+  it('plots the projected weeks even when only one week has been scored', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        scores: { available: true, reason: null, weeks: [1], rosters: [] },
+      }),
+    )
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/Where each roster is projected to rank/)
+    const panel = panelNamed('Projected week by week')
+    expect(panel.querySelector('.bump-chart')).not.toBeNull()
+    expect(panel.querySelectorAll('.bump-series')).toHaveLength(2)
+  })
+
+  /**
+   * Twelve hashed hues are not twelve distinguishable colours, so the chart is
+   * unreadable without the legend that dims the rest -- the same one power
+   * rankings pairs with it.
+   */
+  it('gives each chart a legend that isolates one roster', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/Where each roster is projected to rank/)
+    const panel = panelNamed('Projected week by week')
+
+    await user.click(within(panel).getByRole('button', { name: 'kieriskash' }))
+    expect(panel.querySelectorAll('.bump-series.dimmed')).toHaveLength(1)
+  })
+
   /** The grid is the scored weeks, and the week's top score is marked. */
   it('shows every scored week with the best score of each marked', async () => {
     getLeagueAnalysis.mockResolvedValue(data())
@@ -474,7 +520,9 @@ describe('LeagueAnalysis', () => {
     const grid = document.querySelector('.analysis-scores-grid') as HTMLElement
     expect(within(grid).queryByRole('columnheader', { name: 'Avg' })).not.toBeInTheDocument()
     expect(screen.getByText(/appear from week two/)).toBeInTheDocument()
-    expect(document.querySelector('.bump-chart')).toBeNull()
+    // The scored-week chart specifically -- the projected one above it is
+    // drawn from thirteen weeks and is unaffected by how many were played.
+    expect(panelNamed('Week by week').querySelector('.bump-chart')).toBeNull()
   })
 
   /** Two weeks is a line, so the chart this page borrows from Power rankings appears. */
@@ -483,9 +531,10 @@ describe('LeagueAnalysis', () => {
     render(<LeagueAnalysis />)
 
     await screen.findByText(/What every roster actually scored/)
-    expect(document.querySelector('.bump-chart')).not.toBeNull()
+    const panel = panelNamed('Week by week')
+    expect(panel.querySelector('.bump-chart')).not.toBeNull()
     // One line per roster, and the week axis is the scored weeks.
-    expect(document.querySelectorAll('.bump-series')).toHaveLength(2)
+    expect(panel.querySelectorAll('.bump-series')).toHaveLength(2)
   })
 
   /** Slot against slot, with the heavier side marked as such. */

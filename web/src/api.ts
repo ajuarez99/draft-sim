@@ -892,6 +892,8 @@ export type AnalysisRosterProjection = {
 export type AnalysisWeekTotal = {
   week: number
   points: number
+  /** This roster's projected rank in THAT week, 1 = highest, ties shared. */
+  rank: number
 }
 
 export type AnalysisProjections = {

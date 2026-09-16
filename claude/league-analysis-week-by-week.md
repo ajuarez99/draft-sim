@@ -101,6 +101,29 @@ Working as intended, measured:
   are no remaining weeks to step through.
 - No horizontal overflow at 952px of chart inside the page.
 
+## The follow-up: "wheres the UI charts?"
+
+Asked immediately after the four above shipped, and the answer was that on the
+league Allan actually looks at, there were **none**:
+
+- The scored-week bump chart needs two played weeks to draw a line. The 2026
+  season has **one**. So the chart was correct to refuse and useless to have.
+- The week strip was inside the lineup drawer, behind a click.
+
+Meanwhile the response was already carrying thirteen weeks of projections that
+nothing plotted. So there is now a second chart, **Projected week by week** --
+each roster's projected rank across the remaining weeks, visible on a live
+season from week 1. Its ranks are computed on the BACKEND through `Ranker`,
+not in the page: ties are a rule this repo has already shipped wrong once, and
+a frontend copy would be the second implementation.
+
+**Neither chart was readable without a legend.** Twelve lines in twelve hashed
+hues is a hairball -- `hueFor` spreads names around the wheel but not far
+enough apart to tell a dozen apart. Power rankings already answers this with a
+clickable legend that dims everything else, so both charts here use the same
+markup rather than a second way of reading one chart. With kieriskash isolated,
+the week-5 dive from 1st to 9th reads instantly as the bye it is.
+
 ## Non-goals
 
 - **A win probability**, still. Unchanged from the previous brief.

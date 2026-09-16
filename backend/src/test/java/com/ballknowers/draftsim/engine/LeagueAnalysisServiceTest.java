@@ -193,6 +193,28 @@ class LeagueAnalysisServiceTest {
     }
 
     /**
+     * The rank is a fact about the WEEK, read down the column -- and it ties
+     * through Ranker like every other rank on this page, so two rosters
+     * projected level in a week are both 1st and nobody is 2nd.
+     */
+    @Test
+    void eachWeekIsRankedAcrossRostersAndTiesShareAPlace() {
+        RosterProjection a = new RosterProjection(1, 1L, "a", null, 1, false, 20.0,
+                Map.of(), Map.of(), List.of(starter("a", 20.0)), List.of(), List.of(), 0);
+        RosterProjection b = new RosterProjection(2, 2L, "b", null, 2, false, 20.0,
+                Map.of(), Map.of(), List.of(starter("b", 20.0)), List.of(), List.of(), 0);
+        RosterProjection c = new RosterProjection(3, 3L, "c", null, 3, false, 5.0,
+                Map.of(), Map.of(), List.of(starter("c", 5.0)), List.of(), List.of(), 0);
+
+        List<RosterProjection> out = LeagueAnalysisService.withWeekly(List.of(a, b, c), Map.of(
+                2, Map.of("a", 9.0, "b", 9.0, "c", 4.0)));
+
+        assertEquals(1, out.get(0).byWeek().getFirst().rank());
+        assertEquals(1, out.get(1).byWeek().getFirst().rank());
+        assertEquals(3, out.get(2).byWeek().getFirst().rank());
+    }
+
+    /**
      * A bye is a hole in the week, not a missing entry: the week is still
      * listed, at whatever the rest of the lineup scores. Dropping it would hide
      * the dip that is the entire reason to draw the strip.

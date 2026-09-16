@@ -133,7 +133,7 @@ public class LeagueAnalysisService {
      * taken apart again: a bye week is a hole in this list and is invisible in
      * the total, which is the whole reason the list exists.
      */
-    public record WeekTotal(int week, double points) {}
+    public record WeekTotal(int week, double points, int rank) {}
 
     /**
      * One rostered player, valued over whichever window the pass ran on.
@@ -512,20 +512,40 @@ public class LeagueAnalysisService {
      */
     static List<RosterProjection> withWeekly(List<RosterProjection> rosters,
                                              Map<Integer, Map<String, Double>> perWeek) {
-        List<RosterProjection> out = new ArrayList<>();
-        for (RosterProjection p : rosters) {
-            List<WeekTotal> series = new ArrayList<>();
-            perWeek.forEach((week, points) -> {
+        // One week's points for every roster, then that week ranked across
+        // them. The rank is a fact about the WEEK -- who was best in week 6 --
+        // so it is computed down the column and not along a roster's own row.
+        record Scored(int rosterId, double points) {}
+        Map<Integer, List<WeekTotal>> seriesByRoster = new HashMap<>();
+
+        List<Integer> weeks = new ArrayList<>(perWeek.keySet());
+        Collections.sort(weeks);
+        for (int week : weeks) {
+            Map<String, Double> points = perWeek.get(week);
+            List<Scored> scored = new ArrayList<>();
+            for (RosterProjection p : rosters) {
                 double total = 0;
                 for (LineupPlayer starter : p.starters()) {
                     total += points.getOrDefault(starter.sleeperPlayerId(), 0.0);
                 }
-                series.add(new WeekTotal(week, round(total, 1)));
-            });
-            series.sort(Comparator.comparingInt(WeekTotal::week));
+                scored.add(new Scored(p.rosterId(), round(total, 1)));
+            }
+            // Through Ranker like every other rank on this page: two rosters
+            // projected to the same tenth of a point in a week must not be
+            // numbered as though one were ahead. It exists because the second
+            // copy of that rule was wrong.
+            for (Ranker.Ranked<Scored> r : Ranker.rank(scored,
+                    Comparator.comparingDouble(Scored::points).reversed(), Scored::points)) {
+                seriesByRoster.computeIfAbsent(r.item().rosterId(), k -> new ArrayList<>())
+                        .add(new WeekTotal(week, r.item().points(), r.rank()));
+            }
+        }
+
+        List<RosterProjection> out = new ArrayList<>();
+        for (RosterProjection p : rosters) {
             out.add(new RosterProjection(p.rosterId(), p.managerId(), p.manager(), p.avatarId(), p.rank(),
                     p.isMe(), p.total(), p.byPosition(), p.rankByPosition(), p.starters(), p.bench(),
-                    List.copyOf(series), p.missing()));
+                    List.copyOf(seriesByRoster.getOrDefault(p.rosterId(), List.of())), p.missing()));
         }
         return out;
     }

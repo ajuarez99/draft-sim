@@ -367,6 +367,98 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
   )
 }
 
+/**
+ * The remaining season as movement: each roster's projected rank, week by week.
+ *
+ * <p>This exists because the scored-week chart cannot be drawn until a season
+ * has two played weeks, and a live season in week 2 has exactly one -- so the
+ * page offered no chart at all in the state it is in for most of September,
+ * while carrying thirteen weeks of projections it was not plotting.
+ *
+ * The rank comes from the backend rather than being computed here: ties go
+ * through `Ranker`, and a second implementation of that rule on the frontend is
+ * the bug this repo keeps re-shipping.
+ */
+function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
+  const [highlighted, setHighlighted] = useState<number | null>(null)
+
+  const series: Series[] = useMemo(
+    () =>
+      block.rosters.map((r) => ({
+        rosterId: r.rosterId,
+        managerId: r.managerId,
+        manager: r.manager,
+        hue: hueFor(String(r.managerId ?? r.rosterId)),
+        points: r.byWeek.map((w) => ({
+          week: w.week,
+          rank: w.rank,
+          score: w.points,
+          note: null,
+          ballotCount: null,
+          thin: false,
+        })),
+      })),
+    [block.rosters],
+  )
+
+  if (!block.available) return <NotYet reason={block.reason} />
+
+  const weeks = block.rosters[0]?.byWeek.map((w) => w.week) ?? []
+  if (weeks.length < 2) {
+    return <NotYet reason="One projected week is a point, not a line." />
+  }
+
+  return (
+    <>
+      <BumpLegend series={series} highlighted={highlighted} onHighlight={setHighlighted} />
+      <BumpChart
+        series={series}
+        weeks={weeks}
+        teamCount={block.rosters.length}
+        highlighted={highlighted}
+        onHighlight={setHighlighted}
+      />
+    </>
+  )
+}
+
+/**
+ * Twelve lines in twelve hashed hues is a hairball -- `hueFor` spreads names
+ * around the wheel, but not far enough apart to tell a dozen of them by colour.
+ * Power rankings answers this with a clickable legend that dims everything
+ * else, so this page uses the same one rather than inventing a second way to
+ * read the same chart.
+ */
+function BumpLegend({
+  series,
+  highlighted,
+  onHighlight,
+}: {
+  series: Series[]
+  highlighted: number | null
+  onHighlight: (rosterId: number | null) => void
+}) {
+  return (
+    <div className="bump-legend">
+      {series.map((s) => {
+        const on = highlighted === s.rosterId
+        return (
+          <button
+            key={s.rosterId}
+            type="button"
+            className={`bump-legend-item bump-legend-button${on ? ' on' : ''}`}
+            aria-pressed={on}
+            onClick={() => onHighlight(on ? null : s.rosterId)}
+          >
+            <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${s.hue})` }} />
+            {s.manager ?? `roster ${s.rosterId}`}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
   if (!block.available) return <NotYet reason={block.reason} />
   const teams = block.rosters.length
@@ -634,6 +726,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
             The same weeks as movement: where each roster ranked on points in each one. Click a line
             to follow it.
           </p>
+          <BumpLegend series={series} highlighted={highlighted} onHighlight={setHighlighted} />
           <BumpChart
             series={series}
             weeks={block.weeks}
@@ -936,6 +1029,21 @@ export default function LeagueAnalysis() {
               RB. Open a lineup to see the players the number is made of.
             </p>
             <ProjectionsBlock block={data.projections} />
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2>Projected week by week</h2>
+              <span className="muted small">
+                {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
+              </span>
+            </div>
+            <p className="muted small">
+              Where each roster is projected to rank in each remaining week — the bye weeks are the
+              drops. Click a line to follow it. This is the projection; what was actually scored is
+              further down.
+            </p>
+            <ProjectedBumpBlock block={data.projections} />
           </section>
 
           <section className="panel">
