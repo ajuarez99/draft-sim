@@ -10,6 +10,16 @@ Nothing the engine decided had changed. Hashing the raw body makes this check
 fail on ordinary NFL roster churn, which trains you to ignore the one check
 standing between a seven-phase refactor and a silent regression.
 
+Stripping those two fields is NOT enough on its own, which is what
+BASELINE_BOARD below is for. The engine reads the derived board, so rebuilding
+the board moves every hash here for reasons that have nothing to do with code.
+Measured 2026-09-15: between the board these baselines were taken against
+(2026-09-09) and the next rebuild (2026-09-13), 791 of 850 entries changed adp,
+18 players left the board entirely, and the largest single move was 418 picks.
+Both baselines MOVED, and nothing in the engine had been touched. So the check
+now reports which board it ran against, and refuses to call a mismatch a
+regression when it is standing on different inputs.
+
     python claude/scripts/football-parity-hash.py
 """
 
@@ -29,6 +39,13 @@ BASELINES = {
 }
 
 VOLATILE = ("name", "team")
+
+# The board the BASELINES above were captured against, from GET /api/board's own
+# `capturedOn`. A rebuild since then invalidates the hashes as inputs, not as
+# code -- see the module docstring. Re-baselining is a deliberate act: the
+# expected hashes are the only record of what the engine used to decide, so they
+# are not refreshed automatically just because the board moved.
+BASELINE_BOARD = "2026-09-09"
 
 
 def strip(node):
@@ -56,11 +73,31 @@ def run(draft_id):
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+def board_captured_on():
+    """When the board the engine is about to read was built."""
+    with urllib.request.urlopen(f"{BASE}/api/board?sport=nfl", timeout=60) as r:
+        return json.load(r).get("capturedOn")
+
+
 if __name__ == "__main__":
+    board = board_captured_on()
+    stale = board is not None and board != BASELINE_BOARD
+    print(f"board {board}  (baselines taken against {BASELINE_BOARD})")
+    if stale:
+        print("  ^ the board has been rebuilt since these baselines were captured.\n"
+              "    Any MOVED below is the inputs moving, not the engine. Re-capture the\n"
+              "    baselines against this board -- deliberately, and in their own commit --\n"
+              "    before using this check to clear a refactor.")
+
     failed = False
     for draft_id, expected in BASELINES.items():
         got = run(draft_id)
         ok = got == expected
         failed |= not ok
         print(f"draft {draft_id}\n  expected {expected}\n  got      {got}  {'MATCH' if ok else 'MOVED'}")
+    # A mismatch on a board the baselines never saw is not a regression signal,
+    # and exiting 1 for it is what teaches people to stop running this.
+    if failed and stale:
+        print("\nINCONCLUSIVE: hashes moved, but so did the board underneath them.")
+        raise SystemExit(2)
     raise SystemExit(1 if failed else 0)

@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.ingest.ProjectionIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,9 +41,11 @@ class IngestControllerTest {
     @Mock private FfcAdpService ffcAdp;
     @Mock private BoardService boards;
     @Mock private ProfileService profiles;
+    @Mock private ProjectionIngestService projectionIngest;
 
     private IngestController controller() {
-        return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles);
+        return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
+                projectionIngest);
     }
 
     // ---- POST /api/ingest/adp ----

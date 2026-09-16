@@ -4,14 +4,29 @@
     {
       "name": "draft-sim-web",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd web && npm run dev"],
+      "runtimeArgs": [
+        "/c",
+        "cd web && npm run dev"
+      ],
       "port": 5173
     },
     {
       "name": "draft-sim-api",
       "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "cd backend && .\\gradlew.bat bootRun"],
+      "runtimeArgs": [
+        "/c",
+        "cd backend && .\\gradlew.bat bootRun"
+      ],
       "port": 8080
+    },
+    {
+      "name": "draft-sim-web-alt",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd web && npm run dev -- --port 5178 --strictPort"
+      ],
+      "port": 5178
     }
   ]
 }

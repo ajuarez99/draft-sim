@@ -185,4 +185,92 @@ class FootballRulesTest {
         assertTrue(rules.hasOpenSlot(extraRb.player(), vacancyLineup),
                 "one bench slot is still open");
     }
+
+    // ---- claude/league-analysis.md Phase 3: startingLineup ----
+
+    /**
+     * The safety claim the generalization rests on: routing
+     * startingLineupValue through startingLineup(.., this::value) does not
+     * move the number power rankings already publishes.
+     */
+    @Test
+    void startingLineupSummedByBoardValueEqualsStartingLineupValue() {
+        RosterState r = new RosterState();
+        r.add(entry(1, "RB1", Position.RB, 3));
+        r.add(entry(2, "WR1", Position.WR, 8));
+        r.add(entry(3, "RB2", Position.RB, 15));
+        r.add(entry(4, "TE1", Position.TE, 22));
+        r.add(entry(5, "WR2", Position.WR, 30));
+        r.add(entry(6, "QB1", Position.QB, 40));
+        r.add(entry(7, "WR3", Position.WR, 55));   // FLEX
+        r.add(entry(8, "RB3", Position.RB, 70));   // FLEX
+        r.add(entry(9, "WR4", Position.WR, 95));   // bench
+        r.add(entry(10, "K1", Position.K, 140));
+        r.add(entry(11, "DEF1", Position.DEF, 150));
+
+        double summed = rules.startingLineup(r, SETTINGS, rules::value).stream()
+                .mapToDouble(SportRules.Assigned::value).sum();
+        assertEquals(rules.startingLineupValue(r, SETTINGS), summed, 1e-12);
+    }
+
+    /** Ten slots in this league; a full roster starts exactly that many. */
+    @Test
+    void startingLineupFillsEverySlotItCan() {
+        RosterState r = new RosterState();
+        r.add(entry(1, "RB1", Position.RB, 3));
+        r.add(entry(2, "WR1", Position.WR, 8));
+        r.add(entry(3, "RB2", Position.RB, 15));
+        r.add(entry(4, "TE1", Position.TE, 22));
+        r.add(entry(5, "WR2", Position.WR, 30));
+        r.add(entry(6, "QB1", Position.QB, 40));
+        r.add(entry(7, "WR3", Position.WR, 55));
+        r.add(entry(8, "RB3", Position.RB, 70));
+        r.add(entry(9, "K1", Position.K, 140));
+        r.add(entry(10, "DEF1", Position.DEF, 150));
+
+        assertEquals(SETTINGS.totalStarters(),
+                rules.startingLineup(r, SETTINGS, rules::value).size());
+    }
+
+    /**
+     * The reason startingLineup sorts rather than trusting RosterState's own
+     * ADP order. Under a value function that is NOT monotone in ADP -- which is
+     * exactly what a projected-points lookup is -- the later-drafted player can
+     * be the one who should start. Reading the first `slots` entries of
+     * RosterState.at() would start the wrong RB here and silently under-report
+     * the roster.
+     */
+    @Test
+    void startingLineupStartsTheBestByTheSuppliedValueNotByAdp() {
+        BoardEntry earlyPick = entry(1, "RB1", Position.RB, 3);
+        BoardEntry latePick = entry(2, "RB2", Position.RB, 80);
+        RosterState r = new RosterState();
+        r.add(earlyPick);
+        r.add(latePick);
+
+        // One RB slot's worth of preference, inverted against the board.
+        java.util.function.ToDoubleFunction<BoardEntry> projected =
+                e -> e.player().id() == 2L ? 200.0 : 10.0;
+
+        List<SportRules.Assigned> lineup = rules.startingLineup(r, SETTINGS, projected);
+        SportRules.Assigned bestRb = lineup.stream()
+                .filter(a -> "RB".equals(a.slot()))
+                .max(java.util.Comparator.comparingDouble(SportRules.Assigned::value))
+                .orElseThrow();
+        assertEquals(2L, bestRb.entry().player().id(),
+                "the higher-projected RB should take the RB slot even though he went 77 picks later");
+    }
+
+    /** Basketball has no projection source; the seam says so instead of guessing. */
+    @Test
+    void basketballStartingLineupRefusesRatherThanFallingBackToBoardValue() {
+        SportRules nba = new BasketballRules(new ScoringProperties(
+                null,
+                new ScoringProperties.SportScoring(
+                        new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
+                        12.0, 3.0, 60.0, 0.15, 6, 0.85, Map.of(), 1.0, 30)));
+        assertThrows(UnsupportedOperationException.class,
+                () -> nba.startingLineup(new RosterState(),
+                        new LeagueSettings(Sport.NBA, 12, 13, List.of("PG"), 0.0), nba::value));
+    }
 }

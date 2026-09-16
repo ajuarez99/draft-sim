@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.sport;
 
 import com.ballknowers.draftsim.domain.*;
 
+import java.util.List;
 import java.util.function.ToDoubleFunction;
 
 /**
@@ -42,6 +43,31 @@ public interface SportRules {
 
     /** Expected value of the seat's starting lineup as currently rostered. */
     double startingLineupValue(RosterState roster, LeagueSettings settings);
+
+    /** One player this sport's rules would start, and the slot he fills. */
+    record Assigned(BoardEntry entry, String slot, double value) {}
+
+    /**
+     * Which players the seat would actually start, valued by {@code valueOf}.
+     *
+     * The reporting form of {@link #startingLineupValue}: same rule, but it
+     * names the starters instead of only totalling them, and it takes the value
+     * function rather than assuming {@link #value}. claude/league-analysis.md
+     * needs both -- a roster's projected points broken out by position group is
+     * this list, grouped.
+     *
+     * <p>Unimplemented for a sport until that sport has a projection source to
+     * value a lineup with. This throws rather than quietly falling back to
+     * {@link #value}, which would answer a projection question with a draft-
+     * board answer and look like it worked.
+     */
+    default List<Assigned> startingLineup(RosterState roster, LeagueSettings settings,
+                                          ToDoubleFunction<BoardEntry> valueOf) {
+        throw new UnsupportedOperationException(
+                sport().code() + " has no startingLineup: see claude/league-analysis.md's non-goals. "
+                        + "Sleeper's projection stat keys (pts_ppr and friends) are football's, and "
+                        + "nothing values a basketball lineup in points yet.");
+    }
 
     /**
      * Hard gate: some positions are simply not taken until the draft is nearly

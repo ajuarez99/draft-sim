@@ -53,6 +53,7 @@ export default function LeagueRailSection({ league, pathname, collapsed, onMockI
   const boardHref = draftRoute(season)
   const historyHref = `/leagues/${d.sleeperLeagueId}/history`
   const powerHref = `/leagues/${d.sleeperLeagueId}/power`
+  const analysisHref = `/leagues/${d.sleeperLeagueId}/analysis`
 
   return (
     <div className="app-rail-section app-rail-league">
@@ -145,6 +146,25 @@ export default function LeagueRailSection({ league, pathname, collapsed, onMockI
           </span>
           <span className="app-rail-row-label">Power rankings</span>
         </Link>
+        {/* claude/league-analysis.md, and football-only on its own terms
+            rather than by a shared sport gate: two of this page's three blocks
+            are rest-of-season projections, and the only projection source
+            wired up (Sleeper's pts_ppr and friends) has no basketball
+            equivalent. A basketball league reaching it would get one working
+            block and two explaining themselves. */}
+        {d.sport === 'nfl' && (
+          <Link
+            to={analysisHref}
+            className={`app-rail-row${pathname === analysisHref ? ' on' : ''}`}
+            title="Analysis"
+            aria-label="Analysis"
+          >
+            <span className="app-rail-glyph" aria-hidden="true">
+              ◫
+            </span>
+            <span className="app-rail-row-label">Analysis</span>
+          </Link>
+        )}
         <button
           type="button"
           className="app-rail-row"

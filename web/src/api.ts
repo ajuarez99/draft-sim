@@ -809,6 +809,91 @@ export type PowerRankings = {
 export const getPowerRankings = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power`).then(json<PowerRankings>)
 
+// --- claude/league-analysis.md: the League analysis page ---
+
+/**
+ * Mirrors LeagueAnalysisService's records. Both blocks carry `available` and a
+ * `reason` rather than an empty list the page has to interpret: "too early to
+ * say" and "something broke" look identical from a zero-length array, and only
+ * one of them is worth showing the reader.
+ */
+export type AnalysisWindow = {
+  fromWeek: number
+  toWeek: number
+  weeks: number
+  scoredWeeks: number
+}
+
+export type AnalysisScoreEntry = {
+  rank: number
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  /** 1-100, league mean at 50. Our scaling of `raw` -- see the service. */
+  score: number
+  /** What ffwrapped's published formula actually returns, unscaled. */
+  raw: number
+  avgWeekly: number
+  high: number
+  low: number
+  winPct: number
+  wins: number
+  losses: number
+  ties: number
+}
+
+export type AnalysisRankingScores = {
+  available: boolean
+  reason: string | null
+  formula: string
+  weeksScored: number
+  weeksRequired: number
+  entries: AnalysisScoreEntry[]
+}
+
+export type AnalysisStarter = {
+  sleeperPlayerId: string
+  name: string
+  position: string
+  /** The roster slot filled -- "FLEX" where `position` is RB/WR/TE. */
+  slot: string
+  points: number
+}
+
+export type AnalysisRosterProjection = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  rank: number
+  total: number
+  byPosition: Record<string, number>
+  rankByPosition: Record<string, number>
+  starters: AnalysisStarter[]
+  /** Rostered players with no projection in the window: IR, Out, PUP. */
+  missing: number
+}
+
+export type AnalysisProjections = {
+  available: boolean
+  reason: string | null
+  positionGroups: string[]
+  rosters: AnalysisRosterProjection[]
+}
+
+export type LeagueAnalysis = {
+  season: number
+  /** Which of Sleeper's three scoring totals this league is read under. */
+  scoringKey: 'PPR' | 'HALF_PPR' | 'STANDARD'
+  window: AnalysisWindow
+  rankingScores: AnalysisRankingScores
+  projections: AnalysisProjections
+}
+
+export const getLeagueAnalysis = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/analysis`).then(json<LeagueAnalysis>)
+
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
