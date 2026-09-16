@@ -1,5 +1,27 @@
 # Ball Knowers — handoff
 
+**Also 2026-09-16, same branch: the page reads week by week.**
+`claude/league-analysis-week-by-week.md` is the brief. The page had two time
+horizons and nothing between them -- the whole rest of the season as one bar,
+and the next game -- so every "when" question fell in the gap. Now: a **week
+stepper** on the matchups, a **week strip** inside each lineup drawer, a
+**scored-week grid**, and the **bump chart**.
+
+The bump chart does not break the non-goal both earlier briefs set. It was
+**extracted, not rewritten** -- `web/src/components/BumpChart.tsx` is the
+component that used to live inside `PowerRankings.tsx`, moved unchanged, and
+both pages import it. What differs is the series: power rankings plots its
+composite ladder, this plots what each roster actually scored.
+
+**Read the brief's "The bug this work created" before touching the strip.** The
+obvious implementation re-optimises the lineup each week, and it summed to
+1777.1 under a bar reading 1683.9 -- two correct answers to different questions,
+a centimetre apart. The strip values the bar's own lineup now, and the bye it
+was smoothing away (week 6: 89.2, not 116.5) is the whole reason to draw it.
+
+402 backend tests / 0 failures / 0 skipped, 242 frontend, verified live on both
+the 2026 season (1 scored week) and the finished 2025 one (17).
+
 **Shipped 2026-09-16 on branch `league-analysis-lineups-and-matchups` (pushed, not merged): the League analysis page's second
 pass.** `claude/league-analysis-lineups-and-matchups.md` is the brief. Three
 additions, all answering the same complaint -- the page said a roster projects

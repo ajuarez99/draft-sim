@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
+import BumpChart, { type Series } from '../components/BumpChart'
+import { hueFor } from '../hue'
 import {
   getLeagueAnalysis,
   ingestLeagueHistory,
@@ -13,6 +15,8 @@ import {
   type AnalysisMatchups,
   type AnalysisMatchup,
   type AnalysisSide,
+  type AnalysisScores,
+  type AnalysisWeekTotal,
 } from '../api'
 
 /**
@@ -177,6 +181,47 @@ function LineupRow({ player }: { player: AnalysisLineupPlayer }) {
 }
 
 /**
+ * This roster's remaining weeks, valued with the same lineup the bar is made
+ * of -- so the strip sums to the bar exactly, and a bye reads as the dip it is.
+ *
+ * The lowest week is called out in words next to the chart rather than left as
+ * "the short one". Height alone is a second encoding of a number the reader
+ * cannot read off it (feedback_label_the_axis_spell_out_the_number).
+ */
+function WeekStrip({ byWeek }: { byWeek: AnalysisWeekTotal[] }) {
+  if (byWeek.length === 0) return null
+  const max = Math.max(...byWeek.map((w) => w.points), 1)
+  const low = byWeek.reduce((a, b) => (b.points < a.points ? b : a))
+  const high = byWeek.reduce((a, b) => (b.points > a.points ? b : a))
+
+  return (
+    <div className="analysis-weekstrip">
+      <div className="analysis-weekstrip-head">
+        <h4 className="analysis-lineup-head">Week by week</h4>
+        <span className="muted small">
+          best <span className="mono">wk {high.week} · {pts(high.points)}</span>
+          {' · '}
+          worst <span className="mono">wk {low.week} · {pts(low.points)}</span>
+        </span>
+      </div>
+      <ol className="analysis-weekbars">
+        {byWeek.map((w) => (
+          <li key={w.week} className="analysis-weekbar" title={`Week ${w.week}: ${pts(w.points)} projected`}>
+            <span className="analysis-weekbar-track">
+              <span
+                className={`analysis-weekbar-fill${w.week === low.week ? ' low' : ''}`}
+                style={{ height: `${Math.max(4, (w.points / max) * 100)}%` }}
+              />
+            </span>
+            <span className="mono analysis-weekbar-week">{w.week}</span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/**
  * The lineup behind the bar: every starter in the league's own slot order,
  * then everyone who did not start. The bench is not filler -- it is where the
  * zeroes live, and a zero next to a name is the honest version of "6
@@ -184,6 +229,8 @@ function LineupRow({ player }: { player: AnalysisLineupPlayer }) {
  */
 function LineupCard({ roster }: { roster: AnalysisRosterProjection }) {
   return (
+    <>
+      <WeekStrip byWeek={roster.byWeek} />
     <div className="analysis-lineup">
       <div className="analysis-lineup-col">
         <h4 className="analysis-lineup-head">
@@ -210,6 +257,7 @@ function LineupCard({ roster }: { roster: AnalysisRosterProjection }) {
         )}
       </div>
     </div>
+    </>
   )
 }
 
@@ -470,6 +518,140 @@ function MatchupsBlock({ block }: { block: AnalysisMatchups }) {
   )
 }
 
+/**
+ * Every scored week, read across. Points are the value; the week's best is
+ * marked, because "who won the week" is the one thing a grid of numbers this
+ * dense will not give up on its own.
+ */
+function ScoresBlock({ block }: { block: AnalysisScores }) {
+  const [highlighted, setHighlighted] = useState<number | null>(null)
+
+  const series: Series[] = useMemo(
+    () =>
+      block.rosters.map((r) => ({
+        rosterId: r.rosterId,
+        managerId: r.managerId,
+        manager: r.manager,
+        hue: hueFor(String(r.managerId ?? r.rosterId)),
+        // `thin` and `note` belong to power rankings' ballot coverage; a scored
+        // week has no such notion, so every point here is solid.
+        points: r.weeks.map((w) => ({
+          week: w.week,
+          rank: w.rank,
+          score: w.points,
+          note: null,
+          ballotCount: null,
+          thin: false,
+        })),
+      })),
+    [block.rosters],
+  )
+
+  if (!block.available) return <NotYet reason={block.reason} />
+
+  // With one scored week, total == avg == high == low == that week, and the
+  // row reads as five copies of one number pretending to be five facts. Same
+  // discipline as the ranking score's own gate: the honest answer early is no
+  // answer, said out loud.
+  const summarisable = block.weeks.length > 1
+
+  return (
+    <>
+      <div className="table-wrap">
+        <table className="standings analysis-scores-grid">
+          <thead>
+            <tr>
+              <th>Manager</th>
+              {block.weeks.map((w) => (
+                <th key={w} className="mono analysis-scores-week">
+                  {w}
+                </th>
+              ))}
+              {summarisable && (
+                <>
+                  <th className="mono">Total</th>
+                  <th className="mono">Avg</th>
+                  <th className="mono">High</th>
+                  <th className="mono">Low</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rosters.map((r) => {
+              const byWeek = new Map(r.weeks.map((w) => [w.week, w]))
+              return (
+                <tr
+                  key={r.rosterId}
+                  className={`${r.isMe ? 'mine ' : ''}${highlighted === r.rosterId ? 'on' : ''}`}
+                >
+                  <td>
+                    <ManagerLink
+                      managerId={r.managerId}
+                      manager={r.manager}
+                      rosterId={r.rosterId}
+                      avatarId={r.avatarId}
+                      isMe={r.isMe}
+                    />
+                  </td>
+                  {block.weeks.map((w) => {
+                    const cell = byWeek.get(w)
+                    if (!cell) {
+                      return (
+                        <td key={w} className="mono muted analysis-scores-cell" title="no game scored">
+                          —
+                        </td>
+                      )
+                    }
+                    return (
+                      <td
+                        key={w}
+                        className={`mono analysis-scores-cell${cell.rank === 1 ? ' best' : ''}`}
+                        title={`${managerName(r.manager, r.rosterId)} — week ${w}: ${pts(cell.points)}, ${cell.rank} of ${block.rosters.length}`}
+                      >
+                        {pts(cell.points)}
+                      </td>
+                    )
+                  })}
+                  {summarisable && (
+                    <>
+                      <td className="mono">{pts(r.total)}</td>
+                      <td className="mono">{pts(r.avg)}</td>
+                      <td className="mono">{pts(r.high)}</td>
+                      <td className="mono">{pts(r.low)}</td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {summarisable ? (
+        <>
+          <p className="muted small analysis-bump-note">
+            The same weeks as movement: where each roster ranked on points in each one. Click a line
+            to follow it.
+          </p>
+          <BumpChart
+            series={series}
+            weeks={block.weeks}
+            teamCount={block.rosters.length}
+            highlighted={highlighted}
+            onHighlight={setHighlighted}
+          />
+        </>
+      ) : (
+        <p className="muted small analysis-bump-note">
+          One scored week is a column, not a line. The movement chart, and the total, average, high
+          and low — which are all that same number until there are two weeks — appear from week two.
+        </p>
+      )}
+    </>
+  )
+}
+
 type SlotRow = { slot: string; left: AnalysisLineupPlayer | null; right: AnalysisLineupPlayer | null }
 
 /**
@@ -649,15 +831,35 @@ export default function LeagueAnalysis() {
   const [data, setData] = useState<LeagueAnalysisData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Only the matchup block moves with the chosen week, so only it is refetched
+  // and swapped in. Replacing the whole response would reset every open lineup
+  // drawer to answer a question that did not touch them.
+  const [week, setWeek] = useState<number | null>(null)
+  const [weekLoading, setWeekLoading] = useState(false)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
     setData(null)
     setError(null)
+    setWeek(null)
     getLeagueAnalysis(sleeperLeagueId)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [sleeperLeagueId])
+
+  async function pickWeek(next: number) {
+    if (!sleeperLeagueId) return
+    setWeek(next)
+    setWeekLoading(true)
+    try {
+      const fresh = await getLeagueAnalysis(sleeperLeagueId, next)
+      setData((prev) => (prev == null ? fresh : { ...prev, matchups: fresh.matchups }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setWeekLoading(false)
+    }
+  }
 
   // Same convention as LeagueHistory: a button that fires the ingest, never a
   // curl line printed for the reader to run.
@@ -756,16 +958,51 @@ export default function LeagueAnalysis() {
               <h2>
                 {data.matchups.available ? `Week ${data.matchups.week} matchups` : 'Upcoming matchups'}
               </h2>
-              {data.matchups.available && (
-                <span className="muted small">projected for that week alone</span>
+              {window && window.toWeek >= window.fromWeek && (
+                <div className="analysis-weekpick" role="group" aria-label="Choose a week">
+                  {Array.from(
+                    { length: window.toWeek - window.fromWeek + 1 },
+                    (_, i) => window.fromWeek + i,
+                  ).map((w) => {
+                    const on = (week ?? data.matchups.week) === w
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        className={`chip analysis-weekchip${on ? ' on' : ''}`}
+                        aria-pressed={on}
+                        disabled={weekLoading}
+                        onClick={() => pickWeek(w)}
+                      >
+                        {w}
+                      </button>
+                    )
+                  })}
+                </div>
               )}
             </div>
             <p className="muted small">
-              The league's real pairings, each side's lineup rebuilt for this week rather than
+              The league's real pairings, each side's lineup rebuilt for the chosen week rather than
               sliced out of the rest-of-season total — a bye or a one-week injury moves who starts.
               The margin is two projections subtracted, not a win probability.
             </p>
-            <MatchupsBlock block={data.matchups} />
+            <div aria-busy={weekLoading}>
+              <MatchupsBlock block={data.matchups} />
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-head">
+              <h2>Week by week</h2>
+              <span className="muted small">
+                {data.scores.weeks.length} week{data.scores.weeks.length === 1 ? '' : 's'} scored
+              </span>
+            </div>
+            <p className="muted small">
+              What every roster actually scored, week by week — played games, not projections, so
+              nothing here moves once a week is in the books.
+            </p>
+            <ScoresBlock block={data.scores} />
           </section>
 
           <section className="panel">

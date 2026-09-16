@@ -161,11 +161,71 @@ class LeagueAnalysisServiceTest {
                 slotsOf(List.of(at("SUPER_FLEX", 30.0), at("QB", 4.0))));
     }
 
+    // ---- the weekly strip (claude/league-analysis-week-by-week.md) ----
+
+    private static RosterProjection withStarters(double total, LineupPlayer... starters) {
+        return new RosterProjection(1, 1L, "kieriskash", null, 1, false, total,
+                Map.of(), Map.of(), List.of(starters), List.of(), List.of(), 0);
+    }
+
+    private static LineupPlayer starter(String id, double points) {
+        return new LineupPlayer(id, id, "RB", "CIN", "RB", points, null);
+    }
+
+    /**
+     * The invariant the first cut broke: the weeks under a bar must sum to the
+     * bar. It re-optimised the lineup each week, which scores higher than one
+     * lineup locked for the season -- always, and by 93 points for a real
+     * roster -- so the strip and the total it sat under disagreed with nothing
+     * saying why. This values the bar's OWN lineup week by week.
+     */
+    @Test
+    void theWeeklyStripSumsToTheBarItSitsUnder() {
+        RosterProjection roster = withStarters(30.0, starter("a", 20.0), starter("b", 10.0));
+
+        List<RosterProjection> out = LeagueAnalysisService.withWeekly(List.of(roster), Map.of(
+                2, Map.of("a", 12.0, "b", 4.0),
+                3, Map.of("a", 8.0, "b", 6.0)));
+
+        List<LeagueAnalysisService.WeekTotal> weeks = out.getFirst().byWeek();
+        assertEquals(List.of(2, 3), weeks.stream().map(LeagueAnalysisService.WeekTotal::week).toList());
+        assertEquals(30.0, weeks.stream().mapToDouble(LeagueAnalysisService.WeekTotal::points).sum(), 1e-9);
+    }
+
+    /**
+     * A bye is a hole in the week, not a missing entry: the week is still
+     * listed, at whatever the rest of the lineup scores. Dropping it would hide
+     * the dip that is the entire reason to draw the strip.
+     */
+    @Test
+    void aByeWeekIsADipRatherThanAGapInTheSeries() {
+        RosterProjection roster = withStarters(24.0, starter("a", 14.0), starter("b", 10.0));
+
+        List<RosterProjection> out = LeagueAnalysisService.withWeekly(List.of(roster), Map.of(
+                2, Map.of("a", 14.0, "b", 10.0),
+                3, Map.of("b", 10.0)));
+
+        assertEquals(List.of(24.0, 10.0),
+                out.getFirst().byWeek().stream().map(LeagueAnalysisService.WeekTotal::points).toList());
+    }
+
+    /** Weeks come out in week order whatever order the query handed them over in. */
+    @Test
+    void theSeriesIsInWeekOrder() {
+        RosterProjection roster = withStarters(3.0, starter("a", 3.0));
+
+        List<RosterProjection> out = LeagueAnalysisService.withWeekly(List.of(roster), Map.of(
+                9, Map.of("a", 1.0), 4, Map.of("a", 1.0), 11, Map.of("a", 1.0)));
+
+        assertEquals(List.of(4, 9, 11),
+                out.getFirst().byWeek().stream().map(LeagueAnalysisService.WeekTotal::week).toList());
+    }
+
     // ---- the matchup pairing (piece 3) ----
 
     private static RosterProjection roster(int rosterId, double total) {
         return new RosterProjection(rosterId, (long) rosterId, "manager " + rosterId, null, 0,
-                false, total, Map.of(), Map.of(), List.of(), List.of(), 0);
+                false, total, Map.of(), Map.of(), List.of(), List.of(), List.of(), 0);
     }
 
     private static Map<Integer, RosterProjection> valued(RosterProjection... rosters) {

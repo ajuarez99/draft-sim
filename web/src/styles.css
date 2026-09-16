@@ -2901,6 +2901,57 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-game.bye { display: block; }
 .analysis-game-note { margin: 8px 0 0; }
 
+/* --- week by week (claude/league-analysis-week-by-week.md) ------------------
+ *
+ * Three week-shaped things, and they are deliberately three different marks:
+ * a column per week where the question is "which week" (the strip), a cell per
+ * week where the question is "how much" (the grid), and a line where the
+ * question is "which direction" (the bump chart, borrowed from power rankings
+ * rather than drawn again).
+ */
+
+.analysis-weekstrip { margin-bottom: 14px; }
+.analysis-weekstrip-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  flex-wrap: wrap; margin-bottom: 6px;
+}
+.analysis-weekstrip-head .analysis-lineup-head { margin: 0; }
+
+.analysis-weekbars {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; align-items: flex-end; gap: 4px;
+}
+.analysis-weekbar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.analysis-weekbar-track {
+  width: 100%; height: 34px; display: flex; align-items: flex-end;
+  background: color-mix(in oklch, var(--panel) 60%, transparent); border-radius: 3px;
+}
+.analysis-weekbar-fill { width: 100%; background: var(--teal); border-radius: 3px; opacity: 0.75; }
+/* The worst week is the one a reader is looking for, so it is marked -- and
+   named in words above the chart, because a shorter bar is not a number. */
+.analysis-weekbar-fill.low { background: var(--muted); opacity: 1; }
+.analysis-weekbar-week { font-size: 9px; color: var(--muted); }
+
+/* --- the scored-week grid -------------------------------------------------- */
+
+.analysis-scores-grid th.analysis-scores-week { text-align: right; font-size: 11px; }
+.analysis-scores-cell { text-align: right; font-size: 12px; }
+/* The week's top score. One mark, one meaning: everything else in the row is
+   the number itself. */
+.analysis-scores-cell.best {
+  color: var(--text); font-weight: 600;
+  background: color-mix(in oklch, var(--teal) 14%, transparent);
+}
+.analysis-scores-grid tr.mine { box-shadow: inset 2px 0 0 var(--crimson); }
+.analysis-scores-grid tr.on { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.analysis-bump-note { margin: 12px 0 6px; }
+
+/* Week chips on the matchup panel. Borrowed .chip, so "on" already reads as
+   selected everywhere else in the app. */
+.analysis-weekpick { display: flex; flex-wrap: wrap; gap: 4px; }
+.analysis-weekchip { min-width: 30px; text-align: center; padding: 2px 8px; font-size: 11px; }
+.analysis-weekchip:disabled { opacity: 0.5; cursor: default; }
+
 /* --- head to head --------------------------------------------------------- */
 
 .analysis-vs { margin-top: 12px; }

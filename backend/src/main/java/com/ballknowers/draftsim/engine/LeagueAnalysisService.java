@@ -78,7 +78,8 @@ public class LeagueAnalysisService {
     // ---- wire shapes ----
 
     public record Analysis(int season, String scoringKey, Window window,
-                           RankingScores rankingScores, Projections projections, Matchups matchups) {}
+                           RankingScores rankingScores, Projections projections, Matchups matchups,
+                           Scores scores) {}
 
     /** The rest-of-season window, named so the page can say what it covered. */
     public record Window(int fromWeek, int toWeek, int weeks, int scoredWeeks) {}
@@ -122,7 +123,17 @@ public class LeagueAnalysisService {
     public record RosterProjection(int rosterId, Long managerId, String manager, String avatarId, int rank,
                                    boolean isMe, double total, Map<String, Double> byPosition,
                                    Map<String, Integer> rankByPosition, List<LineupPlayer> starters,
-                                   List<LineupPlayer> bench, int missing) {}
+                                   List<LineupPlayer> bench, List<WeekTotal> byWeek, int missing) {}
+
+    /**
+     * One remaining week of one roster's projection
+     * (claude/league-analysis-week-by-week.md).
+     *
+     * <p>The rest-of-season total is the sum of these, but the sum cannot be
+     * taken apart again: a bye week is a hole in this list and is invisible in
+     * the total, which is the whole reason the list exists.
+     */
+    public record WeekTotal(int week, double points) {}
 
     /**
      * One rostered player, valued over whichever window the pass ran on.
@@ -151,12 +162,39 @@ public class LeagueAnalysisService {
 
     public record Matchup(int matchupId, List<Side> sides) {}
 
+    /**
+     * Every scored week, read across (the grid) and ranked down (the bump
+     * chart's series). Both fall out of {@code roster_week_points} in one pass,
+     * the same way the position matrix falls out of the projections.
+     *
+     * <p>Deliberately NOT power rankings' ladder re-drawn here. That one is a
+     * composite the commissioner and the voters feed; this is what each roster
+     * actually scored, which is a different claim with a different source.
+     */
+    public record Scores(boolean available, String reason, List<Integer> weeks, List<ScoreRow> rosters) {}
+
+    public record ScoreRow(int rosterId, Long managerId, String manager, String avatarId, boolean isMe,
+                           List<WeekScore> weeks, double total, double avg, double high, double low) {}
+
+    /** @param rank this roster's scoring rank THAT WEEK, 1 = highest. */
+    public record WeekScore(int week, double points, int rank) {}
+
     public record Side(int rosterId, Long managerId, String manager, String avatarId, boolean isMe,
                        double projected, Map<String, Double> byPosition, List<LineupPlayer> starters) {}
 
     // ---- entry point ----
 
     public Analysis analyse(String sleeperLeagueId, String sleeperUserId) {
+        return analyse(sleeperLeagueId, sleeperUserId, null);
+    }
+
+    /**
+     * @param week which week the matchup block should be valued for, or null
+     *             for the next unplayed one. Only that block moves: the
+     *             rest-of-season projections and the scores grid are not
+     *             statements about a chosen week and do not change with it.
+     */
+    public Analysis analyse(String sleeperLeagueId, String sleeperUserId, Integer week) {
         LeagueRepository.LeagueRow league = leagues.bySleeperId(sleeperLeagueId)
                 .orElseThrow(() -> new IllegalArgumentException("no such league: " + sleeperLeagueId));
 
@@ -185,12 +223,74 @@ public class LeagueAnalysisService {
         // every lookup table and the roster list itself, and differ only in
         // which weeks they value. Computing them apart would fetch the same
         // twelve Sleeper rosters twice to answer one request.
-        Blocks blocks = projectionBlocks(league, key, fromWeek, toWeek, playoffWeekStart, sleeperUserId);
+        Blocks blocks = projectionBlocks(league, key, fromWeek, toWeek, playoffWeekStart, sleeperUserId,
+                week == null ? fromWeek : week);
 
         return new Analysis(league.season(), key.name(), window,
                 rankingScores(league, scored.size(), lastScored),
-                blocks.projections(), blocks.matchups());
+                blocks.projections(), blocks.matchups(),
+                scores(league, lastScored, sleeperUserId));
     }
+
+    // ---- the scores grid, and the rank-by-week series under it ----
+
+    /**
+     * What every roster actually scored, week by week.
+     *
+     * <p>Reads only {@code roster_week_points}, which is settled data -- a week
+     * that has been played does not change -- so unlike the projections this
+     * needs no staleness rule and no refresh button. The per-week rank goes
+     * through {@link Ranker} for the same reason every other rank on this page
+     * does: two rosters that tied on points in a week must not be numbered as
+     * though they did not.
+     */
+    private Scores scores(LeagueRepository.LeagueRow league, int lastScored, String sleeperUserId) {
+        if (lastScored < 1) {
+            return new Scores(false, "no week of this season has been ingested yet, so there is nothing to read"
+                    + " week by week", List.of(), List.of());
+        }
+
+        Map<Integer, List<RosterWeekPointsRepository.WeekPoint>> byWeek = new TreeMap<>();
+        for (RosterWeekPointsRepository.WeekPoint wp : weekPoints.through(league.id(), lastScored)) {
+            byWeek.computeIfAbsent(wp.week(), w -> new ArrayList<>()).add(wp);
+        }
+
+        // rosterId -> week -> (points, rank). Ranked within each week first,
+        // because a roster's rank in week 3 is a fact about week 3 and not
+        // about the roster's own history.
+        Map<Integer, List<WeekScore>> rowsByRoster = new LinkedHashMap<>();
+        for (Map.Entry<Integer, List<RosterWeekPointsRepository.WeekPoint>> e : byWeek.entrySet()) {
+            for (Ranker.Ranked<RosterWeekPointsRepository.WeekPoint> r : Ranker.rank(e.getValue(),
+                    Comparator.comparingDouble(RosterWeekPointsRepository.WeekPoint::startersPoints).reversed(),
+                    RosterWeekPointsRepository.WeekPoint::startersPoints)) {
+                rowsByRoster.computeIfAbsent(r.item().rosterId(), k -> new ArrayList<>())
+                        .add(new WeekScore(e.getKey(), round(r.item().startersPoints(), 2), r.rank()));
+            }
+        }
+
+        // "Mine" by manager id here rather than by Sleeper owner_id: this block
+        // reads stored standings and must work for a league whose projections
+        // are unavailable, so it cannot depend on the live roster fetch the
+        // projection pass makes. `manager` is unique on sleeper_user_id, so the
+        // two routes name the same person.
+        Long myManagerId = sleeperUserId == null ? null : managers.idsBySleeperUserId().get(sleeperUserId);
+
+        List<ScoreRow> rows = new ArrayList<>();
+        for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
+            List<WeekScore> weeks = rowsByRoster.getOrDefault(r.rosterId(), List.of());
+            if (weeks.isEmpty()) continue;
+            double total = weeks.stream().mapToDouble(WeekScore::points).sum();
+            double high = weeks.stream().mapToDouble(WeekScore::points).max().orElse(0);
+            double low = weeks.stream().mapToDouble(WeekScore::points).min().orElse(0);
+            rows.add(new ScoreRow(r.rosterId(), r.managerId(), r.managerName(), r.avatarId(),
+                    myManagerId != null && myManagerId.equals(r.managerId()), List.copyOf(weeks),
+                    round(total, 2), round(total / weeks.size(), 2), high, low));
+        }
+        rows.sort(Comparator.comparingDouble(ScoreRow::total).reversed());
+
+        return new Scores(true, null, List.copyOf(byWeek.keySet()), List.copyOf(rows));
+    }
+
 
     // ---- piece 1 ----
 
@@ -286,15 +386,15 @@ public class LeagueAnalysisService {
     private Blocks projectionBlocks(LeagueRepository.LeagueRow league,
                                     PlayerProjectionRepository.ScoringKey key,
                                     int fromWeek, int toWeek, int playoffWeekStart,
-                                    String sleeperUserId) {
+                                    String sleeperUserId, int matchupWeek) {
         List<String> groups = Position.forSport(league.sport()).stream().map(Enum::name).toList();
 
         if (playoffWeekStart < 2) {
-            return unavailable(groups, fromWeek,
+            return unavailable(groups, matchupWeek,
                     "this league has no playoff_week_start, so there is no regular season to project to the end of");
         }
         if (fromWeek > toWeek) {
-            return unavailable(groups, fromWeek,
+            return unavailable(groups, matchupWeek,
                     "the regular season is over (weeks run to " + toWeek + ", and " + (fromWeek - 1)
                             + " are scored), so there is nothing left to project");
         }
@@ -304,7 +404,7 @@ public class LeagueAnalysisService {
         // ingest them" advice below would point at an endpoint that answers
         // 400. A reason the reader cannot act on is worse than no reason.
         if (league.sport() != Sport.NFL) {
-            return unavailable(groups, fromWeek,
+            return unavailable(groups, matchupWeek,
                     "roster projections are football-only: the projection source wired up is Sleeper's"
                             + " own weekly points (pts_ppr and friends), which has no "
                             + league.sport().code() + " equivalent. See claude/league-analysis.md's non-goals.");
@@ -313,17 +413,22 @@ public class LeagueAnalysisService {
         Map<String, Double> restOfSeason =
                 projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
         if (restOfSeason.isEmpty()) {
-            return unavailable(groups, fromWeek, noProjectionsStored(league, fromWeek, toWeek));
+            return unavailable(groups, matchupWeek, noProjectionsStored(league, fromWeek, toWeek));
         }
 
         LineupPass pass = new LineupPass(league, groups, sleeperUserId);
-        List<RosterProjection> ranked = rankAll(pass.over(restOfSeason), groups);
+        List<RosterProjection> rosters = pass.over(restOfSeason);
+
+        Map<Integer, Map<String, Double>> perWeek = projections.totalsByPlayerPerWeek(
+                league.sport().code(), league.season(), fromWeek, toWeek, key);
+
+        List<RosterProjection> ranked = rankAll(withWeekly(rosters, perWeek), groups);
 
         log.info("league analysis: league {} projected weeks {}-{} using {} over {} players",
                 league.id(), fromWeek, toWeek, key.column(), restOfSeason.size());
 
         return new Blocks(new Projections(true, null, groups, ranked),
-                matchupBlock(league, key, fromWeek, pass));
+                matchupBlock(league, key, matchupWeek, pass));
     }
 
     /**
@@ -387,6 +492,42 @@ public class LeagueAnalysisService {
         log.info("league analysis: league {} week {} matchups: {} pairings over {} projected players",
                 league.id(), week, out.size(), weekly.size());
         return new Matchups(true, null, week, List.copyOf(out));
+    }
+
+    /**
+     * The rest-of-season bar taken apart into the weeks that made it.
+     *
+     * <p><b>It values the lineup the bar is already made of, week by week --
+     * it does not re-optimise each week.</b> The first cut did re-optimise, and
+     * the numbers immediately disagreed: kieriskash's weeks summed to 1777.1
+     * under a bar reading 1683.9, because setting the best lineup every week
+     * beats locking one lineup for thirteen, always. Both numbers were correct
+     * answers to different questions, printed a centimetre apart with nothing
+     * saying so. This block asks the bar's question, so the strip under a bar
+     * now sums to it exactly, and a bye week still shows as the dip it is.
+     *
+     * <p>The week-by-week optimum is a real number and it has a home: the
+     * matchup preview, where the question genuinely is "what would this roster
+     * start in THAT game".
+     */
+    static List<RosterProjection> withWeekly(List<RosterProjection> rosters,
+                                             Map<Integer, Map<String, Double>> perWeek) {
+        List<RosterProjection> out = new ArrayList<>();
+        for (RosterProjection p : rosters) {
+            List<WeekTotal> series = new ArrayList<>();
+            perWeek.forEach((week, points) -> {
+                double total = 0;
+                for (LineupPlayer starter : p.starters()) {
+                    total += points.getOrDefault(starter.sleeperPlayerId(), 0.0);
+                }
+                series.add(new WeekTotal(week, round(total, 1)));
+            });
+            series.sort(Comparator.comparingInt(WeekTotal::week));
+            out.add(new RosterProjection(p.rosterId(), p.managerId(), p.manager(), p.avatarId(), p.rank(),
+                    p.isMe(), p.total(), p.byPosition(), p.rankByPosition(), p.starters(), p.bench(),
+                    List.copyOf(series), p.missing()));
+        }
+        return out;
     }
 
     /**
@@ -551,7 +692,7 @@ public class LeagueAnalysisService {
                 byPosition.replaceAll((g, v) -> round(v, 1));
                 out.add(new RosterProjection(rosterId, managerId, managerNames.get(rosterId),
                         avatars.get(rosterId), 0, isMe, round(total, 1), byPosition, Map.of(),
-                        List.copyOf(starters), List.copyOf(bench), missing));
+                        List.copyOf(starters), List.copyOf(bench), List.of(), missing));
             }
             return out;
         }
@@ -595,7 +736,7 @@ public class LeagueAnalysisService {
             RosterProjection p = r.item();
             out.add(new RosterProjection(p.rosterId(), p.managerId(), p.manager(), p.avatarId(), r.rank(),
                     p.isMe(), p.total(), p.byPosition(), rankByRoster.get(p.rosterId()), p.starters(),
-                    p.bench(), p.missing()));
+                    p.bench(), p.byWeek(), p.missing()));
         }
         return out;
     }

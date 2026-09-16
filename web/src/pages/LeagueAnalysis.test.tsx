@@ -44,7 +44,8 @@ function roster(rosterId: number, manager: string, rank: number, total: number,
                 missing = 0, over: { isMe?: boolean; starters?: AnalysisLineupPlayer[] } = {}) {
   return {
     rosterId, managerId: rosterId, manager, avatarId: null, rank, isMe: over.isMe ?? false, total,
-    byPosition, rankByPosition, starters: over.starters ?? LINEUP, bench: BENCH, missing,
+    byPosition, rankByPosition, starters: over.starters ?? LINEUP, bench: BENCH,
+    byWeek: [{ week: 2, points: 120 }, { week: 3, points: 96 }, { week: 4, points: 130 }], missing,
   }
 }
 
@@ -82,6 +83,19 @@ function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
           { QB: 229.9, RB: 368.2, WR: 685.3, TE: 138.8, K: 79.3, DEF: 71.4 },
           { QB: 5, RB: 8, WR: 4, TE: 7, K: 9, DEF: 12 }, 0,
           { isMe: true, starters: [player('QB', 'QB', 'Josh Allen', 22.5), ...LINEUP.slice(1)] }),
+      ],
+    },
+    scores: {
+      available: true,
+      reason: null,
+      weeks: [1, 2],
+      rosters: [
+        { rosterId: 1, managerId: 1, manager: 'kieriskash', avatarId: null, isMe: false,
+          weeks: [{ week: 1, points: 164.96, rank: 1 }, { week: 2, points: 120.5, rank: 2 }],
+          total: 285.46, avg: 142.73, high: 164.96, low: 120.5 },
+        { rosterId: 2, managerId: 2, manager: 'jstrobe', avatarId: null, isMe: true,
+          weeks: [{ week: 1, points: 140.1, rank: 2 }, { week: 2, points: 131.0, rank: 1 }],
+          total: 271.1, avg: 135.55, high: 140.1, low: 131.0 },
       ],
     },
     matchups: {
@@ -367,6 +381,111 @@ describe('LeagueAnalysis', () => {
       .toBeInTheDocument()
     expect((picks[0] as HTMLSelectElement).value).toBe('2')
     expect((picks[1] as HTMLSelectElement).value).toBe('1')
+  })
+
+  // ---- week by week (claude/league-analysis-week-by-week.md) ----
+
+  /**
+   * The strip decomposes the bar above it, so the weeks it draws have to be
+   * the weeks the wire sent -- and the worst one is named in words, because a
+   * shorter bar is not a number anyone can read off.
+   */
+  it('draws the weekly strip and names the best and worst week', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await user.click((await screen.findAllByRole('button', { name: /Lineup/ }))[0])
+    const strip = document.querySelector('.analysis-weekstrip') as HTMLElement
+    expect(within(strip).getAllByTitle(/^Week \d+: /)).toHaveLength(3)
+    expect(strip).toHaveTextContent('best')
+    expect(strip).toHaveTextContent('wk 4 · 130.0')
+    expect(strip).toHaveTextContent('worst')
+    expect(strip).toHaveTextContent('wk 3 · 96.0')
+  })
+
+  /** The week stepper asks the backend for that week rather than filtering locally. */
+  it('refetches the matchup block for the week you pick', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText('Week 2 matchups')
+    getLeagueAnalysis.mockResolvedValue(
+      data({ matchups: { available: true, reason: null, week: 6, matchups: [] } }),
+    )
+    await user.click(screen.getByRole('button', { name: '6' }))
+
+    expect(getLeagueAnalysis).toHaveBeenLastCalledWith('L1', 6)
+    await waitFor(() => expect(screen.getByText('Week 6 matchups')).toBeInTheDocument())
+  })
+
+  /**
+   * Only the matchup block moves with the week. Replacing the whole response
+   * would reset every open lineup drawer to answer a question that did not
+   * touch them.
+   */
+  it('keeps an open lineup open when the week changes', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await user.click((await screen.findAllByRole('button', { name: /Lineup/ }))[0])
+    const bars = within(document.querySelector('.analysis-bars') as HTMLElement)
+    expect(bars.getByText('Bijan Robinson')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '6' }))
+    await waitFor(() => expect(bars.getByText('Bijan Robinson')).toBeInTheDocument())
+  })
+
+  /** The grid is the scored weeks, and the week's top score is marked. */
+  it('shows every scored week with the best score of each marked', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/What every roster actually scored/)
+    const grid = document.querySelector('.analysis-scores-grid') as HTMLElement
+    expect(within(grid).getByTitle(/kieriskash — week 1: 165.0, 1 of 2/)).toHaveClass('best')
+    expect(within(grid).getByTitle(/kieriskash — week 2: 120.5, 2 of 2/)).not.toHaveClass('best')
+  })
+
+  /**
+   * With one scored week, total == avg == high == low == that week, and the row
+   * reads as five copies of one number pretending to be five facts.
+   */
+  it('withholds the summary columns until a second week is scored', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        scores: {
+          available: true,
+          reason: null,
+          weeks: [1],
+          rosters: [
+            { rosterId: 1, managerId: 1, manager: 'kieriskash', avatarId: null, isMe: false,
+              weeks: [{ week: 1, points: 165, rank: 1 }],
+              total: 165, avg: 165, high: 165, low: 165 },
+          ],
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/What every roster actually scored/)
+    const grid = document.querySelector('.analysis-scores-grid') as HTMLElement
+    expect(within(grid).queryByRole('columnheader', { name: 'Avg' })).not.toBeInTheDocument()
+    expect(screen.getByText(/appear from week two/)).toBeInTheDocument()
+    expect(document.querySelector('.bump-chart')).toBeNull()
+  })
+
+  /** Two weeks is a line, so the chart this page borrows from Power rankings appears. */
+  it('draws the bump chart once there are two weeks to move between', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/What every roster actually scored/)
+    expect(document.querySelector('.bump-chart')).not.toBeNull()
+    // One line per roster, and the week axis is the scored weeks.
+    expect(document.querySelectorAll('.bump-series')).toHaveLength(2)
   })
 
   /** Slot against slot, with the heavier side marked as such. */

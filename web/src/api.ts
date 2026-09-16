@@ -879,8 +879,19 @@ export type AnalysisRosterProjection = {
   starters: AnalysisLineupPlayer[]
   /** Everyone who did not start, best projection first. The zeroes at the bottom are the IRs. */
   bench: AnalysisLineupPlayer[]
+  /**
+   * The rest-of-season total taken apart again, one entry per remaining week.
+   * `total` is the sum of these; the sum is where a bye week disappears, which
+   * is why the list is carried separately rather than derived from it.
+   */
+  byWeek: AnalysisWeekTotal[]
   /** Rostered players with no projection in the window: IR, Out, PUP. */
   missing: number
+}
+
+export type AnalysisWeekTotal = {
+  week: number
+  points: number
 }
 
 export type AnalysisProjections = {
@@ -919,6 +930,34 @@ export type AnalysisMatchups = {
   matchups: AnalysisMatchup[]
 }
 
+/** @param rank this roster's scoring rank in THAT week, 1 = highest. */
+export type AnalysisWeekScore = {
+  week: number
+  points: number
+  rank: number
+}
+
+export type AnalysisScoreRow = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  isMe: boolean
+  weeks: AnalysisWeekScore[]
+  total: number
+  avg: number
+  high: number
+  low: number
+}
+
+/** What every roster actually scored, week by week -- settled data, unlike the projections. */
+export type AnalysisScores = {
+  available: boolean
+  reason: string | null
+  weeks: number[]
+  rosters: AnalysisScoreRow[]
+}
+
 export type LeagueAnalysis = {
   season: number
   /** Which of Sleeper's three scoring totals this league is read under. */
@@ -927,10 +966,19 @@ export type LeagueAnalysis = {
   rankingScores: AnalysisRankingScores
   projections: AnalysisProjections
   matchups: AnalysisMatchups
+  scores: AnalysisScores
 }
 
-export const getLeagueAnalysis = (sleeperLeagueId: string) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/analysis`).then(json<LeagueAnalysis>)
+/**
+ * @param week which week the MATCHUP block is valued for; the next unplayed
+ *   one when omitted. Nothing else in the response moves with it -- the
+ *   rest-of-season projections and the scores grid are not statements about a
+ *   chosen week.
+ */
+export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
+  apiFetch(
+    `/api/leagues/${sleeperLeagueId}/analysis${week == null ? '' : `?week=${week}`}`,
+  ).then(json<LeagueAnalysis>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {

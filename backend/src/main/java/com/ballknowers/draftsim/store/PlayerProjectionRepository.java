@@ -109,6 +109,39 @@ public class PlayerProjectionRepository {
     }
 
     /**
+     * The same points, kept week by week instead of summed
+     * (claude/league-analysis-week-by-week.md).
+     *
+     * <p>One query, not one per week. The summed form above cannot answer this
+     * -- a rest-of-season total says nothing about WHICH week a bye falls in,
+     * which is the entire question a week-by-week view asks -- and a loop
+     * calling it thirteen times would be thirteen round trips re-reading rows
+     * this reads once.
+     *
+     * @return week -> (Sleeper player id -> points). A week with nothing stored
+     *         is absent rather than present and empty, so the caller can tell
+     *         "no projection published" from "projected zero".
+     */
+    public Map<Integer, Map<String, Double>> totalsByPlayerPerWeek(String sport, int season, int fromWeek,
+                                                                  int toWeek, ScoringKey key) {
+        Map<Integer, Map<String, Double>> byWeek = new java.util.LinkedHashMap<>();
+        db.sql("""
+                select week, sleeper_player_id, coalesce(%s, 0)
+                from player_projection
+                where sport = ? and season = ? and week between ? and ?
+                order by week
+                """.formatted(key.column()))
+                .params(sport, season, fromWeek, toWeek)
+                .query((rs, i) -> {
+                    byWeek.computeIfAbsent(rs.getInt(1), w -> new java.util.HashMap<>())
+                            .put(rs.getString(2), rs.getDouble(3));
+                    return null;
+                })
+                .list();
+        return byWeek;
+    }
+
+    /**
      * Which of Sleeper's three scoring totals a league actually plays under.
      *
      * A constant here would assert a league rule while looking like it reads a
