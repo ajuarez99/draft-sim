@@ -1,5 +1,41 @@
 # Ball Knowers — handoff
 
+**Shipped 2026-09-15 on branch `nba-opinion-power-rankings` (not merged): the
+two OPINION modes of power rankings for basketball** -- league-member ballots
+and the commissioner ordering. Nothing computed (no box score, no preseason
+baseline, no playoff odds). `claude/nba-power-rankings.md` is the brief; read
+its "What live verification found" before trusting the plan half of it. The
+scope works because both opinion modes are orderings of managers that read no
+roster data at all, so basketball has them today -- five weeks before the NBA
+season and before its draft.
+
+The code was small (`nflState()` -> `sportState(Sport)`, three `Sport.NFL` gates
+that each existed only because of that one hardcoded string, one frontend gate,
+one wire rename). **The blocker was data**: `league_member` was empty for all
+three NBA leagues because that chain's ingest last ran before V9, which meant
+every NBA manager would have been shown a vote board of anonymous "roster 1..12"
+chips and told voting was closed -- `members()` reads live Sleeper rosters so the
+rows appear, while `canSubmit`/`canCommission` read `league_member` and both come
+back false. Re-ingested; 12 members and 1 commissioner per NBA season now.
+
+**`/state/nba` says `week: 0` all offseason**, and both modes are gated to the
+current week, so week 0 had to become submittable or the feature shipped dead
+until 2026-10-20. It is, and every surface says **"preseason"** rather than
+"week 0" -- including two strings that survived the first pass because they only
+exist in states you have to be in to see (the compute button, and the ballot
+modal title, which needs the modal open).
+
+**One write-once footgun was closed on the way**: the pre-draft NBA league has
+`players: []` on all twelve rosters, so one press of Compute would have frozen a
+twelve-way tie at zero into the week-0 baseline forever. It now refuses with a
+reason -- verified by accidentally clicking that exact button in the real UI and
+confirming nothing was written. The guard counts ROSTERED players, not
+board-eligible ones: "the board does not cover these players" is a different
+state from "nobody has drafted", and a test caught the conflation.
+
+384 backend tests / 0 failures / 0 skipped, 215 frontend, then the whole path
+driven in a browser against the real Ball Knowers NBA league.
+
 **NBA mock drafts ship 2026-09-14 — the app has no "Soon" left in it.**
 `claude/nba-mock-drafts.md` is the brief. The mock room was multi-sport's last
 Non-goal; almost everything it needed already existed (the sport column since V6,

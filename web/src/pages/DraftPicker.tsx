@@ -437,22 +437,17 @@ export default function DraftPicker() {
                       <Link className="league-link primary" to={draftRoute(d)}>
                         {live ? 'Draft room' : complete ? 'Draft board' : 'Mock draft'}
                       </Link>
-                      {/* Football only, and hidden rather than disabled -- a
-                          greyed-out link invites a click and then explains
-                          itself; an absent one just isn't a promise. See the
-                          equivalent comment this replaced for the full reason
-                          (power rankings' wire format is football-shaped down
-                          to the NFL week/season fields it returns). */}
-                      {d.sport === 'nfl' && (
-                        <>
-                          <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
-                            History
-                          </Link>
-                          <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
-                            Power rankings
-                          </Link>
-                        </>
-                      )}
+                      {/* Both sports since claude/nba-power-rankings.md. These
+                          used to be football-only because power rankings'
+                          wire format was football-shaped down to the NFL
+                          week/season fields it returned; it no longer is, and
+                          /history never was. */}
+                      <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
+                        History
+                      </Link>
+                      <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
+                        Power rankings
+                      </Link>
                     </div>
 
                     <footer className="league-card-foot">

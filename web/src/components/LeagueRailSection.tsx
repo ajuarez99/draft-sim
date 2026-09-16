@@ -53,11 +53,6 @@ export default function LeagueRailSection({ league, pathname, collapsed, onMockI
   const boardHref = draftRoute(season)
   const historyHref = `/leagues/${d.sleeperLeagueId}/history`
   const powerHref = `/leagues/${d.sleeperLeagueId}/power`
-  // Football only, and absent rather than greyed -- power rankings' wire
-  // format is football-shaped down to the NFL week/season fields it returns.
-  // Same call the home card makes: a greyed-out link invites a click and then
-  // explains itself; an absent one just isn't a promise.
-  const nfl = d.sport === 'nfl'
 
   return (
     <div className="app-rail-section app-rail-league">
@@ -128,44 +123,40 @@ export default function LeagueRailSection({ league, pathname, collapsed, onMockI
         </Link>
       )}
 
-      {nfl && (
-        <>
-          <Link
-            to={historyHref}
-            className={`app-rail-row${pathname === historyHref ? ' on' : ''}`}
-            title="History"
-            aria-label="History"
-          >
-            <span className="app-rail-glyph" aria-hidden="true">
-              ◷
-            </span>
-            <span className="app-rail-row-label">History</span>
-          </Link>
-          <Link
-            to={powerHref}
-            className={`app-rail-row${pathname === powerHref ? ' on' : ''}`}
-            title="Power rankings"
-            aria-label="Power rankings"
-          >
-            <span className="app-rail-glyph" aria-hidden="true">
-              ▲
-            </span>
-            <span className="app-rail-row-label">Power rankings</span>
-          </Link>
-          <button
-            type="button"
-            className="app-rail-row"
-            onClick={() => onMockIt(d.sleeperLeagueId, d.sport)}
-            title="Mock it"
-            aria-label="Mock it"
-          >
-            <span className="app-rail-glyph" aria-hidden="true">
-              ▶
-            </span>
-            <span className="app-rail-row-label">Mock it</span>
-          </button>
-        </>
-      )}
+        <Link
+          to={historyHref}
+          className={`app-rail-row${pathname === historyHref ? ' on' : ''}`}
+          title="History"
+          aria-label="History"
+        >
+          <span className="app-rail-glyph" aria-hidden="true">
+            ◷
+          </span>
+          <span className="app-rail-row-label">History</span>
+        </Link>
+        <Link
+          to={powerHref}
+          className={`app-rail-row${pathname === powerHref ? ' on' : ''}`}
+          title="Power rankings"
+          aria-label="Power rankings"
+        >
+          <span className="app-rail-glyph" aria-hidden="true">
+            ▲
+          </span>
+          <span className="app-rail-row-label">Power rankings</span>
+        </Link>
+        <button
+          type="button"
+          className="app-rail-row"
+          onClick={() => onMockIt(d.sleeperLeagueId, d.sport)}
+          title="Mock it"
+          aria-label="Mock it"
+        >
+          <span className="app-rail-glyph" aria-hidden="true">
+            ▶
+          </span>
+          <span className="app-rail-row-label">Mock it</span>
+        </button>
     </div>
   )
 }

@@ -169,9 +169,10 @@ class PowerRankingServiceTest {
         assertEquals(1, builtState.count(Position.RB));
         assertEquals(0, builtState.count(Position.WR), "the OUT WR was excluded, not silently scored");
 
-        assertEquals(1, result.length);
-        assertEquals(900L, result[0].managerId());
-        assertTrue(result[0].note().contains("OUT/Doubtful"), "the exclusion must be stated, not silent");
+        assertEquals(1, result.entries().length);
+        assertNull(result.skipped(), "a roster with a player on it is not an undrafted league");
+        assertEquals(900L, result.entries()[0].managerId());
+        assertTrue(result.entries()[0].note().contains("OUT/Doubtful"), "the exclusion must be stated, not silent");
     }
 
     @Test
@@ -192,7 +193,50 @@ class PowerRankingServiceTest {
 
         var result = service.computeWeek0IfMissing(1L, "SL", 2025);
 
-        assertEquals(1, result.length);
-        assertTrue(result[0].note().contains("not on the board"));
+        // "This app's board does not cover these players" is NOT the same
+        // state as "nobody has drafted", and only the latter refuses -- so a
+        // roster of entirely off-board players still scores, and still says so.
+        assertEquals(1, result.entries().length);
+        assertNull(result.skipped());
+        assertTrue(result.entries()[0].note().contains("not on the board"));
+    }
+
+    /**
+     * claude/nba-power-rankings.md. The week-0 baseline is write-once, so an
+     * answer taken before anyone has drafted is not merely wrong, it is
+     * permanently wrong -- {@code computeWeek0IfMissing} would refuse to ever
+     * overwrite it. Measured live 2026-09-15 against the pre_draft NBA league:
+     * all twelve rosters come back {@code players: []}, every lineup value is
+     * 0.0, and the ranker cheerfully returns a full twelve-way tie at rank 1.
+     *
+     * <p>Not a basketball test despite its origin -- the league here is NFL,
+     * because a football league reached before its draft has exactly this
+     * shape and must refuse identically.
+     */
+    @Test
+    void anUndraftedLeagueWritesNoBaselineRatherThanFreezingATieAtZero() {
+        LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null);
+        when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
+        when(boards.currentBoard(Sport.NFL)).thenReturn(List.of());
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+
+        List<Map<String, Object>> rosters = new ArrayList<>();
+        for (int rosterId = 1; rosterId <= 12; rosterId++) {
+            Map<String, Object> roster = new HashMap<>();
+            roster.put("roster_id", rosterId);
+            roster.put("owner_id", "u" + rosterId);
+            roster.put("players", List.of());
+            rosters.add(roster);
+        }
+        when(sleeper.rosters("SL")).thenReturn(rosters);
+
+        var result = service.computeWeek0IfMissing(1L, "SL", 2025);
+
+        assertEquals(0, result.entries().length);
+        assertNotNull(result.skipped(), "a refusal with no reason reads as a broken feature");
+        assertTrue(result.skipped().contains("not drafted"));
+        verify(rankings, never()).save(anyLong(), anyInt(), anyInt(), any(), any());
     }
 }

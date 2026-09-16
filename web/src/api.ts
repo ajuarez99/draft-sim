@@ -775,7 +775,14 @@ export type PowerRankingEntry = {
   makesPlayoffsPct?: number | null
 }
 
-export type NflState = {
+/** `GET /state/{sport}` for THIS league's sport, not always football.
+ *
+ *  `week` is legitimately 0: measured 2026-09-15, `/state/nba` answers
+ *  `week: 0` for the whole offseason while `/state/nfl` answers 2. Compare it
+ *  with `===` or a null check and never for truthiness -- football is never at
+ *  week 0 during a season, so a `!week` written here fails for basketball
+ *  alone, and silently. */
+export type SportState = {
   week: number
   season: string
   seasonStartDate: string
@@ -792,7 +799,7 @@ export type PlayoffOddsSummary = {
 
 export type PowerRankings = {
   sleeperLeagueId: string
-  nflState: NflState
+  sportState: SportState
   entries: PowerRankingEntry[]
   // Null when this league has no odds at all; the page then says nothing about
   // a simulation rather than describing one that never ran.
@@ -896,9 +903,11 @@ export type BallotMember = {
 /**
  * Mirrors LeagueHistoryController.ballot(). `canSubmit` folds together every
  * reason a ballot might be refused -- signed out, not a member of this league,
- * a non-NFL league (mode 2 is NFL-only by construction while nflState is), and
- * a week that is not the current one -- so the client never has to re-derive
- * the rule and disagree with the server about it.
+ * and a week that is not the current one -- so the client never has to
+ * re-derive the rule and disagree with the server about it. Sport is no longer
+ * one of those reasons (claude/nba-power-rankings.md); a league whose members
+ * have never been ingested is, via `isMember`, which is what an NBA league
+ * looks like before its first post-V9 ingest.
  */
 export type BallotState = {
   season: number

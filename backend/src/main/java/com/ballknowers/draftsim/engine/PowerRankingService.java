@@ -60,11 +60,24 @@ public class PowerRankingService {
         this.rulesRegistry = rulesRegistry;
     }
 
-    public record NflState(int week, String season, String seasonStartDate, boolean started) {}
+    public record SportState(int week, String season, String seasonStartDate, boolean started) {}
 
-    /** claude/plan-review-league-suite.md finding 3: the only way to know what week it is. */
-    public NflState nflState() {
-        Map<String, Object> s = sleeper.state("nfl");
+    /**
+     * claude/plan-review-league-suite.md finding 3: the only way to know what
+     * week it is. Per-sport since claude/nba-power-rankings.md -- this used to
+     * hardcode {@code "nfl"}, and three {@code Sport.NFL} gates elsewhere
+     * existed purely because it did.
+     *
+     * <p><b>{@code week} is legitimately 0, and 0 is falsy in the language on
+     * the other end of the wire.</b> Measured 2026-09-15: {@code /state/nba}
+     * answers {@code week: 0, season_type: "off"} for the whole offseason,
+     * where {@code /state/nfl} answers 2. Every caller comparing against this
+     * must use {@code ==} or a null check, never truthiness -- football is
+     * never at week 0 during a season, so a {@code if (!week)} written here
+     * fails only for basketball and only silently.
+     */
+    public SportState sportState(Sport sport) {
+        Map<String, Object> s = sleeper.state(sport.code());
         int week = ((Number) s.getOrDefault("week", 1)).intValue();
         String season = String.valueOf(s.get("season"));
         String startDate = String.valueOf(s.get("season_start_date"));
@@ -74,7 +87,7 @@ public class PowerRankingService {
         } catch (Exception e) {
             started = false;
         }
-        return new NflState(week, season, startDate, started);
+        return new SportState(week, season, startDate, started);
     }
 
     private record Scored(int rosterId, Long managerId, double score, String note) {}
@@ -85,15 +98,23 @@ public class PowerRankingService {
      * week, week 0 is written once and then frozen. It exists to answer "what
      * did this roster look like before any games were played", and a manager
      * trading players in week 5 must not be able to silently rewrite that
-     * answer just by someone clicking "Compute" again. Returns an empty array
-     * (a no-op) when week 0 is already set.
+     * answer just by someone clicking "Compute" again. Returns no entries and
+     * no reason when week 0 is already set -- that is an ordinary no-op, not a
+     * gap -- and no entries WITH a reason when the league has not drafted yet.
      */
-    public PowerRankingRepository.Entry[] computeWeek0IfMissing(long leagueId, String sleeperLeagueId, int season) {
+    public Week0Result computeWeek0IfMissing(long leagueId, String sleeperLeagueId, int season) {
         if (rankings.exists(leagueId, season, 0, "COMPUTED_REALIZED")) {
-            return new PowerRankingRepository.Entry[0];
+            return new Week0Result(new PowerRankingRepository.Entry[0], null);
         }
         return computePreseasonBaseline(leagueId, sleeperLeagueId, season);
     }
+
+    /**
+     * @param skipped why nothing was written, or null when something was --
+     *                including the ordinary "already set" no-op, which is not
+     *                a gap and says nothing.
+     */
+    public record Week0Result(PowerRankingRepository.Entry[] entries, String skipped) {}
 
     /**
      * Sum of {@link SportRules#startingLineupValue} over each roster's ENTIRE
@@ -104,12 +125,13 @@ public class PowerRankingService {
      * A rostered player who is OUT/Doubtful, or who isn't on this app's board
      * at all, is excluded before scoring -- Phase A acceptance criterion 4.
      *
-     * Always saves at week 0 under kind COMPUTED_REALIZED -- callers wanting
-     * the "write once" behaviour should go through
-     * {@link #computeWeek0IfMissing} instead of calling this directly.
+     * Saves at week 0 under kind COMPUTED_REALIZED unless the league has no
+     * rostered players at all (see the refusal below) -- callers wanting the
+     * "write once" behaviour should go through {@link #computeWeek0IfMissing}
+     * instead of calling this directly.
      */
-    private PowerRankingRepository.Entry[] computePreseasonBaseline(long leagueId, String sleeperLeagueId,
-                                                                     int season) {
+    private Week0Result computePreseasonBaseline(long leagueId, String sleeperLeagueId,
+                                                  int season) {
         LeagueRepository.LeagueRow leagueRow = leagues.byId(leagueId)
                 .orElseThrow(() -> new IllegalStateException("no league row for id " + leagueId));
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, leagueRow.rosterPositions().size());
@@ -121,6 +143,7 @@ public class PowerRankingService {
         Map<String, Long> managerBySleeperUserId = managers.idsBySleeperUserId();
 
         List<Scored> scored = new ArrayList<>();
+        int rosteredAcrossLeague = 0;
         for (Map<String, Object> roster : sleeper.rosters(sleeperLeagueId)) {
             int rosterId = asInt(roster.get("roster_id"), -1);
             if (rosterId < 0) continue;
@@ -129,6 +152,7 @@ public class PowerRankingService {
 
             @SuppressWarnings("unchecked")
             List<String> rosterPlayers = (List<String>) roster.getOrDefault("players", List.of());
+            rosteredAcrossLeague += rosterPlayers.size();
 
             RosterState state = new RosterState();
             int excludedInjured = 0, excludedOffBoard = 0;
@@ -149,11 +173,37 @@ public class PowerRankingService {
             scored.add(new Scored(rosterId, managerId, value, note));
         }
 
+        // An undrafted league is NOT a league of equally bad teams, and this
+        // snapshot is write-once -- so getting it wrong here is permanent.
+        //
+        // The count is of ROSTERED players, deliberately, not of players who
+        // survived the board/injury filters above. "Nobody has drafted" and
+        // "this app's board does not cover these players" are different
+        // states with different fixes, and only the first one is this
+        // refusal's business -- the second keeps its existing behaviour of
+        // scoring what it can and saying in the note what it dropped.
+        // Measured live 2026-09-15 on the pre_draft NBA league: every roster
+        // comes back `players: []`, every startingLineupValue is 0.0, and
+        // rankDescending happily returns a full twelve-way tie at rank 1 that
+        // computeWeek0IfMissing would then refuse to ever overwrite. Same
+        // discipline PlayoffOddsService applies to a league with no scored
+        // games: the honest answer before there are rosters is no answer.
+        //
+        // Deliberately not basketball-specific. A football league reached
+        // before its draft has exactly this shape; basketball is merely the
+        // first to get here, because its season starts five weeks later.
+        if (rosteredAcrossLeague == 0) {
+            log.info("preseason baseline: league {} has no rostered players at all, nothing written", leagueId);
+            return new Week0Result(new PowerRankingRepository.Entry[0],
+                    "every roster is empty -- this league has not drafted yet, so there is no preseason baseline"
+                            + " to take. Compute again once the draft is done.");
+        }
+
         var ranked = rankDescending(scored);
         // Same reasoning as computeRealized: nothing to rank is not a snapshot.
         // Reachable here when Sleeper returns no rosters for the league.
         if (!ranked.isEmpty()) rankings.save(leagueId, season, 0, "COMPUTED_REALIZED", ranked);
-        return ranked.toArray(new PowerRankingRepository.Entry[0]);
+        return new Week0Result(ranked.toArray(new PowerRankingRepository.Entry[0]), null);
     }
 
     private static String note(int excludedInjured, int excludedOffBoard) {

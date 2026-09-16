@@ -240,10 +240,19 @@ function BumpChart({ series, weeks, teamCount, highlighted, onHighlight }: BumpC
 
 export const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
 
-// Week 0 is an app-invented concept -- Sleeper's own week numbering starts at
-// 1 -- so it never reads as a number in the UI, only as "Preseason".
+// Week 0 never reads as a number in the UI, only as "Preseason".
+//
+// It used to be purely an app-invented slot for the preseason baseline, on the
+// stated grounds that "Sleeper's own week numbering starts at 1". That is not
+// true of every sport: measured 2026-09-15, `/state/nba` reports `week: 0` for
+// the entire offseason, so for a basketball league week 0 is ALSO the current
+// week -- the one its members vote in and its commissioner ranks in. Both
+// meanings render the same way, which is the point.
 const weekPhrase = (week: number) => (week === 0 ? 'Preseason' : `week ${week}`)
 const weekShort = (week: number) => (week === 0 ? 'preseason' : `wk ${week}`)
+/** Mid-sentence form, mirroring the backend's own weekLabel(), so a save
+ *  confirmation here and a refusal from the server read the same way. */
+const weekIn = (week: number) => (week === 0 ? 'the preseason' : `week ${week}`)
 const weekRangeLabel = (ws: number[]) => {
   const first = ws[0]
   const last = ws[ws.length - 1]
@@ -488,7 +497,7 @@ export default function PowerRankings() {
   useEffect(refetch, [sleeperLeagueId, user?.sleeperUserId])
 
   const season = useMemo(() => {
-    if (!data || data.entries.length === 0) return Number(data?.nflState.season ?? new Date().getFullYear())
+    if (!data || data.entries.length === 0) return Number(data?.sportState.season ?? new Date().getFullYear())
     return Math.max(...data.entries.map((e) => e.season))
   }, [data])
 
@@ -509,7 +518,10 @@ export default function PowerRankings() {
       })
   }, [sleeperLeagueId, season])
 
-  const currentWeek = data?.nflState.week ?? 1
+  // `?? 1` only covers "no data yet". Once data is here, week 0 is a real
+  // value and must survive -- `data.sportState.week || 1` would quietly send
+  // every basketball ballot to week 1 all offseason.
+  const currentWeek = data?.sportState.week ?? 1
 
   async function compute() {
     if (!sleeperLeagueId) return
@@ -531,7 +543,7 @@ export default function PowerRankings() {
     setSaveMessage(null)
     try {
       await saveCommissionerRanking(sleeperLeagueId, season, currentWeek, orderedRosterIds)
-      setSaveMessage(`Saved week ${currentWeek}`)
+      setSaveMessage(`Saved ${weekIn(currentWeek)}`)
       refetch()
     } catch (e) {
       setSaveMessage(e instanceof Error ? e.message : String(e))
@@ -546,7 +558,7 @@ export default function PowerRankings() {
     setSaveMessage(null)
     try {
       await submitBallot(sleeperLeagueId, currentWeek, orderedRosterIds)
-      setSaveMessage(`Ballot submitted for week ${currentWeek}`)
+      setSaveMessage(`Ballot submitted for ${weekIn(currentWeek)}`)
       refetch()
       setBallotModalOpen(false)
     } catch (e) {
@@ -903,7 +915,7 @@ export default function PowerRankings() {
                   disabled={computing}
                   title="Recompute box-score rankings for the current week (and the preseason baseline, the first time) and save them"
                 >
-                  {computing ? 'Computing…' : `Recompute week ${currentWeek} (commissioner)`}
+                  {computing ? 'Computing…' : `Recompute ${weekIn(currentWeek)} (commissioner)`}
                 </button>
               )}
             </div>
@@ -913,7 +925,7 @@ export default function PowerRankings() {
                 No {KIND_LABEL[ladderMode].toLowerCase()} snapshots yet for this league.{' '}
                 {ladderMode === 'COMPUTED_REALIZED'
                   ? ballot?.canCommission
-                    ? `Use "Recompute week ${currentWeek}" above to build the first one.`
+                    ? `Use "Recompute ${weekIn(currentWeek)}" above to build the first one.`
                     : 'Ask the commissioner to run the first box-score snapshot.'
                   : ladderMode === 'MEMBER'
                     ? 'Ballots build this one -- submit yours above, and the room fills in as others do.'
@@ -1404,7 +1416,9 @@ export default function PowerRankings() {
             </button>
             <div className="pr-ballot-modal-head">
               <span className="cond pr-ballot-modal-title">
-                {editingCommissioner ? `Week ${currentWeek}'s commissioner ranking` : `Your week ${currentWeek} ballot`}
+                {editingCommissioner
+                  ? `${weekTitle(currentWeek)} commissioner ranking`
+                  : `Your ${weekPhrase(currentWeek).toLowerCase()} ballot`}
               </span>
               {!editingCommissioner && ballot && (
                 <span className="small muted">

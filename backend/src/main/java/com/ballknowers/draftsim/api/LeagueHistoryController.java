@@ -208,16 +208,20 @@ public class LeagueHistoryController {
     }
 
     /**
-     * nflState + every stored power-ranking snapshot for the league, one
+     * sportState + every stored power-ranking snapshot for the league, one
      * payload for the client-side toggle -- plus, since
      * claude/power-rankings-ballots.md, one synthetic "MEMBER" snapshot per
      * week that actually has at least one submitted ballot. MEMBER entries
      * are computed on read every call, never written to {@code power_ranking}
      * (V9's migration comment explains why: a ballot's inputs are already
      * frozen the moment the week ends, so a stored average would be a second
-     * copy of the truth that can disagree with the first). "Not building" /
-     * NFL-only, by construction (nflState() itself hardcodes {@code "nfl"}):
-     * a basketball league simply never gets MEMBER entries here.
+     * copy of the truth that can disagree with the first).
+     *
+     * <p>Every sport, since claude/nba-power-rankings.md. This used to skip
+     * MEMBER entries for anything but football, purely because
+     * {@code nflState()} hardcoded {@code "nfl"}; with the state per-sport
+     * that reason is gone, and leaving the skip in would have collected
+     * basketball's ballots and then never rendered them.
      */
     @GetMapping("/leagues/{sleeperId}/power")
     public ResponseEntity<?> powerRankings(@PathVariable String sleeperId,
@@ -226,19 +230,17 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        PowerRankingService.NflState state = power.nflState();
+        PowerRankingService.SportState state = power.sportState(row.sport());
         var snapshots = power.snapshots(row.id());
 
         List<Map<String, Object>> entries = new ArrayList<>(
                 snapshots.stream().map(LeagueHistoryController::snapshotRow).toList());
 
-        if (row.sport() == Sport.NFL) {
-            Map<Long, String> managerNames = managers.names();
-            Map<Long, String> managerAvatars = managers.avatarIds();
-            for (int week : memberRankings.weeksWithBallots(row.id())) {
-                memberRankings.forWeek(row.id(), sleeperId, week).ifPresent(wr ->
-                        wr.entries().forEach(e -> entries.add(memberRow(row.season(), week, e, managerNames, managerAvatars))));
-            }
+        Map<Long, String> managerNames = managers.names();
+        Map<Long, String> managerAvatars = managers.avatarIds();
+        for (int week : memberRankings.weeksWithBallots(row.id())) {
+            memberRankings.forWeek(row.id(), sleeperId, week).ifPresent(wr ->
+                    wr.entries().forEach(e -> entries.add(memberRow(row.season(), week, e, managerNames, managerAvatars))));
         }
 
         // Playoff odds ride on the entries rather than a parallel structure:
@@ -248,15 +250,15 @@ public class LeagueHistoryController {
         // week are the odds AS OF that week, never last week's borrowed.
         attachPlayoffOdds(entries, playoffOdds.madePctByWeek(row.id(), row.season()));
 
-        Map<String, Object> nflState = new LinkedHashMap<>();
-        nflState.put("week", state.week());
-        nflState.put("season", state.season());
-        nflState.put("seasonStartDate", state.seasonStartDate());
-        nflState.put("started", state.started());
+        Map<String, Object> sportState = new LinkedHashMap<>();
+        sportState.put("week", state.week());
+        sportState.put("season", state.season());
+        sportState.put("seasonStartDate", state.seasonStartDate());
+        sportState.put("started", state.started());
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("sleeperLeagueId", sleeperId);
-        response.put("nflState", nflState);
+        response.put("sportState", sportState);
         response.put("entries", entries);
         // Null when this league has no odds at all -- the page then says nothing
         // about a simulation instead of describing one that never ran.
@@ -357,9 +359,10 @@ public class LeagueHistoryController {
      * caller can submit or commission, the roster/member list (works before
      * any history ingest -- {@link MemberRankingService#members}), and this
      * caller's own already-submitted ballot for the requested week, if any.
-     * {@code week} defaults to the current NFL week -- ballots only ever
-     * exist for "now", never a past or future one (no carry-forward, no
-     * backdating).
+     * {@code week} defaults to the current week for this league's own sport
+     * -- ballots only ever exist for "now", never a past or future one (no
+     * carry-forward, no backdating). "Now" is legitimately week 0 for a sport
+     * in its offseason; see {@link #weekLabel}.
      */
     @GetMapping("/leagues/{sleeperId}/ballot")
     public ResponseEntity<?> ballot(@PathVariable String sleeperId,
@@ -369,13 +372,17 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        PowerRankingService.NflState state = power.nflState();
+        PowerRankingService.SportState state = power.sportState(row.sport());
+        // Null check, never truthiness: week 0 is a real, submittable week for
+        // a sport in its offseason, and `week != null` is the only test that
+        // tells "the caller asked for week 0" from "the caller asked for
+        // nothing".
         int effectiveWeek = week != null ? week : state.week();
 
         boolean anonymous = sleeperUserId == null || sleeperUserId.isBlank();
         Long callerManagerId = anonymous ? null : managers.idsBySleeperUserId().get(sleeperUserId);
         boolean isMember = callerManagerId != null && leagueMembers.isMember(row.id(), callerManagerId);
-        boolean canSubmit = !anonymous && isMember && row.sport() == Sport.NFL && effectiveWeek == state.week();
+        boolean canSubmit = !anonymous && isMember && effectiveWeek == state.week();
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("season", row.season());
@@ -456,14 +463,6 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        // Mode 2 is NFL-only by construction (PowerRankingService.nflState()
-        // hardcodes sleeper.state("nfl")) -- without this check, a basketball
-        // league reached by typing the URL would stamp a ballot with an NFL
-        // week number. claude/power-rankings-ballots.md "Not building".
-        if (row.sport() != Sport.NFL) {
-            return ResponseEntity.badRequest().body(Map.of("message", "league member ballots are NFL-only for now"));
-        }
-
         Long managerId = managers.idsBySleeperUserId().get(sleeperUserId);
         if (managerId == null || !leagueMembers.isMember(row.id(), managerId)) {
             return ResponseEntity.status(403).body(Map.of("message", "you are not a member of this league"));
@@ -479,10 +478,10 @@ public class LeagueHistoryController {
         // Current week only -- backdating a ballot after seeing how the
         // games went is exactly the dishonesty this project designs out
         // everywhere else (same argument the commissioner gate below makes).
-        PowerRankingService.NflState state = power.nflState();
+        PowerRankingService.SportState state = power.sportState(row.sport());
         if (body.week() != state.week()) {
             return ResponseEntity.badRequest().body(Map.of("message",
-                    "ballots can only be submitted for the current week (" + state.week() + ")"));
+                    "ballots can only be submitted for " + weekLabel(state.week()) + " -- no backdating"));
         }
 
         // Server-side coverage check: rosterIds must be EXACTLY this
@@ -525,17 +524,23 @@ public class LeagueHistoryController {
         // LinkedHashMap, not Map.of: the reason below is legitimately absent on
         // the happy path, and Map.of throws on a null value.
         Map<String, Object> response = new LinkedHashMap<>();
-        response.put("week0", week0.length);
+        response.put("week0", week0.entries().length);
         response.put("realized", realized.length);
         response.put("playoffOdds", odds.size());
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess
-        // whether the snapshot failed to persist. Week 0 has no equivalent gap
-        // message: a zero there just means it was already set (write-once), not
-        // that anything is missing.
+        // whether the snapshot failed to persist. A zero at week 0 usually
+        // means it was already set (write-once), which is not a gap -- but it
+        // can also mean the league has not drafted, and that one IS reported.
         if (realized.length == 0) {
             response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
+        }
+        // Week 0 has one gap worth reporting and only one: a league that has
+        // not drafted yet. "Already set" is the ordinary case and carries no
+        // reason, so this key is absent then rather than present and empty.
+        if (week0.skipped() != null) {
+            response.put("week0Skipped", week0.skipped());
         }
         return ResponseEntity.ok(response);
     }
@@ -585,14 +590,29 @@ public class LeagueHistoryController {
             return ResponseEntity.status(403).body(response);
         }
 
-        PowerRankingService.NflState state = power.nflState();
+        PowerRankingService.SportState state = power.sportState(row.sport());
         if (!body.week().equals(state.week())) {
             return ResponseEntity.badRequest().body(Map.of("message",
-                    "the commissioner ranking can only be saved for the current week (" + state.week() + ")"));
+                    "the commissioner ranking can only be saved for " + weekLabel(state.week()) + " -- no backdating"));
         }
 
         var entries = power.saveCommissionerRanking(row.id(), sleeperId, body.season(), body.week(), body.rosterIds());
         return ResponseEntity.ok(Map.of("saved", entries.length));
+    }
+
+    /**
+     * {@code "week 7"}, or {@code "the preseason"} for week 0.
+     *
+     * <p>{@code /state/{sport}} reports {@code week: 0} for a sport between
+     * seasons -- measured 2026-09-15, {@code /state/nba} answered
+     * {@code week: 0} while {@code /state/nfl} answered 2 -- and that week is
+     * a perfectly good one to hold an opinion in: a commissioner ordering and
+     * a member ballot are stated opinions, so neither needs a played game to
+     * be honest. What it is NOT is a thing anyone calls "week 0", so no
+     * message this controller returns should.
+     */
+    private static String weekLabel(int week) {
+        return week == 0 ? "the preseason" : "week " + week;
     }
 
     private static double round2(double d) {
