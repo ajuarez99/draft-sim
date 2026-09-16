@@ -6,7 +6,7 @@ a Sleeper league, rather than generic ADP bots.
 ## Start here
 
 `HANDOFF.md` — current state, what is and isn't verified, and what to do next.
-`DEPLOY.md` — deployment runbook (nothing is deployed yet).
+`DEPLOY.md` — deployment runbook for the live Railway deploy at ballknowers.co.
 `ideas/` — speculative directions, explicitly not planned work.
 
 ## Status
@@ -63,9 +63,14 @@ is open. Set it to any long random string and `/api/**` starts requiring
 `Authorization: Bearer <token>`, with `/api/health` left open for platform health
 checks. The app logs which mode it started in — check it before exposing anything.
 
-`DEPLOY.md` has the full deployment sequence. Nothing has been deployed yet, and the
-frontend still assumes a same-origin API with no auth header, so it needs two small
-changes before a remote backend will work.
+`DEPLOY.md` describes the deploy that is actually running: two Railway services
+(backend at `api.ballknowers.co`, frontend at `www.ballknowers.co`) that auto-deploy
+from `main` independently of each other. `API_TOKEN` is blank there, so production
+is running with authentication off — read that file's "The security posture, stated
+plainly" before sharing the URL more widely.
+
+Note that **a deploy ships code, not data**: production has its own Postgres, and a
+league's history and projections have to be ingested against the live API separately.
 
 ## Layout
 

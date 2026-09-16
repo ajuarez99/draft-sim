@@ -1,209 +1,206 @@
 # Deploying Ball Knowers
 
-Written 2026-08-29, before any deploy has happened. Nothing here has been executed;
-it is the intended order, with the things most likely to go wrong called out.
+**This describes what is actually running.** Ball Knowers has been live since
+2026-09-11 on Railway at `ballknowers.co`; this file was rewritten 2026-09-16
+against the deployed thing, replacing a plan written before any deploy happened
+that still described a fly.io/Vercel/Neon split that was never built.
 
-Local development is unaffected by everything in this document. Every deployment
-value has a working local default, so `./gradlew bootRun` still needs no environment.
+Local development is unaffected by everything here. Every deployment value has a
+working local default, so `./gradlew bootRun` still needs no environment.
 
-## Not done yet — read this first
+## What is running
 
-**Built 2026-09-07**: `web/src/api.ts` now routes every call through an `apiFetch`
-helper that prepends `VITE_API_BASE` (blank = same-origin, unchanged from before)
-and sends `Authorization: Bearer ${VITE_API_TOKEN}` when that's set. See
-`web/.env.example`.
+Railway project **joyful-unity**, environment **production**:
 
-**One gap remains, and it's structural, not an oversight:** `useLiveDraft.ts`
-subscribes to `/api/drafts/{id}/live-stream` with the browser's native
-`EventSource`, which has no way to attach a request header at all. `apiUrl()`
-still routes its URL through `VITE_API_BASE`, but there is no way to also send
-the bearer token on that one connection. **Live mode will 401 against any
-split-origin deploy that has `API_TOKEN` set** — same-origin deploys and
-auth-off deploys are both unaffected. Fixing it needs a backend-side answer
-(most likely: accept the token as a query-string parameter on that one route,
-same tradeoff as shipping it to the frontend at all — see the token note
-below) before it can be called done. Left alone for now because it's a
-one-route problem, not a reason to block deploying everything else.
+| Service | What | Root dir | Build | Domain |
+|---|---|---|---|---|
+| `draft-sim` | Spring Boot backend, JVM 21 | `/` | root `Dockerfile` | `api.ballknowers.co` |
+| `perpetual-vitality` | Vite/React frontend | `web` | `web/Dockerfile` | `www.ballknowers.co` |
+| `Postgres` | Railway Postgres plugin | — | — | internal |
 
-## Shape of it
+The backend's root directory is the repo root, not `backend/` — the Dockerfile
+needs both `backend/` and `config/` in its build context. `railway.toml` at the
+repo root carries the backend's build and healthcheck config
+(`healthcheckPath = /api/health`).
 
-    Vercel            web/            static build of the Vite app
-    Fly / Railway     Dockerfile      Spring Boot, JVM 21
-    Neon / Supabase   Postgres 17     managed, with SSL
+Postgres is wired to the backend with Railway reference variables
+(`${{Postgres.PGHOST}}` and friends) rather than a pasted connection string, so
+rotating the database does not mean editing the backend's variables.
 
-Three services, three sets of credentials. The backend is the only one that holds
-secrets.
+**The bare apex forwards, it does not resolve.** `ballknowers.co` ->
+`https://www.ballknowers.co` via Squarespace *domain forwarding*, because
+Squarespace's DNS editor refuses a CNAME at `@`. It is not a second Railway
+custom domain.
 
-## 1. Database
+The Railway plan is **Hobby**, upgraded from the trial specifically to lift a
+one-custom-domain limit that blocked adding `api.ballknowers.co` alongside
+`www.ballknowers.co`. Compute usage is capped low (~$10); this is a near-zero
+traffic hobby project.
 
-Neon or Supabase both work. Create a database named `draftsim` and take the
-connection string.
+## Deploying
 
-Convert it to a JDBC URL — managed Postgres almost always requires SSL, and Flyway
-will fail on the first migration without it:
+**Push to `main`. Both services auto-deploy from GitHub.** Verified 2026-09-16:
+three pushes were picked up without intervention, and `api.ballknowers.co` was
+serving the new response shape within minutes.
 
-    DB_URL=jdbc:postgresql://<host>/draftsim?sslmode=require
+There is nothing to run locally. The Railway CLI is not linked to this checkout
+(`railway status` answers "No linked project"), so anything the dashboard would
+do needs the dashboard, or `railway link` first.
 
-Do **not** run `docker compose up` against a remote database. The compose file is for
-local Postgres only.
+### Two traps that have each cost real time
 
-## 2. Backend
+**"Redeploy" re-runs the SAME commit.** It is not "deploy latest". Clicking it
+on a stale deployment reproduces the stale deployment, forever. Worse, the
+replay then shows as "2 minutes ago via GitHub" carrying the OLD commit message,
+so the deployment list looks current when it is not. **Check the commit message
+against `git log`, never the timestamp.** To pull in new commits use
+Settings -> Source -> **Check for updates**.
 
-The repo root `Dockerfile` is self-contained — it builds from source and bakes in
-`config/weights.yml`. Build context must be the repo root, not `backend/`.
+**Auto-deploy can be switched off per service, silently.** On 2026-09-15 the
+`draft-sim` service had it off and drifted 28 commits behind the frontend. The
+symptom was not an error — it was the frontend calling an API contract the
+backend had never heard of, which white-screened the site. Re-enabled under
+Settings -> Source -> "Auto deploys when pushed to GitHub".
 
-Rehearse it locally before touching a platform:
+### After any change to an API response shape
 
-    docker compose --profile full up --build
-    curl localhost:8080/api/health
+**Confirm BOTH services redeployed.** They deploy independently, and a
+frontend-only deploy ships a client that talks to an older contract. One curl
+answers it in seconds:
 
-That runs the real production image against local Postgres. If it works there it will
-work on Fly.
+    curl https://api.ballknowers.co/api/health
+    curl https://api.ballknowers.co/api/leagues/1346366555759341568/analysis | head -c 400
 
-Then, for Fly:
+When a page breaks in production, check the deployed API's payload shape
+*before* reading frontend code.
 
-    fly launch --no-deploy        # answer no to the Postgres prompt, you have one
-    fly secrets set DB_URL="..." DB_USER="..." DB_PASSWORD="..." API_TOKEN="$(openssl rand -base64 48)"
-    fly deploy
+### A backend deploy runs migrations
 
-Railway and Render are the same idea: point them at the repo, they find the Dockerfile,
-you set the same variables in their UI.
+Flyway runs pending migrations against the production Postgres on boot —
+forward-only, and additive so far, but know it before clicking anything. V14
+(`mock_draft_session.reversal_round`) and V15 (`player_projection`) both applied
+on boot this way. Watch the deploy logs the first time a migration is in flight.
 
-### Environment variables
+## Code is not data
 
-| Variable | Required | Notes |
-|---|---|---|
-| `DB_URL` | yes | JDBC form, with `?sslmode=require` |
-| `DB_USER` | yes | |
-| `DB_PASSWORD` | yes | |
-| `API_TOKEN` | yes | `openssl rand -base64 48`. Blank means **auth off** — see below |
-| `CORS_ORIGINS` | yes | Exact frontend origin, scheme included, no trailing slash |
-| `PORT` | usually not | Most platforms inject it; the app reads it |
-| `LOG_LEVEL` | no | `INFO` in production; defaults to `DEBUG` |
-| `WEIGHTS_FILE` | no | The image sets it to `/app/config/weights.yml` |
-| `DB_POOL_SIZE` | no | Defaults to 10 |
+**A deploy ships the application. It does not ship a database.** Production
+Postgres is its own database and nothing in a build populates it.
 
-`API_TOKEN` being blank disables authentication entirely and every endpoint —
-`/api/ingest/*` included — becomes open to the internet. The app logs a warning at
-startup when this happens. Check the logs on the first deploy; do not assume.
+This bit on 2026-09-16: the League analysis page went live and refused every
+single block — no ranking score, no projections, no charts, no matchups —
+because production had zero scored weeks and zero projections for the 2026
+season while local had both. The page looked broken and was working exactly as
+designed.
 
-## 3. Verify, one stage at a time
+Filling it is two POSTs, **and the order matters**:
 
-Do these in order. Each one isolates a different failure.
+    curl -X POST "https://api.ballknowers.co/api/ingest/league-history/<sleeperLeagueId>"
+    curl -X POST "https://api.ballknowers.co/api/ingest/projections?sport=nfl&season=2026&fromWeek=<lastScored+1>&toWeek=<playoffWeekStart-1>"
 
-    # 1. process is up and config bound
-    curl https://<backend>/api/health
-    #    -> weightsLoaded must be true. False means WEIGHTS_FILE didn't resolve
-    #       and simulations will NPE later instead of failing now.
+The history ingest is what sets `lastScored`, which decides the right `fromWeek`
+for projections. Ask for that window rather than guessing it: after the history
+ingest, `GET /api/leagues/<id>/analysis` reports it as `window.fromWeek`.
 
-    # 2. auth is actually on
-    curl -i https://<backend>/api/board
-    #    -> expect 401. A 200 here means API_TOKEN is blank.
+Measured against production: 2 seasons / 24 rosters / 216 weeks / 156 fixtures,
+then 13 weeks / 6,044 projection rows in about two seconds. Both are idempotent.
 
-    # 3. auth accepts the real token
-    curl -H "Authorization: Bearer $API_TOKEN" https://<backend>/api/board
-    #    -> expect 409 "no blended board" before ingest has run. That is success:
-    #       it means you got past the filter and reached the controller.
+In PowerShell, `curl` is an alias for `Invoke-WebRequest` and has no `-X`. Use
+`curl.exe -X POST "..."` or `Invoke-RestMethod -Method Post -Uri "..."`.
 
-    # 4. ingest (slow — see timeouts below)
-    curl -X POST -H "Authorization: Bearer $API_TOKEN" \
-      https://<backend>/api/ingest/all/1391509063170293760
+## Environment variables
 
-    # 5. read the board
-    curl -H "Authorization: Bearer $API_TOKEN" "https://<backend>/api/board?limit=40"
+Set on the `draft-sim` (backend) service unless noted.
 
-## 4. Frontend
+| Variable | Notes |
+|---|---|
+| `DB_URL` / `DB_USER` / `DB_PASSWORD` | Railway reference variables off the Postgres plugin |
+| `API_TOKEN` | **Currently blank in production — authentication is OFF.** See below |
+| `CORS_ORIGINS` | Exact frontend origin, scheme included, no trailing slash |
+| `PORT` | Railway injects it; the app reads it |
+| `LOG_LEVEL` | `INFO` in production; defaults to `DEBUG` |
+| `WEIGHTS_FILE` | The image sets it to `/app/config/weights.yml` |
+| `DB_POOL_SIZE` | Defaults to 10 |
+| `APP_OWNER_SLEEPER_USER_ID` | Fallback identity only; `X-Sleeper-User` wins when present |
+| `VITE_API_BASE` | **Frontend service.** Baked in at Docker *build* time |
 
-Vercel's **root directory must be set to `web`** — the repo root is not a Vite project
-and auto-detection will either fail or build the wrong thing. Then set `VITE_API_BASE`
-and `VITE_API_TOKEN` in Vercel's environment settings (see `web/.env.example`), and add
-the resulting origin to the backend's `CORS_ORIGINS`. Live mode needs the gap noted
-above resolved first if `API_TOKEN` is set.
+**`VITE_API_BASE` is inlined by Vite at build time**, so changing it requires a
+rebuild, not a restart with a new env value.
 
-Note that any token shipped to a browser is readable by anyone who opens devtools.
-That is acceptable for a private tool you alone use and is not acceptable if you ever
-share the URL. If it needs to be shareable, the token has to move server-side — at
-which point you want real auth rather than a bigger shared secret.
+**A stray `JAVA_OPTS` holding garbage** once caused `Could not find or load main
+class <garbage>`. If the backend will not boot, read the Variables tab for
+anything unexpected before assuming the Dockerfile is broken.
 
-## Multiple people
+## The security posture, stated plainly
 
-claude/user-identity-and-onboarding.md: anyone can type a Sleeper username at
-`/` and see their own leagues, with their own seat highlighted. Four things
-worth knowing before that goes out to more than Allan:
+`API_TOKEN` is blank, so **every route is open to the internet**, including
+`/api/ingest/*` — anyone can make the server crawl an arbitrary Sleeper league
+into the shared database. The app logs which mode it started in; check the logs
+rather than assuming.
 
-- **This is identification, not authentication.** Anyone can type `popsharky`
-  and get Allan's seat highlighting and Allan's league list. There is no
-  password and nothing is hidden. That is an accepted tradeoff for a
-  friends-and-league-mates tool, and it stops being acceptable the moment
-  anything private lands in the database.
-- **The API token is shared.** `VITE_API_TOKEN` is in every visitor's
-  devtools, so every visitor can call `/api/ingest/*` and `/api/drafts`
-  unscoped (`GET /api/drafts` with no `X-Sleeper-User` header still returns
-  everyone's leagues, by design — see §2 above). Signing in scopes what the
-  *app* shows a given visitor; it does not restrict what the *API* will
-  answer to a raw request. The real fix is a server-side proxy or real auth;
-  the interim mitigation, if it matters, is same-origin hosting so at least
-  nothing new is exposed beyond the pre-existing token-in-devtools tradeoff.
-- **What is scoped, and what still isn't.** Every league- and draft-addressed
-  route now answers 404 for a signed-in caller who isn't in that league —
-  `/api/drafts` and each `/api/drafts/{id}/…` route (seats, board, track,
-  live-stream, reversal-round, picks), `/api/leagues/{id}/history` and
-  `/power` (including its two writes), `/api/managers/{id}/history`, and
-  forking a live draft into a mock. Mock sessions are owned (V8), so
-  `/api/mocks` and its per-session routes only answer for their owner. The
-  rule itself lives in one place, `store/LeagueMembership`, and
-  `LeagueMembershipIT` pins it against the draft list it shares its SQL with.
+Sign-in is **identification, not authentication** (claude/user-identity-and-onboarding.md):
+anyone can type `popsharky` and get Allan's seat highlighting and league list.
+There is no password and nothing is hidden. That is an accepted tradeoff for a
+friends-and-league-mates tool and stops being acceptable the moment anything
+private lands in the database.
 
-  Still unscoped, deliberately: `/api/ingest/*` (anyone can make the server
-  crawl an arbitrary Sleeper league into the shared DB), `/api/board`,
-  `/api/sims`, and `GET`/`PUT`/`DELETE /api/managers` — manager profiles are
-  a shared model layer, not a per-league resource, so "whose manager is this"
-  needs a rule this doesn't have yet.
+**What scoping does exist, and what it is worth.** Every league- and
+draft-addressed route answers 404 for a signed-in caller who is not in that
+league — the draft list and each `/api/drafts/{id}/…` route, `/leagues/{id}/history`,
+`/power`, `/analysis`, `/api/managers/{id}/history`, and forking a live draft
+into a mock. Mock sessions are owned (V8). The rule lives in one place,
+`store/LeagueMembership`, pinned by `LeagueMembershipIT`.
 
-  **Treat all of it as scoping, not security.** `X-Sleeper-User` is an
-  unverified claim and Sleeper ids are public, so anyone who wants a league's
-  data can still present a member's id and get it. What this buys is that the
-  app no longer hands every visitor every league by default. A real boundary
-  needs real auth.
+Deliberately unscoped: `/api/ingest/*`, `/api/board`, `/api/sims`, and
+`GET`/`PUT`/`DELETE /api/managers` — manager profiles are a shared model layer,
+not a per-league resource.
 
-- **`/api/drafts/{id}/live-stream` takes its identity as `?user=`,** not the
-  header — the browser's native `EventSource` cannot set one, the same
-  limitation that blocks the bearer token on that route. It feeds the same
-  membership check as everything else; only the transport differs.
-- **Live mode's EventSource still cannot send the token** (the gap noted at
-  the top of this document). It bites a split-origin deploy with `API_TOKEN`
-  set. If draft night matters more than the deploy shape, either keep it
-  same-origin or accept the token as a query parameter on that one route.
-- **`APP_OWNER_SLEEPER_USER_ID` is now a fallback**, not the identity — see
-  `.env.example`. `X-Sleeper-User` (sent by every signed-in visitor's browser)
-  wins when present; the configured owner only matters for a request with no
-  header at all, which is every request until someone signs in.
+**Treat all of it as scoping, not security.** `X-Sleeper-User` is an unverified
+claim and Sleeper ids are public, so anyone who wants a league's data can present
+a member's id and get it. What it buys is that the app no longer hands every
+visitor every league by default. A real boundary needs real auth.
+
+### If `API_TOKEN` is ever switched on
+
+Two things break, both known:
+
+- **`/api/drafts/{id}/live-stream` cannot send a bearer token.** The browser's
+  native `EventSource` has no way to set a request header, so live mode 401s
+  against a split-origin deploy with the token set — and this deploy is
+  split-origin. It already takes its identity as `?user=` for the same reason;
+  the token would need the same treatment.
+- **Any token shipped to a browser is readable in devtools**, so it is a shared
+  secret every visitor holds. The real fix is a server-side proxy or real auth,
+  not a longer string.
 
 ## Things that will probably bite
 
-**Memory on free tiers.** `POST /api/ingest/players` pulls Sleeper's ~5MB player dump
-and parses it into a map of maps. Peak heap is well above the file size. A 256MB
-instance may OOM; 512MB should be comfortable. `JAVA_OPTS` already sets
-`-XX:MaxRAMPercentage=75`.
+**Memory.** `POST /api/ingest/players` pulls Sleeper's ~5MB player dump and
+parses it into a map of maps; peak heap is well above the file size. 512MB is
+comfortable, 256MB may OOM. `JAVA_OPTS` sets `-XX:MaxRAMPercentage=75`.
 
-**Request timeouts on ingest.** `/api/ingest/all/...` does three sequential Sleeper
-crawls plus a board rebuild. Platform HTTP timeouts are often 30–60s. If it times out,
-call the three sub-endpoints separately — `/api/ingest/players`, then
-`/api/ingest/league/{id}`, then `/api/ingest/board` — which is exactly why they exist
-as separate routes.
+**Request timeouts on ingest.** `/api/ingest/all/...` does three sequential
+Sleeper crawls plus a board rebuild. If a platform timeout cuts it short, call
+the three sub-endpoints separately — `/api/ingest/players`, `/api/ingest/league/{id}`,
+`/api/ingest/board` — which is exactly why they exist as separate routes.
 
-**SSE through a proxy.** `/api/sims/stream` is a long-lived streaming response. Some
-platforms buffer it, which turns live progress into one delayed dump at the end. The
-plain `POST /api/sims` returns the same payload without streaming if that happens.
+**SSE through a proxy.** `/api/sims/stream` is a long-lived streaming response
+and some platforms buffer it, turning live progress into one delayed dump.
+`POST /api/sims` returns the same payload without streaming.
 
-**CORS origin exactness.** `https://foo.vercel.app` and `https://foo.vercel.app/` are
-different values here, and Vercel preview deployments each get their own origin. Expect
-to add more than one.
-
-**Flyway on first boot.** The migration has been verified by hand against Postgres 16,
-but Flyway's own bookkeeping has never run. Watch the first deploy's logs.
+**CORS origin exactness.** `https://www.ballknowers.co` and
+`https://www.ballknowers.co/` are different values here.
 
 ## Rolling back
 
-The database is the only stateful part and migrations so far are additive, so rolling
-the backend image back is safe. `fly releases` / `fly deploy --image <previous>`.
+The database is the only stateful part and migrations so far are additive, so
+rolling the backend image back is safe. In Railway, redeploy the previous
+deployment from the service's deployment list — and here "Redeploy re-runs the
+same commit" is the behaviour you actually want.
+
+## Rehearsing locally
+
+`docker compose --profile full up --build` runs the real production image
+against local Postgres. If `curl localhost:8080/api/health` returns
+`weightsLoaded: true` there, the image is sound. Do **not** point
+`docker compose up` at a remote database; the compose file is for local
+Postgres only.
