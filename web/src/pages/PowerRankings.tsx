@@ -471,6 +471,20 @@ export default function PowerRankings() {
     if (!sleeperLeagueId) return
     getPowerRankings(sleeperLeagueId)
       .then((d) => {
+        // A 200 without `sportState` is a backend older than this build: it
+        // answered `nflState` until 90274e7's multi-sport rename, and a
+        // frontend deploy that outran the backend deploy hit exactly that
+        // (measured against api.ballknowers.co, 2026-09-15). Rejecting the
+        // payload here keeps `data` null so the panel below says so. Reading
+        // it optimistically is what white-screened the app -- and defaulting
+        // the missing week to 1 instead would be worse than a crash, since
+        // basketball is legitimately at week 0 all offseason and every ballot
+        // would silently land on the wrong week.
+        if (!d || !d.sportState) {
+          setData(null)
+          setError('This league’s power rankings came back in a format this page cannot read — the server is running an older build than the site. Redeploy the backend.')
+          return
+        }
         setData(d)
         setError(null)
       })

@@ -13,6 +13,7 @@ import LeagueAnalysis from './pages/LeagueAnalysis'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import AppShell from './components/AppShell'
+import ErrorBoundary from './components/ErrorBoundary'
 import { useUser } from './user'
 
 // Forces a full remount of DraftView on every draft change. Without this,
@@ -65,39 +66,45 @@ export default function App() {
     <div className="app">
       <AppShell>
         {user ? (
-          <Routes>
-            <Route path="/" element={<DraftPicker />} />
-            <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
-            <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
-            <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
-            <Route path="/mock/new" element={<MockSetup />} />
-            <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
-            <Route path="/managers" element={<ManagerTendencies />} />
-            <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
-            <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
-            <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
-            <Route path="/leagues/:sleeperLeagueId/analysis" element={<LeagueAnalysis />} />
-            {/* power-rankings-reskin.md §7: a self-check harness, not a page
-                real users should ever reach -- dev-only. */}
-            {import.meta.env.DEV && (
-              <Route path="/leagues/:sleeperLeagueId/power/verify" element={<PowerRankingsVerify />} />
-            )}
-            {/* React Router's own fallback renders a bare "Not Found" with no
-                way back -- on a mistyped draft id that was the whole screen. */}
-            <Route
-              path="*"
-              element={
-                <div className="content">
-                  <section className="panel">
-                    <h2>Nothing here</h2>
-                    <p className="muted">
-                      No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
-                    </p>
-                  </section>
-                </div>
-              }
-            />
-          </Routes>
+          // Inside AppShell, outside <Routes>: a page that throws while
+          // rendering keeps the rail and the league switcher on screen, so
+          // there is still a way out. Before this, one TypeError blanked the
+          // entire document.
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<DraftPicker />} />
+              <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
+              <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
+              <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
+              <Route path="/mock/new" element={<MockSetup />} />
+              <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
+              <Route path="/managers" element={<ManagerTendencies />} />
+              <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
+              <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
+              <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
+              <Route path="/leagues/:sleeperLeagueId/analysis" element={<LeagueAnalysis />} />
+              {/* power-rankings-reskin.md §7: a self-check harness, not a page
+                  real users should ever reach -- dev-only. */}
+              {import.meta.env.DEV && (
+                <Route path="/leagues/:sleeperLeagueId/power/verify" element={<PowerRankingsVerify />} />
+              )}
+              {/* React Router's own fallback renders a bare "Not Found" with no
+                  way back -- on a mistyped draft id that was the whole screen. */}
+              <Route
+                path="*"
+                element={
+                  <div className="content">
+                    <section className="panel">
+                      <h2>Nothing here</h2>
+                      <p className="muted">
+                        No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
+                      </p>
+                    </section>
+                  </div>
+                }
+              />
+            </Routes>
+          </ErrorBoundary>
         ) : (
           <SignIn />
         )}
