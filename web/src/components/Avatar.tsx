@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { hueFor } from '../hue'
+import { hueForName } from '../hue'
 
 /**
  * Sleeper's own avatar id (e.g. "e1d4ebf9ea0760f248119d4ec2ac5a63") resolves
@@ -12,10 +12,15 @@ const sleeperAvatarSrc = (avatarId: string) => `https://sleepercdn.com/avatars/t
 type Props = {
   /** Sleeper's avatar id, or null/undefined when Sleeper has none on file. */
   avatarId?: string | null
-  /** hueFor() input -- the manager id (or other stable identity) that makes the
-   *  same person the same color everywhere on the page, matching the seed the
-   *  many call sites this replaces already agreed on. */
+  /** Stable identity for the fallback color -- the manager id, matching the
+   *  seed the many call sites this replaces already agreed on. */
   seed: string
+  /** An already-spaced hue from the caller, which knows the whole league and so
+   *  can space them evenly; see hueForIndex. Falls back to hashing the seed when
+   *  absent, which is a cosmetic fallback VALUE rather than a rule -- the photo
+   *  is what identifies most managers, and this only paints the initial behind
+   *  it. */
+  hue?: number
   /** Display name; its first character is the fallback initial. Defaults to `seed`. */
   label?: string | null
   /** This avatar's person is the viewer. Crimson fill with no photo; a crimson
@@ -33,10 +38,10 @@ type Props = {
  * App.tsx, superseded by the "everywhere, replacing initials" call. A broken
  * image (avatar id stale, CDN hiccup) falls back to the initial rather than a
  * broken-image icon. */
-export default function Avatar({ avatarId, seed, label, isMe, className }: Props) {
+export default function Avatar({ avatarId, seed, label, isMe, className, hue: given }: Props) {
   const [broken, setBroken] = useState(false)
   const showPhoto = !!avatarId && !broken
-  const hue = hueFor(seed)
+  const hue = given ?? hueForName(seed)
   const style = showPhoto
     ? undefined
     : isMe

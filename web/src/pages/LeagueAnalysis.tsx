@@ -3,7 +3,16 @@ import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import BumpChart, { type Series } from '../components/BumpChart'
-import { hueFor } from '../hue'
+import {
+  FOCUS_CAP,
+  FOCUS_SLOTS,
+  NO_PINS,
+  managerHues,
+  pinnedCount,
+  pinsFull,
+  toggleSelection,
+  type PinSlots,
+} from '../managerColor'
 import {
   getLeagueAnalysis,
   ingestLeagueHistory,
@@ -380,7 +389,11 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
  * the bug this repo keeps re-shipping.
  */
 function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
-  const [highlighted, setHighlighted] = useState<number | null>(null)
+  const [selection, setSelection] = useState<PinSlots>(NO_PINS)
+  const toggle = (rosterId: number) => setSelection((s) => toggleSelection(s, rosterId))
+
+  const hues = useMemo(() => managerHues(block.rosters), [block.rosters])
+  const meRosterId = block.rosters.find((r) => r.isMe)?.rosterId ?? null
 
   const series: Series[] = useMemo(
     () =>
@@ -388,7 +401,7 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
         rosterId: r.rosterId,
         managerId: r.managerId,
         manager: r.manager,
-        hue: hueFor(String(r.managerId ?? r.rosterId)),
+        hue: hues.get(r.rosterId)?.hue ?? 0,
         points: r.byWeek.map((w) => ({
           week: w.week,
           rank: w.rank,
@@ -398,7 +411,7 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
           thin: false,
         })),
       })),
-    [block.rosters],
+    [block.rosters, hues],
   )
 
   if (!block.available) return <NotYet reason={block.reason} />
@@ -410,48 +423,100 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
 
   return (
     <>
-      <BumpLegend series={series} highlighted={highlighted} onHighlight={setHighlighted} />
+      <BumpLegend
+        rosters={block.rosters}
+        selection={selection}
+        meRosterId={meRosterId}
+        onToggle={toggle}
+      />
       <BumpChart
         series={series}
         weeks={weeks}
         teamCount={block.rosters.length}
-        highlighted={highlighted}
-        onHighlight={setHighlighted}
+        colorBy="focus"
+        selection={selection}
+        meRosterId={meRosterId}
+        onToggle={toggle}
       />
     </>
   )
 }
 
 /**
- * Twelve lines in twelve hashed hues is a hairball -- `hueFor` spreads names
- * around the wheel, but not far enough apart to tell a dozen of them by colour.
- * Power rankings answers this with a clickable legend that dims everything
- * else, so this page uses the same one rather than inventing a second way to
- * read the same chart.
+ * Pin up to three rosters to compare them.
+ *
+ * <p>This used to be a one-at-a-time highlight with a colour swatch per manager.
+ * Both halves of that were wrong. The swatch was a lie -- `hueFor` put ids 1-9
+ * on hues 49-57, so fourteen managers shared two colours -- and one-at-a-time
+ * is not what anyone wants from a chart whose whole point is comparison.
+ *
+ * <p>Three is the cap because three is what colour vision can carry on crossing
+ * lines; see `web/src/managerColor.ts`. The fourth pin is disabled with the
+ * reason said out loud rather than silently ignored, and the swatch is now the
+ * manager's avatar, which identifies them whether or not colour survives.
  */
+/** Only what the legend actually reads, so both blocks' row types fit. */
+type LegendRoster = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+}
+
 function BumpLegend({
-  series,
-  highlighted,
-  onHighlight,
+  rosters,
+  selection,
+  meRosterId,
+  onToggle,
 }: {
-  series: Series[]
-  highlighted: number | null
-  onHighlight: (rosterId: number | null) => void
+  rosters: readonly LegendRoster[]
+  selection: PinSlots
+  meRosterId: number | null
+  onToggle: (rosterId: number) => void
 }) {
+  const full = pinsFull(selection)
+  const pinned = pinnedCount(selection)
+  const hues = managerHues(rosters)
+
   return (
     <div className="bump-legend">
-      {series.map((s) => {
-        const on = highlighted === s.rosterId
+      <span className="bump-legend-hint muted small">
+        {pinned === 0
+          ? `Pin up to ${FOCUS_CAP} to compare them.`
+          : `${pinned} of ${FOCUS_CAP} pinned.`}
+      </span>
+      {rosters.map((r) => {
+        const slot = selection.indexOf(r.rosterId)
+        const on = slot >= 0
+        const mine = meRosterId === r.rosterId
+        const atCap = full && !on
         return (
           <button
-            key={s.rosterId}
+            key={r.rosterId}
             type="button"
-            className={`bump-legend-item bump-legend-button${on ? ' on' : ''}`}
+            className={`bump-legend-item bump-legend-button${on ? ' on' : ''}${mine ? ' mine' : ''}`}
             aria-pressed={on}
-            onClick={() => onHighlight(on ? null : s.rosterId)}
+            disabled={atCap}
+            title={
+              atCap
+                ? `Three is the most that stay reliably distinguishable. Unpin one first.`
+                : on
+                  ? `Unpin ${managerName(r.manager, r.rosterId)}`
+                  : `Pin ${managerName(r.manager, r.rosterId)}`
+            }
+            style={on ? ({ '--pin': FOCUS_SLOTS[slot] } as React.CSSProperties) : undefined}
+            onClick={() => onToggle(r.rosterId)}
           >
-            <span className="bump-legend-swatch" style={{ background: `oklch(70% 0.14 ${s.hue})` }} />
-            {s.manager ?? `roster ${s.rosterId}`}
+            <Avatar
+              avatarId={r.avatarId}
+              seed={String(r.managerId ?? r.rosterId)}
+              hue={hues.get(r.rosterId)?.hue}
+              label={r.manager}
+              isMe={mine}
+              className="bump-legend-avatar"
+            />
+            {managerName(r.manager, r.rosterId)}
+            {mine && <span className="cond">you</span>}
           </button>
         )
       })}
@@ -616,7 +681,11 @@ function MatchupsBlock({ block }: { block: AnalysisMatchups }) {
  * dense will not give up on its own.
  */
 function ScoresBlock({ block }: { block: AnalysisScores }) {
-  const [highlighted, setHighlighted] = useState<number | null>(null)
+  const [selection, setSelection] = useState<PinSlots>(NO_PINS)
+  const toggle = (rosterId: number) => setSelection((s) => toggleSelection(s, rosterId))
+
+  const hues = useMemo(() => managerHues(block.rosters), [block.rosters])
+  const meRosterId = block.rosters.find((r) => r.isMe)?.rosterId ?? null
 
   const series: Series[] = useMemo(
     () =>
@@ -624,7 +693,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
         rosterId: r.rosterId,
         managerId: r.managerId,
         manager: r.manager,
-        hue: hueFor(String(r.managerId ?? r.rosterId)),
+        hue: hues.get(r.rosterId)?.hue ?? 0,
         // `thin` and `note` belong to power rankings' ballot coverage; a scored
         // week has no such notion, so every point here is solid.
         points: r.weeks.map((w) => ({
@@ -636,7 +705,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
           thin: false,
         })),
       })),
-    [block.rosters],
+    [block.rosters, hues],
   )
 
   if (!block.available) return <NotYet reason={block.reason} />
@@ -675,7 +744,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
               return (
                 <tr
                   key={r.rosterId}
-                  className={`${r.isMe ? 'mine ' : ''}${highlighted === r.rosterId ? 'on' : ''}`}
+                  className={`${r.isMe ? 'mine ' : ''}${selection.includes(r.rosterId) ? 'on' : ''}`}
                 >
                   <td>
                     <ManagerLink
@@ -723,16 +792,23 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
       {summarisable ? (
         <>
           <p className="muted small analysis-bump-note">
-            The same weeks as movement: where each roster ranked on points in each one. Click a line
-            to follow it.
+            The same weeks as movement: where each roster ranked on points in each one. Your line is
+            crimson; pin up to three to compare them.
           </p>
-          <BumpLegend series={series} highlighted={highlighted} onHighlight={setHighlighted} />
+          <BumpLegend
+            rosters={block.rosters}
+            selection={selection}
+            meRosterId={meRosterId}
+            onToggle={toggle}
+          />
           <BumpChart
             series={series}
             weeks={block.weeks}
             teamCount={block.rosters.length}
-            highlighted={highlighted}
-            onHighlight={setHighlighted}
+            colorBy="focus"
+            selection={selection}
+            meRosterId={meRosterId}
+            onToggle={toggle}
           />
         </>
       ) : (

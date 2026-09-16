@@ -472,7 +472,13 @@ describe('LeagueAnalysis', () => {
    * unreadable without the legend that dims the rest -- the same one power
    * rankings pairs with it.
    */
-  it('gives each chart a legend that isolates one roster', async () => {
+  /**
+   * The legend used to isolate ONE roster and dim the rest. It now pins up to
+   * three, because one-at-a-time is not what a comparison chart is for -- and
+   * because three is the most colours that stay distinguishable on crossing
+   * lines (001-readable-bump-chart, research.md R2).
+   */
+  it('lets the legend pin rosters, and colours them in pin order', async () => {
     const user = userEvent.setup()
     getLeagueAnalysis.mockResolvedValue(data())
     render(<LeagueAnalysis />)
@@ -480,8 +486,27 @@ describe('LeagueAnalysis', () => {
     await screen.findByText(/Where each roster is projected to rank/)
     const panel = panelNamed('Projected week by week')
 
-    await user.click(within(panel).getByRole('button', { name: 'kieriskash' }))
-    expect(panel.querySelectorAll('.bump-series.dimmed')).toHaveLength(1)
+    await user.click(within(panel).getByRole('button', { name: /kieriskash/ }))
+
+    // The pinned roster takes the first validated slot...
+    expect(panel.querySelector('[data-role="focus-1"]')).not.toBeNull()
+    // ...and the reader keeps their own crimson line. (This fixture is two
+    // rosters and the other one is `isMe`, so there is no context line to find.)
+    expect(panel.querySelector('[data-role="me"]')).not.toBeNull()
+    // Nothing was removed -- pinning changes appearance only.
+    expect(panel.querySelectorAll('[data-roster-id]')).toHaveLength(2)
+  })
+
+  /** Identity must survive with no colour at all, so every line is named. */
+  it('labels every line at its right end', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText(/Where each roster is projected to rank/)
+    const panel = panelNamed('Projected week by week')
+
+    const labels = [...panel.querySelectorAll('.bump-end-label')].map((n) => n.textContent)
+    expect(labels).toContain('kieriskash')
   })
 
   /** The grid is the scored weeks, and the week's top score is marked. */

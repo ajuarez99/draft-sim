@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { hueFor } from '../hue'
+import { hueForName } from '../hue'
 import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { relativeTime } from '../relativeTime'
@@ -371,7 +371,7 @@ export default function DraftPicker() {
                 // separate Sleeper league id, so hashing the id gave the two
                 // "(Foot) Ball Knowers" cards different colors -- the exact
                 // opposite of what the crest is for.
-                const hue = hueFor(d.leagueName)
+                const hue = hueForName(d.leagueName)
                 // Leading punctuation is common in league names ("(Foot) Ball
                 // Knowers" would crest as "("), so take the first character that
                 // actually carries identity.
@@ -563,7 +563,7 @@ export default function DraftPicker() {
               {visibleSleeperLeagues
                 .filter((l) => !l.ingested)
                 .map((l) => {
-                  const hue = hueFor(l.name)
+                  const hue = hueForName(l.name)
                   const crest = (l.name.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
                   const setup = setupState[l.sleeperLeagueId]
                   return (

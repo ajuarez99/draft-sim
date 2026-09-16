@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { hueFor } from '../hue'
+import { hueForName } from '../hue'
 import type { RailLeague } from '../railLeague'
 import type { DraftSummary } from '../api'
 
@@ -43,7 +43,7 @@ function draftLabel(d: DraftSummary): string {
 export default function LeagueRailSection({ league, pathname, collapsed, onMockIt }: Props) {
   const { lineage, season } = league
   const d = lineage.current
-  const hue = hueFor(d.leagueName)
+  const hue = hueForName(d.leagueName)
   // Leading punctuation is common in league names ("(Foot) Ball Knowers" would
   // crest as "("), so take the first character that actually carries identity
   // -- same rule as the home card, so one league crests identically in both.

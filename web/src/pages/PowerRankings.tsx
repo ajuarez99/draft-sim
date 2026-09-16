@@ -16,7 +16,7 @@ import {
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
 import Avatar from '../components/Avatar'
-import { hueFor } from '../hue'
+import { managerHues } from '../managerColor'
 import BumpChart, { segmentsOf, type Series, type SeriesPoint } from '../components/BumpChart'
 
 // Re-exported so PowerRankings.chart.test.ts keeps importing the rule from the
@@ -95,11 +95,19 @@ function buildSeries(
   memberCount: number,
 ): Series[] {
   const byRoster = new Map<number, Series>()
+  // Spaced across the league rather than hashed per id -- the hash put ids 1-9
+  // on hues 49-57, so a full league shared two colors (001-readable-bump-chart).
+  const hues = managerHues(
+    [...new Map(entries.map((e) => [e.rosterId, e])).values()].map((e) => ({
+      rosterId: e.rosterId,
+      managerId: e.managerId,
+    })),
+  )
   for (const e of entries) {
     if (e.kind !== kind || e.season !== season) continue
     let s = byRoster.get(e.rosterId)
     if (!s) {
-      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.manager, hue: hueFor(String(e.managerId ?? e.rosterId)), points: [] }
+      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.manager, hue: hues.get(e.rosterId)?.hue ?? 0, points: [] }
       byRoster.set(e.rosterId, s)
     }
     const ballotCount = e.ballotCount ?? null
@@ -1082,7 +1090,7 @@ export default function PowerRankings() {
                             </span>
                           ))}
                         </div>
-                        <BumpChart series={teamSeries} weeks={teamViewWeeks} teamCount={gridRows} highlighted={null} onHighlight={() => {}} />
+                        <BumpChart series={teamSeries} weeks={teamViewWeeks} teamCount={gridRows} colorBy="series" />
                       </>
                     )}
                   </>
@@ -1128,8 +1136,15 @@ export default function PowerRankings() {
                     series={buildSeries(data.entries, ladderMode, season, teamCount)}
                     weeks={ladderWeeks}
                     teamCount={gridRows}
-                    highlighted={highlighted}
-                    onHighlight={setHighlighted}
+                    colorBy="focus"
+                    /* This page's `highlighted` is a page-wide single selection --
+                       it also drives the team view and the row pinning -- so it is
+                       adapted to the chart's pin list here rather than replaced. */
+                    selection={[highlighted, null, null]}
+                    meRosterId={myEntry?.rosterId ?? null}
+                    onToggle={(rosterId) =>
+                      setHighlighted((cur) => (cur === rosterId ? null : rosterId))
+                    }
                   />
                 </>
               ) : (

@@ -121,3 +121,64 @@ Roster order for index assignment is stable *within* a league. It is **not**
 stable across leagues — the same manager in two leagues gets two colors. Judged
 acceptable: the chart is always scoped to one league, and cross-league color
 identity is not something the UI claims today. Flagged rather than solved.
+
+---
+
+## R6. Two defects the browser found that the tests did not (implementation)
+
+Added during `/speckit-implement`. Both were caught by rendering the chart and
+looking at it, after a green unit suite. Recorded because in both cases the tests
+were not merely silent — they actively asserted the wrong thing.
+
+### R6a. The palette was validated three colours short of what is on screen
+
+R2 validated `FOCUS_SLOTS` as three colours and called three the ceiling. But the
+reader's own line is **crimson and always drawn**, so what a reader actually sees
+at once is **four** colours. Validating crimson with the pins:
+
+```bash
+node scripts/validate_palette.js "#d33a3c,#3987e5,#d95926,#199e70" \
+  --mode dark --surface "#09121c" --pairs all
+# FAIL: #d95926 (orange) vs #d33a3c (crimson) — CVD ΔE 5.1, normal-vision ΔE 6.7
+```
+
+Two of the four lines were effectively the same colour. Searching all 56 trios of
+the documented dark palette against crimson found **4 that pass**; the best is
+blue + aqua + yellow:
+
+```bash
+node scripts/validate_palette.js "#d33a3c,#3987e5,#199e70,#c98500" \
+  --mode dark --surface "#09121c" --pairs all
+# ALL CHECKS PASS — CVD ΔE 7.1 · normal-vision ΔE 17.0 · contrast all ≥3:1
+```
+
+CVD 7.1 sits in the 6–8 band, legal **only** with secondary encoding. The direct
+end labels are that encoding, which makes US3 load-bearing rather than a nicety.
+
+**Lesson**: validate the set the reader sees, not the set the constant holds.
+
+### R6b. Releasing a pin repainted the survivors — FR-003, asserted backwards
+
+With `selection` as a plain list, unpinning the first of three shifted the others
+up a slot: gassybois aqua → blue, kordeez yellow → aqua. FR-003 and the BumpChart
+contract both forbid exactly this.
+
+The unit test had encoded the broken behaviour as correct, with a comment
+rationalising it ("3 moves up a slot because 7 left — but they keep their ORDER").
+It passed. It was wrong.
+
+Fixed by making the selection **slots** rather than a list: `PinSlots` is a
+fixed-length array of `number | null`, pin takes the first free slot, unpin empties
+its own. A pinned roster now keeps its colour regardless of what happens to the
+others. Verified in the browser, not just in the test.
+
+**Lesson**: a test written from the same misunderstanding as the code confirms the
+misunderstanding. Something outside the unit — here, clicking it — has to check.
+
+### A third, smaller one
+
+The first attempt at a regression test for R6a compared hues in **sRGB** and
+flagged the good yellow slot as 15° from crimson. sRGB hue angle is not
+perceptual; OKLab puts the same pair at ΔE 17.0, comfortably clear. The test was
+rewritten to measure in OKLab, the same space the validator uses, rather than
+weakening a palette that was already correct.

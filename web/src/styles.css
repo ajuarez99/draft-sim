@@ -1557,18 +1557,41 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .bump-gridline { stroke: var(--line); stroke-width: 1; }
 .bump-rank-label, .bump-week-label { fill: var(--muted); font-size: 9px; }
 .bump-series { cursor: pointer; }
-.bump-series.dimmed { opacity: 0.25; }
 .bump-series circle { transition: r 0.1s; }
 
-.bump-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0; }
+/* 001-readable-bump-chart. Fourteen rosters cannot be told apart by hue -- on
+ * this surface fourteen evenly-spaced hues collapse to a colour-blind delta-E
+ * of 0.5, and even eight tuned slots fail. So context recedes, colour marks
+ * focus, and the name at the end of the line carries identity. Stroke, width
+ * and opacity are set inline from managerColor.ts; what is left here is the
+ * hover affordance and the labels. */
+.bump-series-context:hover { opacity: 0.75 !important; }
+.bump-hit { pointer-events: stroke; }
+
+.bump-end-label { fill: var(--muted); font-size: 10px; cursor: pointer; }
+.bump-end-label-me { fill: var(--crimson); font-weight: 600; }
+.bump-end-label-focus-1,
+.bump-end-label-focus-2,
+.bump-end-label-focus-3 { fill: var(--text); font-weight: 600; }
+
+.bump-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 10px 0; }
+.bump-legend-hint { flex-basis: 100%; margin: 0 0 2px; }
 .bump-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .bump-legend-swatch { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+.bump-legend-avatar { width: 18px; height: 18px; font-size: 10px; }
 .bump-legend-button {
-  background: none; border: none; padding: 2px 6px; border-radius: 999px; cursor: pointer;
-  color: var(--muted); font: inherit;
+  background: none; border: 1px solid transparent; padding: 2px 8px 2px 3px; border-radius: 999px;
+  cursor: pointer; color: var(--muted); font: inherit;
 }
-.bump-legend-button:hover { color: var(--text); background: var(--line); }
-.bump-legend-button.on { color: var(--text); background: color-mix(in oklch, var(--teal) 18%, var(--panel)); }
+.bump-legend-button:hover:not(:disabled) { color: var(--text); background: var(--line); }
+/* The pinned chip wears the colour its line wears -- the legend and the chart
+ * agree, which is the whole job of a legend. */
+.bump-legend-button.on {
+  color: var(--text); border-color: var(--pin);
+  background: color-mix(in oklch, var(--pin) 22%, var(--panel));
+}
+.bump-legend-button.mine { color: var(--text); }
+.bump-legend-button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ===== B1: home hero + global nav =====
  * design-review-next-steps.md B1 (home hero + disclosure) and the leftover

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import { createMockSession, getManagers, type ManagerSummary, type Sport } from '../api'
-import { hueFor } from '../hue'
+import { hueForIndex } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
 
 // Same domain as LeagueShape.SUPPORTED_TEAM_COUNTS (engine/LeagueShape.java) --
@@ -223,10 +223,16 @@ export default function MockSetup() {
             const isMine = slot === userSlot
             const assignedId = managerSeats[slot]
             const assignedManager = assignedId != null ? managers?.find((m) => m.managerId === assignedId) : undefined
-            // Hashed on the manager's name, the same device the league crest
-            // and the board's seat popover use, so "this seat has a real
-            // manager behind it" reads the same color everywhere in the app.
-            const hue = assignedManager ? hueFor(assignedManager.manager) : undefined
+            // Spaced across the full manager list rather than hashed from the
+            // name: hashing put sequential-ish seeds a degree apart, which is
+            // what made a fourteen-team legend read as two colors
+            // (001-readable-bump-chart). Indexing the list the page already has
+            // gives every seated manager a visibly different color.
+            const assignedIndex = assignedManager
+              ? (managers ?? []).findIndex((m) => m.managerId === assignedManager.managerId)
+              : -1
+            const hue =
+              assignedIndex >= 0 ? hueForIndex(assignedIndex, (managers ?? []).length) : undefined
 
             return (
               <div key={slot} className={`mock-seat${isMine ? ' mine' : assignedManager ? ' assigned' : ''}`}>

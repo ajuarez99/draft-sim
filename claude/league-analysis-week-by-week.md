@@ -130,3 +130,41 @@ the week-5 dive from 1st to 9th reads instantly as the bye it is.
 - **Stepping the projections block by week.** The stepper drives the matchups,
   where a week is a game. The rest-of-season bar is not a statement about a
   chosen week and must not silently become one.
+
+---
+
+## 001-readable-bump-chart (2026-09-16) — what shipped, and the ceiling
+
+The projected-week chart drew fourteen rosters in two colours. Cause, measured:
+`hueFor` was `(h * 31 + charCode) % 360`, which advances one degree per
+sequential manager id. Ids 1–9 → hues 49–57 (orange); ids 10–19 → 127–136
+(green). A league's ids *are* sequential, so this was the worst case, always.
+
+**The ceiling worth remembering.** Fixing the hue spread does not make the chart
+readable. Measured on this app's own panel surface (`#09121c`), all-pairs —
+correct here because bump lines cross, so any two series can be adjacent:
+
+| Candidate | CVD ΔE (≥8) | Normal-vision ΔE (≥15) | |
+|---|---|---|---|
+| 14 evenly-spaced hues | 0.5 | 5.5 | FAIL |
+| 8 documented palette slots | 1.6 | 7.1 | FAIL |
+| 3 slots + crimson | 7.1 | 17.0 | PASS |
+
+**Four is what a reader sees**, not three: the pin slots *plus* the reader's own
+crimson line. Validating the three pins alone passed at ΔE 9.4 and hid an orange
+slot sitting ΔE 6.7 from crimson. Validate the set that is on screen.
+
+**What shipped**: lines default to recessive neutral; the reader's line is
+crimson; up to three rosters pin to blue/aqua/yellow; every line carries a direct
+name label at its right end. The labels are load-bearing — the palette's CVD
+figure is in the 6–8 band, which is legal only with secondary encoding.
+
+**Colour follows the entity.** `selection` is *slots* (`PinSlots`, fixed length,
+`null` = free), not a list. With a list, releasing one pin shifted the survivors
+up and repainted them — and the unit test asserted that as correct. Clicking it
+in a browser is what caught it.
+
+`hueFor` is now two functions: `hueForIndex(i, n)` for members of a known set
+(evenly spaced, guaranteed), and `hueForName(seed)` — the old hash, unchanged —
+for league names, which have no set to index within. The rename is the guard;
+a hash cannot promise spread, and even FNV-1a collided at 2° across fourteen ids.
