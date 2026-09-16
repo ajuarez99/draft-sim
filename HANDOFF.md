@@ -22,7 +22,7 @@ was smoothing away (week 6: 89.2, not 116.5) is the whole reason to draw it.
 402 backend tests / 0 failures / 0 skipped, 242 frontend, verified live on both
 the 2026 season (1 scored week) and the finished 2025 one (17).
 
-**Shipped 2026-09-16 on branch `league-analysis-lineups-and-matchups` (pushed, not merged): the League analysis page's second
+**Shipped 2026-09-16, merged to `main`: the League analysis page's second
 pass.** `claude/league-analysis-lineups-and-matchups.md` is the brief. Three
 additions, all answering the same complaint -- the page said a roster projects
 to 1,683.9 points and named nobody: a **lineup drilldown** behind every bar
