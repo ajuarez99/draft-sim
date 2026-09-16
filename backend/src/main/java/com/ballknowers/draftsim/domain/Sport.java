@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum Sport {
     NFL("nfl"),
-    NBA("nba");   // seam only; not implemented in v1
+    NBA("nba");
 
     private final String code;
     Sport(String code) { this.code = code; }
