@@ -1,7 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LeagueAnalysis from './LeagueAnalysis'
-import type { LeagueAnalysis as LeagueAnalysisData } from '../api'
+import type { AnalysisLineupPlayer, LeagueAnalysis as LeagueAnalysisData } from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
@@ -15,12 +16,42 @@ vi.mock('../api', () => ({
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
 }))
 
+function player(slot: string, position: string, name: string, points: number,
+                injuryStatus: string | null = null): AnalysisLineupPlayer {
+  return { sleeperPlayerId: `${name}-${slot}`, name, position, team: 'CIN', slot, points, injuryStatus }
+}
+
+/**
+ * The wire order the backend promises: the league's own slot order, which is
+ * deliberately NOT points order -- the quarterback below is worth less than
+ * the running back and still comes first.
+ */
+const LINEUP: AnalysisLineupPlayer[] = [
+  player('QB', 'QB', 'Jayden Daniels', 18.1),
+  player('RB', 'RB', 'Bijan Robinson', 19.6),
+  player('WR', 'WR', "Ja'Marr Chase", 21.4),
+  player('TE', 'TE', 'Brock Bowers', 13.2),
+  player('FLEX', 'RB', 'Kyren Williams', 12.8),
+]
+
+const BENCH: AnalysisLineupPlayer[] = [
+  player('BN', 'WR', 'Rome Odunze', 9.1),
+  player('BN', 'WR', 'A.J. Brown', 0, 'IR'),
+]
+
 function roster(rosterId: number, manager: string, rank: number, total: number,
                 byPosition: Record<string, number>, rankByPosition: Record<string, number>,
-                missing = 0) {
+                missing = 0, over: { isMe?: boolean; starters?: AnalysisLineupPlayer[] } = {}) {
   return {
-    rosterId, managerId: rosterId, manager, avatarId: null, rank, total,
-    byPosition, rankByPosition, starters: [], missing,
+    rosterId, managerId: rosterId, manager, avatarId: null, rank, isMe: over.isMe ?? false, total,
+    byPosition, rankByPosition, starters: over.starters ?? LINEUP, bench: BENCH, missing,
+  }
+}
+
+function side(rosterId: number, manager: string, projected: number, isMe = false) {
+  return {
+    rosterId, managerId: rosterId, manager, avatarId: null, isMe, projected,
+    byPosition: { RB: projected }, starters: LINEUP,
   }
 }
 
@@ -49,7 +80,17 @@ function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
           { QB: 4, RB: 1, WR: 11, TE: 3, K: 8, DEF: 1 }, 1),
         roster(2, 'jstrobe', 2, 1572.9,
           { QB: 229.9, RB: 368.2, WR: 685.3, TE: 138.8, K: 79.3, DEF: 71.4 },
-          { QB: 5, RB: 8, WR: 4, TE: 7, K: 9, DEF: 12 }),
+          { QB: 5, RB: 8, WR: 4, TE: 7, K: 9, DEF: 12 }, 0,
+          { isMe: true, starters: [player('QB', 'QB', 'Josh Allen', 22.5), ...LINEUP.slice(1)] }),
+      ],
+    },
+    matchups: {
+      available: true,
+      reason: null,
+      week: 2,
+      matchups: [
+        { matchupId: 1, sides: [side(1, 'kieriskash', 118.4), side(2, 'jstrobe', 104.1, true)] },
+        { matchupId: 2, sides: [side(3, 'BamAddABio', 96.2)] },
       ],
     },
     ...over,
@@ -160,5 +201,200 @@ describe('LeagueAnalysis', () => {
     getLeagueAnalysis.mockResolvedValue(data())
     render(<LeagueAnalysis />)
     expect(await screen.findByText(/weeks 2–14 · full PPR/)).toBeInTheDocument()
+  })
+
+  // ---- the lineup drilldown (claude/league-analysis-lineups-and-matchups.md) ----
+
+  /**
+   * The complaint the whole second pass answers: the page said 1,683.9 and
+   * named nobody. A collapsed lineup is fine; an unreachable one is not.
+   */
+  it('opens the lineup behind a bar and names the players in it', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    const toggles = await screen.findAllByRole('button', { name: /Lineup/ })
+    // Scoped to the bars: Head to head renders lineups of its own further down
+    // the page, and an unscoped query would pass on those instead.
+    const bars = within(document.querySelector('.analysis-bars') as HTMLElement)
+    expect(bars.queryByText('Bijan Robinson')).not.toBeInTheDocument()
+
+    await user.click(toggles[0])
+    expect(bars.getByText('Bijan Robinson')).toBeInTheDocument()
+    expect(toggles[0]).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  /**
+   * Slot order, not points order -- the backend sorts by the league's own
+   * roster_positions for this reason, and a card that reordered it into a
+   * ladder would be undoing that on the way out.
+   */
+  it('lists the lineup in slot order even where that is not points order', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await user.click((await screen.findAllByRole('button', { name: /Lineup/ }))[0])
+    const names = Array.from(document.querySelectorAll('.analysis-slotlist .analysis-slot-name'))
+      .map((el) => el.textContent?.replace(/CIN.*$/, '').trim())
+
+    // The 18.1 quarterback above the 21.4 receiver: the league's card, not a ladder.
+    expect(names.slice(0, 3)).toEqual(['Jayden Daniels', 'Bijan Robinson', "Ja'Marr Chase"])
+  })
+
+  /**
+   * "1 unprojected" is a count the reader cannot act on. The bench names the
+   * zero and tags it, which is the same fact in a form that explains itself.
+   */
+  it('names the injured zero on the bench rather than only counting it', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await user.click((await screen.findAllByRole('button', { name: /Lineup/ }))[0])
+    const bench = screen.getByText('A.J. Brown').closest('.analysis-slot') as HTMLElement
+    expect(within(bench).getByText('IR')).toBeInTheDocument()
+    expect(within(bench).getByText('0.0')).toBeInTheDocument()
+  })
+
+  // ---- week N matchups ----
+
+  /** Both sides, the week, and a margin that is called a margin. */
+  it('shows next week\u2019s pairing with both projections and the margin', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    expect(await screen.findByText('Week 2 matchups')).toBeInTheDocument()
+    const game = document.querySelector('.analysis-game') as HTMLElement
+    const scope = within(game)
+    expect(scope.getByText('118.4')).toBeInTheDocument()
+    expect(scope.getByText('104.1')).toBeInTheDocument()
+    expect(scope.getByText('14.3')).toBeInTheDocument()
+  })
+
+  /**
+   * A bye is carried on the wire deliberately. A manager with no game next
+   * week needs telling; a missing card tells them nothing.
+   */
+  it('draws a bye as a bye instead of dropping the manager', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/No opponent this week/)).toBeInTheDocument()
+  })
+
+  /** The same available/reason discipline as the two blocks that came first. */
+  it('explains an unavailable matchup block instead of drawing nothing', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        matchups: {
+          available: false,
+          reason: 'no pairings stored for week 2',
+          week: 2,
+          matchups: [],
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/no pairings stored for week 2/)).toBeInTheDocument()
+  })
+
+  /**
+   * A finished season refuses this block because its regular season ended at
+   * week 14, while `week` is lastScored + 1 = 18. Heading that refusal "Week 18
+   * matchups" would assert a week the reason underneath denies.
+   */
+  it('does not name a week in the heading when it is refusing to show one', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        matchups: {
+          available: false,
+          reason: 'the regular season is over (weeks run to 14, and 17 are scored)',
+          week: 18,
+          matchups: [],
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+
+    expect(await screen.findByText('Upcoming matchups')).toBeInTheDocument()
+    expect(screen.queryByText(/Week 18 matchups/)).not.toBeInTheDocument()
+  })
+
+  /**
+   * "QUESTIONABLE" beside a name swamps the name it is annotating, and this
+   * page draws ten of them at a time. The word survives in the title so the
+   * short code never costs the reader the fact.
+   */
+  it('shortens the long injury words but keeps the word itself reachable', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        projections: {
+          available: true,
+          reason: null,
+          positionGroups: GROUPS,
+          rosters: [
+            roster(1, 'kieriskash', 1, 200, { QB: 200 }, { QB: 1 }, 0,
+              { starters: [player('QB', 'QB', 'Brock Bowers', 17.1, 'Questionable')] }),
+            roster(2, 'jstrobe', 2, 100, { QB: 100 }, { QB: 2 }),
+          ],
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+
+    await user.click((await screen.findAllByRole('button', { name: /Lineup/ }))[0])
+    const bars = within(document.querySelector('.analysis-bars') as HTMLElement)
+    const tag = bars.getByTitle('Questionable')
+    expect(tag).toHaveTextContent('Q')
+  })
+
+  // ---- head to head ----
+
+  /**
+   * It opens on the reader's own roster, which is the comparison they came
+   * for. `isMe` is decided on the backend from Sleeper's owner_id, so the page
+   * does not re-derive it.
+   */
+  it('defaults the comparison to your own roster', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText('Head to head')
+    const picks = screen.getAllByRole('combobox')
+    expect(within(picks[0] as HTMLElement).getByRole('option', { name: /jstrobe \(you\)/ }))
+      .toBeInTheDocument()
+    expect((picks[0] as HTMLSelectElement).value).toBe('2')
+    expect((picks[1] as HTMLSelectElement).value).toBe('1')
+  })
+
+  /** Slot against slot, with the heavier side marked as such. */
+  it('compares the two lineups slot by slot', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText('Head to head')
+    const row = document.querySelector('.analysis-vs-row') as HTMLElement
+    const scope = within(row)
+    // jstrobe's Josh Allen (22.5) against kieriskash's Jayden Daniels (18.1).
+    expect(scope.getByText('Josh Allen')).toBeInTheDocument()
+    expect(scope.getByText('Jayden Daniels')).toBeInTheDocument()
+    expect(scope.getByText('Josh Allen').closest('.analysis-vs-player')).toHaveClass('won')
+  })
+
+  /** Changing a side changes the comparison, not just the dropdown. */
+  it('swaps the compared roster when the picker changes', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+
+    await screen.findByText('Head to head')
+    const picks = screen.getAllByRole('combobox')
+    await user.selectOptions(picks[0], '1')
+
+    const row = document.querySelector('.analysis-vs-row') as HTMLElement
+    // Both sides are kieriskash's lineup now, so Josh Allen is gone from it.
+    expect(within(row).queryByText('Josh Allen')).not.toBeInTheDocument()
   })
 })

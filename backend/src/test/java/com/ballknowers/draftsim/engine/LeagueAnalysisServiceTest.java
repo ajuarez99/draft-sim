@@ -1,16 +1,27 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.engine.LeagueAnalysisService.LineupPlayer;
+import com.ballknowers.draftsim.engine.LeagueAnalysisService.Matchup;
+import com.ballknowers.draftsim.engine.LeagueAnalysisService.RosterProjection;
+import com.ballknowers.draftsim.store.LeagueMatchupRepository.Fixture;
 import com.ballknowers.draftsim.store.PlayerProjectionRepository.ScoringKey;
 import org.junit.jupiter.api.Test;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The two rules in claude/league-analysis.md that are pure functions, pinned
- * without a database: ffwrapped's formula and the scoring-key derivation.
+ * The rules in claude/league-analysis.md and its second pass
+ * (claude/league-analysis-lineups-and-matchups.md) that are pure functions,
+ * pinned without a database: ffwrapped's formula, the scoring-key derivation,
+ * the lineup-card order and the matchup pairing.
  *
  * The rest of {@link LeagueAnalysisService} is a walk over Sleeper's live
- * rosters and four repositories -- exercised by the live pass recorded in the
+ * rosters and five repositories -- exercised by the live pass recorded in the
  * brief rather than mocked into a shape that proves only that the mocks were
  * wired up.
  */
@@ -98,5 +109,126 @@ class LeagueAnalysisServiceTest {
     @Test
     void theRankingScoreNeedsMoreThanOneWeek() {
         assertTrue(LeagueAnalysisService.MIN_SCORED_WEEKS > 1);
+    }
+
+    // ---- the lineup card (claude/league-analysis-lineups-and-matchups.md piece 1) ----
+
+    /** (Foot) Ball Knowers' own roster_positions, which is where the order comes from. */
+    private static final List<String> SLOTS =
+            List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX", "K", "DEF",
+                    "BN", "BN", "BN", "BN", "BN");
+
+    private static LineupPlayer at(String slot, double points) {
+        return new LineupPlayer("id-" + slot + "-" + points, slot + " " + points, "WR",
+                "CIN", slot, points, null);
+    }
+
+    private static List<String> slotsOf(List<LineupPlayer> players) {
+        List<LineupPlayer> sorted = new ArrayList<>(players);
+        sorted.sort(LeagueAnalysisService.byLineupCard(SLOTS));
+        return sorted.stream().map(LineupPlayer::slot).toList();
+    }
+
+    /**
+     * The whole point of the change: a lineup card is in slot order even when
+     * that puts a 12-point quarterback above a 23-point running back. The old
+     * points-descending sort produced exactly the reversed list below.
+     */
+    @Test
+    void theLineupCardIsInTheLeaguesSlotOrderNotPointsOrder() {
+        assertEquals(List.of("QB", "RB", "WR", "TE", "FLEX", "K", "DEF"),
+                slotsOf(List.of(at("DEF", 8.0), at("K", 9.0), at("FLEX", 11.0), at("TE", 14.0),
+                        at("WR", 19.0), at("RB", 23.0), at("QB", 12.0))));
+    }
+
+    /** Within one slot name, the better projection is the one listed first. */
+    @Test
+    void twoPlayersInTheSameSlotAreOrderedByPoints() {
+        List<LineupPlayer> sorted = new ArrayList<>(List.of(at("RB", 9.4), at("RB", 17.2)));
+        sorted.sort(LeagueAnalysisService.byLineupCard(SLOTS));
+        assertEquals(List.of(17.2, 9.4), sorted.stream().map(LineupPlayer::points).toList());
+    }
+
+    /**
+     * A slot this app has never heard of sorts to the end, never to the front.
+     * {@code indexOf} answers -1 for it, and -1 sorts BEFORE the quarterback
+     * unless it is mapped -- which is the whole reason the comparator does not
+     * use the raw index.
+     */
+    @Test
+    void anUnknownSlotSortsToTheEndRatherThanAheadOfTheQuarterback() {
+        assertEquals(List.of("QB", "SUPER_FLEX"),
+                slotsOf(List.of(at("SUPER_FLEX", 30.0), at("QB", 4.0))));
+    }
+
+    // ---- the matchup pairing (piece 3) ----
+
+    private static RosterProjection roster(int rosterId, double total) {
+        return new RosterProjection(rosterId, (long) rosterId, "manager " + rosterId, null, 0,
+                false, total, Map.of(), Map.of(), List.of(), List.of(), 0);
+    }
+
+    private static Map<Integer, RosterProjection> valued(RosterProjection... rosters) {
+        Map<Integer, RosterProjection> byRoster = new HashMap<>();
+        for (RosterProjection r : rosters) byRoster.put(r.rosterId(), r);
+        return byRoster;
+    }
+
+    /**
+     * Sleeper groups two rosters under one matchup_id and never says which is
+     * home, so the pairing is by that key alone and the sides come out
+     * best-projected first.
+     */
+    @Test
+    void rostersSharingAMatchupIdBecomeTheTwoSidesOfOneGame() {
+        List<Matchup> games = LeagueAnalysisService.pair(
+                List.of(new Fixture(2, 1, 7), new Fixture(2, 2, 7)),
+                valued(roster(1, 101.5), roster(2, 133.0)));
+
+        assertEquals(1, games.size());
+        assertEquals(7, games.getFirst().matchupId());
+        assertEquals(List.of(2, 1), games.getFirst().sides().stream()
+                .map(LeagueAnalysisService.Side::rosterId).toList());
+    }
+
+    /**
+     * A bye -- an odd team count, or a week Sleeper has half-published -- is a
+     * group of one, and is carried rather than dropped. A manager with no game
+     * next week needs telling; a missing card tells them nothing.
+     */
+    @Test
+    void aMatchupWithOneRosterInItIsAByeAndSurvives() {
+        List<Matchup> games = LeagueAnalysisService.pair(
+                List.of(new Fixture(2, 5, 3)), valued(roster(5, 118.2)));
+
+        assertEquals(1, games.size());
+        assertEquals(1, games.getFirst().sides().size());
+    }
+
+    /** Heaviest combined projection first, because matchup_id itself means nothing. */
+    @Test
+    void gamesAreOrderedByHowBigTheyAre() {
+        List<Matchup> games = LeagueAnalysisService.pair(
+                List.of(new Fixture(2, 1, 1), new Fixture(2, 2, 1),
+                        new Fixture(2, 3, 2), new Fixture(2, 4, 2)),
+                valued(roster(1, 90.0), roster(2, 95.0), roster(3, 140.0), roster(4, 130.0)));
+
+        assertEquals(List.of(2, 1), games.stream().map(Matchup::matchupId).toList());
+    }
+
+    /**
+     * A fixture naming a roster nothing valued is dropped, not shown at zero.
+     * That state means Sleeper's roster list and the stored schedule disagree,
+     * and "projected to score nothing" is a claim where an absent row is an
+     * absence.
+     */
+    @Test
+    void aFixtureWithNoValuedRosterIsDroppedRatherThanShownAtZero() {
+        List<Matchup> games = LeagueAnalysisService.pair(
+                List.of(new Fixture(2, 1, 4), new Fixture(2, 99, 4)),
+                valued(roster(1, 112.0)));
+
+        assertEquals(1, games.getFirst().sides().size());
+        assertEquals(1, games.getFirst().sides().getFirst().rosterId());
     }
 }

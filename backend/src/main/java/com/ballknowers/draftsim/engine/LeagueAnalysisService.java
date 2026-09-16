@@ -55,12 +55,14 @@ public class LeagueAnalysisService {
     private final PlayerProjectionRepository projections;
     private final PlayerRepository players;
     private final ManagerRepository managers;
+    private final LeagueMatchupRepository matchupRepo;
     private final SleeperClient sleeper;
     private final SportRulesRegistry rulesRegistry;
 
     public LeagueAnalysisService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                  RosterWeekPointsRepository weekPoints, PlayerProjectionRepository projections,
                                  PlayerRepository players, ManagerRepository managers,
+                                 LeagueMatchupRepository matchupRepo,
                                  SleeperClient sleeper, SportRulesRegistry rulesRegistry) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
@@ -68,6 +70,7 @@ public class LeagueAnalysisService {
         this.projections = projections;
         this.players = players;
         this.managers = managers;
+        this.matchupRepo = matchupRepo;
         this.sleeper = sleeper;
         this.rulesRegistry = rulesRegistry;
     }
@@ -75,7 +78,7 @@ public class LeagueAnalysisService {
     // ---- wire shapes ----
 
     public record Analysis(int season, String scoringKey, Window window,
-                           RankingScores rankingScores, Projections projections) {}
+                           RankingScores rankingScores, Projections projections, Matchups matchups) {}
 
     /** The rest-of-season window, named so the page can say what it covered. */
     public record Window(int fromWeek, int toWeek, int weeks, int scoredWeeks) {}
@@ -104,20 +107,56 @@ public class LeagueAnalysisService {
      * @param rankByPosition this roster's rank in the league at each position
      *                     group, 1 = most projected. Piece 3 of the page is
      *                     this field read down the columns.
+     * @param isMe         this is the signed-in reader's own roster. Decided by
+     *                     Sleeper's {@code owner_id}, which IS a Sleeper user
+     *                     id, against the caller's -- so it needs no lookup and
+     *                     is simply false for a signed-out reader.
+     * @param bench        every rostered player who did not start, valued over
+     *                     the same window and sorted descending. A zero at the
+     *                     bottom of this list IS the explanation for a thin
+     *                     bar, in place, where {@code missing} is only a count.
      * @param missing      rostered players with no projection at all in the
      *                     window (IR, Out, PUP). Reported rather than hidden:
      *                     it is the honest explanation for a thin-looking bar.
      */
     public record RosterProjection(int rosterId, Long managerId, String manager, String avatarId, int rank,
-                                   double total, Map<String, Double> byPosition,
-                                   Map<String, Integer> rankByPosition, List<Starter> starters,
-                                   int missing) {}
+                                   boolean isMe, double total, Map<String, Double> byPosition,
+                                   Map<String, Integer> rankByPosition, List<LineupPlayer> starters,
+                                   List<LineupPlayer> bench, int missing) {}
 
-    public record Starter(String sleeperPlayerId, String name, String position, String slot, double points) {}
+    /**
+     * One rostered player, valued over whichever window the pass ran on.
+     *
+     * @param slot         the roster slot filled -- a league slot name for a
+     *                     starter ("QB", "FLEX"), and "BN" for the bench.
+     * @param injuryStatus Sleeper's own tag as of the last player ingest, or
+     *                     null. Carried because it is the explanation for a
+     *                     zero: a bench line reading "A.J. Brown IR 0.0" says
+     *                     what a count of "6 unprojected" cannot.
+     */
+    public record LineupPlayer(String sleeperPlayerId, String name, String position, String team,
+                               String slot, double points, String injuryStatus) {}
+
+    /**
+     * The next unplayed week's real pairings, each side valued for THAT WEEK
+     * alone (claude/league-analysis-lineups-and-matchups.md piece 3).
+     *
+     * <p>Sides rather than home/away: Sleeper has no home team, only a
+     * {@code matchup_id} grouping two rosters, and inventing a side would be
+     * asserting something the source does not say. A group of one is a bye and
+     * is carried rather than dropped -- a manager with no game next week needs
+     * telling.
+     */
+    public record Matchups(boolean available, String reason, int week, List<Matchup> matchups) {}
+
+    public record Matchup(int matchupId, List<Side> sides) {}
+
+    public record Side(int rosterId, Long managerId, String manager, String avatarId, boolean isMe,
+                       double projected, Map<String, Double> byPosition, List<LineupPlayer> starters) {}
 
     // ---- entry point ----
 
-    public Analysis analyse(String sleeperLeagueId) {
+    public Analysis analyse(String sleeperLeagueId, String sleeperUserId) {
         LeagueRepository.LeagueRow league = leagues.bySleeperId(sleeperLeagueId)
                 .orElseThrow(() -> new IllegalArgumentException("no such league: " + sleeperLeagueId));
 
@@ -142,9 +181,15 @@ public class LeagueAnalysisService {
 
         Window window = new Window(fromWeek, toWeek, Math.max(0, toWeek - fromWeek + 1), scored.size());
 
+        // Both projection blocks come out of one call: they share every gate,
+        // every lookup table and the roster list itself, and differ only in
+        // which weeks they value. Computing them apart would fetch the same
+        // twelve Sleeper rosters twice to answer one request.
+        Blocks blocks = projectionBlocks(league, key, fromWeek, toWeek, playoffWeekStart, sleeperUserId);
+
         return new Analysis(league.season(), key.name(), window,
                 rankingScores(league, scored.size(), lastScored),
-                rosterProjections(league, key, fromWeek, toWeek, playoffWeekStart));
+                blocks.projections(), blocks.matchups());
     }
 
     // ---- piece 1 ----
@@ -233,23 +278,25 @@ public class LeagueAnalysisService {
         return ranked;
     }
 
-    // ---- pieces 2 and 3 ----
+    // ---- pieces 2, 3 and the matchup preview ----
 
-    private Projections rosterProjections(LeagueRepository.LeagueRow league,
-                                          PlayerProjectionRepository.ScoringKey key,
-                                          int fromWeek, int toWeek, int playoffWeekStart) {
+    /** The two blocks that read projections, which share every gate below. */
+    private record Blocks(Projections projections, Matchups matchups) {}
+
+    private Blocks projectionBlocks(LeagueRepository.LeagueRow league,
+                                    PlayerProjectionRepository.ScoringKey key,
+                                    int fromWeek, int toWeek, int playoffWeekStart,
+                                    String sleeperUserId) {
         List<String> groups = Position.forSport(league.sport()).stream().map(Enum::name).toList();
 
         if (playoffWeekStart < 2) {
-            return new Projections(false,
-                    "this league has no playoff_week_start, so there is no regular season to project to the end of",
-                    groups, List.of());
+            return unavailable(groups, fromWeek,
+                    "this league has no playoff_week_start, so there is no regular season to project to the end of");
         }
         if (fromWeek > toWeek) {
-            return new Projections(false,
+            return unavailable(groups, fromWeek,
                     "the regular season is over (weeks run to " + toWeek + ", and " + (fromWeek - 1)
-                            + " are scored), so there is nothing left to project",
-                    groups, List.of());
+                            + " are scored), so there is nothing left to project");
         }
 
         // Said before the cache is consulted, because for a sport with no
@@ -257,85 +304,263 @@ public class LeagueAnalysisService {
         // ingest them" advice below would point at an endpoint that answers
         // 400. A reason the reader cannot act on is worse than no reason.
         if (league.sport() != Sport.NFL) {
-            return new Projections(false,
+            return unavailable(groups, fromWeek,
                     "roster projections are football-only: the projection source wired up is Sleeper's"
                             + " own weekly points (pts_ppr and friends), which has no "
-                            + league.sport().code() + " equivalent. See claude/league-analysis.md's non-goals.",
-                    groups, List.of());
+                            + league.sport().code() + " equivalent. See claude/league-analysis.md's non-goals.");
         }
 
-        Map<String, Double> pointsByPlayer =
+        Map<String, Double> restOfSeason =
                 projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
-        if (pointsByPlayer.isEmpty()) {
-            return new Projections(false,
-                    "no projections stored for " + league.sport().code() + " " + league.season()
-                            + " weeks " + fromWeek + "-" + toWeek + " -- run POST /api/ingest/projections?sport="
-                            + league.sport().code() + "&season=" + league.season()
-                            + "&fromWeek=" + fromWeek + "&toWeek=" + toWeek,
-                    groups, List.of());
+        if (restOfSeason.isEmpty()) {
+            return unavailable(groups, fromWeek, noProjectionsStored(league, fromWeek, toWeek));
         }
 
-        LeagueSettings settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
-        SportRules rules = rulesRegistry.get(league.sport());
-        Map<String, Player> playerBySleeperId = new HashMap<>();
-        players.findAll(league.sport()).forEach(p -> playerBySleeperId.put(p.sleeperId(), p));
-        Map<String, Long> managerBySleeperUserId = managers.idsBySleeperUserId();
-        Map<Integer, String> managerNames = new HashMap<>();
-        Map<Integer, String> avatars = new HashMap<>();
-        rosterSeasons.forLeague(league.id()).forEach(r -> {
-            managerNames.put(r.rosterId(), r.managerName());
-            avatars.put(r.rosterId(), r.avatarId());
-        });
-
-        List<RosterProjection> out = new ArrayList<>();
-        for (Map<String, Object> roster : sleeper.rosters(league.sleeperId())) {
-            int rosterId = asInt(roster.get("roster_id"));
-            if (rosterId < 0) continue;
-            Object ownerId = roster.get("owner_id");
-            Long managerId = ownerId == null ? null : managerBySleeperUserId.get(String.valueOf(ownerId));
-
-            @SuppressWarnings("unchecked")
-            List<String> rosterPlayers = (List<String>) roster.getOrDefault("players", List.of());
-
-            RosterState state = new RosterState();
-            int missing = 0;
-            for (String sleeperPlayerId : rosterPlayers) {
-                Player p = playerBySleeperId.get(sleeperPlayerId);
-                if (p == null) { missing++; continue; }
-                if (!pointsByPlayer.containsKey(sleeperPlayerId)) missing++;
-                // A synthetic board entry: this path values players by
-                // projection, and a rostered player who is simply not on the
-                // draft board (a waiver pickup, a rookie past the board's tail)
-                // still scores points. ADP is a placeholder here and never
-                // read -- startingLineup re-sorts by the supplied value
-                // function precisely so this cannot matter.
-                state.add(new BoardEntry(p, OFF_BOARD_ADP, 0));
-            }
-
-            List<SportRules.Assigned> lineup = rules.startingLineup(state, settings,
-                    e -> pointsByPlayer.getOrDefault(e.player().sleeperId(), 0.0));
-
-            Map<String, Double> byPosition = new LinkedHashMap<>();
-            groups.forEach(g -> byPosition.put(g, 0.0));
-            List<Starter> starters = new ArrayList<>();
-            double total = 0;
-            for (SportRules.Assigned a : lineup) {
-                String group = a.entry().position().name();
-                byPosition.merge(group, a.value(), Double::sum);
-                total += a.value();
-                starters.add(new Starter(a.entry().player().sleeperId(), a.entry().player().name(),
-                        group, a.slot(), round(a.value(), 1)));
-            }
-            starters.sort(Comparator.comparingDouble(Starter::points).reversed());
-            byPosition.replaceAll((g, v) -> round(v, 1));
-
-            out.add(new RosterProjection(rosterId, managerId, managerNames.get(rosterId),
-                    avatars.get(rosterId), 0, round(total, 1), byPosition, Map.of(), starters, missing));
-        }
+        LineupPass pass = new LineupPass(league, groups, sleeperUserId);
+        List<RosterProjection> ranked = rankAll(pass.over(restOfSeason), groups);
 
         log.info("league analysis: league {} projected weeks {}-{} using {} over {} players",
-                league.id(), fromWeek, toWeek, key.column(), pointsByPlayer.size());
-        return new Projections(true, null, groups, rankAll(out, groups));
+                league.id(), fromWeek, toWeek, key.column(), restOfSeason.size());
+
+        return new Blocks(new Projections(true, null, groups, ranked),
+                matchupBlock(league, key, fromWeek, pass));
+    }
+
+    /**
+     * One reason, both blocks. Every gate the matchup preview would apply for
+     * itself is upstream of it, so restating them in its own words would be two
+     * explanations of one fact, free to drift apart.
+     */
+    private static Blocks unavailable(List<String> groups, int week, String reason) {
+        return new Blocks(new Projections(false, reason, groups, List.of()),
+                new Matchups(false, reason, week, List.of()));
+    }
+
+    private static String noProjectionsStored(LeagueRepository.LeagueRow league, int fromWeek, int toWeek) {
+        return "no projections stored for " + league.sport().code() + " " + league.season()
+                + " weeks " + fromWeek + "-" + toWeek + " -- run POST /api/ingest/projections?sport="
+                + league.sport().code() + "&season=" + league.season()
+                + "&fromWeek=" + fromWeek + "&toWeek=" + toWeek;
+    }
+
+    /**
+     * The matchup preview. The pairings are already stored: claude/playoff-odds.md
+     * built {@code league_matchup} because {@link RosterWeekPointsRepository}
+     * caches what every roster scored and drops who they played, and the league
+     * history ingest walks unplayed weeks to store theirs. So this is a read,
+     * not an ingest.
+     *
+     * <p><b>The week is valued on its own.</b> A roster's best starter over
+     * thirteen weeks is not necessarily its best starter in week 2 -- a bye or
+     * a one-week injury moves it -- so this re-runs the same greedy assembly
+     * against a one-week points map rather than dividing a rest-of-season total
+     * by anything.
+     */
+    private Matchups matchupBlock(LeagueRepository.LeagueRow league,
+                                  PlayerProjectionRepository.ScoringKey key,
+                                  int week, LineupPass pass) {
+        List<LeagueMatchupRepository.Fixture> fixtures =
+                matchupRepo.between(league.id(), league.season(), week, week);
+        if (fixtures.isEmpty()) {
+            // Reachable, and not an error: Sleeper answers a week it has not
+            // scheduled yet with every matchup_id null, and
+            // LeagueMatchupRepository deliberately refuses to count that as
+            // cached rather than poisoning the schedule forever.
+            return new Matchups(false, "no pairings stored for week " + week
+                    + " -- Sleeper publishes a week's schedule shortly before it, and it is stored by"
+                    + " POST /api/ingest/league-history/" + league.sleeperId(), week, List.of());
+        }
+
+        Map<String, Double> weekly =
+                projections.totalsByPlayer(league.sport().code(), league.season(), week, week, key);
+        if (weekly.isEmpty()) {
+            // Its own gate, not implied by the rest-of-season one above: a
+            // thirteen-week window can hold rows while this single week does not.
+            return new Matchups(false, noProjectionsStored(league, week, week), week, List.of());
+        }
+
+        Map<Integer, RosterProjection> byRoster = new HashMap<>();
+        pass.over(weekly).forEach(r -> byRoster.put(r.rosterId(), r));
+
+        List<Matchup> out = pair(fixtures, byRoster);
+
+        log.info("league analysis: league {} week {} matchups: {} pairings over {} projected players",
+                league.id(), week, out.size(), weekly.size());
+        return new Matchups(true, null, week, List.copyOf(out));
+    }
+
+    /**
+     * Fixtures plus valued rosters into the pairings the page draws.
+     *
+     * <p>Static and package-private because this is the half of the matchup
+     * block with rules in it -- who is grouped with whom, what a group of one
+     * means, what order any of it comes out in -- while everything around it is
+     * Sleeper and Postgres. It is tested directly for that reason.
+     *
+     * <p>A fixture whose roster has no valued lineup is dropped rather than
+     * shown at zero: that only happens when Sleeper's roster list and the
+     * stored schedule disagree, and a roster projected to score nothing is a
+     * claim, where a missing row is an absence.
+     */
+    static List<Matchup> pair(List<LeagueMatchupRepository.Fixture> fixtures,
+                              Map<Integer, RosterProjection> byRoster) {
+        Map<Integer, List<Side>> grouped = new LinkedHashMap<>();
+        for (LeagueMatchupRepository.Fixture f : fixtures) {
+            RosterProjection p = byRoster.get(f.rosterId());
+            if (p == null) continue;
+            grouped.computeIfAbsent(f.matchupId(), k -> new ArrayList<>())
+                    .add(new Side(p.rosterId(), p.managerId(), p.manager(), p.avatarId(),
+                            p.isMe(), p.total(), p.byPosition(), p.starters()));
+        }
+
+        List<Matchup> out = new ArrayList<>();
+        grouped.forEach((matchupId, sides) -> {
+            sides.sort(Comparator.comparingDouble(Side::projected).reversed());
+            out.add(new Matchup(matchupId, List.copyOf(sides)));
+        });
+        // Heaviest game first. Sleeper's matchup_id is an arbitrary key, so some
+        // order has to be chosen, and this one at least means something.
+        out.sort(Comparator.comparingDouble(
+                (Matchup m) -> m.sides().stream().mapToDouble(Side::projected).sum()).reversed());
+        return List.copyOf(out);
+    }
+
+    /**
+     * The league's own lineup card order: a starter sits at the first slot of
+     * its own name in {@code roster_positions}, ties broken by points.
+     *
+     * <p>The order {@link SportRules#startingLineup} returns cannot answer
+     * this: it iterates {@link LeagueSettings#dedicatedStarters()}, which is a
+     * {@code Map.of(...)} whose iteration order is unspecified and salted per
+     * JVM run -- the points-descending sort this replaces was hiding that, and
+     * a lineup card reading RB, WR, QB, FLEX is not a lineup card.
+     * {@code roster_positions} is an ordered list read straight off Sleeper
+     * (QB, RB, RB, WR, WR, TE, FLEX, FLEX, K, DEF), so the league answers it.
+     *
+     * <p>An unrecognised slot sorts to the END rather than the front, so a slot
+     * this app has never heard of (SUPER_FLEX, a bench line) can never
+     * masquerade as the quarterback.
+     */
+    static Comparator<LineupPlayer> byLineupCard(List<String> slotOrder) {
+        return Comparator.comparingInt((LineupPlayer l) -> {
+                    int i = slotOrder.indexOf(l.slot());
+                    return i < 0 ? slotOrder.size() : i;
+                })
+                .thenComparing(Comparator.comparingDouble(LineupPlayer::points).reversed());
+    }
+
+    /**
+     * Everything a lineup pass needs that does not depend on WHICH weeks are
+     * being valued, so that the rest-of-season block and the weekly matchup
+     * block are the same assembly run twice rather than two assemblies.
+     *
+     * <p>A second loop valued weekly would be two implementations of "what does
+     * this roster start" -- the bug this repo has shipped three times under
+     * three names, and the reason {@link SportRules#startingLineup} exists as
+     * one shared rule in the first place.
+     */
+    private final class LineupPass {
+
+        private final List<Map<String, Object>> rosters;
+        private final LeagueSettings settings;
+        private final SportRules rules;
+        private final List<String> groups;
+        private final List<String> slotOrder;
+        private final Map<String, Player> playerBySleeperId = new HashMap<>();
+        private final Map<String, Long> managerBySleeperUserId;
+        private final Map<Integer, String> managerNames = new HashMap<>();
+        private final Map<Integer, String> avatars = new HashMap<>();
+        private final String sleeperUserId;
+
+        LineupPass(LeagueRepository.LeagueRow league, List<String> groups, String sleeperUserId) {
+            this.groups = groups;
+            this.sleeperUserId = sleeperUserId;
+            this.settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
+            this.rules = rulesRegistry.get(league.sport());
+            this.slotOrder = league.rosterPositions();
+            this.rosters = sleeper.rosters(league.sleeperId());
+            this.managerBySleeperUserId = managers.idsBySleeperUserId();
+            players.findAll(league.sport()).forEach(p -> playerBySleeperId.put(p.sleeperId(), p));
+            rosterSeasons.forLeague(league.id()).forEach(r -> {
+                managerNames.put(r.rosterId(), r.managerName());
+                avatars.put(r.rosterId(), r.avatarId());
+            });
+        }
+
+        /** Unranked: ranking is the rest-of-season block's business, not the weekly one's. */
+        List<RosterProjection> over(Map<String, Double> pointsByPlayer) {
+            List<RosterProjection> out = new ArrayList<>();
+            for (Map<String, Object> roster : rosters) {
+                int rosterId = asInt(roster.get("roster_id"));
+                if (rosterId < 0) continue;
+                Object ownerId = roster.get("owner_id");
+                String owner = ownerId == null ? null : String.valueOf(ownerId);
+                Long managerId = owner == null ? null : managerBySleeperUserId.get(owner);
+                // owner_id IS a Sleeper user id, which is exactly what the
+                // caller's header carries, so "is this mine" is a string
+                // comparison and not a manager lookup. A signed-out reader has
+                // no id and therefore owns nothing, which is the right answer.
+                boolean isMe = owner != null && owner.equals(sleeperUserId);
+
+                @SuppressWarnings("unchecked")
+                List<String> rosterPlayers = (List<String>) roster.getOrDefault("players", List.of());
+
+                RosterState state = new RosterState();
+                List<Player> known = new ArrayList<>();
+                int missing = 0;
+                for (String sleeperPlayerId : rosterPlayers) {
+                    Player p = playerBySleeperId.get(sleeperPlayerId);
+                    if (p == null) { missing++; continue; }
+                    if (!pointsByPlayer.containsKey(sleeperPlayerId)) missing++;
+                    known.add(p);
+                    // A synthetic board entry: this path values players by
+                    // projection, and a rostered player who is simply not on the
+                    // draft board (a waiver pickup, a rookie past the board's
+                    // tail) still scores points. ADP is a placeholder here and
+                    // never read -- startingLineup re-sorts by the supplied
+                    // value function precisely so this cannot matter.
+                    state.add(new BoardEntry(p, OFF_BOARD_ADP, 0));
+                }
+
+                List<SportRules.Assigned> lineup = rules.startingLineup(state, settings,
+                        e -> pointsByPlayer.getOrDefault(e.player().sleeperId(), 0.0));
+
+                Map<String, Double> byPosition = new LinkedHashMap<>();
+                groups.forEach(g -> byPosition.put(g, 0.0));
+                List<LineupPlayer> starters = new ArrayList<>();
+                Set<String> started = new HashSet<>();
+                double total = 0;
+                for (SportRules.Assigned a : lineup) {
+                    Player p = a.entry().player();
+                    String group = a.entry().position().name();
+                    byPosition.merge(group, a.value(), Double::sum);
+                    total += a.value();
+                    started.add(p.sleeperId());
+                    starters.add(lineupPlayer(p, group, a.slot(), a.value()));
+                }
+                starters.sort(byLineupCard(slotOrder));
+
+                List<LineupPlayer> bench = new ArrayList<>();
+                for (Player p : known) {
+                    if (started.contains(p.sleeperId())) continue;
+                    bench.add(lineupPlayer(p, p.primary().name(), "BN",
+                            pointsByPlayer.getOrDefault(p.sleeperId(), 0.0)));
+                }
+                bench.sort(Comparator.comparingDouble(LineupPlayer::points).reversed());
+
+                byPosition.replaceAll((g, v) -> round(v, 1));
+                out.add(new RosterProjection(rosterId, managerId, managerNames.get(rosterId),
+                        avatars.get(rosterId), 0, isMe, round(total, 1), byPosition, Map.of(),
+                        List.copyOf(starters), List.copyOf(bench), missing));
+            }
+            return out;
+        }
+
+        private LineupPlayer lineupPlayer(Player p, String group, String slot, double points) {
+            return new LineupPlayer(p.sleeperId(), p.name(), group, p.team(), slot,
+                    round(points, 1), p.injuryStatus());
+        }
+
     }
 
     /**
@@ -369,7 +594,8 @@ public class LeagueAnalysisService {
                 Comparator.comparingDouble(RosterProjection::total).reversed(), RosterProjection::total)) {
             RosterProjection p = r.item();
             out.add(new RosterProjection(p.rosterId(), p.managerId(), p.manager(), p.avatarId(), r.rank(),
-                    p.total(), p.byPosition(), rankByRoster.get(p.rosterId()), p.starters(), p.missing()));
+                    p.isMe(), p.total(), p.byPosition(), rankByRoster.get(p.rosterId()), p.starters(),
+                    p.bench(), p.missing()));
         }
         return out;
     }

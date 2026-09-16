@@ -48,6 +48,6 @@ public class LeagueAnalysisController {
         if (league.isEmpty() || !membership.canSee(sleeperUserId, league.get().id())) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(analysis.analyse(sleeperId));
+        return ResponseEntity.ok(analysis.analyse(sleeperId, sleeperUserId));
     }
 }

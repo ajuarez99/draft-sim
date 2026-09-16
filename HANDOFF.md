@@ -1,5 +1,26 @@
 # Ball Knowers — handoff
 
+**Shipped 2026-09-16, uncommitted on `main`: the League analysis page's second
+pass.** `claude/league-analysis-lineups-and-matchups.md` is the brief. Three
+additions, all answering the same complaint -- the page said a roster projects
+to 1,683.9 points and named nobody: a **lineup drilldown** behind every bar
+(starters in the league's own slot order, then the bench, where the zeroes and
+their IR/PUP tags live), **head to head** for any two rosters slot against slot,
+and a **week N matchup preview** off the league's real pairings.
+
+Cheaper than it looks, twice over: `starters` was already computed and already
+on the wire, unread by the page; and `league_matchup` -- the fixture table
+playoff odds built -- already held the schedule, so the matchup preview is a
+read and not an ingest. The one real engine change is that the weekly block
+re-runs the same greedy lineup assembly against a one-week points map rather
+than slicing the rest-of-season total, behind a `LineupPass` both blocks share.
+
+399 backend tests / 0 failures / **0 skipped**, 236 frontend, then the whole
+page driven in a browser against the real league. Read the brief's "What live
+verification found" first: four bugs got past the green suite, and the worst had
+the injury tag wearing `--crimson`, the token this stylesheet reserves for
+"this is yours".
+
 **Shipped 2026-09-15 on branch `nba-opinion-power-rankings` (not merged): the
 two OPINION modes of power rankings for basketball** -- league-member ballots
 and the commissioner ordering. Nothing computed (no box score, no preseason

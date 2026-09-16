@@ -2739,8 +2739,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    comparable to each other and not just internally. */
 .analysis-bar-row {
   display: grid;
-  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) 84px;
-  grid-template-areas: 'who track total' 'who legend legend';
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr) 84px auto;
+  grid-template-areas:
+    'who track total toggle'
+    'who legend legend legend'
+    'lineup lineup lineup lineup';
   align-items: center;
   gap: 4px 12px;
   padding: 8px 10px;
@@ -2748,6 +2751,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--bg);
 }
 .analysis-bar-row:hover { background: color-mix(in oklch, var(--teal) 6%, var(--bg)); }
+/* Crimson is reserved for "this is mine" everywhere in this app; same inset
+   rule the power-rankings ladder uses, so the two pages mark you identically. */
+.analysis-bar-row.mine { box-shadow: inset 2px 0 0 var(--crimson); }
 
 .analysis-bar-who { grid-area: who; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .analysis-bar-who .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2798,9 +2804,171 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-cell-rank { display: block; font-size: 15px; font-weight: 600; }
 .analysis-cell-points { display: block; font-size: 10px; color: var(--muted); }
 
+/* --- the lineup drawer (claude/league-analysis-lineups-and-matchups.md) -----
+ *
+ * The three shapes below are as deliberate as the three above. A lineup is a
+ * CARD -- an ordered list of slots, which is how every fantasy site on earth
+ * draws one and how the reader already holds it in their head. A game is a
+ * card with two sides and a margin. A comparison is a centre-split table. None
+ * of them is a grid of equal tiles, because none of them is a set of peers.
+ */
+
+.analysis-expand {
+  grid-area: toggle;
+  display: inline-flex; align-items: center; gap: 4px;
+  background: transparent; border: 1px solid var(--line); color: var(--muted);
+  border-radius: 999px; padding: 3px 10px; font-size: 11px; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.analysis-expand:hover { border-color: var(--teal); color: var(--text); }
+.analysis-expand:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.analysis-expand[aria-expanded='true'] { border-color: var(--teal); color: var(--text); }
+.analysis-caret { font-size: 9px; }
+
+.analysis-lineup-wrap {
+  grid-area: lineup;
+  margin-top: 8px; padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.analysis-lineup { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; }
+.analysis-lineup-head {
+  margin: 0 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.analysis-lineup-head .muted { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+
+.analysis-slotlist { list-style: none; margin: 0; padding: 0; }
+
+/* Three columns: the slot, who is in it, what they are worth. The slot pill is
+   coloured by the position the player PLAYS and lettered with the slot they
+   FILL, so a green FLEX says "running back in the flex" with no second column. */
+.analysis-slot {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 3px 6px; border-radius: 6px;
+}
+.analysis-slot:nth-child(odd) { background: color-mix(in oklch, var(--panel) 55%, transparent); }
+.analysis-slot.bn .analysis-slot-name { color: var(--muted); }
+.analysis-slot-pill { margin-right: 0; }
+.analysis-slot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.analysis-slot-team { margin-left: 6px; }
+.analysis-slot-pts { font-size: 13px; font-weight: 600; }
+
+/* A status tag, never a number: it explains a zero rather than producing one.
+   Deliberately colourless. --crimson is reserved by this stylesheet for "this
+   is yours", and an injury tag is not a severity scale this app has any way to
+   rank -- the WORD is the meaning, so the word carries it. */
+.analysis-inj {
+  margin-left: 6px; padding: 1px 5px; border-radius: 4px; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  border: 1px solid var(--line); color: var(--muted);
+}
+
+/* --- week N matchups ------------------------------------------------------ */
+
+.analysis-games {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px; margin-top: 12px;
+}
+.analysis-game {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  background: var(--bg);
+}
+.analysis-game.mine {
+  border-color: color-mix(in oklch, var(--crimson) 45%, var(--line));
+  background: color-mix(in oklch, var(--crimson) 7%, var(--bg));
+}
+.analysis-game-row + .analysis-game-row { margin-top: 8px; }
+.analysis-game-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.analysis-game-side .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.analysis-game-pts { margin-left: auto; font-weight: 600; }
+.analysis-game-row.lead .analysis-game-pts { color: var(--text); }
+
+/* One bar, two projections, split where they actually divide. Not a
+   probability -- see the margin line, which says what it is in words. */
+.analysis-game-split {
+  display: flex; height: 6px; margin: 8px 0 6px;
+  border-radius: 999px; overflow: hidden; background: var(--line);
+}
+.analysis-game-fill { display: block; background: var(--teal); }
+
+.analysis-game-margin { margin: 0; font-size: 12px; }
+/* Indented under the manager it belongs to -- the association is the point. */
+.analysis-game-top { display: flex; align-items: center; margin: 2px 0 0 30px; }
+/* The gap belongs to the layout, not to a literal space in the markup: JSX
+   swallowed that one and rendered "Jahmyr Gibbs26.1". */
+.analysis-game-top .mono { margin-left: 6px; }
+.analysis-game.bye { display: block; }
+.analysis-game-note { margin: 8px 0 0; }
+
+/* --- head to head --------------------------------------------------------- */
+
+.analysis-vs { margin-top: 12px; }
+.analysis-vs-picks { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.analysis-vs-pick { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.analysis-vs-pick select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 8px; font-size: 13px; font-family: inherit; max-width: 240px;
+}
+.analysis-vs-pick select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.analysis-vs-versus { align-self: center; color: var(--muted); font-size: 12px; padding-bottom: 6px; }
+
+.analysis-vs-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 12px;
+  margin: 14px 0 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+}
+.analysis-vs-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.analysis-vs-side.right { justify-content: flex-end; }
+.analysis-vs-total { font-size: 16px; font-weight: 600; }
+.analysis-vs-margin { text-align: center; white-space: nowrap; }
+.analysis-vs-margin-n { font-size: 15px; font-weight: 600; color: var(--teal); }
+
+.analysis-vs-rows { list-style: none; margin: 0; padding: 0; }
+
+/* The slot sits in the middle and both lineups read inward toward it, so the
+   two names being compared are the two things next to each other. */
+.analysis-vs-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) 62px minmax(0, 1fr);
+  align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px;
+}
+.analysis-vs-row:nth-child(odd) { background: color-mix(in oklch, var(--panel) 55%, transparent); }
+.analysis-vs-slot { margin-right: 0; justify-self: center; }
+
+.analysis-vs-player { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; }
+.analysis-vs-row .analysis-vs-player:first-child { flex-direction: row-reverse; }
+.analysis-vs-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+/* The heavier side of each row is the one in full-strength text. Weight, not
+   hue -- teal already means "the app is talking" and crimson already means
+   "this is you", and a third colour here would be a third rule to remember. */
+.analysis-vs-player.won .analysis-vs-name,
+.analysis-vs-player.won .analysis-vs-pts { color: var(--text); font-weight: 600; }
+.analysis-vs-pts { color: var(--muted); }
+.analysis-vs-empty { font-style: italic; }
+
+.analysis-vs-groups-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.analysis-vs-groups-note + .analysis-vs-groups { margin-top: 6px; padding-top: 0; border-top: 0; }
+.analysis-vs-groups {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 16px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line);
+}
+.analysis-vs-group { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.analysis-vs-group .pos { margin-right: 0; }
+.analysis-vs-group-diff { margin-left: auto; font-size: 11px; color: var(--muted); }
+.analysis-vs-group-diff.left, .analysis-vs-group-diff.right { color: var(--text); }
+
 @media (max-width: 720px) {
   .analysis-bar-row {
     grid-template-columns: minmax(0, 1fr) 84px;
-    grid-template-areas: 'who total' 'track track' 'legend legend';
+    grid-template-areas:
+      'who total'
+      'track track'
+      'legend toggle'
+      'lineup lineup';
   }
+  .analysis-expand { justify-self: end; }
+  .analysis-lineup { grid-template-columns: minmax(0, 1fr); }
+  .analysis-vs-head { grid-template-columns: minmax(0, 1fr); }
+  .analysis-vs-side.right { justify-content: flex-start; }
+  .analysis-vs-row { grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr); gap: 6px; }
 }
