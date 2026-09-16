@@ -852,13 +852,16 @@ export type AnalysisRankingScores = {
   entries: AnalysisScoreEntry[]
 }
 
-export type AnalysisStarter = {
+export type AnalysisLineupPlayer = {
   sleeperPlayerId: string
   name: string
   position: string
-  /** The roster slot filled -- "FLEX" where `position` is RB/WR/TE. */
+  team: string | null
+  /** The slot filled -- "FLEX" where `position` is RB/WR/TE, "BN" on the bench. */
   slot: string
   points: number
+  /** Sleeper's tag as of the last player ingest: "IR", "Out", "Questionable"... */
+  injuryStatus: string | null
 }
 
 export type AnalysisRosterProjection = {
@@ -867,10 +870,15 @@ export type AnalysisRosterProjection = {
   manager: string | null
   avatarId: string | null
   rank: number
+  /** This is the signed-in reader's own roster, decided by Sleeper owner_id on the backend. */
+  isMe: boolean
   total: number
   byPosition: Record<string, number>
   rankByPosition: Record<string, number>
-  starters: AnalysisStarter[]
+  /** In the league's own slot order -- QB, RB, RB, WR, WR, TE, FLEX, FLEX, K, DEF. */
+  starters: AnalysisLineupPlayer[]
+  /** Everyone who did not start, best projection first. The zeroes at the bottom are the IRs. */
+  bench: AnalysisLineupPlayer[]
   /** Rostered players with no projection in the window: IR, Out, PUP. */
   missing: number
 }
@@ -882,6 +890,35 @@ export type AnalysisProjections = {
   rosters: AnalysisRosterProjection[]
 }
 
+/**
+ * One side of one game. Sleeper has no home team -- only a `matchupId`
+ * grouping two rosters -- so the wire has sides, best projection first, and a
+ * `sides` of length 1 is a bye rather than a missing opponent.
+ */
+export type AnalysisSide = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  isMe: boolean
+  projected: number
+  byPosition: Record<string, number>
+  starters: AnalysisLineupPlayer[]
+}
+
+export type AnalysisMatchup = {
+  matchupId: number
+  sides: AnalysisSide[]
+}
+
+export type AnalysisMatchups = {
+  available: boolean
+  reason: string | null
+  /** The next unplayed week, projected on its own rather than sliced out of the rest of the season. */
+  week: number
+  matchups: AnalysisMatchup[]
+}
+
 export type LeagueAnalysis = {
   season: number
   /** Which of Sleeper's three scoring totals this league is read under. */
@@ -889,6 +926,7 @@ export type LeagueAnalysis = {
   window: AnalysisWindow
   rankingScores: AnalysisRankingScores
   projections: AnalysisProjections
+  matchups: AnalysisMatchups
 }
 
 export const getLeagueAnalysis = (sleeperLeagueId: string) =>
