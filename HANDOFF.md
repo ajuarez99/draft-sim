@@ -1,6 +1,6 @@
 # Ball Knowers — handoff
 
-**Shipped 2026-09-16, uncommitted on `main`: the League analysis page's second
+**Shipped 2026-09-16 on branch `league-analysis-lineups-and-matchups` (pushed, not merged): the League analysis page's second
 pass.** `claude/league-analysis-lineups-and-matchups.md` is the brief. Three
 additions, all answering the same complaint -- the page said a roster projects
 to 1,683.9 points and named nobody: a **lineup drilldown** behind every bar
