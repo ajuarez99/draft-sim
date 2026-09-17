@@ -84,4 +84,44 @@ describe('mock responses from a backend older than this bundle', () => {
     expect(state.reversalRound).toBe(3)
     expect(state.sport).toBe('nba')
   })
+
+  /*
+   * V16's sourceSleeperLeagueId is the newest field to pass through this same
+   * window. It must stay ABSENT rather than be defaulted: there is no honest
+   * fallback for "which league seeded this mock", and inventing one would put a
+   * league's name in the rail of a mock that never came from it.
+   */
+  it('leaves an absent source league id absent rather than defaulting it', async () => {
+    respondWith({ ...OLD_SUMMARY, myPicks: [], seats: [], picks: [], available: [] })
+
+    const state = await getMockSession(4)
+
+    expect(state.sourceSleeperLeagueId ?? null).toBeNull()
+    // What MockDraftView does with it. The rail publishes nothing and shows no
+    // League section; the page renders.
+    expect(() => String(state.sourceSleeperLeagueId ?? '')).not.toThrow()
+  })
+
+  it('keeps a real source league id', async () => {
+    respondWith({
+      ...OLD_SUMMARY,
+      sourceSleeperLeagueId: 'L_REAL',
+      myPicks: [],
+      seats: [],
+      picks: [],
+      available: [],
+    })
+
+    const state = await getMockSession(4)
+
+    expect(state.sourceSleeperLeagueId).toBe('L_REAL')
+  })
+
+  it('leaves an absent source league id absent on a summary row too', async () => {
+    respondWith([OLD_SUMMARY])
+
+    const [row] = await getMockSessions()
+
+    expect(row.sourceSleeperLeagueId ?? null).toBeNull()
+  })
 })

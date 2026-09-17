@@ -195,7 +195,13 @@ public class MockDraftService {
         long rngSeed = System.nanoTime();
         long id = mockDrafts.createSession(shape.sport(), teams, shape.rounds(), shape.rosterPositions(),
                 shape.pointsPerReception(), JsonUtil.write(seats), userSlot, rngSeed,
-                null, null, sleeperUserId, sourceLeagueName, shape.reversalRound());
+                null, null, sleeperUserId, sourceLeagueName, shape.reversalRound(),
+                // The id this method already resolved, checked for membership
+                // and checked for sport agreement, a few lines up. Before V16
+                // it was read for league.name() and then dropped -- which left
+                // /mock/:id with a label it could print and no key it could
+                // navigate by.
+                sourceSleeperLeagueId);
 
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
@@ -299,7 +305,11 @@ public class MockDraftService {
         while (forkedAtPickNo <= ctx.totalPicks() && completed.containsKey(forkedAtPickNo)) forkedAtPickNo++;
         long id = mockDrafts.createSession(settings.sport(), settings.teams(), settings.rounds(),
                 settings.rosterPositions(), settings.pointsPerReception(), JsonUtil.write(seats), mySlot, rngSeed,
-                draft.id(), forkedAtPickNo, sleeperUserId, league.name(), settings.reversalRound());
+                draft.id(), forkedAtPickNo, sleeperUserId, league.name(), settings.reversalRound(),
+                // A fork knows its league for certain -- it was resolved to get
+                // here. Storing the id as well as the name is what lets the
+                // rail inside the forked room link back to the real one.
+                league.sleeperId());
 
         List<MockDraftRepository.PickRow> seedRows = new ArrayList<>();
         for (Map.Entry<Integer, Long> e : completed.entrySet()) {
@@ -531,7 +541,7 @@ public class MockDraftService {
         return new MockSessionState(row.id(), row.sport(), row.status(), row.teams(), row.rounds(),
                 row.rosterPositions(), row.userSlot(), myPicks, seatViews, pickViews, available,
                 row.currentPickNo(), onTheClockSlot, isUsersTurn, row.sourceDraftId(), row.forkedAtPickNo(),
-                row.reversalRound());
+                row.reversalRound(), row.sourceSleeperLeagueId());
     }
 
     /** A slot missing from `seats` is a BOT -- same convention DraftContextFactory.build() uses. */

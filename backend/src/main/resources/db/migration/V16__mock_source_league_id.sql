@@ -1,0 +1,19 @@
+-- 003-easier-navigation: a mock seeded from a league had no way back to it.
+--
+-- V12 stored the source league's NAME so a mock row could identify itself at a
+-- glance. That is a display string and nothing more -- the rail on /mock/:id
+-- needs a key it can resolve a league from, and matching a stored name would
+-- be ambiguous across users, unstable across renames, and would bypass the
+-- membership check MockDraftService already performs on the id at creation
+-- time. So the id is stored alongside the name rather than derived from it.
+--
+-- The value is not new: MockDraftService receives sourceSleeperLeagueId,
+-- validates the league is ingested, visible to the caller and of the matching
+-- sport, and then keeps only league.name(). This column is where the id it
+-- already holds goes.
+--
+-- Nullable with no default and no backfill, deliberately. A mock started with
+-- no league in mind has no source league, and rows written before this
+-- migration hold only a name -- those correctly show no league context rather
+-- than a guessed one.
+alter table mock_draft_session add column source_sleeper_league_id text;

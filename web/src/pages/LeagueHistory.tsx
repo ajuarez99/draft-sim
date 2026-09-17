@@ -13,6 +13,7 @@ import {
   type WeeklyScoreRecord,
 } from '../api'
 import Avatar from '../components/Avatar'
+import { useLeagueLinkState } from '../railLeague'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -87,9 +88,12 @@ function ScoreList({ title, rows }: { title: string; rows: WeeklyScoreRecord[] }
  * the record book rather than report it.
  */
 function RecordWho({ row }: { row: { rosterId: number; managerId: number | null; manager: string | null; avatarId: string | null } }) {
+  // Carries this league to the manager's own page, whose URL can't say which
+  // league you came from -- without it the rail there shows no league at all.
+  const linkState = useLeagueLinkState()
   if (row.managerId == null) return <span className="muted">roster {row.rosterId}</span>
   return (
-    <Link to={`/managers/${row.managerId}/history`} className="standings-manager">
+    <Link to={`/managers/${row.managerId}/history`} state={linkState} className="standings-manager">
       <Avatar avatarId={row.avatarId} seed={String(row.managerId)} label={row.manager} />
       {row.manager ?? `roster ${row.rosterId}`}
     </Link>
@@ -208,6 +212,7 @@ function StandingsTable({
   onCompute: () => void
   computing: boolean
 }) {
+  const linkState = useLeagueLinkState()
   return (
     <div className="table-wrap">
       <table className="standings">
@@ -230,7 +235,11 @@ function StandingsTable({
                 <td>{r.champion && <span title="Champion">🏆</span>}</td>
                 <td>
                   {r.managerId != null ? (
-                    <Link to={`/managers/${r.managerId}/history`} className="standings-manager">
+                    <Link
+                      to={`/managers/${r.managerId}/history`}
+                      state={linkState}
+                      className="standings-manager"
+                    >
                       <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.manager} />
                       {r.manager ?? `roster ${r.rosterId}`}
                     </Link>

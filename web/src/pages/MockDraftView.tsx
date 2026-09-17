@@ -14,6 +14,7 @@ import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
 import PickFeed from '../components/PickFeed'
 import { LoadingScreen } from '../components/Skeleton'
+import { useRailLeagueHint } from '../appSlots'
 
 /**
  * Always reports NEUTRAL/zeroed behaviour, even for a MANAGER-type seat
@@ -47,6 +48,13 @@ export default function MockDraftView() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+
+  // A mock seeded from a league is exactly where you want that league's real
+  // room one click away -- but nothing in `/mock/:id` names the league, so the
+  // page hands it to the rail rather than the rail reading it off the path.
+  // Undefined (an older backend that predates V16) publishes nothing, which
+  // shows no League section rather than throwing.
+  useRailLeagueHint(state?.sourceSleeperLeagueId)
 
   useEffect(() => {
     getMockSession(Number(sessionId))

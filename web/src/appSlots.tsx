@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useEffect } from 'react'
 
 /*
  * Two DOM nodes inside AppShell -- the chrome that survives across every page
@@ -43,4 +43,33 @@ export const RailContextSlotContext = createContext<RailContext>({ node: null, c
 
 export function useRailContextSlot() {
   return useContext(RailContextSlotContext)
+}
+
+/**
+ * How a page tells the rail which league it is inside, when the URL cannot.
+ *
+ * Only one route needs it: a mock session knows its seeding league from its
+ * own fetched state (`sourceSleeperLeagueId`), and nothing in `/mock/:id`
+ * carries that league. Manager history takes the other route -- it is reached
+ * by a link, so its league rides along in route state and AppShell reads it
+ * without the page's help.
+ *
+ * Data rather than DOM, which is why this is a context and not a portal slot
+ * like the two above.
+ */
+export const RailLeagueHintContext = createContext<(sleeperLeagueId: string | null) => void>(() => {})
+
+/**
+ * Publishes this page's league to the rail for as long as the page is mounted.
+ *
+ * Clears on unmount, so a mock's league cannot follow you to the next page --
+ * `acceptsLeagueHint` also refuses the hint on any route that isn't entitled
+ * to one, which is the belt to this braces.
+ */
+export function useRailLeagueHint(sleeperLeagueId: string | null | undefined) {
+  const publish = useContext(RailLeagueHintContext)
+  useEffect(() => {
+    publish(sleeperLeagueId ?? null)
+    return () => publish(null)
+  }, [publish, sleeperLeagueId])
 }
