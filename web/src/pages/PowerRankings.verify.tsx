@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getBallot, getPowerRankings, type BallotState, type PowerRankingEntry, type PowerRankings as PowerRankingsData } from '../api'
-import { ballotBlockState, buildDeck, buildHeadline, computeWeeklyStory, recordLabel, roomTakeSentence } from './PowerRankings'
+import { ballotBlockState, ballotsCountedIn, buildDeck, buildHeadline, computeWeeklyStory, recordLabel, roomTakeSentence } from './PowerRankings'
 
 /**
  * power-rankings-reskin.md §7. A self-check harness, not a design surface --
@@ -28,7 +28,7 @@ const REGRESSION_CHECKLIST: ChecklistRow[] = [
     status: 'pass',
     note: 'Ladder segmented control renders all 3 ALL_POWER_RANKING_KINDS; avatar click no longer opens a popup.',
   },
-  { id: 2, text: 'The table still shows the latest week each mode actually has, not the current NFL week.', status: 'pass', note: 'tableWeek = last(weeksOf(ladderMode)), unchanged pattern from the pre-reskin page.' },
+  { id: 2, text: "The table still shows the latest week each mode actually has, not the current NFL week -- and says so, with that week's own ballot tally.", status: 'pass', note: 'tableWeek = last(weeksOf(ladderMode)), unchanged; every count beside a shown week now comes from ballotsCountedIn(that week), and a .pr-ladder-lag line names both weeks when they differ.' },
   { id: 3, text: 'Week 0 renders as Preseason everywhere; its score is a rounded integer, not 2dp.', status: 'pass', note: 'weekPhrase/weekTitle + scoreLabel(e.week===0 -> Math.round) kept verbatim.' },
   { id: 4, text: 'Movement is rank(reference) - rank(current), same season+week; column disappears (not a fake 0) when the reference mode has no snapshot.', status: 'pass', note: 'hasReference gates a literal grid-template-columns swap (.pr-list.no-reference), not a hidden cell.' },
   { id: 5, text: 'The implausible-delta console.warn guard is still in place.', status: 'pass', note: 'Unchanged console.warn(\'[power] implausible movement delta\', ...) in the ladder row map.' },
@@ -131,7 +131,7 @@ export default function PowerRankingsVerify() {
   const previousRows = prevWeek == null ? null : (memberEntriesByWeek.get(prevWeek) ?? null)
   const story = computeWeeklyStory(currentRows, previousRows)
   const headline = buildHeadline(story, week)
-  const deck = buildDeck(story, ballot?.ballotCount ?? 0, ballot?.memberCount ?? 0, week)
+  const deck = buildDeck(story, ballotsCountedIn(data?.entries ?? [], season, week), ballot?.memberCount ?? 0, week)
 
   const decimalHits = currentRows
     .flatMap((e: PowerRankingEntry) => [recordLabel(undefined), roomTakeSentence(e, currentRows.length || 1)])

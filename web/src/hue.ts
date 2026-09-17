@@ -53,3 +53,21 @@ export function hueForName(seed: string): number {
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % 360
   return h
 }
+
+/**
+ * The character a league crests with.
+ *
+ * <p>Leading punctuation is common in league names -- "(Foot) Ball Knowers"
+ * would crest as "(" -- so this takes the first character that actually
+ * carries identity.
+ *
+ * <p>It lives here, beside {@link hueForName}, because the two always travel
+ * together: a crest is this letter in that hue. It is one rule because a
+ * league has to crest identically wherever it appears -- the home grid, the
+ * picker, the rail, the palette. It was written out by hand in three places
+ * before the palette would have made it four, which is the same shape as the
+ * Analysis bug this feature exists to fix.
+ */
+export function crestLetter(name: string): string {
+  return (name.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
+}

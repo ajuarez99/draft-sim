@@ -19,6 +19,7 @@ const INDEX: SearchDestination[] = [
     context: 'Ball Knowers',
     href: '/leagues/L1/history',
     sports: ['nfl'],
+    mark: { kind: 'crest', letter: 'B', hue: 120 },
     terms: ['history', 'ball knowers'],
   },
   {
@@ -28,6 +29,7 @@ const INDEX: SearchDestination[] = [
     context: 'Ball Knowers',
     href: '/leagues/L1/power',
     sports: ['nfl'],
+    mark: { kind: 'crest', letter: 'B', hue: 120 },
     terms: ['power rankings', 'ball knowers'],
   },
   {
@@ -37,6 +39,7 @@ const INDEX: SearchDestination[] = [
     context: 'Manager',
     href: '/managers/4/history',
     sports: ['nfl', 'nba'],
+    mark: { kind: 'avatar', avatarId: null, seed: '4' },
     terms: ['kieriskash', 'manager'],
   },
 ]

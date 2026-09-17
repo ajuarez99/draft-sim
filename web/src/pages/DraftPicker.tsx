@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { hueForName } from '../hue'
+import { crestLetter, hueForName } from '../hue'
 import { leagueLineages } from '../leagueLineage'
 import { roundPickLabel } from '../roundPickLabel'
 import { relativeTime } from '../relativeTime'
@@ -372,10 +372,7 @@ export default function DraftPicker() {
                 // "(Foot) Ball Knowers" cards different colors -- the exact
                 // opposite of what the crest is for.
                 const hue = hueForName(d.leagueName)
-                // Leading punctuation is common in league names ("(Foot) Ball
-                // Knowers" would crest as "("), so take the first character that
-                // actually carries identity.
-                const crest = (d.leagueName.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
+                const crest = crestLetter(d.leagueName)
                 return (
                   <article key={d.sleeperLeagueId} className={`league-card${live ? ' live' : ''}`}>
                     <header className="league-card-head">
@@ -564,7 +561,7 @@ export default function DraftPicker() {
                 .filter((l) => !l.ingested)
                 .map((l) => {
                   const hue = hueForName(l.name)
-                  const crest = (l.name.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
+                  const crest = crestLetter(l.name)
                   const setup = setupState[l.sleeperLeagueId]
                   return (
                     <article key={l.sleeperLeagueId} className="league-card">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { hueForName } from '../hue'
+import { crestLetter, hueForName } from '../hue'
 import {
   destinationFromPath,
   destinationsFor,
@@ -158,10 +158,7 @@ export default function LeagueRailSection({
   // The flyout earns its place only if it has something to offer.
   const hasSwitcher = others.length > 0 || multiSeason
   const hue = hueForName(d.leagueName)
-  // Leading punctuation is common in league names ("(Foot) Ball Knowers" would
-  // crest as "("), so take the first character that actually carries identity
-  // -- same rule as the home card, so one league crests identically in both.
-  const crest = (d.leagueName.match(/[\p{L}\p{N}]/u)?.[0] ?? '?').toUpperCase()
+  const crest = crestLetter(d.leagueName)
 
   const destinations = destinationsFor(league)
   const boardHref = destinations.find((x) => x.key === 'board')?.href(league) ?? '/'

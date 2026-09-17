@@ -55,13 +55,18 @@
  *   4 `.avail-sheet` · 5 `.start-overlay`. Add a layer here, not inline.
  *
  * STACKING (page-level `position: fixed` layers, not scoped to `.board-stage`)
- *   `.modal-backdrop` is the only other one, at z-index 100. RankBoard's
- *   drag ghost (`.rankboard-ghost`) is 50 -- comfortably above ordinary
- *   in-flow page content (which creates no stacking context of its own) and
- *   deliberately still below a modal, even though the two can never be open
- *   at once in practice (an active drag holds pointer capture, and nothing
- *   that opens a modal can fire while it does). Add the next page-level
- *   fixed layer here, not inline.
+ *   100  `.modal-backdrop`. The top of the app.
+ *    60  `.jumpto-backdrop` -- the jump-to palette. Above the page, below a
+ *         modal, because a rail row ("Mock it") can open one.
+ *    50  RankBoard's drag ghost (`.rankboard-ghost`) -- comfortably above
+ *         ordinary in-flow page content (which creates no stacking context of
+ *         its own) and deliberately still below a modal, even though the two
+ *         can never be open at once in practice (an active drag holds pointer
+ *         capture, and nothing that opens a modal can fire while it does).
+ *    45  `.jumpto-fab`, the phone-only return control. Below the overlay it
+ *         opens, and below a drag in progress. It was 50 first, which tied the
+ *         ghost and left DOM order to decide; a tie is not a decision.
+ *   Add the next page-level fixed layer here, not inline.
  *
  * DENSITY
  *   Match the layout to the shape of the content: rows for lists
@@ -1392,7 +1397,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
 }
 
-.modal-backdrop {
+.modal-backdrop, .jumpto-backdrop {
   position: fixed; inset: 0; z-index: 100;
   background: rgba(0, 0, 0, 0.55);
   display: flex; align-items: center; justify-content: center; padding: 24px;
@@ -1683,7 +1688,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .app-rail-context:empty { display: none; }
 
 .app-rail-section { display: flex; flex-direction: column; gap: 2px; }
-.app-rail-label {
+.app-rail-label, .jumpto-group-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); padding: 0 6px 6px;
 }
@@ -2326,7 +2331,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-hero { display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; }
 .pr-hero-copy { flex: 1 1 360px; min-width: 0; }
 
-.pr-hero-pills { display: flex; gap: 8px; margin-top: 14px; }
+.pr-hero-pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 
 .pr-number-one { flex: none; width: 292px; padding: 16px 18px; }
 .pr-number-one-label {
@@ -2368,6 +2373,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-ladder-head { gap: 14px; margin-bottom: 4px; }
 .pr-ladder-modes { margin-left: auto; }
 .pr-compute-trigger { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* "Showing week 1, nothing for week 2 yet." Reads as a status strip rather
+   than body copy, because it is the one line that reconciles the week the
+   rows are from with the week the ballot panel is collecting for. */
+.pr-ladder-lag {
+  margin: 0 0 12px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  background: color-mix(in oklch, var(--teal) 7%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 24%, transparent);
+}
 
 .pr-list { max-width: 1180px; }
 /* Record carries the playoff odds now (claude/playoff-odds.md), so there is no
@@ -3162,12 +3178,18 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .app-rail.collapsed .rail-jumpto { justify-content: center; padding: 9px 0; gap: 0; margin-bottom: 10px; }
 
+/* Dimmed by `.modal-backdrop`'s own rule (it names this class too) rather than
+   by a fourth recipe: the palette is a modal in every other respect -- dialog,
+   aria-modal, focus trap, Escape -- and this file already carries three
+   deliberately different dimmings (.modal-backdrop 55%, .start-overlay 72%,
+   .avail-sheet near-opaque), each with a reason. "It looked nice" is not a
+   fourth reason. Only the anchoring differs, and that has one: a centred card
+   whose height tracks the result count moves under the reader's eye on every
+   keystroke, so the input is the fixed point and results grow downward. */
 .jumpto-backdrop {
-  position: fixed; inset: 0; z-index: 60;
-  display: flex; align-items: flex-start; justify-content: center;
+  z-index: 60;
+  align-items: flex-start;
   padding: 12vh 16px 16px;
-  background: color-mix(in oklch, var(--bg) 70%, transparent);
-  backdrop-filter: blur(2px);
 }
 
 .jumpto {
@@ -3187,21 +3209,32 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .jumpto-note { padding: 14px 10px; margin: 0; }
 
 .jumpto-group + .jumpto-group { margin-top: 10px; }
-.jumpto-group-label {
-  display: block; padding: 4px 10px; font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--muted);
-}
+/* Type comes from `.app-rail-label`, which names this class too: "Pages" here
+   and "League" in the rail are the same thing said in two places, and at 55%
+   backdrop the rail's are still legible behind the overlay's. One vocabulary,
+   not two that differ by half a pixel. Only the inset is the overlay's own. */
+.jumpto-group-label { display: block; padding: 4px 10px; }
 
 .jumpto-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 9px 10px; border: 0; border-radius: 9px; background: none;
   font: inherit; font-size: 14px; color: var(--text); text-align: left; cursor: pointer;
+  text-decoration: none;
 }
+/* The league's crest, or the manager's photo. Smaller than `.league-crest`'s
+   card size and than a bare `.avatar`: it is an identifier inside a 36px row,
+   not the subject of one. Both marks share the slot so labels line up whatever
+   group they are in. */
+.jumpto-row-mark { width: 18px; height: 18px; font-size: 9px; flex-shrink: 0; }
 /* One highlight, shared by mouse and keyboard -- two would mean Enter could
    take a row the pointer wasn't on. */
 .jumpto-row.on { background: color-mix(in oklch, var(--teal) 14%, transparent); }
 .jumpto-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-.jumpto-row-label { font-weight: 550; }
+/* 600, not 550: Plus Jakarta Sans is imported at wght@400;500;600;700 --
+   named instances, not a variable axis -- so 550 snaps or synthesises
+   rather than rendering as drawn. 600 is what `.app-rail-row.on` already
+   uses for the same "this is the live one" meaning. */
+.jumpto-row-label { font-weight: 600; }
 /* Which league this page belongs to. Five leagues each have a "History", so
    without this the list is identical rows. */
 .jumpto-row-context { margin-left: auto; }
@@ -3222,7 +3255,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    * navigation you scroll back up to reach. A 44px button is not a band.
    */
   .jumpto-fab {
-    position: fixed; right: 16px; bottom: 16px; z-index: 50;
+    position: fixed; right: 16px; bottom: 16px; z-index: 45;
     display: flex; align-items: center; justify-content: center;
     width: 44px; height: 44px; border-radius: 50%;
     background: var(--panel); color: var(--text);

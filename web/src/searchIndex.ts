@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { destinationsFor, labelOf, type LeagueContext } from './destinations'
+import { crestLetter, hueForName } from './hue'
 import { leagueLineages } from './leagueLineage'
 import { cachedDrafts } from './railLeague'
 import { getManagers, type DraftSummary, type ManagerSummary, type Sport } from './api'
@@ -20,6 +21,30 @@ import { getManagers, type DraftSummary, type ManagerSummary, type Sport } from 
 
 export type SearchKind = 'league-page' | 'season-board' | 'manager'
 
+/**
+ * The mark a row carries, left of its label.
+ *
+ * This is the inverse of the rail, on purpose. In the rail you are already
+ * inside one league, so the thing you are choosing between is the destination
+ * and the destination gets the mark -- `◷` for History, `▲` for Power
+ * rankings. In the palette a search for "hist" returns five rows that all read
+ * "History", so the thing you are choosing between is the LEAGUE, and the
+ * league gets the mark. Same destination, different question, different mark.
+ *
+ * Without it the only discriminator is `context`, which sits at the right edge
+ * of a 560px row -- the eye scans labels down the left and finds five
+ * identical words. The mark is a second channel beside the context text, not a
+ * replacement for it.
+ *
+ * Required, never defaulted: a row with no mark is a row that lost its
+ * identity, which should be a type error rather than a blank circle.
+ */
+export type SearchMark =
+  | { kind: 'crest'; letter: string; hue: number }
+  /** Managers already have a real photo everywhere else in the app; `seed` and
+   *  `avatarId` are exactly what `<Avatar>` takes. */
+  | { kind: 'avatar'; avatarId: string | null; seed: string }
+
 export type SearchDestination = {
   id: string
   kind: SearchKind
@@ -33,6 +58,8 @@ export type SearchDestination = {
   /** Every sport this row belongs to. A manager who plays both appears once,
    *  carrying both -- see `mergeManagers`. */
   sports: Sport[]
+  /** What this row shows left of its label. See {@link SearchMark}. */
+  mark: SearchMark
   /** Lowercased haystack: everything worth matching against, joined. */
   terms: string[]
 }
@@ -56,6 +83,14 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
   for (const lineage of leagueLineages(drafts)) {
     const current = lineage.current
     const ctx: LeagueContext = { lineage, season: current }
+    // One crest per league, shared by its pages and its season boards: the two
+    // kinds are the same league seen twice, and crestLetter/hueForName are the
+    // same pair the rail and the home grid crest it with.
+    const mark: SearchMark = {
+      kind: 'crest',
+      letter: crestLetter(current.leagueName),
+      hue: hueForName(current.leagueName),
+    }
 
     for (const dest of destinationsFor(ctx)) {
       // "Mock it" opens a modal from the rail rather than going anywhere. A
@@ -69,6 +104,7 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
         context: current.leagueName,
         href: dest.href(ctx),
         sports: [current.sport],
+        mark,
         terms: lower(label, current.leagueName, current.sport, dest.key),
       })
     }
@@ -87,6 +123,7 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
               ? `/drafts/${season.sleeperDraftId}/board`
               : `/drafts/${season.sleeperDraftId}`,
           sports: [season.sport],
+          mark,
           terms: lower(season.season, 'board', current.leagueName, season.sport),
         })
       }
@@ -121,6 +158,10 @@ export function mergeManagers(bySport: { sport: Sport; managers: ManagerSummary[
         context: 'Manager',
         href: `/managers/${m.managerId}/history`,
         sports: [sport],
+        // The manager id is the seed every other Avatar in the app already
+        // uses for this person, so the fallback initial's colour matches the
+        // one on the standings row you came from.
+        mark: { kind: 'avatar', avatarId: m.avatarId, seed: String(m.managerId) },
         terms: lower(m.manager, 'manager'),
       })
     }

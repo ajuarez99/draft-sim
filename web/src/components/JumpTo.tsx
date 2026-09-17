@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { searchDestinations, type SearchDestination, type SearchKind } from '../searchIndex'
+import { searchDestinations, type SearchDestination, type SearchKind, type SearchMark } from '../searchIndex'
+import Avatar from './Avatar'
 
 type Props = {
   index: SearchDestination[]
@@ -34,6 +35,36 @@ const GROUP_ORDER: SearchKind[] = ['league-page', 'season-board', 'manager']
 
 /** Caps the list so a long index can't turn the overlay into the page. */
 const MAX_RESULTS = 40
+
+/**
+ * The mark left of a row's label -- a league's crest, or a manager's photo.
+ *
+ * Decorative in both cases: the label and the context beside it already say
+ * everything the mark says, so it is `aria-hidden` rather than a second thing
+ * for a screen reader to read out per row. See `SearchMark` for why the league
+ * gets the mark here and the destination gets it in the rail.
+ */
+function RowMark({ mark, label }: { mark: SearchMark; label: string }) {
+  if (mark.kind === 'avatar') {
+    return (
+      <Avatar
+        avatarId={mark.avatarId}
+        seed={mark.seed}
+        label={label}
+        className="jumpto-row-mark"
+      />
+    )
+  }
+  return (
+    <span
+      className="avatar league-crest jumpto-row-mark"
+      style={{ background: `oklch(30% 0.05 ${mark.hue})`, color: `oklch(84% 0.12 ${mark.hue})` }}
+      aria-hidden="true"
+    >
+      {mark.letter}
+    </span>
+  )
+}
 
 export default function JumpTo({ index, loading, onClose }: Props) {
   const navigate = useNavigate()
@@ -140,11 +171,21 @@ export default function JumpTo({ index, loading, onClose }: Props) {
 
           {grouped.map((group) => (
             <div className="jumpto-group" key={group.kind}>
-              <span className="jumpto-group-label cond">{GROUP_LABEL[group.kind]}</span>
+              {/* Not `.cond`: the rail's own section labels ("League", "Menu")
+                  are the app's vocabulary for naming a group of navigation
+                  rows, and this shares their rule rather than inventing a
+                  second one -- see .app-rail-label in styles.css. */}
+              <span className="jumpto-group-label">{GROUP_LABEL[group.kind]}</span>
               {group.rows.map(({ row, flatIndex }) => (
-                <button
-                  type="button"
+                // An <a> with a real href, not a <button>: every row here
+                // navigates, and the house rule is that navigation is a link.
+                // It is also the whole difference between a list you can scan
+                // and one you can work -- a button has no href, so Cmd-click
+                // and middle-click cannot open a destination in a background
+                // tab and the browser shows no target on hover.
+                <a
                   key={row.id}
+                  href={row.href}
                   role="option"
                   aria-selected={flatIndex === active}
                   className={`jumpto-row${flatIndex === active ? ' on' : ''}`}
@@ -152,8 +193,16 @@ export default function JumpTo({ index, loading, onClose }: Props) {
                   // keeping its own, so Enter always takes the row you can see
                   // is highlighted.
                   onMouseEnter={() => setActive(flatIndex)}
-                  onClick={() => go(row)}
+                  onClick={(e) => {
+                    // Modified clicks stay the browser's: they are how someone
+                    // opens three leagues' histories at once. Only the plain
+                    // left click is ours to turn into a client-side navigation.
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                    e.preventDefault()
+                    go(row)
+                  }}
                 >
+                  <RowMark mark={row.mark} label={row.label} />
                   <span className="jumpto-row-label">{row.label}</span>
                   <span className="jumpto-row-context muted small">{row.context}</span>
                   {row.sports.map((s) => (
@@ -161,7 +210,7 @@ export default function JumpTo({ index, loading, onClose }: Props) {
                       {s.toUpperCase()}
                     </span>
                   ))}
-                </button>
+                </a>
               ))}
             </div>
           ))}
