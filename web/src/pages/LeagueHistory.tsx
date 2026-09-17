@@ -2,20 +2,212 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import {
+  backfillFinalRanks,
   getLeagueHistory,
   ingestLeagueHistory,
   type LeagueHistory as LeagueHistoryData,
+  type LeagueRecords,
+  type MarginRecord,
+  type RankStatus,
   type StandingRow,
+  type WeeklyScoreRecord,
 } from '../api'
 import Avatar from '../components/Avatar'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
- * one league. Read-only apart from the error state's own "Load past seasons"
- * button, which fires the ingest rather than telling the reader to curl it.
+ * one league -- plus, since specs/002-league-history-record-book, the record
+ * book those seasons add up to: the highest and lowest weeks anyone has posted,
+ * the closest games and the widest, and each season's end-of-season power rank
+ * on its own standings row.
+ *
+ * Read-only apart from two buttons, both of which FIRE the call rather than
+ * telling the reader to curl it: "Load past seasons" on the error state, and
+ * "Compute" in a rank cell whose season was never ranked.
+ *
+ * Every panel here states a reason when it has nothing to show. That is not
+ * politeness -- a panel that draws nothing and says nothing is indistinguishable
+ * from a broken one, and this page has a league in its own database for each
+ * empty case (West Coast 2025 has scores and no pairings; NBA 2026 is ingested
+ * and unplayed).
  */
 
-function StandingsTable({ rows }: { rows: StandingRow[] }) {
+/**
+ * specs/002-league-history-record-book. Two panels below the standings.
+ *
+ * Both render a stated reason when they have nothing, never an empty container:
+ * a panel that draws nothing and says nothing is indistinguishable from one
+ * that is broken, which is the lesson the season-with-no-standings guard
+ * further down already learned the hard way.
+ */
+function RecordBook({ records }: { records: LeagueRecords }) {
+  const hasScores = records.highestWeeks.length > 0 || records.lowestWeeks.length > 0
+  return (
+    <section className="panel">
+      <h3 className="cond">Record book</h3>
+      {!hasScores ? (
+        <p className="muted small">
+          No weekly scores have been loaded for this league's seasons yet, so there are no records to show.
+        </p>
+      ) : (
+        <div className="records-pair">
+          <ScoreList title="Highest weeks" rows={records.highestWeeks} />
+          <ScoreList title="Lowest weeks" rows={records.lowestWeeks} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ScoreList({ title, rows }: { title: string; rows: WeeklyScoreRecord[] }) {
+  return (
+    <div className="records-col">
+      <h4>{title}</h4>
+      <ol className="record-list">
+        {rows.map((r, i) => (
+          <li className="record-row" key={`${r.season}-${r.week}-${r.rosterId}`}>
+            <span className="record-rank">{i + 1}</span>
+            <span className="record-who">
+              <RecordWho row={r} />
+            </span>
+            <span className="record-points">{r.points.toFixed(2)}</span>
+            <span className="record-when">
+              {r.season} · Wk {r.week}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  )
+}
+
+/**
+ * A roster-season with no manager still renders. Sleeper leaves rosters unowned
+ * when someone leaves mid-season, and dropping those rows would silently edit
+ * the record book rather than report it.
+ */
+function RecordWho({ row }: { row: { rosterId: number; managerId: number | null; manager: string | null; avatarId: string | null } }) {
+  if (row.managerId == null) return <span className="muted">roster {row.rosterId}</span>
+  return (
+    <Link to={`/managers/${row.managerId}/history`} className="standings-manager">
+      <Avatar avatarId={row.avatarId} seed={String(row.managerId)} label={row.manager} />
+      {row.manager ?? `roster ${row.rosterId}`}
+    </Link>
+  )
+}
+
+function MatchupMargins({ records }: { records: LeagueRecords }) {
+  const has = records.closestMatchups.length > 0 || records.biggestBlowouts.length > 0
+  return (
+    <section className="panel">
+      <h3 className="cond">Matchup margins</h3>
+      {!has ? (
+        <p className="muted small">
+          {records.marginsUnavailableReason ??
+            "Head-to-head pairings aren't available for this league's seasons."}
+        </p>
+      ) : (
+        <div className="records-pair">
+          <MarginGroup title="Closest matchups" rows={records.closestMatchups} />
+          <MarginGroup title="Biggest blowouts" rows={records.biggestBlowouts} />
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MarginGroup({ title, rows }: { title: string; rows: MarginRecord[] }) {
+  return (
+    <div className="records-col">
+      <h4>{title}</h4>
+      <div className="margin-cards">
+        {rows.map((m) => (
+          <div className="margin-card" key={`${m.season}-${m.week}-${m.winner.rosterId}-${m.loser.rosterId}`}>
+            <div className="margin-card-head">
+              <span>
+                <span className="margin-value">{m.margin.toFixed(2)}</span>
+                {/* The axis, spelled out. "0.16" alone does not say what it measures. */}
+                <span className="margin-label"> Margin</span>
+              </span>
+              <span className="margin-when">
+                {m.season} · Wk {m.week}
+              </span>
+            </div>
+            <div className="margin-side won">
+              <RecordWho row={m.winner} />
+              <span className="margin-side-pts">{m.winner.points.toFixed(2)}</span>
+            </div>
+            <div className="margin-side lost">
+              <RecordWho row={m.loser} />
+              <span className="margin-side-pts">{m.loser.points.toFixed(2)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The rank cell's absent states. Three different reasons, three different
+ * sentences, because they ask three different things of the reader: wait, press
+ * the button, or nothing at all. A bare dash would say none of that (FR-005).
+ *
+ * Note IN_PROGRESS is not an error. A season still being played has no final
+ * rank and is not supposed to.
+ */
+const RANK_REASON: Record<Exclude<RankStatus, 'RANKED'>, string> = {
+  IN_PROGRESS: 'season in progress',
+  NOT_COMPUTED: 'not computed yet',
+  UNAVAILABLE: 'no weekly scores stored',
+}
+
+function RankCell({
+  row,
+  onCompute,
+  computing,
+}: {
+  row: StandingRow
+  onCompute: () => void
+  computing: boolean
+}) {
+  if (row.rankStatus === 'RANKED' && row.finalRank != null) {
+    return (
+      <td className="mono rank-cell" title={`Through week ${row.finalRankWeek}`}>
+        {row.finalRank}
+      </td>
+    )
+  }
+  // An older server that does not send rankStatus at all -- the field is
+  // optional on the wire because getManagerHistory reuses this row type.
+  if (row.rankStatus == null) return <td className="mono rank-cell">—</td>
+  // RANKED with no rank means this roster is missing from an otherwise-present
+  // snapshot, which is the same thing as having nothing to show for it.
+  const status = row.rankStatus === 'RANKED' ? 'UNAVAILABLE' : row.rankStatus
+  return (
+    <td className="rank-cell">
+      <span className="rank-missing">{RANK_REASON[status]}</span>{' '}
+      {/* A button, never the endpoint printed for the reader to run -- the
+          "Load past seasons" control below was written for exactly this
+          reason and the pattern came straight back in new code once already. */}
+      {status === 'NOT_COMPUTED' && (
+        <button className="action-button" onClick={onCompute} disabled={computing}>
+          {computing ? 'Computing…' : 'Compute'}
+        </button>
+      )}
+    </td>
+  )
+}
+
+function StandingsTable({
+  rows,
+  onCompute,
+  computing,
+}: {
+  rows: StandingRow[]
+  onCompute: () => void
+  computing: boolean
+}) {
   return (
     <div className="table-wrap">
       <table className="standings">
@@ -23,6 +215,7 @@ function StandingsTable({ rows }: { rows: StandingRow[] }) {
           <tr>
             <th></th>
             <th>Manager</th>
+            <th className="mono" title="End-of-season power rank">Rank</th>
             <th className="mono">W</th>
             <th className="mono">L</th>
             <th className="mono">T</th>
@@ -45,6 +238,7 @@ function StandingsTable({ rows }: { rows: StandingRow[] }) {
                     <span className="muted">roster {r.rosterId} (unowned)</span>
                   )}
                 </td>
+                <RankCell row={r} onCompute={onCompute} computing={computing} />
                 <td className="mono">{r.wins ?? '—'}</td>
                 <td className="mono">{r.losses ?? '—'}</td>
                 <td className="mono">{r.ties ?? '—'}</td>
@@ -64,6 +258,7 @@ export default function LeagueHistory() {
   const [history, setHistory] = useState<LeagueHistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [computing, setComputing] = useState(false)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -87,6 +282,26 @@ export default function LeagueHistory() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
+    }
+  }
+
+  /**
+   * Backs the Compute button in a NOT_COMPUTED rank cell. Runs the whole chain
+   * rather than one season: the endpoint already reports per-season what it
+   * skipped and why, and a reader who wants one season's rank almost always
+   * wants the others too.
+   */
+  async function computeFinalRanks() {
+    if (!sleeperLeagueId) return
+    setComputing(true)
+    setError(null)
+    try {
+      await backfillFinalRanks(sleeperLeagueId)
+      setHistory(await getLeagueHistory(sleeperLeagueId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setComputing(false)
     }
   }
 
@@ -145,11 +360,14 @@ export default function LeagueHistory() {
                   No standings for {s.season} yet — Sleeper reports them once the season is under way.
                 </p>
               ) : (
-                <StandingsTable rows={s.standings} />
+                <StandingsTable rows={s.standings} onCompute={computeFinalRanks} computing={computing} />
               )}
             </div>
           ))}
       </section>
+
+      {history && <RecordBook records={history.records} />}
+      {history && <MatchupMargins records={history.records} />}
     </div>
   )
 }

@@ -342,4 +342,100 @@ public class PowerRankingService {
             return fallback;
         }
     }
+
+    // --- specs/002-league-history-record-book US2: a season's FINAL rank ------
+
+    /**
+     * Why a season's standings row does or does not carry a final power rank.
+     * The three absent cases are deliberately distinct: FR-005 forbids
+     * collapsing them into a bare dash, because they call for three different
+     * things from the reader (wait, press the button, nothing).
+     */
+    public enum RankStatus { RANKED, IN_PROGRESS, NOT_COMPUTED, UNAVAILABLE }
+
+    /** {@code byRoster} is empty unless {@code status} is RANKED. */
+    public record SeasonRanks(RankStatus status, Integer week, Map<Integer, Integer> byRoster) {}
+
+    /**
+     * The end-of-season rank for one league-season.
+     *
+     * <p><b>"Is this season over?" is answered by POSITION IN THE CHAIN, not by
+     * a week number.</b> Two reasons, and both are constraints this feature is
+     * under. A week comparison would have to know that football ends at 17 and
+     * basketball at 24 -- the optional-parameter-encodes-a-sport's-rule bug
+     * this repo has shipped three times (FR-011). And asking Sleeper what week
+     * it is would put a network call on a page load, which FR-002 forbids and
+     * SC-005 measures. A predecessor season is complete by construction: the
+     * league only has a successor because that year finished.
+     *
+     * @param isHeadOfChain true for the newest season in the chain
+     */
+    public SeasonRanks finalRankForSeason(long leagueId, boolean isHeadOfChain) {
+        List<PowerRankingRepository.FinalRank> ranks = rankings.finalRealizedRanks(leagueId);
+        if (!ranks.isEmpty()) {
+            Map<Integer, Integer> byRoster = new LinkedHashMap<>();
+            ranks.forEach(r -> byRoster.put(r.rosterId(), r.rank()));
+            return new SeasonRanks(RankStatus.RANKED, ranks.get(0).week(), byRoster);
+        }
+        // Still being played. Not an error, and not something a button fixes.
+        if (isHeadOfChain) return new SeasonRanks(RankStatus.IN_PROGRESS, null, Map.of());
+        // Finished, never computed -- but computable, because computeRealized
+        // reads only roster_week_points and those are already here.
+        if (!weekPoints.storedWeeks(leagueId).isEmpty()) {
+            return new SeasonRanks(RankStatus.NOT_COMPUTED, null, Map.of());
+        }
+        return new SeasonRanks(RankStatus.UNAVAILABLE, null, Map.of());
+    }
+
+    /** One season's outcome from a backfill run. {@code reason} is null on success. */
+    public record BackfilledSeason(int season, Integer week, int entries, String reason) {}
+
+    /**
+     * Computes the missing end-of-season snapshot for every completed season in
+     * a chain that lacks one.
+     *
+     * <p>No Sleeper call: {@link #computeRealized} reads only
+     * {@code roster_week_points}, which the history ingest has already filled
+     * for every played season. That is the whole reason this is cheap enough to
+     * offer as a button.
+     *
+     * <p>Idempotent -- {@link PowerRankingRepository#save} upserts on
+     * (league, season, week, kind), so a second press replaces rather than
+     * duplicates.
+     *
+     * <p>A season with no stored weeks is REPORTED, never written: an empty
+     * snapshot is not a fact, and save() would refuse it anyway.
+     *
+     * @param onlySeason restrict to one season, or null for every eligible one
+     */
+    public List<BackfilledSeason> backfillFinalRanks(List<LeagueRepository.LeagueRow> chain, Integer onlySeason) {
+        List<BackfilledSeason> out = new ArrayList<>();
+        for (int i = 0; i < chain.size(); i++) {
+            LeagueRepository.LeagueRow row = chain.get(i);
+            if (onlySeason != null && row.season() != onlySeason) continue;
+            boolean head = i == 0;
+
+            SeasonRanks existing = finalRankForSeason(row.id(), head);
+            switch (existing.status()) {
+                case RANKED -> out.add(new BackfilledSeason(row.season(), existing.week(), 0,
+                        "already computed through week " + existing.week()));
+                case IN_PROGRESS -> out.add(new BackfilledSeason(row.season(), null, 0,
+                        "season is still in progress"));
+                case UNAVAILABLE -> out.add(new BackfilledSeason(row.season(), null, 0,
+                        "no weekly scores stored for this season, so there is nothing to compute from"));
+                case NOT_COMPUTED -> {
+                    int week = weekPoints.storedWeeks(row.id()).stream().max(Integer::compareTo).orElse(0);
+                    if (week < 1) {
+                        out.add(new BackfilledSeason(row.season(), null, 0,
+                                "no scored week found for this season"));
+                        break;
+                    }
+                    PowerRankingRepository.Entry[] entries = computeRealized(row.id(), row.season(), week);
+                    out.add(new BackfilledSeason(row.season(), week, entries.length,
+                            entries.length == 0 ? "compute produced no entries" : null));
+                }
+            }
+        }
+        return out;
+    }
 }
