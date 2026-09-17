@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.LeagueRecordService;
 import com.ballknowers.draftsim.engine.MemberRankingService;
 import com.ballknowers.draftsim.engine.PlayoffOddsService;
 import com.ballknowers.draftsim.engine.PowerRankingService;
@@ -45,13 +46,14 @@ public class LeagueHistoryController {
     private final MemberRankingService memberRankings;
     private final OwnerProperties ownerProperties;
     private final PlayoffOddsService playoffOdds;
+    private final LeagueRecordService records;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                    PowerRankingService power, ProfileService profiles,
                                    LeagueMembership membership, SleeperClient sleeper, ManagerRepository managers,
                                    LeagueMemberRepository leagueMembers, RankingBallotRepository ballots,
                                    MemberRankingService memberRankings, OwnerProperties ownerProperties,
-                                   PlayoffOddsService playoffOdds) {
+                                   PlayoffOddsService playoffOdds, LeagueRecordService records) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
@@ -64,6 +66,7 @@ public class LeagueHistoryController {
         this.memberRankings = memberRankings;
         this.playoffOdds = playoffOdds;
         this.ownerProperties = ownerProperties;
+        this.records = records;
     }
 
     /**
@@ -101,9 +104,13 @@ public class LeagueHistoryController {
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
 
         List<Map<String, Object>> seasons = new ArrayList<>();
-        for (LeagueRepository.LeagueRow league : chain) {
+        for (int i = 0; i < chain.size(); i++) {
+            LeagueRepository.LeagueRow league = chain.get(i);
+            // chainBySleeperId walks backwards from the league asked for, so
+            // index 0 is the newest season -- the one still being played.
+            PowerRankingService.SeasonRanks ranks = power.finalRankForSeason(league.id(), i == 0);
             List<Map<String, Object>> standings = rosterSeasons.forLeague(league.id()).stream()
-                    .map(LeagueHistoryController::standingRow)
+                    .map(r -> withFinalRank(standingRow(r), r.rosterId(), ranks))
                     .toList();
             Map<String, Object> season = new LinkedHashMap<>();
             season.put("season", league.season());
@@ -113,7 +120,90 @@ public class LeagueHistoryController {
             season.put("standings", standings);
             seasons.add(season);
         }
-        return ResponseEntity.ok(Map.of("sleeperLeagueId", sleeperId, "seasons", seasons));
+
+        // Records span the CHAIN, not seasons[0]. league.id is a league-season
+        // here, so a single id answers "this season" -- the question the page
+        // could already answer (specs/002-league-history-record-book, FR-001).
+        List<Long> chainIds = chain.stream().map(LeagueRepository.LeagueRow::id).toList();
+
+        // LinkedHashMap, not Map.of: marginsUnavailableReason is legitimately
+        // null once pairings exist, and Map.of throws on a null value. Same
+        // reason the power compute endpoint below builds its response this way.
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("sleeperLeagueId", sleeperId);
+        response.put("records", recordBook(records.forChain(chainIds)));
+        response.put("seasons", seasons);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * The record book as the client reads it. Always emitted, even when every
+     * list is empty -- an absent key would make "this league has no records"
+     * indistinguishable from "this endpoint is older than the record book"
+     * (contracts/league-history-api.md).
+     */
+    /**
+     * The rank cell on a standings row. rankStatus is present on EVERY row;
+     * finalRank is non-null exactly when the status is RANKED. The three other
+     * statuses each carry a different reason there is no rank, which is the
+     * point -- a bare null on the wire would leave the page nothing to say
+     * (FR-005).
+     */
+    private static Map<String, Object> withFinalRank(Map<String, Object> row, int rosterId,
+                                                     PowerRankingService.SeasonRanks ranks) {
+        Integer rank = ranks.byRoster().get(rosterId);
+        // A roster missing from an otherwise-present snapshot has no rank of its
+        // own, whatever the season's status is.
+        row.put("rankStatus", (rank == null && ranks.status() == PowerRankingService.RankStatus.RANKED
+                ? PowerRankingService.RankStatus.UNAVAILABLE : ranks.status()).name());
+        row.put("finalRank", rank);
+        row.put("finalRankWeek", rank == null ? null : ranks.week());
+        return row;
+    }
+
+    private static Map<String, Object> recordBook(LeagueRecordService.RecordBook b) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("limit", b.limit());
+        m.put("highestWeeks", b.highestWeeks().stream().map(LeagueHistoryController::weeklyScoreRow).toList());
+        m.put("lowestWeeks", b.lowestWeeks().stream().map(LeagueHistoryController::weeklyScoreRow).toList());
+        m.put("closestMatchups", b.closestMatchups().stream().map(LeagueHistoryController::marginRow).toList());
+        m.put("biggestBlowouts", b.biggestBlowouts().stream().map(LeagueHistoryController::marginRow).toList());
+        m.put("marginsUnavailableReason", b.marginsUnavailableReason());
+        return m;
+    }
+
+    private static Map<String, Object> weeklyScoreRow(LeagueRecordService.WeeklyScoreRecord r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("season", r.season());
+        m.put("week", r.week());
+        m.put("rosterId", r.rosterId());
+        m.put("managerId", r.managerId());
+        m.put("manager", r.manager());
+        m.put("avatarId", r.avatarId());
+        // BigDecimal, so Jackson writes 205.04 rather than a pre-formatted
+        // string -- formatting is the client's call, not the wire's.
+        m.put("points", r.points());
+        return m;
+    }
+
+    private static Map<String, Object> marginRow(LeagueRecordService.MarginRecord r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("season", r.season());
+        m.put("week", r.week());
+        m.put("margin", r.margin());
+        m.put("winner", marginSide(r.winner()));
+        m.put("loser", marginSide(r.loser()));
+        return m;
+    }
+
+    private static Map<String, Object> marginSide(LeagueRecordService.Side s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("rosterId", s.rosterId());
+        m.put("managerId", s.managerId());
+        m.put("manager", s.manager());
+        m.put("avatarId", s.avatarId());
+        m.put("points", s.points());
+        return m;
     }
 
     private static Map<String, Object> standingRow(RosterSeasonRepository.StandingRow r) {
@@ -508,6 +598,59 @@ public class LeagueHistoryController {
      * that's write-once rather than refreshed on every call like {@code week}
      * itself is.
      */
+    /**
+     * Computes the missing end-of-season snapshot for completed seasons in this
+     * league's chain. specs/002-league-history-record-book FR-006.
+     *
+     * <p>Sibling of {@code /power/compute}, which only ever targets the season
+     * the caller's league id names -- which is why three of four played seasons
+     * in this database had no power rankings at all: nobody could have run it
+     * against a predecessor season without knowing that season's own Sleeper id.
+     *
+     * <p>Makes no Sleeper call. The backing compute reads roster_week_points,
+     * which the history ingest has already filled.
+     */
+    @PostMapping("/leagues/{sleeperId}/power/backfill")
+    public ResponseEntity<?> backfillFinalRanks(@PathVariable String sleeperId,
+                                                @RequestParam(required = false) Integer season,
+                                                @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        if (visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
+        if (chain.isEmpty()) return ResponseEntity.notFound().build();
+
+        if (season != null && chain.stream().noneMatch(r -> r.season() == season)) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", "season " + season + " is not in this league's chain"));
+        }
+
+        List<PowerRankingService.BackfilledSeason> results = power.backfillFinalRanks(chain, season);
+
+        List<Map<String, Object>> backfilled = new ArrayList<>();
+        List<Map<String, Object>> skipped = new ArrayList<>();
+        for (PowerRankingService.BackfilledSeason r : results) {
+            if (r.reason() == null) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("season", r.season());
+                m.put("week", r.week());
+                m.put("entries", r.entries());
+                backfilled.add(m);
+            } else {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("season", r.season());
+                m.put("reason", r.reason());
+                skipped.add(m);
+            }
+        }
+
+        // An empty "backfilled" always arrives with a populated "skipped". A
+        // zero that does not say why reads as a broken feature -- the same
+        // argument /power/compute below already makes about its own counts.
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("backfilled", backfilled);
+        response.put("skipped", skipped);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/leagues/{sleeperId}/power/compute")
     public ResponseEntity<?> compute(@PathVariable String sleeperId, @RequestParam int season,
                                      @RequestParam int week,

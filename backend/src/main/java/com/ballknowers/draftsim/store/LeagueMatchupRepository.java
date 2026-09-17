@@ -3,6 +3,8 @@ package com.ballknowers.draftsim.store;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -67,6 +69,60 @@ public class LeagueMatchupRepository {
                 """)
                 .params(leagueId, season, fromWeek, toWeek)
                 .query((rs, i) -> new Fixture(rs.getInt(1), rs.getInt(2), (Integer) rs.getObject(3)))
+                .list();
+    }
+
+    /**
+     * A played game: two rosters that shared a matchup_id in one (season, week),
+     * with both scored totals. specs/002-league-history-record-book.
+     */
+    public record PairedGame(int season, int week,
+                             int aRosterId, Long aManagerId, String aManager, String aAvatarId, BigDecimal aPoints,
+                             int bRosterId, Long bManagerId, String bManager, String bAvatarId, BigDecimal bPoints) {}
+
+    /**
+     * Every PLAYED pairing across a set of league ids (the chain).
+     *
+     * <p>Three constraints here are load-bearing, and each of them is a wrong
+     * answer rather than an error if dropped (data-model R5-R8):
+     *
+     * <ul>
+     *   <li>{@code a.roster_id < b.roster_id} -- without it the self-join returns
+     *       every game twice, mirrored, and both copies land in the record book.
+     *   <li>{@code matchup_id is not null} on both sides -- a null means no game
+     *       that week (bye, odd roster count, unpublished), not a game against
+     *       nobody.
+     *   <li>an INNER join to roster_week_points on both sides -- this table also
+     *       holds FUTURE fixtures, which have a pairing and no score. Treating a
+     *       missing score as zero would invent a 130-point blowout for a game
+     *       that has not kicked off.
+     * </ul>
+     */
+    public List<PairedGame> pairedWithScores(Collection<Long> leagueIds) {
+        if (leagueIds == null || leagueIds.isEmpty()) return List.of();
+        String ids = RosterWeekPointsRepository.inClause(leagueIds);
+        String sql = """
+                select a.season, a.week,
+                       a.roster_id, rsa.manager_id, ma.display_name, ma.avatar_id, wa.starters_points,
+                       b.roster_id, rsb.manager_id, mb.display_name, mb.avatar_id, wb.starters_points
+                from league_matchup a
+                join league_matchup b
+                  on b.league_id = a.league_id and b.season = a.season and b.week = a.week
+                 and b.matchup_id = a.matchup_id and b.roster_id > a.roster_id
+                join roster_week_points wa on wa.league_id = a.league_id and wa.week = a.week and wa.roster_id = a.roster_id
+                join roster_week_points wb on wb.league_id = b.league_id and wb.week = b.week and wb.roster_id = b.roster_id
+                left join roster_season rsa on rsa.league_id = a.league_id and rsa.roster_id = a.roster_id
+                left join roster_season rsb on rsb.league_id = b.league_id and rsb.roster_id = b.roster_id
+                left join manager ma on ma.id = rsa.manager_id
+                left join manager mb on mb.id = rsb.manager_id
+                where a.league_id in (%s) and a.matchup_id is not null and b.matchup_id is not null
+                order by a.season desc, a.week asc, a.roster_id asc
+                """.formatted(ids);
+        return db.sql(sql)
+                .params(List.copyOf(leagueIds))
+                .query((rs, i) -> new PairedGame(rs.getInt(1), rs.getInt(2),
+                        rs.getInt(3), (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7),
+                        rs.getInt(8), (Long) rs.getObject(9), rs.getString(10), rs.getString(11), rs.getBigDecimal(12)))
                 .list();
     }
 }

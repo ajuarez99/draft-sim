@@ -27,6 +27,24 @@
         "cd web && npm run dev -- --port 5178 --strictPort"
       ],
       "port": 5178
+    },
+    {
+      "name": "draft-sim-api-8081",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd backend && .\\gradlew.bat bootRun --args=\"--server.port=8081\""
+      ],
+      "port": 8081
+    },
+    {
+      "name": "draft-sim-web-8081",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd web && set DRAFTSIM_PROXY_TARGET=http://localhost:8081 && npm run dev -- --port 5179 --strictPort"
+      ],
+      "port": 5179
     }
   ]
 }

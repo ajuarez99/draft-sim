@@ -3046,3 +3046,82 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .analysis-vs-side.right { justify-content: flex-start; }
   .analysis-vs-row { grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr); gap: 6px; }
 }
+
+/* --- league history record book -------------------------------------------
+   specs/002-league-history-record-book.
+
+   Two panels, two shapes, on purpose. A score record is a RANKED LIST -- it has
+   an order, and the order is the point, so it gets rows with a rank number and
+   no box around each entry. A margin is a PAIRING -- two teams and two numbers
+   that only mean anything next to each other, so it gets a card, echoing
+   .analysis-game, which is the same content shape one page over.
+
+   Reusing one uniform card for both would have been less code and would have
+   thrown away the only structural cue distinguishing them. */
+
+.records-pair {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 18px; margin-top: 12px;
+}
+.records-col h4 {
+  margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.record-list { list-style: none; margin: 0; padding: 0; }
+.record-row {
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  align-items: center; gap: 10px;
+  padding: 6px 8px; border-radius: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.record-row:last-child { border-bottom: none; }
+/* Hover depth rather than a permanent fill: fourteen rows of tinted background
+   is noise, one row under the cursor is a pointer. */
+.record-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.record-row.mine { background: color-mix(in oklch, var(--crimson) 8%, transparent); }
+
+.record-rank {
+  color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right;
+}
+.record-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.record-who .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The number is the record. It gets the weight; the date next to it does not. */
+.record-points { font-weight: 700; font-variant-numeric: tabular-nums; }
+.record-when { color: var(--muted); font-size: 11px; white-space: nowrap; }
+
+.margin-cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px; margin-top: 10px;
+}
+.margin-card {
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  background: var(--bg);
+}
+.margin-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+/* Spelled out beside the number, not encoded in it -- the bare figure "0.16"
+   does not say what it measures. */
+.margin-value { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.margin-label { color: var(--muted); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+.margin-when { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.margin-side {
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line);
+}
+.margin-side:first-of-type { border-top: none; padding-top: 0; }
+.margin-side .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.margin-side-pts { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+.margin-side.won .margin-side-pts { color: var(--text); }
+.margin-side.lost { color: var(--muted); }
+
+/* The rank cell on a standings row. A status, not a number, when there is no
+   rank -- and the button lives in the cell rather than the page, because the
+   thing it recomputes is this season, not all of them. */
+.rank-cell { white-space: nowrap; }
+.rank-missing { color: var(--muted); font-size: 11px; }
+
+@media (max-width: 640px) {
+  .records-pair { grid-template-columns: minmax(0, 1fr); }
+  .record-row { grid-template-columns: 20px minmax(0, 1fr) auto; row-gap: 2px; }
+  .record-when { grid-column: 2 / -1; }
+}

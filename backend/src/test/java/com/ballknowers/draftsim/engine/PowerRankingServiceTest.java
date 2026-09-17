@@ -239,4 +239,111 @@ class PowerRankingServiceTest {
         assertTrue(result.skipped().contains("not drafted"));
         verify(rankings, never()).save(anyLong(), anyInt(), anyInt(), any(), any());
     }
+
+    // ---- specs/002-league-history-record-book US2: final-rank status ----
+
+    private static LeagueRepository.LeagueRow leagueRow(long id, int season) {
+        return new LeagueRepository.LeagueRow(id, Sport.NFL, "S" + id, "L" + id, season,
+                12, List.of(), 1.0, null);
+    }
+
+    private static PowerRankingRepository.FinalRank fr(int rosterId, int rank, int week) {
+        return new PowerRankingRepository.FinalRank(rosterId, rank, week);
+    }
+
+    /**
+     * A finished season with a real snapshot reports its rank and the week it
+     * came from.
+     */
+    @Test
+    void aSeasonWithARealizedSnapshotIsRanked() {
+        when(rankings.finalRealizedRanks(5L)).thenReturn(List.of(fr(7, 1, 17), fr(3, 2, 17)));
+
+        PowerRankingService.SeasonRanks out = service.finalRankForSeason(5L, false);
+
+        assertEquals(PowerRankingService.RankStatus.RANKED, out.status());
+        assertEquals(17, out.week());
+        assertEquals(1, out.byRoster().get(7));
+    }
+
+    /**
+     * The season still being played is IN_PROGRESS, not an error and not
+     * something a button fixes.
+     *
+     * <p>Decided by POSITION IN THE CHAIN rather than by a week number: this DB
+     * runs a 17-week football league and a 24-week basketball one, and an
+     * optional parameter that quietly encodes one sport's rule is a bug this
+     * repo has shipped three times (FR-011).
+     */
+    @Test
+    void theHeadOfTheChainIsInProgressRatherThanMissing() {
+        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
+
+        PowerRankingService.SeasonRanks out = service.finalRankForSeason(4L, true);
+
+        assertEquals(PowerRankingService.RankStatus.IN_PROGRESS, out.status());
+        assertNull(out.week());
+        verifyNoInteractions(weekPoints);
+    }
+
+    /**
+     * A finished season with no snapshot but with stored scores is computable,
+     * so it earns the button.
+     */
+    @Test
+    void aFinishedSeasonWithScoresButNoSnapshotIsNotComputed() {
+        when(rankings.finalRealizedRanks(212L)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(212L)).thenReturn(Set.of(1, 2, 24));
+
+        assertEquals(PowerRankingService.RankStatus.NOT_COMPUTED,
+                service.finalRankForSeason(212L, false).status());
+    }
+
+    /** Finished, no snapshot, nothing to compute FROM -- the button would lie. */
+    @Test
+    void aFinishedSeasonWithNoStoredScoresIsUnavailable() {
+        when(rankings.finalRealizedRanks(210L)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(210L)).thenReturn(Set.of());
+
+        assertEquals(PowerRankingService.RankStatus.UNAVAILABLE,
+                service.finalRankForSeason(210L, false).status());
+    }
+
+    /** The backfill computes at the season's LAST stored week, whatever that is. */
+    @Test
+    void backfillComputesAtTheSeasonsLastStoredWeekNotAFixedOne() {
+        LeagueRepository.LeagueRow head = leagueRow(4L, 2026);
+        LeagueRepository.LeagueRow nba = leagueRow(212L, 2024);
+        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
+        when(rankings.finalRealizedRanks(212L)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(212L)).thenReturn(Set.of(1, 12, 24));
+        when(rosterSeasons.forLeague(212L)).thenReturn(List.of());
+        when(weekPoints.through(212L, 24)).thenReturn(List.of(
+                new RosterWeekPointsRepository.WeekPoint(24, 1, 100.0)));
+
+        List<PowerRankingService.BackfilledSeason> out = service.backfillFinalRanks(List.of(head, nba), null);
+
+        // 24, a basketball season length -- nothing here assumes 17.
+        verify(weekPoints).through(212L, 24);
+        assertTrue(out.stream().anyMatch(r -> r.season() == 2026
+                && "season is still in progress".equals(r.reason())));
+    }
+
+    /**
+     * FR-006's honesty rule: an empty "backfilled" always arrives with a
+     * populated "skipped". A zero that does not say why reads as broken.
+     */
+    @Test
+    void everySkippedSeasonCarriesAReason() {
+        LeagueRepository.LeagueRow head = leagueRow(4L, 2026);
+        LeagueRepository.LeagueRow empty = leagueRow(210L, 2025);
+        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
+        when(rankings.finalRealizedRanks(210L)).thenReturn(List.of());
+        when(weekPoints.storedWeeks(210L)).thenReturn(Set.of());
+
+        List<PowerRankingService.BackfilledSeason> out = service.backfillFinalRanks(List.of(head, empty), null);
+
+        assertEquals(2, out.size());
+        assertTrue(out.stream().allMatch(r -> r.reason() != null && !r.reason().isBlank()));
+    }
 }

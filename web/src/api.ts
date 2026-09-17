@@ -659,7 +659,32 @@ export type StandingRow = {
   champion: boolean
   season: number | null
   sleeperLeagueId: string | null
+
+  /**
+   * specs/002-league-history-record-book US2. Optional, not required: this same
+   * type backs getManagerHistory, whose rows are a manager's seasons across
+   * leagues and carry no rank -- making these required would break that call's
+   * typecheck rather than describe it.
+   *
+   * finalRank is non-null iff rankStatus is 'RANKED'. Every other status is a
+   * different REASON there is no rank, and the page renders the reason; see
+   * RankStatus.
+   */
+  finalRank?: number | null
+  finalRankWeek?: number | null
+  rankStatus?: RankStatus
 }
+
+/**
+ * Why a season's row does or doesn't show a final power rank.
+ *
+ * The three absent cases are deliberately distinct. A season still being played
+ * has no final rank and that is not an error; a finished season that was never
+ * computed is one button away from having one; a finished season with no stored
+ * weekly scores has nothing to compute from. Collapsing them into a bare "--"
+ * is what this enum exists to prevent.
+ */
+export type RankStatus = 'RANKED' | 'IN_PROGRESS' | 'NOT_COMPUTED' | 'UNAVAILABLE'
 
 export type SeasonHistory = {
   season: number
@@ -669,13 +694,82 @@ export type SeasonHistory = {
   standings: StandingRow[]
 }
 
+/**
+ * specs/002-league-history-record-book. Mirrors
+ * LeagueHistoryController.weeklyScoreRow(). `points` is a number, not a
+ * pre-formatted string -- the wire carries the stored numeric(8,2) and the page
+ * decides how to show it.
+ */
+export type WeeklyScoreRecord = {
+  season: number
+  week: number
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  points: number
+}
+
+export type MarginSide = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  points: number
+}
+
+export type MarginRecord = {
+  season: number
+  week: number
+  margin: number
+  winner: MarginSide
+  loser: MarginSide
+}
+
+/**
+ * Always present on a 200, even when every list is empty. An absent key would
+ * make "this league has no records" indistinguishable from "this server predates
+ * the record book", which is exactly the ambiguity the contract forbids.
+ *
+ * `marginsUnavailableReason` is non-null exactly when the margin lists are
+ * empty. A panel that renders nothing and says nothing reads as broken.
+ */
+export type LeagueRecords = {
+  limit: number
+  highestWeeks: WeeklyScoreRecord[]
+  lowestWeeks: WeeklyScoreRecord[]
+  closestMatchups: MarginRecord[]
+  biggestBlowouts: MarginRecord[]
+  marginsUnavailableReason: string | null
+}
+
 export type LeagueHistory = {
   sleeperLeagueId: string
   seasons: SeasonHistory[]
+  records: LeagueRecords
 }
 
 export const getLeagueHistory = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/history`).then(json<LeagueHistory>)
+
+export type BackfillResult = {
+  backfilled: { season: number; week: number | null; entries: number }[]
+  skipped: { season: number; reason: string }[]
+}
+
+/**
+ * Computes the missing end-of-season power rank for completed seasons.
+ *
+ * Backs the button in a NOT_COMPUTED rank cell. It exists so the page never
+ * has to print `POST /api/leagues/{id}/power/backfill` for the reader to run
+ * in a terminal -- the same convention ingestLeagueHistory above already
+ * carries.
+ */
+export const backfillFinalRanks = (sleeperLeagueId: string, season?: number) =>
+  apiFetch(
+    `/api/leagues/${sleeperLeagueId}/power/backfill${season == null ? '' : `?season=${season}`}`,
+    { method: 'POST' },
+  ).then(json<BackfillResult>)
 
 export type ManagerHistory = {
   managerId: number

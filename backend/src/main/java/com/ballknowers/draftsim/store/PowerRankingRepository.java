@@ -95,4 +95,44 @@ public class PowerRankingRepository {
                         rs.getInt(8), rs.getObject(9) == null ? null : rs.getDouble(9), rs.getString(10)))
                 .list();
     }
+
+    /** A roster's rank in one snapshot, plus which week that snapshot was. */
+    public record FinalRank(int rosterId, int rank, int week) {}
+
+    /**
+     * The end-of-season COMPUTED_REALIZED ranks for one league-season, or empty.
+     * specs/002-league-history-record-book, data-model R9/R10.
+     *
+     * <p>Both filters are load-bearing, and this database contains a live
+     * instance of each trap:
+     *
+     * <ul>
+     *   <li>{@code week > 0} -- week 0 is the PRESEASON BASELINE, written once by
+     *       {@code computeWeek0IfMissing} before a ball is thrown. The 2026
+     *       season's only COMPUTED_REALIZED snapshot is week 0, so a plain
+     *       max(week) would publish a preseason guess as the final standing.
+     *   <li>{@code kind = 'COMPUTED_REALIZED'} -- the 2026 season's GREATEST week
+     *       is a COMMISSIONER row. A kind-agnostic query would return one
+     *       person's opinion as the season's result.
+     * </ul>
+     *
+     * <p>Neither mistake throws. Both just show a wrong number.
+     */
+    public List<FinalRank> finalRealizedRanks(long leagueId) {
+        return db.sql("""
+                select e.roster_id, e.rank, pr.week
+                from power_ranking pr
+                join power_ranking_entry e on e.ranking_id = pr.id
+                where pr.league_id = ?
+                  and pr.kind = 'COMPUTED_REALIZED'
+                  and pr.week = (
+                      select max(week) from power_ranking
+                      where league_id = ? and kind = 'COMPUTED_REALIZED' and week > 0
+                  )
+                order by e.rank
+                """)
+                .params(leagueId, leagueId)
+                .query((rs, i) -> new FinalRank(rs.getInt(1), rs.getInt(2), rs.getInt(3)))
+                .list();
+    }
 }
