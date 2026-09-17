@@ -107,6 +107,51 @@ then 13 weeks / 6,044 projection rows in about two seconds. Both are idempotent.
 In PowerShell, `curl` is an alias for `Invoke-WebRequest` and has no `-X`. Use
 `curl.exe -X POST "..."` or `Invoke-RestMethod -Method Post -Uri "..."`.
 
+### Repairing the league-seasons that lost their pairings
+
+A second instance of "code is not data", and a nastier one, because nothing
+looks broken.
+
+`ingestWeeklyPoints` used to skip a week whenever its scores were already
+cached, which took the `league_matchup` upsert down with it. `league_matchup`
+arrived on 2026-09-14, so **every season ingested before that date has complete
+scores and no pairings**, and re-running the ingest could not repair it -- the
+skip was keyed on the table that was already full. Fixed in `945371e`.
+
+Anything reading `league_matchup` then answers from whatever single week
+survived. League history's record book reported this league's biggest blowout as
+**67.6** when the real figure is **118.86**, with no empty state to give it
+away, because the list was not empty.
+
+**This cannot be fixed with SQL.** `league_matchup.matchup_id` is the only
+pairing data in the schema and it was never written -- there is no column to
+derive it from and no backup. The values exist only in Sleeper's matchups
+endpoint, so repair means asking Sleeper again:
+
+    DATABASE_URL="<prod url>" API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh
+    DATABASE_URL="<prod url>" API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh --apply
+
+Without `--apply` it reports and changes nothing. It finds the affected seasons,
+collapses them to chain **heads** (the ingest walks `previous_league_id`
+backwards, so the newest league in a chain repairs every season behind it in one
+pass), re-ingests each, and re-checks.
+
+**Deploy the fix first.** Against an old build the gate still skips the cached
+weeks, and the script is a no-op that looks like it worked.
+
+Measured locally on 2026-09-16: three affected league-seasons across two chains,
+repaired in two calls (540 and 230 roster-weeks), after which the detection
+query returned zero rows and every scored week had its pairing -- football 2025
+went from 8 paired rows in one week to 196 across all 17.
+
+To check without repairing anything:
+
+    psql -d "$DATABASE_URL" -f scripts/find-missing-pairings.sql
+
+In Git Bash, a `postgres://` URL passed positionally gets rewritten by MSYS path
+conversion and psql silently drops every flag after it. Both scripts set
+`MSYS2_ARG_CONV_EXCL` and pass the URL through `-d`.
+
 ## Environment variables
 
 Set on the `draft-sim` (backend) service unless noted.
