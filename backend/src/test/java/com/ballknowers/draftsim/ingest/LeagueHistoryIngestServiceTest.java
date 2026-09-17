@@ -123,8 +123,12 @@ class LeagueHistoryIngestServiceTest {
         when(sleeper.leagueChain("L3")).thenReturn(List.of(league));
         when(sleeper.leagueUsers("L3")).thenReturn(List.of());
         when(sleeper.rosters("L3")).thenReturn(List.of());
-        // Weeks 1-3 already cached; week 4 is the newest scored week and must be re-fetched.
+        // Weeks 1-3 fully cached -- BOTH scores and pairings. Before
+        // specs/002-league-history-record-book this test stubbed only the
+        // scores, which made it pass while pairings were silently never
+        // backfilled; a week is settled only when both tables hold it.
         when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3));
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2, 3));
         when(sleeper.matchups(eq("L3"), anyInt())).thenReturn(List.of());
 
         service.ingestChain(Sport.NFL, "L3");
@@ -133,6 +137,60 @@ class LeagueHistoryIngestServiceTest {
         verify(sleeper, never()).matchups("L3", 2);
         verify(sleeper, never()).matchups("L3", 3);
         verify(sleeper, times(1)).matchups("L3", 4);
+    }
+
+    /**
+     * specs/002-league-history-record-book FR-007, research D2.
+     *
+     * <p>The bug this pins: league_matchup was added after roster_week_points,
+     * so every season ingested before it has complete scores and no pairings.
+     * With the gate keyed on scores alone, those weeks were skipped forever and
+     * re-running the ingest could never repair them -- the skip was keyed on
+     * the table that was already full. Measured live on (Foot) Ball Knowers
+     * 2025: 204 scores across 17 weeks, pairings for one.
+     *
+     * <p>Nothing throws in that state. The page just quietly computes its
+     * "biggest blowout" from one week.
+     */
+    @Test
+    void reRunningBackfillsPairingsForWeeksWhoseScoresAreAlreadyCached() {
+        Map<String, Object> league = leagueObject("L3b", 2025, Map.of("last_scored_leg", 4), Map.of());
+        when(sleeper.leagueChain("L3b")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3b")).thenReturn(List.of());
+        when(sleeper.rosters("L3b")).thenReturn(List.of());
+        // Scores for every week, pairings for none -- the state this database
+        // was actually in.
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3, 4));
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of());
+        when(sleeper.matchups(eq("L3b"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3b");
+
+        verify(sleeper, times(1)).matchups("L3b", 1);
+        verify(sleeper, times(1)).matchups("L3b", 2);
+        verify(sleeper, times(1)).matchups("L3b", 3);
+        verify(sleeper, times(1)).matchups("L3b", 4);
+    }
+
+    /**
+     * The mirror case: pairings present, scores missing. Fetching must still
+     * happen -- the gate is an OR, and keying it on pairings alone would just
+     * move the same bug to the other table.
+     */
+    @Test
+    void reRunningFetchesWeeksWhosePairingsAreCachedButScoresAreNot() {
+        Map<String, Object> league = leagueObject("L3c", 2025, Map.of("last_scored_leg", 2), Map.of());
+        when(sleeper.leagueChain("L3c")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3c")).thenReturn(List.of());
+        when(sleeper.rosters("L3c")).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of());
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2));
+        when(sleeper.matchups(eq("L3c"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3c");
+
+        verify(sleeper, times(1)).matchups("L3c", 1);
+        verify(sleeper, times(1)).matchups("L3c", 2);
     }
 
     @Test

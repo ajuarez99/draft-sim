@@ -132,6 +132,21 @@ public class LeagueHistoryIngestService {
      * even if already cached, since it may have been ingested while Sleeper
      * was still finalizing that week's scores; every earlier stored week is
      * settled and skipped (finding 5).
+     *
+     * <p><b>The skip gate tests BOTH tables, not just one</b>
+     * (specs/002-league-history-record-book, research D2). This loop writes two
+     * rows per roster-week -- the score and the pairing -- and league_matchup
+     * was added on 2026-09-14, long after roster_week_points existed. While the
+     * gate was keyed on stored scores alone, every season ingested before that
+     * date was skipped wholesale on every subsequent run, so the pairing was
+     * never written and re-running could never repair it: the skip was keyed on
+     * the table that was already full. Measured on (Foot) Ball Knowers 2025 --
+     * 204 scores over 17 weeks, and pairings for exactly one week.
+     *
+     * <p>So a week is fetched when its scores are missing OR its pairings are.
+     * Dropping the gate entirely would have fixed it too, and would have
+     * re-fetched every week of every season on every ingest, which is the cost
+     * finding 5 added the gate to avoid.
      */
     private int ingestWeeklyPoints(long leagueId, int season, String sleeperLeagueId, Map<String, Object> league) {
         Map<String, Object> settings = asMap(league.get("settings"));
@@ -139,9 +154,14 @@ public class LeagueHistoryIngestService {
         if (lastScoredLeg < 1) return 0;
 
         Set<Integer> stored = weekPoints.storedWeeks(leagueId);
+        // scheduledWeeks deliberately does NOT count a week whose matchup_ids
+        // all came back null, so an unscheduled week cannot poison this cache
+        // into never being fetched again.
+        Set<Integer> paired = fixtures.scheduledWeeks(leagueId, season);
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
-            if (stored.contains(week) && week != lastScoredLeg) continue;
+            boolean settled = stored.contains(week) && paired.contains(week);
+            if (settled && week != lastScoredLeg) continue;
             List<Map<String, Object>> matchups = sleeper.matchups(sleeperLeagueId, week);
             if (matchups == null) continue;
             for (Map<String, Object> m : matchups) {
