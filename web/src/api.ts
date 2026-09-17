@@ -524,6 +524,17 @@ export type MockSessionState = {
   // draft reverses at round 3, and a plain-snake grid puts your own highlighted
   // picks in another seat's column.
   reversalRound: number
+  // The Sleeper league this mock borrowed its settings from (V16), so the rail
+  // can show league context inside a mock room. Null for a mock started with no
+  // league in mind, and for every session created before V16 -- those stored
+  // only the league's display name, which is not a key and is not backfilled.
+  //
+  // OPTIONAL, not merely nullable, and deliberately so: the frontend and
+  // backend are separate Railway services that deploy independently, so "new
+  // frontend, old backend" is a state every rollout passes through. It cost a
+  // white page on 2026-09-14 (see withSportDefaults below). A missing field
+  // must degrade one rail section, never the page.
+  sourceSleeperLeagueId?: string | null
 }
 
 // Mirrors store/MockDraftRepository.SessionSummary. Backs the picker screen's
@@ -541,6 +552,9 @@ export type MockSessionSummary = {
   // "use settings from" step (V12) -- null for a mock started with no league
   // in mind. A display label; the sport is its own field above.
   sourceLeagueName: string | null
+  // The same league as a key rather than a label (V16). Optional for the same
+  // split-deploy reason as MockSessionState's copy above.
+  sourceSleeperLeagueId?: string | null
 }
 
 /**

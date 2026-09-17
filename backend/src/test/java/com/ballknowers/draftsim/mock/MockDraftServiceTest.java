@@ -673,15 +673,18 @@ class MockDraftServiceTest {
         // owners/sourceLeagueNames are kept alongside sessions rather than on
         // SessionRow: the real row type doesn't carry either (nothing that reads
         // a session needs them), and ownerOf is its own query there for the same
-        // reason.
+        // reason. sourceSleeperLeagueId is the exception -- V16 put it ON the
+        // row, because the mock room's rail reads it back to show which league
+        // the mock came from, so the fake must carry it there too.
         @Override
         public long createSession(Sport sport, int teams, int rounds, List<String> rosterPositions, double ppr,
                                   String seatsJson, int userSlot, long rngSeed,
                                   Long sourceDraftId, Integer forkedAtPickNo, String ownerSleeperUserId,
-                                  String sourceLeagueName, int reversalRound) {
+                                  String sourceLeagueName, int reversalRound, String sourceSleeperLeagueId) {
             long id = nextId.getAndIncrement();
             sessions.put(id, new SessionRow(id, sport, "IN_PROGRESS", teams, rounds, rosterPositions, ppr,
-                    seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo, reversalRound));
+                    seatsJson, userSlot, rngSeed, 1, sourceDraftId, forkedAtPickNo, reversalRound,
+                    sourceSleeperLeagueId));
             owners.put(id, Optional.ofNullable(ownerSleeperUserId));
             sourceLeagueNames.put(id, sourceLeagueName);
             picksBySession.put(id, new ArrayList<>());
@@ -708,7 +711,8 @@ class MockDraftServiceTest {
             SessionRow r = sessions.get(id);
             sessions.put(id, new SessionRow(r.id(), r.sport(), status, r.teams(), r.rounds(), r.rosterPositions(),
                     r.pointsPerReception(), r.seatsJson(), r.userSlot(), r.rngSeed(), currentPickNo,
-                    r.sourceDraftId(), r.forkedAtPickNo(), r.reversalRound()));
+                    r.sourceDraftId(), r.forkedAtPickNo(), r.reversalRound(),
+                    r.sourceSleeperLeagueId()));
         }
 
         @Override
@@ -730,7 +734,8 @@ class MockDraftServiceTest {
                         return owner.map(sleeperUserId::equals).orElse(true);
                     })
                     .map(r -> new SessionSummary(r.id(), r.sport(), r.status(), r.teams(), r.rounds(),
-                            r.userSlot(), r.currentPickNo(), Instant.now(), sourceLeagueNames.get(r.id())))
+                            r.userSlot(), r.currentPickNo(), Instant.now(), sourceLeagueNames.get(r.id()),
+                            r.sourceSleeperLeagueId()))
                     .toList();
         }
     }

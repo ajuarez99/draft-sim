@@ -236,6 +236,34 @@ export function spaceStatsFor(e: PowerRankingEntry, teamCount: number, myRank: n
   }
 }
 
+/**
+ * Ballots that actually produced one MEMBER week, read off that week's own
+ * entries.
+ *
+ * Deliberately NOT `BallotState.ballotCount`: /ballot always answers for the
+ * CURRENT week, so pairing it with a stale `heroWeek`/`tableWeek` label is
+ * what printed "0 of 12 ballots in for week 1" above twelve real week-1
+ * averages (ballknowers.co, 2026-09-17, once the NFL state advanced to week 2
+ * with nobody voting yet). Every week shown on this page gets its tally from
+ * here, and the live one from `ballot` -- labelled as the live one.
+ *
+ * Per-entry `ballotCount` is per-ROSTER, hence the max: a submitted ballot
+ * must cover this league's roster-id set exactly (LeagueHistoryController
+ * rejects a missing, extra or duplicate roster), so the best-covered roster's
+ * count IS the week's ballot count. 0 is the honest answer for a week with no
+ * MEMBER entries rather than "unknown" -- MemberRankingService.forWeek()
+ * returns empty exactly when the week has no ballots at all, and MEMBER
+ * entries are derived on read, never stored, so they cannot lag the ballots.
+ */
+export function ballotsCountedIn(entries: PowerRankingEntry[], season: number, week: number): number {
+  let max = 0
+  for (const e of entries) {
+    if (e.kind !== 'MEMBER' || e.season !== season || e.week !== week) continue
+    if (e.ballotCount != null && e.ballotCount > max) max = e.ballotCount
+  }
+  return max
+}
+
 // --- headline / deck / story cards (§5) -------------------------------------
 //
 // Deterministic, not an LLM call: exactly the rule order in
@@ -577,7 +605,18 @@ export default function PowerRankings() {
   const heroPrevRows = heroPrevWeek == null ? null : entriesFor('MEMBER', heroPrevWeek)
   const story = computeWeeklyStory(heroRows, heroPrevRows)
   const headline = buildHeadline(story, heroWeek)
-  const deck = buildDeck(story, ballot?.ballotCount ?? 0, ballot?.memberCount ?? teamCount, heroWeek)
+  const memberCount = ballot?.memberCount ?? teamCount
+  // heroWeek's OWN tally, not the live one. See ballotsCountedIn().
+  const heroBallots = ballotsCountedIn(data.entries, season, heroWeek)
+  const deck = buildDeck(story, heroBallots, memberCount, heroWeek)
+  // The two weeks this page has to hold at once: the last one the room
+  // actually produced (heroWeek/tableWeek) and the one it is voting in now
+  // (currentWeek). They differ for the whole stretch between a week advancing
+  // and the first ballot landing, which for this league is most of a week.
+  // Null when they agree, so every label below can say which is which
+  // instead of printing one week's number under the other's heading.
+  // `===` on purpose: week 0 is a real week all NBA offseason.
+  const collectingWeek = currentWeek === heroWeek ? null : currentWeek
 
   const heroReferenceRows = entriesFor(REFERENCE_KIND.MEMBER, heroWeek)
   const heroReferenceRank = new Map(heroReferenceRows.map((e) => [e.rosterId, e.rank]))
@@ -597,7 +636,11 @@ export default function PowerRankings() {
     ? `Playoff odds are ${oddsSummary.iterations.toLocaleString()} simulated seasons against the real remaining schedule, from ${oddsSummary.weeksOfScoring} week${oddsSummary.weeksOfScoring === 1 ? '' : 's'} of scoring.`
     : null
 
-  const memberEntries = entriesFor('MEMBER', currentWeek)
+  // The homer card is a fact about the ballots that produced the averages
+  // above it, so it reads heroWeek. Against `currentWeek` it silently emptied
+  // itself the moment the season advanced, which is how a week-1 page ended
+  // up with no homer while showing week 1's ballots.
+  const memberEntries = entriesFor('MEMBER', heroWeek)
   const homers = memberEntries.filter((e) => e.selfRankBias != null).sort((a, b) => a.selfRankBias! - b.selfRankBias!)
   const topHomer = homers[0] ?? null
 
@@ -678,13 +721,16 @@ export default function PowerRankings() {
         <div className="pr-hero-copy">
           <h1 className="page-title hero cond">{headline}</h1>
           <p className="page-sub wide">{deck}</p>
-          {ballot && (
-            <div className="pr-hero-pills">
-              <span className="chip on">
-                {ballot.ballotCount} of {ballot.memberCount} ballots in
+          <div className="pr-hero-pills">
+            <span className="chip on">
+              {heroBallots} of {memberCount} ballots in · {weekPhrase(heroWeek)}
+            </span>
+            {collectingWeek != null && ballot && (
+              <span className="chip">
+                {ballot.ballotCount} of {ballot.memberCount} in · {weekPhrase(collectingWeek)} open
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {story.top && (
@@ -790,7 +836,7 @@ export default function PowerRankings() {
               <h2>The ladder</h2>
               <span className="small muted">
                 {KIND_LABEL[ladderMode]} · {weekPhrase(tableWeek)}
-                {ladderMode === 'MEMBER' && ballot ? ` · ${ballot.ballotCount} ballots` : ''}
+                {ladderMode === 'MEMBER' ? ` · ${ballotsCountedIn(data.entries, season, tableWeek)} ballots` : ''}
               </span>
               <div className="segmented sm pr-ladder-modes" role="group" aria-label="Ranking mode">
                 {ALL_POWER_RANKING_KINDS.map((k) => (
@@ -820,6 +866,19 @@ export default function PowerRankings() {
                 </button>
               )}
             </div>
+
+            {/* The ladder deliberately shows the latest week this mode HAS,
+                not the current week (regression checklist #2) -- so when those
+                differ it has to say so. Without this line twelve week-1 rows
+                sat under a week-1 heading while the ballot panel below
+                collected for week 2, and nothing on the page connected the
+                two. */}
+            {rows.length > 0 && tableWeek !== currentWeek && (
+              <p className="small muted pr-ladder-lag">
+                Showing {weekIn(tableWeek)} — the latest {KIND_LABEL[ladderMode].toLowerCase()} week there is. Nothing for{' '}
+                {weekIn(currentWeek)} yet.
+              </p>
+            )}
 
             {rows.length === 0 ? (
               <p className="muted">
@@ -1203,6 +1262,7 @@ export default function PowerRankings() {
             <section className="panel">
               <div className="panel-head">
                 <h2>Homer of the week</h2>
+                <span className="small muted">{weekPhrase(heroWeek)}</span>
               </div>
               <div className="pr-homer-of-week-name">{topHomer.manager ?? `roster ${topHomer.rosterId}`}</div>
               <p className="muted small">
@@ -1253,7 +1313,9 @@ export default function PowerRankings() {
               </>
             ) : (
               <p className="muted small">
-                {ballot?.canCommission ? "You haven't set a ranking for this week yet." : "The commissioner hasn't ranked this week yet."}
+                {ballot?.canCommission
+                  ? `You haven't set a ranking for ${weekIn(currentWeek)} yet.`
+                  : `The commissioner hasn't ranked ${weekIn(currentWeek)} yet.`}
               </p>
             )}
           </section>

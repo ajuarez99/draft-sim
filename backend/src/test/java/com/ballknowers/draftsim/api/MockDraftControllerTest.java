@@ -32,7 +32,7 @@ class MockDraftControllerTest {
     private MockSessionState sampleState(long id) {
         return new MockSessionState(id, Sport.NFL, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
                 List.of(new MockSessionState.SeatView(1, SeatSpec.Type.USER, null, "You", null)),
-                List.of(), List.of(), 1, 1, true, null, null, 0);
+                List.of(), List.of(), 1, 1, true, null, null, 0, null);
     }
 
     @Test
@@ -180,7 +180,7 @@ class MockDraftControllerTest {
     @Test
     void listDelegatesToTheService() {
         MockDraftController controller = new MockDraftController(mocks);
-        var summary = new MockDraftRepository.SessionSummary(1, Sport.NFL, "IN_PROGRESS", 8, 15, 1, 1, null, null);
+        var summary = new MockDraftRepository.SessionSummary(1, Sport.NFL, "IN_PROGRESS", 8, 15, 1, 1, null, null, null);
         when(mocks.listSessions(null)).thenReturn(List.of(summary));
 
         assertEquals(List.of(summary), controller.list(null));

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { getManagers, type ManagerSummary, type Sport } from '../api'
 import { PROVENANCE_LABEL } from '../provenance'
@@ -125,7 +126,13 @@ function ManagerRow({ m, onChanged }: RowProps) {
         <div className="mgr-identity">
           <Avatar avatarId={m.avatarId} seed={String(m.managerId)} label={m.manager} />
           <span className="mgr-identity-text">
-            <span className="who">{m.manager}</span>
+            {/* The page listing every manager linked to none of them: a
+                manager's own history was reachable only by clicking their name
+                inside a league's standings table, which is a strange place to
+                have to go to read the page named after them. */}
+            <Link to={`/managers/${m.managerId}/history`} className="who mgr-who-link">
+              {m.manager}
+            </Link>
             {/* Note and comparison ride under the name rather than taking
                 columns of their own: both are optional and only a handful of
                 managers have either, so a column for them would be mostly

@@ -48,7 +48,18 @@ public record MockSessionState(
          * plain-snake grid, and the user's own highlighted picks land in another
          * seat's column.
          */
-        int reversalRound
+        int reversalRound,
+        /**
+         * The Sleeper league this mock borrowed its settings from (V16), or
+         * null when it was started with no league in mind -- and null for
+         * every session created before V16, which stored only the league's
+         * display name and cannot be backfilled from it.
+         *
+         * Here so the rail can show league context inside a mock room: a mock
+         * seeded from a league is exactly where you want the real room one
+         * click away, and before this the page had no way to name its league.
+         */
+        String sourceSleeperLeagueId
 ) {
     public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager, String avatarId) {}
 

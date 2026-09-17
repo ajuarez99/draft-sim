@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Rail from './Rail'
+import JumpTo from './JumpTo'
 import LeagueRailSection from './LeagueRailSection'
-import { PageActionSlotContext, RailContextSlotContext } from '../appSlots'
-import { useRailLeague } from '../railLeague'
+import { PageActionSlotContext, RailContextSlotContext, RailLeagueHintContext } from '../appSlots'
+import { useAllLeagues, useRailLeague } from '../railLeague'
+import { useSearchIndex } from '../searchIndex'
 import { clearUser, useUser } from '../user'
 import type { Sport } from '../api'
 
@@ -83,11 +85,31 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   const [pageActionSlot, setPageActionSlot] = useState<HTMLDivElement | null>(null)
   const [railContextSlot, setRailContextSlot] = useState<HTMLDivElement | null>(null)
+  const [jumpOpen, setJumpOpen] = useState(false)
+  const { index: jumpIndex, loading: jumpLoading, load: loadJumpIndex } = useSearchIndex()
 
-  // Resolved from the path, not from the page -- six league-scoped routes
-  // share two URL shapes, and the rail would otherwise need the same block
-  // portaled from six components. See railLeague.ts.
-  const railLeague = useRailLeague(location.pathname)
+  // Published by a page that knows its league when the URL doesn't -- only
+  // MockDraftView today, from the session's own sourceSleeperLeagueId.
+  const [pageLeagueHint, setPageLeagueHint] = useState<string | null>(null)
+
+  // Manager history takes the other path: it is always arrived at by a link
+  // from a league's standings, so the league rides in route state and needs
+  // nothing from the page. A direct visit has no state and gets no league,
+  // which is the honest answer rather than a guess.
+  const stateLeagueHint =
+    (location.state as { railLeagueId?: string } | null)?.railLeagueId ?? null
+
+  // Resolved from the path where the path can say, from a hint where it can't
+  // -- the league-scoped routes share two URL shapes, and the rail would
+  // otherwise need the same block portaled from every one of them. See
+  // railLeague.ts and destinations.ts.
+  const railLeague = useRailLeague(location.pathname, pageLeagueHint ?? stateLeagueHint)
+
+  // Every league the user can see, for the rail's switcher. Same cache as
+  // above, so this costs no request of its own -- and only asked for once we
+  // are actually inside a league, since that is the only place a switcher can
+  // appear.
+  const allLeagues = useAllLeagues(railLeague != null)
 
   // null = follow the route's own default. Once someone has chosen, the
   // choice sticks across routes and reloads -- a 13" laptop wants the icon
@@ -112,6 +134,33 @@ export default function AppShell({ children }: { children: ReactNode }) {
     clearUser()
     navigate('/', { replace: true })
   }
+
+  const openJumpTo = useCallback(() => {
+    loadJumpIndex()
+    setJumpOpen(true)
+  }, [loadJumpIndex])
+
+  /*
+   * Ctrl/Cmd+K, globally.
+   *
+   * Deliberately not a bare `/`: draft rooms have their own player search and
+   * several pages have text inputs, and a bare key would fight every one of
+   * them. The modifier is what makes this safe to bind at document level.
+   *
+   * Bound while signed in only -- the hook runs before the signed-out early
+   * return below, so it checks `user` itself rather than relying on position.
+   */
+  useEffect(() => {
+    if (!user) return
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        openJumpTo()
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [user, openJumpTo])
 
   // The new-mock modal lives on Home -- it needs the league list Home has
   // already fetched, and the rail has no business refetching it. So this is a
@@ -143,6 +192,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onToggleCollapsed={toggleCollapsed}
         onSignOut={signOut}
         onOpenMockModal={openMockModal}
+        onOpenJumpTo={openJumpTo}
         contextSlotRef={setRailContextSlot}
       >
         {railLeague && (
@@ -151,6 +201,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             pathname={location.pathname}
             collapsed={collapsed}
             onMockIt={(leagueId, sport) => openMockModal({ leagueId, sport })}
+            allLeagues={allLeagues}
           />
         )}
       </Rail>
@@ -161,10 +212,31 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div className="app-main-head" ref={setPageActionSlot} />
         <PageActionSlotContext.Provider value={pageActionSlot}>
           <RailContextSlotContext.Provider value={railContextValue}>
-            {children}
+            <RailLeagueHintContext.Provider value={setPageLeagueHint}>
+              {children}
+            </RailLeagueHintContext.Provider>
           </RailContextSlotContext.Provider>
         </PageActionSlotContext.Provider>
       </main>
+
+      {/* Phone-only way back to navigation. The bar itself scrolls away with
+          the page on purpose -- pinning it measured 252px of an 812px viewport
+          (styles.css, the 860px block), and a third of the screen spent
+          permanently on navigation is worse than navigation you scroll up to
+          reach. This costs a button and solves only the return trip. */}
+      <button
+        type="button"
+        className="jumpto-fab"
+        onClick={openJumpTo}
+        aria-label="Jump to a league, page or manager"
+        title="Jump to"
+      >
+        <span aria-hidden="true">⌕</span>
+      </button>
+
+      {jumpOpen && (
+        <JumpTo index={jumpIndex} loading={jumpLoading} onClose={() => setJumpOpen(false)} />
+      )}
     </div>
   )
 }

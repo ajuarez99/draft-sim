@@ -108,7 +108,7 @@ class MockDraftRepositoryIT {
                 Long.class, leagueId, "it-draft-mdr-source-draft", 2026, 15, 8, "snake", "drafting");
 
         long forkedId = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
-                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr", null, 0);
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L, draftId, 5, "it-owner-mdr", null, 0, null);
         try {
             MockDraftRepository.SessionRow row = mockDrafts.find(forkedId).orElseThrow();
             assertEquals(draftId, row.sourceDraftId());
@@ -116,6 +116,54 @@ class MockDraftRepositoryIT {
         } finally {
             jdbc.update("delete from mock_draft_session where id = ?", forkedId);
             jdbc.update("delete from league where id = ?", leagueId);   // cascades draft
+        }
+    }
+
+    /**
+     * V16. The mock room's rail resolves its league from this id, so it has to
+     * survive the write/read round trip as an id -- not be re-derived from
+     * source_league_name, which is a display label and neither unique across
+     * users nor stable across renames.
+     */
+    @Test
+    void createSessionRoundTripsTheSourceLeagueId() {
+        long seeded = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L,
+                null, null, "it-owner-mdr", "IT Source League", 0, "it-sleeper-league-16");
+        try {
+            MockDraftRepository.SessionRow row = mockDrafts.find(seeded).orElseThrow();
+            assertEquals("it-sleeper-league-16", row.sourceSleeperLeagueId());
+            // Deliberately NOT a foreign key: the name column it sits beside is
+            // a creation-time snapshot too, and a mock must outlive a league
+            // being re-ingested underneath it.
+            assertEquals("it-sleeper-league-16", mockDrafts.allSessionsFor("it-owner-mdr").stream()
+                    .filter(s -> s.id() == seeded).findFirst().orElseThrow().sourceSleeperLeagueId());
+        } finally {
+            jdbc.update("delete from mock_draft_session where id = ?", seeded);
+        }
+    }
+
+    /**
+     * The honest-absence half. A mock started with no league in mind has no
+     * source league, and so does every session written before V16 -- those hold
+     * only a name, and are not backfilled from it. Both must read back null so
+     * the rail shows no league rather than a guessed one.
+     */
+    @Test
+    void aMockWithNoSeedingLeagueReadsBackNull() {
+        MockDraftRepository.SessionRow row = mockDrafts.find(sessionId).orElseThrow();
+        assertNull(row.sourceSleeperLeagueId(),
+                "the 9-arg createSession (no league in mind) must leave the source league id null");
+
+        // A blank is not an id. Stored as one it would make an unseeded mock
+        // look seeded, and send the rail looking up a league that cannot exist.
+        long blank = mockDrafts.createSession(Sport.NFL, 8, 15, List.of("QB", "BN"), 1.0,
+                "[{\"slot\":1,\"type\":\"USER\",\"managerId\":null}]", 1, 42L,
+                null, null, "it-owner-mdr", null, 0, "   ");
+        try {
+            assertNull(mockDrafts.find(blank).orElseThrow().sourceSleeperLeagueId());
+        } finally {
+            jdbc.update("delete from mock_draft_session where id = ?", blank);
         }
     }
 

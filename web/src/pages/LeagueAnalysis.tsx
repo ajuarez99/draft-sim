@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
+import { useLeagueLinkState } from '../railLeague'
 import BumpChart, { type Series } from '../components/BumpChart'
 import {
   FOCUS_CAP,
@@ -95,9 +96,12 @@ function ManagerLink({
   isMe?: boolean
 }) {
   const name = managerName(manager, rosterId)
+  // Carries this league to the manager's own page -- see RecordWho in
+  // LeagueHistory, which does the same for the same reason.
+  const linkState = useLeagueLinkState()
   if (managerId == null) return <span className="muted">{name}</span>
   return (
-    <Link to={`/managers/${managerId}/history`} className="standings-manager">
+    <Link to={`/managers/${managerId}/history`} state={linkState} className="standings-manager">
       <Avatar avatarId={avatarId} seed={String(managerId)} label={manager} isMe={isMe} />
       {name}
     </Link>

@@ -14,6 +14,10 @@ type Props = {
    *  The modal itself lives on Home, so from anywhere else this routes to
    *  Home and asks it to open -- see AppShell. */
   onOpenMockModal: () => void
+  /** Opens the jump-to palette. A visible control as well as a shortcut: a
+   *  feature only reachable by Ctrl/Cmd+K is a feature most people never learn
+   *  they have. */
+  onOpenJumpTo: () => void
   /** Filled by AppShell with the ref callback for the page-context region.
    *  See appSlots.tsx: the current page portals into it. */
   contextSlotRef: (el: HTMLDivElement | null) => void
@@ -53,6 +57,7 @@ export default function Rail({
   onToggleCollapsed,
   onSignOut,
   onOpenMockModal,
+  onOpenJumpTo,
   contextSlotRef,
   children,
 }: Props) {
@@ -96,6 +101,17 @@ export default function Rail({
           {collapsed ? '»' : '«'}
         </button>
       </div>
+
+      {/* Above the league block and the Menu rows both, because it reaches
+          past either of them -- every league, every page, every manager. */}
+      <button type="button" className="rail-jumpto" onClick={onOpenJumpTo} title="Jump to (Ctrl+K)">
+        <span className="rail-jumpto-glyph" aria-hidden="true">
+          ⌕
+        </span>
+        <span className="rail-jumpto-text app-rail-row-label">
+          Jump to<kbd className="rail-jumpto-kbd">Ctrl K</kbd>
+        </span>
+      </button>
 
       {/* URL-derived (league context). */}
       {children}
