@@ -279,6 +279,27 @@ not block any football work, and it does not block the shared code path.
 
 ---
 
+## R12. MEASURED 2026-09-18: reconciliation against ffwrapped (SC-001)
+
+Live `GET /api/leagues/1346366555759341568/roster-management` against ffwrapped's published figures for
+the same league, week 1 of 2026:
+
+| | Result |
+|---|---|
+| **Total points** | **11/11 exact.** Both sides read Sleeper's own weekly total, so this is the arm that had to match, and does. |
+| **Potential points** | **11/11 agree to ffwrapped's displayed integer** — `floor(ours)` equals their printed value for every team (174.16→174, 189.7→189, 121.9→121, …). They floor for display; we carry two decimals. |
+| **Residual** | Back-solving their unrounded potential from the efficiency they print gives deltas of −0.77 to +0.81 points (under 0.5%). Puka-Boo agrees to 0.02; Master Bates and jpelwell are the widest. |
+
+The residual is exactly what R3 predicted: two different optimal-lineup rules over identical inputs.
+Some of it is their own display rounding — efficiency printed to one decimal leaves ±0.2 of slack in
+any back-solved potential — and the rest is a genuine rule difference not yet isolated.
+
+**Not tuned to match, deliberately.** The totals prove the inputs and the plumbing are right. The
+potential is this app's own `SportRules` answer, and making it agree with ffwrapped's to the second
+decimal would mean adopting their lineup rule over the one every other lineup-based view in this app
+uses. If that difference is ever worth closing, the honest way is to find the specific eligibility rule
+that differs, not to fit the number.
+
 ## R11. Constitution
 
 `.specify/memory/constitution.md` is the unmodified Spec Kit template — every principle is still a

@@ -71,6 +71,41 @@ public class RosterWeekPointsRepository {
      * produces when someone leaves mid-season. rosterId is never null, so a
      * caller always has something to render (data-model R1).
      */
+    /**
+     * One roster's scored week WITH its per-player breakdown.
+     *
+     * <p>{@code playersPointsJson} is Sleeper's {@code players_points} as
+     * stored: {@code sleeper_player_id -> points} for every player on the
+     * roster that week, bench included. It is the input to every
+     * backward-looking view in specs/004-ffwrapped-feature-parity -- potential
+     * points, weekly awards and top performers all read it, and none of them
+     * needs a new ingest because V5 has been storing it since the beginning.
+     *
+     * <p>Can be {@code "{}"} for a week Sleeper returned no breakdown for.
+     * Callers must treat that as "no answer for this week" rather than zero
+     * (FR-007); {@code RealizedLineupService} does.
+     */
+    public record WeekBreakdown(int week, int rosterId, double startersPoints, String playersPointsJson) {}
+
+    /**
+     * Every stored week of one league-season, with per-player points.
+     *
+     * <p>One query for the whole page: a roster-management view reads every
+     * roster's every week, and doing that per roster would be a dozen round
+     * trips for a page that is already fully cached in this table.
+     */
+    public List<WeekBreakdown> breakdownsFor(long leagueId, int season) {
+        return db.sql("""
+                select week, roster_id, starters_points, players_points::text
+                from roster_week_points
+                where league_id = ? and season = ?
+                order by roster_id, week
+                """)
+                .params(leagueId, season)
+                .query((rs, i) -> new WeekBreakdown(rs.getInt(1), rs.getInt(2), rs.getDouble(3), rs.getString(4)))
+                .list();
+    }
+
     public record ScoreRow(int season, int week, int rosterId, Long managerId, String manager,
                            String avatarId, BigDecimal points) {}
 
