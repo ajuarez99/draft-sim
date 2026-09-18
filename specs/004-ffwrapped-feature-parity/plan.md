@@ -133,7 +133,10 @@ backend/src/main/java/com/ballknowers/draftsim/
 │   ├── LeagueTransactionRepository.java # NEW  US6
 │   └── PlayoffOddsRepository.java       # US4: distributions
 └── api/
-    └── LeagueAnalyticsController.java   # NEW: the four new read endpoints
+    ├── RosterManagementController.java  # NEW  US2 (+ US6 sections, same page)
+    ├── ExpectedWinsController.java      # NEW  US3
+    ├── SeasonForecastController.java    # NEW  US4
+    └── WeeklyReportController.java      # NEW  US5
 
 backend/src/main/resources/db/migration/
 ├── V17__roster_week_starters.sql        # US5
@@ -152,7 +155,14 @@ web/src/
 
 **Structure decision**: Web application layout, matching the existing repo. New analysis logic goes in
 `engine/` beside `LeagueAnalysisService` and `PowerRankingService`, which are the closest existing
-neighbours and already establish the read-only-service-plus-controller shape. `RealizedLineupService` is
+neighbours and already establish the read-only-service-plus-controller shape.
+
+One controller per page, named after the page, following the existing per-family split
+(`LeagueHistoryController` hosts the history/power/ballot family, `LeagueAnalysisController` hosts
+analysis). A single shared controller was rejected on naming grounds alone: the obvious name,
+`LeagueAnalyticsController`, is one letter from the existing `LeagueAnalysisController`, and a pair of
+near-identical names that do different things is the same quiet-collision failure this feature exists
+to clean up. `RealizedLineupService` is
 split out from `RosterManagementService` deliberately: three stories (US2, US5, and any later
 efficiency-based award) need "what was this roster's best possible lineup in week N", and that must be
 one implementation, not three.
