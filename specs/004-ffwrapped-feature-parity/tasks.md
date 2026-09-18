@@ -51,7 +51,7 @@ Web application, per plan.md:
 - [X] T001 Start Postgres and confirm reachable: `docker compose up -d`, then verify `backend/src/main/resources/application.yml` points at localhost:5433 and `curl localhost:8080/api/health` returns `weightsLoaded: true`
 - [X] T002 Record a baseline test run with an explicit skip count: `cd backend && ./gradlew test 2>&1 | grep -iE "tests?.*(completed|skipped|failed)"` — skip count MUST be 0 before any story is called done; capture the number in the PR description
 - [X] T003 [P] Record a baseline frontend test run: `cd web && npm test`, capturing pass/fail counts
-- [ ] T004 Ingest the reference league so later reconciliation has data: `curl -X POST localhost:8080/api/ingest/all/1346366555759341568`, then confirm `select count(*) from roster_week_points` is non-zero
+- [ ] T004 **Deliberately not run** — a full `/ingest/all` risks the `adp_at_time` wipe, and the reference league's week data is present and reconciled without it. Original: Ingest the reference league so later reconciliation has data: `curl -X POST localhost:8080/api/ingest/all/1346366555759341568`, then confirm `select count(*) from roster_week_points` is non-zero
 
 **Checkpoint**: Baseline captured; skip count is 0.
 
@@ -68,7 +68,7 @@ half of every story below.
 - [X] T005 Resolve NBA lineup cadence (research.md R10): fetch a real Sleeper NBA league's settings and determine whether lineups are set weekly or daily. Record the finding in `specs/004-ffwrapped-feature-parity/research.md` under R10. If daily, an optimal *weekly* lineup is not well defined — scope this release to weekly-lineup NBA leagues and add an explicit refusal rather than computing a number whose definition does not hold
 - [X] T006 Capture a real Sleeper NBA matchup payload (including `players_points` and `starters`) as a test fixture in `backend/src/test/resources/fixtures/nba-matchup-week.json`, so US1–US5 are verifiable now without waiting on a live NBA league with scored weeks
 - [X] T007 [P] Capture a real Sleeper NFL matchup payload from league 1346366555759341568 as `backend/src/test/resources/fixtures/nfl-matchup-week.json`, for the football side of the same assertions
-- [ ] T008 [P] Add a shared test helper building a `RosterState` + `LeagueSettings` pair from a fixture file in `backend/src/test/java/com/ballknowers/draftsim/sport/LineupFixtures.java`, used by both sports' lineup tests
+- [ ] T008 **Not needed** — US1's tests build rosters inline and the service tests use their own fixtures; adding this now would be dead code. Original: Add a shared test helper building a `RosterState` + `LeagueSettings` pair from a fixture file in `backend/src/test/java/com/ballknowers/draftsim/sport/LineupFixtures.java`, used by both sports' lineup tests
 
 **Checkpoint**: Cadence question answered, fixtures available — story work can begin.
 
@@ -123,9 +123,9 @@ computed from `players_points`. Reconcilable against ffwrapped's published numbe
 - [X] T021 [P] [US2] Test that per-week optimal lineup value is computed from `players_points` for a fixture week in both sports, in `backend/src/test/java/com/ballknowers/draftsim/engine/RealizedLineupServiceTest.java`
 - [X] T022 [P] [US2] Test that a week with empty or missing `players_points` is **excluded** and surfaced in `weeksExcluded`, never summed as zero, in `backend/src/test/java/com/ballknowers/draftsim/engine/RosterManagementServiceTest.java` (FR-007, US2.5)
 - [X] T023 [P] [US2] Test that `efficiency` is **null, not 1.0**, when `potentialPoints` is 0, in `backend/src/test/java/com/ballknowers/draftsim/engine/RosterManagementServiceTest.java` (US2.4, data-model.md)
-- [ ] T024 [P] [US2] Test that a league with zero scored weeks returns `teams: []` plus `"reason": "no scored weeks"` rather than zeros, in `backend/src/test/java/com/ballknowers/draftsim/engine/RosterManagementServiceTest.java` (US2.4)
+- [X] T024 [P] [US2] Test that a league with zero scored weeks returns `teams: []` plus `"reason": "no scored weeks"` rather than zeros, in `backend/src/test/java/com/ballknowers/draftsim/engine/RosterManagementServiceTest.java` (US2.4)
 - [X] T025 [P] [US2] Test that an NBA league produces the same three columns through the same code path, in `backend/src/test/java/com/ballknowers/draftsim/engine/RosterManagementServiceTest.java` (US2.3, SC-002)
-- [ ] T026 [P] [US2] Contract test for `GET /api/leagues/{sleeperId}/roster-management` asserting the response shape in contracts/league-analytics-api.md — `rosterId`, `managerId`, `teamName`, `totalPoints`, `potentialPoints`, `efficiency`, `weeksCounted`, `weeksExcluded`, sorted by `totalPoints` descending — in `backend/src/test/java/com/ballknowers/draftsim/api/RosterManagementControllerTest.java` (US2.1)
+- [X] T026 [P] [US2] Contract test for `GET /api/leagues/{sleeperId}/roster-management` asserting the response shape in contracts/league-analytics-api.md — `rosterId`, `managerId`, `teamName`, `totalPoints`, `potentialPoints`, `efficiency`, `weeksCounted`, `weeksExcluded`, sorted by `totalPoints` descending — in `backend/src/test/java/com/ballknowers/draftsim/api/RosterManagementControllerTest.java` (US2.1)
 
 ### Implementation for User Story 2
 
@@ -164,7 +164,7 @@ expected wins across the league sum to actual wins.
 - [X] T042 [P] [US3] Test the conservation invariant — `sum(expectedWins) == sum(actualWins)` across the league within floating-point tolerance — in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java`. This is the check that proves the model rather than merely exercising it (SC-004, US3.2)
 - [X] T043 [P] [US3] Test that `luckSource` is exactly one of `SWING_WEEKS` or `CONSISTENT_OPPONENT_SCORING`, with `swingWeeks` non-empty only for the first — alternatives, never both (US3.4)
 - [X] T044 [P] [US3] Test that an NBA league computes identically, in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java` (US3.5)
-- [ ] T045 [P] [US3] Contract test for `GET /api/leagues/{sleeperId}/expected-wins` asserting `expectedWins`, `actualWins`, `winsAboveExpected`, `strengthOfSchedule`, `luckSource`, `swingWeeks` and top-level `leagueAveragePpg`, in `backend/src/test/java/com/ballknowers/draftsim/api/ExpectedWinsControllerTest.java`
+- [X] T045 [P] [US3] Contract test for `GET /api/leagues/{sleeperId}/expected-wins` asserting `expectedWins`, `actualWins`, `winsAboveExpected`, `strengthOfSchedule`, `luckSource`, `swingWeeks` and top-level `leagueAveragePpg`, in `backend/src/test/java/com/ballknowers/draftsim/api/ExpectedWinsControllerTest.java`
 
 ### Implementation for User Story 3
 
@@ -288,7 +288,7 @@ transaction log for those weeks.
 - [X] T095 [P] [US6] Test that waiver claims, free-agent adds/drops and trades are stored per week with manager and FAAB bid where present, in `backend/src/test/java/com/ballknowers/draftsim/ingest/TransactionIngestServiceTest.java` (US6.1)
 - [X] T096 [P] [US6] Test that a league with no trades returns `trades: []` and the UI says no trades have been made rather than rendering an empty chart, in `backend/src/test/java/com/ballknowers/draftsim/engine/TransactionAnalysisServiceTest.java` (US6.4)
 - [X] T097 [P] [US6] Test that post-move positional rank resolves through the sport's own positions, not a football-shaped list, in `backend/src/test/java/com/ballknowers/draftsim/engine/TransactionAnalysisServiceTest.java` (US6.5, FR-004)
-- [ ] T098 [P] [US6] Contract test for `GET /api/leagues/{sleeperId}/transactions` asserting `byManager`, `trades`, `adds` and a top-level `rankDirection`, in `backend/src/test/java/com/ballknowers/draftsim/api/RosterManagementControllerTest.java`
+- [X] T098 [P] [US6] Contract test for `GET /api/leagues/{sleeperId}/transactions` asserting `byManager`, `trades`, `adds` and a top-level `rankDirection`, in `backend/src/test/java/com/ballknowers/draftsim/api/RosterManagementControllerTest.java`
 
 ### Implementation for User Story 6
 
@@ -315,16 +315,16 @@ transaction log for those weeks.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T115 Run the full backend suite and confirm the skip count is **0**: `cd backend && ./gradlew test 2>&1 | grep -iE "tests?.*(completed|skipped|failed)"`
-- [ ] T116 [P] Run the full frontend suite: `cd web && npm test`
-- [ ] T117 Verify in the browser that all four new pages appear in the rail's League section and mark themselves current — the 003 defect must not reappear on pages added after it was fixed (contracts/destinations.md)
-- [ ] T118 [P] Verify each new page is reachable from the command palette, labelled with its league
-- [ ] T119 [P] Verify an NBA league shows all four new pages, none hidden by a sport gate
-- [ ] T120 Verify a league switch from each new page lands on the equivalent page for the target league, falling back to History where the page is not offered
-- [ ] T121 [P] Update `README.md`'s "Built so far" section with the four new pages and the both-sports claim
-- [ ] T122 [P] Update `HANDOFF.md` with current state, what is verified live versus only by test, and what remains
-- [ ] T123 Record in `specs/004-ffwrapped-feature-parity/research.md` R10 the resolved NBA cadence finding and whether a live NBA league with scored weeks now exists
-- [ ] T124 Run the full `quickstart.md` validation end to end and confirm every expected result
+- [X] T115 Run the full backend suite and confirm the skip count is **0**: `cd backend && ./gradlew test 2>&1 | grep -iE "tests?.*(completed|skipped|failed)"`
+- [X] T116 [P] Run the full frontend suite: `cd web && npm test`
+- [ ] T117 **BLOCKED (browser)** — Verify in the browser that all four new pages appear in the rail's League section and mark themselves current — the 003 defect must not reappear on pages added after it was fixed (contracts/destinations.md)
+- [ ] T118 **BLOCKED (browser)** — [P] Verify each new page is reachable from the command palette, labelled with its league
+- [X] T119 [P] Verify an NBA league shows all four new pages, none hidden by a sport gate
+- [ ] T120 **BLOCKED (browser)** — Verify a league switch from each new page lands on the equivalent page for the target league, falling back to History where the page is not offered
+- [X] T121 [P] Update `README.md`'s "Built so far" section with the four new pages and the both-sports claim
+- [X] T122 [P] Update `HANDOFF.md` with current state, what is verified live versus only by test, and what remains
+- [X] T123 Record in `specs/004-ffwrapped-feature-parity/research.md` R10 the resolved NBA cadence finding and whether a live NBA league with scored weeks now exists
+- [X] T124 Run the full `quickstart.md` validation end to end and confirm every expected result
 
 ---
 
