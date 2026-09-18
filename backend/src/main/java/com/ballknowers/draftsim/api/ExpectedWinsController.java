@@ -37,6 +37,7 @@ public class ExpectedWinsController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("available", r.available());
         out.put("season", r.season());
+        out.put("requestedSeason", r.requestedSeason());
         out.put("sport", r.sport().code());
         out.put("weeksScored", r.weeksScored());
         out.put("leagueAveragePpg", r.leagueAveragePpg());

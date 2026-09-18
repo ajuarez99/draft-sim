@@ -41,6 +41,7 @@ public class RosterManagementService {
     private final LeagueMemberRepository members;
     private final SportRulesRegistry rulesRegistry;
     private final RealizedLineupService realized;
+    private final LeagueSeasonResolver seasons;
 
     public RosterManagementService(LeagueRepository leagues,
                                    RosterWeekPointsRepository weekPoints,
@@ -48,7 +49,8 @@ public class RosterManagementService {
                                    PlayerRepository players,
                                    LeagueMemberRepository members,
                                    SportRulesRegistry rulesRegistry,
-                                   RealizedLineupService realized) {
+                                   RealizedLineupService realized,
+                                   LeagueSeasonResolver seasons) {
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.rosterSeasons = rosterSeasons;
@@ -56,6 +58,7 @@ public class RosterManagementService {
         this.members = members;
         this.rulesRegistry = rulesRegistry;
         this.realized = realized;
+        this.seasons = seasons;
     }
 
     /**
@@ -81,18 +84,24 @@ public class RosterManagementService {
      *                  {@code PlayoffOddsService} refusing before a week is
      *                  scored.
      */
-    public record Result(boolean available, String reason, int season, Sport sport,
-                         int weeksScored, List<TeamRow> teams) {
+    /**
+     * @param requestedSeason non-null when the reader asked for a season that
+     *                        has not been played and this is answering about an
+     *                        earlier one. The page says so rather than quietly
+     *                        showing a different year.
+     */
+    public record Result(boolean available, String reason, int season, Integer requestedSeason,
+                         Sport sport, int weeksScored, List<TeamRow> teams) {
 
         static Result unavailable(String reason, int season, Sport sport) {
-            return new Result(false, reason, season, sport, 0, List.of());
+            return new Result(false, reason, season, null, sport, 0, List.of());
         }
     }
 
     public Optional<Result> forLeague(String sleeperLeagueId) {
-        Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        LeagueRepository.LeagueRow league = found.get();
+        LeagueRepository.LeagueRow league = found.get().league();
 
         LeagueSettings settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
         SportRules rules = rulesRegistry.get(settings.sport());
@@ -178,8 +187,8 @@ public class RosterManagementService {
                     league.id(), excludedTotal);
         }
 
-        return Optional.of(new Result(true, null, league.season(), settings.sport(),
-                scoredWeeks.size(), teams));
+        return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
+                settings.sport(), scoredWeeks.size(), teams));
     }
 
     /** Points are a two-decimal quantity everywhere Sleeper reports them. */

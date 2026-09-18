@@ -4090,3 +4090,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .tx-name { flex-basis: 8rem; }
   .tx-team { display: none; }
 }
+
+/* Season fallback note: the page moved to an earlier year and says so. */
+.season-fallback {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid oklch(62% 0.13 80);
+  background: color-mix(in oklab, var(--panel) 88%, white 4%);
+  border-radius: 0 4px 4px 0;
+}

@@ -43,6 +43,7 @@ public class SeasonForecastController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("available", f.available());
         out.put("season", f.season());
+        out.put("requestedSeason", f.requestedSeason());
         if (!f.available()) {
             // A named reason, not an empty table: "this league's seeding is not
             // modelled" and "no week has been scored" call for different words

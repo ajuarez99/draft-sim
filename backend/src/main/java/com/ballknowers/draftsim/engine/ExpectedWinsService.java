@@ -36,15 +36,18 @@ public class ExpectedWinsService {
     private final LeagueMatchupRepository matchups;
     private final RosterSeasonRepository rosterSeasons;
     private final LeagueMemberRepository members;
+    private final LeagueSeasonResolver seasons;
 
     public ExpectedWinsService(LeagueRepository leagues,
                                LeagueMatchupRepository matchups,
                                RosterSeasonRepository rosterSeasons,
-                               LeagueMemberRepository members) {
+                               LeagueMemberRepository members,
+                               LeagueSeasonResolver seasons) {
         this.leagues = leagues;
         this.matchups = matchups;
         this.rosterSeasons = rosterSeasons;
         this.members = members;
+        this.seasons = seasons;
     }
 
     /** One played, scored game. The pure core's only input. */
@@ -59,11 +62,11 @@ public class ExpectedWinsService {
                           double expectedWins, double actualWins, double winsAboveExpected,
                           double strengthOfSchedule, LuckSource luckSource, List<SwingWeek> swingWeeks) {}
 
-    public record Result(boolean available, String reason, int season, Sport sport,
-                         int weeksScored, double leagueAveragePpg, List<TeamRow> teams) {
+    public record Result(boolean available, String reason, int season, Integer requestedSeason,
+                         Sport sport, int weeksScored, double leagueAveragePpg, List<TeamRow> teams) {
 
         static Result unavailable(String reason, int season, Sport sport) {
-            return new Result(false, reason, season, sport, 0, 0, List.of());
+            return new Result(false, reason, season, null, sport, 0, 0, List.of());
         }
     }
 
@@ -193,9 +196,9 @@ public class ExpectedWinsService {
     // ------------------------------------------------------------- repo walk
 
     public Optional<Result> forLeague(String sleeperLeagueId) {
-        Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        LeagueRepository.LeagueRow league = found.get();
+        LeagueRepository.LeagueRow league = found.get().league();
 
         List<Game> games = new ArrayList<>();
         for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()))) {
@@ -249,8 +252,8 @@ public class ExpectedWinsService {
                 .thenComparingInt(TeamRow::rosterId));
 
         int weeks = (int) games.stream().mapToInt(Game::week).distinct().count();
-        return Optional.of(new Result(true, null, league.season(), league.sport(),
-                weeks, round2(leaguePpg(games)), teams));
+        return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
+                league.sport(), weeks, round2(leaguePpg(games)), teams));
     }
 
     private static double round2(double d) {

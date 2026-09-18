@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import { getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
 import { hueForIndex } from '../hue'
+import SeasonFallbackNote from '../components/SeasonFallbackNote'
 
 /**
  * specs/004-ffwrapped-feature-parity US4: where the season is heading.
@@ -63,13 +64,20 @@ export default function SeasonForecast() {
 
       {loading && !data && <p className="muted small">Loading…</p>}
 
-      {data && !data.available && <Refusal reason={data.reason ?? null} />}
+      {data && !data.available && (
+        <Refusal
+          reason={data.reason ?? null}
+          season={data.season}
+          requestedSeason={data.requestedSeason}
+        />
+      )}
 
       {data && data.available && (
         <section className="panel">
           <h3 className="cond">
             Through week {data.week} · {(data.iterations ?? 0).toLocaleString()} simulated seasons
           </h3>
+          <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
 
           <table className="sf-table">
             <thead>
@@ -101,16 +109,27 @@ export default function SeasonForecast() {
 }
 
 /** Different refusals need different words; they are not interchangeable. */
-function Refusal({ reason }: { reason: string | null }) {
+function Refusal({
+  reason,
+  season,
+  requestedSeason,
+}: {
+  reason: string | null
+  season: number
+  requestedSeason?: number | null
+}) {
   const body =
     reason === 'UNMODELLED_SEEDING'
       ? "This league seeds its playoffs in a way this app doesn't model — divisions, or a non-default seeding rule. Rather than show odds computed under the wrong bracket, it shows none."
-      : reason === 'NO_DISTRIBUTIONS'
+      : reason === 'NOT_COMPUTED'
+        ? 'This season has been played, but no odds have been computed for it yet. A commissioner recompute produces them — the page reads a stored simulation rather than running one on load.'
+        : reason === 'NO_DISTRIBUTIONS'
         ? 'The stored snapshot for this league predates win and seed distributions. The next commissioner recompute will produce them; the earlier simulation cannot be re-run to mean the same thing.'
         : 'No week has been scored yet, so there is nothing to project from. Odds appear once the first week is final.'
   return (
     <section className="panel">
       <h3 className="cond">No forecast for this league</h3>
+      <SeasonFallbackNote season={season} requestedSeason={requestedSeason} />
       <p className="muted small">{body}</p>
     </section>
   )

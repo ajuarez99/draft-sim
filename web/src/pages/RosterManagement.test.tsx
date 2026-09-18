@@ -173,6 +173,30 @@ describe('Roster management', () => {
     expect(within(row).getByText('95.0%')).toBeInTheDocument()
   })
 
+  /**
+   * The season-fallback announcement. The rail links league pages at the newest
+   * season; when that season has not been played the page answers about an
+   * earlier one, and must say so rather than quietly show a different year.
+   */
+  it('says which season it fell back to when the one asked for is unplayed', async () => {
+    getRosterManagement.mockResolvedValue(
+      data({ season: 2025, requestedSeason: 2026, weeksScored: 21 }),
+    )
+    render(<RosterManagement />)
+
+    expect(await screen.findByText(/has no scored weeks yet, so this is/)).toBeInTheDocument()
+    expect(screen.getByText('2026')).toBeInTheDocument()
+    expect(screen.getByText('2025')).toBeInTheDocument()
+  })
+
+  it('says nothing about seasons when it did not fall back', async () => {
+    getRosterManagement.mockResolvedValue(data())
+    render(<RosterManagement />)
+
+    await screen.findByRole('row', { name: /Master Bates/ })
+    expect(screen.queryByText(/has no scored weeks yet, so this is/)).not.toBeInTheDocument()
+  })
+
   // ---- US6: transactions, as sections of this same page ----
 
   it('breaks transactions out by type with the count on each segment', async () => {

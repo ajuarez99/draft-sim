@@ -1246,6 +1246,10 @@ export type RosterManagement = {
   available: boolean
   reason?: string | null
   season: number
+  /** Set when the season asked for had not been played and an earlier one is
+   *  shown instead. The page says so; a silently different year would be worse
+   *  than the refusal it replaces. */
+  requestedSeason?: number | null
   sport: Sport
   weeksScored: number
   teams: RosterManagementTeam[]
@@ -1287,6 +1291,7 @@ export type ExpectedWins = {
   available: boolean
   reason?: string | null
   season: number
+  requestedSeason?: number | null
   sport: Sport
   weeksScored: number
   leagueAveragePpg: number
@@ -1323,8 +1328,9 @@ export type ForecastTeam = {
 /** `reason` names which refusal applies; they need different words on screen. */
 export type SeasonForecast = {
   available: boolean
-  reason?: 'UNMODELLED_SEEDING' | 'NO_SCORED_WEEKS' | 'NO_DISTRIBUTIONS' | null
+  reason?: 'UNMODELLED_SEEDING' | 'NO_SCORED_WEEKS' | 'NOT_COMPUTED' | 'NO_DISTRIBUTIONS' | null
   season: number
+  requestedSeason?: number | null
   week?: number
   iterations?: number
   model?: string | null
@@ -1366,6 +1372,7 @@ export type WeeklyReport = {
   available: boolean
   reason?: string | null
   season: number
+  requestedSeason?: number | null
   week: number
   sport: Sport
   matchups: WeeklyMatchup[]

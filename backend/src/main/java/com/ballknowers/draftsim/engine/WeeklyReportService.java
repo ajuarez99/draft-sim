@@ -36,11 +36,13 @@ public class WeeklyReportService {
     private final PlayerRepository players;
     private final SportRulesRegistry rulesRegistry;
     private final RealizedLineupService realized;
+    private final LeagueSeasonResolver seasons;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members, PlayerRepository players,
-                               SportRulesRegistry rulesRegistry, RealizedLineupService realized) {
+                               SportRulesRegistry rulesRegistry, RealizedLineupService realized,
+                               LeagueSeasonResolver seasons) {
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.matchups = matchups;
@@ -49,6 +51,7 @@ public class WeeklyReportService {
         this.players = players;
         this.rulesRegistry = rulesRegistry;
         this.realized = realized;
+        this.seasons = seasons;
     }
 
     public record Side(int rosterId, String teamName, String avatarId, String record, double points) {}
@@ -63,12 +66,13 @@ public class WeeklyReportService {
     /** An award that could not be computed, and why. Never a silent absence. */
     public record OmittedAward(String kind, String reason) {}
 
-    public record Result(boolean available, String reason, int season, int week, Sport sport,
+    public record Result(boolean available, String reason, int season, Integer requestedSeason,
+                         int week, Sport sport,
                          List<Matchup> matchups, List<Performer> topPerformers,
                          List<Award> awards, List<OmittedAward> awardsOmitted) {
 
         static Result unavailable(String reason, int season, int week, Sport sport) {
-            return new Result(false, reason, season, week, sport,
+            return new Result(false, reason, season, null, week, sport,
                     List.of(), List.of(), List.of(), List.of());
         }
     }
@@ -77,9 +81,9 @@ public class WeeklyReportService {
     static final String STARTERS_NOT_STORED = "STARTERS_NOT_STORED";
 
     public Optional<Result> forWeek(String sleeperLeagueId, int week) {
-        Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        LeagueRepository.LeagueRow league = found.get();
+        LeagueRepository.LeagueRow league = found.get().league();
         LeagueSettings settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
         SportRules rules = rulesRegistry.get(settings.sport());
 
@@ -178,8 +182,8 @@ public class WeeklyReportService {
             omitted.add(new OmittedAward("SELF_INFLICTED_WOUND", STARTERS_NOT_STORED));
         }
 
-        return Optional.of(new Result(true, null, league.season(), week, settings.sport(),
-                games, top, awards, omitted));
+        return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
+                week, settings.sport(), games, top, awards, omitted));
     }
 
     // ------------------------------------------------------------- awards

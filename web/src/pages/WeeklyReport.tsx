@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
+import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   getWeeklyReport,
   type WeeklyReport as Data,
@@ -90,6 +91,7 @@ export default function WeeklyReport() {
         <>
           <section className="panel">
             <h3 className="cond">Week {data.week} matchups</h3>
+            <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
             <div className="wr-games">
               {data.matchups.map((m, i) => (
                 <Game key={i} game={m} />

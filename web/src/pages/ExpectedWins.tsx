@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
 import { hueForIndex } from '../hue'
+import SeasonFallbackNote from '../components/SeasonFallbackNote'
 
 /**
  * specs/004-ffwrapped-feature-parity US3: expected wins, schedule luck and
@@ -81,6 +82,7 @@ export default function ExpectedWins() {
               Season {data.season} · {data.weeksScored} week{data.weeksScored === 1 ? '' : 's'} ·
               league average {data.leagueAveragePpg.toFixed(2)} points per game
             </h3>
+            <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
 
             <table className="ew-table">
               <thead>

@@ -34,6 +34,7 @@ class PlayoffOddsServiceTest {
     @Mock private LeagueMatchupRepository fixtures;
     @Mock private PlayoffOddsRepository odds;
     @Mock private com.ballknowers.draftsim.store.LeagueMemberRepository members;
+    @Mock private LeagueSeasonResolver seasons;
 
     private PlayoffOddsService service;
 
@@ -41,7 +42,7 @@ class PlayoffOddsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PlayoffOddsService(leagues, rosterSeasons, weekPoints, fixtures, odds, members);
+        service = new PlayoffOddsService(leagues, rosterSeasons, weekPoints, fixtures, odds, members, seasons);
     }
 
     private static LeagueRepository.PlayoffFormat plainFormat() {

@@ -43,16 +43,19 @@ public class PlayoffOddsService {
     private final LeagueMatchupRepository fixtures;
     private final PlayoffOddsRepository odds;
     private final LeagueMemberRepository members;
+    private final LeagueSeasonResolver seasons;
 
     public PlayoffOddsService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                               RosterWeekPointsRepository weekPoints, LeagueMatchupRepository fixtures,
-                              PlayoffOddsRepository odds, LeagueMemberRepository members) {
+                              PlayoffOddsRepository odds, LeagueMemberRepository members,
+                              LeagueSeasonResolver seasons) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
         this.fixtures = fixtures;
         this.odds = odds;
         this.members = members;
+        this.seasons = seasons;
     }
 
     /**
@@ -236,19 +239,31 @@ public class PlayoffOddsService {
     // ------------------------------------------------ Season Forecast (US4)
 
     /** Why a forecast is not being shown. Distinct values, not one empty list. */
-    public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NO_DISTRIBUTIONS }
+    /**
+     * {@code NOT_COMPUTED} is distinct from {@code NO_SCORED_WEEKS} on purpose:
+     * a finished season with 21 played weeks and no odds snapshot is not a
+     * season with nothing to project from, and telling the reader it is would
+     * send them looking for the wrong thing.
+     */
+    public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NOT_COMPUTED, NO_DISTRIBUTIONS }
 
     public record ForecastTeam(int rosterId, Long managerId, String teamName, String avatarId,
                                double playoffOdds, double averageWins, double projectedPoints,
                                Integer winP10, Integer winP90, Double averageSeed,
                                double seedOnePct, Map<Integer, Double> seedOdds) {}
 
-    public record Forecast(boolean available, Unavailable reason, int season, int week,
-                           int iterations, String model, String snapshotAt,
+    public record Forecast(boolean available, Unavailable reason, int season, Integer requestedSeason,
+                           int week, int iterations, String model, String snapshotAt,
                            List<ForecastTeam> teams) {
 
         static Forecast no(Unavailable reason, int season) {
-            return new Forecast(false, reason, season, 0, 0, null, null, List.of());
+            return no(reason, season, null);
+        }
+
+        /** A refusal announces the season fallback too: the reader still needs
+         *  to know the answer is about a different year than the one clicked. */
+        static Forecast no(Unavailable reason, int season, Integer requestedSeason) {
+            return new Forecast(false, reason, season, requestedSeason, 0, 0, null, null, List.of());
         }
     }
 
@@ -263,19 +278,24 @@ public class PlayoffOddsService {
      * instead of becoming a new endpoint's zero.
      */
     public Optional<Forecast> forecast(String sleeperLeagueId) {
-        Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        LeagueRepository.LeagueRow league = found.get();
+        LeagueRepository.LeagueRow league = found.get().league();
         int season = league.season();
 
         Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
         if (format.isEmpty() || !format.get().modelable()) {
-            return Optional.of(Forecast.no(Unavailable.UNMODELLED_SEEDING, season));
+            return Optional.of(Forecast.no(Unavailable.UNMODELLED_SEEDING, season,
+                    found.get().requestedSeason()));
         }
 
         Optional<PlayoffOddsRepository.Snapshot> snap = odds.latest(league.id(), season);
         if (snap.isEmpty() || snap.get().entries().isEmpty()) {
-            return Optional.of(Forecast.no(Unavailable.NO_SCORED_WEEKS, season));
+            // Which refusal depends on WHY there is no snapshot.
+            boolean played = !weekPoints.storedWeeks(league.id()).isEmpty();
+            return Optional.of(Forecast.no(
+                    played ? Unavailable.NOT_COMPUTED : Unavailable.NO_SCORED_WEEKS, season,
+                    found.get().requestedSeason()));
         }
         PlayoffOddsRepository.Snapshot s = snap.get();
 
@@ -312,8 +332,8 @@ public class PlayoffOddsService {
                     share(seeds)));
         }
 
-        return Optional.of(new Forecast(true, null, s.season(), s.week(), s.iterations(),
-                s.model(), null, teams));
+        return Optional.of(new Forecast(true, null, s.season(), found.get().requestedSeason(),
+                s.week(), s.iterations(), s.model(), null, teams));
     }
 
     /** {@code "3": 412} -> {3: 412}. Null (a pre-V17 snapshot) is an empty map. */

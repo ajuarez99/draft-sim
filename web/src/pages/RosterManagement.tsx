@@ -11,6 +11,7 @@ import {
   type MovedPlayer,
 } from '../api'
 import { hueForIndex } from '../hue'
+import SeasonFallbackNote from '../components/SeasonFallbackNote'
 
 /**
  * specs/004-ffwrapped-feature-parity US2: what each team scored, what it could
@@ -106,6 +107,7 @@ export default function RosterManagement() {
           <h3 className="cond">
             Season {data.season} · {data.weeksScored} week{data.weeksScored === 1 ? '' : 's'} scored
           </h3>
+          <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
 
           <table className="rm-table">
             <thead>

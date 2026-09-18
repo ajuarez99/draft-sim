@@ -54,6 +54,9 @@ public class RosterManagementController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("available", r.available());
         out.put("season", r.season());
+        // Present and null unless the page moved to an earlier season, which it
+        // must announce rather than silently show a different year.
+        out.put("requestedSeason", r.requestedSeason());
         out.put("sport", r.sport().code());
         out.put("weeksScored", r.weeksScored());
         if (!r.available()) {
