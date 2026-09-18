@@ -13,6 +13,7 @@ import LeagueAnalysis from './pages/LeagueAnalysis'
 import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
 import SeasonForecast from './pages/SeasonForecast'
+import WeeklyReport from './pages/WeeklyReport'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import AppShell from './components/AppShell'
@@ -97,6 +98,10 @@ export default function App() {
               <Route
                 path="/leagues/:sleeperLeagueId/forecast"
                 element={<SeasonForecast />}
+              />
+              <Route
+                path="/leagues/:sleeperLeagueId/weekly-report"
+                element={<WeeklyReport />}
               />
               {/* power-rankings-reskin.md §7: a self-check harness, not a page
                   real users should ever reach -- dev-only. */}

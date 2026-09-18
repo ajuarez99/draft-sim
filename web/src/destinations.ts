@@ -39,7 +39,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'mock'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -201,6 +201,19 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Season forecast',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/forecast`,
     match: /^\/leagues\/([^/]+)\/forecast\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'weeklyReport',
+    glyph: '◨',
+    // Both sports. Matchups, scores and the optimal-lineup awards all read
+    // points already scored; none of it is a projection.
+    sports: ['nfl', 'nba'],
+    label: 'Weekly report',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/weekly-report`,
+    match: /^\/leagues\/([^/]+)\/weekly-report\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

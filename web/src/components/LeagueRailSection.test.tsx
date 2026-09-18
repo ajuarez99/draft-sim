@@ -107,6 +107,7 @@ describe('what a league is offered', () => {
       'Roster management',
       'Expected wins',
       'Season forecast',
+      'Weekly report',
       'Mock it',
     ])
   })
@@ -128,6 +129,7 @@ describe('what a league is offered', () => {
     expect(rowLabels()).toContain('Roster management')
     expect(rowLabels()).toContain('Expected wins')
     expect(rowLabels()).toContain('Season forecast')
+    expect(rowLabels()).toContain('Weekly report')
   })
 
   it('offers Follow live only while a draft is running', async () => {

@@ -1333,3 +1333,46 @@ export type SeasonForecast = {
 
 export const getSeasonForecast = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/forecast`).then(json<SeasonForecast>)
+
+// --- specs/004-ffwrapped-feature-parity US5: Weekly report ---
+
+export type WeeklySide = {
+  rosterId: number
+  teamName: string
+  avatarId: string | null
+  record: string
+  points: number
+}
+
+export type WeeklyMatchup = { home: WeeklySide; away: WeeklySide }
+
+export type WeeklyPerformer = {
+  playerId: string
+  playerName: string
+  position: string
+  teamName: string
+  points: number
+}
+
+export type WeeklyAward = { kind: string; teamName: string; detail: string }
+
+/**
+ * An award that could not be computed, and why. Rendered rather than dropped:
+ * a missing award is otherwise indistinguishable from nobody qualifying.
+ */
+export type WeeklyOmittedAward = { kind: string; reason: string }
+
+export type WeeklyReport = {
+  available: boolean
+  reason?: string | null
+  season: number
+  week: number
+  sport: Sport
+  matchups: WeeklyMatchup[]
+  topPerformers: WeeklyPerformer[]
+  awards: WeeklyAward[]
+  awardsOmitted: WeeklyOmittedAward[]
+}
+
+export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-report/${week}`).then(json<WeeklyReport>)

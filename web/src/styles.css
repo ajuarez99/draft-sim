@@ -3779,3 +3779,165 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     max-width: 12ch;
   }
 }
+
+/* --- Weekly report (specs/004-ffwrapped-feature-parity US5) -------------
+   Matchups are cards, not table rows: a matchup is a pair facing each other,
+   and the layout should look like the thing it describes. Awards are a third
+   shape again, tinted so they do not read as more matchups. */
+
+.wr-weekpick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wr-weekpick input {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.wr-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.wr-game {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wr-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-side + .wr-side {
+  border-top: 1px solid var(--line);
+}
+
+/* The winner gets weight and a tint, so the result reads without comparing
+   two numbers first. */
+.wr-won {
+  background: color-mix(in oklab, var(--panel) 82%, white 6%);
+  font-weight: 600;
+}
+
+.wr-avatar {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  font-size: 11px;
+}
+
+.wr-team {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-record {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.wr-points {
+  flex: 0 0 auto;
+  min-width: 7ch;
+  text-align: right;
+}
+
+.wr-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.wr-award {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.wr-award h4 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.wr-award-team {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.wr-omitted {
+  margin: 14px 0 0;
+  padding: 10px 0 0 18px;
+  border-top: 1px solid var(--line);
+  line-height: 1.5;
+}
+
+.wr-performers {
+  margin: 0;
+  padding-left: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-performers li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wr-performers li:last-child {
+  border-bottom: 0;
+}
+
+.wr-pname {
+  font-weight: 500;
+}
+
+.wr-ppos {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.wr-pteam {
+  flex: 1 1 auto;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-ppts {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+}

@@ -102,7 +102,7 @@ larger than a rounding difference; do not tune the formula to match.
 **Cross-check against Sleeper's own aggregate:**
 
 ```bash
-psql -h localhost -p 5433 -c "select roster_id, points_for, points_possible from roster_season where league_id = (select id from league where sleeper_league_id = '1346366555759341568');"
+docker compose exec -T postgres psql -U draftsim -d draftsim -c "select roster_id, points_for, points_possible from roster_season where league_id = (select id from league where sleeper_id = '1346366555759341568');"
 ```
 
 A large divergence from computed potential is a signal to read, not a test to fail (R3).
@@ -183,7 +183,7 @@ settled week and leave the column null, silently. This already happened once in 
 After migrating, extending the gate and re-ingesting, **count populated rows**:
 
 ```bash
-psql -h localhost -p 5433 -c "select count(*) filter (where starters is not null) as populated, count(*) as total from roster_week_points where league_id = (select id from league where sleeper_league_id = '1346366555759341568');"
+docker compose exec -T postgres psql -U draftsim -d draftsim -c "select count(*) filter (where starters is not null) as populated, count(*) as total from roster_week_points where league_id = (select id from league where sleeper_id = '1346366555759341568');"
 ```
 
 `populated` must equal `total` for scored weeks. If `populated` is small and `total` is large, the gate
@@ -212,7 +212,7 @@ Confirm idempotency — the natural key is `(league_id, sleeper_transaction_id)`
 
 ```bash
 curl -X POST localhost:8080/api/ingest/transactions/1346366555759341568
-psql -h localhost -p 5433 -c "select type, count(*) from league_transaction group by type;"
+docker compose exec -T postgres psql -U draftsim -d draftsim -c "select type, count(*) from league_transaction group by type;"
 ```
 
 Counts must be unchanged after the second ingest.

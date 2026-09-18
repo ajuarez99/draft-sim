@@ -129,6 +129,10 @@ class LeagueHistoryIngestServiceTest {
         // backfilled; a week is settled only when both tables hold it.
         when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3));
         when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2, 3));
+        // And starters, for the same reason the pairings stub was added:
+        // specs/004-ffwrapped-feature-parity V18 put a third thing in a
+        // roster-week, so "settled" means all three are present.
+        when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of(1, 2, 3));
         when(sleeper.matchups(eq("L3"), anyInt())).thenReturn(List.of());
 
         service.ingestChain(Sport.NFL, "L3");
@@ -170,6 +174,39 @@ class LeagueHistoryIngestServiceTest {
         verify(sleeper, times(1)).matchups("L3b", 2);
         verify(sleeper, times(1)).matchups("L3b", 3);
         verify(sleeper, times(1)).matchups("L3b", 4);
+    }
+
+    /**
+     * specs/004-ffwrapped-feature-parity FR-010, research R6.
+     *
+     * <p>The same bug as the pairings case above, one column later. V18 added
+     * roster_week_points.starters; with the gate keyed on scores and pairings
+     * alone, every week already stored would be skipped forever and the new
+     * column would stay null no matter how many times ingest was re-run --
+     * because the skip is keyed on the tables that are already full.
+     *
+     * <p>Nothing throws in that state either. The weekly report just quietly
+     * omits an award for every week of the season.
+     */
+    @Test
+    void reRunningBackfillsStartersForWeeksWhoseScoresAndPairingsAreAlreadyCached() {
+        Map<String, Object> league = leagueObject("L3d", 2025, Map.of("last_scored_leg", 4), Map.of());
+        when(sleeper.leagueChain("L3d")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3d")).thenReturn(List.of());
+        when(sleeper.rosters("L3d")).thenReturn(List.of());
+        // Scores and pairings for every week, starters for none -- the state
+        // the database is in the moment V18 is applied.
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3, 4));
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2, 3, 4));
+        when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of());
+        when(sleeper.matchups(eq("L3d"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3d");
+
+        verify(sleeper, times(1)).matchups("L3d", 1);
+        verify(sleeper, times(1)).matchups("L3d", 2);
+        verify(sleeper, times(1)).matchups("L3d", 3);
+        verify(sleeper, times(1)).matchups("L3d", 4);
     }
 
     /**

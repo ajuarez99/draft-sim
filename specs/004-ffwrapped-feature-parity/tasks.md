@@ -243,28 +243,28 @@ scores against pairings for one week (research.md R6).
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T075 [P] [US5] Test that the ingest skip gate refetches a week whose `starters` is null even when scores and pairings are present, in `backend/src/test/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestServiceTest.java` — the R6 regression guard
-- [ ] T076 [P] [US5] Test that top performers rank by that week's actual points from `players_points` with the owning team named, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.2)
-- [ ] T077 [P] [US5] Test that an award requiring starter identity appears in `awardsOmitted` with `"reason": "STARTERS_NOT_STORED"` when `starters` is null — omitted with a reason, never guessed — in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.4)
-- [ ] T078 [P] [US5] Test that an award naming a bench-for-starter swap identifies the specific players when `starters` is populated, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.3)
-- [ ] T079 [P] [US5] Test that an NBA league renders matchups, top performers and efficiency-based awards, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.5)
-- [ ] T080 [P] [US5] Test that every matchup in a scored week reports both teams, each team's record and each team's final score, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.1)
+- [X] T075 [P] [US5] Test that the ingest skip gate refetches a week whose `starters` is null even when scores and pairings are present, in `backend/src/test/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestServiceTest.java` — the R6 regression guard
+- [X] T076 [P] [US5] Test that top performers rank by that week's actual points from `players_points` with the owning team named, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.2)
+- [X] T077 [P] [US5] Test that an award requiring starter identity appears in `awardsOmitted` with `"reason": "STARTERS_NOT_STORED"` when `starters` is null — omitted with a reason, never guessed — in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.4)
+- [X] T078 [P] [US5] Test that an award naming a bench-for-starter swap identifies the specific players when `starters` is populated, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.3)
+- [X] T079 [P] [US5] Test that an NBA league renders matchups, top performers and efficiency-based awards, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.5)
+- [X] T080 [P] [US5] Test that every matchup in a scored week reports both teams, each team's record and each team's final score, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportServiceTest.java` (US5.1)
 
 ### Implementation for User Story 5
 
-- [ ] T081 [US5] Create migration `backend/src/main/resources/db/migration/V18__roster_week_starters.sql` adding `starters jsonb` to `roster_week_points` — an ordered array of `sleeper_player_id`. **Nullable by design**: weeks ingested before this column existed and never refetched stay null, and US5.4 requires the affected award to be omitted with a stated reason (data-model.md). **`V18`, not `V17`** — US4's migration lands first
-- [ ] T082 [US5] Extend the skip gate in `backend/src/main/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestService.ingestWeeklyPoints` from `stored.contains(week) && paired.contains(week)` to also require the new column's presence, following the pattern already used when pairings hit this bug. **Same task as the migration** — a migration without the gate change is the silent failure (FR-010, R6)
-- [ ] T083 [US5] Persist the `starters` array in `backend/src/main/java/com/ballknowers/draftsim/store/RosterWeekPointsRepository.java`, reading it from the matchup payload's `starters` field alongside the existing `points` and `players_points`
-- [ ] T084 [US5] Re-ingest and verify the backfill **by counting populated rows**, not by a successful build: `select count(*) filter (where starters is not null) as populated, count(*) as total from roster_week_points where league_id = (select id from league where sleeper_league_id = '1346366555759341568');` — `populated` must equal `total` for scored weeks (quickstart.md US5, FR-010)
-- [ ] T085 [US5] Create `WeeklyReportService` in `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` assembling matchups from `LeagueMatchupRepository` with both teams, records and final scores, and top performers ranked from `players_points` (US5.1, US5.2)
-- [ ] T086 [US5] Implement the awards in `WeeklyReportService`, split into those computable from totals alone (`GOT_AWAY_WITH_IT`, `DESERVED_BETTER`, `ONE_PLAYER_CARRY`) and those requiring `starters` (`SELF_INFLICTED_WOUND`), reusing `RealizedLineupService` for every efficiency-based award rather than recomputing an optimal lineup
-- [ ] T087 [US5] Emit `awardsOmitted` from `WeeklyReportService` carrying the kind and reason for each award that could not be computed (US5.4, contracts/league-analytics-api.md)
-- [ ] T088 [US5] Create `WeeklyReportController` in `backend/src/main/java/com/ballknowers/draftsim/api/WeeklyReportController.java` exposing `GET /api/leagues/{sleeperId}/weekly-report/{week}`
-- [ ] T089 [US5] Add the `weeklyReport` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/weekly-report`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
-- [ ] T090 [US5] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
-- [ ] T091 [US5] Create `web/src/pages/WeeklyReport.tsx` with the week selector, matchup list, awards and top performers
-- [ ] T092 [US5] Render `awardsOmitted` visibly in `web/src/pages/WeeklyReport.tsx` — a missing award states why rather than simply not appearing (US5.4)
-- [ ] T093 [P] [US5] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering a populated week and a week with omitted awards
+- [X] T081 [US5] Create migration `backend/src/main/resources/db/migration/V18__roster_week_starters.sql` adding `starters jsonb` to `roster_week_points` — an ordered array of `sleeper_player_id`. **Nullable by design**: weeks ingested before this column existed and never refetched stay null, and US5.4 requires the affected award to be omitted with a stated reason (data-model.md). **`V18`, not `V17`** — US4's migration lands first
+- [X] T082 [US5] Extend the skip gate in `backend/src/main/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestService.ingestWeeklyPoints` from `stored.contains(week) && paired.contains(week)` to also require the new column's presence, following the pattern already used when pairings hit this bug. **Same task as the migration** — a migration without the gate change is the silent failure (FR-010, R6)
+- [X] T083 [US5] Persist the `starters` array in `backend/src/main/java/com/ballknowers/draftsim/store/RosterWeekPointsRepository.java`, reading it from the matchup payload's `starters` field alongside the existing `points` and `players_points`
+- [X] T084 [US5] Re-ingest and verify the backfill **by counting populated rows**, not by a successful build: `select count(*) filter (where starters is not null) as populated, count(*) as total from roster_week_points where league_id = (select id from league where sleeper_league_id = '1346366555759341568');` — `populated` must equal `total` for scored weeks (quickstart.md US5, FR-010)
+- [X] T085 [US5] Create `WeeklyReportService` in `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` assembling matchups from `LeagueMatchupRepository` with both teams, records and final scores, and top performers ranked from `players_points` (US5.1, US5.2)
+- [X] T086 [US5] Implement the awards in `WeeklyReportService`, split into those computable from totals alone (`GOT_AWAY_WITH_IT`, `DESERVED_BETTER`, `ONE_PLAYER_CARRY`) and those requiring `starters` (`SELF_INFLICTED_WOUND`), reusing `RealizedLineupService` for every efficiency-based award rather than recomputing an optimal lineup
+- [X] T087 [US5] Emit `awardsOmitted` from `WeeklyReportService` carrying the kind and reason for each award that could not be computed (US5.4, contracts/league-analytics-api.md)
+- [X] T088 [US5] Create `WeeklyReportController` in `backend/src/main/java/com/ballknowers/draftsim/api/WeeklyReportController.java` exposing `GET /api/leagues/{sleeperId}/weekly-report/{week}`
+- [X] T089 [US5] Add the `weeklyReport` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/weekly-report`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
+- [X] T090 [US5] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
+- [X] T091 [US5] Create `web/src/pages/WeeklyReport.tsx` with the week selector, matchup list, awards and top performers
+- [X] T092 [US5] Render `awardsOmitted` visibly in `web/src/pages/WeeklyReport.tsx` — a missing award states why rather than simply not appearing (US5.4)
+- [X] T093 [P] [US5] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering a populated week and a week with omitted awards
 
 **Checkpoint**: Weekly Report ships; the `starters` backfill is verified by row count.
 

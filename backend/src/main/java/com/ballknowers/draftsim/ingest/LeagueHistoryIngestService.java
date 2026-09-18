@@ -154,13 +154,20 @@ public class LeagueHistoryIngestService {
         if (lastScoredLeg < 1) return 0;
 
         Set<Integer> stored = weekPoints.storedWeeks(leagueId);
+        // The gate asks about the STARTERS column too, not just about rows
+        // existing. specs/004-ffwrapped-feature-parity R6: V18 added
+        // roster_week_points.starters, and without this a re-ingest skips every
+        // settled week and the column stays null forever. That is not a
+        // hypothetical -- it is precisely what happened to league_matchup on
+        // 2026-09-14, described in the javadoc above.
+        Set<Integer> withStarters = weekPoints.weeksWithStarters(leagueId);
         // scheduledWeeks deliberately does NOT count a week whose matchup_ids
         // all came back null, so an unscheduled week cannot poison this cache
         // into never being fetched again.
         Set<Integer> paired = fixtures.scheduledWeeks(leagueId, season);
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
-            boolean settled = stored.contains(week) && paired.contains(week);
+            boolean settled = stored.contains(week) && paired.contains(week) && withStarters.contains(week);
             if (settled && week != lastScoredLeg) continue;
             List<Map<String, Object>> matchups = sleeper.matchups(sleeperLeagueId, week);
             if (matchups == null) continue;
@@ -174,8 +181,16 @@ public class LeagueHistoryIngestService {
                 // roster every week until this was caught by actually running it.
                 double startersPoints = asDouble(m.get("points"), 0.0);
                 String playersPointsJson = JsonUtil.write(m.getOrDefault("players_points", Map.of()));
+                // WHO was started, which nothing has ever stored. Sleeper sends
+                // it in roster_positions order, so index 0 is the first starting
+                // slot -- kept as sent (US5). Null when absent rather than an
+                // empty array: "Sleeper did not tell us" and "nobody was
+                // started" are different, and only the second is a real lineup.
+                Object startersRaw = m.get("starters");
+                String startersJson = startersRaw instanceof List<?> l && !l.isEmpty()
+                        ? JsonUtil.write(l) : null;
                 weekPoints.upsert(new RosterWeekPointsRepository.Row(
-                        leagueId, season, week, rosterId, startersPoints, playersPointsJson));
+                        leagueId, season, week, rosterId, startersPoints, playersPointsJson, startersJson));
                 // The pairing rides along free here -- this payload has it and
                 // roster_week_points has nowhere to put it (claude/playoff-odds.md).
                 fixtures.upsert(new LeagueMatchupRepository.Row(
