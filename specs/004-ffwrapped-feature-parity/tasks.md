@@ -197,28 +197,28 @@ marginals reproduce the already-published single playoff-odds number.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T056 [P] [US4] Test that the seed-distribution marginal reproduces the existing single playoff-odds figure, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsSimulatorTest.java` (FR-008)
-- [ ] T057 [P] [US4] Test that two successive reads of the forecast endpoint return an identical `snapshotAt` — proving nothing is computed on page load — in `backend/src/test/java/com/ballknowers/draftsim/api/SeasonForecastControllerTest.java` (FR-009, US4.2)
-- [ ] T058 [P] [US4] Test that a league with divisions or a non-default `playoff_seed_type` returns `{"available": false, "reason": "UNMODELLED_SEEDING"}`, confirming the new endpoint is not a back door around the existing refusal, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java` (US4.3)
-- [ ] T059 [P] [US4] Test that a league with no scored week returns `{"available": false, "reason": "NO_SCORED_WEEKS"}` (US4.4)
-- [ ] T060 [P] [US4] Test that win percentiles p10/p90 derive from the stored histogram rather than a second computation, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java`
-- [ ] T061 [P] [US4] Test that an NBA league whose seeding this app models produces a forecast, driven by weekly scores and pairings — both of which NBA has — using the fixture from T006, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java` (US4.5, FR-004)
+- [X] T056 [P] [US4] Test that the seed-distribution marginal reproduces the existing single playoff-odds figure, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsSimulatorTest.java` (FR-008)
+- [X] T057 [P] [US4] Test that two successive reads of the forecast endpoint return an identical `snapshotAt` — proving nothing is computed on page load — in `backend/src/test/java/com/ballknowers/draftsim/api/SeasonForecastControllerTest.java` (FR-009, US4.2)
+- [X] T058 [P] [US4] Test that a league with divisions or a non-default `playoff_seed_type` returns `{"available": false, "reason": "UNMODELLED_SEEDING"}`, confirming the new endpoint is not a back door around the existing refusal, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java` (US4.3)
+- [X] T059 [P] [US4] Test that a league with no scored week returns `{"available": false, "reason": "NO_SCORED_WEEKS"}` (US4.4)
+- [X] T060 [P] [US4] Test that win percentiles p10/p90 derive from the stored histogram rather than a second computation, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java`
+- [X] T061 [P] [US4] Test that an NBA league whose seeding this app models produces a forecast, driven by weekly scores and pairings — both of which NBA has — using the fixture from T006, in `backend/src/test/java/com/ballknowers/draftsim/engine/PlayoffOddsServiceTest.java` (US4.5, FR-004)
 
 ### Implementation for User Story 4
 
-- [ ] T062 [US4] Create migration `backend/src/main/resources/db/migration/V17__playoff_odds_distributions.sql` adding to the playoff-odds snapshot: `seed_counts jsonb` (`seed -> count` over simulated seasons) and `win_counts jsonb` (`wins -> count`), per data-model.md. **`V17`, not `V18`** — this story lands before US5's migration and Flyway will not accept a lower version afterwards
-- [ ] T063 [US4] Emit the seed and win distributions from `backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsSimulator.java` — they are already computed over the 10,000 iterations and discarded; this retains them rather than adding a second simulation (R8)
-- [ ] T064 [US4] Persist the distributions in `backend/src/main/java/com/ballknowers/draftsim/store/PlayoffOddsRepository.java`, written on the existing commissioner recompute — **no new trigger, no page-load computation** (FR-009)
-- [ ] T065 [US4] Derive `averageWins`, `winRange` p10–p90, `averageSeed`, `seedOdds` and `championshipOdds` from the stored distributions in `backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsService.java`, keeping `playoffOdds` the same field the Record cell already reads so the two views cannot disagree (FR-008, SC-005)
-- [ ] T066 [US4] Preserve both refusal paths in `PlayoffOddsService` — `UNMODELLED_SEEDING` and `NO_SCORED_WEEKS` returned as explicit `available: false` bodies so the UI can distinguish "no answer" from 0.0 (FR-009, contracts/league-analytics-api.md)
-- [ ] T067 [US4] Create `SeasonForecastController` in `backend/src/main/java/com/ballknowers/draftsim/api/SeasonForecastController.java` exposing `GET /api/leagues/{sleeperId}/forecast`
-- [ ] T068 [US4] Add the `forecast` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/forecast`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
-- [ ] T069 [US4] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
-- [ ] T070 [US4] Create `web/src/pages/SeasonForecast.tsx` with the projected standings table: playoff odds, average wins, win range, average seed, No. 1 seed odds (US4.1)
-- [ ] T071 [US4] Add the seed-odds visualization to `web/src/pages/SeasonForecast.tsx`, each mark labelled with its exact probability (FR-011)
-- [ ] T072 [US4] Render the refusal states in `web/src/pages/SeasonForecast.tsx` — an unmodelled seeding scheme says why rather than showing "--" with no explanation (US4.3)
-- [ ] T073 [P] [US4] Add frontend tests in `web/src/pages/SeasonForecast.test.tsx` covering the populated table and both refusal branches
-- [ ] T074 [US4] Verify agreement live per quickstart.md US4: playoff odds from `/forecast` and from `/power` must be the same number from the same snapshot (SC-005)
+- [X] T062 [US4] Create migration `backend/src/main/resources/db/migration/V17__playoff_odds_distributions.sql` adding to the playoff-odds snapshot: `seed_counts jsonb` (`seed -> count` over simulated seasons) and `win_counts jsonb` (`wins -> count`), per data-model.md. **`V17`, not `V18`** — this story lands before US5's migration and Flyway will not accept a lower version afterwards
+- [X] T063 [US4] Emit the seed and win distributions from `backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsSimulator.java` — they are already computed over the 10,000 iterations and discarded; this retains them rather than adding a second simulation (R8)
+- [X] T064 [US4] Persist the distributions in `backend/src/main/java/com/ballknowers/draftsim/store/PlayoffOddsRepository.java`, written on the existing commissioner recompute — **no new trigger, no page-load computation** (FR-009)
+- [X] T065 [US4] Derive `averageWins`, `winRange` p10–p90, `averageSeed`, `seedOdds` and `championshipOdds` from the stored distributions in `backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsService.java`, keeping `playoffOdds` the same field the Record cell already reads so the two views cannot disagree (FR-008, SC-005)
+- [X] T066 [US4] Preserve both refusal paths in `PlayoffOddsService` — `UNMODELLED_SEEDING` and `NO_SCORED_WEEKS` returned as explicit `available: false` bodies so the UI can distinguish "no answer" from 0.0 (FR-009, contracts/league-analytics-api.md)
+- [X] T067 [US4] Create `SeasonForecastController` in `backend/src/main/java/com/ballknowers/draftsim/api/SeasonForecastController.java` exposing `GET /api/leagues/{sleeperId}/forecast`
+- [X] T068 [US4] Add the `forecast` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/forecast`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
+- [X] T069 [US4] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
+- [X] T070 [US4] Create `web/src/pages/SeasonForecast.tsx` with the projected standings table: playoff odds, average wins, win range, average seed, No. 1 seed odds (US4.1)
+- [X] T071 [US4] Add the seed-odds visualization to `web/src/pages/SeasonForecast.tsx`, each mark labelled with its exact probability (FR-011)
+- [X] T072 [US4] Render the refusal states in `web/src/pages/SeasonForecast.tsx` — an unmodelled seeding scheme says why rather than showing "--" with no explanation (US4.3)
+- [X] T073 [P] [US4] Add frontend tests in `web/src/pages/SeasonForecast.test.tsx` covering the populated table and both refusal branches
+- [X] T074 [US4] Verify agreement live per quickstart.md US4: playoff odds from `/forecast` and from `/power` must be the same number from the same snapshot (SC-005)
 
 **Checkpoint**: Season Forecast and the playoff picture ship from the existing simulation, both sports.
 

@@ -3642,3 +3642,140 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     max-width: 14ch;
   }
 }
+
+/* --- Season forecast (specs/004-ffwrapped-feature-parity US4) -----------
+   The win range is a span with the mean marked on it, not two more numeric
+   columns: the interesting property of "8–12" is its WIDTH, which a pair of
+   cells hides. The exact endpoints still sit beside the span. */
+
+.sf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sf-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+.sf-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.sf-table td,
+.sf-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.sf-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sf-odds {
+  font-weight: 600;
+}
+
+.sf-rangehead {
+  width: 34%;
+}
+
+.sf-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.sf-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.sf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 20ch;
+}
+
+.sf-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sf-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 16px;
+  min-width: 110px;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--line) calc(50% - 1px),
+    var(--line) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.sf-span {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  background: oklch(45% 0.08 var(--hue));
+  border: 1px solid oklch(58% 0.1 var(--hue));
+}
+
+/* The mean, marked on the span it sits inside rather than given its own row. */
+.sf-mean {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--fg);
+  transform: translateX(-1px);
+}
+
+.sf-range-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 6ch;
+  text-align: right;
+}
+
+.sf-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+  .sf-rangehead,
+  .sf-range {
+    display: none;
+  }
+  .sf-name {
+    max-width: 12ch;
+  }
+}

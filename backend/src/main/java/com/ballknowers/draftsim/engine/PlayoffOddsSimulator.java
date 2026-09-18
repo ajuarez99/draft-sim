@@ -41,7 +41,20 @@ public final class PlayoffOddsSimulator {
     /** One roster's game in one week. {@code matchupId} groups the two sides. */
     public record Fixture(int week, int rosterId, int matchupId) {}
 
-    public record Odds(int rosterId, double madePct, double seedOnePct, double projWins, double projPoints) {}
+    /**
+     * @param seedCounts how many simulated seasons ended with this team at each
+     *                   seed, index 0 = the 1 seed. Retained rather than
+     *                   collapsed: the loop already sorts a full standings order
+     *                   every iteration, and everything a forecast view wants --
+     *                   average seed, per-seed odds -- was being thrown away one
+     *                   line after it was computed
+     *                   (specs/004-ffwrapped-feature-parity, research R8).
+     * @param winCounts  how many simulated seasons ended on each whole-number
+     *                   win total, index = wins. Gives the win percentile range
+     *                   without a second simulation.
+     */
+    public record Odds(int rosterId, double madePct, double seedOnePct, double projWins, double projPoints,
+                       List<Integer> seedCounts, List<Integer> winCounts) {}
 
     /**
      * @param medianMatch Sleeper's {@code league_average_match}: every team also
@@ -75,6 +88,13 @@ public final class PlayoffOddsSimulator {
         int[] seedOne = new int[n];
         double[] winSum = new double[n];
         double[] pointSum = new double[n];
+        // Distributions, not just their means. Both are filled from values the
+        // loop below already has in hand.
+        int[][] seedCounts = new int[n][n];
+        double maxBase = 0;
+        for (double b : baseWins) maxBase = Math.max(maxBase, b);
+        int winBuckets = (int) Math.ceil(maxBase) + weeks.size() * (medianMatch ? 2 : 1) + 2;
+        int[][] winCounts = new int[n][winBuckets];
 
         RandomGenerator rng = new SplittableRandom(seed);
         double[] wins = new double[n];
@@ -123,6 +143,12 @@ public final class PlayoffOddsSimulator {
             int spots = Math.min(playoffTeams, n);
             for (int rank = 0; rank < spots; rank++) made[order[rank]]++;
             seedOne[order[0]]++;
+            // The same `order` the two lines above read, kept whole.
+            for (int rank = 0; rank < n; rank++) seedCounts[order[rank]][rank]++;
+            for (int i = 0; i < n; i++) {
+                int bucket = (int) Math.round(wins[i]);
+                if (bucket >= 0 && bucket < winBuckets) winCounts[i][bucket]++;
+            }
         }
 
         List<Odds> out = new ArrayList<>(n);
@@ -131,7 +157,8 @@ public final class PlayoffOddsSimulator {
                     pct(made[i], iterations),
                     pct(seedOne[i], iterations),
                     round2(winSum[i] / iterations),
-                    round2(pointSum[i] / iterations)));
+                    round2(pointSum[i] / iterations),
+                    boxed(seedCounts[i]), boxed(winCounts[i])));
         }
         out.sort(Comparator.comparingDouble(Odds::madePct).reversed()
                 .thenComparingInt(Odds::rosterId));
@@ -193,6 +220,22 @@ public final class PlayoffOddsSimulator {
 
     private static double pct(int hits, int iterations) {
         return round2(100.0 * hits / iterations);
+    }
+
+    /**
+     * A counter array to an immutable {@code List<Integer>}.
+     *
+     * <p>The record holds lists rather than the raw {@code int[]} the loop fills
+     * because a record's generated {@code equals} compares components with
+     * {@code Objects.equals}, and arrays compare by IDENTITY -- so two runs from
+     * the same seed produced structurally identical Odds that were never equal,
+     * and {@code sameSeedGivesTheSameAnswer} failed. The counting itself stays
+     * on primitive arrays; this converts once per roster at the end.
+     */
+    private static List<Integer> boxed(int[] counts) {
+        List<Integer> out = new ArrayList<>(counts.length);
+        for (int c : counts) out.add(c);
+        return List.copyOf(out);
     }
 
     private static double round2(double v) {

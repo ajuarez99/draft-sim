@@ -39,7 +39,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'mock'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -187,6 +187,20 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Expected wins',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/expected-wins`,
     match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'forecast',
+    glyph: '◔',
+    // Both sports. The simulator is driven by weekly scores and pairings, which
+    // basketball has; the only gate is whether this app models the league's
+    // seeding, and that is a league property rather than a sport one.
+    sports: ['nfl', 'nba'],
+    label: 'Season forecast',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/forecast`,
+    match: /^\/leagues\/([^/]+)\/forecast\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
