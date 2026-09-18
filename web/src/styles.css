@@ -3331,3 +3331,132 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      placed by the same measurement. */
   .rail-switcher-toggle { width: auto; margin: 0; }
 }
+
+/* --- Roster management (specs/004-ffwrapped-feature-parity US2) ---------
+   A table, not a grid of cards: twelve teams x four numbers is tabular data,
+   and the shape of the content is what picks the layout. The comparison bar
+   lives in the row rather than in a second chart below, so the exact value
+   sits beside its own mark instead of on a shared axis far from it. */
+
+.rm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+/* Hover depth rather than a flat zebra: the row is the unit you read. */
+.rm-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.rm-table td,
+.rm-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.rm-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rm-barhead {
+  width: 42%;
+}
+
+.rm-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.rm-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.rm-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.rm-bars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The potential bar is the faint full-length one; the scored bar is drawn on
+   top of it. One encoding per mark: length is points, and the only thing
+   colour distinguishes is scored from possible. */
+.rm-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 18px;
+  min-width: 90px;
+}
+
+.rm-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 3px;
+}
+
+.rm-bar-potential {
+  background: oklch(32% 0.04 var(--hue));
+  border: 1px solid oklch(42% 0.06 var(--hue));
+}
+
+.rm-bar-actual {
+  background: oklch(62% 0.12 var(--hue));
+}
+
+.rm-left {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 16ch;
+}
+
+.rm-excluded {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+  .rm-barhead,
+  .rm-bars {
+    display: none;
+  }
+  .rm-name {
+    max-width: 14ch;
+  }
+}

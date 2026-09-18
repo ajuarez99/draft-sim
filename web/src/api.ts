@@ -1216,3 +1216,40 @@ export const submitBallot = (sleeperLeagueId: string, week: number, rosterIds: n
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ week, rosterIds }),
   }).then(json<{ saved: number }>)
+
+// --- specs/004-ffwrapped-feature-parity US2: the Roster management page ---
+
+/**
+ * One team's season. Mirrors RosterManagementService.TeamRow.
+ *
+ * `efficiency` is nullable on purpose and must not be coerced to a number at
+ * the edge: null means there was no potential to divide by, and rendering that
+ * as 100% would be the most flattering possible wrong answer. `weeksExcluded`
+ * lists weeks dropped for want of a per-player breakdown -- they are excluded
+ * from the totals, so the page has to say so rather than let a short season
+ * read as a full one.
+ */
+export type RosterManagementTeam = {
+  rosterId: number
+  managerId: number | null
+  teamName: string
+  avatarId: string | null
+  totalPoints: number
+  potentialPoints: number
+  efficiency: number | null
+  weeksCounted: number
+  weeksExcluded: number[]
+}
+
+/** `available: false` carries a reason; it is not an empty table. */
+export type RosterManagement = {
+  available: boolean
+  reason?: string | null
+  season: number
+  sport: Sport
+  weeksScored: number
+  teams: RosterManagementTeam[]
+}
+
+export const getRosterManagement = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/roster-management`).then(json<RosterManagement>)

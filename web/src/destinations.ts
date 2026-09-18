@@ -37,7 +37,8 @@ export type LeagueContext = {
   season: DraftSummary
 }
 
-export type DestinationKey = 'board' | 'live' | 'history' | 'power' | 'analysis' | 'mock'
+export type DestinationKey =
+  | 'board' | 'live' | 'history' | 'power' | 'analysis' | 'rosterManagement' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -155,6 +156,22 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Analysis',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/analysis`,
     match: /^\/leagues\/([^/]+)\/analysis\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'rosterManagement',
+    glyph: '◱',
+    // Both sports, and written out rather than inherited from ALL_SPORTS by
+    // habit: this page earns it. Unlike Analysis above, nothing here is a
+    // projection -- total, potential and efficiency are all computed from
+    // points already scored, which Sleeper reports for basketball exactly as
+    // for football. See specs/004-ffwrapped-feature-parity research R2/R4.
+    sports: ['nfl', 'nba'],
+    label: 'Roster management',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/roster-management`,
+    match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

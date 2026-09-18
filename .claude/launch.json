@@ -63,6 +63,15 @@
         "cd web && set DRAFTSIM_PROXY_TARGET=http://localhost:8082 && npm run dev -- --port 5180 --strictPort"
       ],
       "port": 5180
+    },
+    {
+      "name": "draft-sim-web-8099",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd web && set DRAFTSIM_PROXY_TARGET=http://localhost:8099 && npm run dev -- --port 5181 --strictPort"
+      ],
+      "port": 5181
     }
   ]
 }

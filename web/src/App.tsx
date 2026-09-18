@@ -10,6 +10,7 @@ import ManagerTendencies from './pages/ManagerTendencies'
 import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
 import LeagueAnalysis from './pages/LeagueAnalysis'
+import RosterManagement from './pages/RosterManagement'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import AppShell from './components/AppShell'
@@ -83,6 +84,10 @@ export default function App() {
               <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
               <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<LeagueAnalysis />} />
+              <Route
+                path="/leagues/:sleeperLeagueId/roster-management"
+                element={<RosterManagement />}
+              />
               {/* power-rankings-reskin.md §7: a self-check harness, not a page
                   real users should ever reach -- dev-only. */}
               {import.meta.env.DEV && (
