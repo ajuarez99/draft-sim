@@ -56,18 +56,25 @@ public interface SportRules {
      * needs both -- a roster's projected points broken out by position group is
      * this list, grouped.
      *
-     * <p>Unimplemented for a sport until that sport has a projection source to
-     * value a lineup with. This throws rather than quietly falling back to
-     * {@link #value}, which would answer a projection question with a draft-
-     * board answer and look like it worked.
+     * <p><b>This values a lineup with whatever function it is handed, and must
+     * not assume that function is a projection.</b> It previously carried a
+     * throwing default, justified on the grounds that a sport without a
+     * projection source had nothing to value a lineup with. That reasoning was
+     * right about projections and wrong as a blanket rule: a backward-looking
+     * caller passes points a player has <i>already scored</i>, which Sleeper
+     * reports for every sport it serves. The default therefore locked
+     * basketball out of views whose data it already had, and it was
+     * inheritable -- a new sport got a runtime failure rather than a compile
+     * error. Both problems go away by making this abstract, so every sport
+     * must answer (specs/004-ffwrapped-feature-parity, research R4).
+     *
+     * <p>The original concern still stands for <i>callers</i>: do not pass
+     * {@link #value} where a projection is meant. A draft-board number is not
+     * a forecast, and a caller that needs one and has none should decline to
+     * answer rather than substitute the other.
      */
-    default List<Assigned> startingLineup(RosterState roster, LeagueSettings settings,
-                                          ToDoubleFunction<BoardEntry> valueOf) {
-        throw new UnsupportedOperationException(
-                sport().code() + " has no startingLineup: see claude/league-analysis.md's non-goals. "
-                        + "Sleeper's projection stat keys (pts_ppr and friends) are football's, and "
-                        + "nothing values a basketball lineup in points yet.");
-    }
+    List<Assigned> startingLineup(RosterState roster, LeagueSettings settings,
+                                  ToDoubleFunction<BoardEntry> valueOf);
 
     /**
      * Hard gate: some positions are simply not taken until the draft is nearly

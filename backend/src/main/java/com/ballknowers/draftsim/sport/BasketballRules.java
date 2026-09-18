@@ -152,7 +152,21 @@ public class BasketballRules implements SportRules {
             Map<String, Integer> countByKind,
             Map<String, Integer> capacityByKind,
             boolean benchFull,
-            ToDoubleFunction<BoardEntry> valueOf
+            ToDoubleFunction<BoardEntry> valueOf,
+            /**
+             * The seated players, in the order the greedy kept them (value
+             * descending), and the slot assignment {@code assign[slotOrdinal]
+             * -> index into kept}, or -1 for an empty slot.
+             *
+             * <p>Retained rather than dropped so {@link #startingLineup} can
+             * name who was seated and where, instead of re-running the greedy
+             * a second time. Costs two references on a record the hot path
+             * already allocates once per pick -- both lists are built by
+             * {@link #prepareLineup} regardless, and were previously just
+             * discarded once {@code total} had been summed off them.
+             */
+            List<BoardEntry> kept,
+            int[] assign                    // size NUM_SLOTS
     ) {}
 
     /**
@@ -251,7 +265,8 @@ public class BasketballRules implements SportRules {
 
         boolean benchFull = (roster.size() - kept.size()) >= settings.benchSlots();
 
-        return new Lineup(total, maskCanJoin, maskEvictValue, countByKind, capacityByKind, benchFull, valueOf);
+        return new Lineup(total, maskCanJoin, maskEvictValue, countByKind, capacityByKind, benchFull, valueOf,
+                kept, assign);
     }
 
     private static int[] toIntArray(List<Integer> list) {
@@ -288,13 +303,69 @@ public class BasketballRules implements SportRules {
 
     /**
      * Not on the simulation hot path (see {@link #prepareLineup}); delegates
-     * to it so "what is this roster's starting lineup worth" has exactly one
-     * implementation of the matroid-greedy logic rather than two that could
-     * drift apart.
+     * to {@link #startingLineup} so "what is this roster's starting lineup"
+     * has exactly one implementation rather than two that could drift apart.
+     *
+     * <p>Same shape as {@code FootballRules.startingLineupValue}, and adopted
+     * here for the same reason. This used to be
+     * {@code lineupValue(prepareLineup(roster, settings, this::value))}, which
+     * was not a second implementation of the greedy -- but it was a second
+     * path to the answer, and the sport that had one of those grew a reporting
+     * gap that locked basketball out of every view needing named starters.
+     *
+     * <p>The two concern the same players because the matroid greedy only ever
+     * keeps a player whose addition leaves the kept set matchable, so
+     * {@code assign} holds a perfect matching of {@code kept} into distinct
+     * slots. The totals can still differ in the last bit from
+     * {@link #lineupValue}'s, which accumulates in greedy order rather than
+     * slot order -- real but not a disagreement about the lineup.
+     * {@code SportRulesAgreementTest} pins both halves: bit-exact against the
+     * same accumulation, and within float noise against a compensated sum.
      */
     @Override
     public double startingLineupValue(RosterState roster, LeagueSettings settings) {
-        return lineupValue(prepareLineup(roster, settings, this::value));
+        double total = 0;
+        for (SportRules.Assigned a : startingLineup(roster, settings, this::value)) {
+            total += a.value();
+        }
+        return total;
+    }
+
+    /**
+     * Which players this roster would actually start, valued by
+     * {@code valueOf}, with the slot each fills.
+     *
+     * <p>No new solver: {@link #prepareLineup} already takes an arbitrary
+     * value function and already computes the greedy-optimal starting nine as
+     * a maximum-weight independent set over the transversal matroid. This is
+     * the reporting form of that same result -- it reads the seated players
+     * and their slots off the {@link Lineup} rather than recomputing anything.
+     *
+     * <p><b>Correct for value functions that are not monotone in ADP</b>,
+     * which is the case that matters here. {@link #prepareLineup} sorts its
+     * candidates by the supplied {@code valueOf} before the greedy pass, so
+     * the matroid greedy theorem's precondition -- a pass in non-increasing
+     * order of the value being maximized -- holds for realized weekly points
+     * just as it does for board value. A late-round player routinely outscores
+     * an early one in a given week, and the lineup that comes back reflects
+     * that rather than draft order.
+     *
+     * <p>{@code UTIL_1} and {@code UTIL_2} are both reported as {@code UTIL}:
+     * callers group by slot kind, and the two are interchangeable by
+     * construction ({@link #SLOT_ACCEPTS} gives them identical masks).
+     */
+    @Override
+    public List<SportRules.Assigned> startingLineup(RosterState roster, LeagueSettings settings,
+                                                    ToDoubleFunction<BoardEntry> valueOf) {
+        Lineup lin = (Lineup) prepareLineup(roster, settings, valueOf);
+        List<SportRules.Assigned> out = new ArrayList<>(NUM_SLOTS);
+        for (Slot s : SLOTS) {
+            int idx = lin.assign()[s.ordinal()];
+            if (idx == -1) continue;   // slot unfilled: roster too small or too eligibility-constrained
+            BoardEntry e = lin.kept().get(idx);
+            out.add(new SportRules.Assigned(e, kindName(s), valueOf.applyAsDouble(e)));
+        }
+        return out;
     }
 
     /**

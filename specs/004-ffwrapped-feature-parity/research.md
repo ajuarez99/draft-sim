@@ -229,7 +229,36 @@ by default. Memory records that a defaulted sport list has shipped this bug thre
 
 ---
 
-## R10. Open question: NBA lineup cadence and available test data
+## R10. RESOLVED 2026-09-18: NBA is weekly, and real scored data already exists
+
+**Measured against the real NBA league** (`GET /league/1229352720222134272`, "Ball Knowers", nba, 2025):
+
+| Setting | Value | Consequence |
+|---|---|---|
+| `status` | `complete` | a full season is scored and ingestable |
+| `last_scored_leg` / `leg` | `21` | **weekly, not daily** — a daily-lineup league would number legs in the hundreds |
+| `playoff_week_start` | `19` | 18 regular-season weeks, consistent with weekly legs |
+| `roster_positions` | `PG,SG,G,SF,PF,F,C,UTIL,UTIL` + 5 `BN` | exactly the nine slots `BasketballRules` hardcodes |
+| `playoff_seed_type` | `0` (default) | seeding **is** modelled — US4 can forecast for this league |
+| `divisions` | `0` | same |
+
+And the week-1 matchup payload (`/matchups/1`) is shape-identical to football's:
+`players_points` (15 entries), `starters` (9 ids), `points`, `starters_points`, `matchup_id`.
+
+**Both halves of the open question are answered, and more favourably than the plan assumed:**
+
+1. **Cadence**: weekly. The "refuse daily-lineup leagues" escape hatch is not needed for this league. It
+   is still worth keeping as a guard, because nothing stops a future NBA league from being daily, but it
+   is not on the critical path.
+2. **Test data**: a live NBA league with 21 scored weeks already exists. NBA acceptance does not have to
+   be fixture-only — the fixtures remain useful for deterministic unit tests, but the service-level and
+   live checks can run against real basketball data from the start.
+
+The one correction to the plan: memory recorded that "NBA managers can't be fitted until the 2026 draft
+happens." That is about *manager profile fitting*, which needs a completed NBA **draft**. It does not
+apply to any story here — every backward-looking view needs scored **weeks**, which this league has.
+
+### Original question, kept for the record
 
 Two things could not be settled from the repo:
 
