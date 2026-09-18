@@ -38,7 +38,8 @@ export type LeagueContext = {
 }
 
 export type DestinationKey =
-  | 'board' | 'live' | 'history' | 'power' | 'analysis' | 'rosterManagement' | 'mock'
+  | 'board' | 'live' | 'history' | 'power' | 'analysis'
+  | 'rosterManagement' | 'expectedWins' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -172,6 +173,20 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Roster management',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/roster-management`,
     match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'expectedWins',
+    glyph: '◑',
+    // Both sports, explicitly. Expected wins touches no position, no lineup and
+    // no projection -- it is weekly scores and pairings, which mean the same
+    // thing in basketball.
+    sports: ['nfl', 'nba'],
+    label: 'Expected wins',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/expected-wins`,
+    match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

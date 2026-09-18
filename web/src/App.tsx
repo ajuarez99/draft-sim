@@ -11,6 +11,7 @@ import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
 import LeagueAnalysis from './pages/LeagueAnalysis'
 import RosterManagement from './pages/RosterManagement'
+import ExpectedWins from './pages/ExpectedWins'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import AppShell from './components/AppShell'
@@ -87,6 +88,10 @@ export default function App() {
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
                 element={<RosterManagement />}
+              />
+              <Route
+                path="/leagues/:sleeperLeagueId/expected-wins"
+                element={<ExpectedWins />}
               />
               {/* power-rankings-reskin.md §7: a self-check harness, not a page
                   real users should ever reach -- dev-only. */}

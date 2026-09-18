@@ -3460,3 +3460,185 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     max-width: 14ch;
   }
 }
+
+/* --- Expected wins (specs/004-ffwrapped-feature-parity US3) -------------
+   A diverging bar around a zero line. The sign is the whole story here --
+   lucky or unlucky -- so it gets an axis rather than a minus sign buried in a
+   column of numbers, and the exact value still sits beside its own mark. */
+
+.ew-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.ew-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ew-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+.ew-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.ew-table td,
+.ew-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.ew-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ew-barhead {
+  width: 38%;
+}
+
+.ew-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ew-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.ew-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.ew-bars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ew-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 16px;
+  min-width: 120px;
+}
+
+.ew-zero {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--line);
+}
+
+.ew-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 2px;
+}
+
+.ew-bar-lucky {
+  background: oklch(68% 0.13 150);
+}
+
+.ew-bar-unlucky {
+  background: oklch(62% 0.15 25);
+}
+
+.ew-delta {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch;
+  text-align: right;
+}
+
+.ew-up {
+  color: oklch(74% 0.13 150);
+}
+
+.ew-down {
+  color: oklch(70% 0.15 25);
+}
+
+.ew-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ew-luck {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* Tinted, not a flat uniform card: the luck cards are a different kind of
+   object from the table rows above and should not read as more of them. */
+.ew-luck-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.ew-luck-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ew-luck-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ew-swings {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ew-swings strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .ew-barhead,
+  .ew-bars {
+    display: none;
+  }
+  .ew-name {
+    max-width: 14ch;
+  }
+}

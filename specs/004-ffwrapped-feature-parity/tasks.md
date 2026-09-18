@@ -160,24 +160,24 @@ expected wins across the league sum to actual wins.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T041 [P] [US3] Test that a team's weekly contribution is the fraction of other teams it outscored that week, in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java` (US3.1)
-- [ ] T042 [P] [US3] Test the conservation invariant — `sum(expectedWins) == sum(actualWins)` across the league within floating-point tolerance — in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java`. This is the check that proves the model rather than merely exercising it (SC-004, US3.2)
-- [ ] T043 [P] [US3] Test that `luckSource` is exactly one of `SWING_WEEKS` or `CONSISTENT_OPPONENT_SCORING`, with `swingWeeks` non-empty only for the first — alternatives, never both (US3.4)
-- [ ] T044 [P] [US3] Test that an NBA league computes identically, in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java` (US3.5)
+- [X] T041 [P] [US3] Test that a team's weekly contribution is the fraction of other teams it outscored that week, in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java` (US3.1)
+- [X] T042 [P] [US3] Test the conservation invariant — `sum(expectedWins) == sum(actualWins)` across the league within floating-point tolerance — in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java`. This is the check that proves the model rather than merely exercising it (SC-004, US3.2)
+- [X] T043 [P] [US3] Test that `luckSource` is exactly one of `SWING_WEEKS` or `CONSISTENT_OPPONENT_SCORING`, with `swingWeeks` non-empty only for the first — alternatives, never both (US3.4)
+- [X] T044 [P] [US3] Test that an NBA league computes identically, in `backend/src/test/java/com/ballknowers/draftsim/engine/ExpectedWinsServiceTest.java` (US3.5)
 - [ ] T045 [P] [US3] Contract test for `GET /api/leagues/{sleeperId}/expected-wins` asserting `expectedWins`, `actualWins`, `winsAboveExpected`, `strengthOfSchedule`, `luckSource`, `swingWeeks` and top-level `leagueAveragePpg`, in `backend/src/test/java/com/ballknowers/draftsim/api/ExpectedWinsControllerTest.java`
 
 ### Implementation for User Story 3
 
-- [ ] T046 [US3] Create `ExpectedWinsService` in `backend/src/main/java/com/ballknowers/draftsim/engine/ExpectedWinsService.java` computing per roster: `expectedWins` (sum over weeks of the fraction of other teams outscored), `actualWins`, `winsAboveExpected`
-- [ ] T047 [US3] Add `strengthOfSchedule` to `ExpectedWinsService` as the mean of opponents' PPG minus the league-wide PPG, reading pairings from `backend/src/main/java/com/ballknowers/draftsim/store/LeagueMatchupRepository.java`
-- [ ] T048 [US3] Add swing-week detection to `ExpectedWinsService`, emitting `luckSource` as a discriminator with `swingWeeks` populated only for `SWING_WEEKS` (US3.4)
-- [ ] T049 [US3] Create `ExpectedWinsController` in `backend/src/main/java/com/ballknowers/draftsim/api/ExpectedWinsController.java` exposing `GET /api/leagues/{sleeperId}/expected-wins`
-- [ ] T050 [US3] Add the `expectedWins` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/expected-wins`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
-- [ ] T051 [US3] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
-- [ ] T052 [US3] Create `web/src/pages/ExpectedWins.tsx` with the standings table and the Actual vs Expected chart, each mark carrying its exact value and a labelled axis (FR-011)
-- [ ] T053 [US3] Add the Strength of Schedule chart to `web/src/pages/ExpectedWins.tsx`, **stating the sign convention** — positive means a harder schedule — rather than leaving the reader to infer it (US3.3)
-- [ ] T054 [P] [US3] Add frontend tests in `web/src/pages/ExpectedWins.test.tsx` covering both `luckSource` branches rendering different explanations
-- [ ] T055 [US3] Verify the conservation invariant live per quickstart.md US3, comparing against ffwrapped's 2026-09-18 figures (jpelwell 0.45 expected / 1 actual; Justice for Wags 0.55 / 0) — a symmetric pair is the conservation law showing through
+- [X] T046 [US3] Create `ExpectedWinsService` in `backend/src/main/java/com/ballknowers/draftsim/engine/ExpectedWinsService.java` computing per roster: `expectedWins` (sum over weeks of the fraction of other teams outscored), `actualWins`, `winsAboveExpected`
+- [X] T047 [US3] Add `strengthOfSchedule` to `ExpectedWinsService` as the mean of opponents' PPG minus the league-wide PPG, reading pairings from `backend/src/main/java/com/ballknowers/draftsim/store/LeagueMatchupRepository.java`
+- [X] T048 [US3] Add swing-week detection to `ExpectedWinsService`, emitting `luckSource` as a discriminator with `swingWeeks` populated only for `SWING_WEEKS` (US3.4)
+- [X] T049 [US3] Create `ExpectedWinsController` in `backend/src/main/java/com/ballknowers/draftsim/api/ExpectedWinsController.java` exposing `GET /api/leagues/{sleeperId}/expected-wins`
+- [X] T050 [US3] Add the `expectedWins` row to `web/src/destinations.ts` with route `/leagues/:sleeperLeagueId/expected-wins`, explicit `sports: ['nfl', 'nba']`, `match` and `idKind: 'league'` (FR-005)
+- [X] T051 [US3] Register the route in `web/src/App.tsx` and confirm `web/src/destinations.test.ts` passes (FR-012)
+- [X] T052 [US3] Create `web/src/pages/ExpectedWins.tsx` with the standings table and the Actual vs Expected chart, each mark carrying its exact value and a labelled axis (FR-011)
+- [X] T053 [US3] Add the Strength of Schedule chart to `web/src/pages/ExpectedWins.tsx`, **stating the sign convention** — positive means a harder schedule — rather than leaving the reader to infer it (US3.3)
+- [X] T054 [P] [US3] Add frontend tests in `web/src/pages/ExpectedWins.test.tsx` covering both `luckSource` branches rendering different explanations
+- [X] T055 [US3] Verify the conservation invariant live per quickstart.md US3, comparing against ffwrapped's 2026-09-18 figures (jpelwell 0.45 expected / 1 actual; Justice for Wags 0.55 / 0) — a symmetric pair is the conservation law showing through
 
 **Checkpoint**: Expected Wins ships for both sports, with no new ingest.
 

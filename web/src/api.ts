@@ -1253,3 +1253,45 @@ export type RosterManagement = {
 
 export const getRosterManagement = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/roster-management`).then(json<RosterManagement>)
+
+// --- specs/004-ffwrapped-feature-parity US3: Expected wins ---
+
+/**
+ * `luckSource` is a discriminator, not a pair of optional blocks: `swingWeeks`
+ * is non-empty only for SWING_WEEKS, so the page shows one explanation or the
+ * other and never both.
+ */
+export type ExpectedWinsSwing = {
+  week: number
+  result: 'WON' | 'LOST'
+  points: number
+  weeklyRank: number
+  opponent: string
+}
+
+export type ExpectedWinsTeam = {
+  rosterId: number
+  managerId: number | null
+  teamName: string
+  avatarId: string | null
+  expectedWins: number
+  actualWins: number
+  winsAboveExpected: number
+  /** Opponents' points per game minus the league's. Positive = harder schedule. */
+  strengthOfSchedule: number
+  luckSource: 'SWING_WEEKS' | 'CONSISTENT_OPPONENT_SCORING'
+  swingWeeks: ExpectedWinsSwing[]
+}
+
+export type ExpectedWins = {
+  available: boolean
+  reason?: string | null
+  season: number
+  sport: Sport
+  weeksScored: number
+  leagueAveragePpg: number
+  teams: ExpectedWinsTeam[]
+}
+
+export const getExpectedWins = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/expected-wins`).then(json<ExpectedWins>)

@@ -105,6 +105,7 @@ describe('what a league is offered', () => {
       'Power rankings',
       'Analysis',
       'Roster management',
+      'Expected wins',
       'Mock it',
     ])
   })
@@ -124,6 +125,7 @@ describe('what a league is offered', () => {
     // source, while nothing on Roster management is a projection -- it reads
     // points already scored, which Sleeper reports for both sports.
     expect(rowLabels()).toContain('Roster management')
+    expect(rowLabels()).toContain('Expected wins')
   })
 
   it('offers Follow live only while a draft is running', async () => {
