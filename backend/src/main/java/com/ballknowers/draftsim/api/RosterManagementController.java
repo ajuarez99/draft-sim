@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.RosterManagementService;
+import com.ballknowers.draftsim.engine.TransactionAnalysisService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,9 +30,12 @@ import java.util.Map;
 public class RosterManagementController {
 
     private final RosterManagementService rosterManagement;
+    private final TransactionAnalysisService transactions;
 
-    public RosterManagementController(RosterManagementService rosterManagement) {
+    public RosterManagementController(RosterManagementService rosterManagement,
+                                      TransactionAnalysisService transactions) {
         this.rosterManagement = rosterManagement;
+        this.transactions = transactions;
     }
 
     @GetMapping("/leagues/{sleeperId}/roster-management")
@@ -73,6 +77,88 @@ public class RosterManagementController {
             teams.add(row);
         }
         out.put("teams", teams);
+        return out;
+    }
+
+    /**
+     * Transactions extend the Roster Management PAGE rather than adding a route
+     * of their own, matching ffwrapped, where the counts, trades and waiver
+     * adds are sections of the same view (contracts/destinations.md).
+     */
+    @GetMapping("/leagues/{sleeperId}/transactions")
+    public ResponseEntity<Map<String, Object>> transactions(@PathVariable String sleeperId) {
+        return transactions.forLeague(sleeperId)
+                .map(r -> ResponseEntity.ok(transactionsBody(r)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private static Map<String, Object> transactionsBody(TransactionAnalysisService.Result r) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("available", r.available());
+        out.put("season", r.season());
+        out.put("sport", r.sport().code());
+        // Stated, never implied: a 4 beside a name is good, and nothing on the
+        // page says so unless this does (US6.3).
+        out.put("rankDirection", r.rankDirection());
+        if (!r.available()) {
+            out.put("reason", r.reason());
+            out.put("byManager", List.of());
+            out.put("trades", List.of());
+            out.put("adds", List.of());
+            return out;
+        }
+        List<Map<String, Object>> managers = new ArrayList<>();
+        for (TransactionAnalysisService.ManagerCounts m : r.byManager()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("managerId", m.managerId());
+            row.put("teamName", m.teamName());
+            row.put("counts", m.counts());
+            row.put("total", m.total());
+            managers.add(row);
+        }
+        out.put("byManager", managers);
+
+        List<Map<String, Object>> trades = new ArrayList<>();
+        for (TransactionAnalysisService.Trade t : r.trades()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("week", t.week());
+            List<Map<String, Object>> sides = new ArrayList<>();
+            for (TransactionAnalysisService.TradeSide side : t.sides()) {
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("teamName", side.teamName());
+                s.put("received", side.received().stream().map(RosterManagementController::movedBody).toList());
+                sides.add(s);
+            }
+            row.put("sides", sides);
+            trades.add(row);
+        }
+        out.put("trades", trades);
+
+        List<Map<String, Object>> adds = new ArrayList<>();
+        for (TransactionAnalysisService.Add a : r.adds()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("week", a.week());
+            row.put("teamName", a.teamName());
+            row.put("type", a.type());
+            row.put("status", a.status());
+            row.put("added", movedBody(a.added()));
+            row.put("dropped", a.dropped() == null ? null : movedBody(a.dropped()));
+            row.put("faabBid", a.faabBid());
+            adds.add(row);
+        }
+        out.put("adds", adds);
+        return out;
+    }
+
+    private static Map<String, Object> movedBody(TransactionAnalysisService.MovedPlayer p) {
+        if (p == null) return null;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("playerId", p.playerId());
+        out.put("playerName", p.playerName());
+        out.put("position", p.position());
+        // Null when no week has been played since the move: ungraded, not bad.
+        out.put("postMovePositionalRank", p.postMoveRank());
+        out.put("weeksCounted", p.weeksCounted());
         return out;
     }
 }

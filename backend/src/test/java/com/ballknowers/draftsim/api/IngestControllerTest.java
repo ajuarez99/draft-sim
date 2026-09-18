@@ -42,10 +42,11 @@ class IngestControllerTest {
     @Mock private BoardService boards;
     @Mock private ProfileService profiles;
     @Mock private ProjectionIngestService projectionIngest;
+    @Mock private com.ballknowers.draftsim.ingest.TransactionIngestService transactionIngest;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
-                projectionIngest);
+                projectionIngest, transactionIngest);
     }
 
     // ---- POST /api/ingest/adp ----

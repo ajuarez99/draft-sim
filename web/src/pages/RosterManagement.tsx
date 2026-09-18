@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
-import { getRosterManagement, type RosterManagement as Data, type RosterManagementTeam } from '../api'
+import {
+  getRosterManagement,
+  getLeagueTransactions,
+  type RosterManagement as Data,
+  type RosterManagementTeam,
+  type LeagueTransactions,
+  type MovedPlayer,
+} from '../api'
 import { hueForIndex } from '../hue'
 
 /**
@@ -22,6 +29,7 @@ import { hueForIndex } from '../hue'
 export default function RosterManagement() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<Data | null>(null)
+  const [tx, setTx] = useState<LeagueTransactions | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -39,6 +47,24 @@ export default function RosterManagement() {
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sleeperLeagueId])
+
+  // Transactions are a separate call on purpose: they are a separate ingest,
+  // and the standings half of this page must still render when they have not
+  // been pulled yet. A failure here is not a failure of the page.
+  useEffect(() => {
+    if (!sleeperLeagueId) return
+    let cancelled = false
+    getLeagueTransactions(sleeperLeagueId)
+      .then((t) => {
+        if (!cancelled) setTx(t)
+      })
+      .catch(() => {
+        if (!cancelled) setTx(null)
       })
     return () => {
       cancelled = true
@@ -103,7 +129,116 @@ export default function RosterManagement() {
           <ExcludedNote teams={data.teams} />
         </section>
       )}
+
+      {tx && tx.available && <Transactions tx={tx} />}
     </div>
+  )
+}
+
+/**
+ * The rest of ffwrapped's roster-management view: who moved, what they got,
+ * and how it worked out. Sections of this page rather than a route of their
+ * own, matching where ffwrapped puts them.
+ */
+function Transactions({ tx }: { tx: LeagueTransactions }) {
+  const types = ['WAIVER', 'FREE_AGENT', 'TRADE', 'COMMISSIONER']
+  const widest = Math.max(1, ...tx.byManager.map((m) => m.total))
+  return (
+    <>
+      <section className="panel">
+        <h3 className="cond">League transactions</h3>
+        <ul className="tx-counts">
+          {tx.byManager.map((m) => (
+            <li key={m.teamName}>
+              <span className="tx-name">{m.teamName}</span>
+              <span className="tx-bar">
+                {types.map((t) =>
+                  m.counts[t] ? (
+                    <span
+                      key={t}
+                      className={`tx-seg tx-${t.toLowerCase()}`}
+                      style={{ width: `${(m.counts[t] / widest) * 100}%` }}
+                    >
+                      {/* The count is labelled on the segment, not left to a
+                          legend and a length comparison. */}
+                      {m.counts[t]}
+                    </span>
+                  ) : null,
+                )}
+              </span>
+              <span className="tx-total">{m.total}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="muted small tx-legend">
+          <span className="tx-key tx-waiver" /> Waiver claims
+          <span className="tx-key tx-free_agent" /> Free agents
+          <span className="tx-key tx-trade" /> Trades
+        </p>
+      </section>
+
+      <section className="panel">
+        <h3 className="cond">League trades</h3>
+        {tx.trades.length === 0 ? (
+          <p className="muted small">No trades have been made.</p>
+        ) : (
+          <ul className="tx-trades">
+            {tx.trades.map((t, i) => (
+              <li key={i}>
+                <span className="tx-week">Week {t.week}</span>
+                {t.sides.map((side) => (
+                  <span key={side.teamName} className="tx-side">
+                    <strong>{side.teamName}</strong> received{' '}
+                    {side.received.map((p) => p.playerName).join(', ')}
+                  </span>
+                ))}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="panel">
+        <h3 className="cond">Waivers and free agent adds</h3>
+        <ul className="tx-adds">
+          {tx.adds.map((a, i) => (
+            <li key={i}>
+              <span className="tx-week">Wk {a.week}</span>
+              <span className="tx-added">
+                {a.added.position && <em className="tx-pos">{a.added.position}</em>}
+                {a.added.playerName}
+              </span>
+              <Rank player={a.added} />
+              {a.dropped && <span className="muted small tx-dropped">for {a.dropped.playerName}</span>}
+              <span className="tx-team muted">{a.teamName}</span>
+              {a.faabBid != null && <span className="tx-faab">${a.faabBid}</span>}
+            </li>
+          ))}
+        </ul>
+        <p className="muted small tx-legend">
+          Rank is the player's average finish among others at his position since the move —{' '}
+          <strong>lower is better</strong>, and the number of weeks it covers is shown beside it, so a
+          single week is not mistaken for a season.
+        </p>
+      </section>
+    </>
+  )
+}
+
+function Rank({ player }: { player: MovedPlayer }) {
+  if (player.postMovePositionalRank == null) {
+    return (
+      <span className="muted small tx-rank" title="No week has been played since this move">
+        ungraded
+      </span>
+    )
+  }
+  return (
+    <span className="tx-rank">
+      {player.position ?? ''}
+      {player.postMovePositionalRank.toFixed(1)}
+      <span className="muted"> · {player.weeksCounted} wk</span>
+    </span>
   )
 }
 

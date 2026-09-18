@@ -3941,3 +3941,152 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   min-width: 6ch;
   text-align: right;
 }
+
+/* --- Transactions on the roster-management page (US6) -------------------
+   Counts are a stacked bar with the number ON each segment, so the reader
+   never has to match a length against a legend to learn "three waivers". */
+
+.tx-counts,
+.tx-adds,
+.tx-trades {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tx-counts li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.tx-name {
+  flex: 0 0 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tx-bar {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 2px;
+  height: 18px;
+}
+
+.tx-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bg);
+}
+
+.tx-waiver { background: oklch(70% 0.13 250); }
+.tx-free_agent { background: oklch(72% 0.13 150); }
+.tx-trade { background: oklch(75% 0.14 80); }
+.tx-commissioner { background: oklch(60% 0.02 250); }
+
+.tx-total {
+  flex: 0 0 auto;
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.tx-legend {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tx-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 5px 0 12px;
+}
+
+.tx-legend .tx-key:first-child {
+  margin-left: 0;
+}
+
+.tx-adds li,
+.tx-trades li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.tx-adds li:last-child,
+.tx-trades li:last-child {
+  border-bottom: 0;
+}
+
+.tx-week {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 4rem;
+}
+
+.tx-added {
+  font-weight: 500;
+}
+
+.tx-pos {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-right: 6px;
+}
+
+.tx-rank {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.tx-dropped {
+  flex: 0 0 auto;
+}
+
+.tx-team {
+  flex: 1 1 auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tx-faab {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: oklch(74% 0.13 150);
+}
+
+.tx-side {
+  margin-right: 14px;
+}
+
+@media (max-width: 720px) {
+  .tx-name { flex-basis: 8rem; }
+  .tx-team { display: none; }
+}
