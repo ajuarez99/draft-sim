@@ -24,19 +24,58 @@ public class RosterWeekPointsRepository {
     }
 
     public record Row(long leagueId, int season, int week, int rosterId, double startersPoints,
-                      String playersPointsJson) {}
+                      String playersPointsJson, String startersJson) {
+
+        /** Callers with no starters list to store (pre-V18 shape). */
+        public Row(long leagueId, int season, int week, int rosterId, double startersPoints,
+                   String playersPointsJson) {
+            this(leagueId, season, week, rosterId, startersPoints, playersPointsJson, null);
+        }
+    }
 
     public void upsert(Row r) {
         db.sql("""
-                insert into roster_week_points (league_id, season, week, roster_id, starters_points, players_points)
-                values (?, ?, ?, ?, ?, ?::jsonb)
+                insert into roster_week_points (league_id, season, week, roster_id, starters_points,
+                                                players_points, starters)
+                values (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
                 on conflict (league_id, week, roster_id) do update set
                     season = excluded.season,
                     starters_points = excluded.starters_points,
-                    players_points = excluded.players_points
+                    players_points = excluded.players_points,
+                    -- coalesce, not a plain overwrite: a re-ingest that cannot
+                    -- see the starters (Sleeper no longer serving that week)
+                    -- must not erase a list an earlier run did capture.
+                    starters = coalesce(excluded.starters, roster_week_points.starters)
                 """)
-                .params(r.leagueId(), r.season(), r.week(), r.rosterId(), r.startersPoints(), r.playersPointsJson())
+                .params(r.leagueId(), r.season(), r.week(), r.rosterId(), r.startersPoints(),
+                        r.playersPointsJson(), r.startersJson())
                 .update();
+    }
+
+    /**
+     * Weeks whose starters list is populated for EVERY stored roster.
+     *
+     * <p>The ingest skip gate needs this because it is otherwise keyed on rows
+     * existing rather than on columns being filled: adding a per-week column
+     * and re-running ingest would skip every settled week and leave the column
+     * null forever. league_matchup hit exactly that on 2026-09-14
+     * (specs/004-ffwrapped-feature-parity research R6), and the fix there was
+     * the same shape -- widen the gate to ask about the new thing too.
+     *
+     * <p>"every stored roster", not "any": one roster with starters does not
+     * make the week done.
+     */
+    public Set<Integer> weeksWithStarters(long leagueId) {
+        return db.sql("""
+                select week from roster_week_points
+                where league_id = ?
+                group by week
+                having count(*) filter (where starters is not null) = count(*)
+                """)
+                .param(leagueId)
+                .query(Integer.class)
+                .list()
+                .stream().collect(Collectors.toSet());
     }
 
     /** Weeks already cached for this league -- ingest skips these except the current week. */
@@ -60,6 +99,43 @@ public class RosterWeekPointsRepository {
                 """)
                 .params(leagueId, weekThrough)
                 .query((rs, i) -> new WeekPoint(rs.getInt(1), rs.getInt(2), rs.getDouble(3)))
+                .list();
+    }
+
+    /**
+     * One roster's scored week WITH its per-player breakdown.
+     *
+     * <p>{@code playersPointsJson} is Sleeper's {@code players_points} as
+     * stored: {@code sleeper_player_id -> points} for every player on the
+     * roster that week, bench included. It is the input to every
+     * backward-looking view in specs/004-ffwrapped-feature-parity -- potential
+     * points, weekly awards and top performers all read it, and none of them
+     * needs a new ingest because V5 has been storing it since the beginning.
+     *
+     * <p>Can be {@code "{}"} for a week Sleeper returned no breakdown for.
+     * Callers must treat that as "no answer for this week" rather than zero
+     * (FR-007); {@code RealizedLineupService} does.
+     */
+    public record WeekBreakdown(int week, int rosterId, double startersPoints, String playersPointsJson,
+                                String startersJson) {}
+
+    /**
+     * Every stored week of one league-season, with per-player points.
+     *
+     * <p>One query for the whole page: a roster-management view reads every
+     * roster's every week, and doing that per roster would be a dozen round
+     * trips for a page that is already fully cached in this table.
+     */
+    public List<WeekBreakdown> breakdownsFor(long leagueId, int season) {
+        return db.sql("""
+                select week, roster_id, starters_points, players_points::text, starters::text
+                from roster_week_points
+                where league_id = ? and season = ?
+                order by roster_id, week
+                """)
+                .params(leagueId, season)
+                .query((rs, i) -> new WeekBreakdown(rs.getInt(1), rs.getInt(2), rs.getDouble(3),
+                        rs.getString(4), rs.getString(5)))
                 .list();
     }
 

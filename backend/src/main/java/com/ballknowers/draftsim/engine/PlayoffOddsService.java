@@ -1,6 +1,8 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.JsonUtil;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
+import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayoffOddsRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
@@ -40,15 +42,20 @@ public class PlayoffOddsService {
     private final RosterWeekPointsRepository weekPoints;
     private final LeagueMatchupRepository fixtures;
     private final PlayoffOddsRepository odds;
+    private final LeagueMemberRepository members;
+    private final LeagueSeasonResolver seasons;
 
     public PlayoffOddsService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                               RosterWeekPointsRepository weekPoints, LeagueMatchupRepository fixtures,
-                              PlayoffOddsRepository odds) {
+                              PlayoffOddsRepository odds, LeagueMemberRepository members,
+                              LeagueSeasonResolver seasons) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
         this.fixtures = fixtures;
         this.odds = odds;
+        this.members = members;
+        this.seasons = seasons;
     }
 
     /**
@@ -115,7 +122,8 @@ public class PlayoffOddsService {
 
         List<PlayoffOddsRepository.Entry> entries = result.stream()
                 .map(o -> new PlayoffOddsRepository.Entry(o.rosterId(), o.madePct(), null, o.seedOnePct(),
-                        o.projWins(), o.projPoints()))
+                        o.projWins(), o.projPoints(),
+                        countsJson(o.seedCounts(), 1), countsJson(o.winCounts(), 0)))
                 .toList();
         odds.save(leagueId, season, throughWeek, ITERATIONS, PlayoffOddsSimulator.MODEL, entries);
         log.info("playoff odds: league {} week {} -- {} teams, {} remaining fixtures, {} iterations",
@@ -205,6 +213,177 @@ public class PlayoffOddsService {
         for (RosterSeasonRepository.StandingRow s : standings) {
             out.computeIfAbsent(s.rosterId(), r -> new ArrayList<>());
         }
+        return out;
+    }
+
+    /**
+     * A count array to a {@code key -> count} object, dropping zero buckets.
+     *
+     * <p>Zeroes are dropped rather than written because a 12-team league's seed
+     * array is mostly zeroes and the object is stored per roster per week; a
+     * reader treats a missing key as zero, which it is. This is the one place
+     * where absent and zero genuinely do mean the same thing -- unlike the
+     * column itself being null, which means the snapshot predates V17.
+     *
+     * @param firstKey 1 for seeds (there is no seed 0), 0 for win totals
+     */
+    static String countsJson(List<Integer> counts, int firstKey) {
+        if (counts == null) return null;
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (int i = 0; i < counts.size(); i++) {
+            if (counts.get(i) > 0) out.put(String.valueOf(i + firstKey), counts.get(i));
+        }
+        return JsonUtil.write(out);
+    }
+
+    // ------------------------------------------------ Season Forecast (US4)
+
+    /** Why a forecast is not being shown. Distinct values, not one empty list. */
+    /**
+     * {@code NOT_COMPUTED} is distinct from {@code NO_SCORED_WEEKS} on purpose:
+     * a finished season with 21 played weeks and no odds snapshot is not a
+     * season with nothing to project from, and telling the reader it is would
+     * send them looking for the wrong thing.
+     */
+    public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NOT_COMPUTED, NO_DISTRIBUTIONS }
+
+    public record ForecastTeam(int rosterId, Long managerId, String teamName, String avatarId,
+                               double playoffOdds, double averageWins, double projectedPoints,
+                               Integer winP10, Integer winP90, Double averageSeed,
+                               double seedOnePct, Map<Integer, Double> seedOdds) {}
+
+    public record Forecast(boolean available, Unavailable reason, int season, Integer requestedSeason,
+                           int week, int iterations, String model, String snapshotAt,
+                           List<ForecastTeam> teams) {
+
+        static Forecast no(Unavailable reason, int season) {
+            return no(reason, season, null);
+        }
+
+        /** A refusal announces the season fallback too: the reader still needs
+         *  to know the answer is about a different year than the one clicked. */
+        static Forecast no(Unavailable reason, int season, Integer requestedSeason) {
+            return new Forecast(false, reason, season, requestedSeason, 0, 0, null, null, List.of());
+        }
+    }
+
+    /**
+     * Served ENTIRELY from the stored snapshot (FR-009). Nothing here simulates,
+     * so two reads return the same numbers and this view cannot disagree with
+     * the playoff-odds figure the Record cell already shows (FR-008, SC-005).
+     *
+     * <p>The refusals are the ones {@code compute} already enforces, surfaced
+     * rather than bypassed: a league whose seeding this app does not model has
+     * no snapshot to read, which is why the honest answer stays "no answer"
+     * instead of becoming a new endpoint's zero.
+     */
+    public Optional<Forecast> forecast(String sleeperLeagueId) {
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        if (found.isEmpty()) return Optional.empty();
+        LeagueRepository.LeagueRow league = found.get().league();
+        int season = league.season();
+
+        Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
+        if (format.isEmpty() || !format.get().modelable()) {
+            return Optional.of(Forecast.no(Unavailable.UNMODELLED_SEEDING, season,
+                    found.get().requestedSeason()));
+        }
+
+        Optional<PlayoffOddsRepository.Snapshot> snap = odds.latest(league.id(), season);
+        if (snap.isEmpty() || snap.get().entries().isEmpty()) {
+            // Which refusal depends on WHY there is no snapshot.
+            boolean played = !weekPoints.storedWeeks(league.id()).isEmpty();
+            return Optional.of(Forecast.no(
+                    played ? Unavailable.NOT_COMPUTED : Unavailable.NO_SCORED_WEEKS, season,
+                    found.get().requestedSeason()));
+        }
+        PlayoffOddsRepository.Snapshot s = snap.get();
+
+        Map<Long, String> teamNameByManager = new HashMap<>();
+        for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
+            if (m.teamName() != null && !m.teamName().isBlank()) {
+                teamNameByManager.put(m.managerId(), m.teamName());
+            }
+        }
+        Map<Integer, Long> managerByRoster = new HashMap<>();
+        Map<Integer, String> avatarByRoster = new HashMap<>();
+        Map<Integer, String> nameByRoster = new HashMap<>();
+        for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
+            managerByRoster.put(r.rosterId(), r.managerId());
+            avatarByRoster.put(r.rosterId(), r.avatarId());
+            String name = r.managerId() == null ? null : teamNameByManager.get(r.managerId());
+            if (name == null) name = r.managerName();
+            if (name != null && !name.isBlank()) nameByRoster.put(r.rosterId(), name);
+        }
+
+        List<ForecastTeam> teams = new ArrayList<>();
+        for (PlayoffOddsRepository.Entry e : s.entries()) {
+            Map<Integer, Integer> seeds = parseCounts(e.seedCountsJson());
+            Map<Integer, Integer> wins = parseCounts(e.winCountsJson());
+            teams.add(new ForecastTeam(
+                    e.rosterId(),
+                    managerByRoster.get(e.rosterId()),
+                    nameByRoster.getOrDefault(e.rosterId(), "Roster " + e.rosterId()),
+                    avatarByRoster.get(e.rosterId()),
+                    e.madePct(), e.projWins(), e.projPoints(),
+                    percentile(wins, 0.10), percentile(wins, 0.90),
+                    averageKey(seeds),
+                    e.seedOnePct() == null ? 0.0 : e.seedOnePct(),
+                    share(seeds)));
+        }
+
+        return Optional.of(new Forecast(true, null, s.season(), found.get().requestedSeason(),
+                s.week(), s.iterations(), s.model(), null, teams));
+    }
+
+    /** {@code "3": 412} -> {3: 412}. Null (a pre-V17 snapshot) is an empty map. */
+    static Map<Integer, Integer> parseCounts(String json) {
+        if (json == null || json.isBlank()) return Map.of();
+        Map<String, Object> raw = JsonUtil.readMap(json);
+        Map<Integer, Integer> out = new TreeMap<>();
+        raw.forEach((k, v) -> {
+            if (v instanceof Number n) out.put(Integer.parseInt(k), n.intValue());
+        });
+        return out;
+    }
+
+    /**
+     * The {@code p}-th percentile key of a count distribution.
+     *
+     * <p>Walks the cumulative count rather than expanding the samples: the
+     * distribution is already a histogram, and 10,000 iterations would be
+     * 10,000 boxed integers per roster to sort for an answer the counts give
+     * directly. Null for an empty distribution -- a pre-V17 snapshot has no
+     * range, which is not the same as a range of zero.
+     */
+    static Integer percentile(Map<Integer, Integer> counts, double p) {
+        if (counts.isEmpty()) return null;
+        int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+        if (total == 0) return null;
+        double target = p * total;
+        int seen = 0;
+        for (Map.Entry<Integer, Integer> e : new TreeMap<>(counts).entrySet()) {
+            seen += e.getValue();
+            if (seen >= target) return e.getKey();
+        }
+        return new TreeMap<>(counts).lastKey();
+    }
+
+    /** Mean of the keys weighted by their counts; null for an empty distribution. */
+    static Double averageKey(Map<Integer, Integer> counts) {
+        int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+        if (total == 0) return null;
+        double sum = 0;
+        for (Map.Entry<Integer, Integer> e : counts.entrySet()) sum += (double) e.getKey() * e.getValue();
+        return Math.round((sum / total) * 100.0) / 100.0;
+    }
+
+    /** Counts to fractions of the whole, so a caller renders odds not tallies. */
+    static Map<Integer, Double> share(Map<Integer, Integer> counts) {
+        int total = counts.values().stream().mapToInt(Integer::intValue).sum();
+        if (total == 0) return Map.of();
+        Map<Integer, Double> out = new TreeMap<>();
+        counts.forEach((k, v) -> out.put(k, Math.round((v * 1000.0 / total)) / 1000.0));
         return out;
     }
 }

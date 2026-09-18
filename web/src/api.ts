@@ -1216,3 +1216,223 @@ export const submitBallot = (sleeperLeagueId: string, week: number, rosterIds: n
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ week, rosterIds }),
   }).then(json<{ saved: number }>)
+
+// --- specs/004-ffwrapped-feature-parity US2: the Roster management page ---
+
+/**
+ * One team's season. Mirrors RosterManagementService.TeamRow.
+ *
+ * `efficiency` is nullable on purpose and must not be coerced to a number at
+ * the edge: null means there was no potential to divide by, and rendering that
+ * as 100% would be the most flattering possible wrong answer. `weeksExcluded`
+ * lists weeks dropped for want of a per-player breakdown -- they are excluded
+ * from the totals, so the page has to say so rather than let a short season
+ * read as a full one.
+ */
+export type RosterManagementTeam = {
+  rosterId: number
+  managerId: number | null
+  teamName: string
+  avatarId: string | null
+  totalPoints: number
+  potentialPoints: number
+  efficiency: number | null
+  weeksCounted: number
+  weeksExcluded: number[]
+}
+
+/** `available: false` carries a reason; it is not an empty table. */
+export type RosterManagement = {
+  available: boolean
+  reason?: string | null
+  season: number
+  /** Set when the season asked for had not been played and an earlier one is
+   *  shown instead. The page says so; a silently different year would be worse
+   *  than the refusal it replaces. */
+  requestedSeason?: number | null
+  sport: Sport
+  weeksScored: number
+  teams: RosterManagementTeam[]
+}
+
+export const getRosterManagement = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/roster-management`).then(json<RosterManagement>)
+
+// --- specs/004-ffwrapped-feature-parity US3: Expected wins ---
+
+/**
+ * `luckSource` is a discriminator, not a pair of optional blocks: `swingWeeks`
+ * is non-empty only for SWING_WEEKS, so the page shows one explanation or the
+ * other and never both.
+ */
+export type ExpectedWinsSwing = {
+  week: number
+  result: 'WON' | 'LOST'
+  points: number
+  weeklyRank: number
+  opponent: string
+}
+
+export type ExpectedWinsTeam = {
+  rosterId: number
+  managerId: number | null
+  teamName: string
+  avatarId: string | null
+  expectedWins: number
+  actualWins: number
+  winsAboveExpected: number
+  /** Opponents' points per game minus the league's. Positive = harder schedule. */
+  strengthOfSchedule: number
+  luckSource: 'SWING_WEEKS' | 'CONSISTENT_OPPONENT_SCORING'
+  swingWeeks: ExpectedWinsSwing[]
+}
+
+export type ExpectedWins = {
+  available: boolean
+  reason?: string | null
+  season: number
+  requestedSeason?: number | null
+  sport: Sport
+  weeksScored: number
+  leagueAveragePpg: number
+  teams: ExpectedWinsTeam[]
+}
+
+export const getExpectedWins = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/expected-wins`).then(json<ExpectedWins>)
+
+// --- specs/004-ffwrapped-feature-parity US4: Season forecast ---
+
+/**
+ * Read from one stored simulation snapshot, never computed on load — which is
+ * what keeps this view and the playoff-odds figure in the Record cell showing
+ * the same number.
+ *
+ * `winRange` and `averageSeed` are nullable: a snapshot taken before the
+ * distributions were stored has no range, and that is not a range of zero.
+ */
+export type ForecastTeam = {
+  rosterId: number
+  managerId: number | null
+  teamName: string
+  avatarId: string | null
+  playoffOdds: number
+  averageWins: number
+  projectedPoints: number
+  winRange: { p10: number | null; p90: number | null }
+  averageSeed: number | null
+  seedOnePct: number
+  seedOdds: Record<string, number>
+}
+
+/** `reason` names which refusal applies; they need different words on screen. */
+export type SeasonForecast = {
+  available: boolean
+  reason?: 'UNMODELLED_SEEDING' | 'NO_SCORED_WEEKS' | 'NOT_COMPUTED' | 'NO_DISTRIBUTIONS' | null
+  season: number
+  requestedSeason?: number | null
+  week?: number
+  iterations?: number
+  model?: string | null
+  teams: ForecastTeam[]
+}
+
+export const getSeasonForecast = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/forecast`).then(json<SeasonForecast>)
+
+// --- specs/004-ffwrapped-feature-parity US5: Weekly report ---
+
+export type WeeklySide = {
+  rosterId: number
+  teamName: string
+  avatarId: string | null
+  record: string
+  points: number
+}
+
+export type WeeklyMatchup = { home: WeeklySide; away: WeeklySide }
+
+export type WeeklyPerformer = {
+  playerId: string
+  playerName: string
+  position: string
+  teamName: string
+  points: number
+}
+
+export type WeeklyAward = { kind: string; teamName: string; detail: string }
+
+/**
+ * An award that could not be computed, and why. Rendered rather than dropped:
+ * a missing award is otherwise indistinguishable from nobody qualifying.
+ */
+export type WeeklyOmittedAward = { kind: string; reason: string }
+
+export type WeeklyReport = {
+  available: boolean
+  reason?: string | null
+  season: number
+  requestedSeason?: number | null
+  week: number
+  sport: Sport
+  matchups: WeeklyMatchup[]
+  topPerformers: WeeklyPerformer[]
+  awards: WeeklyAward[]
+  awardsOmitted: WeeklyOmittedAward[]
+}
+
+export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-report/${week}`).then(json<WeeklyReport>)
+
+// --- specs/004-ffwrapped-feature-parity US6: transactions ---
+
+/**
+ * `postMovePositionalRank` is null when no week has been played since the move
+ * — ungraded, not bad. `weeksCounted` rides beside every rank so a one-week
+ * sample is not read as a season verdict.
+ *
+ * Rank is within the player's own position, among players rostered in THIS
+ * league. ffwrapped ranks against a wider pool, so the numbers are close but
+ * not identical; the direction is what `rankDirection` states.
+ */
+export type MovedPlayer = {
+  playerId: string
+  playerName: string
+  position: string | null
+  postMovePositionalRank: number | null
+  weeksCounted: number
+}
+
+export type TransactionAdd = {
+  week: number
+  teamName: string
+  type: string
+  status: string | null
+  added: MovedPlayer
+  dropped: MovedPlayer | null
+  faabBid: number | null
+}
+
+export type TradeSide = { teamName: string; received: MovedPlayer[] }
+export type LeagueTrade = { week: number; sides: TradeSide[] }
+
+export type ManagerTransactionCounts = {
+  managerId: number | null
+  teamName: string
+  counts: Record<string, number>
+  total: number
+}
+
+export type LeagueTransactions = {
+  available: boolean
+  reason?: string | null
+  season: number
+  sport: Sport
+  byManager: ManagerTransactionCounts[]
+  trades: LeagueTrade[]
+  adds: TransactionAdd[]
+  rankDirection: string
+}
+
+export const getLeagueTransactions = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/transactions`).then(json<LeagueTransactions>)

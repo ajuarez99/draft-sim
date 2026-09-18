@@ -37,7 +37,9 @@ export type LeagueContext = {
   season: DraftSummary
 }
 
-export type DestinationKey = 'board' | 'live' | 'history' | 'power' | 'analysis' | 'mock'
+export type DestinationKey =
+  | 'board' | 'live' | 'history' | 'power' | 'analysis'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -155,6 +157,63 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Analysis',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/analysis`,
     match: /^\/leagues\/([^/]+)\/analysis\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'rosterManagement',
+    glyph: '◱',
+    // Both sports, and written out rather than inherited from ALL_SPORTS by
+    // habit: this page earns it. Unlike Analysis above, nothing here is a
+    // projection -- total, potential and efficiency are all computed from
+    // points already scored, which Sleeper reports for basketball exactly as
+    // for football. See specs/004-ffwrapped-feature-parity research R2/R4.
+    sports: ['nfl', 'nba'],
+    label: 'Roster management',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/roster-management`,
+    match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'expectedWins',
+    glyph: '◑',
+    // Both sports, explicitly. Expected wins touches no position, no lineup and
+    // no projection -- it is weekly scores and pairings, which mean the same
+    // thing in basketball.
+    sports: ['nfl', 'nba'],
+    label: 'Expected wins',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/expected-wins`,
+    match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'forecast',
+    glyph: '◔',
+    // Both sports. The simulator is driven by weekly scores and pairings, which
+    // basketball has; the only gate is whether this app models the league's
+    // seeding, and that is a league property rather than a sport one.
+    sports: ['nfl', 'nba'],
+    label: 'Season forecast',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/forecast`,
+    match: /^\/leagues\/([^/]+)\/forecast\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'weeklyReport',
+    glyph: '◨',
+    // Both sports. Matchups, scores and the optimal-lineup awards all read
+    // points already scored; none of it is a projection.
+    sports: ['nfl', 'nba'],
+    label: 'Weekly report',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/weekly-report`,
+    match: /^\/leagues\/([^/]+)\/weekly-report\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

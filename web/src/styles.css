@@ -3331,3 +3331,771 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      placed by the same measurement. */
   .rail-switcher-toggle { width: auto; margin: 0; }
 }
+
+/* --- Roster management (specs/004-ffwrapped-feature-parity US2) ---------
+   A table, not a grid of cards: twelve teams x four numbers is tabular data,
+   and the shape of the content is what picks the layout. The comparison bar
+   lives in the row rather than in a second chart below, so the exact value
+   sits beside its own mark instead of on a shared axis far from it. */
+
+.rm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rm-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+/* Hover depth rather than a flat zebra: the row is the unit you read. */
+.rm-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.rm-table td,
+.rm-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.rm-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.rm-barhead {
+  width: 42%;
+}
+
+.rm-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.rm-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.rm-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.rm-bars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* The potential bar is the faint full-length one; the scored bar is drawn on
+   top of it. One encoding per mark: length is points, and the only thing
+   colour distinguishes is scored from possible. */
+.rm-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 18px;
+  min-width: 90px;
+}
+
+.rm-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 3px;
+}
+
+.rm-bar-potential {
+  background: oklch(32% 0.04 var(--hue));
+  border: 1px solid oklch(42% 0.06 var(--hue));
+}
+
+.rm-bar-actual {
+  background: oklch(62% 0.12 var(--hue));
+}
+
+.rm-left {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 16ch;
+}
+
+.rm-excluded {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+  .rm-barhead,
+  .rm-bars {
+    display: none;
+  }
+  .rm-name {
+    max-width: 14ch;
+  }
+}
+
+/* --- Expected wins (specs/004-ffwrapped-feature-parity US3) -------------
+   A diverging bar around a zero line. The sign is the whole story here --
+   lucky or unlucky -- so it gets an axis rather than a minus sign buried in a
+   column of numbers, and the exact value still sits beside its own mark. */
+
+.ew-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.ew-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ew-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+.ew-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.ew-table td,
+.ew-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.ew-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ew-barhead {
+  width: 38%;
+}
+
+.ew-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.ew-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.ew-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.ew-bars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ew-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 16px;
+  min-width: 120px;
+}
+
+.ew-zero {
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--line);
+}
+
+.ew-bar {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  border-radius: 2px;
+}
+
+.ew-bar-lucky {
+  background: oklch(68% 0.13 150);
+}
+
+.ew-bar-unlucky {
+  background: oklch(62% 0.15 25);
+}
+
+.ew-delta {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  min-width: 5ch;
+  text-align: right;
+}
+
+.ew-up {
+  color: oklch(74% 0.13 150);
+}
+
+.ew-down {
+  color: oklch(70% 0.15 25);
+}
+
+.ew-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.ew-luck {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+/* Tinted, not a flat uniform card: the luck cards are a different kind of
+   object from the table rows above and should not read as more of them. */
+.ew-luck-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.ew-luck-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ew-luck-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ew-swings {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.ew-swings strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .ew-barhead,
+  .ew-bars {
+    display: none;
+  }
+  .ew-name {
+    max-width: 14ch;
+  }
+}
+
+/* --- Season forecast (specs/004-ffwrapped-feature-parity US4) -----------
+   The win range is a span with the mean marked on it, not two more numeric
+   columns: the interesting property of "8–12" is its WIDTH, which a pair of
+   cells hides. The exact endpoints still sit beside the span. */
+
+.sf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-table thead th {
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  font-weight: 600;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sf-table tbody tr {
+  border-bottom: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+
+.sf-table tbody tr:hover {
+  background: color-mix(in oklab, var(--panel) 80%, white 6%);
+}
+
+.sf-table td,
+.sf-table tbody th {
+  padding: 10px;
+  vertical-align: middle;
+}
+
+.sf-num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sf-odds {
+  font-weight: 600;
+}
+
+.sf-rangehead {
+  width: 34%;
+}
+
+.sf-team {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+}
+
+.sf-avatar {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  font-size: 12px;
+}
+
+.sf-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 20ch;
+}
+
+.sf-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sf-track {
+  position: relative;
+  flex: 1 1 auto;
+  height: 16px;
+  min-width: 110px;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--line) calc(50% - 1px),
+    var(--line) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.sf-span {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 5px;
+  background: oklch(45% 0.08 var(--hue));
+  border: 1px solid oklch(58% 0.1 var(--hue));
+}
+
+/* The mean, marked on the span it sits inside rather than given its own row. */
+.sf-mean {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--fg);
+  transform: translateX(-1px);
+}
+
+.sf-range-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 6ch;
+  text-align: right;
+}
+
+.sf-note {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 720px) {
+  .sf-rangehead,
+  .sf-range {
+    display: none;
+  }
+  .sf-name {
+    max-width: 12ch;
+  }
+}
+
+/* --- Weekly report (specs/004-ffwrapped-feature-parity US5) -------------
+   Matchups are cards, not table rows: a matchup is a pair facing each other,
+   and the layout should look like the thing it describes. Awards are a third
+   shape again, tinted so they do not read as more matchups. */
+
+.wr-weekpick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wr-weekpick input {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.wr-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.wr-game {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wr-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-side + .wr-side {
+  border-top: 1px solid var(--line);
+}
+
+/* The winner gets weight and a tint, so the result reads without comparing
+   two numbers first. */
+.wr-won {
+  background: color-mix(in oklab, var(--panel) 82%, white 6%);
+  font-weight: 600;
+}
+
+.wr-avatar {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  font-size: 11px;
+}
+
+.wr-team {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-record {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.wr-points {
+  flex: 0 0 auto;
+  min-width: 7ch;
+  text-align: right;
+}
+
+.wr-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.wr-award {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.wr-award h4 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.wr-award-team {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.wr-omitted {
+  margin: 14px 0 0;
+  padding: 10px 0 0 18px;
+  border-top: 1px solid var(--line);
+  line-height: 1.5;
+}
+
+.wr-performers {
+  margin: 0;
+  padding-left: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-performers li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wr-performers li:last-child {
+  border-bottom: 0;
+}
+
+.wr-pname {
+  font-weight: 500;
+}
+
+.wr-ppos {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.wr-pteam {
+  flex: 1 1 auto;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-ppts {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+}
+
+/* --- Transactions on the roster-management page (US6) -------------------
+   Counts are a stacked bar with the number ON each segment, so the reader
+   never has to match a length against a legend to learn "three waivers". */
+
+.tx-counts,
+.tx-adds,
+.tx-trades {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tx-counts li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.tx-name {
+  flex: 0 0 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tx-bar {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 2px;
+  height: 18px;
+}
+
+.tx-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bg);
+}
+
+.tx-waiver { background: oklch(70% 0.13 250); }
+.tx-free_agent { background: oklch(72% 0.13 150); }
+.tx-trade { background: oklch(75% 0.14 80); }
+.tx-commissioner { background: oklch(60% 0.02 250); }
+
+.tx-total {
+  flex: 0 0 auto;
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.tx-legend {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tx-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 5px 0 12px;
+}
+
+.tx-legend .tx-key:first-child {
+  margin-left: 0;
+}
+
+.tx-adds li,
+.tx-trades li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.tx-adds li:last-child,
+.tx-trades li:last-child {
+  border-bottom: 0;
+}
+
+.tx-week {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 4rem;
+}
+
+.tx-added {
+  font-weight: 500;
+}
+
+.tx-pos {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-right: 6px;
+}
+
+.tx-rank {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.tx-dropped {
+  flex: 0 0 auto;
+}
+
+.tx-team {
+  flex: 1 1 auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tx-faab {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: oklch(74% 0.13 150);
+}
+
+.tx-side {
+  margin-right: 14px;
+}
+
+@media (max-width: 720px) {
+  .tx-name { flex-basis: 8rem; }
+  .tx-team { display: none; }
+}
+
+/* Season fallback note: the page moved to an earlier year and says so. */
+.season-fallback {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid oklch(62% 0.13 80);
+  background: color-mix(in oklab, var(--panel) 88%, white 4%);
+  border-radius: 0 4px 4px 0;
+}

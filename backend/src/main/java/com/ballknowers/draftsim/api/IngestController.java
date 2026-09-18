@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
+import com.ballknowers.draftsim.ingest.TransactionIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionIngestService;
@@ -28,11 +29,13 @@ public class IngestController {
     private final BoardService boards;
     private final ProfileService profiles;
     private final ProjectionIngestService projectionIngest;
+    private final TransactionIngestService transactionIngest;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
                             FfcAdpService ffcAdp, BoardService boards, ProfileService profiles,
-                            ProjectionIngestService projectionIngest) {
+                            ProjectionIngestService projectionIngest,
+                            TransactionIngestService transactionIngest) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -40,6 +43,7 @@ public class IngestController {
         this.boards = boards;
         this.profiles = profiles;
         this.projectionIngest = projectionIngest;
+        this.transactionIngest = transactionIngest;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -69,6 +73,18 @@ public class IngestController {
      * it. Idempotent; re-running only refetches weeks not already stored (plus
      * the most recently scored one) -- see LeagueHistoryIngestService.
      */
+    /**
+     * specs/004-ffwrapped-feature-parity US6: roster moves.
+     *
+     * <p>Its own route rather than folded into /all, because it is the one
+     * ingest that walks a call per week and a caller should be able to refresh
+     * transactions without re-walking players, leagues and the board.
+     */
+    @PostMapping("/transactions/{sleeperLeagueId}")
+    public java.util.Map<String, Object> transactions(@PathVariable String sleeperLeagueId) {
+        return java.util.Map.of("stored", transactionIngest.ingest(sleeperLeagueId));
+    }
+
     @PostMapping("/league-history/{sleeperLeagueId}")
     public LeagueHistoryIngestService.Result leagueHistory(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);

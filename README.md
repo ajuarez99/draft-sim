@@ -25,6 +25,16 @@ Built so far:
   hardcoded page.
 - **Live draft tracking.** Poll a real, in-progress Sleeper draft in the
   background and stream its state to the UI over SSE as picks land.
+- **League analysis, in both sports** (specs/004-ffwrapped-feature-parity). Four
+  pages built on weekly results Sleeper has always reported and this app has
+  always stored: **Roster management** (points scored against the most a perfect
+  weekly lineup could have scored, plus every waiver, trade and FAAB bid),
+  **Expected wins** (the all-play record, so the gap from the real record is
+  schedule luck), **Season forecast** (per-seed odds and win ranges off the
+  playoff simulation that was already running), and the **Weekly report**
+  (matchups, top performers, and the awards nobody wants).
+  All four work for **basketball as well as football**, because none of them is a
+  projection -- they read points already scored, which Sleeper reports for both.
 - **Interactive mock draft room** (`/mock/new`). Start a from-scratch mock at
   8/10/12/14 teams with no real Sleeper league or draft behind it -- bots
   auto-pick down the snake order, you take your own picks on your turn, sessions

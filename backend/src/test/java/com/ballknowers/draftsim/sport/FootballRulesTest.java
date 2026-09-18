@@ -261,16 +261,37 @@ class FootballRulesTest {
                 "the higher-projected RB should take the RB slot even though he went 77 picks later");
     }
 
-    /** Basketball has no projection source; the seam says so instead of guessing. */
+    /**
+     * Replaces {@code basketballStartingLineupRefusesRatherThanFallingBackToBoardValue},
+     * which asserted basketball threw here.
+     *
+     * <p>That refusal conflated two different questions. It was justified on
+     * the grounds that basketball has no projection source -- true, and still
+     * true -- but {@code startingLineup} is not a projection method. It values
+     * a lineup with whatever function the caller supplies, and a caller asking
+     * "what would this roster have started in week 3" supplies points already
+     * scored, which Sleeper reports for basketball exactly as for football.
+     * The blanket throw therefore locked NBA out of views whose data it had
+     * (specs/004-ffwrapped-feature-parity, research R4).
+     *
+     * <p>What the old test was protecting is still protected, just not here:
+     * the obligation not to answer a projection question with board value now
+     * sits on callers, and {@code LeagueAnalysisService} still declines for a
+     * sport with no projection source.
+     */
     @Test
-    void basketballStartingLineupRefusesRatherThanFallingBackToBoardValue() {
+    void basketballStartingLineupNowAnswersInsteadOfThrowing() {
         SportRules nba = new BasketballRules(new ScoringProperties(
                 null,
                 new ScoringProperties.SportScoring(
                         new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
                         12.0, 3.0, 60.0, 0.15, 6, 0.85, Map.of(), 1.0, 30)));
-        assertThrows(UnsupportedOperationException.class,
-                () -> nba.startingLineup(new RosterState(),
-                        new LeagueSettings(Sport.NBA, 12, 13, List.of("PG"), 0.0), nba::value));
+        LeagueSettings nbaSettings = new LeagueSettings(
+                Sport.NBA, 12, 14,
+                List.of("PG", "SG", "G", "SF", "PF", "F", "C", "UTIL", "UTIL", "BN", "BN"), 0.0);
+
+        assertDoesNotThrow(() -> nba.startingLineup(new RosterState(), nbaSettings, nba::value));
+        assertTrue(nba.startingLineup(new RosterState(), nbaSettings, nba::value).isEmpty(),
+                "an empty roster seats nobody -- but it answers the question instead of refusing it");
     }
 }

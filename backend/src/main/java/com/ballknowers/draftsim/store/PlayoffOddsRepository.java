@@ -24,8 +24,24 @@ public class PlayoffOddsRepository {
         this.db = db;
     }
 
+    /**
+     * @param seedCountsJson seed -> simulated-season count, or null for a
+     *                       snapshot taken before V17. Null is not zero: that
+     *                       simulation is gone and cannot be re-run to mean the
+     *                       same thing, so a reader must say "no distribution"
+     *                       rather than draw an empty chart.
+     * @param winCountsJson  wins -> simulated-season count, same nullability
+     */
     public record Entry(int rosterId, double madePct, Double byePct, Double seedOnePct,
-                        double projWins, double projPoints) {}
+                        double projWins, double projPoints,
+                        String seedCountsJson, String winCountsJson) {
+
+        /** Pre-V17 call sites that have no distributions to store. */
+        public Entry(int rosterId, double madePct, Double byePct, Double seedOnePct,
+                     double projWins, double projPoints) {
+            this(rosterId, madePct, byePct, seedOnePct, projWins, projPoints, null, null);
+        }
+    }
 
     /** Null stays null: a bye percentage that was never computed is not 0%. */
     private static Double nullableDouble(java.math.BigDecimal v) {
@@ -55,11 +71,11 @@ public class PlayoffOddsRepository {
         for (Entry e : entries) {
             db.sql("""
                     insert into playoff_odds_entry (odds_id, roster_id, made_pct, bye_pct, seed_one_pct,
-                                                    proj_wins, proj_points)
-                    values (?, ?, ?, ?, ?, ?, ?)
+                                                    proj_wins, proj_points, seed_counts, win_counts)
+                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb)
                     """)
                     .params(oddsId, e.rosterId(), e.madePct(), e.byePct(), e.seedOnePct(),
-                            e.projWins(), e.projPoints())
+                            e.projWins(), e.projPoints(), e.seedCountsJson(), e.winCountsJson())
                     .update();
         }
     }
@@ -82,7 +98,8 @@ public class PlayoffOddsRepository {
                 .optional();
         if (head.isEmpty()) return head;
         List<Entry> entries = db.sql("""
-                select e.roster_id, e.made_pct, e.bye_pct, e.seed_one_pct, e.proj_wins, e.proj_points
+                select e.roster_id, e.made_pct, e.bye_pct, e.seed_one_pct, e.proj_wins, e.proj_points,
+                       e.seed_counts::text, e.win_counts::text
                 from playoff_odds_entry e
                 join playoff_odds o on o.id = e.odds_id
                 where o.league_id = ? and o.season = ? and o.week = ?
@@ -94,7 +111,7 @@ public class PlayoffOddsRepository {
                 // endpoint the first time this ran against a real snapshot.
                 .query((rs, i) -> new Entry(rs.getInt(1), rs.getDouble(2),
                         nullableDouble(rs.getBigDecimal(3)), nullableDouble(rs.getBigDecimal(4)),
-                        rs.getDouble(5), rs.getDouble(6)))
+                        rs.getDouble(5), rs.getDouble(6), rs.getString(7), rs.getString(8)))
                 .list();
         Snapshot h = head.get();
         return Optional.of(new Snapshot(h.season(), h.week(), h.iterations(), h.model(), entries));

@@ -1,6 +1,67 @@
 # Ball Knowers — handoff
 
-**Also 2026-09-16, same branch: the page reads week by week.**
+**2026-09-18, branch `004-ffwrapped-feature-parity` (pushed, not merged): four
+new league pages, both sports.** `specs/004-ffwrapped-feature-parity/` is the
+brief; read `research.md` first, it is where the measurements are.
+
+The spec walks ffwrapped's whole 19-view sidebar. Views 4 through 11 are now
+covered: **Roster management**, **Expected wins**, **Season forecast** and the
+**Weekly report**, with transactions as sections of the first.
+
+**The finding that set the shape.** Every view here asks one of two questions.
+Backward-looking ones (what already scored) read
+`roster_week_points.players_points`, which V5 has stored since the beginning and
+whose own comment anticipated exactly this use -- so they need **no new ingest**
+and work for **both sports**, because Sleeper reports per-player weekly points
+for NBA identically. Forward-looking ones need a projection source, and this
+app's is football's stat keys. That line, not the feature list, is what decides
+whether something can be basketball-compatible.
+
+**US1 is the load-bearing change.** `SportRules.startingLineup` carried a
+throwing default that `BasketballRules` inherited, justified in terms of
+projections -- which locked basketball out of views whose data it already had.
+It is now abstract, so a future sport gets a compile error rather than a runtime
+one. No new solver: `prepareLineup` already took an arbitrary value function and
+already solved the matroid; it just discarded the seating.
+
+**Verified live against ffwrapped, not only by test.** Roster management totals
+match on all 11 teams and `floor(our potential)` matches their displayed
+potential on all 11. Expected wins reproduce their figures on all 11 and the
+conservation invariant holds exactly (6.0000 = 6.0000). Three weekly awards and
+the top-performer order reproduce their text verbatim; the fourth exposed a real
+bug in the swap search, and after fixing it reproduces verbatim too.
+
+**Two residual differences, recorded rather than tuned** (research R3, R12, and
+the US6 commit): potential points differ from ffwrapped by under 0.81 points
+(two different optimal-lineup rules), and post-move positional rank differs
+because we rank among players rostered in the league and they use a wider pool.
+Both are pool/rule differences with a stated rule on our side. Do not fit them.
+
+**Migrations follow execution order, not story order.** V17 playoff-odds
+distributions, V18 roster-week starters, V19 league transactions. Flyway's
+`outOfOrder` is unset and therefore false, so numbering by story number would
+break the next boot. The plan originally had V17/V18 the other way round and
+`/speckit-analyze` caught it.
+
+**The V18 trap is the one to remember.** The ingest skip gate tests whether ROWS
+exist, not whether a COLUMN is populated, so adding `starters` and re-running
+ingest would have skipped every settled week forever -- the same failure
+`league_matchup` hit on 2026-09-14. The gate now asks about starters too, and
+the backfill was proven by counting rows: 0 of 12 populated before, 12 of 12
+after. Never verify a backfill with a green build.
+
+478 backend tests / 0 failures / **0 skipped**, 439 frontend.
+
+**NOT verified in a browser.** Six pages are verified by tests and live API
+calls; none of the CSS has been seen rendered. Five dev-server slots were held
+by other Claude sessions for the whole session and the cap is five. That is the
+first thing to do next.
+
+Also open: T004 (a full re-ingest is deliberately skipped -- it risks the
+`adp_at_time` wipe, and the data is present and reconciled) and T008 (a fixture
+helper nothing currently needs; adding it now would be dead code).
+
+**2026-09-16, same branch: the page reads week by week.**
 `claude/league-analysis-week-by-week.md` is the brief. The page had two time
 horizons and nothing between them -- the whole rest of the season as one bar,
 and the next game -- so every "when" question fell in the gap. Now: a **week

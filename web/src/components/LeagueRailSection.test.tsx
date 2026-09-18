@@ -99,7 +99,17 @@ describe('what a league is offered', () => {
     const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(rowLabels()).toEqual(['Draft board', 'History', 'Power rankings', 'Analysis', 'Mock it'])
+    expect(rowLabels()).toEqual([
+      'Draft board',
+      'History',
+      'Power rankings',
+      'Analysis',
+      'Roster management',
+      'Expected wins',
+      'Season forecast',
+      'Weekly report',
+      'Mock it',
+    ])
   })
 
   // The sport gate is one-way, and it now lives in one place rather than in
@@ -111,6 +121,15 @@ describe('what a league is offered', () => {
     await waitFor(() => expect(leagueSection()).not.toBeNull())
     expect(rowLabels()).not.toContain('Analysis')
     expect(rowLabels()).toContain('Power rankings')
+    // Roster management IS offered to basketball, and the contrast with
+    // Analysis one line up is the whole point: Analysis is gated because two
+    // of its blocks are projections and there is no basketball projection
+    // source, while nothing on Roster management is a projection -- it reads
+    // points already scored, which Sleeper reports for both sports.
+    expect(rowLabels()).toContain('Roster management')
+    expect(rowLabels()).toContain('Expected wins')
+    expect(rowLabels()).toContain('Season forecast')
+    expect(rowLabels()).toContain('Weekly report')
   })
 
   it('offers Follow live only while a draft is running', async () => {
