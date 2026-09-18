@@ -317,10 +317,10 @@ transaction log for those weeks.
 
 - [X] T115 Run the full backend suite and confirm the skip count is **0**: `cd backend && ./gradlew test 2>&1 | grep -iE "tests?.*(completed|skipped|failed)"`
 - [X] T116 [P] Run the full frontend suite: `cd web && npm test`
-- [ ] T117 **BLOCKED (browser)** — Verify in the browser that all four new pages appear in the rail's League section and mark themselves current — the 003 defect must not reappear on pages added after it was fixed (contracts/destinations.md)
-- [ ] T118 **BLOCKED (browser)** — [P] Verify each new page is reachable from the command palette, labelled with its league
+- [X] T117 Verify in the browser that all four new pages appear in the rail's League section and mark themselves current — the 003 defect must not reappear on pages added after it was fixed (contracts/destinations.md)
+- [X] T118 [P] Verify each new page is reachable from the command palette, labelled with its league
 - [X] T119 [P] Verify an NBA league shows all four new pages, none hidden by a sport gate
-- [ ] T120 **BLOCKED (browser)** — Verify a league switch from each new page lands on the equivalent page for the target league, falling back to History where the page is not offered
+- [X] T120 Verify a league switch from each new page lands on the equivalent page for the target league, falling back to History where the page is not offered
 - [X] T121 [P] Update `README.md`'s "Built so far" section with the four new pages and the both-sports claim
 - [X] T122 [P] Update `HANDOFF.md` with current state, what is verified live versus only by test, and what remains
 - [X] T123 Record in `specs/004-ffwrapped-feature-parity/research.md` R10 the resolved NBA cadence finding and whether a live NBA league with scored weeks now exists
