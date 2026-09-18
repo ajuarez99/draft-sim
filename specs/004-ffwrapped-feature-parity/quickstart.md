@@ -175,7 +175,7 @@ Recompute is commissioner-triggered, as today — no new trigger.
 
 ## US5 — Weekly Report
 
-**The migration is not the finish line.** `V17` adds `roster_week_points.starters`, and the ingest skip
+**The migration is not the finish line.** `V18` adds `roster_week_points.starters`, and the ingest skip
 gate is keyed on rows existing, not columns being populated (R6). Re-running ingest will skip every
 settled week and leave the column null, silently. This already happened once in this repo with
 `league_matchup`.

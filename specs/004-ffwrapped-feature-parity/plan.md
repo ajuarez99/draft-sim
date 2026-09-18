@@ -139,9 +139,9 @@ backend/src/main/java/com/ballknowers/draftsim/
     └── WeeklyReportController.java      # NEW  US5
 
 backend/src/main/resources/db/migration/
-├── V17__roster_week_starters.sql        # US5
-├── V18__playoff_odds_distributions.sql  # US4
-└── V19__league_transaction.sql          # US6
+├── V17__playoff_odds_distributions.sql  # US4 (phase 6 — lands first)
+├── V18__roster_week_starters.sql        # US5 (phase 7)
+└── V19__league_transaction.sql          # US6 (phase 8)
 
 web/src/
 ├── destinations.ts                      # every new page declared here, with explicit sports
@@ -176,11 +176,17 @@ Each phase is independently shippable and leaves the app working.
 | 1 | US1 — basketball starting lineup | none | both | — |
 | 2 | US2 — Roster Management | none | both | US1 |
 | 3 | US3 — Expected Wins | none | both | — (parallel with US2) |
-| 4 | US4 — Season Forecast + Playoffs | `V18` columns | both | — (parallel) |
-| 5 | US5 — Weekly Report | `V17` + backfill | both | US1, US2 |
+| 4 | US4 — Season Forecast + Playoffs | `V17` columns | both | — (parallel) |
+| 5 | US5 — Weekly Report | `V18` + backfill | both | US1, US2 |
 | 6 | US6 — Transactions | `V19` table + ingest | both | US2 |
 
 US3 and US4 touch nothing US2 touches and can run in parallel with it. US1 gates US2 and US5 only.
+
+**Migration versions follow execution order, and must keep doing so.** Flyway's `outOfOrder` is not set
+in `application.yml`, so it defaults to false: once a higher version is applied, a lower one added later
+fails at boot. US4 ships before US5, so US4 takes `V17` and US5 takes `V18` — not the reverse, however
+tempting it is to number them by story. If these stories are staffed in parallel, whoever merges second
+takes the next free version and updates this table; do not reserve a number ahead of a merge.
 
 ## Complexity Tracking
 

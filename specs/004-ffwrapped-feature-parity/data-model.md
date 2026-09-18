@@ -11,6 +11,11 @@ Two principles govern everything below, both from [research.md](research.md):
    rows exist, not whether a column is populated (R6), so every new per-week column ships with a gate
    change and a counted backfill in the same task.
 
+**Version numbers below follow execution order, not story order.** Flyway's `outOfOrder` is unset and
+therefore false, so a lower version added after a higher one has been applied fails at boot. US4 ships
+in phase 6 and takes `V17`; US5 ships in phase 7 and takes `V18`. Numbering these by story number
+instead would put `V17` after `V18` on disk and break the next startup.
+
 ---
 
 ## Existing tables this feature reads
@@ -46,7 +51,7 @@ The stored simulation snapshot. Extended in US4; never recomputed on read.
 
 ## New storage
 
-### US4 — `V18__playoff_odds_distributions.sql`
+### US4 — `V17__playoff_odds_distributions.sql`
 
 The simulator already computes these distributions over its 10,000 seasons and discards them at
 serialization (R8). This adds somewhere to keep them.
@@ -60,7 +65,7 @@ Written on the same commissioner recompute that already writes the snapshot. No 
 page-load computation, and the existing refusal for divisions / non-default `playoff_seed_type` is
 untouched (FR-009).
 
-### US5 — `V17__roster_week_starters.sql`
+### US5 — `V18__roster_week_starters.sql`
 
 | Column | Type | Notes |
 |---|---|---|
