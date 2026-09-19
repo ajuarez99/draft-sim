@@ -327,6 +327,51 @@ transaction log for those weeks.
 - [X] T124 Run the full `quickstart.md` validation end to end and confirm every expected result
 
 ---
+## Phase 10: Gap closure (added 2026-09-18 by a `/speckit-tasks` gap check)
+
+**Why this phase exists**: Phases 1–9 are marked complete and PR #4 is merged to `main` (`d3e2742`). A
+measured pass over the running tree, database and deployed code found six items that the live system
+does not bear out. Each task below names the measurement that found it, so it can be re-measured rather
+than re-argued.
+
+**Measured baseline, 2026-09-18**: backend `488 tests, 0 failures, 0 skipped` (read from
+`backend/build/test-results/test/*.xml`, not from `BUILD SUCCESSFUL`); frontend `42 files, 441 tests,
+all passing`. Both suites are genuinely green. **Every gap below is a gap in what was wired or run, not
+in what was tested** — which is why a green suite did not catch any of them.
+
+**Confirmed NOT gaps** (measured, recorded so they are not re-investigated): `startingLineup` has no
+throwing implementations left; V17/V18/V19 are all applied; all four pages exist with explicit
+`sports: ['nfl', 'nba']` rows in `destinations.ts`; and SC-002 is proven live — NBA league
+`1229352720222134272` returns real Roster Management numbers over 21 scored weeks
+(`totalPoints: 5339.5`, `potentialPoints: 5547.0`, `weeksExcluded: []`) through the same endpoint as
+football.
+
+### Transactions (US6) — the largest gap
+
+The pipeline works, but nothing calls it automatically, so five of six leagues have no transactions and
+no trade has ever been stored.
+
+- [X] T125 [US6] Call `transactions.ingest(sleeperLeagueId)` from the chain walk in `backend/src/main/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestService.java:57`, after `ingestStandings` populates `roster_season` (the transaction ingest reads it to map a roster id to its manager). **Placed here rather than in `IngestController`'s `/all` as this task first proposed**: `/all` ingests players, the league/draft chain, ADP, the board and profiles, and no week-level data at all — weekly points already arrive through this service, and transactions are week-level data on the same chain and the same cadence. This is also what plan.md's file map specified (`LeagueHistoryIngestService.java — US6: call transactions`). `Result` gains a fifth component, `transactionsIngested`, so the endpoint's own response reports the count (US6.1)
+- [X] T126 [US6] Added `theChainWalkIngestsTransactionsForEverySeason` to `backend/src/test/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestServiceTest.java`, asserting the walk calls the transaction ingest once per season **by that season's own league id** and sums the counts into the result. Confirmed to be a real guard, not decoration: with the T125 call removed the test fails, with it restored it passes. Suite after the change: `489 tests, 0 failures, 0 skipped`
+- [ ] T127 [US6] Ingest transactions for the five leagues that have none (`1141438340626231296`, `1229352720222134272`, `1254190892974084096`, `1262506916429430784`, `1389361939561332736`) and record the per-league counts — measured 2026-09-18, `league_transaction` holds 16 rows, all from `1346366555759341568`: 10 `FREE_AGENT`, 4 `WAIVER/complete`, 2 `WAIVER/failed`
+- [ ] T128 [US6] Verify US6.5 on real NBA data: ingest transactions for NBA league `1229352720222134272` and confirm through `GET /api/leagues/1229352720222134272/transactions` that positional grading resolves through basketball's positions — the sport-agnostic claim is currently carried by a unit test in `backend/src/test/java/com/ballknowers/draftsim/engine/TransactionAnalysisServiceTest.java` and by no real NBA row
+- [ ] T129 [US6] Verify US6.3 against a real trade: `select count(*) from league_transaction where type = 'TRADE'` returns **0** league-wide, so the trade section, each side's post-trade positional rank and `rankDirection: "LOWER_IS_BETTER"` have never rendered from stored data — only the US6.4 empty-trades path has. Ingest a season known to contain trades (the 2025 leagues are the candidates) and confirm the section renders in `web/src/pages/RosterManagement.tsx`
+
+### Weekly Report starters backfill (US5)
+
+- [ ] T130 [US5] Backfill `roster_week_points.starters` for the two NFL leagues where it is entirely null — `1262506916429430784` (216 of 216 rows null, weeks 1–18, season 2025) and `1389361939561332736` (14 of 14 null, week 1, season 2026) — by re-running the weekly-points ingest, then verify with `select count(*) filter (where starters is not null) from roster_week_points`, **counting populated rows rather than trusting the build result**. Measured 2026-09-18: 756 of 986 rows populated, so 230 remain. This is plan.md Risk 2 (FR-010) recurring: the backfill T084 verified covered only the leagues it re-ingested
+- [ ] T131 [US5] If Sleeper no longer returns `starters` for those settled weeks, record that finding under R6 in `specs/004-ffwrapped-feature-parity/research.md` and confirm `web/src/pages/WeeklyReport.tsx` shows `awardsOmitted` with `"reason": "STARTERS_NOT_STORED"` for every week of those two leagues (US5.4) — an award that silently disappears for a whole season is the failure this story exists to prevent
+
+### Season Forecast (US4)
+
+- [ ] T132 [US4] Compute playoff odds for both NBA leagues via the existing commissioner recompute, then confirm `GET /api/leagues/1229352720222134272/forecast` returns `available: true` — it returns `{"available": false, "reason": "NOT_COMPUTED"}` today despite 21 scored weeks, so US4.5 ("an NBA league ... forecasts") is satisfied by test fixtures and by no real simulation. `playoff_odds` holds 3 snapshots, all NFL
+- [ ] T133 [US4] Resolve the unreachable `NO_DISTRIBUTIONS` refusal: it is declared in `backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsService.java:248`, typed in `web/src/api.ts:1331` and rendered in `web/src/pages/SeasonForecast.tsx:126`, but `grep -rn "NO_DISTRIBUTIONS" backend/src/main/java/` shows it is **emitted nowhere**. Either emit it, or delete all three declarations — a refusal reason that three files agree on and no code path produces is the "one declaration per rule" convention failing quietly. Note the genuinely-partial case is already handled correctly and differently: pre-V17 snapshot `1254190892974084096` returns `available: true` with `winRange: {p10: null, p90: null}`, `averageSeed: null`, `seedOdds: {}`, and the page degrades per field ("no distribution stored", "—"), which is covered by `web/src/pages/SeasonForecast.test.tsx:95`
+
+### Phase 10 verification
+
+- [ ] T134 Re-run both suites and confirm the backend skip count is still **0**, reading `backend/build/test-results/test/*.xml` rather than the build result, and re-measure the four counts this phase is keyed on: populated `starters` rows, `league_transaction` rows by type, `TRADE` count, and NBA forecast availability
+
+---
 
 ## Dependencies & Execution Order
 
