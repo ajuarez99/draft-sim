@@ -103,28 +103,28 @@ team named. Ships without US2 and is useful alone.
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T017 [P] [US1] Test that the per-game ingest is **idempotent on the natural key** — a second run over the same season inserts no rows and leaves the count unchanged — in `backend/src/test/java/com/ballknowers/draftsim/ingest/PlayerGameIngestServiceTest.java`
-- [ ] T018 [P] [US1] Test that a game's week comes from the entry's own `week` field and is **never derived from `game_date`** (research R6, which also settles the spec's postponed-game edge case), in `PlayerGameIngestServiceTest.java`
-- [ ] T019 [P] [US1] Test that a player whose fetch fails increments `playersFailed` and leaves every other player's rows stored, in `PlayerGameIngestServiceTest.java`
-- [ ] T020 [P] [US1] Test that every `bestNights` entry's points equal **one game's** league-scored value and no entry is a sum, using a fixture where a player played more than once, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportBestNightsTest.java`
-- [ ] T021 [P] [US1] Test the ordering rule from data-model.md verbatim — points descending, then `sleeper_player_id` ascending, then `game_id` ascending — and that two assemblies of the same week produce identical orderings including on exact ties (FR-009), in `WeeklyReportBestNightsTest.java`
-- [ ] T022 [P] [US1] Test that when per-game detail is missing, `sectionsUnavailable` carries `{"section": "BEST_NIGHTS", "reason": ...}` and the array is **empty rather than populated from the stored single-game value** (FR-006), in `WeeklyReportBestNightsTest.java`
-- [ ] T023 [P] [US1] Contract test for `GET /api/leagues/{sleeperId}/weekly-report/{week}` asserting the basketball shape in contracts/weekly-report-sections.md — `bestNights` present, `topPerformers` **absent**, `playersPlayMultiplePerPeriod: true` — in `backend/src/test/java/com/ballknowers/draftsim/api/WeeklyReportControllerIT.java`
-- [ ] T024 [P] [US1] Contract test that two successive reads of the same week make **no upstream calls** (FR-008), in `WeeklyReportControllerIT.java`
+- [X] T017 [P] [US1] Split across two levels, deliberately. The walk issuing the same upserts on a re-run is pinned with a mock in `PlayerGameIngestServiceTest`; those upserts **collapsing into one row** is a property of `unique (sleeper_player_id, game_id)` and only Postgres can be asked, so it is asserted in `backend/src/test/java/com/ballknowers/draftsim/store/PlayerGameRepositoryIT.java` — which also pins that the upsert **overwrites**, since an `on conflict do nothing` would pass a row count and silently freeze a corrected stat line. Verified live too: a second backfill left 19,428 rows at 19,428
+- [X] T018 [P] [US1] Test that a game's week comes from the entry's own `week` field and is **never derived from `game_date`** (research R6, which also settles the spec's postponed-game edge case), in `PlayerGameIngestServiceTest.java`
+- [X] T019 [P] [US1] `oneFailingPlayerIsCountedAndTheRestAreStillStored` in `PlayerGameIngestServiceTest.java` — one player throwing leaves the other's rows stored and increments `playersFailed`. Live, both backfills reported `playersFailed: 0` across 611 players
+- [X] T020 [P] [US1] Test that every `bestNights` entry's points equal **one game's** league-scored value and no entry is a sum, using a fixture where a player played more than once, in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportBestNightsTest.java`
+- [X] T021 [P] [US1] Test the ordering rule from data-model.md verbatim — points descending, then `sleeper_player_id` ascending, then `game_id` ascending — and that two assemblies of the same week produce identical orderings including on exact ties (FR-009), in `WeeklyReportBestNightsTest.java`
+- [X] T022 [P] [US1] Test that when per-game detail is missing, `sectionsUnavailable` carries `{"section": "BEST_NIGHTS", "reason": ...}` and the array is **empty rather than populated from the stored single-game value** (FR-006), in `WeeklyReportBestNightsTest.java`
+- [X] T023 [P] [US1] `backend/src/test/java/com/ballknowers/draftsim/api/WeeklyReportShapeTest.java`, 8 assertions over the contract's shape rules. **This test exists because live verification found a bug the whole suite missed** — see T035
+- [X] T024 [P] [US1] Asserted **structurally** rather than by counting calls, in `NoSportNameInWeeklyReportTest.theWeeklyReportServiceHoldsNoUpstreamClient`: the service holds no upstream client, so no page load *can* fetch. A future edit that injects one fails the test rather than quietly adding a round trip to every render
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Create `PlayerGameIngestService` in `backend/src/main/java/com/ballknowers/draftsim/ingest/PlayerGameIngestService.java` walking the players that appear in a league-season's stored `players_points` and fetching each player's whole season in **one call** (research R1), upserting through `PlayerGameRepository`
-- [ ] T026 [US1] In `PlayerGameIngestService`, return `{playersWalked, gamesStored, playersFailed}` rather than only logging — the count is how anyone running a backfill learns whether it worked, the argument feature 004's `transactionsIngested` settled
-- [ ] T027 [US1] Add `POST /api/ingest/player-games/{sleeperLeagueId}?season={season}` to `backend/src/main/java/com/ballknowers/draftsim/api/IngestController.java`, exposing the backfill as its own endpoint
-- [ ] T028 [US1] **Do not** call `PlayerGameIngestService` from `backend/src/main/java/com/ballknowers/draftsim/ingest/LeagueHistoryIngestService.java` — ~331 calls per league-season do not belong in a routine per-league ingest. This is the deliberate opposite of the transactions decision in 004; add a comment at the chain walk recording why, so the next reader does not "fix" the inconsistency
-- [ ] T029 [US1] Assemble `bestNights` in `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` from `PlayerGameRepository` rows scored through `GameScoringService`, attributing the owning team from `roster_week_points` exactly as `topPerformers` already does
-- [ ] T030 [US1] In `WeeklyReportService`, emit `basis: "ALL_GAMES_PLAYED"` as a **required, never-defaulted** field on the basketball shape — the page's FR-005 disclosure is driven by it rather than by prose hardcoded in a component
-- [ ] T031 [US1] Emit `sectionsUnavailable` from `WeeklyReportService` as `{section, reason}` where `section` is one of `BEST_NIGHTS`, `BEST_WEEK` and `reason` is a discriminator rather than a sentence, so the reader-facing words can change without a contract change
-- [ ] T032 [US1] Add the response types for `bestNights`, `basis`, `sectionsUnavailable` and `playersPlayMultiplePerPeriod` to `web/src/api.ts`, leaving the existing `topPerformers` type in place
-- [ ] T033 [US1] Render the Best Nights section in `web/src/pages/WeeklyReport.tsx` with each entry's exact value beside the name (FR-007), the date and the opponent, and a row rendered as unknown rather than guessed when `opponent` is null
-- [ ] T034 [P] [US1] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering a populated Best Nights section, a null `opponent`, and a `sectionsUnavailable` entry rendering its reason rather than an empty list
-- [ ] T035 [US1] Verify live per quickstart.md 1a–1d: backfill league `1229352720222134272` season 2025 (expect `playersWalked` near **331**, `playersFailed` **0**), re-run it and confirm the row count is unchanged, then confirm Jokić appears at **58.5 on 2025-11-17 vs CHI** and that **182.0 does not appear in `bestNights`**
+- [X] T025 [US1] Create `PlayerGameIngestService` in `backend/src/main/java/com/ballknowers/draftsim/ingest/PlayerGameIngestService.java` walking the players that appear in a league-season's stored `players_points` and fetching each player's whole season in **one call** (research R1), upserting through `PlayerGameRepository`
+- [X] T026 [US1] In `PlayerGameIngestService`, return `{playersWalked, gamesStored, playersFailed}` rather than only logging — the count is how anyone running a backfill learns whether it worked, the argument feature 004's `transactionsIngested` settled
+- [X] T027 [US1] Add `POST /api/ingest/player-games/{sleeperLeagueId}?season={season}` to `backend/src/main/java/com/ballknowers/draftsim/api/IngestController.java`, exposing the backfill as its own endpoint
+- [X] T028 [US1] Confirmed **not** called from `LeagueHistoryIngestService`, with a comment at the chain walk recording why the inconsistency with the transactions call above it is deliberate: transactions ride that walk's own cadence, 331 per-player calls do not. Its own endpoint instead
+- [X] T029 [US1] Assemble `bestNights` in `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` from `PlayerGameRepository` rows scored through `GameScoringService`, attributing the owning team from `roster_week_points` exactly as `topPerformers` already does
+- [X] T030 [US1] In `WeeklyReportService`, emit `basis: "ALL_GAMES_PLAYED"` as a **required, never-defaulted** field on the basketball shape — the page's FR-005 disclosure is driven by it rather than by prose hardcoded in a component
+- [X] T031 [US1] Emit `sectionsUnavailable` from `WeeklyReportService` as `{section, reason}` where `section` is one of `BEST_NIGHTS`, `BEST_WEEK` and `reason` is a discriminator rather than a sentence, so the reader-facing words can change without a contract change
+- [X] T032 [US1] Add the response types for `bestNights`, `basis`, `sectionsUnavailable` and `playersPlayMultiplePerPeriod` to `web/src/api.ts`, leaving the existing `topPerformers` type in place
+- [X] T033 [US1] Render the Best Nights section in `web/src/pages/WeeklyReport.tsx` with each entry's exact value beside the name (FR-007), the date and the opponent, and a row rendered as unknown rather than guessed when `opponent` is null
+- [X] T034 [P] [US1] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering a populated Best Nights section, a null `opponent`, and a `sectionsUnavailable` entry rendering its reason rather than an empty list
+- [X] T035 [US1] Verified live on a second instance (port 8200, so the shared :8080 server other sessions use was left alone). Backfill: **331 players walked, 19,428 games stored, 0 failed, in 75s** — matching research R2's predicted 331 exactly. Re-run: identical 19,428 rows, so the natural key holds. Jokić reads **58.50 on 2025-11-17 vs CHI**, and **182.0 never appears among the nights**. **This step found a real bug**: `playersPlayMultiplePerPeriod` was absent from every response and the basketball path would have thrown on a null `topPerformers`, because the controller hand-builds its map and the service's `@JsonInclude` was decorative. 522 tests were green throughout. Fixed, and T023 now pins it
 
 **Checkpoint**: Best Nights renders from real data with real nights; US1 is independently demoable.
 
@@ -143,19 +143,19 @@ different aggregation of the same rows.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T036 [P] [US2] Test that each `bestWeek` entry's `totalPoints` equals the sum of that player's games for the week and `gamesPlayed` equals their count (SC-003), in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportBestWeekTest.java`
-- [ ] T037 [P] [US2] Test that a player who played **zero games** in the week is **absent from both arrays** — never present with `totalPoints: 0` or `gamesPlayed: 0` (a spec edge case), in `WeeklyReportBestWeekTest.java`
-- [ ] T038 [P] [US2] Test that a week whose per-game detail is incomplete marks `complete` false and takes the `sectionsUnavailable` path with `{"section": "BEST_WEEK", "reason": "PER_GAME_DETAIL_MISSING"}` rather than reporting a quiet undercount (FR-006), in `WeeklyReportBestWeekTest.java`
-- [ ] T039 [P] [US2] Test that the two rankings are **distinct lists** for a fixture week where they differ, so neither can be mistaken for the other (FR-003), in `WeeklyReportBestWeekTest.java`
+- [X] T036 [P] [US2] Test that each `bestWeek` entry's `totalPoints` equals the sum of that player's games for the week and `gamesPlayed` equals their count (SC-003), in `backend/src/test/java/com/ballknowers/draftsim/engine/WeeklyReportBestWeekTest.java`
+- [X] T037 [P] [US2] Test that a player who played **zero games** in the week is **absent from both arrays** — never present with `totalPoints: 0` or `gamesPlayed: 0` (a spec edge case), in `WeeklyReportBestWeekTest.java`
+- [X] T038 [P] [US2] Test that a week whose per-game detail is incomplete marks `complete` false and takes the `sectionsUnavailable` path with `{"section": "BEST_WEEK", "reason": "PER_GAME_DETAIL_MISSING"}` rather than reporting a quiet undercount (FR-006), in `WeeklyReportBestWeekTest.java`
+- [X] T039 [P] [US2] Test that the two rankings are **distinct lists** for a fixture week where they differ, so neither can be mistaken for the other (FR-003), in `WeeklyReportBestWeekTest.java`
 
 ### Implementation for User Story 2
 
-- [ ] T040 [US2] Add the player-week aggregation to `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java`: group the week's game rows by player, sum the league-scored values, and carry `gamesPlayed` and `complete` alongside the total
-- [ ] T041 [US2] Emit `bestWeek` from `WeeklyReportService` ordered by `totalPoints` descending then `sleeper_player_id` ascending, and **omit** `topPerformers` on the basketball shape so three overlapping rankings never appear on one page
-- [ ] T042 [US2] Add the `bestWeek` response type to `web/src/api.ts` with `totalPoints` and `gamesPlayed`
-- [ ] T043 [US2] Render the Best Week section beside Best Nights in `web/src/pages/WeeklyReport.tsx`, showing **the number of games each total covers** next to the total so the figure is never read without its denominator, and stating from `basis` that these are real-world production rather than points that decided a matchup (FR-005)
-- [ ] T044 [P] [US2] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering the populated pair, the games-played label, the FR-005 disclosure being present, and a `BEST_WEEK` entry in `sectionsUnavailable`
-- [ ] T045 [US2] Verify live per quickstart.md 2a–2d: Jokić week 5 totals **182.0 across 4 games**, the two top-threes differ for at least one week (SC-002), `basis` is `ALL_GAMES_PLAYED`, and a rostered player who played no games appears in neither array
+- [X] T040 [US2] Add the player-week aggregation to `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java`: group the week's game rows by player, sum the league-scored values, and carry `gamesPlayed` and `complete` alongside the total
+- [X] T041 [US2] Emit `bestWeek` from `WeeklyReportService` ordered by `totalPoints` descending then `sleeper_player_id` ascending, and **omit** `topPerformers` on the basketball shape so three overlapping rankings never appear on one page
+- [X] T042 [US2] Add the `bestWeek` response type to `web/src/api.ts` with `totalPoints` and `gamesPlayed`
+- [X] T043 [US2] Render the Best Week section beside Best Nights in `web/src/pages/WeeklyReport.tsx`, showing **the number of games each total covers** next to the total so the figure is never read without its denominator, and stating from `basis` that these are real-world production rather than points that decided a matchup (FR-005)
+- [X] T044 [P] [US2] Add frontend tests in `web/src/pages/WeeklyReport.test.tsx` covering the populated pair, the games-played label, the FR-005 disclosure being present, and a `BEST_WEEK` entry in `sectionsUnavailable`
+- [X] T045 [US2] Verified live: Jokić **182.00 across 4 games**, cross-checked in SQL against the sum of his stored games (182.00) and Harden's (121.00). `basis` is `ALL_GAMES_PLAYED`. **SC-002 holds visibly** — Jalen Johnson and Josh Giddey top Best Week without appearing among the nights at all, and on the 2024 league Giannis tops the week while LaMelo Ball tops the nights
 
 **Checkpoint**: The pair renders, disagrees usefully, and says what the bigger number means.
 
@@ -171,12 +171,12 @@ carries `topPerformers`, carries neither new array, and the page looks as it did
 
 **Depends on**: Foundational (the cadence rule). Can otherwise run in parallel with US1 and US2.
 
-- [ ] T046 [P] [US3] Contract test asserting football's response shape is **unchanged** — `topPerformers` present, `bestNights` and `bestWeek` **absent rather than empty**, `playersPlayMultiplePerPeriod: false` (SC-004) — in `backend/src/test/java/com/ballknowers/draftsim/api/WeeklyReportControllerIT.java`
-- [ ] T047 [US3] Ensure `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` selects the form through the `SportRules` cadence rule and that the two shapes are mutually exclusive — `topPerformers` **or** the pair, never both (contract assertions 1 and 2)
-- [ ] T048 [US3] Branch the rendering in `web/src/pages/WeeklyReport.tsx` on `playersPlayMultiplePerPeriod` from the response rather than inferring the sport from which arrays happen to be populated
-- [ ] T049 [P] [US3] Add a frontend test in `web/src/pages/WeeklyReport.test.tsx` asserting that a football payload renders today's Top performers list and neither new section
-- [ ] T050 [US3] Add the sport-name guard as a test rather than a convention: assert no sport literal appears in `WeeklyReportService.java` or `WeeklyReport.tsx` (FR-004). A grep in a test is ugly; three shipped instances of this defect class in this repo are uglier
-- [ ] T051 [US3] Verify live per quickstart.md Story 3 that `GET /api/leagues/1346366555759341568/weekly-report/1` carries `topPerformers` and neither new array, and that the NFL Weekly Report page is visually unchanged in a browser
+- [X] T046 [P] [US3] In `WeeklyReportShapeTest`: football carries `topPerformers`, carries `bestNights` and `bestWeek` **absent rather than empty**, and states `playersPlayMultiplePerPeriod: false`
+- [X] T047 [US3] Ensure `backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java` selects the form through the `SportRules` cadence rule and that the two shapes are mutually exclusive — `topPerformers` **or** the pair, never both (contract assertions 1 and 2)
+- [X] T048 [US3] Branch the rendering in `web/src/pages/WeeklyReport.tsx` on `playersPlayMultiplePerPeriod` from the response rather than inferring the sport from which arrays happen to be populated
+- [X] T049 [P] [US3] Add a frontend test in `web/src/pages/WeeklyReport.test.tsx` asserting that a football payload renders today's Top performers list and neither new section
+- [X] T050 [US3] Two guards, one per side: `backend/src/test/java/com/ballknowers/draftsim/engine/NoSportNameInWeeklyReportTest.java` and a block in `web/src/pages/WeeklyReport.test.tsx` reading the page source via `?raw`, the way `destinations.test.ts` reads `App.tsx`. Both skip comments, so the reasoning may still name the sports it reasons about
+- [X] T051 [US3] Verified live: `GET /api/leagues/1346366555759341568/weekly-report/1` returns `playersPlayMultiplePerPeriod: false`, `topPerformers` with 10 entries, and neither new key. Not yet checked by eye in a browser — recorded as owed in HANDOFF.md
 
 **Checkpoint**: Football provably untouched; all three stories independently verified.
 
@@ -184,14 +184,14 @@ carries `topPerformers`, carries neither new array, and the page looks as it did
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T052 Run the full backend suite and confirm the skip count is **0** by reading `backend/build/test-results/test/*.xml`, not the build result; the total must exceed the 489 baseline by the tests this feature added
-- [ ] T053 [P] Run the full frontend suite (`cd web && npm test`) and `npx tsc --noEmit`, both clean
-- [ ] T054 [P] Backfill the second NBA league `1141438340626231296` season 2024 (expect ~**280** players per research R2) and confirm Best Nights renders for one of its scored weeks
-- [ ] T055 [P] Confirm ordering determinism live per quickstart.md: two successive requests for the same week return identical `bestNights` player-id sequences (SC-006, FR-009)
-- [ ] T056 [P] Update `README.md`'s "Built so far" section with the pair and the basketball-only scope
-- [ ] T057 [P] Update `HANDOFF.md` with current state, what is verified live versus only by test, and the per-game backfill's cost so the next reader does not run it casually
-- [ ] T058 Record in `specs/005-daily-weekly-top-players/research.md` the T004 outcome and anything the second league revealed that the first did not
-- [ ] T059 Run the full `quickstart.md` validation end to end and confirm every expected result
+- [X] T052 Backend **530 tests, 0 failures, 0 skipped**, read from `backend/build/test-results/test/*.xml` rather than the build result. Baseline entering the feature was 489, so this added 41
+- [X] T053 [P] Run the full frontend suite (`cd web && npm test`) and `npx tsc --noEmit`, both clean
+- [X] T054 [P] Backfilled `1141438340626231296` season 2024: **280 players, 16,909 games, 0 failed** — again matching R2's predicted 280. Best Nights renders for its week 5, and its scoring genuinely differs from the 2025 league, so this exercises the generic sum rather than repeating it. Jokić's 44.50 there matches the value T004 measured
+- [X] T055 [P] Two successive reads of week 5 returned byte-identical `bestNights` orderings (`1658@2025-11-17, 2126@2025-11-20, 2181@2025-11-19, 1240@2025-11-22, 1658@2025-11-22`), including the same player holding two rows
+- [X] T056 [P] Update `README.md`'s "Built so far" section with the pair and the basketball-only scope
+- [X] T057 [P] Update `HANDOFF.md` with current state, what is verified live versus only by test, and the per-game backfill's cost so the next reader does not run it casually
+- [X] T058 Recorded in `research.md` risk 4: T004 closed it, and the outcome was stronger than a repeat because the 2024 league's scoring differs (`dd` 1.0 vs 2.0, `td` 2.0 vs 3.0, no assist or rebound bonuses). One generic key-by-key sum reproduced both leagues
+- [X] T059 Ran `quickstart.md` end to end, 2026-09-19. Every expected result held: backfill counts (331/280 players, 0 failed), idempotency (19,428 rows unchanged on re-run), Jokić 58.50 on 2025-11-17 vs CHI, 182.0 absent from the nights, week totals reconciled in SQL, the two rankings disagreeing, football's shape unchanged, and the literal grep for a sport name in `WeeklyReportService.java` and `WeeklyReport.tsx` returning nothing. Final: backend **531 tests, 0 failures, 0 skipped**; frontend **42 files, 451 tests**; `tsc --noEmit` clean. One number worth knowing: 330 of 331 and 278 of 280 walked players have stored games — the remainder played no games that season, which is a real absence rather than a failed fetch (`playersFailed` was 0 both times). **Not done: a browser pass.** Every page check was through the API
 
 ---
 

@@ -2,7 +2,6 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.*;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
@@ -109,12 +108,11 @@ public class WeeklyReportService {
      * Carries EITHER {@code topPerformers} OR the {@code bestNights}/{@code bestWeek}
      * pair, never both -- decided by the sport's own cadence rule.
      *
-     * <p>{@code NON_NULL} so the inapplicable shape is <b>absent</b> rather than
-     * null. An empty array would say "we looked and there were none"; absence
-     * says "this measure does not apply to this sport", and a reader can tell
-     * those apart.
+     * <p>A null side means "this measure does not apply to this sport", and
+     * {@code WeeklyReportController} leaves it out of the response entirely
+     * rather than sending null or an empty array. An empty array would say "we
+     * looked and there were none", which is a different claim.
      */
-    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Result(boolean available, String reason, int season, Integer requestedSeason,
                          int week, Sport sport, boolean playersPlayMultiplePerPeriod,
                          List<Matchup> matchups, List<Performer> topPerformers,

@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.store.PlayerGameRepository;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -124,5 +125,89 @@ class PlayerGameIngestServiceTest {
         assertNotNull(r);
         assertNull(r.opponent());
         assertNull(r.isAway(), "unknown must stay unknown rather than defaulting to home");
+    }
+
+    // ---- the walk itself, with the upstream client mocked (T017/T019) ----
+
+    /**
+     * T019. One player's failure must not cost the other 330, and must not pass
+     * silently either -- a partial backfill that reports success is how feature
+     * 004 ended up with five leagues holding nothing while the suite was green.
+     */
+    @Test
+    void oneFailingPlayerIsCountedAndTheRestAreStillStored() {
+        var stats = org.mockito.Mockito.mock(SleeperPlayerStatsClient.class);
+        var leagues = org.mockito.Mockito.mock(com.ballknowers.draftsim.store.LeagueRepository.class);
+        var weekPoints = org.mockito.Mockito.mock(
+                com.ballknowers.draftsim.store.RosterWeekPointsRepository.class);
+        var games = org.mockito.Mockito.mock(PlayerGameRepository.class);
+
+        org.mockito.Mockito.when(leagues.bySleeperId("L1")).thenReturn(java.util.Optional.of(
+                new com.ballknowers.draftsim.store.LeagueRepository.LeagueRow(
+                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null)));
+        org.mockito.Mockito.when(weekPoints.breakdownsFor(7L, 2025)).thenReturn(List.of(
+                new com.ballknowers.draftsim.store.RosterWeekPointsRepository.WeekBreakdown(
+                        5, 3, 269.0, "{\"good\":58.5,\"bad\":10.0}", null)));
+
+        org.mockito.Mockito.when(stats.seasonByWeek("nba", "good", 2025))
+                .thenReturn(Map.of("5", List.of(fullEntry())));
+        org.mockito.Mockito.when(stats.seasonByWeek("nba", "bad", 2025))
+                .thenThrow(new RuntimeException("upstream said no"));
+
+        var service = new PlayerGameIngestService(stats, leagues, weekPoints, games);
+        PlayerGameIngestService.Result r = service.ingest("L1", 2025);
+
+        assertEquals(2, r.playersWalked());
+        assertEquals(1, r.gamesStored(), "the healthy player's game still landed");
+        assertEquals(1, r.playersFailed(), "the failure is reported, not swallowed");
+        org.mockito.Mockito.verify(games, org.mockito.Mockito.times(1))
+                .upsert(org.mockito.ArgumentMatchers.any());
+    }
+
+    /**
+     * T017's half that does not need a database: re-running the walk issues the
+     * same upserts rather than accumulating. The natural key turning those into
+     * one row is asserted against real Postgres in
+     * {@code PlayerGameRepositoryIT}.
+     */
+    @Test
+    void reRunningTheWalkIssuesTheSameUpsertsRatherThanMore() {
+        var stats = org.mockito.Mockito.mock(SleeperPlayerStatsClient.class);
+        var leagues = org.mockito.Mockito.mock(com.ballknowers.draftsim.store.LeagueRepository.class);
+        var weekPoints = org.mockito.Mockito.mock(
+                com.ballknowers.draftsim.store.RosterWeekPointsRepository.class);
+        var games = org.mockito.Mockito.mock(PlayerGameRepository.class);
+
+        org.mockito.Mockito.when(leagues.bySleeperId("L1")).thenReturn(java.util.Optional.of(
+                new com.ballknowers.draftsim.store.LeagueRepository.LeagueRow(
+                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null)));
+        org.mockito.Mockito.when(weekPoints.breakdownsFor(7L, 2025)).thenReturn(List.of(
+                new com.ballknowers.draftsim.store.RosterWeekPointsRepository.WeekBreakdown(
+                        5, 3, 269.0, "{\"1658\":58.5}", null)));
+        org.mockito.Mockito.when(stats.seasonByWeek("nba", "1658", 2025))
+                .thenReturn(Map.of("5", List.of(fullEntry())));
+
+        var service = new PlayerGameIngestService(stats, leagues, weekPoints, games);
+        PlayerGameIngestService.Result first = service.ingest("L1", 2025);
+        PlayerGameIngestService.Result second = service.ingest("L1", 2025);
+
+        assertEquals(first, second, "a second walk must report the same work, not more");
+        assertEquals(1, first.gamesStored());
+    }
+
+    /** A league this app has never ingested is a no-op, not a crash. */
+    @Test
+    void anUnknownLeagueWalksNothing() {
+        var stats = org.mockito.Mockito.mock(SleeperPlayerStatsClient.class);
+        var leagues = org.mockito.Mockito.mock(com.ballknowers.draftsim.store.LeagueRepository.class);
+        var weekPoints = org.mockito.Mockito.mock(
+                com.ballknowers.draftsim.store.RosterWeekPointsRepository.class);
+        var games = org.mockito.Mockito.mock(PlayerGameRepository.class);
+        org.mockito.Mockito.when(leagues.bySleeperId("nope")).thenReturn(java.util.Optional.empty());
+
+        var r = new PlayerGameIngestService(stats, leagues, weekPoints, games).ingest("nope", 2025);
+
+        assertEquals(new PlayerGameIngestService.Result(0, 0, 0), r);
+        org.mockito.Mockito.verifyNoInteractions(stats, games);
     }
 }

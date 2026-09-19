@@ -72,4 +72,30 @@ class NoSportNameInWeeklyReportTest {
         assertTrue(offendingLines(f).isEmpty(),
                 "GameScoringService must score from the league's scoring_json, not from a sport name");
     }
+
+    /**
+     * FR-008, asserted structurally rather than by counting HTTP calls
+     * (specs/005-daily-weekly-top-players, T024).
+     *
+     * <p>"Nothing is fetched on a page load" is a property of what this service
+     * can reach, not of what it happened to do during one test. If it holds no
+     * upstream client, no page load can make an upstream call -- and a future
+     * edit that injects one fails here rather than quietly adding a network
+     * round trip to every render.
+     */
+    @Test
+    void theWeeklyReportServiceHoldsNoUpstreamClient() {
+        List<String> upstream = new ArrayList<>();
+        for (var ctor : WeeklyReportService.class.getDeclaredConstructors()) {
+            for (Class<?> p : ctor.getParameterTypes()) {
+                String n = p.getSimpleName();
+                if (n.startsWith("Sleeper") || n.endsWith("Client") || n.contains("Ffc")) {
+                    upstream.add(n);
+                }
+            }
+        }
+        assertTrue(upstream.isEmpty(),
+                "WeeklyReportService must read stored rows only; a page load cannot fetch. Found: "
+                        + upstream);
+    }
 }
