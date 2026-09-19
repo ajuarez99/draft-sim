@@ -129,23 +129,124 @@ export default function WeeklyReport() {
             )}
           </section>
 
-          <section className="panel">
-            <h3 className="cond">Top performers</h3>
-            <ol className="wr-performers">
-              {data.topPerformers.map((p) => (
-                <li key={p.playerId}>
-                  <span className="wr-pname">{p.playerName}</span>
-                  <span className="wr-ppos">{p.position}</span>
-                  <span className="wr-pteam muted">{p.teamName}</span>
-                  <span className="wr-ppts">{p.points.toFixed(2)}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
+          {data.playersPlayMultiplePerPeriod ? (
+            <Rankings data={data} />
+          ) : (
+            <section className="panel">
+              <h3 className="cond">Top performers</h3>
+              <ol className="wr-performers">
+                {(data.topPerformers ?? []).map((p) => (
+                  <li key={p.playerId}>
+                    <span className="wr-pname">{p.playerName}</span>
+                    <span className="wr-ppos">{p.position}</span>
+                    <span className="wr-pteam muted">{p.teamName}</span>
+                    <span className="wr-ppts">{p.points.toFixed(2)}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
         </>
       )}
     </div>
   )
+}
+
+/**
+ * The pair, for sports whose players play more than once in a scoring period.
+ *
+ * Two rankings of the same week that answer different questions: the biggest
+ * single night, and the biggest whole week. They disagree often -- a player
+ * with four steady games can top the week without owning a single night --
+ * and that disagreement is the reason both are here.
+ */
+function Rankings({ data }: { data: Data }) {
+  const missing = (section: 'BEST_NIGHTS' | 'BEST_WEEK') =>
+    (data.sectionsUnavailable ?? []).find((s) => s.section === section)
+  const nights = data.bestNights ?? []
+  const weeks = data.bestWeek ?? []
+
+  return (
+    <div className="wr-rankings">
+      <section className="panel">
+        <h3 className="cond">Best nights</h3>
+        <p className="muted small">The biggest single games anyone rostered this week.</p>
+        {missing('BEST_NIGHTS') ? (
+          <Unavailable reason={missing('BEST_NIGHTS')!.reason} />
+        ) : (
+          <ol className="wr-performers">
+            {nights.map((p) => (
+              <li key={`${p.playerId}-${p.date}`}>
+                <span className="wr-pname">{p.playerName}</span>
+                <span className="wr-ppos">{p.position}</span>
+                <span className="wr-pteam muted">{p.teamName}</span>
+                <span className="wr-when muted">{whenLabel(p.date, p.opponent, p.isAway)}</span>
+                <span className="wr-ppts">{p.points.toFixed(2)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="panel">
+        <h3 className="cond">Best week</h3>
+        {/*
+          FR-005: this total counts every game the player played, including
+          games the league's scoring never counted. Driven by `basis` rather
+          than hardcoded, so the page cannot keep claiming it after the
+          server stops meaning it.
+        */}
+        {data.basis === 'ALL_GAMES_PLAYED' && (
+          <p className="muted small">
+            Every game played, added up — real production, not the points that decided a matchup.
+          </p>
+        )}
+        {missing('BEST_WEEK') ? (
+          <Unavailable reason={missing('BEST_WEEK')!.reason} />
+        ) : (
+          <ol className="wr-performers">
+            {weeks.map((p) => (
+              <li key={p.playerId}>
+                <span className="wr-pname">{p.playerName}</span>
+                <span className="wr-ppos">{p.position}</span>
+                <span className="wr-pteam muted">{p.teamName}</span>
+                {/* The denominator, always beside the total: 182.0 means
+                    nothing without knowing it covers four games. */}
+                <span className="wr-when muted">
+                  {p.gamesPlayed} {p.gamesPlayed === 1 ? 'game' : 'games'}
+                </span>
+                <span className="wr-ppts">{p.totalPoints.toFixed(2)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** A ranking that could not be filled says why, rather than rendering empty. */
+function Unavailable({ reason }: { reason: string }) {
+  return (
+    <p className="muted small">
+      {reason === 'PER_GAME_DETAIL_MISSING'
+        ? 'Game-by-game detail has not been stored for this week yet, so this ranking cannot be built. It is not that nobody played.'
+        : `This ranking is unavailable (${reason}).`}
+    </p>
+  )
+}
+
+/**
+ * "Nov 17 vs CHI". An unknown opponent shows the night alone rather than a
+ * guess -- the date is the fact, the opponent is the nicety.
+ */
+function whenLabel(date: string, opponent?: string | null, isAway?: boolean | null): string {
+  const d = new Date(`${date}T00:00:00`)
+  const day = Number.isNaN(d.getTime())
+    ? date
+    : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  if (!opponent) return day
+  return `${day} ${isAway ? '@' : 'vs'} ${opponent}`
 }
 
 function Game({ game }: { game: WeeklyMatchup }) {

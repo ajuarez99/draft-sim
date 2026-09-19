@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import java.sql.Array;
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -64,6 +66,37 @@ public class LeagueRepository {
         });
         if (id == null) throw new IllegalStateException("league upsert returned no id: " + sleeperId);
         return id;
+    }
+
+    /**
+     * The league's full scoring settings, category to multiplier
+     * (specs/005-daily-weekly-top-players).
+     *
+     * <p>A separate read rather than another field on {@link LeagueRow}, which
+     * is constructed on every league query in the app and derives only the one
+     * scoring value the draft board needs ({@code ppr}). Per-game scoring is
+     * asked for by one page for one sport; widening a record everybody builds
+     * to carry it would be the wrong trade.
+     *
+     * <p>Values arrive as numbers and are returned as doubles. A non-numeric
+     * entry is dropped rather than defaulted, because a scoring category whose
+     * multiplier cannot be read is not a zero -- it is a category this app does
+     * not understand, and silently scoring it as nothing would quietly change
+     * every total that depends on it.
+     */
+    public Map<String, Double> scoringOf(long leagueId) {
+        String json = db.sql("select scoring_json from league where id = ?")
+                .param(leagueId)
+                .query(String.class)
+                .optional()
+                .orElse(null);
+        if (json == null || json.isBlank()) return Map.of();
+
+        Map<String, Double> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> e : JsonUtil.readMap(json).entrySet()) {
+            if (e.getValue() instanceof Number n) out.put(e.getKey(), n.doubleValue());
+        }
+        return out;
     }
 
     public record LeagueRow(long id, Sport sport, String sleeperId, String name, int season,

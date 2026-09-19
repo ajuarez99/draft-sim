@@ -63,4 +63,81 @@ class WeeklyReportServiceTest {
         assertEquals(9, WeeklyReportService.startersOf(json).size(),
                 "basketball starts nine, and this is the shape Sleeper actually sent");
     }
+
+    // ---- specs/005-daily-weekly-top-players: the two ranking rules ----
+
+    private static WeeklyReportService.NightPerformance night(String id, double pts, String date) {
+        return new WeeklyReportService.NightPerformance(id, "P" + id, "C", "Team", pts,
+                java.time.LocalDate.parse(date), "CHI", false);
+    }
+
+    private static WeeklyReportService.PlayerWeek pweek(String id, double total, int games) {
+        return new WeeklyReportService.PlayerWeek(id, "P" + id, "C", "Team", total, games);
+    }
+
+    /** US1: highest single game first. */
+    @Test
+    void bestNightsRanksByPointsDescending() {
+        var ranked = WeeklyReportService.rankNights(java.util.List.of(
+                night("a", 34.0, "2025-11-19"),
+                night("b", 58.5, "2025-11-17"),
+                night("c", 44.0, "2025-11-21")), 5);
+
+        assertEquals(java.util.List.of("b", "c", "a"),
+                ranked.stream().map(WeeklyReportService.NightPerformance::playerId).toList());
+    }
+
+    /**
+     * FR-009. Half-point scoring makes exact ties ordinary, and an unstable
+     * order would reorder a finished week between two loads -- which reads as
+     * the data changing under the reader.
+     */
+    @Test
+    void bestNightsBreaksExactTiesDeterministically() {
+        var input = java.util.List.of(
+                night("zeta", 44.0, "2025-11-21"),
+                night("alpha", 44.0, "2025-11-22"),
+                night("alpha", 44.0, "2025-11-20"));
+
+        var first = WeeklyReportService.rankNights(input, 5);
+        var second = WeeklyReportService.rankNights(input, 5);
+
+        assertEquals(first, second, "two rankings of one week must not disagree");
+        // player id first, then date -- one player can hold two rows here.
+        assertEquals(java.util.List.of("alpha", "alpha", "zeta"),
+                first.stream().map(WeeklyReportService.NightPerformance::playerId).toList());
+        assertEquals("2025-11-20", first.get(0).date().toString());
+    }
+
+    @Test
+    void bestWeekRanksByTotalAndBreaksTiesByPlayer() {
+        var ranked = WeeklyReportService.rankWeeks(java.util.List.of(
+                pweek("zeta", 121.0, 4),
+                pweek("alpha", 182.0, 4),
+                pweek("mid", 121.0, 3)), 5);
+
+        assertEquals(java.util.List.of("alpha", "mid", "zeta"),
+                ranked.stream().map(WeeklyReportService.PlayerWeek::playerId).toList());
+        assertEquals(WeeklyReportService.rankWeeks(java.util.List.of(
+                pweek("zeta", 121.0, 4), pweek("alpha", 182.0, 4), pweek("mid", 121.0, 3)), 5), ranked);
+    }
+
+    /** Both rankings cut to the same length, so the pair stays visually balanced. */
+    @Test
+    void bothRankingsRespectTheLimit() {
+        var many = new java.util.ArrayList<WeeklyReportService.NightPerformance>();
+        for (int i = 0; i < 40; i++) many.add(night("p" + i, 60.0 - i, "2025-11-17"));
+        assertEquals(5, WeeklyReportService.rankNights(many, 5).size());
+
+        var manyWeeks = new java.util.ArrayList<WeeklyReportService.PlayerWeek>();
+        for (int i = 0; i < 40; i++) manyWeeks.add(pweek("p" + i, 200.0 - i, 4));
+        assertEquals(5, WeeklyReportService.rankWeeks(manyWeeks, 5).size());
+    }
+
+    /** An empty week ranks to empty rather than throwing on a page load. */
+    @Test
+    void emptyInputRanksToEmpty() {
+        assertTrue(WeeklyReportService.rankNights(java.util.List.of(), 5).isEmpty());
+        assertTrue(WeeklyReportService.rankWeeks(java.util.List.of(), 5).isEmpty());
+    }
 }

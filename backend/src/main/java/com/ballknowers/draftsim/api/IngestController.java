@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
+import com.ballknowers.draftsim.ingest.PlayerGameIngestService;
 import com.ballknowers.draftsim.ingest.TransactionIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
@@ -30,12 +31,14 @@ public class IngestController {
     private final ProfileService profiles;
     private final ProjectionIngestService projectionIngest;
     private final TransactionIngestService transactionIngest;
+    private final PlayerGameIngestService playerGameIngest;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
                             FfcAdpService ffcAdp, BoardService boards, ProfileService profiles,
                             ProjectionIngestService projectionIngest,
-                            TransactionIngestService transactionIngest) {
+                            TransactionIngestService transactionIngest,
+                            PlayerGameIngestService playerGameIngest) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -44,6 +47,7 @@ public class IngestController {
         this.profiles = profiles;
         this.projectionIngest = projectionIngest;
         this.transactionIngest = transactionIngest;
+        this.playerGameIngest = playerGameIngest;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -80,6 +84,20 @@ public class IngestController {
      * ingest that walks a call per week and a caller should be able to refresh
      * transactions without re-walking players, leagues and the board.
      */
+    /**
+     * Per-game stat lines for one league-season (specs/005, US1).
+     *
+     * <p>Its own endpoint, and never part of {@code /all} or
+     * {@code /league-history}: this is one upstream call per player, measured at
+     * 331 players for the reference league's 2025 season. Run deliberately, not
+     * as a side effect of a routine ingest.
+     */
+    @PostMapping("/player-games/{sleeperLeagueId}")
+    public PlayerGameIngestService.Result playerGames(@PathVariable String sleeperLeagueId,
+                                                      @RequestParam(required = false) Integer season) {
+        return playerGameIngest.ingest(sleeperLeagueId, season);
+    }
+
     @PostMapping("/transactions/{sleeperLeagueId}")
     public java.util.Map<String, Object> transactions(@PathVariable String sleeperLeagueId) {
         return java.util.Map.of("stored", transactionIngest.ingest(sleeperLeagueId));
