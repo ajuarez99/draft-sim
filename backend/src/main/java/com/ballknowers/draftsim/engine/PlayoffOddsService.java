@@ -238,14 +238,22 @@ public class PlayoffOddsService {
 
     // ------------------------------------------------ Season Forecast (US4)
 
-    /** Why a forecast is not being shown. Distinct values, not one empty list. */
     /**
-     * {@code NOT_COMPUTED} is distinct from {@code NO_SCORED_WEEKS} on purpose:
+     * Why a forecast is not being shown. Distinct values, not one empty list.
+     *
+     * <p>{@code NOT_COMPUTED} is distinct from {@code NO_SCORED_WEEKS} on purpose:
      * a finished season with 21 played weeks and no odds snapshot is not a
      * season with nothing to project from, and telling the reader it is would
      * send them looking for the wrong thing.
+     *
+     * <p>There is deliberately no value here for a snapshot that predates V17's
+     * distributions. That case is not a refusal: such a snapshot still carries
+     * real playoff odds and average wins, and only {@code winRange},
+     * {@code averageSeed} and {@code seedOdds} are absent. It is served with
+     * {@code available: true} and degrades field by field, so the reader keeps
+     * the numbers that do exist. A whole-page refusal would hide them.
      */
-    public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NOT_COMPUTED, NO_DISTRIBUTIONS }
+    public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NOT_COMPUTED }
 
     public record ForecastTeam(int rosterId, Long managerId, String teamName, String avatarId,
                                double playoffOdds, double averageWins, double projectedPoints,

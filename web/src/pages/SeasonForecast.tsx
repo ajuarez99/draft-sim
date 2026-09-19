@@ -123,8 +123,6 @@ function Refusal({
       ? "This league seeds its playoffs in a way this app doesn't model — divisions, or a non-default seeding rule. Rather than show odds computed under the wrong bracket, it shows none."
       : reason === 'NOT_COMPUTED'
         ? 'This season has been played, but no odds have been computed for it yet. A commissioner recompute produces them — the page reads a stored simulation rather than running one on load.'
-        : reason === 'NO_DISTRIBUTIONS'
-        ? 'The stored snapshot for this league predates win and seed distributions. The next commissioner recompute will produce them; the earlier simulation cannot be re-run to mean the same thing.'
         : 'No week has been scored yet, so there is nothing to project from. Odds appear once the first week is final.'
   return (
     <section className="panel">
