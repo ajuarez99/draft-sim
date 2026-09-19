@@ -34,13 +34,14 @@ class LeagueHistoryIngestServiceTest {
     @Mock private RosterSeasonRepository rosterSeasons;
     @Mock private RosterWeekPointsRepository weekPoints;
     @Mock private LeagueMatchupRepository fixtures;
+    @Mock private TransactionIngestService transactions;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures);
+                weekPoints, fixtures, transactions);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any()))
                 .thenReturn(55L);
     }
@@ -258,5 +259,35 @@ class LeagueHistoryIngestServiceTest {
         m.put("starters_points", List.of());
         m.put("players_points", Map.of());
         return m;
+    }
+
+    /**
+     * specs/004-ffwrapped-feature-parity T125/T126.
+     *
+     * <p>TransactionIngestService was written, tested and then called by nothing
+     * but a manual endpoint, so five of six real leagues held zero transactions
+     * while the suite stayed green -- no test walked the chain as far as asking
+     * whether transactions came with it. This is that test: once per season in
+     * the chain, by the league id of that season rather than the one requested.
+     */
+    @Test
+    void theChainWalkIngestsTransactionsForEverySeason() {
+        Map<String, Object> older = leagueObject("L9-2024", 2024, Map.of("last_scored_leg", 1), Map.of());
+        Map<String, Object> current = leagueObject("L9", 2025, Map.of("last_scored_leg", 1), Map.of());
+        when(sleeper.leagueChain("L9")).thenReturn(List.of(current, older));
+        when(sleeper.leagueUsers(anyString())).thenReturn(List.of());
+        when(sleeper.rosters(anyString())).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of());
+        when(sleeper.matchups(anyString(), anyInt())).thenReturn(List.of());
+        when(transactions.ingest("L9")).thenReturn(4);
+        when(transactions.ingest("L9-2024")).thenReturn(7);
+
+        LeagueHistoryIngestService.Result result = service.ingestChain(Sport.NFL, "L9");
+
+        verify(transactions, times(1)).ingest("L9");
+        verify(transactions, times(1)).ingest("L9-2024");
+        // Counted and reported, not merely called: the endpoint's own response is
+        // how anyone running an ingest finds out whether transactions arrived.
+        assertEquals(11, result.transactionsIngested());
     }
 }

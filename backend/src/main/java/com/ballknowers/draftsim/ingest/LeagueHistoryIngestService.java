@@ -38,11 +38,13 @@ public class LeagueHistoryIngestService {
     private final RosterSeasonRepository rosterSeasons;
     private final RosterWeekPointsRepository weekPoints;
     private final LeagueMatchupRepository fixtures;
+    private final TransactionIngestService transactions;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                       ManagerRepository managers, LeagueMemberRepository leagueMembers,
                                       RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints,
-                                      LeagueMatchupRepository fixtures) {
+                                      LeagueMatchupRepository fixtures,
+                                      TransactionIngestService transactions) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
@@ -50,12 +52,14 @@ public class LeagueHistoryIngestService {
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
         this.fixtures = fixtures;
+        this.transactions = transactions;
     }
 
-    public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested) {}
+    public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested,
+                         int transactionsIngested) {}
 
     public Result ingestChain(Sport sport, String currentLeagueId) {
-        int seasons = 0, rosterCount = 0, weekCount = 0, fixtureCount = 0;
+        int seasons = 0, rosterCount = 0, weekCount = 0, fixtureCount = 0, txCount = 0;
 
         for (Map<String, Object> league : sleeper.leagueChain(currentLeagueId)) {
             seasons++;
@@ -67,10 +71,22 @@ public class LeagueHistoryIngestService {
             rosterCount += ingestStandings(leagueId, sleeperLeagueId, league, managerByUserId);
             weekCount += ingestWeeklyPoints(leagueId, season, sleeperLeagueId, league);
             fixtureCount += ingestRemainingFixtures(leagueId, season, sleeperLeagueId, league);
+
+            // Transactions are week-level league data on the same chain walk and
+            // the same cadence as the weekly points above, so they are ingested
+            // here rather than behind their own endpoint. Until this call existed
+            // TransactionIngestService had exactly one caller -- a manual POST
+            // nobody ran -- and five of six leagues held zero transactions while a
+            // 488-test suite stayed green, because no test walked the chain.
+            //
+            // After ingestStandings, not before: the transaction ingest reads
+            // roster_season to map a roster id to its manager, and a move whose
+            // manager cannot be resolved is not worth storing.
+            txCount += transactions.ingest(sleeperLeagueId);
         }
-        log.info("league history: {} seasons, {} roster-seasons, {} roster-weeks, {} future fixtures ingested",
-                seasons, rosterCount, weekCount, fixtureCount);
-        return new Result(seasons, rosterCount, weekCount, fixtureCount);
+        log.info("league history: {} seasons, {} roster-seasons, {} roster-weeks, {} future fixtures, {} transactions ingested",
+                seasons, rosterCount, weekCount, fixtureCount, txCount);
+        return new Result(seasons, rosterCount, weekCount, fixtureCount, txCount);
     }
 
     /**
