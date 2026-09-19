@@ -189,6 +189,13 @@ SC-004 is then verifiable by asserting the football response shape is unchanged.
 3. **The per-player endpoint is undocumented**, like the projections endpoint V15 depends on. It may
    change shape without notice. Mitigation: the same one V15 accepted — store what it returns, and fail
    visibly rather than silently when the shape stops matching.
-4. **Only one NBA league-season has been examined in depth.** The week-alignment finding (R6) and the
-   scoring reproduction (R3) are measured on league `1229352720222134272`. Both should be re-asserted
-   against `1141438340626231296` before the backfill is trusted broadly.
+4. ~~**Only one NBA league-season has been examined in depth.**~~ **CLOSED 2026-09-19 by T004.** R3 and
+   R6 were re-asserted against `1141438340626231296` (season 2024) and both hold: the stored weekly value
+   equalled a computed game in **10 of 10 weeks**, including a week where the player's only two games
+   were both 0.0.
+
+   The check was stronger than a repeat, because that league's scoring is **different**: `dd: 1.0` and
+   `td: 2.0` against the 2025 league's `2.0` and `3.0`, and it has no `bonus_ast_15p` or
+   `bonus_reb_20p` at all. Reproducing both leagues with one generic key-by-key sum is evidence the
+   approach is not fitted to a single league's settings — which is exactly what R3 claimed and had not
+   yet earned.

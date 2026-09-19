@@ -41,6 +41,28 @@ public interface SportRules {
     /** Board value of a player, decreasing in board position. */
     double value(BoardEntry entry);
 
+    /**
+     * Whether one player can appear in more than one game inside a single
+     * scoring period (specs/005-daily-weekly-top-players, research R7).
+     *
+     * <p>Football cannot: a player's week is one game, so "his best night" and
+     * "his best week" are the same number and presenting both would print one
+     * fact twice. Basketball can: three or four games on named nights, which is
+     * the entire reason the Weekly Report splits into two rankings for it.
+     *
+     * <p><b>No default, deliberately.</b> This is a rule about a sport, and a
+     * defaulted rule asserts an answer rather than a value -- the defect this
+     * repo has shipped three times under different names, most recently the
+     * throwing {@link #startingLineup} default that locked basketball out of
+     * views whose data it already had. A new sport must answer this to compile,
+     * rather than silently inheriting football's shape and rendering the wrong
+     * page.
+     *
+     * <p>Callers use this to choose which form to render. Nothing outside this
+     * interface compares a sport name to make that choice (FR-004).
+     */
+    boolean playsMultipleGamesPerScoringPeriod();
+
     /** Expected value of the seat's starting lineup as currently rostered. */
     double startingLineupValue(RosterState roster, LeagueSettings settings);
 
