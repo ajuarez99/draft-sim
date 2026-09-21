@@ -1,5 +1,49 @@
 # Ball Knowers — handoff
 
+**2026-09-19, branch `005-daily-weekly-top-players`: best nights beside best
+weeks, basketball only.** `specs/005-daily-weekly-top-players/` is the brief;
+read `research.md` first, it is where the measurements are.
+
+**The finding that set the shape.** This league's NBA scoring counts roughly
+**one game per player per week** -- Jokic's stored week 5 is 58.5, while his four
+games that week summed to 182.0. That is not an ingest bug: Sleeper's own
+matchup payload reports 58.5, and weeks 1-18 reconcile against Sleeper's own
+season `fpts` per roster (roster 3 exact at 4583.0). It is the league's format,
+`game_mode: 1`. The mechanism picking which game counts is **not understood** --
+not first, last, or highest -- and that is what forced the design: ranking "the
+counted game" would rank a set nobody can explain, so Best Nights ranks every
+game and the page says what the figures are and are not.
+
+**Verified live, on two leagues with different scoring.** The backfill walked
+331 players / 19,428 games for 2025 and 280 / 16,909 for 2024, both with zero
+failures, in 75s and 110s. Re-running left the row count identical. Jokic reads
+58.5 on 2025-11-17 vs CHI; his Best Week row reads 182.0 over 4 games, and 182.0
+correctly never appears among the nights. The two rankings genuinely disagree --
+Jalen Johnson and Josh Giddey top the week without owning a single night --
+which is SC-002 and the reason the pair earns its place.
+
+**What live verification caught that 522 green tests did not.** The service
+returned a record with `@JsonInclude(NON_NULL)`, which looked like it produced
+the contract's "absent, not empty" rule. It did not: `WeeklyReportController`
+hand-builds a `LinkedHashMap`, so the annotation was decorative, the new fields
+were never emitted, football silently lost `playersPlayMultiplePerPeriod`, and
+the basketball path would have thrown on a null `topPerformers`. Only a request
+to a running server found it. `WeeklyReportShapeTest` is now that request, made
+cheap enough to run every time.
+
+**Two deliberate inconsistencies, both commented in place.** The per-game
+backfill is *not* wired into the ingest chain, the opposite of the transactions
+call added to `LeagueHistoryIngestService` a day earlier -- transactions ride
+that walk's own cadence, 331 per-player calls do not. And two tests grep source
+text, because a one-line `sport === 'nba'` hotfix would otherwise pass every
+other test in the suite.
+
+**Still owed:** the pages have not been looked at in a browser, only driven
+through the API. Football's Weekly Report is asserted unchanged by test and by a
+live request, but not by eye.
+
+---
+
 **2026-09-18, branch `004-ffwrapped-feature-parity` (pushed, not merged): four
 new league pages, both sports.** `specs/004-ffwrapped-feature-parity/` is the
 brief; read `research.md` first, it is where the measurements are.

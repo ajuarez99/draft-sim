@@ -4099,3 +4099,39 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: color-mix(in oklab, var(--panel) 88%, white 4%);
   border-radius: 0 4px 4px 0;
 }
+
+/* --- Best nights / Best week, side by side (specs/005) ------------------ */
+
+/*
+ * Two rankings of one week that answer different questions. Side by side on a
+ * wide screen because the comparison IS the feature -- a player can top one
+ * and be absent from the other -- and stacked on a phone, where side-by-side
+ * would squeeze both into unreadable columns.
+ */
+.wr-rankings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .wr-rankings {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The night, or the games-played denominator. Sits before the value so the
+   number stays hard against the right edge with the other rankings' totals. */
+.wr-when {
+  flex: 0 0 auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Team name yields first when the row is tight -- the night and the value are
+   the two things this section exists to say. */
+.wr-rankings .wr-pteam {
+  flex: 1 1 40%;
+  min-width: 0;
+}

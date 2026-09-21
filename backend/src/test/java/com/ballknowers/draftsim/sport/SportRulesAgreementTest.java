@@ -259,4 +259,57 @@ class SportRulesAgreementTest {
             }
         }
     }
+
+    /**
+     * specs/005-daily-weekly-top-players T016.
+     *
+     * <p>The cadence rule is the second obligation this interface makes
+     * unavoidable, and it is here rather than in its own class for the same
+     * reason as the rest: an obligation every sport owes belongs in the suite
+     * that walks every sport, not in a file per rule.
+     *
+     * <p>Declared with no default, so a sport that fails to answer is a compile
+     * error rather than a page rendered in the wrong shape. This asserts the
+     * other half -- that the answers exist, are reachable, and do not throw.
+     */
+    @Test
+    void everySportAnswersTheScoringPeriodCadenceWithoutThrowing() {
+        for (Case c : cases()) {
+            try {
+                c.rules().playsMultipleGamesPerScoringPeriod();
+            } catch (UnsupportedOperationException e) {
+                fail(c.name() + ": playsMultipleGamesPerScoringPeriod throws. A rule about a sport "
+                        + "must be answered, not deferred to runtime.");
+            }
+        }
+    }
+
+    /**
+     * The two sports must not agree here. If they ever do, either football has
+     * started rendering a pair it should not, or basketball has stopped.
+     */
+    @Test
+    void footballAndBasketballDisagreeAboutScoringPeriodCadence() {
+        SportRules nfl = cases().stream().filter(c -> c.name().equals("NFL")).findFirst().orElseThrow().rules();
+        SportRules nba = cases().stream().filter(c -> c.name().equals("NBA")).findFirst().orElseThrow().rules();
+
+        assertFalse(nfl.playsMultipleGamesPerScoringPeriod(),
+                "an NFL player plays at most one game per scoring period");
+        assertTrue(nba.playsMultipleGamesPerScoringPeriod(),
+                "an NBA player plays several games per fantasy week -- the whole premise of 005");
+    }
+
+    /**
+     * Guards the interface itself rather than an implementation: a {@code default}
+     * added later would be inheritable, and a new sport would silently take
+     * football's shape. That is the exact defect the throwing
+     * {@code startingLineup} default caused for basketball in 004.
+     */
+    @Test
+    void theCadenceRuleHasNoDefaultImplementation() throws Exception {
+        var method = SportRules.class.getMethod("playsMultipleGamesPerScoringPeriod");
+        assertFalse(method.isDefault(),
+                "playsMultipleGamesPerScoringPeriod must stay abstract: a defaulted rule asserts an "
+                        + "answer rather than a value, and a new sport must be forced to answer it.");
+    }
 }

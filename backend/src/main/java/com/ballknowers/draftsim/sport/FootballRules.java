@@ -80,6 +80,18 @@ public class FootballRules implements SportRules {
     }
 
     /**
+     * No. An NFL player plays at most one game per scoring period, so his best
+     * night and his best week are the same figure. The Weekly Report uses this
+     * to keep showing football exactly the list it has always shown, rather
+     * than splitting one fact across two rankings
+     * (specs/005-daily-weekly-top-players, US3).
+     */
+    @Override
+    public boolean playsMultipleGamesPerScoringPeriod() {
+        return false;
+    }
+
+    /**
      * Everything {@link #rosterNeed} needs to score any candidate against
      * {@code roster} in O(1): the roster's current total, and, per position,
      * whether a new player would (a) simply fill an empty starter slot, (b)

@@ -122,6 +122,17 @@ public class BasketballRules implements SportRules {
     }
 
     /**
+     * Yes. An NBA player plays three or four games in a fantasy week, on named
+     * nights against named opponents, and flattening them into one number is
+     * what specs/005-daily-weekly-top-players exists to undo. This is what
+     * turns the Weekly Report's single list into a pair for basketball.
+     */
+    @Override
+    public boolean playsMultipleGamesPerScoringPeriod() {
+        return true;
+    }
+
+    /**
      * @param mask this candidate's eligibility bitmask over {PG,SG,SF,PF,C} -- 0 if none of his
      *             {@link Player#positions()} are basketball positions (defensive; real NBA board
      *             entries always have at least one).

@@ -1,11 +1,13 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.*;
+import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -37,12 +39,15 @@ public class WeeklyReportService {
     private final SportRulesRegistry rulesRegistry;
     private final RealizedLineupService realized;
     private final LeagueSeasonResolver seasons;
+    private final PlayerGameRepository playerGames;
+    private final GameScoringService gameScoring;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members, PlayerRepository players,
                                SportRulesRegistry rulesRegistry, RealizedLineupService realized,
-                               LeagueSeasonResolver seasons) {
+                               LeagueSeasonResolver seasons, PlayerGameRepository playerGames,
+                               GameScoringService gameScoring) {
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.matchups = matchups;
@@ -52,6 +57,8 @@ public class WeeklyReportService {
         this.rulesRegistry = rulesRegistry;
         this.realized = realized;
         this.seasons = seasons;
+        this.playerGames = playerGames;
+        this.gameScoring = gameScoring;
     }
 
     public record Side(int rosterId, String teamName, String avatarId, String record, double points) {}
@@ -66,14 +73,56 @@ public class WeeklyReportService {
     /** An award that could not be computed, and why. Never a silent absence. */
     public record OmittedAward(String kind, String reason) {}
 
+    /** One player's one game: what they scored, which night, against whom (US1). */
+    public record NightPerformance(String playerId, String playerName, String position,
+                                   String teamName, double points, LocalDate date,
+                                   String opponent, Boolean isAway) {}
+
+    /** One player's whole fantasy week, across every game they played (US2). */
+    public record PlayerWeek(String playerId, String playerName, String position,
+                             String teamName, double totalPoints, int gamesPlayed) {}
+
+    /**
+     * A section that could not be filled, and why. A discriminator rather than a
+     * sentence: the words a reader sees belong in the page, so changing them is
+     * not a contract change.
+     */
+    public record SectionUnavailable(String section, String reason) {}
+
+    /**
+     * {@code ALL_GAMES_PLAYED} says the week totals count every game a player
+     * played, including games this league's scoring never counted. Required on
+     * the basketball shape and never defaulted, because the page's FR-005
+     * disclosure is driven by it rather than by prose hardcoded in a component.
+     */
+    public static final String BASIS_ALL_GAMES = "ALL_GAMES_PLAYED";
+
+    static final String PER_GAME_DETAIL_MISSING = "PER_GAME_DETAIL_MISSING";
+    static final String SECTION_BEST_NIGHTS = "BEST_NIGHTS";
+    static final String SECTION_BEST_WEEK = "BEST_WEEK";
+
+    /** How many entries each ranking carries. A presentation choice, not a rule. */
+    private static final int RANK_LIMIT = 5;
+
+    /**
+     * Carries EITHER {@code topPerformers} OR the {@code bestNights}/{@code bestWeek}
+     * pair, never both -- decided by the sport's own cadence rule.
+     *
+     * <p>A null side means "this measure does not apply to this sport", and
+     * {@code WeeklyReportController} leaves it out of the response entirely
+     * rather than sending null or an empty array. An empty array would say "we
+     * looked and there were none", which is a different claim.
+     */
     public record Result(boolean available, String reason, int season, Integer requestedSeason,
-                         int week, Sport sport,
+                         int week, Sport sport, boolean playersPlayMultiplePerPeriod,
                          List<Matchup> matchups, List<Performer> topPerformers,
+                         List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
+                         String basis, List<SectionUnavailable> sectionsUnavailable,
                          List<Award> awards, List<OmittedAward> awardsOmitted) {
 
         static Result unavailable(String reason, int season, int week, Sport sport) {
-            return new Result(false, reason, season, null, week, sport,
-                    List.of(), List.of(), List.of(), List.of());
+            return new Result(false, reason, season, null, week, sport, false,
+                    List.of(), List.of(), null, null, null, null, List.of(), List.of());
         }
     }
 
@@ -182,8 +231,114 @@ public class WeeklyReportService {
             omitted.add(new OmittedAward("SELF_INFLICTED_WOUND", STARTERS_NOT_STORED));
         }
 
+        // ---- Best Nights / Best Week (specs/005, US1 + US2)
+        //
+        // Which form this league gets comes from the sport's own cadence rule and
+        // from nowhere else. No sport name is compared here (FR-004).
+        boolean multipleGames = rules.playsMultipleGamesPerScoringPeriod();
+        List<NightPerformance> bestNights = null;
+        List<PlayerWeek> bestWeek = null;
+        String basis = null;
+        List<SectionUnavailable> sectionsUnavailable = null;
+        List<Performer> topForResult = top;
+
+        if (multipleGames) {
+            // The pair replaces the single list rather than joining it: three
+            // overlapping rankings of the same week is not a richer page.
+            topForResult = null;
+            basis = BASIS_ALL_GAMES;
+            sectionsUnavailable = new ArrayList<>();
+
+            Map<Integer, String> ownerByRoster = nameByRoster;
+            Map<String, Integer> rosterByPlayer = new HashMap<>();
+            for (RosterWeekPointsRepository.WeekBreakdown w : thisWeek) {
+                if (w.playersPointsJson() == null || w.playersPointsJson().isBlank()) continue;
+                for (String pid : JsonUtil.readMap(w.playersPointsJson()).keySet()) {
+                    rosterByPlayer.put(pid, w.rosterId());
+                }
+            }
+
+            Map<String, Double> scoring = leagues.scoringOf(league.id());
+            List<PlayerGameRepository.Row> rows =
+                    playerGames.forWeek(settings.sport(), league.season(), week);
+
+            // Rows exist for every player in the sport, not just this league's.
+            // Restricting to the rostered set is what keeps this a league page.
+            List<NightPerformance> nights = new ArrayList<>();
+            Map<String, double[]> weekTotals = new HashMap<>();
+            for (PlayerGameRepository.Row r : rows) {
+                Integer rosterId = rosterByPlayer.get(r.sleeperPlayerId());
+                if (rosterId == null) continue;
+                Player pl = playersBySleeperId.get(r.sleeperPlayerId());
+                if (pl == null) continue;
+
+                double pts = gameScoring.score(scoring, JsonUtil.readMap(r.statsJson()));
+                String owner = ownerByRoster.getOrDefault(rosterId, "Roster " + rosterId);
+                nights.add(new NightPerformance(r.sleeperPlayerId(), pl.name(), pl.primary().name(),
+                        owner, pts, r.gameDate(), r.opponent(), r.isAway()));
+
+                double[] acc = weekTotals.computeIfAbsent(r.sleeperPlayerId(), k -> new double[2]);
+                acc[0] += pts;
+                acc[1] += 1;
+            }
+
+            if (nights.isEmpty()) {
+                // No per-game detail for this week. Say so for both sections
+                // rather than falling back to the stored single-game value and
+                // presenting it as a night or a week (FR-006).
+                sectionsUnavailable.add(new SectionUnavailable(SECTION_BEST_NIGHTS, PER_GAME_DETAIL_MISSING));
+                sectionsUnavailable.add(new SectionUnavailable(SECTION_BEST_WEEK, PER_GAME_DETAIL_MISSING));
+                bestNights = List.of();
+                bestWeek = List.of();
+            } else {
+                bestNights = rankNights(nights, RANK_LIMIT);
+
+                List<PlayerWeek> weeks = new ArrayList<>();
+                for (Map.Entry<String, double[]> e : weekTotals.entrySet()) {
+                    int played = (int) e.getValue()[1];
+                    // A player who played nothing is absent, never a 0.0 row.
+                    if (played == 0) continue;
+                    Player pl = playersBySleeperId.get(e.getKey());
+                    Integer rosterId = rosterByPlayer.get(e.getKey());
+                    weeks.add(new PlayerWeek(e.getKey(), pl.name(), pl.primary().name(),
+                            ownerByRoster.getOrDefault(rosterId, "Roster " + rosterId),
+                            Math.round(e.getValue()[0] * 100.0) / 100.0, played));
+                }
+                bestWeek = rankWeeks(weeks, RANK_LIMIT);
+            }
+        }
+
         return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
-                week, settings.sport(), games, top, awards, omitted));
+                week, settings.sport(), multipleGames, games, topForResult,
+                bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted));
+    }
+
+    /**
+     * Best Nights order: points descending, then player id, then date (FR-009).
+     *
+     * <p>Extracted and named because the tiebreak is the part that matters and
+     * the part nobody would think to check. Half-point scoring makes exact ties
+     * ordinary rather than rare -- two 44.0 nights in one week is a Tuesday --
+     * and an unstable sort would reorder them between two loads of the same
+     * finished week, which reads as data changing under the reader.
+     *
+     * <p>One player can hold two rows here, which is why date breaks the tie
+     * after the player id rather than before it.
+     */
+    static List<NightPerformance> rankNights(List<NightPerformance> nights, int limit) {
+        List<NightPerformance> sorted = new ArrayList<>(nights);
+        sorted.sort(Comparator.comparingDouble(NightPerformance::points).reversed()
+                .thenComparing(NightPerformance::playerId)
+                .thenComparing(n -> n.date().toString()));
+        return sorted.stream().limit(limit).toList();
+    }
+
+    /** Best Week order: total descending, then player id. Same reasoning. */
+    static List<PlayerWeek> rankWeeks(List<PlayerWeek> weeks, int limit) {
+        List<PlayerWeek> sorted = new ArrayList<>(weeks);
+        sorted.sort(Comparator.comparingDouble(PlayerWeek::totalPoints).reversed()
+                .thenComparing(PlayerWeek::playerId));
+        return sorted.stream().limit(limit).toList();
     }
 
     // ------------------------------------------------------------- awards

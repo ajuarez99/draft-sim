@@ -35,6 +35,16 @@ Built so far:
   (matchups, top performers, and the awards nobody wants).
   All four work for **basketball as well as football**, because none of them is a
   projection -- they read points already scored, which Sleeper reports for both.
+- **Best nights, beside best weeks** (specs/005-daily-weekly-top-players).
+  Basketball only, and deliberately: an NBA player plays three or four games a
+  fantasy week, so the Weekly Report splits its single list into two. **Best
+  nights** ranks the biggest individual games, each naming the night and the
+  opponent -- Jokic's 58.5 was one Monday against Chicago, not a week. **Best
+  week** ranks what a player actually produced across every game they played,
+  labelled as real production rather than the points that decided a matchup,
+  because those are different numbers: that same week was 182.0 across four
+  games, and only 58.5 counted. Football keeps the list it has always had, since
+  an NFL player's best night and best week are the same game.
 - **Interactive mock draft room** (`/mock/new`). Start a from-scratch mock at
   8/10/12/14 teams with no real Sleeper league or draft behind it -- bots
   auto-pick down the snake order, you take your own picks on your turn, sessions

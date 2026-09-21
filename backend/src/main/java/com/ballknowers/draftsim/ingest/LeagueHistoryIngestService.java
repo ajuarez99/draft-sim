@@ -83,6 +83,17 @@ public class LeagueHistoryIngestService {
             // roster_season to map a roster id to its manager, and a move whose
             // manager cannot be resolved is not worth storing.
             txCount += transactions.ingest(sleeperLeagueId);
+
+            // PlayerGameIngestService is deliberately NOT called here, and the
+            // inconsistency with the line above is the point rather than an
+            // oversight. Transactions are week-level data on this walk's own
+            // cadence, so they cost nothing extra to collect while we are here.
+            // Per-game stat lines are player-level: one upstream call per
+            // player, measured at 331 for the reference league's 2025 season.
+            // Adding them would make every routine league ingest hundreds of
+            // calls slower for data only the basketball weekly report reads.
+            // They have their own endpoint, POST /api/ingest/player-games/{id}
+            // (specs/005-daily-weekly-top-players T028).
         }
         log.info("league history: {} seasons, {} roster-seasons, {} roster-weeks, {} future fixtures, {} transactions ingested",
                 seasons, rosterCount, weekCount, fixtureCount, txCount);
