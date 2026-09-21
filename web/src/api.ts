@@ -1328,7 +1328,7 @@ export type ForecastTeam = {
 /** `reason` names which refusal applies; they need different words on screen. */
 export type SeasonForecast = {
   available: boolean
-  reason?: 'UNMODELLED_SEEDING' | 'NO_SCORED_WEEKS' | 'NOT_COMPUTED' | 'NO_DISTRIBUTIONS' | null
+  reason?: 'UNMODELLED_SEEDING' | 'NO_SCORED_WEEKS' | 'NOT_COMPUTED' | null
   season: number
   requestedSeason?: number | null
   week?: number
