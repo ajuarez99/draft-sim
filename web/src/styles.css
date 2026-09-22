@@ -2239,16 +2239,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    wrapped badges in a flex-wrap row, where content width is exactly right and
    stretching them would make a column of stripes out of a bag of names.
 
-   Scoped to the phone breakpoint for a different reason -- measured, not
-   guessed. At 375px the row is 331px and a filled pill runs to 241px, so the
-   tail past the text is about 107px and the thing still reads as a pill. In
-   the 640px modal on a desktop the same rule gives a 481px pill holding 167px
-   of text: a 277px void inside a capsule, which is the wide flat slab this
-   board's design notes exist to avoid. A mouse does not need the help anyway;
-   a thumb does. */
-@media (max-width: 700px) {
-  .rankboard-slot .rankboard-chip { flex: 1 1 auto; }
-}
+   Applied at every width, deliberately. It was briefly held to the phone
+   breakpoint because the desktop numbers are less flattering -- in the 640px
+   modal the rule gives a 481px pill holding about 167px of text, so most of
+   the capsule is empty, where at 375px the tail is only ~107px. Allan's call
+   was to take the consistency: one rule, a row that is a row on every screen,
+   and the same target wherever you click it. If that emptiness ever reads
+   wrong, the fix is to give the tail something to hold, not to shrink the
+   target back to the length of someone's username. */
+.rankboard-slot .rankboard-chip { flex: 1 1 auto; }
 
 /* The grip. `touch-action: none` lives HERE and nowhere else now.
    It used to sit on .rankboard-chip, which is a full-width 44px row that
