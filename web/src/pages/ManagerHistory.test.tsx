@@ -1,7 +1,12 @@
 import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ManagerHistory from './ManagerHistory'
-import type { CareerProfile, ManagerHistory as ManagerHistoryData, StandingRow } from '../api'
+import type {
+  CareerProfile,
+  CareerSeason,
+  ManagerHistory as ManagerHistoryData,
+  StandingRow,
+} from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ managerId: '7' }),
@@ -30,40 +35,65 @@ function standing(overrides: Partial<StandingRow>): StandingRow {
   }
 }
 
+/**
+ * A row as `careers[].seasons[]` carries it: `standing()`'s shape plus
+ * `counted`. Since T076 this is the ONLY place season rows reach this page --
+ * the flat `seasons[]` these fixtures used to set is gone from the response,
+ * so a fixture that sets one would be testing a payload the server cannot
+ * send.
+ */
+function careerSeason(overrides: Partial<CareerSeason> = {}): CareerSeason {
+  return { ...standing(overrides), counted: true, ...overrides }
+}
+
+const NFL_ROWS: CareerSeason[] = [
+  careerSeason({
+    sport: 'nfl', season: 2026, leagueName: 'West Coast Fantasy Football', sleeperLeagueId: 'L-wc',
+    rosterId: 7, wins: 1, losses: 0, pointsFor: 189.9, pointsAgainst: 140, complete: false,
+  }),
+  careerSeason({
+    sport: 'nfl', season: 2026, leagueName: '(Foot) Ball Knowers', sleeperLeagueId: 'L-fbk-26',
+    rosterId: 1, wins: 1, losses: 0, pointsFor: 157.4, pointsAgainst: 147.9, complete: false, champion: true,
+  }),
+  careerSeason({
+    sport: 'nfl', season: 2025, leagueName: '(Foot) Ball Knowers', sleeperLeagueId: 'L-fbk-25',
+    rosterId: 1, wins: 10, losses: 4, pointsFor: 2042.84, pointsAgainst: 1771.16, champion: true,
+  }),
+]
+
+const NBA_ROWS: CareerSeason[] = [
+  careerSeason({
+    sport: 'nba', season: 2025, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-25',
+    rosterId: 7, wins: 8, losses: 10, pointsFor: 4370.0, pointsAgainst: 4200.0,
+  }),
+  careerSeason({
+    sport: 'nba', season: 2024, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-24',
+    rosterId: 7, wins: 9, losses: 11, pointsFor: 5146.0, pointsAgainst: 5000.0,
+  }),
+]
+
 function twoSportHistory(): ManagerHistoryData {
   return {
     managerId: 7,
     manager: 'popsharky',
     avatarId: null,
-    seasons: [
-      standing({
-        sport: 'nfl', season: 2026, leagueName: 'West Coast Fantasy Football', sleeperLeagueId: 'L-wc',
-        rosterId: 7, wins: 1, losses: 0, pointsFor: 189.9, pointsAgainst: 140, complete: false,
+    draftHistory: [],
+    // T076: the rows live HERE now, one career per sport, because the flat
+    // `seasons[]` these fixtures used to carry no longer exists on the wire.
+    // The totals match what the page used to derive by summing those rows
+    // (nfl 12-4 over three, nba 17-21 over two), so every assertion below
+    // still describes the same screen -- the difference is that the numbers
+    // now have exactly one source, which is the point of the removal.
+    careers: [
+      careerProfile({
+        sport: 'nfl', seasons: NFL_ROWS, seasonsCounted: 3,
+        wins: 12, losses: 4, ties: 0, titles: 1,
       }),
-      standing({
-        sport: 'nfl', season: 2026, leagueName: '(Foot) Ball Knowers', sleeperLeagueId: 'L-fbk-26',
-        rosterId: 1, wins: 1, losses: 0, pointsFor: 157.4, pointsAgainst: 147.9, complete: false, champion: true,
-      }),
-      standing({
-        sport: 'nfl', season: 2025, leagueName: '(Foot) Ball Knowers', sleeperLeagueId: 'L-fbk-25',
-        rosterId: 1, wins: 10, losses: 4, pointsFor: 2042.84, pointsAgainst: 1771.16, champion: true,
-      }),
-      standing({
-        sport: 'nba', season: 2025, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-25',
-        rosterId: 7, wins: 8, losses: 10, pointsFor: 4370.0, pointsAgainst: 4200.0,
-      }),
-      standing({
-        sport: 'nba', season: 2024, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-24',
-        rosterId: 7, wins: 9, losses: 11, pointsFor: 5146.0, pointsAgainst: 5000.0,
+      careerProfile({
+        sport: 'nba', seasons: NBA_ROWS, seasonsCounted: 2,
+        wins: 17, losses: 21, ties: 0, titles: 0,
       }),
     ],
-    draftHistory: [],
-    // Empty by default so the T012/T017-T020 fixtures above stay exactly the
-    // shape they measured -- CareerPanel renders nothing for an empty list,
-    // so the season-table's own per-sport blocks stay the only
-    // `.manager-sport-block` on the page in those tests. The career-profile
-    // describe block below overrides this per test.
-    careers: [],
   }
 }
 
@@ -174,11 +204,16 @@ describe('per-sport grouping (FR-002)', () => {
 
     await screen.findByText('popsharky')
 
-    const nflHeading = screen.getByText('NFL', { selector: '.panel-head .sport-pill' })
+    // Scoped to the standings section: since the fixture carries real
+    // careers, an `NFL` sport-pill in a `.panel-head` also appears in the
+    // career panel, which is a different block about the same sport.
+    const seasons = within(document.querySelector('.manager-seasons') as HTMLElement)
+
+    const nflHeading = seasons.getByText('NFL', { selector: '.panel-head .sport-pill' })
     const nflBlock = nflHeading.closest('.manager-sport-block') as HTMLElement
     expect(within(nflBlock).getAllByRole('row')).toHaveLength(4) // header + 3 seasons
 
-    const nbaHeading = screen.getByText('NBA', { selector: '.panel-head .sport-pill' })
+    const nbaHeading = seasons.getByText('NBA', { selector: '.panel-head .sport-pill' })
     const nbaBlock = nbaHeading.closest('.manager-sport-block') as HTMLElement
     expect(within(nbaBlock).getAllByRole('row')).toHaveLength(3) // header + 2 seasons
 
@@ -197,22 +232,24 @@ describe('per-sport grouping (FR-002)', () => {
     // Both 2026 football rows must be tellable apart by league name alone --
     // the fixture's (Foot) Ball Knowers name appears on its two rows (2025
     // and 2026), the West Coast name on its one.
-    expect(await screen.findByText('West Coast Fantasy Football')).toBeTruthy()
-    expect(screen.getAllByText('(Foot) Ball Knowers')).toHaveLength(2)
+    const seasons = within(document.querySelector('.manager-seasons') as HTMLElement)
+    expect(seasons.getByText('West Coast Fantasy Football')).toBeTruthy()
+    expect(seasons.getAllByText('(Foot) Ball Knowers')).toHaveLength(2)
   })
 })
 
 describe('a manager who plays one sport (T020)', () => {
   it('renders only that sport, with no empty second block', async () => {
     const oneSport = twoSportHistory()
-    oneSport.seasons = oneSport.seasons.filter((s) => s.sport === 'nfl')
+    oneSport.careers = oneSport.careers.filter((c) => c.sport === 'nfl')
     getManagerHistory.mockResolvedValue(oneSport)
     render(<ManagerHistory />)
 
     await screen.findByText('popsharky')
 
-    expect(screen.getByText('NFL', { selector: '.panel-head .sport-pill' })).toBeTruthy()
-    expect(screen.queryByText('NBA', { selector: '.panel-head .sport-pill' })).toBeNull()
+    const seasons = within(document.querySelector('.manager-seasons') as HTMLElement)
+    expect(seasons.getByText('NFL', { selector: '.panel-head .sport-pill' })).toBeTruthy()
+    expect(seasons.queryByText('NBA', { selector: '.panel-head .sport-pill' })).toBeNull()
   })
 })
 
@@ -303,13 +340,19 @@ describe('career profile panel (US3)', () => {
     expect(screen.queryByText('Trades per season: 0')).toBeNull()
   })
 
-  it('renders nothing for a manager with no career profile in any sport', async () => {
-    const noCareer = twoSportHistory()
-    getManagerHistory.mockResolvedValue(noCareer)
+  it('T076: the season tables are built from careers[].seasons, the one season list on the wire', async () => {
+    // The flat `seasons[]` is gone from the wire, so `careers` is the only
+    // thing that can produce a table. An empty one therefore produces no
+    // tables AND no panel -- there is no second list left to fall back to,
+    // which is exactly what the removal was for.
+    const noCareers = twoSportHistory()
+    noCareers.careers = []
+    getManagerHistory.mockResolvedValue(noCareers)
     render(<ManagerHistory />)
     await screen.findByText('popsharky')
 
     expect(screen.queryByText('Career profile')).toBeNull()
+    expect(document.querySelectorAll('.manager-seasons .manager-sport-block')).toHaveLength(0)
   })
 })
 
@@ -404,19 +447,26 @@ describe('waiver activity panel (US6)', () => {
 describe('the header and the career panel agree (FR-007)', () => {
   it('takes its record, tie and season count from careers, not from the season rows', async () => {
     const data = twoSportHistory()
-    // Three listed NBA seasons, one of them unplayed -- exactly the live
-    // shape. The career says two counted, and 17-21-1 including the tie.
-    data.seasons.push(
-      standing({
-        sport: 'nba', season: 2026, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-26',
-        rosterId: 7, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, complete: false,
-      }),
-    )
-    // Both sports carry a career, so nothing falls back -- football's three
-    // listed seasons all have scored weeks and legitimately count three.
+    // Three LISTED basketball seasons, one of them ingested but unplayed --
+    // exactly the live shape -- against a career that counts two. Since T076
+    // both numbers come out of the same object, so the header cannot read the
+    // list while the panel reads the count; this test now guards that they
+    // stay different fields with different meanings rather than that two
+    // sources agree.
     data.careers = [
-      careerProfile({ sport: 'nfl', seasonsCounted: 3, wins: 12, losses: 4, ties: 0, titles: 1 }),
-      careerProfile({ sport: 'nba', seasonsCounted: 2, wins: 17, losses: 21, ties: 1, titles: 0 }),
+      careerProfile({ sport: 'nfl', seasons: NFL_ROWS, seasonsCounted: 3, wins: 12, losses: 4, ties: 0, titles: 1 }),
+      careerProfile({
+        sport: 'nba',
+        seasons: [
+          ...NBA_ROWS,
+          careerSeason({
+            sport: 'nba', season: 2026, leagueName: 'Ball Knowers', sleeperLeagueId: 'L-bk-26',
+            rosterId: 7, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, complete: false,
+            counted: false,
+          }),
+        ],
+        seasonsCounted: 2, wins: 17, losses: 21, ties: 1, titles: 0,
+      }),
     ]
     getManagerHistory.mockResolvedValue(data)
     render(<ManagerHistory />)
@@ -431,12 +481,11 @@ describe('the header and the career panel agree (FR-007)', () => {
     expect(screen.getByText(/12-4 across 3 seasons/)).toBeTruthy()
   })
 
-  it('still renders against a server older than careers[], falling back to the rows', async () => {
-    const data = twoSportHistory()
-    data.careers = []
-    getManagerHistory.mockResolvedValue(data)
-    render(<ManagerHistory />)
-    // nfl: three listed rows, no career to read from.
-    expect(await screen.findByText(/12-4 across 3 seasons/)).toBeTruthy()
-  })
+  // The companion test that used to sit here -- "still renders against a
+  // server older than careers[], falling back to the rows" -- is deleted with
+  // T076, not ported. That fallback existed for the one release in which the
+  // response carried both lists; a server old enough to omit careers[] now
+  // sends a payload this page cannot render at all, and pretending otherwise
+  // would be testing a reconstruction of the very second source the removal
+  // was meant to delete.
 })

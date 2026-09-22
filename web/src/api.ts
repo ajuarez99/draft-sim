@@ -1002,7 +1002,6 @@ export type ManagerHistory = {
   managerId: number
   manager: string | null
   avatarId: string | null
-  seasons: StandingRow[]
   /**
    * One entry per sport this manager has actually drafted in, newest concept
    * first: a manager is not a football manager, they are a manager, and
@@ -1025,10 +1024,12 @@ export type ManagerHistory = {
     provenance: Provenance
   }[]
   /**
-   * specs/006-deeper-history-both-sports T040/US3. Rides ALONGSIDE the flat
-   * `seasons` above, not in place of it -- see contracts/manager-profile-api.md's
-   * Migration section. One entry per sport the manager has a roster-season in;
-   * never a top-level total spanning sports.
+   * specs/006-deeper-history-both-sports T040/US3, and since T076 the ONLY
+   * season list on this type -- the flat `seasons` it shipped beside for one
+   * release is gone (step 3 of contracts/manager-profile-api.md's Migration).
+   * One entry per sport the manager has a roster-season in, each holding that
+   * sport's own rows; never a top-level total spanning sports, and no second
+   * flat copy that a caller could total across sports without noticing.
    */
   careers: CareerProfile[]
 }
