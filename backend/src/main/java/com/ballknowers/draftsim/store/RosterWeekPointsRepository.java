@@ -186,6 +186,34 @@ public class RosterWeekPointsRepository {
                 .list();
     }
 
+    /**
+     * Every scored roster-week across a chain, manager-attributed, with no
+     * ORDER/LIMIT -- the raw population a caller aggregates itself.
+     * specs/006-deeper-history-both-sports T060: the all-time points leaders
+     * need every week summed per manager, not just the top/bottom {@code
+     * limit} that {@link #extremes} hands back. Aggregating here in Java
+     * rather than with a SQL {@code sum} keeps one definition of "which rows
+     * count" -- the same left join {@link #extremes} already uses, so an
+     * unowned roster-season (R1) still contributes its points instead of
+     * being silently dropped by an inner join.
+     */
+    public List<ScoreRow> allScores(Collection<Long> leagueIds) {
+        if (leagueIds == null || leagueIds.isEmpty()) return List.of();
+        String sql = """
+                select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points
+                from roster_week_points w
+                left join roster_season rs on rs.league_id = w.league_id and rs.roster_id = w.roster_id
+                left join manager m on m.id = rs.manager_id
+                where w.league_id in (%s)
+                order by w.season asc, w.week asc, w.roster_id asc
+                """.formatted(inClause(leagueIds));
+        return db.sql(sql)
+                .params(List.copyOf(leagueIds))
+                .query((rs, i) -> new ScoreRow(rs.getInt(1), rs.getInt(2), rs.getInt(3),
+                        (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7)))
+                .list();
+    }
+
     /** {@code ?, ?, ?} for an IN list -- the ids are still bound, never inlined. */
     static String inClause(Collection<Long> ids) {
         return String.join(", ", java.util.Collections.nCopies(ids.size(), "?"));

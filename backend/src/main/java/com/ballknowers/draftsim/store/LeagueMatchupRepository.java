@@ -125,4 +125,46 @@ public class LeagueMatchupRepository {
                         rs.getInt(8), (Long) rs.getObject(9), rs.getString(10), rs.getString(11), rs.getBigDecimal(12)))
                 .list();
     }
+
+    /**
+     * Both sides of every SCHEDULED pairing within one league-season, by
+     * manager -- no join to {@code roster_week_points}, unlike {@link
+     * #pairedWithScores}. specs/006-deeper-history-both-sports T048.
+     *
+     * <p>Exists for exactly one reason: telling apart the two ways a shared
+     * season can produce zero head-to-head meetings between two particular
+     * managers (contracts/head-to-head-api.md, US4.4). "The fixtures are
+     * scheduled but nobody has played yet" (the 2026 chains, 168/196 rows with
+     * no score) and "the schedule simply never paired these two people this
+     * season" (true even in a fully-scored season -- a 12-team league does not
+     * play a full round robin in 17 weeks) are different facts, and only one
+     * of them is fixed by waiting. {@link HeadToHeadService} uses this to pick
+     * the right sentence rather than leaving every empty pairing looking the
+     * same.
+     *
+     * <p>Same three constraints as {@code pairedWithScores}'s own javadoc,
+     * minus the score join: {@code roster_id <} to avoid a mirrored double
+     * row, {@code matchup_id is not null} on both sides because a null means
+     * no game that week, not a game against nobody.
+     */
+    public record ScheduledPair(int season, int week, int aRosterId, Long aManagerId,
+                                int bRosterId, Long bManagerId) {}
+
+    public List<ScheduledPair> scheduledPairs(long leagueId) {
+        return db.sql("""
+                select a.season, a.week, a.roster_id, rsa.manager_id, b.roster_id, rsb.manager_id
+                from league_matchup a
+                join league_matchup b
+                  on b.league_id = a.league_id and b.season = a.season and b.week = a.week
+                 and b.matchup_id = a.matchup_id and b.roster_id > a.roster_id
+                left join roster_season rsa on rsa.league_id = a.league_id and rsa.roster_id = a.roster_id
+                left join roster_season rsb on rsb.league_id = b.league_id and rsb.roster_id = b.roster_id
+                where a.league_id = ? and a.matchup_id is not null and b.matchup_id is not null
+                order by a.week, a.roster_id
+                """)
+                .param(leagueId)
+                .query((rs, i) -> new ScheduledPair(rs.getInt(1), rs.getInt(2), rs.getInt(3),
+                        (Long) rs.getObject(4), rs.getInt(5), (Long) rs.getObject(6)))
+                .list();
+    }
 }
