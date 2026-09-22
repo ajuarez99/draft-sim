@@ -45,6 +45,20 @@ Built so far:
   because those are different numbers: that same week was 182.0 across four
   games, and only 58.5 counted. Football keeps the list it has always had, since
   an NFL player's best night and best week are the same game.
+- **Manager careers, per sport** (specs/006-deeper-history-both-sports). The
+  manager page answers at career grain, not one season at a time: record, win
+  rate, efficiency, wins above expected, titles and waiver/FAAB tendencies,
+  **grouped per sport and never summed across them** -- and every average
+  states the season count it was divided by. `/managers/:a/versus/:b` puts two
+  managers side by side with the head-to-head record, and league history gains
+  all-time points leaders and longest win/loss streaks.
+  Two live defects had to be fixed before any of it could be trusted: a
+  manager's season rows carried no sport, so the old header added NBA wins to
+  NFL wins; and Sleeper's `latest_league_winner_roster_id` rides along on the
+  *new* season's league object, where it names the *previous* season's winner
+  -- which had crowned two managers champions of 2026 seasons one week old.
+  `league.status` (V21) is now stored, a null is never read as "complete", and
+  the champion write clears rather than skips.
 - **Interactive mock draft room** (`/mock/new`). Start a from-scratch mock at
   8/10/12/14 teams with no real Sleeper league or draft behind it -- bots
   auto-pick down the snake order, you take your own picks on your turn, sessions
