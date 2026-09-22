@@ -22,9 +22,24 @@ import java.util.*;
  * {@code LeagueHistoryContaminationIT}.
  *
  * Champion is read off {@code league.metadata.latest_league_winner_roster_id}
- * rather than parsed out of {@code winners_bracket} -- the plan's own
- * shortcut, since full placement (2nd, 3rd, ...) is not required by Phase A's
- * acceptance criteria and reconstructing it needs the whole bracket tree.
+ * rather than parsed out of {@code winners_bracket} -- full placement (2nd,
+ * 3rd, ...) is still not required by Phase A's acceptance criteria, and
+ * reconstructing it needs the whole bracket tree.
+ *
+ * <p><b>That metadata key alone is not safe to write unconditionally.</b>
+ * Sleeper carries it on the NEW season's league object too, where it means
+ * "most recent winner" -- i.e. LAST season's, not this one's. Verified live:
+ * {@code GET https://api.sleeper.app/v1/league/1346366555759341568} returned
+ * {@code "status": "in_season"} with
+ * {@code "metadata": {"latest_league_winner_roster_id": "1"}}, which stored
+ * popsharky (and, in a sibling league, gregmullen) as champion of a 2026
+ * season that had played one week
+ * (specs/006-deeper-history-both-sports/baseline.md T003). {@link #ingestStandings}
+ * therefore gates the write on this ingest pass's own {@code status} being
+ * {@code "complete"}, via
+ * {@link com.ballknowers.draftsim.store.LeagueRepository.LeagueRow#isComplete(String)}
+ * -- the same null-is-not-complete rule {@code LeagueRow.complete()} applies
+ * everywhere else, not a second copy of it.
  */
 @Service
 public class LeagueHistoryIngestService {
@@ -129,6 +144,20 @@ public class LeagueHistoryIngestService {
         Integer championRosterId = championRosterIdRaw == null ? null : LeagueMapper.asInt(championRosterIdRaw, -1);
         if (championRosterId != null && championRosterId < 0) championRosterId = null;
 
+        // Sleeper's `status` is a top-level field on THIS league object -- the
+        // same one LeagueMapper.upsert just forwarded into the row it wrote a
+        // few lines up in ingestChain -- read directly off this pass's own map
+        // rather than reading it back out of the DB, since that would just be
+        // a slower way to ask the same question this pass already has the
+        // answer to. specs/006-deeper-history-both-sports T023: the champion
+        // write is gated on this being "complete", because
+        // latest_league_winner_roster_id on an in-season league names the
+        // PREVIOUS season's winner (class javadoc). isComplete is the Phase 2
+        // rule verbatim -- null (not yet known) is NOT complete -- so this
+        // gate can never disagree with LeagueRow.complete()'s own answer.
+        Object statusRaw = league.get("status");
+        boolean seasonComplete = LeagueRepository.LeagueRow.isComplete(statusRaw == null ? null : String.valueOf(statusRaw));
+
         List<RosterSeasonRepository.Upsert> rows = new ArrayList<>();
         for (Map<String, Object> roster : sleeper.rosters(sleeperLeagueId)) {
             int rosterId = LeagueMapper.asInt(roster.get("roster_id"), -1);
@@ -145,7 +174,13 @@ public class LeagueHistoryIngestService {
                     points(settings, "fpts", "fpts_decimal"),
                     points(settings, "fpts_against", "fpts_against_decimal"),
                     points(settings, "ppts", "ppts_decimal"),
-                    championRosterId != null && championRosterId == rosterId ? 1 : null));
+                    // Written even when false, over any previously-stored 1 --
+                    // this is a CLEAR, not a skip. T022/research R2: the same
+                    // shape as the adp_at_time and league_matchup lessons, a
+                    // skip gate in front of a column never repairs it, and
+                    // roster_season already holds two wrong champions from
+                    // before this gate existed.
+                    seasonComplete && championRosterId != null && championRosterId == rosterId ? 1 : null));
         }
         rosterSeasons.upsertAll(rows);
         return rows.size();

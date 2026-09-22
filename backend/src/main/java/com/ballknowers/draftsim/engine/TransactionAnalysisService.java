@@ -75,6 +75,147 @@ public class TransactionAnalysisService {
     /** Stated on the wire because "4" meaning good is not self-evident. */
     static final String RANK_DIRECTION = "LOWER_IS_BETTER";
 
+    // ------------------------------------------------------- US6 (T070-T072): career-grain waiver/FAAB
+
+    /** One league-season this manager shared no FAAB bidding with, and why. */
+    public record ExcludedSeason(int season, String leagueName, String reason) {}
+
+    /**
+     * All five figures from data-model.md's FaabTendency, every one of them a
+     * fraction of a season's own {@code waiver_budget} -- never a dollar
+     * amount, which this database's budgets (100 -> 10000) make meaningless
+     * across one manager's own career (research R8).
+     *
+     * @param typicalBidPct    mean bid size, win or lose -- "what this manager
+     *                         usually bids", not "what he usually wins".
+     * @param largestBidPct    the single biggest bid attempted, win or lose.
+     * @param spentPerSeasonPct total of WON bids only, per season counted --
+     *                         money actually spent, unlike the two above.
+     * @param claimsPerSeason  FAAB bids attempted (won or lost) per season
+     *                         counted -- narrower than {@code movesPerSeason}
+     *                         above it, which also counts free-agent adds and
+     *                         priority-waiver claims that carried no bid.
+     * @param bidSuccessRate   won bids / bids attempted, within FAAB seasons
+     *                         only.
+     */
+    public record FaabTendency(double typicalBidPct, double largestBidPct, double spentPerSeasonPct,
+                               double claimsPerSeason, double bidSuccessRate) {}
+
+    /**
+     * One manager, one sport, their whole career's waiver behaviour
+     * (specs/006-deeper-history-both-sports US6, data-model.md WaiverTendency).
+     *
+     * @param seasonsCounted the SAME divisor {@link ManagerCareerService}
+     *                       already computed for the rest of this manager's
+     *                       CareerProfile (T073) -- not re-derived here, so
+     *                       "moves per season" and every other career average
+     *                       on the same block mean the same seasons. This
+     *                       repo has shipped the two-implementations-of-one-
+     *                       count bug under four different names; this field
+     *                       exists so this is not the fifth.
+     * @param faab           null when no season this manager played ran FAAB
+     *                       at all (data-model.md: "null when no season used
+     *                       FAAB").
+     */
+    public record WaiverTendency(double movesPerSeason, int seasonsCounted,
+                                 FaabTendency faab, List<ExcludedSeason> faabExcludedSeasons) {}
+
+    /**
+     * The career-grain sibling of {@link #forLeague}'s per-league-season
+     * {@code ManagerCounts} (T070) -- same "what counts as a move" rule
+     * (WAIVER + FREE_AGENT; a TRADE cannot be attributed to one manager,
+     * every one of 25 stored trades has a null {@code manager_id}, research
+     * R8), just summed across a manager's whole career instead of one
+     * league-season. Nothing here re-derives that rule; it is stated once,
+     * in the one status-blind count below, the same way {@code forLeague}'s
+     * own {@code countsByRoster} counts every status.
+     *
+     * @param managerId     whose career this is.
+     * @param leagueSeasons every league-season of ONE sport this manager has
+     *                      a roster in -- {@link ManagerCareerService} passes
+     *                      its own per-sport grouping, so this method never
+     *                      has to decide what a "sport" is.
+     * @param seasonsCounted the divisor -- see {@link WaiverTendency#seasonsCounted}.
+     */
+    public WaiverTendency careerWaiverTendency(long managerId, List<LeagueRepository.LeagueRow> leagueSeasons,
+                                               int seasonsCounted) {
+        if (leagueSeasons.isEmpty()) {
+            return new WaiverTendency(0, seasonsCounted, null, List.of());
+        }
+        List<Long> leagueIds = leagueSeasons.stream().map(LeagueRepository.LeagueRow::id).toList();
+
+        // ---- moves: WAIVER + FREE_AGENT, every league-season, no status
+        // filter -- forLeague()'s own ManagerCounts above applies none
+        // either; a failed waiver claim is still a move this manager
+        // attempted, and this is the one place that rule is stated.
+        int totalMoves = 0;
+        for (LeagueTransactionRepository.ManagerTypeCount c : transactions.movesByManager(managerId, leagueIds)) {
+            if ("WAIVER".equals(c.type()) || "FREE_AGENT".equals(c.type())) totalMoves += c.count();
+        }
+        double movesPerSeason = seasonsCounted > 0 ? round2((double) totalMoves / seasonsCounted) : 0;
+
+        // ---- T072: name every season that did not run FAAB before touching
+        // a single bid. waiver_type 0 (or anything but 2) is priority -- no
+        // bidding at all, and that is the correct, measured format for those
+        // seasons (research R8: NFL 2025 alone holds 321 such WAIVER rows,
+        // every one with a null faab_bid), not something to "fix" here.
+        Map<Long, LeagueRepository.WaiverFormat> formatByLeague = new HashMap<>();
+        List<ExcludedSeason> excluded = new ArrayList<>();
+        for (LeagueRepository.LeagueRow league : leagueSeasons) {
+            Optional<LeagueRepository.WaiverFormat> format = leagues.waiverFormat(league.id());
+            format.ifPresent(f -> formatByLeague.put(league.id(), f));
+            if (format.isEmpty() || !format.get().usesFaab()) {
+                excluded.add(new ExcludedSeason(league.season(), league.name(), "used waiver priority, not FAAB"));
+            }
+        }
+
+        // ---- T071, verbatim from data-model.md: every bid normalised
+        // against ITS OWN season's budget before anything is summed. Budgets
+        // in this database range 100 -> 10000 across a single manager's own
+        // seasons, so summing raw dollars first and dividing once at the end
+        // would silently let the highest-budget season dominate the figure.
+        List<Double> bidPcts = new ArrayList<>();
+        double spentPctSum = 0;
+        int claims = 0, successes = 0;
+        for (LeagueTransactionRepository.FaabBidRow bid : transactions.faabBidsByManager(managerId, leagueIds)) {
+            LeagueRepository.WaiverFormat format = formatByLeague.get(bid.leagueId());
+            // A bid can only exist in a FAAB season by construction (R8), but
+            // usesFaab()/waiverBudget()>0 is re-checked rather than trusted --
+            // a 0 budget would make the percentage undefined, not 0.
+            if (format == null || !format.usesFaab() || format.waiverBudget() <= 0) continue;
+            double pct = bid.bid() / format.waiverBudget();
+            bidPcts.add(pct);
+            claims++;
+            if (bid.successful()) {
+                successes++;
+                spentPctSum += pct;
+            }
+        }
+
+        FaabTendency faab = null;
+        if (!bidPcts.isEmpty()) {
+            double typical = bidPcts.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+            double largest = bidPcts.stream().mapToDouble(Double::doubleValue).max().orElse(0);
+            double spentPerSeasonPct = seasonsCounted > 0 ? spentPctSum / seasonsCounted : 0;
+            double claimsPerSeason = seasonsCounted > 0 ? (double) claims / seasonsCounted : 0;
+            double bidSuccessRate = claims > 0 ? (double) successes / claims : 0;
+            faab = new FaabTendency(round4(typical), round4(largest), round4(spentPerSeasonPct),
+                    round2(claimsPerSeason), round4(bidSuccessRate));
+        }
+
+        return new WaiverTendency(movesPerSeason, seasonsCounted, faab, excluded);
+    }
+
+    /** Counts (moves per season) keep two decimals, the same scale {@code pointsPerSeason} uses. */
+    private static double round2(double d) {
+        return Math.round(d * 100.0) / 100.0;
+    }
+
+    /** Rates and percentages keep four decimals, the same scale {@code winRate}/{@code averageEfficiency} use. */
+    private static double round4(double d) {
+        return Math.round(d * 10000.0) / 10000.0;
+    }
+
     public Optional<Result> forLeague(String sleeperLeagueId) {
         Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();

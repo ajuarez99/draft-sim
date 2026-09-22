@@ -98,7 +98,41 @@ public class RosterManagementService {
         }
     }
 
+    /**
+     * The per-sport player map {@link #forLeague} needs, keyed the same way it
+     * builds internally -- exposed so a caller that walks several
+     * league-seasons of the SAME sport in one request (a career profile,
+     * {@link ManagerCareerService}, specs/006-deeper-history-both-sports
+     * research R4) can load it ONCE and hand it to every {@link #forLeague}
+     * call, instead of paying {@code players.findAll(sport)} again for each
+     * one. Measured (baseline.md T004 supporting measurements): 4386 NFL /
+     * 2066 NBA player rows reloaded per call, 29-120ms per league-season; the
+     * deepest manager in this DB (popsharky) has six roster-seasons, so a
+     * naive per-season reload was 300-600ms -- over budget for one page load.
+     */
+    public Map<String, Player> playersBySleeperId(Sport sport) {
+        Map<String, Player> map = new HashMap<>();
+        for (Player p : players.findAll(sport)) {
+            if (p.sleeperId() != null) map.put(p.sleeperId(), p);
+        }
+        return map;
+    }
+
     public Optional<Result> forLeague(String sleeperLeagueId) {
+        return forLeague(sleeperLeagueId, null);
+    }
+
+    /**
+     * @param preloadedPlayers when non-null, used in place of
+     *                         {@code players.findAll(settings.sport())} --
+     *                         the caller is responsible for it being built by
+     *                         {@link #playersBySleeperId} for the SAME sport
+     *                         this league resolves to. {@code null} preserves
+     *                         this method's original behaviour exactly (always
+     *                         reload), which is what keeps every existing
+     *                         caller and test unaffected by T033's hoist.
+     */
+    public Optional<Result> forLeague(String sleeperLeagueId, Map<String, Player> preloadedPlayers) {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
@@ -113,11 +147,12 @@ public class RosterManagementService {
                     "no scored weeks yet for this league", league.season(), settings.sport()));
         }
 
-        // One player lookup for the whole request, not one per roster-week.
-        Map<String, Player> playersBySleeperId = new HashMap<>();
-        for (Player p : players.findAll(settings.sport())) {
-            if (p.sleeperId() != null) playersBySleeperId.put(p.sleeperId(), p);
-        }
+        // One player lookup for the whole request, not one per roster-week --
+        // and, per T033 above, not one per CALL either when the caller already
+        // holds a map for this sport.
+        Map<String, Player> playersBySleeperId = preloadedPlayers != null
+                ? preloadedPlayers
+                : playersBySleeperId(settings.sport());
 
         // Team name lives on league_member (Sleeper's per-league team name),
         // the manager's display name is the fallback, and "Roster N" is the

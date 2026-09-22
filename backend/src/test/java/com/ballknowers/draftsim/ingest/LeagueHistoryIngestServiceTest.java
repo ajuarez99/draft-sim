@@ -42,18 +42,32 @@ class LeagueHistoryIngestServiceTest {
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
                 weekPoints, fixtures, transactions);
-        lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any()))
+        lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
     }
 
     private static Map<String, Object> leagueObject(String leagueId, int season, Map<String, Object> settings,
                                                      Map<String, Object> metadata) {
+        return leagueObject(leagueId, season, settings, metadata, null);
+    }
+
+    /**
+     * specs/006-deeper-history-both-sports T023: {@code status} is now the
+     * gate on the champion write, so a test that cares about
+     * {@code finalPlacement} has to state it explicitly rather than rely on
+     * the 4-arg overload's default of {@code null} (not yet known -- which
+     * {@link LeagueRepository.LeagueRow#isComplete} treats as NOT complete,
+     * same as every other unfinished state).
+     */
+    private static Map<String, Object> leagueObject(String leagueId, int season, Map<String, Object> settings,
+                                                     Map<String, Object> metadata, String status) {
         Map<String, Object> l = new HashMap<>();
         l.put("league_id", leagueId);
         l.put("season", season);
         l.put("previous_league_id", null);
         l.put("settings", settings);
         l.put("metadata", metadata);
+        l.put("status", status);
         return l;
     }
 
@@ -74,7 +88,12 @@ class LeagueHistoryIngestServiceTest {
     @Test
     void standingsCombineWholeAndDecimalPointsAndFlagTheChampion() {
         Map<String, Object> metadata = Map.of("latest_league_winner_roster_id", "2");
-        Map<String, Object> league = leagueObject("L1", 2025, Map.of("last_scored_leg", 0), metadata);
+        // status: "complete" -- T023 gates the champion write on it. Without
+        // this, latest_league_winner_roster_id is not trustworthy (see
+        // ChampionOnlyWhenCompleteTest and this file's own re-ingest case
+        // below), so this test states the one status under which the
+        // metadata key IS the right answer.
+        Map<String, Object> league = leagueObject("L1", 2025, Map.of("last_scored_leg", 0), metadata, "complete");
         when(sleeper.leagueChain("L1")).thenReturn(List.of(league));
         when(sleeper.leagueUsers("L1")).thenReturn(List.of(Map.of("user_id", "u1", "display_name", "Alice"),
                 Map.of("user_id", "u2", "display_name", "Bob")));
@@ -99,6 +118,54 @@ class LeagueHistoryIngestServiceTest {
         RosterSeasonRepository.Upsert roster2 = rows.stream().filter(r -> r.rosterId() == 2).findFirst().orElseThrow();
         assertEquals(1600.05, roster2.pointsFor(), 1e-9);
         assertEquals(1, roster2.finalPlacement(), "metadata.latest_league_winner_roster_id says roster 2 won it");
+    }
+
+    /**
+     * specs/006-deeper-history-both-sports T022, research R2 -- the crux of
+     * the whole fix. Gating the champion WRITE (T023) is not enough on its
+     * own if the gate could ALSO cause the roster to be dropped from the
+     * upsert batch entirely: a skip gate in front of a column never repairs
+     * it, which is precisely how {@code adp_at_time} and, separately, the
+     * {@code league_matchup} fixture gate each shipped as real bugs in this
+     * repo (see this file's own javadoc, and the pairings/starters tests
+     * above, for the second one). Reuses L1's exact shape --
+     * {@code latest_league_winner_roster_id: "2"} -- so this is
+     * unmistakably the SAME league {@code standingsCombineWholeAndDecimalPointsAndFlagTheChampion}
+     * proved WOULD be crowned under {@code status: "complete"}; here the
+     * status is {@code "in_season"} instead, simulating a re-ingest of a
+     * league whose {@code roster_season.final_placement = 1} is already
+     * wrongly stored from before T023 existed (baseline.md T003: exactly
+     * this shape, for popsharky and gregmullen).
+     */
+    @Test
+    void reIngestClearsAPreviouslyStoredChampionRatherThanSkippingTheRow() {
+        Map<String, Object> metadata = Map.of("latest_league_winner_roster_id", "2");
+        Map<String, Object> league = leagueObject("L1b", 2026, Map.of("last_scored_leg", 0), metadata, "in_season");
+        when(sleeper.leagueChain("L1b")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L1b")).thenReturn(List.of(Map.of("user_id", "u1", "display_name", "Alice"),
+                Map.of("user_id", "u2", "display_name", "Bob")));
+        when(managers.upsert("u1", "Alice", null)).thenReturn(101L);
+        when(managers.upsert("u2", "Bob", null)).thenReturn(102L);
+        when(sleeper.rosters("L1b")).thenReturn(List.of(
+                rosterObject(1, "u1", 8, 6, 1500, 42),
+                rosterObject(2, "u2", 1, 0, 190, 0)));
+
+        service.ingestChain(Sport.NFL, "L1b");
+
+        ArgumentCaptor<List<RosterSeasonRepository.Upsert>> captor = ArgumentCaptor.forClass(List.class);
+        verify(rosterSeasons).upsertAll(captor.capture());
+        List<RosterSeasonRepository.Upsert> rows = captor.getValue();
+
+        // Not skipped: roster 2 -- the one metadata still names as the
+        // "winner" -- is still present in the batch handed to upsertAll.
+        // A skip gate would have simply omitted this row from the list,
+        // leaving whatever the DB already had untouched forever.
+        assertEquals(2, rows.size(), "every roster is still written, not omitted from the batch");
+
+        RosterSeasonRepository.Upsert roster2 = rows.stream().filter(r -> r.rosterId() == 2).findFirst().orElseThrow();
+        assertNull(roster2.finalPlacement(),
+                "status: in_season -- a previously-stored champion must be CLEARED (written as null), "
+                        + "not left alone by skipping the row");
     }
 
     @Test

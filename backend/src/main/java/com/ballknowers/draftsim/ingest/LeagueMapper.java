@@ -29,7 +29,13 @@ final class LeagueMapper {
                 asInt(league.get("total_rosters"), 0),
                 JsonUtil.write(league.getOrDefault("settings", Map.of())),
                 JsonUtil.write(league.getOrDefault("scoring_settings", Map.of())),
-                rosterPositions);
+                rosterPositions,
+                // Top-level on the league object (pre_draft / drafting / in_season /
+                // complete) -- NOT inside `settings`, so it never lands in
+                // settings_json alongside the two lines above. Dropped by this
+                // mapper before V21/research R2; see LeagueRow.complete() for why a
+                // missing value must never be read as "complete".
+                league.get("status") == null ? null : String.valueOf(league.get("status")));
     }
 
     static int asInt(Object o, int fallback) {

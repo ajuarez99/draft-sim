@@ -10,6 +10,7 @@ import {
   type MarginRecord,
   type RankStatus,
   type StandingRow,
+  type StreakRecord,
   type WeeklyScoreRecord,
 } from '../api'
 import Avatar from '../components/Avatar'
@@ -34,12 +35,14 @@ import { useLeagueLinkState } from '../railLeague'
  */
 
 /**
- * specs/002-league-history-record-book. Two panels below the standings.
+ * specs/002-league-history-record-book. Two panels below the standings --
+ * joined, since specs/006-deeper-history-both-sports US5, by two more:
+ * all-time points leaders and the longest win/loss streaks.
  *
- * Both render a stated reason when they have nothing, never an empty container:
- * a panel that draws nothing and says nothing is indistinguishable from one
- * that is broken, which is the lesson the season-with-no-standings guard
- * further down already learned the hard way.
+ * All four render a stated reason when they have nothing, never an empty
+ * container: a panel that draws nothing and says nothing is indistinguishable
+ * from one that is broken, which is the lesson the season-with-no-standings
+ * guard further down already learned the hard way.
  */
 function RecordBook({ records }: { records: LeagueRecords }) {
   const hasScores = records.highestWeeks.length > 0 || records.lowestWeeks.length > 0
@@ -148,6 +151,127 @@ function MarginGroup({ title, rows }: { title: string; rows: MarginRecord[] }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+/**
+ * specs/006-deeper-history-both-sports T065 (US5): all-time points scored,
+ * summed across the whole chain per manager. A RANKED LIST, same shape as
+ * ScoreList above and for the same reason -- there is an order and the order
+ * is the point -- rather than the margin-card pairing, which has no
+ * "opponent" side here to pair against.
+ *
+ * US5.4: the empty state names the same cause `RecordBook` already does for
+ * `highestWeeks`/`lowestWeeks`, because `pointsLeaders` is empty under
+ * exactly that condition -- no stored weekly scores.
+ */
+function PointsLeaders({ records }: { records: LeagueRecords }) {
+  const rows = records.pointsLeaders
+  return (
+    <section className="panel">
+      <h3 className="cond">All-time points leaders</h3>
+      {rows.length === 0 ? (
+        // Deliberately reworded rather than the RecordBook panel's identical
+        // sentence: both panels are empty for the same underlying reason (no
+        // stored weekly scores), but printing the exact same sentence twice
+        // on one page reads as a copy-paste rather than two honest panels.
+        <p className="muted small">
+          No weekly scores are stored for this league's seasons yet, so there's no all-time leaderboard
+          to show.
+        </p>
+      ) : (
+        <ol className="record-list">
+          {rows.map((r, i) => (
+            <li
+              className="record-row"
+              key={r.managerId != null ? `m-${r.managerId}` : `u-${r.rosterId}-${r.spanSeasons[0]}`}
+            >
+              <span className="record-rank">{i + 1}</span>
+              <span className="record-who">
+                <RecordWho row={r} />
+              </span>
+              <span className="record-points">{r.points.toFixed(2)}</span>
+              {/* US5.4: the span is named beside the total, not assumed --
+                  with one or two played seasons in this database, an
+                  unlabeled "all-time" figure reads as a single season's. */}
+              <span className="record-when">
+                over {r.spanSeasons.length} season{r.spanSeasons.length === 1 ? '' : 's'}
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  )
+}
+
+/**
+ * specs/006-deeper-history-both-sports T065 (US5): the longest runs of wins
+ * and losses. Paired like `RecordBook`'s own two lists -- win streaks and
+ * loss streaks only mean anything read side by side, the same reasoning that
+ * gave the score lists a `records-pair` rather than one long list.
+ *
+ * The empty state reuses `marginsUnavailableReason`: both streak lists and
+ * the margin lists are built from the same paired-fixture data
+ * (`LeagueMatchupRepository#pairedWithScores`), so they are empty under
+ * exactly the same condition, and stating the cause twice in two different
+ * sentences would only risk the two drifting apart.
+ */
+function Streaks({ records }: { records: LeagueRecords }) {
+  const rows = [...records.winStreaks, ...records.lossStreaks]
+  return (
+    <section className="panel">
+      <h3 className="cond">Streaks</h3>
+      {rows.length === 0 ? (
+        <p className="muted small">
+          {records.marginsUnavailableReason ??
+            "Head-to-head pairings aren't available for this league's seasons."}
+        </p>
+      ) : (
+        <>
+          {/* research R7 / US5.2: the rule is stated once for the panel,
+              rather than left for the reader to assume streaks can cross a
+              season boundary. Every entry on the wire carries its own
+              withinSeasonOnly, so a future cross-season streak still gets a
+              true sentence -- this one just covers the common case today. */}
+          <p className="muted tiny">
+            {rows.every((r) => r.withinSeasonOnly)
+              ? 'Longest run within a single season — a streak never carries across the offseason into the next year.'
+              : 'Some streaks below cross a season boundary; each row states its own span.'}
+          </p>
+          <div className="records-pair">
+            <StreakList title="Longest win streaks" rows={records.winStreaks} />
+            <StreakList title="Longest loss streaks" rows={records.lossStreaks} />
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function StreakList({ title, rows }: { title: string; rows: StreakRecord[] }) {
+  return (
+    <div className="records-col">
+      <h4>{title}</h4>
+      <ol className="record-list">
+        {rows.map((r, i) => (
+          <li className="record-row" key={`${r.rosterId}-${r.spanSeasons[0]}-${r.startWeek}`}>
+            <span className="record-rank">{i + 1}</span>
+            <span className="record-who">
+              <RecordWho row={r} />
+            </span>
+            <span className="record-points">
+              {r.length} game{r.length === 1 ? '' : 's'}
+            </span>
+            <span className="record-when">
+              {r.spanSeasons.join('–')} · Wk {r.startWeek}
+              {r.endWeek !== r.startWeek ? `–${r.endWeek}` : ''}
+              {!r.withinSeasonOnly && ' (crosses seasons)'}
+            </span>
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }
@@ -377,6 +501,8 @@ export default function LeagueHistory() {
 
       {history && <RecordBook records={history.records} />}
       {history && <MatchupMargins records={history.records} />}
+      {history && <PointsLeaders records={history.records} />}
+      {history && <Streaks records={history.records} />}
     </div>
   )
 }

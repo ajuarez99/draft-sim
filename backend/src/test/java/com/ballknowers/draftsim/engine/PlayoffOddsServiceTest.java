@@ -50,8 +50,11 @@ class PlayoffOddsServiceTest {
     }
 
     private static RosterSeasonRepository.StandingRow standing(int rosterId, int wins, double pointsFor) {
+        // sport/leagueName/complete (specs/006-deeper-history-both-sports T013/T014)
+        // are irrelevant to playoff-odds math, same as the season/sleeperLeagueId
+        // nulls already here -- this test never reads any of them.
         return new RosterSeasonRepository.StandingRow(LEAGUE, rosterId, null, null, null,
-                wins, 0, 0, pointsFor, 0.0, null, 2026, null);
+                wins, 0, 0, pointsFor, 0.0, null, 2026, null, null, null, null);
     }
 
     private static List<RosterSeasonRepository.StandingRow> twelveTeams() {

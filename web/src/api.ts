@@ -661,6 +661,13 @@ export const submitMockPick = (id: number, sleeperPlayerId: string) =>
 // are only populated by getManagerHistory (a per-league standings list already
 // knows both without repeating them on every row).
 export type StandingRow = {
+  /**
+   * specs/006-deeper-history-both-sports T040. The internal id, present on
+   * every row from standingRow() (not conditional the way season/sleeperLeagueId
+   * are) -- what a rank/chain lookup joins on, distinct from sleeperLeagueId,
+   * which is what a re-ingest or a deep link uses.
+   */
+  leagueId: number
   rosterId: number
   managerId: number | null
   manager: string | null
@@ -673,6 +680,20 @@ export type StandingRow = {
   champion: boolean
   season: number | null
   sleeperLeagueId: string | null
+
+  /**
+   * specs/006-deeper-history-both-sports US1. Null from getLeagueHistory's
+   * per-league call (the page already knows all three -- it asked for this
+   * one league); populated from getManagerHistory, whose rows span several
+   * leagues and sports with nothing else to tell them apart. Before this,
+   * `ManagerHistory.tsx` summed NBA and NFL rows into one header record --
+   * see baseline.md's T002 for the six-row, two-sport, no-`sport`-field
+   * defect this fixes.
+   */
+  sport: Sport | null
+  leagueName: string | null
+  /** league.status == 'complete'. A null/false value is NOT complete -- see LeagueRepository.LeagueRow#complete(). */
+  complete: boolean | null
 
   /**
    * specs/002-league-history-record-book US2. Optional, not required: this same
@@ -741,12 +762,52 @@ export type MarginRecord = {
 }
 
 /**
+ * specs/006-deeper-history-both-sports T060/T064. All-time points scored,
+ * summed across the whole chain per manager (or per unowned roster-season --
+ * see RecordWho, which already renders that case for the other four lists).
+ * `spanSeasons` is what lets the page state "over N seasons" beside a total,
+ * per US5.4: with one or two played seasons in this database, an unlabeled
+ * all-time figure reads as a season record wearing a career number's name.
+ */
+export type PointsLeaderRecord = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  points: number
+  spanSeasons: number[]
+}
+
+/**
+ * A run of consecutive weeks one roster won (or lost) every game, within one
+ * season (research R7). `withinSeasonOnly` rides on every entry so the page
+ * states the rule rather than leaving it for the reader to assume (US5.2).
+ */
+export type StreakRecord = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  avatarId: string | null
+  length: number
+  spanSeasons: number[]
+  startWeek: number
+  endWeek: number
+  withinSeasonOnly: boolean
+}
+
+/**
  * Always present on a 200, even when every list is empty. An absent key would
  * make "this league has no records" indistinguishable from "this server predates
  * the record book", which is exactly the ambiguity the contract forbids.
  *
  * `marginsUnavailableReason` is non-null exactly when the margin lists are
  * empty. A panel that renders nothing and says nothing reads as broken.
+ *
+ * `pointsLeaders`/`winStreaks`/`lossStreaks` carry no reason field of their
+ * own: `pointsLeaders` is empty under the same condition as `highestWeeks`/
+ * `lowestWeeks` (no stored weekly scores), and the two streak lists are empty
+ * under the same condition as the margin lists (no paired games) -- the page
+ * already has a sentence for each cause and reuses it.
  */
 export type LeagueRecords = {
   limit: number
@@ -755,6 +816,9 @@ export type LeagueRecords = {
   closestMatchups: MarginRecord[]
   biggestBlowouts: MarginRecord[]
   marginsUnavailableReason: string | null
+  pointsLeaders: PointsLeaderRecord[]
+  winStreaks: StreakRecord[]
+  lossStreaks: StreakRecord[]
 }
 
 export type LeagueHistory = {
@@ -785,6 +849,155 @@ export const backfillFinalRanks = (sleeperLeagueId: string, season?: number) =>
     { method: 'POST' },
   ).then(json<BackfillResult>)
 
+/**
+ * specs/006-deeper-history-both-sports US3 (FR-008, research R5). A ranked
+ * figure that always carries the population it was ranked against and the one
+ * league chain it was ranked within -- a bare "#2" is not a rank, and the repo
+ * has a standing rule about exactly this
+ * (feedback_label_the_axis_spell_out_the_number.md: one encoding per mark,
+ * the exact value beside it).
+ *
+ * One entry per league chain a manager plays in for this sport: a manager in
+ * two football chains gets two `winRate` ranks, never one blended across
+ * chains that have never played each other.
+ */
+export type Rank = {
+  figure: 'winRate' | 'pointsPerSeason' | 'averageEfficiency'
+  position: number
+  population: number
+  leagueName: string
+  sleeperLeagueId: string
+}
+
+/**
+ * A figure this app genuinely cannot answer, named rather than printed as a
+ * zero (FR-011). `unavailable` is present on every CareerProfile even when
+ * empty, so "no answer" is distinguishable from an older server that never
+ * asked the question -- render the reason, never a bare 0.
+ */
+export type Unavailable = {
+  figure: 'playoffAppearances' | 'tradesPerSeason'
+  reason: string
+}
+
+/**
+ * specs/006-deeper-history-both-sports US6 (data-model.md FaabTendency,
+ * research R8). Every field is a FRACTION of a season's own
+ * `settings_json.waiver_budget`, aggregated across seasons only AFTER each
+ * bid is normalised -- never a raw dollar figure, which this database's
+ * budgets (100 -> 10000, a 50x spread across one manager's own career) make
+ * meaningless to sum first and divide once.
+ */
+export type FaabTendency = {
+  /** Mean bid size, win or lose -- "what this manager usually bids". */
+  typicalBidPct: number
+  /** The single biggest bid attempted, win or lose. */
+  largestBidPct: number
+  /** Total of WON bids only, per season counted -- money actually spent. */
+  spentPerSeasonPct: number
+  /** FAAB bids attempted (won or lost) per season counted. */
+  claimsPerSeason: number
+  /** Won bids / bids attempted, within FAAB seasons only. */
+  bidSuccessRate: number
+}
+
+/**
+ * One league-season this manager shared no FAAB bidding with, and why --
+ * `waiver_type` 0 is waiver PRIORITY, with no bidding at all. NFL 2025 alone
+ * holds 321 such WAIVER rows with zero bids, and that is the correct format
+ * for that season, never something to render as a gap.
+ */
+export type FaabExcludedSeason = {
+  season: number
+  leagueName: string
+  reason: string
+}
+
+/**
+ * specs/006-deeper-history-both-sports US6. One manager, one sport, their
+ * whole career's waiver behaviour -- mirrors
+ * TransactionAnalysisService.WaiverTendency field-for-field.
+ */
+export type WaiverTendency = {
+  /** WAIVER + FREE_AGENT rows / seasonsCounted -- no status filter, a failed claim is still a move attempted. */
+  movesPerSeason: number
+  /**
+   * The SAME divisor the rest of this manager's CareerProfile already uses
+   * (T073) -- not a second count of "seasons with transactions ingested".
+   * One source for the number and its label.
+   */
+  seasonsCounted: number
+  /** Null when no season this manager played ran FAAB at all. */
+  faab: FaabTendency | null
+  faabExcludedSeasons: FaabExcludedSeason[]
+}
+
+/**
+ * A careers[].seasons[] row: standingRow()'s own shape plus `counted`, the one
+ * fact StandingRow cannot carry on its own (counted is about roster_week_points,
+ * not roster_season). An uncounted season -- NBA 2026, ingested and unplayed --
+ * is still listed here; it just contributes to none of the totals beside it.
+ */
+export type CareerSeason = StandingRow & { counted: boolean }
+
+/**
+ * One manager, one sport, their whole recorded career (never spans sports --
+ * FR-002). Mirrors ManagerCareerService.CareerProfile field-for-field.
+ *
+ * Every average below is divided by `seasonsCounted`, and that count rides on
+ * the SAME object as the average it explains (SC-008) -- a career figure with
+ * one or two played seasons behind it that doesn't say so reads as a season
+ * record wearing a career's name.
+ */
+export type CareerProfile = {
+  sport: Sport
+  /** The divisor behind every average below, and the seasons-covered label beside it. */
+  seasonsCounted: number
+  /** Every roster-season, including uncounted ones -- see CareerSeason. */
+  seasons: CareerSeason[]
+  wins: number
+  losses: number
+  ties: number
+  /** Null, never 0, when no games have been played. */
+  winRate: number | null
+  pointsFor: number
+  pointsAgainst: number
+  /** Null when there are no counted seasons to divide by. */
+  pointsPerSeason: number | null
+  /**
+   * Weeks-weighted mean of RosterManagementService's own per-week optimal
+   * lineup -- never roster_season.points_possible, which gives a different,
+   * more flattering number for the same manager-season (contracts/
+   * manager-profile-api.md). Null, never 1.0, when there is no potential to
+   * divide by.
+   */
+  averageEfficiency: number | null
+  /** Weeks actually behind averageEfficiency. */
+  weeksCounted: number
+  /**
+   * A COUNT of weeks dropped for want of a per-player breakdown -- not the
+   * week-number list RosterManagementTeam.weeksExcluded carries; a career
+   * spans several leagues' own week numbers, which cannot be merged into one
+   * list. An excluded week must stay visible rather than silently vanish from
+   * the average (FR-006).
+   */
+  weeksExcluded: number
+  /** Sum of per-season ExpectedWinsService figures. Null only when not one counted season produced a computable figure. */
+  winsAboveExpected: number | null
+  /** Counted seasons with finalPlacement == 1 AND the season complete. */
+  titles: number
+  unavailable: Unavailable[]
+  ranks: Rank[]
+  /**
+   * specs/006-deeper-history-both-sports US6 (T073). Always present -- never
+   * null -- even when this manager has never placed a FAAB bid: `waivers.faab`
+   * is the field that goes null then, not `waivers` itself. `tradesPerSeason`
+   * stays in `unavailable` above regardless; waivers answering does not make
+   * trades answerable too (T068).
+   */
+  waivers: WaiverTendency
+}
+
 export type ManagerHistory = {
   managerId: number
   manager: string | null
@@ -811,10 +1024,108 @@ export type ManagerHistory = {
     picksScored: number
     provenance: Provenance
   }[]
+  /**
+   * specs/006-deeper-history-both-sports T040/US3. Rides ALONGSIDE the flat
+   * `seasons` above, not in place of it -- see contracts/manager-profile-api.md's
+   * Migration section. One entry per sport the manager has a roster-season in;
+   * never a top-level total spanning sports.
+   */
+  careers: CareerProfile[]
 }
 
 export const getManagerHistory = (managerId: number) =>
   apiFetch(`/api/managers/${managerId}/history`).then(json<ManagerHistory>)
+
+// --- specs/006-deeper-history-both-sports US4: manager-vs-manager comparison ---
+
+/** One side of a `versus` response -- just enough to render an identity, not a full ManagerHistory. */
+export type VersusManagerRef = {
+  managerId: number
+  manager: string | null
+  avatarId: string | null
+}
+
+/**
+ * One scored, paired game between the two managers this endpoint compares.
+ * `winner` is decided by `starters_points`, never by `roster_season.wins` --
+ * that column is a whole season, and this is one game (mirrors
+ * LeagueRecordService.margin's own comment). Ties are their own outcome
+ * (US4.5), never folded into a side's losses.
+ */
+export type VersusMeeting = {
+  season: number
+  week: number
+  leagueName: string
+  sleeperLeagueId: string
+  aPoints: number
+  bPoints: number
+  winner: 'A' | 'B' | 'TIE'
+}
+
+/**
+ * A season both managers shared that produced zero meetings between THEM
+ * specifically, named with its own reason rather than left silently absent
+ * (US4.4). Backend's `HeadToHeadService.exclusionReason` distinguishes three
+ * different facts here: fixtures scheduled but not yet scored, a schedule
+ * that never paired them this season, or a league with nothing loaded at all
+ * -- only the first of those resolves itself by waiting.
+ */
+export type VersusSeasonExcluded = {
+  season: number
+  leagueName: string
+  reason: string
+}
+
+/**
+ * One comparison figure, one value per side. Null on a side with no counted
+ * season to compute it from -- the same null rules `CareerProfile`'s own
+ * fields already state, since every value here is read straight off it.
+ */
+export type VersusFigure<T> = { a: T | null; b: T | null }
+
+/**
+ * The side-by-side career comparison -- each side is one manager's own
+ * `CareerProfile` for this sport, read by `ManagerComparisonController`
+ * rather than re-derived, so this page and `/managers/:id/history` can never
+ * print two different numbers for the same manager.
+ */
+export type VersusComparison = {
+  titles: VersusFigure<number>
+  record: VersusFigure<string>
+  pointsFor: VersusFigure<number>
+  /** `pointsFor / (wins + losses + ties)`, not `/ weeks` -- matches the record beside it. */
+  pointsPerGame: VersusFigure<number>
+  winsAboveExpected: VersusFigure<number>
+  averageEfficiency: VersusFigure<number>
+  seasonsCounted: VersusFigure<number>
+}
+
+/** One sport's worth of the two managers' shared history. Never combined across sports (US4.2). */
+export type VersusSport = {
+  sport: Sport
+  aWins: number
+  bWins: number
+  ties: number
+  meetings: VersusMeeting[]
+  seasonsExcluded: VersusSeasonExcluded[]
+  comparison: VersusComparison
+}
+
+/**
+ * Mirrors `ManagerComparisonController.versus`'s response shape. `sports` is
+ * empty with `sharedNothing: true` when the two managers have never owned a
+ * roster in the same `league_id` at all -- never a bare `0-0`, which would be
+ * indistinguishable from "they played and split everything evenly" (US4.3).
+ */
+export type ManagerComparison = {
+  a: VersusManagerRef
+  b: VersusManagerRef
+  sports: VersusSport[]
+  sharedNothing: boolean
+}
+
+export const getManagerComparison = (aId: number, bId: number) =>
+  apiFetch(`/api/managers/${aId}/versus/${bId}`).then(json<ManagerComparison>)
 
 /**
  * The one place the mode list is written down.

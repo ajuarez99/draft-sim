@@ -144,7 +144,7 @@ class PlayerGameIngestServiceTest {
 
         org.mockito.Mockito.when(leagues.bySleeperId("L1")).thenReturn(java.util.Optional.of(
                 new com.ballknowers.draftsim.store.LeagueRepository.LeagueRow(
-                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null)));
+                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null, null)));
         org.mockito.Mockito.when(weekPoints.breakdownsFor(7L, 2025)).thenReturn(List.of(
                 new com.ballknowers.draftsim.store.RosterWeekPointsRepository.WeekBreakdown(
                         5, 3, 269.0, "{\"good\":58.5,\"bad\":10.0}", null)));
@@ -180,7 +180,7 @@ class PlayerGameIngestServiceTest {
 
         org.mockito.Mockito.when(leagues.bySleeperId("L1")).thenReturn(java.util.Optional.of(
                 new com.ballknowers.draftsim.store.LeagueRepository.LeagueRow(
-                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null)));
+                        7L, Sport.NBA, "L1", "Ball Knowers", 2025, 12, List.of(), 0.0, null, null)));
         org.mockito.Mockito.when(weekPoints.breakdownsFor(7L, 2025)).thenReturn(List.of(
                 new com.ballknowers.draftsim.store.RosterWeekPointsRepository.WeekBreakdown(
                         5, 3, 269.0, "{\"1658\":58.5}", null)));
