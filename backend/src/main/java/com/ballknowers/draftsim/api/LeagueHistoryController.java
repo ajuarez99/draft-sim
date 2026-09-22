@@ -286,8 +286,8 @@ public class LeagueHistoryController {
         // sleeperLeagueId -- the internal id is what a rank/chain lookup
         // joins on, the Sleeper id is what a re-ingest or a deep link uses.
         // Added here rather than only for the careers[] path since
-        // standingRow() is the one row-builder shared with history()'s and
-        // managerHistory()'s flat seasons -- an extra field is harmless there.
+        // standingRow() is the one row-builder shared with history()'s league
+        // standings too -- an extra field is harmless there.
         m.put("leagueId", r.leagueId());
         m.put("rosterId", r.rosterId());
         m.put("managerId", r.managerId());
@@ -345,12 +345,13 @@ public class LeagueHistoryController {
         record.put("managerId", managerId);
         record.put("manager", seasons.get(0).managerName());
         record.put("avatarId", seasons.get(0).avatarId());
-        // r.complete() is populated here (unlike history()'s forLeague() rows)
-        // by forManager()'s own join through LeagueRow.complete() -- T014 --
-        // so this is the real per-season fact, not a stand-in.
-        record.put("seasons", seasons.stream()
-                .map(r -> standingRow(r, Boolean.TRUE.equals(r.complete())))
-                .toList());
+        // The flat seasons[] that used to sit here is GONE (T076) -- step 3 of
+        // the migration in specs/006-deeper-history-both-sports/contracts/manager-profile-api.md,
+        // now that ManagerHistory.tsx reads careers[].seasons[] instead.
+        // careers[] partitions exactly the same rows by sport (every
+        // roster-season of this manager lands in exactly one CareerProfile),
+        // so nothing is dropped from the response -- only the second, flat
+        // copy that let a caller total two sports together without noticing.
 
         // One entry per sport this manager has actually drafted in, rather than
         // one object fitted from Sport.NFL unconditionally.
@@ -391,13 +392,12 @@ public class LeagueHistoryController {
         }
         record.put("draftHistory", draftHistory);
 
-        // T040 (specs/006-deeper-history-both-sports, US3): careers[] rides
-        // ALONGSIDE the flat seasons[] above, not in place of it -- seasons[]
-        // is a shipped field with a live consumer (web/src/pages/ManagerHistory.tsx)
-        // and the migration in contracts/manager-profile-api.md removes it in
-        // a change of its own, once nothing reads it. At no point does a
-        // caller see a career total spanning two sports (careers[] is one
-        // entry per sport, same rule draftHistory above already follows).
+        // T040 (specs/006-deeper-history-both-sports, US3): careers[] is now
+        // the ONLY season list in this response -- it shipped alongside the
+        // flat seasons[] for one release, and T076 removed that field once
+        // ManagerHistory.tsx had moved over. At no point does a caller see a
+        // career total spanning two sports (careers[] is one entry per sport,
+        // same rule draftHistory above already follows).
         record.put("careers", careers.forManager(managerId).stream()
                 .map(LeagueHistoryController::careerRow)
                 .toList());

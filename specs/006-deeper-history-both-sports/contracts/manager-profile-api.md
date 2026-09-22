@@ -123,8 +123,8 @@ right with one entry per sport. The record half does not.
   // Unchanged, already per-sport.
   "draftHistory": [ { "sport": "nfl", "...": "…" } ],
 
-  // Retained for one release. See Migration.
-  "seasons": [ "…flat list, now with sport on every row…" ]
+  // The flat "seasons" that rode here for one release is GONE (step 3 below,
+  // done 2026-09-22). careers[].seasons[] is the only season list.
 }
 ```
 
@@ -146,18 +146,26 @@ right with one entry per sport. The record half does not.
 | `waivers.faab` | Null when no season used FAAB. All figures are fractions of each season's own `waiver_budget` — budgets in this database range 100 to 10000, so dollars do not compare across one manager's seasons. |
 | `waivers.faabExcludedSeasons[]` | Each names its reason. `waiver_type 0` is waiver priority: NFL 2025 holds 321 waiver rows and zero bids, and that is correct. |
 
-## Migration
+## Migration — complete
 
-`seasons` is a **shipped field with a live consumer** (`ManagerHistory.tsx`), so it is not removed in
-the same change that adds `careers`:
+`seasons` was a **shipped field with a live consumer** (`ManagerHistory.tsx`), so it was not removed
+in the same change that added `careers`:
 
-1. Add `sport`, `leagueName` and `complete` to every existing `seasons[]` row, and correct `champion`.
-   `ManagerHistory.tsx` switches to per-sport blocks off that alone. This is US1 + US2 and it ships
+1. ✅ Add `sport`, `leagueName` and `complete` to every existing `seasons[]` row, and correct
+   `champion`. `ManagerHistory.tsx` switches to per-sport blocks off that alone. US1 + US2, shipped
    first.
-2. Add `careers[]` (US3, US6). The page reads `careers`.
-3. Remove `seasons[]` once nothing reads it, in a change of its own.
+2. ✅ Add `careers[]` (US3, US6). The page reads `careers`.
+3. ✅ **Remove `seasons[]` once nothing reads it, in a change of its own** — done 2026-09-22 (T076),
+   after the rest of 006 merged. The page now builds its season tables from `careers[].seasons`, and
+   the header reads `wins`/`losses`/`ties`/`seasonsCounted`/`titles` straight off the career with no
+   row-summing fallback behind them.
 
-At no point does a caller see a career total spanning two sports.
+At no point did a caller see a career total spanning two sports, and there is no longer a flat list
+that could be totalled into one by accident.
+
+**A consequence worth stating plainly:** a client is now *required* to read `careers`. There is no
+degraded mode for one that only knows `seasons` — it renders nothing rather than something wrong,
+which is the trade this removal deliberately makes.
 
 ## Verification
 

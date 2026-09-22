@@ -71,20 +71,21 @@ export default function ManagerHistory() {
   // sport it was. Sports with no seasons are omitted (T020) rather than
   // rendered as an empty block -- the same "nothing to say" rule
   // draftHistory below already follows.
-  const seasonsBySport = SPORT_ORDER.map((sport) => ({
-    sport,
-    rows: data.seasons.filter((s) => s.sport === sport),
-  })).filter((g) => g.rows.length > 0)
-
-  // Pairs each sport's season rows with its career profile, so the header
-  // and the panel below can never disagree about how many seasons a figure
-  // covers -- see the header's own comment for the live defect this
-  // prevents. `career` is undefined only against a server older than
-  // `careers[]`, which the header handles by falling back.
-  const careersBySport = seasonsBySport.map((g) => ({
-    ...g,
-    career: data.careers?.find((c) => c.sport === g.sport),
-  }))
+  //
+  // T076: the rows come from `careers[].seasons`, which is now the response's
+  // only season list -- the flat `seasons[]` this used to filter is gone. The
+  // two were always the same rows; the difference is that a career's rows
+  // arrive already belonging to one sport, so there is no longer any list on
+  // this page that CAN be totalled across sports by mistake. That is the
+  // whole point of the removal, not a refactor on the way to it.
+  // flatMap, not map().filter(): it narrows `career` to present, which is now
+  // guaranteed for any sport this page renders -- the rows ARE the career's
+  // rows. That removes the `?? rows.length` fallback the rail used to need
+  // against a server too old to send careers[].
+  const careersBySport = SPORT_ORDER.flatMap((sport) => {
+    const career = data.careers?.find((c) => c.sport === sport)
+    return career && career.seasons.length > 0 ? [{ sport, career, rows: career.seasons }] : []
+  })
 
   const name = data.manager ?? `manager ${data.managerId}`
 
@@ -105,7 +106,7 @@ export default function ManagerHistory() {
                 <span className="rail-league-name">{name}</span>
                 {/* FR-002: a season count is one of the totals that must not
                     span sports, same as the header below -- so this is a
-                    count per sport, not data.seasons.length. styles.css
+                    count per sport, never a figure spanning them. styles.css
                     already sizes a sport-pill inside rail-league-sub for
                     exactly this.
                     FR-007: and it is the SAME count the header and the career
@@ -113,14 +114,16 @@ export default function ManagerHistory() {
                     rail reading "NBA 3" beside a header reading "2 seasons"
                     -- the third place on one screen where a number labelled
                     "seasons" meant something different. `seasonsCounted`
-                    is the one source; the row count is the fallback only
-                    against a server older than `careers[]`. */}
+                    is the one source, and since T076 the only one -- a
+                    sport whose seasons are all uncounted reads 0 here, which
+                    is what "counted seasons" means and what the panel below
+                    says too. */}
                 <span className="rail-league-sub">
-                  {careersBySport.map(({ sport, rows, career }, i) => (
+                  {careersBySport.map(({ sport, career }, i) => (
                     <span key={sport}>
                       {i > 0 && ' · '}
                       <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>{' '}
-                      {career?.seasonsCounted ?? rows.length}
+                      {career.seasonsCounted}
                     </span>
                   ))}
                 </span>
@@ -166,17 +169,21 @@ export default function ManagerHistory() {
           // its label come from ONE source. `seasonsCounted` is that source
           // (FR-007), and `careers` is where it lives.
           <>
-            {careersBySport.map(({ sport, career, rows }, i) => {
-              const wins = career?.wins ?? rows.reduce((sum, s) => sum + (s.wins ?? 0), 0)
-              const losses = career?.losses ?? rows.reduce((sum, s) => sum + (s.losses ?? 0), 0)
-              const ties = career?.ties ?? 0
+            {careersBySport.map(({ sport, career }, i) => {
+              // Read straight off the career, with no row-summing fallback:
+              // since T076 the rows on this page ARE the career's rows, so a
+              // fallback could only ever produce a SECOND answer to a question
+              // this object already answers -- the shape of defect this whole
+              // feature existed to remove.
+              const wins = career.wins
+              const losses = career.losses
+              const ties = career.ties
               // Counted seasons, matching the panel. A season with no scored
               // week (NBA 2026) is listed in the table above and counts
               // towards nothing, which is the same rule everywhere on this
-              // page. Falls back to the row count only when the server is
-              // older than `careers`.
-              const seasons = career?.seasonsCounted ?? rows.length
-              const titles = career?.titles ?? rows.filter((s) => s.champion).length
+              // page.
+              const seasons = career.seasonsCounted
+              const titles = career.titles
               return (
                 <span key={sport}>
                   {i > 0 && ' · '}
@@ -191,13 +198,17 @@ export default function ManagerHistory() {
         }
       />
 
-      <section className="panel">
+      {/* `manager-seasons` names this section so a test (or a future style)
+          can scope to the standings tables alone: `.manager-sport-block` with
+          a `.panel-head .sport-pill` inside it now occurs three times on this
+          page -- here, in the career panel, and in draft history. */}
+      <section className="panel manager-seasons">
         {/* The career line that used to open this panel is the page header's
             sub now -- it describes the manager, not the standings table.
             One block per sport (T017), following the same pattern
             draftHistory already uses below, rather than inventing a second
             way to split a manager's history by sport. */}
-        {seasonsBySport.map(({ sport, rows }) => (
+        {careersBySport.map(({ sport, rows }) => (
           <div key={sport} className="manager-sport-block">
             <div className="panel-head">
               <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>

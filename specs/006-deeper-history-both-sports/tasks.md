@@ -237,7 +237,7 @@ a stated reason; trades are omitted with theirs.
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T076 Remove the flat `seasons[]` field from `managerHistory(...)` in `backend/src/main/java/com/ballknowers/draftsim/api/LeagueHistoryController.java` and from `web/src/api.ts`, once nothing reads it — step 3 of the migration in `contracts/manager-profile-api.md`, in a change of its own
+- [X] T076 Remove the flat `seasons[]` field from `managerHistory(...)` in `backend/src/main/java/com/ballknowers/draftsim/api/LeagueHistoryController.java` and from `web/src/api.ts`, once nothing reads it — step 3 of the migration in `contracts/manager-profile-api.md`, in a change of its own — done 2026-09-22 after 006 merged. `ManagerHistory.tsx` now builds its season tables from `careers[].seasons`, and the header reads the career directly: the `?? rows.reduce(...)` fallbacks behind wins/losses/seasons/titles are gone, because a fallback could only ever be a second answer to a question `careers` already answers. The test that asserted the old fallback is deleted rather than ported
 - [X] T077 [P] Amend `specs/002-league-history-record-book/contracts/league-history-api.md` to record that `champion` is false for any season whose `league.status` is not `complete`
 - [X] T078 [P] Verify every new chart carries the exact value beside the mark and a labelled axis; one encoding per mark (FR-014) — **no charts were added**: every new figure is a value+label card or a ranked list, each printing its exact number beside its name. Verified visually at desktop and 375px
 - [X] T079 [P] Check the new panels in both light and dark themes and at phone width
