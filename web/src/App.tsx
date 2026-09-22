@@ -16,6 +16,7 @@ import SeasonForecast from './pages/SeasonForecast'
 import WeeklyReport from './pages/WeeklyReport'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
+import ManagerComparison from './pages/ManagerComparison'
 import AppShell from './components/AppShell'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useUser } from './user'
@@ -84,6 +85,19 @@ export default function App() {
               <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
               <Route path="/managers" element={<ManagerTendencies />} />
               <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
+              {/* specs/006-deeper-history-both-sports US4: manager-scoped, not
+                  league-scoped -- addressed by two manager ids, not a league,
+                  so it lives beside /managers/:managerId/history rather than in
+                  destinations.ts. That registry's own LeagueDestination.href
+                  takes a LeagueContext (a lineage + a viewed season); a
+                  comparison between two people has neither, and
+                  destinations.test.ts's "does not claim routes that belong to
+                  no league" already asserts /managers/... routes match no row
+                  there (contracts/head-to-head-api.md's own wording talks
+                  about destinations.ts, but the registry it names is strictly
+                  for pages reached from inside one league -- see that file's
+                  own header comment). */}
+              <Route path="/managers/:aId/versus/:bId" element={<ManagerComparison />} />
               <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
               <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<LeagueAnalysis />} />

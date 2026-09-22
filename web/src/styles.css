@@ -3136,6 +3136,54 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .rank-cell { white-space: nowrap; }
 .rank-missing { color: var(--muted); font-size: 11px; }
 
+/* specs/006-deeper-history-both-sports US3: the manager career profile panel
+   reuses margin-card (value + label) for each figure rather than a flat
+   uniform grid -- feedback_avoid_flat_uniform_cards.md. These rules cover
+   what margin-card doesn't already: the "over N seasons" caption every card
+   carries (FR-007/SC-008), and the ranked-figure list beneath it (FR-008 --
+   population and league name beside every rank, never a bare ordinal). */
+.career-stat-seasons { margin: 6px 0 0; }
+.career-ranks {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.career-rank-row {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px;
+  padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
+}
+/* Hover depth rather than a permanent fill -- same argument as .record-row. */
+.career-rank-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.career-rank-figure { font-weight: 600; }
+.career-rank-position { font-weight: 700; }
+.career-unavailable {
+  list-style: none; margin: 10px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+/* specs/006-deeper-history-both-sports US4: the manager-vs-manager comparison
+   page. The title needs a third piece (the literal "vs") that page-title-avatar
+   alone doesn't carry, and the record beside a sport's panel-head needs to read
+   as a headline number the way margin-value already does elsewhere -- reused
+   here rather than duplicated since it is the identical rule (the axis is the
+   panel-head's own sport-pill beside it, spelling out what the number means). */
+.versus-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.versus-vs { color: var(--muted); font-size: 16px; font-weight: 400; }
+.versus-record { font-size: 18px; font-weight: 700; }
+.versus-meetings { margin-top: 14px; }
+.versus-excluded { margin-top: 10px; }
+
+/* specs/006-deeper-history-both-sports US6: the waiver/FAAB sub-block inside
+   each sport's career block. Same margin-card grid as the career figures
+   above it (reused, not restated), just under its own small label -- the
+   same muted, letter-spaced sub-header convention .history-season h3 and
+   .modal-alts h3 already use elsewhere, so this reads as a subsection of the
+   career block rather than a new panel. */
+.career-waivers { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.career-waivers-head {
+  margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
 @media (max-width: 640px) {
   .records-pair { grid-template-columns: minmax(0, 1fr); }
   .record-row { grid-template-columns: 20px minmax(0, 1fr) auto; row-gap: 2px; }

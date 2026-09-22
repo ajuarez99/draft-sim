@@ -88,6 +88,27 @@ no existing field is renamed, retyped or removed.
 - "Season is over" is derived from league settings and sport state, never a hardcoded week
   (FR-011).
 
+### Amended by specs/006-deeper-history-both-sports (2026-09-21)
+
+- `champion` is **false for any season whose `league.status` is not `complete`**, and
+  `IN_PROGRESS` is now decided by that stored status rather than by the season's position in the
+  chain.
+
+  This contract previously let `champion` follow `final_placement` alone. That was wrong on live
+  data: the ingest read the champion off `league.metadata.latest_league_winner_roster_id`, which
+  Sleeper carries on the **new** season's league object meaning *most recent winner* — last
+  season's. Verified against the source on 2026-09-21: league `1346366555759341568` returned
+  `"status": "in_season"` with `latest_league_winner_roster_id: "1"`, so popsharky was stored and
+  rendered as champion of a season that had played one week. The same was true of gregmullen in
+  West Coast. Two of the six stored placements were wrong, and the 🏆 drew on an in-progress
+  standings table.
+
+  The `IN_PROGRESS` row of the `rankStatus` table above said "Season is the chain's newest and is
+  not over", and the code matched it literally — `history()` passed `i == 0`. That proxy silently
+  becomes wrong the moment a chain's newest season completes, so it now reads `league.status`
+  (stored by migration `V21__league_status.sql`) instead. The table's meaning is unchanged; only
+  the way it is decided is.
+
 ---
 
 ## 2. `POST /api/leagues/{sleeperId}/power/backfill` — NEW
