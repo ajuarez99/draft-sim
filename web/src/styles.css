@@ -2197,7 +2197,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: color-mix(in oklch, var(--panel) 70%, var(--bg));
 }
 /* The drop target. A tint and a ring, never a lift -- grid tiles are on the
-   plane, and a slot that rises to meet the cursor reads as a card. */
+   plane, and a slot that rises to meet the cursor reads as a card.
+
+   Now set ONLY while dragging a chip out of the tray, which is the one path
+   that still defers its placement to the drop. A chip already in the ordering
+   reorders live as the pointer crosses each row's midpoint, so the board
+   itself -- renumbered, with the placeholder sitting in the destination -- is
+   the "where will this land" indication, and a tint under the fingertip would
+   be both redundant and hidden by the finger. */
 .rankboard-slot.drop-target {
   border-color: var(--teal);
   background: color-mix(in oklch, var(--teal) 14%, var(--panel));
@@ -2218,8 +2225,43 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; align-items: center; gap: 8px; min-height: 44px;
   padding: 4px 14px 4px 4px; border: 1px solid var(--line); border-radius: 999px;
   background: var(--panel); color: var(--text); font: inherit; text-align: left;
-  cursor: grab; touch-action: none; max-width: 100%; min-width: 0;
+  cursor: grab; max-width: 100%; min-width: 0;
 }
+
+/* The grip. `touch-action: none` lives HERE and nowhere else now.
+   It used to sit on .rankboard-chip, which is a full-width 44px row that
+   tiles the list -- so the entire scrollable surface was declared
+   unscrollable and every thumb-swipe became a drag. Scrolling the board and
+   moving a team were competing for the same pixels; a handle ends the
+   competition instead of arbitrating it with a timer (research.md §1).
+
+   44px square because it is the drag target on a phone; the six dots inside
+   are the ornament, the same rule finding 10 applied to the chip's avatar. */
+.rankboard-handle {
+  margin-left: auto; flex-shrink: 0;
+  width: 44px; min-height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); cursor: grab; touch-action: none;
+  border-radius: 10px;
+}
+.rankboard-handle:hover { color: var(--text); background: color-mix(in oklch, var(--line) 45%, transparent); }
+
+/* The tap route's nudge pair, on the selected chip only. These are what make
+   "use the arrows" a true sentence on a phone, which has no arrow keys --
+   the instruction used to point touch users at a keyboard-only control. They
+   sit before the grip, so the grip keeps the row's right edge. */
+.rankboard-nudge { display: flex; flex-shrink: 0; gap: 2px; margin-left: auto; }
+.rankboard-nudge + .rankboard-handle { margin-left: 4px; }
+.rankboard-nudge button {
+  width: 34px; min-height: 44px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); font-size: 10px; line-height: 1; cursor: pointer;
+}
+.rankboard-nudge button:hover:not(:disabled) { border-color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent); }
+.rankboard-nudge button:disabled { opacity: 0.3; cursor: default; }
+.rankboard-nudge button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.rankboard.dragging .rankboard-handle { cursor: grabbing; }
 .rankboard-chip:hover { border-color: color-mix(in oklch, var(--teal) 55%, var(--line)); }
 .rankboard-chip:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
 /* Selected is the click-to-place path's held state -- teal, because it is
@@ -2643,6 +2685,24 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .modal-card.wide .rankboard-tray,
 .modal-card.wide .rankboard .controls { flex-shrink: 0; }
 .modal-card.wide .rankboard-slots { flex: 1; min-height: 0; overflow-y: auto; }
+
+@media (max-width: 700px) {
+  /* The ballot modal is the only modal whose content is a twelve-row list you
+     have to drag around inside. At 375px the shared chrome was spending 96px
+     of the screen's width on padding alone (24px backdrop x2, 24px card x2),
+     leaving a 279px row to hold an avatar, a name, a team and -- once US2
+     lands -- a 44px grip. This buys back ~52px of width and ~97px of height,
+     which is about two more slots visible before autoscroll has to do any
+     work at all.
+
+     Scoped to `.pr-ballot-backdrop`, NOT to `.modal-backdrop`: five other
+     modals share that class (the player card, the player picker, the
+     on-the-clock input, the seat popover, the draft settings sheet) and none
+     of them asked to be reshaped. */
+  .pr-ballot-backdrop { padding: 8px; }
+  .pr-ballot-backdrop .modal-card { padding: 14px; border-radius: 12px; }
+  .pr-ballot-backdrop .modal-card.wide { max-height: 92vh; }
+}
 
 @media (max-width: 1180px) {
   /* The sidebar stops being a sidebar before the rows start truncating. */

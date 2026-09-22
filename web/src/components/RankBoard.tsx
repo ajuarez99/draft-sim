@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Avatar from './Avatar'
+import { autoScrollStep, clampScroll, targetSlotFor } from '../dragGesture'
 import {
   isComplete,
   makeEmptyOrder,
@@ -90,6 +91,37 @@ export type RankBoardProps = {
 
 const DRAG_THRESHOLD_PX = 6
 
+// Autoscroll feel. Named here rather than inline because these two are the
+// numbers most likely to want adjusting by hand on a real phone: the zone is
+// how close to an edge counts as "keep going", the cap is the fastest the
+// list may travel in one frame (~720px/s at 60fps).
+const AUTOSCROLL_ZONE_PX = 64
+const AUTOSCROLL_MAX_PX_PER_FRAME = 12
+
+/** How far above the fingertip the ghost rides on touch. A finger covers
+ *  roughly its own width of screen; without this the chip you are moving is
+ *  the one thing you cannot see (FR-011). Zero for a mouse, which occludes
+ *  nothing. */
+const TOUCH_GHOST_LIFT_PX = 28
+
+/**
+ * The nearest ancestor that actually scrolls, or null for the viewport.
+ *
+ * Not hard-coded to `.rankboard-slots` even though that is what scrolls
+ * today (styles.css gives it `overflow-y: auto` inside `.modal-card.wide`):
+ * this component is used twice and owns none of its callers' chrome, so the
+ * scroller is a property of where it was rendered, not of what it is.
+ */
+function resolveScrollParent(from: Element | null): Element | null {
+  let el: Element | null = from
+  while (el && el !== document.body && el !== document.documentElement) {
+    const overflowY = getComputedStyle(el).overflowY
+    if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return el
+    el = el.parentElement
+  }
+  return null
+}
+
 type DragOrigin = { kind: 'tray' } | { kind: 'slot'; index: number }
 
 type DragSession = {
@@ -102,6 +134,18 @@ type DragSession = {
   grabDY: number
   lastX: number
   lastY: number
+  /** Resolved once at threshold-crossing, never per frame. Null = viewport. */
+  scrollParent: Element | null
+  /** Where this chip sits *right now* under live reordering -- which is not
+   *  `origin.index` after the first move, and is the authority for the next
+   *  one. Null for a chip dragged out of the tray, which is not in the
+   *  ordering yet and is still placed on drop. */
+  currentSlot: number | null
+  /** What is driving this gesture. Touch must start on the grip; a mouse or
+   *  pen may start anywhere on the chip (FR-021 -- the handle must cost the
+   *  pointer path nothing). */
+  pointerType: string
+  startedOnHandle: boolean
 }
 
 type HitResult = { kind: 'slot'; index: number } | { kind: 'tray' } | null
@@ -158,6 +202,9 @@ export default function RankBoard({
   const dragRef = useRef<DragSession | null>(null)
   const draggingRef = useRef(false)
   const hoverRef = useRef<HitResult>(null)
+  const slotsElRef = useRef<HTMLOListElement | null>(null)
+  const autoScrollRef = useRef<number | null>(null)
+  const remeasureRef = useRef<(() => void) | null>(null)
   const suppressClickRef = useRef(false)
   const pendingFocusRef = useRef<ChipId | null>(null)
   const chipButtonRefs = useRef(new Map<ChipId, HTMLButtonElement>())
@@ -249,6 +296,17 @@ export default function RankBoard({
     placeSelectedInto(slotIndex)
   }
 
+  /** One rank up or down, from the keyboard or from the on-screen buttons --
+   *  the single nudge rule both routes call. Keeps the chip selected, because
+   *  moving a team two ranks means pressing twice. */
+  function nudge(chipId: ChipId, delta: -1 | 1) {
+    const next = moveChipBy(order, chipId, delta)
+    if (next === order) return
+    pendingFocusRef.current = chipId
+    announce(chipId, next)
+    setOrder(next)
+  }
+
   function handleChipKeyDown(e: React.KeyboardEvent<HTMLButtonElement>, chipId: ChipId, slotIndex: number | null) {
     if (e.key === 'Escape') {
       setSelected(null)
@@ -258,12 +316,7 @@ export default function RankBoard({
     const delta = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : null
     if (delta == null) return
     e.preventDefault()
-    const next = moveChipBy(order, chipId, delta)
-    if (next !== order) {
-      pendingFocusRef.current = chipId
-      announce(chipId, next)
-      setOrder(next)
-    }
+    nudge(chipId, delta)
   }
 
   // ---------------------------------------------------------------------
@@ -285,9 +338,100 @@ export default function RankBoard({
     slotElsRef.current.forEach((el, i) => el?.classList.toggle('drop-target', i === index))
   }
 
-  function handleChipPointerDown(e: React.PointerEvent<HTMLButtonElement>, chipId: ChipId, slotIndex: number | null) {
+  // ---- re-measure while a drag is live --------------------------------
+  //
+  // The original review of this board (claude/power-rankings-ballots.md,
+  // finding 10) said it in as many words: "Cache, but re-measure on `scroll`
+  // and `resize`, and after every placement." Only the last third shipped --
+  // the useEffect on `order` above -- and the missing two thirds are exactly
+  // why a drop could land on the wrong row once anything scrolled. A cached
+  // `getBoundingClientRect()` is viewport-relative and goes stale the instant
+  // the list moves under it.
+  //
+  // Listening on `document` in the capture phase rather than on the resolved
+  // scroll parent: scroll events do not bubble, and an ancestor other than
+  // the one we resolved can still move us.
+  function attachRemeasure() {
+    if (remeasureRef.current) return
+    const onMove = () => measureRects()
+    remeasureRef.current = onMove
+    document.addEventListener('scroll', onMove, { capture: true, passive: true })
+    window.addEventListener('resize', onMove)
+  }
+
+  function detachRemeasure() {
+    const onMove = remeasureRef.current
+    if (!onMove) return
+    document.removeEventListener('scroll', onMove, { capture: true })
+    window.removeEventListener('resize', onMove)
+    remeasureRef.current = null
+  }
+
+  // ---- autoscroll ------------------------------------------------------
+  //
+  // A twelve-slot board overflows its modal on a phone by about three rows,
+  // so without this a chip can only ever be dropped somewhere already on
+  // screen and last-to-first cannot be done in one gesture (US1).
+  function startAutoScroll() {
+    if (autoScrollRef.current != null) return
+    const frame = () => {
+      const drag = dragRef.current
+      if (!drag || !draggingRef.current) {
+        autoScrollRef.current = null
+        return
+      }
+      const parent = drag.scrollParent
+      if (parent) {
+        const r = parent.getBoundingClientRect()
+        const step = autoScrollStep(drag.lastY, r.top, r.bottom, AUTOSCROLL_ZONE_PX, AUTOSCROLL_MAX_PX_PER_FRAME)
+        if (step !== 0) {
+          const next = clampScroll(parent.scrollTop + step, parent.scrollHeight, parent.clientHeight)
+          if (next !== parent.scrollTop) {
+            parent.scrollTop = next
+            // Inline rather than waiting for the scroll listener: that event
+            // is dispatched asynchronously, and applyPointer below needs
+            // rects from *after* this scroll, not one frame behind it.
+            measureRects()
+          }
+        }
+      }
+      // Every frame, not only on pointermove. A finger can be perfectly still
+      // while the list travels underneath it -- the rank under it changes with
+      // no pointer event to announce it, and driving placement from
+      // pointermove alone is the way to build autoscroll that looks right and
+      // lands wrong.
+      applyPointer(drag.lastX, drag.lastY)
+      autoScrollRef.current = requestAnimationFrame(frame)
+    }
+    autoScrollRef.current = requestAnimationFrame(frame)
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollRef.current != null) {
+      cancelAnimationFrame(autoScrollRef.current)
+      autoScrollRef.current = null
+    }
+  }
+
+  function handleChipPointerDown(
+    e: React.PointerEvent<Element>,
+    chipId: ChipId,
+    slotIndex: number | null,
+    fromHandle = false,
+  ) {
     if (e.button !== 0) return // ignore non-primary buttons (right/middle click, secondary touch)
-    const rect = e.currentTarget.getBoundingClientRect()
+
+    // A touch that did not start on the grip is a scroll, and we want the
+    // browser to treat it as one -- returning here (rather than capturing and
+    // then deciding) is what lets the list scroll at all. Mouse and pen keep
+    // the whole chip as their grab area, with no delay and no threshold
+    // change: a handle is a touch affordance and must cost them nothing.
+    if (e.pointerType === 'touch' && !fromHandle) return
+
+    // Measure the CHIP, not `e.currentTarget` -- when the gesture starts on
+    // the grip those are different elements, and a ghost offset from the grip
+    // rather than the chip jumps sideways the instant it appears.
+    const rect = (chipButtonRefs.current.get(chipId) ?? e.currentTarget).getBoundingClientRect()
     dragRef.current = {
       pointerId: e.pointerId,
       chipId,
@@ -298,6 +442,10 @@ export default function RankBoard({
       grabDY: e.clientY - rect.top,
       lastX: e.clientX,
       lastY: e.clientY,
+      scrollParent: null,
+      currentSlot: slotIndex,
+      pointerType: e.pointerType,
+      startedOnHandle: fromHandle,
     }
     // Capture is deliberately NOT taken here. It is taken in pointermove, the
     // moment the drag threshold is crossed (see handleContainerPointerMove).
@@ -326,6 +474,12 @@ export default function RankBoard({
     dragRef.current = null
     draggingRef.current = false
     hoverRef.current = null
+    // Invariant: autoScrollRef is null whenever dragRef is null. A loop that
+    // outlives its drag scrolls a list nobody is touching. Both of these are
+    // idempotent, which matters because endDrag is reached from pointerup,
+    // pointercancel AND lostpointercapture (FR-014).
+    stopAutoScroll()
+    detachRemeasure()
     try {
       containerRef.current?.releasePointerCapture(pointerId)
     } catch {
@@ -354,18 +508,76 @@ export default function RankBoard({
       // a different React parent), and capturing a node that is about to
       // unmount is the `lostpointercapture` trap this component exists to
       // avoid. The container never unmounts mid-drag.
-      containerRef.current?.setPointerCapture(e.pointerId)
+      try {
+        containerRef.current?.setPointerCapture(e.pointerId)
+      } catch {
+        // Throws NotFoundError if the pointer is no longer active by the time
+        // we get here -- a very fast flick, or an OS interruption landing
+        // between pointerdown and this first qualifying move. Capture is what
+        // keeps events coming when the pointer leaves the container; without
+        // it the drag still works while the pointer is over the board, and
+        // pointerup/pointercancel still end it. That is a far better failure
+        // than an uncaught throw here, which would strand the drag with
+        // draggingRef already true and no ghost ever rendered.
+        // (releasePointerCapture in endDrag has always been guarded this way.)
+      }
       measureRects()
+      drag.scrollParent = resolveScrollParent(slotsElRef.current)
+      attachRemeasure()
+      startAutoScroll()
       setDraggingChipId(drag.chipId)
     }
 
     e.preventDefault()
+    applyPointer(e.clientX, e.clientY)
+  }
+
+  /**
+   * Everything that follows the pointer. Called from `pointermove`, and from
+   * every autoscroll frame -- which is why it takes coordinates rather than
+   * an event.
+   *
+   * A chip already in the ordering reorders LIVE: the board commits
+   * `move()` as the pointer crosses each row's midpoint, exactly as
+   * ArrowUp/ArrowDown already does. That is what makes the stale-rect class
+   * of bug impossible rather than merely less likely -- there is no remembered
+   * measurement consulted at drop time, because there is no placement at drop
+   * time. It is also what shows the landing spot around a fingertip: the
+   * indication is the board itself, renumbered.
+   *
+   * A chip dragged out of the tray is not in the ordering yet, so it keeps
+   * the deferred hit-test-and-place path and its `.drop-target` tint.
+   */
+  function applyPointer(x: number, y: number) {
+    const drag = dragRef.current
+    if (!drag || !draggingRef.current) return
+
     if (ghostElRef.current) {
-      ghostElRef.current.style.transform = `translate3d(${e.clientX - drag.grabDX}px, ${e.clientY - drag.grabDY}px, 0)`
+      const lift = drag.pointerType === 'touch' ? TOUCH_GHOST_LIFT_PX : 0
+      ghostElRef.current.style.transform = `translate3d(${x - drag.grabDX}px, ${y - drag.grabDY - lift}px, 0)`
     }
-    const hit = hitTest(e.clientX, e.clientY)
+
+    // Kept for both paths: the placed path reads it only to notice a drop
+    // over the tray, which still means "unrank this".
+    const hit = hitTest(x, y)
     hoverRef.current = hit
-    setSlotHoverClass(hit?.kind === 'slot' ? hit.index : null)
+
+    if (drag.currentSlot == null) {
+      setSlotHoverClass(hit?.kind === 'slot' ? hit.index : null)
+      return
+    }
+
+    const from = drag.currentSlot
+    const target = targetSlotFor(y, slotRectsRef.current, from)
+    if (target !== from) {
+      drag.currentSlot = target
+      // Functional updater, and deliberately side-effect free: unlike the
+      // click and keyboard handlers above, this one fires from an rAF loop
+      // whose closure would otherwise hold a stale `order`. The announcement
+      // is made once, on release -- announcing each micro-move would flood a
+      // screen reader.
+      setOrder((prev) => move(prev, from, target))
+    }
   }
 
   function handleContainerPointerUp(e: React.PointerEvent<HTMLDivElement>) {
@@ -375,16 +587,39 @@ export default function RankBoard({
       e.preventDefault()
       suppressClickRef.current = true
       const hit = hoverRef.current
-      let next = order
-      if (hit?.kind === 'slot') {
-        next = drag.origin.kind === 'tray' ? place(order, drag.chipId, hit.index) : move(order, drag.origin.index, hit.index)
-      } else if (hit?.kind === 'tray' && drag.origin.kind === 'slot') {
-        next = unplace(order, drag.chipId)
-      }
-      if (next !== order) {
+      const name = chipName(membersById.get(drag.chipId), drag.chipId)
+
+      if (drag.currentSlot == null) {
+        // Out of the tray: still a deferred placement, because a tray chip is
+        // not in the ordering to reorder live.
+        const next = hit?.kind === 'slot' ? place(order, drag.chipId, hit.index) : order
+        if (next !== order) {
+          pendingFocusRef.current = drag.chipId
+          announce(drag.chipId, next)
+          setOrder(next)
+        } else {
+          setLiveMessage(`${name} is still unranked. Nothing changed.`)
+        }
+      } else if (hit?.kind === 'tray') {
+        const next = unplace(order, drag.chipId)
+        if (next !== order) {
+          pendingFocusRef.current = drag.chipId
+          announce(drag.chipId, next)
+          setOrder(next)
+        }
+      } else {
+        // Live reordering has already applied every move this gesture made,
+        // including when the pointer ends up outside the list -- the board has
+        // been showing the result the whole way, so committing what is on
+        // screen is the honest end, and snapping back would contradict it.
+        // All that is left is to say what happened, once (FR-012, FR-013).
         pendingFocusRef.current = drag.chipId
-        announce(drag.chipId, next)
-        setOrder(next)
+        const startedAt = drag.origin.kind === 'slot' ? drag.origin.index : null
+        if (drag.currentSlot === startedAt) {
+          setLiveMessage(`${name} is still ranked ${ordinal(drag.currentSlot + 1)} of ${members.length}. Nothing changed.`)
+        } else {
+          setLiveMessage(`Placed ${name} ${ordinal(drag.currentSlot + 1)} of ${members.length}.`)
+        }
       }
     }
     endDrag(drag.pointerId)
@@ -496,7 +731,7 @@ export default function RankBoard({
         </div>
       )}
 
-      <ol className="rankboard-slots">
+      <ol className="rankboard-slots" ref={slotsElRef}>
         {order.map((chipId, i) => (
           <li
             key={i}
@@ -509,7 +744,54 @@ export default function RankBoard({
               {i + 1}
             </span>
             {chipId != null ? (
-              renderChip(membersById.get(chipId)!, i)
+              <>
+                {renderChip(membersById.get(chipId)!, i)}
+                {/* The tap route's "arrows", made real on a device with no
+                    arrow keys. Same `moveChipBy` the keydown handler calls, so
+                    there is one nudge rule and not two. Shown only on the
+                    selected chip: twenty-four always-on buttons would be a
+                    toolbar, not a ranking. */}
+                {selected === chipId && (
+                  <span className="rankboard-nudge">
+                    <button
+                      type="button"
+                      aria-label={`Move ${chipName(membersById.get(chipId), chipId)} up one rank`}
+                      disabled={i === 0}
+                      onClick={() => nudge(chipId, -1)}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${chipName(membersById.get(chipId), chipId)} down one rank`}
+                      disabled={i === order.length - 1}
+                      onClick={() => nudge(chipId, 1)}
+                    >
+                      ▼
+                    </button>
+                  </span>
+                )}
+                {/* A sibling of the chip, not a child: the chip is a <button>
+                    and nesting one interactive element inside another is
+                    invalid. `aria-hidden` because this is a drag affordance
+                    and dragging is the one route assistive technology cannot
+                    take -- the operable paths (tap-to-place, ArrowUp/Down,
+                    and the selected chip's own move buttons) are all on the
+                    chip itself and all announced. Offering AT a "reorder"
+                    control that does nothing when activated would be worse
+                    than offering none. */}
+                <span
+                  className="rankboard-handle"
+                  aria-hidden="true"
+                  onPointerDown={(e) => handleChipPointerDown(e, chipId, i, true)}
+                >
+                  <svg viewBox="0 0 10 16" width="10" height="16" focusable="false">
+                    {[3, 8, 13].map((cy) =>
+                      [2.5, 7.5].map((cx) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.4" fill="currentColor" />),
+                    )}
+                  </svg>
+                </span>
+              </>
             ) : (
               <button type="button" className="rankboard-slot-empty" aria-label={`Slot ${i + 1}, empty`} onClick={() => handleEmptySlotClick(i)}>
                 <span className="tiny muted">Empty</span>

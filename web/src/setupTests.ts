@@ -18,3 +18,18 @@ afterEach(() => {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
+
+// Same story for pointer capture: jsdom ships the PointerEvent constructor but
+// neither setPointerCapture nor releasePointerCapture, so any drag in
+// RankBoard throws on the frame the threshold is crossed. Capture is a real
+// browser behaviour with nothing to stand in for it here -- what these stubs
+// buy is the ability to assert which gestures START a drag at all, which is
+// where the touch-vs-scroll decision lives. Where the chip LANDS still cannot
+// be tested in jsdom (no layout, so getBoundingClientRect is all zeros); that
+// arithmetic lives in dragGesture.ts and is unit-tested directly.
+if (!Element.prototype.setPointerCapture) {
+  Element.prototype.setPointerCapture = () => {}
+}
+if (!Element.prototype.releasePointerCapture) {
+  Element.prototype.releasePointerCapture = () => {}
+}

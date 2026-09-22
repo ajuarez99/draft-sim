@@ -1379,7 +1379,7 @@ export default function PowerRankings() {
 
       {/* ---- ballot / commissioner ranking modal (2d) ---- */}
       {ballotModalOpen && (
-        <div className="modal-backdrop" onClick={() => setBallotModalOpen(false)}>
+        <div className="modal-backdrop pr-ballot-backdrop" onClick={() => setBallotModalOpen(false)}>
           <div className="modal-card wide" onClick={(ev) => ev.stopPropagation()}>
             <button className="modal-close" onClick={() => setBallotModalOpen(false)} aria-label="Close">
               ✕
@@ -1412,7 +1412,7 @@ export default function PowerRankings() {
                   />
                   {commissionerSeed.seededFrom && (
                     <p className="tiny muted">
-                      Starting order: {commissionerSeed.seededFrom}. Drag to disagree -- nothing is saved until you submit.
+                      Starting order: {commissionerSeed.seededFrom}. Drag by the grip, or tap a team and use the arrows -- nothing is saved until you submit.
                     </p>
                   )}
                   {saveMessage && <p className="small muted">{saveMessage}</p>}
@@ -1427,7 +1427,8 @@ export default function PowerRankings() {
             ) : blockState === 'ok' ? (
               <>
                 <p className="muted small">
-                  Drag to reorder -- or tap a team and use the arrows. Your own team is in the list; we show the bias rather
+                  Drag a team by the grip on its right, or tap it and use the arrows that appear. Your own team is in the
+                  list; we show the bias rather
                   than removing it. Nothing saves until you submit.
                 </p>
                 <RankBoard
@@ -1447,10 +1448,12 @@ export default function PowerRankings() {
                 />
                 {ballotSeed.seededFrom && (
                   <p className="tiny muted">
-                    Starting order: {ballotSeed.seededFrom}. Drag to disagree -- nothing is saved until you submit.
+                    Starting order: {ballotSeed.seededFrom}. Drag by the grip, or tap a team and use the arrows -- nothing is saved until you submit.
                   </p>
                 )}
-                <p className="tiny muted">Drag a chip, or click one and use ↑ / ↓ to move it. Escape drops the selection.</p>
+                <p className="tiny muted">
+                  Drag by the grip, or tap a team and use ↑ / ↓ to move it. Escape drops the selection.
+                </p>
                 {saveMessage && <p className="small muted">{saveMessage}</p>}
               </>
             ) : blockState === 'signed-out' ? (
