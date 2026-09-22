@@ -2227,6 +2227,28 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--panel); color: var(--text); font: inherit; text-align: left;
   cursor: grab; max-width: 100%; min-width: 0;
 }
+/* In a slot, the chip IS the row: it takes every pixel between the rank number
+   and the grip, so tapping anywhere on the row selects that team. Sized to its
+   content it was a ~116px pill floating in a 331px row, which made the target
+   a function of how short someone's username happens to be -- `jstrobe` got a
+   third of the row `GrandmasBeefRagu` got. An empty slot already claimed the
+   full width (.rankboard-slot-empty has flex: 1), so a filled one not doing so
+   was an inconsistency as much as a hit-target problem.
+
+   Scoped to .rankboard-slot on purpose: in the tray these same chips are
+   wrapped badges in a flex-wrap row, where content width is exactly right and
+   stretching them would make a column of stripes out of a bag of names.
+
+   Scoped to the phone breakpoint for a different reason -- measured, not
+   guessed. At 375px the row is 331px and a filled pill runs to 241px, so the
+   tail past the text is about 107px and the thing still reads as a pill. In
+   the 640px modal on a desktop the same rule gives a 481px pill holding 167px
+   of text: a 277px void inside a capsule, which is the wide flat slab this
+   board's design notes exist to avoid. A mouse does not need the help anyway;
+   a thumb does. */
+@media (max-width: 700px) {
+  .rankboard-slot .rankboard-chip { flex: 1 1 auto; }
+}
 
 /* The grip. `touch-action: none` lives HERE and nowhere else now.
    It used to sit on .rankboard-chip, which is a full-width 44px row that
