@@ -206,6 +206,16 @@ follows the same shape — match it rather than inventing a new process:
   (where "nothing built" is a legitimate outcome): `claude/next-features-roadmap.md`,
   `claude/borrowed-drafts.md`, `claude/adp-sources.md`.
 
+## Subagents: coding runs on Sonnet
+
+Any subagent spawned to write or change code — the build stage of the pipeline
+above, a fix pass, a refactor, a test-writing pass — runs on Sonnet. In Claude
+Code that means passing `model: "sonnet"` on the Agent tool call; in any other
+harness, pick its Sonnet-tier model. This applies to coding work only: the plan,
+adversarial review, bug-hunting review and live-verification stages keep the
+session's own model unless told otherwise. The parent session still owns the
+result — read the diff a Sonnet agent produces before reporting it as done.
+
 ## Working style that fits this project
 
 - Allan is a backend engineer (Java, Go, C#/.NET) — skip framework tutorials and
