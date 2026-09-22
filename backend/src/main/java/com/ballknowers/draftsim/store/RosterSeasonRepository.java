@@ -141,11 +141,14 @@ public class RosterSeasonRepository {
                 withSeason ? rs.getString(13) : null,
                 withSeason ? Sport.fromCode(rs.getString(14)) : null,
                 withSeason ? rs.getString(15) : null,
-                // Mirrors LeagueRepository.LeagueRow#complete() verbatim rather
-                // than re-deriving the rule here: a null status means not yet
-                // known and must never read as complete. See that method's
-                // javadoc for why -- popsharky and gregmullen were both
-                // crowned champions of a 2026 season one week old.
-                withSeason ? "complete".equals(rs.getString(16)) : null);
+                // CALLS LeagueRepository.LeagueRow#isComplete rather than
+                // re-deriving the rule here: a null status means not yet known
+                // and must never read as complete. See that method's javadoc
+                // for why -- popsharky and gregmullen were both crowned
+                // champions of a 2026 season one week old. This line used to
+                // spell the rule out again under a comment claiming it
+                // mirrored that method, which is how two implementations of
+                // one rule start.
+                withSeason ? LeagueRepository.LeagueRow.isComplete(rs.getString(16)) : null);
     }
 }
