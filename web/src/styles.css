@@ -1688,6 +1688,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .app-rail-context:empty { display: none; }
 
 .app-rail-section { display: flex; flex-direction: column; gap: 2px; }
+/* Holds the league's page links. On desktop it is invisible -- it reproduces
+   exactly the column the rows used to form as direct children of the section.
+   It exists for the phone breakpoint, which turns it into a scroll lane. */
+.app-rail-pages { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .app-rail-label, .jumpto-group-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); padding: 0 6px 6px;
@@ -1939,6 +1943,33 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .app-wordmark-line { display: inline; }
   .app-rail-toggle { display: none; }
   .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; align-items: center; }
+
+  /*
+   * The league's nine page links ride ONE horizontally scrolling lane.
+   *
+   * Left to wrap they took five stacked lines -- measured 2026-09-22 on a
+   * 375x812 screen, the whole rail had grown to 388px, 48% of the viewport
+   * before a single row of content, of which ~200px was these links. That is
+   * past the line the note below already drew: "a third of the viewport spent
+   * permanently on navigation is worse than navigation you scroll back up to
+   * reach."
+   *
+   * Laid end to end the links are ~1130px, so they will not fit any phone at
+   * any font size. A lane you swipe keeps every destination one gesture away
+   * and costs one 36px line instead of five. `flex: 0 0 100%` puts the lane on
+   * its own row beneath the league's identity; `min-width: 0` is what actually
+   * lets it scroll rather than stretch its parent.
+   */
+  .app-rail-pages {
+    flex: 0 0 100%; min-width: 0;
+    flex-direction: row; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    gap: 4px; padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .app-rail-pages::-webkit-scrollbar { display: none; }
+  .app-rail-pages .app-rail-row { flex: 0 0 auto; }
   .rail-league-id { padding: 0 6px 0 0; }
   .rail-league-seasons { padding: 0; }
   .app-rail-label { display: none; }
@@ -2226,6 +2257,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 4px 14px 4px 4px; border: 1px solid var(--line); border-radius: 999px;
   background: var(--panel); color: var(--text); font: inherit; text-align: left;
   cursor: grab; max-width: 100%; min-width: 0;
+  /* A press-and-hold on a row is now how you pick a team up on a phone, and
+     iOS answers a long press on its own with a callout and a text magnifier.
+     Suppressing both is what makes the hold feel like a grab rather than like
+     the page arguing with you. */
+  -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
 }
 /* In a slot, the chip IS the row: it takes every pixel between the rank number
    and the grip, so tapping anywhere on the row selects that team. Sized to its
@@ -2264,6 +2300,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; align-items: center; justify-content: center;
   color: var(--muted); cursor: grab; touch-action: none;
   border-radius: 10px;
+  /* Tinted at rest, not only on hover. As a bare glyph on the panel it read
+     as decoration and got missed -- and a hover state is no help at all on
+     the device this exists for. A phone gets no hover, so the affordance has
+     to be visible standing still. */
+  background: color-mix(in oklch, var(--line) 38%, transparent);
 }
 .rankboard-handle:hover { color: var(--text); background: color-mix(in oklch, var(--line) 45%, transparent); }
 

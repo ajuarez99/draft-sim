@@ -85,21 +85,37 @@ export function autoScrollStep(
 ): number {
   if (!(zonePx > 0) || !(containerBottom > containerTop)) return 0
 
+  // Never let the two zones eat the list. A fixed 64px zone in the 435px lane
+  // a 12-team ballot gets on a phone put 29% of the visible rows inside an
+  // autoscroll trigger, so a finger aiming at the second row from the top was
+  // already scrolling. Capped at a fifth of the container from each end, a
+  // short list keeps a real middle to aim at.
+  const zone = Math.min(zonePx, (containerBottom - containerTop) * 0.2)
+  if (!(zone > 0)) return 0
+
   // How far past the zone's inner boundary the pointer has reached. Negative
   // means it has not reached the zone at all. Beyond the container's own edge
-  // this exceeds zonePx, which the ramp caps at full speed.
-  const topDepth = zonePx - (pointerY - containerTop)
-  const bottomDepth = zonePx - (containerBottom - pointerY)
+  // this exceeds the zone, which the ramp caps at full speed.
+  const topDepth = zone - (pointerY - containerTop)
+  const bottomDepth = zone - (containerBottom - pointerY)
 
   // A container shorter than two zones has them overlapping in the middle;
   // the deeper reading is the nearer edge, and it wins.
-  if (topDepth > 0 && topDepth >= bottomDepth) return -ramp(topDepth, zonePx, maxPxPerFrame)
-  if (bottomDepth > 0) return ramp(bottomDepth, zonePx, maxPxPerFrame)
+  if (topDepth > 0 && topDepth >= bottomDepth) return -ramp(topDepth, zone, maxPxPerFrame)
+  if (bottomDepth > 0) return ramp(bottomDepth, zone, maxPxPerFrame)
   return 0
 }
 
+/**
+ * Quadratic, not linear. Linear meant that merely touching the edge of the
+ * zone already moved the list at a fair clip, so there was no slow end of the
+ * range to steer with -- you were either not scrolling or scrolling fast.
+ * Squaring puts most of the travel in the last few pixels: drift into the
+ * zone and it creeps, push right to the edge and it commits.
+ */
 function ramp(depth: number, zonePx: number, maxPxPerFrame: number): number {
-  return Math.min(depth / zonePx, 1) * maxPxPerFrame
+  const t = Math.min(depth / zonePx, 1)
+  return t * t * maxPxPerFrame
 }
 
 /**
