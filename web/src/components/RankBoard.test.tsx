@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import RankBoard, { type RankBoardMember } from './RankBoard'
 
@@ -46,7 +46,47 @@ function pressAndMove(target: Element, board: HTMLElement, pointerType: string) 
 }
 
 describe('RankBoard gesture gating', () => {
-  it('does not start a drag when a touch begins on the row body', () => {
+  it('starts a drag when a touch rests on the row body', () => {
+    // The fix for "I pressed the team and the page just scrolled". The grip is
+    // only discoverable once you know it is there; a hold is what people
+    // actually reach for.
+    vi.useFakeTimers()
+    try {
+      const { container } = renderBoard()
+      const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+
+      fireEvent.pointerDown(chip, { pointerId: 1, button: 0, pointerType: 'touch', clientX: 50, clientY: 50 })
+      expect(isDragging(container)).toBe(false) // nothing yet -- this could still be a scroll
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(isDragging(container)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('abandons a pending hold if the finger travels first', () => {
+    // A swipe that happens to begin on a chip is still a swipe.
+    vi.useFakeTimers()
+    try {
+      const { container, board } = renderBoard()
+      const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+
+      fireEvent.pointerDown(chip, { pointerId: 1, button: 0, pointerType: 'touch', clientX: 50, clientY: 50 })
+      fireEvent.pointerMove(board, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 90 })
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+
+      expect(isDragging(container)).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not start a drag when a touch swipes straight off the row body', () => {
     // The scroll case. Before the handle existed this picked the team up,
     // which is why the board could not be read on a phone without disturbing
     // it -- every row is a 44px full-width target and they tile the list.

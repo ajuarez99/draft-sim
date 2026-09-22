@@ -135,6 +135,29 @@ describe('autoScrollStep', () => {
     expect(autoScrollStep(300, 500, 100, ZONE, MAX)).toBe(0)
     expect(autoScrollStep(300, TOP, BOTTOM, 0, MAX)).toBe(0)
   })
+
+  it('caps the zone at a fifth of the container, so a short list keeps a middle', () => {
+    // A 100px lane asked for a 64px zone would have no neutral band at all --
+    // both zones would overlap across the whole thing and a finger anywhere
+    // would scroll. Capped at 20px a side, the middle 60px is still aimable.
+    const shortTop = 0
+    const shortBottom = 100
+    expect(autoScrollStep(50, shortTop, shortBottom, 64, MAX)).toBe(0)
+    expect(autoScrollStep(30, shortTop, shortBottom, 64, MAX)).toBe(0)
+    expect(autoScrollStep(70, shortTop, shortBottom, 64, MAX)).toBe(0)
+    // Inside the capped zone it still works, and still respects the cap.
+    expect(autoScrollStep(5, shortTop, shortBottom, 64, MAX)).toBeLessThan(0)
+    expect(autoScrollStep(95, shortTop, shortBottom, 64, MAX)).toBeGreaterThan(0)
+  })
+
+  it('ramps quadratically, so the outer edge of the zone creeps', () => {
+    // Half way into the zone should be a quarter of top speed, not half --
+    // linear left no slow end of the range to steer with.
+    const halfway = Math.abs(autoScrollStep(TOP + ZONE / 2, TOP, BOTTOM, ZONE, MAX))
+    expect(halfway).toBeCloseTo(MAX * 0.25, 5)
+    const atEdge = Math.abs(autoScrollStep(TOP, TOP, BOTTOM, ZONE, MAX))
+    expect(atEdge).toBeCloseTo(MAX, 5)
+  })
 })
 
 describe('clampScroll', () => {

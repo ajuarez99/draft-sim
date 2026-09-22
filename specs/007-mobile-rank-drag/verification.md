@@ -111,3 +111,49 @@ board behaved exactly as designed. Fixed by clearing the selection with Escape
 and asserting `aria-pressed` between steps. Recorded because "the automation
 desynced" and "the feature is broken" look identical in a failing assertion,
 and the difference was only visible by tracing the selection state.
+
+---
+
+## After real-phone use, 2026-09-22
+
+The seventeen scenarios above all passed and the feature was still bad on a
+phone. Allan reported all four of the symptoms offered: the list flew, a press
+on a row did nothing but scroll, the grip was hard to hit, and the chip lagged
+the finger. Worth recording precisely how a green log missed each one.
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| List jumped / flew | 64px zones were 29% of the 435px lane, and 12px/frame is 720px/s against a 137px scroll range — end to end in **190ms**. A finger drifting within ~1.3 rows of an edge snapped the board. | Zone 40px and capped at a fifth of the container, 5px/frame, quadratic ramp so the zone's outer edge creeps. |
+| Press did nothing, page scrolled | The grip was the only way to pick a team up on touch, and it is discoverable only once you know it is there. People grab the row. | Press-and-hold (320ms, 10px slop) anywhere on a row now starts a drag. The grip keeps its no-delay path; a mouse still never waits. |
+| Couldn't hit the grip | A bare muted glyph on the panel reads as decoration, and its only affordance was a hover state — which a phone does not have. | Tinted at rest. |
+| Chip lagged the finger | Two forced layouts per frame (the loop measured inline *and* its own scroll event re-measured), a 12-rect hit test every frame for a tray that usually is not rendered, and the ghost transform rewritten 60×/s even with a still finger. | Self-scroll guard on the re-measure listener, hit test skipped when there is no tray, ghost moved on pointermove only. |
+
+**Why scenario 2 hid the worst of it.** It was written as "hold at the edge
+until the list reaches the end, and confirm it stops". Flying the entire range
+in 190ms *passes* that scenario — it reaches the end and stops. The scenario
+that would have caught it is "move a team two rows and drop it", which nobody
+wrote because it sounds too easy to be worth a line.
+
+**The wider lesson.** Every number in the first pass was picked to be
+defensible in isolation and none was checked against this board's real
+geometry: a 435px lane with a 137px scroll range. The arithmetic that exposed
+all of it took one minute and no browser.
+
+## Also fixed in the same pass: the rail
+
+Not part of spec 007, reported alongside it. At 375×812 `.app-rail` measured
+**388px — 48% of the viewport before a single row of content**, because the
+league's nine page links wrap onto five stacked lines (~200px). They are
+~1130px laid end to end, so they fit no phone at any font size.
+
+They now ride one horizontally scrolling lane (`.app-rail-pages`), which is
+38px instead of ~200px. Rail 388 → **229px**, content top 404 → 245. Desktop is
+untouched: at 1280px the lane is still a column, nine rows on nine lines,
+`overflow-x: visible`.
+
+The CSS already carried a note from a previous round saying "a third of the
+viewport spent permanently on navigation is worse than navigation you scroll
+back up to reach" — written when the bar measured 252px. It had since grown to
+388px without anyone re-measuring. 229px is back inside that stated line, but
+only just, and the remaining cost is four stacked rows: wordmark, league
+identity, the page lane, and global nav + account.

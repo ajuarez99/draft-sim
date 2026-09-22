@@ -322,7 +322,12 @@ export default function LeagueRailSection({
         </div>
       )}
 
-      {destinations.map(rowFor)}
+      {/* Wrapped, rather than left as bare siblings of the league identity,
+          so the phone breakpoint can turn just these into one horizontally
+          scrolling lane. As siblings they wrapped onto five stacked lines at
+          375px -- about 200px of an 812px screen spent on page links alone.
+          The wrapper reproduces the column layout it replaced on desktop. */}
+      <div className="app-rail-pages">{destinations.map(rowFor)}</div>
     </div>
   )
 }

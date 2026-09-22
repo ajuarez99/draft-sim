@@ -91,18 +91,40 @@ export type RankBoardProps = {
 
 const DRAG_THRESHOLD_PX = 6
 
-// Autoscroll feel. Named here rather than inline because these two are the
-// numbers most likely to want adjusting by hand on a real phone: the zone is
-// how close to an edge counts as "keep going", the cap is the fastest the
-// list may travel in one frame (~720px/s at 60fps).
-const AUTOSCROLL_ZONE_PX = 64
-const AUTOSCROLL_MAX_PX_PER_FRAME = 12
+// Autoscroll feel, retuned 2026-09-22 after the first numbers were tried on a
+// real phone and were plainly wrong.
+//
+// They were 64px and 12px/frame. On the 435px lane a 12-team ballot gets at
+// 375x812 that made 29% of the visible rows an autoscroll trigger, and 12px a
+// frame is 720px/s against a scroll range of only 137px -- the whole list
+// travelled end to end in 190ms. Drift a finger within about a row and a third
+// of either edge and the board snapped to the end.
+//
+// None of this showed up in verification because the scenario run was "hold at
+// the edge until it reaches the end and confirm it stops", which is exactly
+// the case where flying looks correct.
+//
+// 40px and 5px/frame is 300px/s, ~460ms across the whole range, and
+// dragGesture.ts additionally caps the zone at a fifth of the container so a
+// short list keeps a middle to aim at. The ramp there is quadratic, so the
+// outer edge of the zone creeps rather than commits.
+const AUTOSCROLL_ZONE_PX = 40
+const AUTOSCROLL_MAX_PX_PER_FRAME = 5
 
 /** How far above the fingertip the ghost rides on touch. A finger covers
  *  roughly its own width of screen; without this the chip you are moving is
  *  the one thing you cannot see (FR-011). Zero for a mouse, which occludes
  *  nothing. */
 const TOUCH_GHOST_LIFT_PX = 28
+
+/** How long a finger must rest on a row before it becomes draggable. Long
+ *  enough that a swipe which happens to begin on a chip is still a swipe,
+ *  short enough that a deliberate press does not feel ignored. */
+const LONG_PRESS_MS = 320
+
+/** Movement that cancels a pending long press. Bigger than a resting thumb's
+ *  wobble, smaller than any intentional swipe. */
+const LONG_PRESS_SLOP_PX = 10
 
 /**
  * The nearest ancestor that actually scrolls, or null for the viewport.
@@ -146,6 +168,10 @@ type DragSession = {
    *  pointer path nothing). */
   pointerType: string
   startedOnHandle: boolean
+  /** True between a touch landing on a row body and the hold timer firing --
+   *  the window in which this gesture could still turn out to be a scroll.
+   *  Nothing is captured and nothing moves while it is true. */
+  pending: boolean
 }
 
 type HitResult = { kind: 'slot'; index: number } | { kind: 'tray' } | null
@@ -205,6 +231,12 @@ export default function RankBoard({
   const slotsElRef = useRef<HTMLOListElement | null>(null)
   const autoScrollRef = useRef<number | null>(null)
   const remeasureRef = useRef<(() => void) | null>(null)
+  const longPressRef = useRef<number | null>(null)
+  /** Set while the autoscroll loop is driving scrollTop itself, so the
+   *  document scroll listener does not re-measure a second time in the same
+   *  frame -- two forced layouts per frame on a phone is exactly the kind of
+   *  cost that reads as the chip lagging the finger. */
+  const selfScrollingRef = useRef(false)
   const suppressClickRef = useRef(false)
   const pendingFocusRef = useRef<ChipId | null>(null)
   const chipButtonRefs = useRef(new Map<ChipId, HTMLButtonElement>())
@@ -222,6 +254,28 @@ export default function RankBoard({
   useEffect(() => {
     measureRects()
   }, [order])
+
+  // Once a touch drag is live the page must not also scroll under it. React
+  // attaches `onTouchMove` as a PASSIVE listener, where preventDefault is a
+  // no-op with a console warning, so the only way to say "this gesture is
+  // mine now" is a listener we add ourselves with `{ passive: false }`.
+  //
+  // This is safe precisely because of the hold: the finger has been still for
+  // LONG_PRESS_MS, so the browser has not begun a scroll it would refuse to
+  // give back. A grip drag does not need this -- `.rankboard-handle` carries
+  // `touch-action: none` -- but it costs nothing to cover both.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const onTouchMove = (e: TouchEvent) => {
+      const drag = dragRef.current
+      if (drag && !drag.pending && draggingRef.current && drag.pointerType === 'touch') {
+        e.preventDefault()
+      }
+    }
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onTouchMove)
+  }, [])
 
   // Re-focus the chip a keyboard or click action just moved -- see the
   // per-slot `<li key={i}>` note below on why this can't just rely on React
@@ -353,7 +407,13 @@ export default function RankBoard({
   // the one we resolved can still move us.
   function attachRemeasure() {
     if (remeasureRef.current) return
-    const onMove = () => measureRects()
+    const onMove = () => {
+      // The autoscroll loop measures inline right after it sets scrollTop, so
+      // the scroll event it causes would be a second forced layout in the same
+      // frame. Only other people's scrolls need this listener.
+      if (selfScrollingRef.current) return
+      measureRects()
+    }
     remeasureRef.current = onMove
     document.addEventListener('scroll', onMove, { capture: true, passive: true })
     window.addEventListener('resize', onMove)
@@ -387,11 +447,19 @@ export default function RankBoard({
         if (step !== 0) {
           const next = clampScroll(parent.scrollTop + step, parent.scrollHeight, parent.clientHeight)
           if (next !== parent.scrollTop) {
+            selfScrollingRef.current = true
             parent.scrollTop = next
+            selfScrollingRef.current = false
             // Inline rather than waiting for the scroll listener: that event
             // is dispatched asynchronously, and applyPointer below needs
             // rects from *after* this scroll, not one frame behind it.
             measureRects()
+          } else if (step !== 0) {
+            // Already hard against an end. Nothing will change until the
+            // pointer leaves the zone, so stop paying for the rest of the
+            // frame's work.
+            autoScrollRef.current = requestAnimationFrame(frame)
+            return
           }
         }
       }
@@ -421,12 +489,19 @@ export default function RankBoard({
   ) {
     if (e.button !== 0) return // ignore non-primary buttons (right/middle click, secondary touch)
 
-    // A touch that did not start on the grip is a scroll, and we want the
-    // browser to treat it as one -- returning here (rather than capturing and
-    // then deciding) is what lets the list scroll at all. Mouse and pen keep
-    // the whole chip as their grab area, with no delay and no threshold
-    // change: a handle is a touch affordance and must cost them nothing.
-    if (e.pointerType === 'touch' && !fromHandle) return
+    // A touch on the row body starts PENDING: neither a scroll nor a drag yet.
+    //
+    // This used to return outright, leaving the grip as the only way to pick a
+    // team up on a phone, and the reasoning was that a hold timer has to guess
+    // at intent while a handle does not. Real use said otherwise -- people
+    // reach for the row, get a scroll, and conclude dragging is broken. The
+    // handle is discoverable only once you already know it is there.
+    //
+    // So: hold still and the row becomes draggable; move before the timer and
+    // it was a scroll after all, which is the reading a finger that is already
+    // travelling deserves. The grip keeps its no-delay path for anyone who
+    // does know, and a mouse never waits (FR-021).
+    const pending = e.pointerType === 'touch' && !fromHandle
 
     // Measure the CHIP, not `e.currentTarget` -- when the gesture starts on
     // the grip those are different elements, and a ghost offset from the grip
@@ -446,6 +521,18 @@ export default function RankBoard({
       currentSlot: slotIndex,
       pointerType: e.pointerType,
       startedOnHandle: fromHandle,
+      pending,
+    }
+
+    if (pending) {
+      clearLongPress()
+      longPressRef.current = window.setTimeout(() => {
+        longPressRef.current = null
+        const drag = dragRef.current
+        if (!drag || !drag.pending) return
+        drag.pending = false
+        beginDrag(drag, drag.lastX, drag.lastY)
+      }, LONG_PRESS_MS)
     }
     // Capture is deliberately NOT taken here. It is taken in pointermove, the
     // moment the drag threshold is crossed (see handleContainerPointerMove).
@@ -478,6 +565,7 @@ export default function RankBoard({
     // outlives its drag scrolls a list nobody is touching. Both of these are
     // idempotent, which matters because endDrag is reached from pointerup,
     // pointercancel AND lostpointercapture (FR-014).
+    clearLongPress()
     stopAutoScroll()
     detachRemeasure()
     try {
@@ -489,47 +577,90 @@ export default function RankBoard({
     setDraggingChipId(null)
   }
 
+  function clearLongPress() {
+    if (longPressRef.current != null) {
+      window.clearTimeout(longPressRef.current)
+      longPressRef.current = null
+    }
+  }
+
+  /**
+   * Commit to a drag. Reached two ways -- a mouse or grip crossing the 6px
+   * threshold, and a touch resting on a row for LONG_PRESS_MS -- so it lives
+   * here rather than inline in pointermove, which is where it used to be when
+   * the threshold was the only route in.
+   */
+  function beginDrag(drag: DragSession, x: number, y: number) {
+    draggingRef.current = true
+    // Capture starts HERE, not on pointerdown. Capturing on pointerdown breaks
+    // the entire click path, and does it invisibly: while a pointer is
+    // captured, the `click` synthesized from the pointer sequence is
+    // dispatched to the CAPTURE TARGET, not to the element under the cursor.
+    // Capturing on the container therefore retargeted every chip's onClick to
+    // the container, so click-to-select did nothing while dragging still
+    // worked perfectly. Verified in a real browser, not by reading.
+    try {
+      containerRef.current?.setPointerCapture(drag.pointerId)
+    } catch {
+      // NotFoundError if the pointer is no longer active by now -- a fast
+      // flick, or an interruption landing between pointerdown and here.
+      // Without capture the drag still works while the pointer is over the
+      // board, and pointerup/pointercancel still end it; that is a far better
+      // failure than an uncaught throw leaving draggingRef true with no ghost.
+    }
+    measureRects()
+    drag.scrollParent = resolveScrollParent(slotsElRef.current)
+    attachRemeasure()
+    startAutoScroll()
+    setDraggingChipId(drag.chipId)
+    // A phone has no cursor to change and no hover to lift, so the only way to
+    // say "this is yours to move now" is to buzz. Absent on iOS Safari, which
+    // is why nothing depends on it.
+    try {
+      navigator.vibrate?.(10)
+    } catch {
+      // Some browsers throw on vibrate in a non-interactive context.
+    }
+    moveGhost(drag, x, y)
+  }
+
   function handleContainerPointerMove(e: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== e.pointerId) return
     drag.lastX = e.clientX
     drag.lastY = e.clientY
 
+    // Still deciding whether this touch was a scroll. Any real travel says it
+    // was: drop the gesture entirely and let the browser have it.
+    if (drag.pending) {
+      if (Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) >= LONG_PRESS_SLOP_PX) {
+        clearLongPress()
+        dragRef.current = null
+      }
+      return
+    }
+
     if (!draggingRef.current) {
       const dx = e.clientX - drag.startX
       const dy = e.clientY - drag.startY
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return
-      draggingRef.current = true
-      // Capture starts HERE, not on pointerdown -- this is the first moment
-      // we know it is a drag rather than a click (see handleChipPointerDown
-      // for why capturing earlier silently kills the click path). Captured on
-      // the stable root, never on the chip: the chip's DOM node does not
-      // survive a placement (it moves between the tray list and a slot list,
-      // a different React parent), and capturing a node that is about to
-      // unmount is the `lostpointercapture` trap this component exists to
-      // avoid. The container never unmounts mid-drag.
-      try {
-        containerRef.current?.setPointerCapture(e.pointerId)
-      } catch {
-        // Throws NotFoundError if the pointer is no longer active by the time
-        // we get here -- a very fast flick, or an OS interruption landing
-        // between pointerdown and this first qualifying move. Capture is what
-        // keeps events coming when the pointer leaves the container; without
-        // it the drag still works while the pointer is over the board, and
-        // pointerup/pointercancel still end it. That is a far better failure
-        // than an uncaught throw here, which would strand the drag with
-        // draggingRef already true and no ghost ever rendered.
-        // (releasePointerCapture in endDrag has always been guarded this way.)
-      }
-      measureRects()
-      drag.scrollParent = resolveScrollParent(slotsElRef.current)
-      attachRemeasure()
-      startAutoScroll()
-      setDraggingChipId(drag.chipId)
+      beginDrag(drag, e.clientX, e.clientY)
     }
 
     e.preventDefault()
+    moveGhost(drag, e.clientX, e.clientY)
     applyPointer(e.clientX, e.clientY)
+  }
+
+  /** The floating chip under the finger. Separated from applyPointer because
+   *  the ghost tracks the POINTER, not the list: while autoscroll runs with a
+   *  still finger the ghost must not move, so there is no reason to rewrite
+   *  its transform sixty times a second. */
+  function moveGhost(drag: DragSession, x: number, y: number) {
+    const el = ghostElRef.current
+    if (!el) return
+    const lift = drag.pointerType === 'touch' ? TOUCH_GHOST_LIFT_PX : 0
+    el.style.transform = `translate3d(${x - drag.grabDX}px, ${y - drag.grabDY - lift}px, 0)`
   }
 
   /**
@@ -552,19 +683,17 @@ export default function RankBoard({
     const drag = dragRef.current
     if (!drag || !draggingRef.current) return
 
-    if (ghostElRef.current) {
-      const lift = drag.pointerType === 'touch' ? TOUCH_GHOST_LIFT_PX : 0
-      ghostElRef.current.style.transform = `translate3d(${x - drag.grabDX}px, ${y - drag.grabDY - lift}px, 0)`
-    }
-
-    // Kept for both paths: the placed path reads it only to notice a drop
-    // over the tray, which still means "unrank this".
-    const hit = hitTest(x, y)
-    hoverRef.current = hit
-
-    if (drag.currentSlot == null) {
-      setSlotHoverClass(hit?.kind === 'slot' ? hit.index : null)
-      return
+    // The tray is the only reason a placed chip still needs a hit test, and it
+    // is not rendered at all once every slot is filled -- which is the normal
+    // state of a seeded ballot. Skipping it then takes twelve rect
+    // comparisons out of every animation frame.
+    if (drag.currentSlot == null || trayRef.current) {
+      const hit = hitTest(x, y)
+      hoverRef.current = hit
+      if (drag.currentSlot == null) {
+        setSlotHoverClass(hit?.kind === 'slot' ? hit.index : null)
+        return
+      }
     }
 
     const from = drag.currentSlot
