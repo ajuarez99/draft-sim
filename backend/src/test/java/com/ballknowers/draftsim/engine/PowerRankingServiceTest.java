@@ -142,7 +142,7 @@ class PowerRankingServiceTest {
     @Test
     void anOutStarterIsExcludedFromMarketValueNotScoredAsThoughHePlayed() {
         LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
-                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null);
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null, null);
         when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
 
         Player healthy = player(1L, "sp1", Position.RB, null);
@@ -178,7 +178,7 @@ class PowerRankingServiceTest {
     @Test
     void aPlayerNotOnTheBoardIsExcludedAndNotedRatherThanCrashing() {
         LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
-                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 1, List.of("QB", "BN"), 0.5, null);
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 1, List.of("QB", "BN"), 0.5, null, null);
         when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of());
@@ -216,7 +216,7 @@ class PowerRankingServiceTest {
     @Test
     void anUndraftedLeagueWritesNoBaselineRatherThanFreezingATieAtZero() {
         LeagueRepository.LeagueRow leagueRow = new LeagueRepository.LeagueRow(
-                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null);
+                1L, Sport.NFL, "sleeper-league", "Test League", 2025, 2, List.of("QB", "BN"), 0.5, null, null);
         when(leagues.byId(1L)).thenReturn(Optional.of(leagueRow));
         when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of());
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of());
@@ -244,7 +244,7 @@ class PowerRankingServiceTest {
 
     private static LeagueRepository.LeagueRow leagueRow(long id, int season) {
         return new LeagueRepository.LeagueRow(id, Sport.NFL, "S" + id, "L" + id, season,
-                12, List.of(), 1.0, null);
+                12, List.of(), 1.0, null, null);
     }
 
     private static PowerRankingRepository.FinalRank fr(int rosterId, int rank, int week) {

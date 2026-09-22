@@ -33,11 +33,11 @@ public class LeagueRepository {
      */
     public long upsert(Sport sport, int season, String sleeperId, String previousLeagueId,
                        String name, int totalRosters, String settingsJson, String scoringJson,
-                       List<String> rosterPositions) {
+                       List<String> rosterPositions, String status) {
         String sql = """
                 insert into league (sport, season, sleeper_id, previous_league_id, name,
-                                    total_rosters, settings_json, scoring_json, roster_positions)
-                values (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?)
+                                    total_rosters, settings_json, scoring_json, roster_positions, status)
+                values (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
                 on conflict (sleeper_id) do update set
                     season = excluded.season,
                     previous_league_id = excluded.previous_league_id,
@@ -45,7 +45,8 @@ public class LeagueRepository {
                     total_rosters = excluded.total_rosters,
                     settings_json = excluded.settings_json,
                     scoring_json = excluded.scoring_json,
-                    roster_positions = excluded.roster_positions
+                    roster_positions = excluded.roster_positions,
+                    status = excluded.status
                 returning id
                 """;
 
@@ -60,6 +61,7 @@ public class LeagueRepository {
             ps.setString(7, settingsJson);
             ps.setString(8, scoringJson);
             ps.setArray(9, slots);
+            ps.setString(10, status);
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getLong(1) : null;
             }
@@ -101,11 +103,47 @@ public class LeagueRepository {
 
     public record LeagueRow(long id, Sport sport, String sleeperId, String name, int season,
                             int totalRosters, List<String> rosterPositions, double ppr,
-                            String previousLeagueId) {}
+                            String previousLeagueId, String status) {
+
+        /**
+         * specs/006-deeper-history-both-sports data-model.md, "league.status",
+         * nullability rule, verbatim: "A null status means not yet known, and
+         * is treated as not complete. It must never be treated as complete,
+         * because that is the failure mode this feature exists to fix."
+         *
+         * <p>That failure mode is not hypothetical -- it is the two wrong
+         * champions already stored (popsharky and gregmullen, both crowned for
+         * a 2026 season after one week, from a metadata key that actually
+         * names the *previous* season's winner). A {@code status} of
+         * {@code null} means this row predates V21 and has not been
+         * re-ingested yet, not that its season is somehow finished, so it must
+         * read exactly like {@code pre_draft} / {@code drafting} /
+         * {@code in_season} here: not complete.
+         */
+        public boolean complete() {
+            return isComplete(status);
+        }
+
+        /**
+         * The same rule as {@link #complete()}, exposed statically for the one
+         * caller that has to apply it before a {@code LeagueRow} exists at all:
+         * {@code LeagueHistoryIngestService#ingestStandings} (T023) reads
+         * Sleeper's raw {@code status} straight off the league map it is
+         * already mid-ingest with, in the same pass that upserts this very
+         * row -- going back to the DB to re-read what this pass just wrote
+         * would be a slower way to ask a question already answered, and
+         * copying the null-is-not-complete rule into the ingest service would
+         * make it a second definition of "complete" to keep in sync with this
+         * one. specs/006-deeper-history-both-sports research R2.
+         */
+        public static boolean isComplete(String status) {
+            return "complete".equals(status);
+        }
+    }
 
     private static final String ROW_COLUMNS = """
             id, sport, sleeper_id, name, season, total_rosters, roster_positions,
-            coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id
+            coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id, status
             """;
 
     private static LeagueRow mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -113,7 +151,7 @@ public class LeagueRepository {
         List<String> slots = List.of((String[]) a.getArray());
         return new LeagueRow(rs.getLong("id"), Sport.fromCode(rs.getString("sport")), rs.getString("sleeper_id"),
                 rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
-                slots, rs.getDouble("ppr"), rs.getString("previous_league_id"));
+                slots, rs.getDouble("ppr"), rs.getString("previous_league_id"), rs.getString("status"));
     }
 
     public Optional<LeagueRow> bySleeperId(String sleeperId) {
@@ -202,6 +240,41 @@ public class LeagueRepository {
                 .param(leagueId)
                 .query((rs, i) -> new PlayoffFormat(rs.getInt(1), rs.getInt(2), rs.getInt(3),
                         rs.getBoolean(4), rs.getBoolean(5)))
+                .optional();
+    }
+
+    /**
+     * A season's waiver format, read straight out of {@code settings_json}
+     * (specs/006-deeper-history-both-sports research R8). {@code waiverType}
+     * 2 is FAAB bidding; 0 (and, per Sleeper's own docs, 1) is waiver
+     * PRIORITY, with no bidding at all -- which is why a priority season can
+     * hold hundreds of {@code WAIVER} rows and zero {@code faab_bid} values.
+     * That is the correct format for that season, not an ingest defect, and
+     * {@code TransactionAnalysisService}'s career-grain FAAB aggregation
+     * excludes exactly these seasons rather than averaging a zero bid into
+     * everyone else's.
+     *
+     * @param waiverBudget the season's own starting FAAB budget. Measured to
+     *                      range 100 -> 10000 across this database's six
+     *                      played seasons, so a raw dollar figure never
+     *                      survives across a single manager's own career --
+     *                      only a percentage of THIS field does.
+     */
+    public record WaiverFormat(int waiverType, double waiverBudget) {
+
+        public boolean usesFaab() {
+            return waiverType == 2;
+        }
+    }
+
+    public Optional<WaiverFormat> waiverFormat(long leagueId) {
+        return db.sql("""
+                select coalesce((settings_json->>'waiver_type')::int, 0),
+                       coalesce((settings_json->>'waiver_budget')::numeric, 0)
+                from league where id = ?
+                """)
+                .param(leagueId)
+                .query((rs, i) -> new WaiverFormat(rs.getInt(1), rs.getDouble(2)))
                 .optional();
     }
 

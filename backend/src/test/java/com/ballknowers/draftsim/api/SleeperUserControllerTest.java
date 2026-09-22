@@ -75,7 +75,7 @@ class SleeperUserControllerTest {
         when(leagues.bySleeperId("111")).thenReturn(Optional.empty());
         when(leagues.bySleeperId("222")).thenReturn(Optional.of(
                 new LeagueRepository.LeagueRow(1L, Sport.NBA, "222", "Basketball League", 2026, 10,
-                        List.of(), 0.0, null)));
+                        List.of(), 0.0, null, null)));
 
         List<Map<String, Object>> result = controller().leagues("42");
 

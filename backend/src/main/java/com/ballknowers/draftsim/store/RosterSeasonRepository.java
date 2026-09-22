@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -23,6 +24,23 @@ public class RosterSeasonRepository {
                          Integer ties, Double pointsFor, Double pointsAgainst, Double pointsPossible,
                          Integer finalPlacement) {}
 
+    /**
+     * T025 (specs/006-deeper-history-both-sports): confirmed this upsert
+     * CLEARS {@code final_placement}, it does not skip the row. Every row in
+     * {@code rows} is always written, unconditionally -- there is no branch
+     * above that omits a roster whose computed placement is null -- and
+     * {@code final_placement = excluded.final_placement} is a plain column
+     * assignment with no {@code coalesce}, so a null {@code Upsert.finalPlacement()}
+     * overwrites whatever was stored before, including the two wrong
+     * champions research R2 found (popsharky and gregmullen, crowned after
+     * one week of a new season). This matters because the fix in
+     * {@code LeagueHistoryIngestService#ingestStandings} depends on it: T023
+     * gates the champion write on the season being complete, and that gate
+     * only repairs the two already-wrong rows if THIS method still writes
+     * them when the gate says no -- the same lesson this repo already
+     * learned twice, as {@code adp_at_time} and the {@code league_matchup}
+     * fixture gate: a skip gate in front of a column never repairs it.
+     */
     public void upsertAll(List<Upsert> rows) {
         if (rows.isEmpty()) return;
         for (Upsert r : rows) {
@@ -47,15 +65,20 @@ public class RosterSeasonRepository {
     }
 
     /**
-     * season/sleeperLeagueId are null from {@link #forLeague} (the caller
-     * already knows both -- it asked for this one league) and populated from
-     * {@link #forManager}, which spans several leagues/seasons and has no
-     * other way to tell its rows apart or link back to one.
+     * season/sleeperLeagueId/sport/leagueName/complete are null from
+     * {@link #forLeague} (the caller already knows all of them -- it asked
+     * for this one league) and populated from {@link #forManager}, which
+     * spans several leagues/seasons/sports and has no other way to tell its
+     * rows apart, link back to one, or say which sport it was
+     * (specs/006-deeper-history-both-sports research R1: extending this one
+     * record via the existing {@code withSeason} flag rather than adding a
+     * second row type -- a second "manager's standings row" is the bug class
+     * this repo has now shipped under four different names).
      */
     public record StandingRow(long leagueId, int rosterId, Long managerId, String managerName, String avatarId,
                               Integer wins, Integer losses, Integer ties, Double pointsFor,
                               Double pointsAgainst, Integer finalPlacement, Integer season,
-                              String sleeperLeagueId) {}
+                              String sleeperLeagueId, Sport sport, String leagueName, Boolean complete) {}
 
     /** One league's standings, best placement (or most wins, if no bracket yet) first. */
     public List<StandingRow> forLeague(long leagueId) {
@@ -73,12 +96,20 @@ public class RosterSeasonRepository {
                 .list();
     }
 
-    /** One manager's record across every ingested season, newest first. */
+    /**
+     * One manager's record across every ingested season, newest first, now
+     * carrying the sport and league name each row belongs to
+     * (specs/006-deeper-history-both-sports US1) -- without these two, a
+     * caller spanning several leagues/sports has no way to tell an NFL
+     * season from an NBA one, which is exactly the defect baseline.md's T002
+     * pinned: six rows, three leagues, two sports, nothing to tell them
+     * apart.
+     */
     public List<StandingRow> forManager(long managerId) {
         return db.sql("""
                 select rs.league_id, rs.roster_id, rs.manager_id, m.display_name, m.avatar_id,
                        rs.wins, rs.losses, rs.ties, rs.points_for, rs.points_against, rs.final_placement,
-                       l.season, l.sleeper_id
+                       l.season, l.sleeper_id, l.sport, l.name, l.status
                 from roster_season rs
                 join league l on l.id = rs.league_id
                 left join manager m on m.id = rs.manager_id
@@ -107,6 +138,14 @@ public class RosterSeasonRepository {
                 rs.getObject(10) == null ? null : rs.getDouble(10),
                 rs.getObject(11) == null ? null : rs.getInt(11),
                 withSeason ? rs.getInt(12) : null,
-                withSeason ? rs.getString(13) : null);
+                withSeason ? rs.getString(13) : null,
+                withSeason ? Sport.fromCode(rs.getString(14)) : null,
+                withSeason ? rs.getString(15) : null,
+                // Mirrors LeagueRepository.LeagueRow#complete() verbatim rather
+                // than re-deriving the rule here: a null status means not yet
+                // known and must never read as complete. See that method's
+                // javadoc for why -- popsharky and gregmullen were both
+                // crowned champions of a 2026 season one week old.
+                withSeason ? "complete".equals(rs.getString(16)) : null);
     }
 }

@@ -105,7 +105,7 @@ class SimulationServiceReversalRoundTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-reversal", 2026, ROUNDS, TEAMS, "pre_draft", Map.of(), REVERSAL_ROUND);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                10L, Sport.NFL, "sleeper-league-reversal", "Reversal League", 2026, TEAMS, SLOTS, 1.0, null);
+                10L, Sport.NFL, "sleeper-league-reversal", "Reversal League", 2026, TEAMS, SLOTS, 1.0, null, null);
 
         when(drafts.bySleeperId("sleeper-draft-reversal")).thenReturn(Optional.of(draft));
         when(leagues.all()).thenReturn(List.of(league));
@@ -163,7 +163,7 @@ class SimulationServiceReversalRoundTest {
         DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
                 1L, 10L, "sleeper-draft-plain", 2026, ROUNDS, TEAMS, "pre_draft", Map.of(), 0);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
-                10L, Sport.NFL, "sleeper-league-plain", "Plain League", 2026, TEAMS, SLOTS, 1.0, null);
+                10L, Sport.NFL, "sleeper-league-plain", "Plain League", 2026, TEAMS, SLOTS, 1.0, null, null);
 
         when(drafts.bySleeperId("sleeper-draft-plain")).thenReturn(Optional.of(draft));
         when(leagues.all()).thenReturn(List.of(league));
