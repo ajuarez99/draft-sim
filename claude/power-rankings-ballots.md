@@ -701,11 +701,39 @@ exactly), minimum slot 52px, page does not scroll sideways, and `.content.scroll
 reports 2674px of content in an 812px viewport and genuinely scrolls -- AC2, the
 unreachable-bottom problem finding 10 raised, confirmed fixed.
 
+> **Superseded on 2026-09-22 by `specs/007-mobile-rank-drag/`.** Two things this
+> section and finding 10 left open turned out to be the whole of why the board
+> was unusable on a phone, and both are now closed:
+>
+> - **Finding 10's "re-measure on `scroll` and `resize`, and after every
+>   placement" only ever shipped its last third.** There was no scroll listener
+>   and no resize listener in `RankBoard.tsx` — only the `useEffect` on `order`.
+>   Both now exist, attached for the duration of a drag. More to the point, the
+>   deferred hit test they were protecting is gone: a placed chip now reorders
+>   **live**, as the pointer crosses each row's midpoint, so there is no
+>   remembered rectangle consulted at drop time to be stale in the first place.
+> - **`touch-action: none` was on `.rankboard-chip`** — a full-width 44px row
+>   that tiles the list — so the entire scrollable surface was declared
+>   unscrollable and every thumb-swipe became a drag. It now lives on a 44px
+>   grip handle instead, and touch must start there; mouse and pen still grab
+>   anywhere on the chip with no delay.
+>
+> Also added: autoscroll while a chip is held near an edge (without it a chip
+> could only ever reach rows already on screen, so last-to-first was impossible
+> in one gesture), and on-screen ↑/↓ buttons on the selected chip — the copy
+> here used to tell phone users to "use the arrows", which were `ArrowUp`/
+> `ArrowDown` keydowns on a device with no arrow keys.
+
 ### Not verified
 
-- **Real touch input.** The drag was driven by mouse-derived pointer events. The
-  touch path (`touch-action: none`, a real finger, mobile Safari) has not been
-  exercised on a device.
+- **Real touch input.** Still not a finger on a real device, but no longer
+  untested: on 2026-09-22 the touch path was exercised at 375×812 against this
+  league through synthesized `PointerEvent`s — seventeen scenarios, seventeen
+  logged results in `specs/007-mobile-rank-drag/verification.md`. `touch-action`
+  is verified as computed style rather than by the compositor, and the autoscroll
+  loop ran through a `setTimeout` shim because the automation pane never paints
+  and so never fires `requestAnimationFrame` (measured: 0 frames in 600ms). What
+  is still owed is one pass on real hardware, mobile Safari included.
 - **A week with partial coverage on the chart.** Every ballot so far is week 1, so
   the dotted/broken segment logic is covered by unit tests
   (`PowerRankings.chart.test.ts`) and by the one-ballot lone-point rendering, but
