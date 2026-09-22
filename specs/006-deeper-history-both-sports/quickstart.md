@@ -241,3 +241,44 @@ SC-006 — did not run.
 Several Claude sessions share this working tree, this database and this server. Re-run the baseline
 queries before trusting a verification result rather than assuming the state an earlier step left
 behind is still there.
+
+---
+
+## Results — walked end to end 2026-09-22
+
+Backend and web both served from the `006-complete-rule` worktree (the main checkout had moved on to
+another branch), Postgres on 5433, signed in as `popsharky`.
+
+| Scenario | Result |
+|---|---|
+| Baseline: sport on every row | **Pass.** `/api/managers/7/history` returns `sport` and `leagueName` on all six rows; the two 2026 football rows are told apart by league name. |
+| Baseline: a live season has a champion | **Already repaired.** The placement query returns four rows, not six, before any step here — an earlier ingest on this branch cleared them. The gate was re-proved instead (below). |
+| 2 — the trophy only goes to a finished season | **Pass.** Sleeper still answers `2026 in_season latest_league_winner_roster_id=1`; re-ingesting all three chains left exactly four placements, all on `complete` seasons. `/leagues/1346366555759341568/history` shows 🏆 on 2025 only, and the manager page reads `1 title`. |
+| 3 — the career profile, per sport | **Pass.** `titles` 1, `unavailable[]` names `playoffAppearances` and `tradesPerSeason` with reasons, NBA 2026 is listed with `counted: false` and moves no average. Every figure on screen carries "over N seasons". |
+| 3 — the efficiency check (SC-004) | **Pass.** Sleeper's stored `ppts` gives 92.7% for popsharky 2025; the app's one implementation gives 2468.5 / 2695.18 = 91.6%, and the career figure traces to the second. |
+| 4 — head to head | **Pass.** 2-1 in football, 2-2 in basketball, never combined; each meeting's winner matches the higher `starters_points`. (Foot) Ball Knowers 2025 holds 196 paired rows → 98 meetings, as stated. |
+| 5 — the deeper record book | **Pass.** All-time points leaders and longest win/loss streaks on both chains, each naming the manager, the exact value, the span and the seasons covered; the page states that a streak never crosses the offseason. |
+| 6 — waiver and FAAB tendencies | **Pass.** Ground truth matches: FBK 2025 and both West Coast seasons are `waiver_type 0`, NBA 2025 is type 2 on 10000, FBK 2026 type 2 on 200. NBA shows bids as % of each season's own budget; excluded seasons are named with "used waiver priority, not FAAB". Trades are unattributed in all three seasons that have any, and `tradesPerSeason` is omitted with that reason rather than shown as 0. |
+| Test suites | **Pass, with the skip count read.** 83 classes, 565 tests, `skipped="0"`, `failures="0"` with Postgres up. The same run with Docker down reports BUILD SUCCESSFUL and 86 silently skipped. Web: 43 files, 474 tests. |
+
+### Where the live answers differ from what this file predicted
+
+Four, all explained, none a defect:
+
+1. **The champions were already cleared** before this walk, so the "before" half of Scenario 2 could
+   not be observed. What was proved instead is the stronger property: a fresh ingest, with Sleeper
+   still returning `in_season` and a winner id, does not re-crown them.
+2. **The reconciliation figures moved with the season.** Scoped to (Foot) Ball Knowers alone,
+   popsharky is now 11-5 with 2259.83 points (2042.84 + 216.99), not the 11-4 / 2200.24 written here
+   on 2026-09-21 — 2026 has played another week since. The football career spans both leagues: 13-5,
+   2577.89.
+3. **Rank population is 13 and 17, not 12.** It counts every manager who has held a roster in that
+   chain across its seasons (`select count(distinct manager_id)` per chain), not the team count of one
+   season, and each rank names the league it is within — "2nd of 13 in (Foot) Ball Knowers".
+4. **Football 2026 is no longer a head-to-head exclusion.** A week has been scored since this file was
+   written, so it contributes a real meeting (2026 Wk 2). Basketball 2026 is still excluded, with the
+   reason "fixtures haven't been loaded for this league's season yet".
+
+One figure worth not misreading: football `faab` is null for popsharky although FBK 2026 runs FAAB.
+He has placed no bid there — `select count(faab_bid)` is 0 for his 2026 rows — so this is "no bids to
+average", and the seasons that ran waiver priority are listed separately with that reason.
