@@ -150,11 +150,18 @@ describe('autoScrollStep', () => {
     expect(autoScrollStep(95, shortTop, shortBottom, 64, MAX)).toBeGreaterThan(0)
   })
 
-  it('ramps quadratically, so the outer edge of the zone creeps', () => {
-    // Half way into the zone should be a quarter of top speed, not half --
-    // linear left no slow end of the range to steer with.
+  it('creeps as soon as the zone is entered, and only commits at the edge', () => {
+    // The dead band is the bug this guards. A pure quadratic from zero meant
+    // the outer half of the zone moved the list at single-digit px/s, which
+    // reads as "it does not scroll" -- the opposite complaint to the one the
+    // quadratic was introduced to fix.
+    const justInside = Math.abs(autoScrollStep(TOP + ZONE - 1, TOP, BOTTOM, ZONE, MAX))
+    expect(justInside).toBeGreaterThan(MAX * 0.15)
+
     const halfway = Math.abs(autoScrollStep(TOP + ZONE / 2, TOP, BOTTOM, ZONE, MAX))
-    expect(halfway).toBeCloseTo(MAX * 0.25, 5)
+    expect(halfway).toBeGreaterThan(justInside)
+    expect(halfway).toBeLessThan(MAX * 0.6) // still clearly a creep, not a run
+
     const atEdge = Math.abs(autoScrollStep(TOP, TOP, BOTTOM, ZONE, MAX))
     expect(atEdge).toBeCloseTo(MAX, 5)
   })

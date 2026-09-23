@@ -104,12 +104,17 @@ const DRAG_THRESHOLD_PX = 6
 // the edge until it reaches the end and confirm it stops", which is exactly
 // the case where flying looks correct.
 //
-// 40px and 5px/frame is 300px/s, ~460ms across the whole range, and
-// dragGesture.ts additionally caps the zone at a fifth of the container so a
-// short list keeps a middle to aim at. The ramp there is quadratic, so the
-// outer edge of the zone creeps rather than commits.
-const AUTOSCROLL_ZONE_PX = 40
-const AUTOSCROLL_MAX_PX_PER_FRAME = 5
+// The first correction (40px, 5px/frame, a quadratic ramp starting at zero)
+// overshot in the other direction: five pixels into the zone came out at
+// 4.7px/s, eighteen seconds to cross the list, so the outer half of the zone
+// did nothing and the honest report was that it would not scroll at all.
+//
+// 56px is a little wider than one row, so the zone is actually reachable while
+// aiming at the top or bottom row. dragGesture.ts caps it at a fifth of the
+// container and ramps from a floor, so entering the zone creeps visibly
+// (~95px/s) and only the last few pixels commit to 420px/s.
+const AUTOSCROLL_ZONE_PX = 56
+const AUTOSCROLL_MAX_PX_PER_FRAME = 7
 
 /** How far above the fingertip the ghost rides on touch. A finger covers
  *  roughly its own width of screen; without this the chip you are moving is
@@ -117,10 +122,18 @@ const AUTOSCROLL_MAX_PX_PER_FRAME = 5
  *  nothing. */
 const TOUCH_GHOST_LIFT_PX = 28
 
-/** How long a finger must rest on a row before it becomes draggable. Long
- *  enough that a swipe which happens to begin on a chip is still a swipe,
- *  short enough that a deliberate press does not feel ignored. */
-const LONG_PRESS_MS = 320
+/** How long a finger must rest on a row before it becomes draggable.
+ *
+ *  Was 320ms, and that made the list impossible to scroll. People do not
+ *  flick a list the instant they touch it -- they land a thumb, settle, then
+ *  move -- and any settle longer than the timer armed a drag, after which the
+ *  non-passive touchmove below refuses the browser its scroll. So roughly
+ *  every other attempt to scroll moved a team instead.
+ *
+ *  450ms is near the platform long-press convention and leaves room to land
+ *  and go. The grip is still there for anyone who does not want to wait at
+ *  all. */
+const LONG_PRESS_MS = 450
 
 /** Movement that cancels a pending long press. Bigger than a resting thumb's
  *  wobble, smaller than any intentional swipe. */
