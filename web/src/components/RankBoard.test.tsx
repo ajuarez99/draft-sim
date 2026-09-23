@@ -59,7 +59,7 @@ describe('RankBoard gesture gating', () => {
       expect(isDragging(container)).toBe(false) // nothing yet -- this could still be a scroll
 
       act(() => {
-        vi.advanceTimersByTime(400)
+        vi.advanceTimersByTime(600)
       })
       expect(isDragging(container)).toBe(true)
     } finally {
@@ -77,7 +77,7 @@ describe('RankBoard gesture gating', () => {
       fireEvent.pointerDown(chip, { pointerId: 1, button: 0, pointerType: 'touch', clientX: 50, clientY: 50 })
       fireEvent.pointerMove(board, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 90 })
       act(() => {
-        vi.advanceTimersByTime(400)
+        vi.advanceTimersByTime(600)
       })
 
       expect(isDragging(container)).toBe(false)

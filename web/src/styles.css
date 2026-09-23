@@ -1960,8 +1960,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    * its own row beneath the league's identity; `min-width: 0` is what actually
    * lets it scroll rather than stretch its parent.
    */
+  /* The rail and its sections must not be widened by their own contents --
+     without this the lane's `100%` resolves against a section that has already
+     stretched to the full 1130px of links, so nothing ever clips and the whole
+     page scrolls sideways instead. */
+  .app-rail { max-width: 100%; box-sizing: border-box; }
+  .app-rail-section { min-width: 0; max-width: 100%; }
+
   .app-rail-pages {
-    flex: 0 0 100%; min-width: 0;
+    flex: 0 0 100%; min-width: 0; max-width: 100%;
     flex-direction: row; flex-wrap: nowrap;
     overflow-x: auto; overflow-y: hidden;
     gap: 4px; padding-bottom: 2px;
@@ -1970,6 +1977,44 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   }
   .app-rail-pages::-webkit-scrollbar { display: none; }
   .app-rail-pages .app-rail-row { flex: 0 0 auto; }
+}
+
+@media (max-width: 700px) {
+  /*
+   * Phone chrome, cut to what a phone needs.
+   *
+   * The lane above took the rail from 388px to 229px and that was still "a
+   * shit ton of space" -- 28% of an 812px screen, and more once the browser's
+   * own address bar takes its ~100px. What was left was five stacked rows:
+   * wordmark, league identity, the lane, the global menu, and the account.
+   *
+   * Three of those carry things a phone does not need on every page, and each
+   * is still reachable:
+   *   - the season pills (2026 / 2025) duplicate the Switch menu, which lists
+   *     Seasons and Leagues and is kept;
+   *   - the league's sport pill and manager count are context, not navigation;
+   *   - Home / Managers / Mock drafts and Sign out keep their glyphs and lose
+   *     their labels, so they cost icons rather than words -- and Jump to,
+   *     which is kept at full size, reaches all of them by name anyway.
+   *
+   * Nothing is removed from the DOM: this is all display and sizing, so the
+   * accessible names on every control are untouched.
+   */
+  .app-wordmark { font-size: 16px; }
+  .rail-league-seasons { display: none; }
+  .rail-league-sub { display: none; }
+
+  /* Icon-only for the global menu -- NOT the league lane, whose labels are the
+     only thing distinguishing nine destinations from each other. */
+  .app-rail-section:not(.app-rail-league) .app-rail-row-label { display: none; }
+  .app-rail-section:not(.app-rail-league) .app-rail-row { padding: 9px 10px; gap: 0; }
+
+  .app-account-name { display: none; }
+  .app-signout .app-rail-row-label { display: none; }
+  .app-signout-glyph { display: block; }
+  .app-signout { padding: 0 8px; }
+
+  .app-rail { gap: 8px 12px; padding: 10px 14px; }
   .rail-league-id { padding: 0 6px 0 0; }
   .rail-league-seasons { padding: 0; }
   .app-rail-label { display: none; }
@@ -2761,9 +2806,24 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      modals share that class (the player card, the player picker, the
      on-the-clock input, the seat popover, the draft settings sheet) and none
      of them asked to be reshaped. */
-  .pr-ballot-backdrop { padding: 8px; }
-  .pr-ballot-backdrop .modal-card { padding: 14px; border-radius: 12px; }
-  .pr-ballot-backdrop .modal-card.wide { max-height: 92vh; }
+  /* A full-screen sheet, not a centred card.
+     Ranking twelve teams is the whole job while this is open, and on a phone
+     the nav above it was still taking a quarter of the screen out of the list
+     you are trying to drag inside. A sheet takes the lot: at 375x812 that is
+     every pixel, so the slot list gets roughly 300px more than it had and
+     most of a twelve-team board fits without scrolling at all -- which is
+     also the cheapest way to make scrolling it less necessary.
+     dvh, not vh, because vh on a phone is the viewport with the address bar
+     hidden and leaves the submit button under it. */
+  .pr-ballot-backdrop { padding: 0; }
+  .pr-ballot-backdrop .modal-card {
+    padding: 14px; border-radius: 0;
+    max-width: none; width: 100%;
+  }
+  .pr-ballot-backdrop .modal-card.wide {
+    max-height: 100vh; max-height: 100dvh;
+    height: 100vh; height: 100dvh;
+  }
 }
 
 @media (max-width: 1180px) {

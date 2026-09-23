@@ -107,15 +107,24 @@ export function autoScrollStep(
 }
 
 /**
- * Quadratic, not linear. Linear meant that merely touching the edge of the
- * zone already moved the list at a fair clip, so there was no slow end of the
- * range to steer with -- you were either not scrolling or scrolling fast.
- * Squaring puts most of the travel in the last few pixels: drift into the
- * zone and it creeps, push right to the edge and it commits.
+ * A floor, then a quadratic rise.
+ *
+ * Pure quadratic from zero was the first correction and it overshot: five
+ * pixels into a 40px zone came out at 0.08px a frame, which is 4.7px/s, which
+ * is eighteen seconds to cross the list. The outer half of the zone was a dead
+ * band, so the honest report was "it doesn't scroll" -- the opposite complaint
+ * to the one the quadratic was meant to fix, and just as true.
+ *
+ * The floor means crossing into the zone at all produces a visible creep
+ * immediately. The quadratic on top of it keeps the fast end reachable only by
+ * pushing right to the edge, which is what stops a small drift committing to a
+ * full-speed run.
  */
+const RAMP_FLOOR = 0.22
+
 function ramp(depth: number, zonePx: number, maxPxPerFrame: number): number {
   const t = Math.min(depth / zonePx, 1)
-  return t * t * maxPxPerFrame
+  return (RAMP_FLOOR + (1 - RAMP_FLOOR) * t * t) * maxPxPerFrame
 }
 
 /**
