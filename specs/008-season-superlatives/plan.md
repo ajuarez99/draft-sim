@@ -39,6 +39,11 @@ Research changed three things the spec assumed (spec.md "Amended after planning"
 - **Embiid counts every missed game** (research R10, amended): it isn't limited to weeks with no
   game played, because a manager wants the player for every game.
 
+**Found by `/speckit-analyze` (2026-09-23)**: `ExpectedWinsService` has a second caller,
+`ManagerCareerService.java:225`, which sums wins-above-expected into career profiles. The bound
+changes those too. That's covered by a task and a before/after, and shown to Allan with the Expected
+wins change (spec amendment 11).
+
 ## Technical Context
 
 **Language/Version**: Java 21 (Spring Boot 3.5, virtual threads), TypeScript (React + Vite, strict)
@@ -142,6 +147,7 @@ backend/src/main/java/com/ballknowers/draftsim/
 ├── engine/
 │   ├── SeasonSuperlativesService.java           # new: composes the twelve kinds
 │   ├── ExpectedWinsService.java                 # explicit regular-season bound (R3; approved)
+│   ├── ManagerCareerService.java                # passes the same bound; career luck changes too (analysis H1)
 │   └── LeagueRecordService.java                 # explicit week ceiling threaded through
 └── api/
     ├── SuperlativesController.java              # new: GET superlatives, GET/POST/DELETE conduct-list

@@ -56,6 +56,26 @@ is left in place. These corrections take precedence where they conflict:
    single game anyways and not just that one game." Each missed game while he was a regular on that
    roster costs his mean points per game played (research R10).
 
+### Amended after analysis (2026-09-23)
+
+`/speckit-analyze` found gaps between this spec, the plan and the tasks. Corrections:
+
+8. **FR-006 covers the Unethical Award too.** FR-006 named four kinds for the early-season caveat,
+   while the contract and tasks applied it to six. The six is right: a suspension tally three weeks
+   in is as thin a sample as luck is. FR-006 now names all six.
+9. **The commissioner's list is per season** (FR-017). The list is stored against one league-season,
+   and every superlative on the page is season-scoped, so a new season starts with an empty list.
+   *This is Claude's default, not yet confirmed by Allan*; say so if the list should carry over.
+10. **FR-002, for season totals.** Luck and bench points are season-wide sums, not events in a week.
+    They show the span they cover ("weeks 1–6") rather than individual weeks. Luck also carries the
+    expected-wins table's existing swing weeks, and bench points its single worst week.
+11. **Career profiles change too** (amendment 6's consequence). `ManagerCareerService` sums each
+    season's wins-above-expected into a manager's career figure. Bounding expected wins to the
+    regular season changes those career numbers as well, found by analysis rather than planning.
+    The tasks capture a before/after for it and surface it to Allan alongside the Expected wins page.
+12. **No `?season=` parameter.** The plan's contract promised one, but a past season is chosen by
+    its own league id, the way every other season-scoped page here works.
+
 ## Problem
 
 A league chat argues about the season *while it is happening*. The app answers "what happened this
@@ -109,7 +129,7 @@ The one closest game of the season still appears once, under the extremes in US1
 
 ### User Story 1 - The season's extremes and close games (Priority: P1)
 
-A manager opens the league analysis page mid-season and sees season-to-date superlatives, each
+A manager opens the Superlatives page (amendment 1: its own page, not a section of League analysis) mid-season and sees season-to-date superlatives, each
 naming a team and the exact figure behind it:
 
 - highest and lowest single-week score
@@ -214,7 +234,7 @@ the total and top pickups against the superlative.
 ### User Story 4 - The Joel Embiid Award (Priority: P3)
 
 The section names the team that has been hit hardest by its players missing games: the points its
-regular contributors would have been expected to score in the scoring periods they didn't play.
+regular contributors would have been expected to score in the games they missed (amendment 7: every missed game, not whole weeks).
 It shows the total, the players who cost the most, and how many games or weeks each missed.
 
 It is labelled as **games missed, not injuries**. The app can see that a player didn't play, but
@@ -342,7 +362,8 @@ a qualifying week.
 - **FR-001**: The section MUST cover only fully scored regular-season weeks of the league's current
   (or selected) season, and MUST give the last week covered in its title.
 - **FR-002**: Every superlative MUST show the team, the exact figure, and the week(s) or games it
-  comes from. No superlative may appear as a name alone.
+  comes from. No superlative may appear as a name alone. Season-long totals show the span of weeks
+  they cover instead (amended, see 10).
 - **FR-003**: Ties MUST name every tied team.
 - **FR-004**: Any superlative that restates a figure the app already shows elsewhere (schedule luck
   from expected wins; pickups from the transactions view; a weekly award from the Weekly Report) MUST
@@ -350,7 +371,7 @@ a qualifying week.
   implementation of the same rule.
 - **FR-005**: Where a superlative couldn't use every week (missing pairings, unrecorded lineups,
   missing per-game records), it MUST say how many weeks it covers and why the rest were left out.
-- **FR-006**: Luck, bench, waiver and Embiid superlatives MUST carry a visible early-season caveat
+- **FR-006**: Luck, bench, waiver, Embiid and Unethical superlatives (amended, see 8) MUST carry a visible early-season caveat
   below a minimum number of scored weeks. That threshold is hand-set and MUST be labelled as
   arbitrary where it's configured.
 - **FR-007**: The section MUST be labelled "this season" so it can be told apart from the Weekly
@@ -386,7 +407,7 @@ a qualifying week.
 - **FR-017**: Only the league's commissioner MAY add, edit or remove entries on the commissioner's
   list. Each entry MUST have a player, a short reason and the date it applies from. Every manager in
   the league MAY see the entries. The list MUST be scoped to that one league and never visible to or
-  shared with another league.
+  shared with another league. It is per season: a new season starts empty (amended, see 9).
 - **FR-018**: A player MUST count for a team only in weeks that team rostered him while he
   qualified (tagged suspended that week, or on or after a commissioner entry's date).
 - **FR-019**: The award MUST state the week suspension tracking began for the season, and MUST NOT

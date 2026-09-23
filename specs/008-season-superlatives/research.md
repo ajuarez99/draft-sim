@@ -36,6 +36,13 @@ scored set ("reporting the stored count is reporting what the page is showing").
 week is never stored, so FR-001's in-progress case falls out of the storage rule. That's the same
 answer every other page gives.
 
+**Caveat, amended after analysis (2026-09-23):** "stored" is slightly stronger than "final". The
+same ingest always re-fetches the most recent stored week, because it "may have been ingested while
+Sleeper was still finalizing that week's scores" (`LeagueHistoryIngestService.ingestWeeklyPoints`
+javadoc). So the newest week's figures can move by a stat correction until the next ingest. Every
+page that reads stored weeks shares this. Superlatives don't claim more: the page says "through
+week N", not "final".
+
 Measured: (Foot) Ball Knowers 2026 is `in_season`, `last_scored_leg: 2`, `playoff_week_start: 15`,
 and Sleeper's `/state/nfl` reports week 3. So the page would read "through week 2" today.
 
@@ -277,8 +284,20 @@ suspensions".
 will usually be empty for football, and the commissioner's list will carry the award. That's a
 measured snapshot of one day, not a season rate.
 
-**Not verified**: whether a suspended player on a Sleeper IR/reserve slot still appears in
-`players_points`. If he doesn't, he'd be missed. Check in the quickstart.
+**Not verified**: whether a player in a Sleeper IR/reserve slot still appears in `players_points`.
+If he doesn't, he'd be missed. Check in the quickstart.
+
+**Amended after analysis (2026-09-23): this matters for US4 too, not only US6.** Both awards decide
+roster membership from `players_points` keys (R10, R11). IR is where injured players sit, so if
+reserve-slot players aren't keys, the Embiid award would miss most long absences. The tasks now have
+an explicit decision task after the measurement:
+- **If reserve players are keys**: record it as verified; no change.
+- **If they aren't**: membership for those two awards comes from a roster-tenure reconstruction
+  (draft picks, plus `league_transaction` adds/drops/trades, in order). Its result is compared
+  against `players_points` keys for players *not* on reserve, and the two must agree before it's
+  trusted.
+- **If even that can't be made to agree**: both awards report "players in an IR slot can't be seen
+  in Sleeper's weekly data" as a coverage reason, not a silent undercount.
 
 **Alternatives**:
 - A new `@Scheduled` daily capture. Deferred: it adds scheduling infrastructure to a Railway
@@ -319,7 +338,7 @@ calls misleading. It can come back as its own change.
 ## R14 — Endpoint shape and scoping
 
 **Decision**:
-- `GET /api/leagues/{sleeperId}/superlatives[?season=]` returns every superlative in one payload,
+- `GET /api/leagues/{sleeperId}/superlatives` (a season is chosen by its own league id; no `?season=`, see the contract) returns every superlative in one payload,
   each with its own availability and coverage.
 - `GET|POST /api/leagues/{sleeperId}/conduct-list` and `DELETE /api/leagues/{sleeperId}/conduct-list/{entryId}`
   handle the commissioner's list.

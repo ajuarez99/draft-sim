@@ -65,6 +65,8 @@ These decide whether research is right. Record the actual numbers.
 - **R3, expected wins and playoffs.** Count stored pairings at or past `playoff_week_start` for NFL
   2025. If it's non-zero, the pre-change Expected wins page counted playoff games. Capture that
   page's NFL 2025 numbers **before** the change, so the difference can be shown to Allan.
+  - Also capture `GET /api/managers/{managerId}/history` for one manager with seasons in both
+    sports. Its career `winsAboveExpected` comes from the same service and will change too.
 - **R8, transaction `leg`.** Find one waiver add in NFL 2026 and check its stored `week` against the
   first week that player appears in the adding roster's `starters`. Is the add's week ≤ the first
   started week?
@@ -75,9 +77,12 @@ These decide whether research is right. Record the actual numbers.
     `ENTRY_WITHOUT_PLAY`. Bye: a known bye week of a rostered player has no absence row.
 - **R9, football latent bug.** Confirm `player_game` holds no NFL row for a week the player didn't
   play (the `playedIn` fix).
-- **R11, suspended players on reserve.** If any rostered player in any reference league is
-  suspended or on IR, confirm he appears in that roster's `players_points`. If none exists, record
-  "not checkable today", not "passed".
+- **R11, players in an IR/reserve slot.** Find any rostered player in an IR slot in any reference
+  league. Sleeper's `/league/{id}/rosters` lists them under `reserve`. Confirm whether he appears as
+  a key in that roster's `players_points` for a week he sat there.
+  - This decides roster membership for the Embiid and Unethical awards (see the tasks' membership
+    decision task). IR is exactly where injured players sit, so it matters more than it looks.
+  - If no such player exists, record "not checkable today", not "passed".
 - **R11, capture rows.** After one `POST /api/ingest/players?sport=nfl`, confirm a `status_capture`
   row for (nfl, 2026, current week) and one `player_suspension` row per `Sus`-tagged player (10 on
   2026-09-22).
@@ -99,8 +104,9 @@ curl -s -H "X-Sleeper-User: <your sleeper user id>" localhost:8080/api/leagues/1
 - **SC-003**: for `WAIVER_WIRE_WARRIOR`'s holder, sum by hand: each started week × a player whose
   latest arrival on that roster was a completed WAIVER/FREE_AGENT row. Must equal `value`.
 - **Scoping**: the same call with no header, or a user outside the league, gets 404.
-- **Season param**: `?season=2025` on the NFL league returns the 2025 window, with
-  `throughWeek: 14`, not 17.
+- **Past season**: `GET /api/leagues/1254190892974084096/superlatives` (the NFL 2025 league's own
+  id; there is no `?season=` parameter) returns the 2025 window with `throughWeek: 14`, not 17,
+  because playoff weeks 15–17 are excluded.
 
 ## 3. Basketball (SC-004, SC-006)
 
@@ -115,6 +121,12 @@ curl -s -H "X-Sleeper-User: <id>" "localhost:8080/api/leagues/122935272022213427
   league's settings. Hand-score one game against the league's scoring to check it.
   `estimatedPointsLost` = `gamesMissed` × `pointsPerGame`.
 - **Margin**: `closeGameMargin` is 15, and the close-game counts use it.
+
+**Football scoring check (analysis M1).** `GameScoringService` was only ever verified against
+basketball leagues. For one NFL 2025 regular contributor, score two of his played weeks with it under
+the league's settings, and compare against his stored `players_points` for those weeks. Football has
+one game per week, so the two must match. If they don't, `pointsPerGame` for football is wrong. Stop
+and report; don't widen a tolerance to make it pass.
 
 ## 4. Commissioner's list (US6)
 
@@ -161,6 +173,12 @@ cd web && npx tsc -b && npm run build && npx vitest run
 
 ## 7. The Expected wins page after the R3 change
 
-Open `/leagues/1254190892974084096/expected-wins?season=2025` and compare it with the numbers
+Open `/leagues/1254190892974084096/expected-wins` and compare it with the numbers
 captured in step 1. Write the before/after into the verification notes (the bound was approved on
 2026-09-23, so this records the change rather than asking for it).
+
+Do the same for **career profiles**, which also read expected wins: `ManagerCareerService.java:225`
+sums `winsAboveExpected` across a manager's seasons. Compare
+`GET /api/managers/{managerId}/history` for one manager against the step 1 capture, and write that
+before/after down too. Allan approved the Expected wins page changing; this second change was found
+by analysis, so show it to him explicitly.

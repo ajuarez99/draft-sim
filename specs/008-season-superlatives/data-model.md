@@ -63,7 +63,7 @@ Everything else is **read** from tables that already exist: `roster_week_points`
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigserial pk | |
-| `league_id` | bigint not null → `league(id)` on delete cascade | one league-season, so FR-017's "never visible to another league" is structural |
+| `league_id` | bigint not null → `league(id)` on delete cascade | one league-**season**, so FR-017's "never visible to another league" is structural, and a new season starts with an empty list (spec amendment 9) |
 | `sleeper_player_id` | text not null | |
 | `reason` | text not null | 1–140 chars, trimmed; shown as plain text |
 | `applies_from_week` | int not null | ≥ 1. Counts from this week on (FR-018) |
