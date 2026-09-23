@@ -46,6 +46,6 @@
   planning"), from measurements in research.md. One open decision for Allan: research R3 (bounding
   Expected wins to the regular season).
 - 2026-09-23 after /speckit-analyze: spec amendments 8–12 (FR-006 covers six kinds, commissioner
-  list per season [Claude's default, unconfirmed], FR-002 season-total spans, career profiles also
+  list per season [confirmed by Allan 2026-09-23], FR-002 season-total spans, career profiles also
   change, no ?season= parameter). tasks.md gained two tasks (IR membership decision, career caller)
   and is now 70 tasks.

@@ -1,5 +1,13 @@
 # Ball Knowers — handoff
 
+**2026-09-23, branch `008-season-superlatives`: specced, planned and tasked. Nothing built
+yet.** `specs/008-season-superlatives/` is the brief. Twelve season-to-date superlatives on
+their own page, including Allan's Waiver Wire Warrior, Joel Embiid Award and Unethical Award.
+Start at `tasks.md` T001–T003: they bring the DB up and capture the Expected wins and career
+numbers **before** the regular-season bound changes them. Read `research.md` first. Its Sleeper
+measurements (football DNP vs bye, suspension tag fields, margin spreads) were run live on
+2026-09-22; nothing was run against the app's DB.
+
 **2026-09-19, branch `005-daily-weekly-top-players`: best nights beside best
 weeks, basketball only.** `specs/005-daily-weekly-top-players/` is the brief;
 read `research.md` first, it is where the measurements are.

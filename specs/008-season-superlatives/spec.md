@@ -6,7 +6,7 @@
 
 **Status**: Draft (clarified 2026-09-22, see "Clarifications")
 
-**Input**: User description: "the superlatives idea" — i.e. `ideas/ongoing-superlatives.md`, parked
+**Input**: User description: "the superlatives idea" — i.e. `ideas/ongoing-superlatives.md` (moved to `origin-idea.md` in this folder on 2026-09-23), parked
 earlier on 2026-09-22 as "table for later". Follow-up: "season long. but i want like waiver wire
 warrior. whos been the most unlucky with injury (joel embiid award), closest wins, closest losses".
 
@@ -65,7 +65,7 @@ is left in place. These corrections take precedence where they conflict:
    in is as thin a sample as luck is. FR-006 now names all six.
 9. **The commissioner's list is per season** (FR-017). The list is stored against one league-season,
    and every superlative on the page is season-scoped, so a new season starts with an empty list.
-   *This is Claude's default, not yet confirmed by Allan*; say so if the list should carry over.
+   **Confirmed by Allan on 2026-09-23**: "new season fresh".
 10. **FR-002, for season totals.** Luck and bench points are season-wide sums, not events in a week.
     They show the span they cover ("weeks 1–6") rather than individual weeks. Luck also carries the
     expected-wins table's existing swing weeks, and bench points its single worst week.

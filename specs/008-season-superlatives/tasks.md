@@ -580,7 +580,7 @@ ingest.
   change**, the membership decision from the R11 decision task, the football player-games
   ingest cost from T045, and the open item that suspension capture depends on player ingest being
   run (no scheduler).
-- [ ] T069 Move `ideas/ongoing-superlatives.md` out of `ideas/` (it's now spec 008), updating
+- [x] T069 Move `ideas/ongoing-superlatives.md` out of `ideas/` (it's now spec 008), updating
   `ideas/README.md`'s entry to say where it went, per `ideas/README.md`'s own convention. Confirm
   with Allan first, since those two files predate this session.
 - [ ] T070 Update the memory `project_season_superlatives.md` from "planned, not built" to its real
