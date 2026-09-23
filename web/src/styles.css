@@ -2815,6 +2815,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
      also the cheapest way to make scrolling it less necessary.
      dvh, not vh, because vh on a phone is the viewport with the address bar
      hidden and leaves the submit button under it. */
+  /* The rail is gone, not merely covered, while the ballot is open. See the
+     effect in PowerRankings.tsx for why a full-viewport backdrop was not
+     enough on a real phone. Scoped to the phone breakpoint: on a desktop the
+     ballot is still a centred card over a dimmed page, and hiding the rail
+     behind it would just shuffle the page around under the dimming. */
+  body.bk-modal-fullscreen .app-rail { display: none; }
+
   .pr-ballot-backdrop { padding: 0; }
   .pr-ballot-backdrop .modal-card {
     padding: 14px; border-radius: 0;
