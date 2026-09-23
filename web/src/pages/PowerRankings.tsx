@@ -378,6 +378,25 @@ export default function PowerRankings() {
   const [homersOpen, setHomersOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
   const [ballotModalOpen, setBallotModalOpen] = useState(false)
+
+  // Take the rail off the page entirely while the ballot is open.
+  //
+  // In principle this is redundant: `.modal-backdrop` is `position: fixed;
+  // inset: 0` and on phones the ballot is now a full-screen sheet, so there
+  // should be nothing of the rail left to see. On a real phone there was --
+  // Allan's screenshot shows the nav sitting above the sheet, undimmed, while
+  // the page content below it is dimmed, which is not a thing a fixed
+  // full-viewport backdrop can do. I could not reproduce it here and would
+  // rather not ship a fix aimed at a cause I never proved.
+  //
+  // Removing the rail from the layout does not depend on knowing why. Ranking
+  // twelve teams is the whole job while this is open and none of that
+  // navigation is usable during it, so it is also the better design.
+  useEffect(() => {
+    if (!ballotModalOpen) return
+    document.body.classList.add('bk-modal-fullscreen')
+    return () => document.body.classList.remove('bk-modal-fullscreen')
+  }, [ballotModalOpen])
   const [computing, setComputing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
