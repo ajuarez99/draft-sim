@@ -195,21 +195,58 @@ public class ExpectedWinsService {
 
     // ------------------------------------------------------------- repo walk
 
-    public Optional<Result> forLeague(String sleeperLeagueId) {
+    /**
+     * The only entry point (specs/008-season-superlatives T027/T028): a caller
+     * always states which weeks it wants, explicitly, via {@link WeekBound} --
+     * there is deliberately no unbounded overload (memory "optional params
+     * that encode rules").
+     */
+    public Optional<Result> forLeague(String sleeperLeagueId, WeekBound bound) {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        LeagueRepository.LeagueRow league = found.get().league();
+        return Optional.of(compute(found.get(), bound));
+    }
+
+    /**
+     * Convenience for the common case of "this season's own regular season"
+     * (T029's Expected wins page, T030's career sum), so neither caller
+     * duplicates {@link LeagueSeasonResolver} resolution just to compute the
+     * bound itself (contracts/superlatives-api.md T028/T029 discussion).
+     */
+    public Optional<Result> forLeagueRegularSeason(String sleeperLeagueId) {
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        if (found.isEmpty()) return Optional.empty();
+        WeekBound bound = regularSeasonBound(found.get().league());
+        return Optional.of(compute(found.get(), bound));
+    }
+
+    /**
+     * The regular-season ceiling for one league row: the week before
+     * {@code playoff_week_start} when the league has one configured (>= 2),
+     * else no ceiling at all. Public so every caller of a season window
+     * (this class, {@code SeasonSuperlativesService}, {@code ManagerCareerService})
+     * applies the identical rule rather than each re-deriving it.
+     */
+    public WeekBound regularSeasonBound(LeagueRepository.LeagueRow league) {
+        Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
+        if (format.isPresent() && format.get().playoffWeekStart() >= 2) {
+            return WeekBound.through(format.get().playoffWeekStart() - 1);
+        }
+        return WeekBound.ALL_WEEKS;
+    }
+
+    private Result compute(LeagueSeasonResolver.Resolved found, WeekBound bound) {
+        LeagueRepository.LeagueRow league = found.league();
 
         List<Game> games = new ArrayList<>();
-        for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()))) {
+        for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), bound)) {
             if (p.season() != league.season()) continue;
             if (p.aPoints() == null || p.bPoints() == null) continue;
             games.add(new Game(p.week(), p.aRosterId(), p.aPoints().doubleValue(),
                     p.bRosterId(), p.bPoints().doubleValue()));
         }
         if (games.isEmpty()) {
-            return Optional.of(Result.unavailable(
-                    "no completed games for this league yet", league.season(), league.sport()));
+            return Result.unavailable("no completed games for this league yet", league.season(), league.sport());
         }
 
         Map<Long, String> teamNameByManager = new HashMap<>();
@@ -252,8 +289,8 @@ public class ExpectedWinsService {
                 .thenComparingInt(TeamRow::rosterId));
 
         int weeks = (int) games.stream().mapToInt(Game::week).distinct().count();
-        return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
-                league.sport(), weeks, round2(leaguePpg(games)), teams));
+        return new Result(true, null, league.season(), found.requestedSeason(),
+                league.sport(), weeks, round2(leaguePpg(games)), teams);
     }
 
     private static double round2(double d) {

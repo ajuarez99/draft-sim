@@ -423,4 +423,36 @@ public class BasketballRules implements SportRules {
             default -> false;
         };
     }
+
+    /**
+     * Stats non-null and non-empty. Measured 2026-09-22 (research R9): Joel
+     * Embiid's 2025 season carries one entry per scheduled game, played or
+     * not, and a missed game is {@code stats: {}}. {@code gp} is absent even
+     * when he played, so it cannot be the played signal in basketball.
+     */
+    @Override
+    public boolean playedIn(Map<String, ?> stats) {
+        return stats != null && !stats.isEmpty();
+    }
+
+    /**
+     * Measured 2026-09-22 (research R11): basketball's suspension tag lives
+     * in {@code status = "SUS"} (Jontay Porter measured); {@code injury_status}
+     * is unused for suspension here.
+     */
+    @Override
+    public boolean isSuspended(Player player) {
+        String status = player.status();
+        return status != null && "SUS".equalsIgnoreCase(status.trim());
+    }
+
+    /**
+     * Hand-set, arbitrary: each sport's 2025 regular-season 25th-percentile
+     * margin, measured 2026-09-22 (research R5). Basketball's p25 was 14.0,
+     * rounded to a number a reader can quote.
+     */
+    @Override
+    public double closeGameMargin() {
+        return 15.0;
+    }
 }

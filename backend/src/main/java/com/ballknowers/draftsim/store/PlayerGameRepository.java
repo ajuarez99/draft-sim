@@ -5,9 +5,11 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * One row per player per game (specs/005-daily-weekly-top-players, US1).
@@ -69,6 +71,20 @@ public class PlayerGameRepository {
                 .update();
     }
 
+    /**
+     * Removes a specific game, keyed by (sleeper_player_id, game_id)
+     * (coordinator follow-up 2026-09-23, item 2): called when a later ingest
+     * run sees the SAME game as an ENTRY_WITHOUT_PLAY (a stat correction, or a
+     * game that briefly showed a box score before being corrected to a DNP).
+     * Without this, both a player_game row and an absence row would exist for
+     * the one game. A no-op if no such row exists.
+     */
+    public void deleteByGame(Sport sport, int season, String sleeperPlayerId, String gameId) {
+        db.sql("delete from player_game where sport = ? and season = ? and sleeper_player_id = ? and game_id = ?")
+                .params(sport.code(), season, sleeperPlayerId, gameId)
+                .update();
+    }
+
     /** Every game in one fantasy week. The read path both ranking sections use. */
     public List<Row> forWeek(Sport sport, int season, int week) {
         return db.sql("""
@@ -92,6 +108,39 @@ public class PlayerGameRepository {
     }
 
     /**
+     * Every game played by a specific set of players in one sport and season
+     * (specs/008-season-superlatives, research R10): the input to a player's
+     * mean points per game played, over however many weeks are stored.
+     */
+    public List<Row> forPlayers(Sport sport, int season, Collection<String> playerIds) {
+        if (playerIds == null || playerIds.isEmpty()) return List.of();
+        String placeholders = String.join(", ", Collections.nCopies(playerIds.size(), "?"));
+        String sql = """
+                select sport, season, week, sleeper_player_id, game_id, game_date, opponent,
+                       is_away, stats::text as stats
+                from player_game
+                where sport = ? and season = ? and sleeper_player_id in (%s)
+                """.formatted(placeholders);
+        List<Object> params = new ArrayList<>();
+        params.add(sport.code());
+        params.add(season);
+        params.addAll(playerIds);
+        return db.sql(sql)
+                .params(params)
+                .query((rs, n) -> new Row(
+                        Sport.fromCode(rs.getString("sport")),
+                        rs.getInt("season"),
+                        rs.getInt("week"),
+                        rs.getString("sleeper_player_id"),
+                        rs.getString("game_id"),
+                        rs.getDate("game_date").toLocalDate(),
+                        rs.getString("opponent"),
+                        (Boolean) rs.getObject("is_away"),
+                        rs.getString("stats")))
+                .list();
+    }
+
+    /**
      * Which players already have games stored for a season.
      *
      * <p>Reported rather than used as a skip gate. The backfill refetches every
@@ -101,10 +150,16 @@ public class PlayerGameRepository {
      * has already shipped once, on roster_week_points.
      */
     public Set<String> playersWithGames(Sport sport, int season) {
+        // .set() (not .stream()): JdbcClient's stream() holds the connection open
+        // until the Stream itself is closed, and this call site never closes it --
+        // a live connection leak, one Hikari connection per call, that hung the
+        // whole pool after ~10 page loads (specs/008-season-superlatives, found in
+        // live verification 2026-09-23). This was dead code on main (spec 005)
+        // until SeasonSuperlativesService started calling it every page load.
+        // Regression coverage: PlayerGameRepositoryConnectionLeakIT.
         return db.sql("select distinct sleeper_player_id from player_game where sport = ? and season = ?")
                 .params(sport.code(), season)
                 .query(String.class)
-                .stream()
-                .collect(Collectors.toSet());
+                .set();
     }
 }

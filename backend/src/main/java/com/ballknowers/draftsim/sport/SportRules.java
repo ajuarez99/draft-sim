@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.sport;
 import com.ballknowers.draftsim.domain.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.function.ToDoubleFunction;
 
 /**
@@ -116,4 +117,46 @@ public interface SportRules {
     boolean isDraftable(BoardEntry entry, Object lineup, int round, int totalRounds);
 
     boolean isEligible(Player player, String rosterSlot);
+
+    /**
+     * Whether a Sleeper per-game or per-week stats entry means the player
+     * actually played (specs/008-season-superlatives, research R9).
+     *
+     * <p><b>Measured, not guessed.</b> Basketball's {@code stats} is empty
+     * ({@code {}}) for a missed game and a full box score for a played one,
+     * with no {@code gp} field either way. Football's entry carries a
+     * non-empty {@code stats} even when the player did not dress (Christian
+     * McCaffrey's 2024 weeks 2-8 on IR: {@code gms_active: 1.0}, no {@code gp}
+     * and no points) -- so {@code gms_active} must NOT be read as "played".
+     * Football's actual played signal is {@code gp > 0}.
+     *
+     * <p><b>No default, deliberately</b> -- same reasoning as
+     * {@link #playsMultipleGamesPerScoringPeriod}: this is a fact about a
+     * sport's stat shape, and a defaulted answer would silently assume one
+     * sport's shape for a sport that has never confirmed it.
+     */
+    boolean playedIn(Map<String, ?> stats);
+
+    /**
+     * Whether Sleeper currently tags {@code player} as suspended
+     * (specs/008-season-superlatives, research R11).
+     *
+     * <p><b>Measured, not guessed.</b> The two sports put the tag in different
+     * fields: football sets {@code injury_status = "Sus"} (10 players measured
+     * 2026-09-22; {@code status} stays {@code Active}/{@code Inactive}).
+     * Basketball sets {@code status = "SUS"} ({@code injury_status} unused for
+     * suspension; 1 player measured 2026-09-22). No call site compares a
+     * string directly against either field -- this is the one place that does.
+     */
+    boolean isSuspended(Player player);
+
+    /**
+     * The point margin under which a paired game counts as "close"
+     * (specs/008-season-superlatives, FR-011; research R5). <b>Hand-set,
+     * arbitrary: each sport's 2025 regular-season 25th-percentile margin,
+     * measured 2026-09-22.</b> The spread of scores (not the totals) is what
+     * differs between the sports, so this is an absolute point value per
+     * sport rather than a share of score -- see research R5 for the numbers.
+     */
+    double closeGameMargin();
 }

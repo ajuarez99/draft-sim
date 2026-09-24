@@ -66,10 +66,18 @@ class ManagerCareerServiceTest {
     private long managerE; // leagueUnplayed roster 2 ONLY -- no games ever played.
     private long managerF; // leagueZeroPotential roster 1 ONLY -- scored, but no breakdown.
 
+    private long leaguePlayoffBound; // 2025, complete, 4 rosters, playoff_week_start=2 -- week 1 regular, week 2 playoff.
+
+    private long managerG; // leaguePlayoffBound roster 1 -- winsAboveExpected must come from week 1 alone.
+    private long managerH; // leaguePlayoffBound roster 2.
+    private long managerI; // leaguePlayoffBound roster 3.
+    private long managerJ; // leaguePlayoffBound roster 4.
+
     private static final List<String> SLEEPER_USER_IDS = List.of(
-            "it-career-a", "it-career-b", "it-career-c", "it-career-d", "it-career-e", "it-career-f");
+            "it-career-a", "it-career-b", "it-career-c", "it-career-d", "it-career-e", "it-career-f",
+            "it-career-g", "it-career-h", "it-career-i", "it-career-j");
     private static final List<String> LEAGUE_SLEEPER_IDS = List.of(
-            "it-career-conservation", "it-career-unplayed", "it-career-zero-potential");
+            "it-career-conservation", "it-career-unplayed", "it-career-zero-potential", "it-career-playoff-bound");
     private static final List<String> PLAYER_SLEEPER_IDS = List.of(
             "it-career-p1", "it-career-p2", "it-career-p3", "it-career-p4");
 
@@ -118,6 +126,43 @@ class ManagerCareerServiceTest {
         leagueZeroPotential = insertLeague("it-career-zero-potential", 2025, 1, "complete");
         insertRosterSeason(leagueZeroPotential, managerF, 1, 1, 0, 50.00);
         insertWeekPoints(leagueZeroPotential, 2025, 1, 1, 50.00, "{}");
+
+        // --- leaguePlayoffBound: playoff_week_start = 2, so only week 1 is
+        // "regular season". Week 1 mirrors leagueConservation's own scores
+        // (100/80/95/60), whose winsAboveExpected for roster 1 is a known,
+        // clean 0.0 (roster 1 is the top scorer, beats everyone, and the
+        // all-play share for a 4-team week a top scorer sweeps is exactly
+        // 1.0 -- see the conservation test above). Week 2's scores are
+        // deliberately extreme so that if T030's bound leaked, this would
+        // fail loudly rather than by a rounding coincidence.
+        managerG = insertManager("it-career-g", "IT Career G");
+        managerH = insertManager("it-career-h", "IT Career H");
+        managerI = insertManager("it-career-i", "IT Career I");
+        managerJ = insertManager("it-career-j", "IT Career J");
+        leaguePlayoffBound = insertLeagueWithPlayoffStart("it-career-playoff-bound", 2025, 4, "complete", 2);
+        insertRosterSeason(leaguePlayoffBound, managerG, 1, 2, 0, 105.00);
+        insertRosterSeason(leaguePlayoffBound, managerH, 2, 0, 2, 380.00);
+        insertRosterSeason(leaguePlayoffBound, managerI, 3, 1, 1, 345.00);
+        insertRosterSeason(leaguePlayoffBound, managerJ, 4, 1, 1, 70.00);
+        insertWeekPoints(leaguePlayoffBound, 2025, 1, 1, 100.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 1, 2, 80.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 1, 3, 95.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 1, 4, 60.00, "{}");
+        insertMatchup(leaguePlayoffBound, 2025, 1, 1, 500);
+        insertMatchup(leaguePlayoffBound, 2025, 1, 2, 500);
+        insertMatchup(leaguePlayoffBound, 2025, 1, 3, 501);
+        insertMatchup(leaguePlayoffBound, 2025, 1, 4, 501);
+        // Week 2, the playoff week: roster 1 collapses and roster 2 explodes.
+        // If this reached winsAboveExpected, roster 1's figure would move far
+        // from 0.0 -- it must not move at all.
+        insertWeekPoints(leaguePlayoffBound, 2025, 2, 1, 5.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 2, 2, 300.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 2, 3, 250.00, "{}");
+        insertWeekPoints(leaguePlayoffBound, 2025, 2, 4, 10.00, "{}");
+        insertMatchup(leaguePlayoffBound, 2025, 2, 1, 510);
+        insertMatchup(leaguePlayoffBound, 2025, 2, 2, 510);
+        insertMatchup(leaguePlayoffBound, 2025, 2, 3, 511);
+        insertMatchup(leaguePlayoffBound, 2025, 2, 4, 511);
     }
 
     @AfterEach
@@ -126,8 +171,9 @@ class ManagerCareerServiceTest {
     }
 
     private void cleanup() {
-        jdbc.update("delete from league where sleeper_id in (?, ?, ?)", LEAGUE_SLEEPER_IDS.toArray());
-        jdbc.update("delete from manager where sleeper_user_id in (?, ?, ?, ?, ?, ?)", SLEEPER_USER_IDS.toArray());
+        jdbc.update("delete from league where sleeper_id in (?, ?, ?, ?)", LEAGUE_SLEEPER_IDS.toArray());
+        jdbc.update("delete from manager where sleeper_user_id in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                SLEEPER_USER_IDS.toArray());
         jdbc.update("delete from player where sport = 'nfl' and sleeper_id in (?, ?, ?, ?)",
                 PLAYER_SLEEPER_IDS.toArray());
     }
@@ -149,6 +195,17 @@ class ManagerCareerServiceTest {
                 values ('nfl', ?, ?, ?, ?, ?, '{QB}')
                 returning id
                 """, Long.class, season, sleeperId, "IT League " + sleeperId, totalRosters, status);
+    }
+
+    /** T030: a league whose {@code settings_json} carries a real playoff_week_start, so
+     * {@link ExpectedWinsService#regularSeasonBound} has something to bound against. */
+    private long insertLeagueWithPlayoffStart(String sleeperId, int season, int totalRosters, String status,
+                                              int playoffWeekStart) {
+        return jdbc.queryForObject("""
+                insert into league (sport, season, sleeper_id, name, total_rosters, status, roster_positions, settings_json)
+                values ('nfl', ?, ?, ?, ?, ?, '{QB}', jsonb_build_object('playoff_week_start', ?))
+                returning id
+                """, Long.class, season, sleeperId, "IT League " + sleeperId, totalRosters, status, playoffWeekStart);
     }
 
     private void insertRosterSeason(long leagueId, long managerId, int rosterId, int wins, int losses, double pointsFor) {
@@ -255,6 +312,29 @@ class ManagerCareerServiceTest {
             sum += wae;
         }
         assertEquals(0.0, sum, 1e-6, "winsAboveExpected must conserve to zero across the whole league-season");
+    }
+
+    // ------------------------------------------------------------- T030 (008-season-superlatives)
+
+    /**
+     * specs/008-season-superlatives T030: {@link ManagerCareerService} now asks
+     * {@link ExpectedWinsService#forLeagueRegularSeason} rather than the old
+     * unbounded {@code forLeague}, so a season's playoff-week games must not
+     * reach the career winsAboveExpected sum. leaguePlayoffBound's week 1
+     * (the regular season) is roster 1 sweeping a 4-team week it top-scored,
+     * whose winsAboveExpected is a clean 0.0; week 2 (the playoff week, per
+     * {@code playoff_week_start = 2}) sends roster 1's score to the bottom
+     * and roster 2's to the top -- if that leaked in, roster 1's figure would
+     * move far away from 0.0, not stay put.
+     */
+    @Test
+    void playoffWeekGamesDoNotReachTheCareerWinsAboveExpectedSum() {
+        ManagerCareerService.CareerProfile career = nfl(managerG);
+
+        assertNotNull(career.winsAboveExpected(), "roster 1 played a fully-paired regular-season week");
+        assertEquals(0.0, career.winsAboveExpected(), 1e-6,
+                "week 2's extreme, playoff-week scores must not move managerG's winsAboveExpected off its "
+                        + "week-1-only value of 0.0");
     }
 
     // ------------------------------------------------------------- T068

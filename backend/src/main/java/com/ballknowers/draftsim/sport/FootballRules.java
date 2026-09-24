@@ -353,4 +353,36 @@ public class FootballRules implements SportRules {
         }
         return !lin.flexFull() && isEligible(player, "FLEX");
     }
+
+    /**
+     * {@code gp} present and greater than zero. Measured 2026-09-22 (research
+     * R9): a week the player did not dress, such as Christian McCaffrey's
+     * 2024 weeks 2-8 on IR, carries {@code gms_active: 1.0} but no {@code gp}
+     * and no points -- {@code gms_active} is not the played signal here.
+     */
+    @Override
+    public boolean playedIn(Map<String, ?> stats) {
+        Object gp = stats == null ? null : stats.get("gp");
+        return gp instanceof Number n && n.doubleValue() > 0;
+    }
+
+    /**
+     * Measured 2026-09-22 (research R11): football's suspension tag lives in
+     * {@code injury_status = "Sus"} (10 players), never in {@code status}.
+     */
+    @Override
+    public boolean isSuspended(Player player) {
+        String injuryStatus = player.injuryStatus();
+        return injuryStatus != null && "Sus".equalsIgnoreCase(injuryStatus.trim());
+    }
+
+    /**
+     * Hand-set, arbitrary: each sport's 2025 regular-season 25th-percentile
+     * margin, measured 2026-09-22 (research R5). Football's p25 was 9.8,
+     * rounded to a number a reader can quote.
+     */
+    @Override
+    public double closeGameMargin() {
+        return 10.0;
+    }
 }

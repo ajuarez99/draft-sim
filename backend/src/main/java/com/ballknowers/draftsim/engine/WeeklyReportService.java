@@ -161,7 +161,7 @@ public class WeeklyReportService {
             nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
             avatarByRoster.put(s.rosterId(), s.avatarId());
             recordByRoster.put(s.rosterId(), recordAfter(all, league.season(), week, s.rosterId(),
-                    matchups.pairedWithScores(List.of(league.id()))));
+                    matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)));
         }
 
         Map<Integer, Double> pointsByRoster = new HashMap<>();
@@ -171,7 +171,7 @@ public class WeeklyReportService {
 
         // ---- matchups (US5.1): both teams, their records, their final scores
         List<Matchup> games = new ArrayList<>();
-        for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()))) {
+        for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)) {
             if (p.season() != league.season() || p.week() != week) continue;
             games.add(new Matchup(
                     new Side(p.aRosterId(), nameByRoster.getOrDefault(p.aRosterId(), "Roster " + p.aRosterId()),

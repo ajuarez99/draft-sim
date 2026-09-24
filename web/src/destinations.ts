@@ -39,7 +39,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'mock'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock'
 
 export type LeagueDestination = {
   key: DestinationKey
@@ -214,6 +214,19 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Weekly report',
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/weekly-report`,
     match: /^\/leagues\/([^/]+)\/weekly-report\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'superlatives',
+    glyph: '◈',
+    // Both sports. Every superlative reads scores, pairings and transactions
+    // already stored -- none of it is a projection, so basketball gets it too.
+    sports: ['nfl', 'nba'],
+    label: 'Superlatives',
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/superlatives`,
+    match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

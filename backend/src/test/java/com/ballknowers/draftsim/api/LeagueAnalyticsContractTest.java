@@ -159,7 +159,7 @@ class LeagueAnalyticsContractTest {
 
     @Test
     void expectedWinsCarriesTheLuckDiscriminatorAndItsWeeks() {
-        when(expectedWins.forLeague(LEAGUE)).thenReturn(Optional.of(
+        when(expectedWins.forLeagueRegularSeason(LEAGUE)).thenReturn(Optional.of(
                 new ExpectedWinsService.Result(true, null, 2026, null, Sport.NFL, 1, 130.1, List.of(
                         new ExpectedWinsService.TeamRow(6, 9L, "jpelwell", null,
                                 0.45, 1.0, 0.55, -12.4,
@@ -191,7 +191,7 @@ class LeagueAnalyticsContractTest {
     /** US3.4: the other branch carries no swing weeks at all, never an empty heading. */
     @Test
     void consistentOpponentScoringCarriesNoSwingWeeks() {
-        when(expectedWins.forLeague(LEAGUE)).thenReturn(Optional.of(
+        when(expectedWins.forLeagueRegularSeason(LEAGUE)).thenReturn(Optional.of(
                 new ExpectedWinsService.Result(true, null, 2026, null, Sport.NBA, 3, 228.0, List.of(
                         new ExpectedWinsService.TeamRow(2, 3L, "Hoop Dreams", null,
                                 2.4, 2.0, -0.4, 5.1,

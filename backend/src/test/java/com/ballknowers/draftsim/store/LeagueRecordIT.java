@@ -64,7 +64,7 @@ class LeagueRecordIT {
      */
     @Test
     void highestWeekInTheChainIs205AtSeason2025Week8() {
-        List<RosterWeekPointsRepository.ScoreRow> top = weekPoints.extremes(footballChain(), true, 5);
+        List<RosterWeekPointsRepository.ScoreRow> top = weekPoints.extremes(footballChain(), true, 5, WeekBound.ALL_WEEKS);
 
         Assumptions.assumeFalse(top.isEmpty(), "no roster_week_points stored for this chain");
         assertEquals(new BigDecimal("205.04"), top.get(0).points());
@@ -75,7 +75,7 @@ class LeagueRecordIT {
     /** Descending for highest, ascending for lowest -- not the same list twice. */
     @Test
     void lowestIsAscendingAndDiffersFromHighest() {
-        List<RosterWeekPointsRepository.ScoreRow> low = weekPoints.extremes(footballChain(), false, 5);
+        List<RosterWeekPointsRepository.ScoreRow> low = weekPoints.extremes(footballChain(), false, 5, WeekBound.ALL_WEEKS);
         Assumptions.assumeFalse(low.isEmpty(), "no roster_week_points stored for this chain");
 
         assertEquals(new BigDecimal("40.68"), low.get(0).points(), "baseline.md Q2 bottom row");
@@ -95,7 +95,7 @@ class LeagueRecordIT {
         Set<Long> chain = footballChain();
         Assumptions.assumeTrue(chain.size() > 1, "this chain has only one ingested season");
 
-        List<RosterWeekPointsRepository.ScoreRow> top = weekPoints.extremes(chain, true, 10);
+        List<RosterWeekPointsRepository.ScoreRow> top = weekPoints.extremes(chain, true, 10, WeekBound.ALL_WEEKS);
         Assumptions.assumeFalse(top.isEmpty(), "no roster_week_points stored for this chain");
 
         assertTrue(top.stream().anyMatch(r -> r.season() == 2025),
@@ -110,8 +110,8 @@ class LeagueRecordIT {
     @Test
     void orderingIsDeterministicAcrossRepeatCalls() {
         Set<Long> chain = footballChain();
-        List<RosterWeekPointsRepository.ScoreRow> a = weekPoints.extremes(chain, true, 10);
-        List<RosterWeekPointsRepository.ScoreRow> b = weekPoints.extremes(chain, true, 10);
+        List<RosterWeekPointsRepository.ScoreRow> a = weekPoints.extremes(chain, true, 10, WeekBound.ALL_WEEKS);
+        List<RosterWeekPointsRepository.ScoreRow> b = weekPoints.extremes(chain, true, 10, WeekBound.ALL_WEEKS);
         assertEquals(a, b);
     }
 
@@ -121,7 +121,7 @@ class LeagueRecordIT {
      */
     @Test
     void limitIsHonoured() {
-        assertTrue(weekPoints.extremes(footballChain(), true, 3).size() <= 3);
+        assertTrue(weekPoints.extremes(footballChain(), true, 3, WeekBound.ALL_WEEKS).size() <= 3);
     }
 
     /**
@@ -132,6 +132,6 @@ class LeagueRecordIT {
      */
     @Test
     void emptyLeagueSetReturnsNothingRatherThanEverything() {
-        assertTrue(weekPoints.extremes(Set.of(), true, 10).isEmpty());
+        assertTrue(weekPoints.extremes(Set.of(), true, 10, WeekBound.ALL_WEEKS).isEmpty());
     }
 }

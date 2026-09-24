@@ -202,4 +202,12 @@ describe('sports', () => {
       expect(destinationsFor(ctx({ sport: s })).length, s).toBeGreaterThan(0)
     }
   })
+
+  // specs/008-season-superlatives T016: both sports, same reasoning as
+  // Expected wins and Weekly report -- nothing about superlatives is a
+  // projection.
+  it('offers Superlatives to both sports', () => {
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).toContain('superlatives')
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('superlatives')
+  })
 })

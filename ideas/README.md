@@ -23,6 +23,14 @@ If something moves from "maybe" to "next", it leaves this folder and goes into
   one of the four already built (8/10/12/14). Demoted from the roadmap: none of
   Allan's actual leagues need it.
 
+## Left this folder (promoted to a spec, 2026-09-23)
+
+- **`ongoing-superlatives.md`** → now `specs/008-season-superlatives/origin-idea.md`,
+  kept as the origin of spec 008. Parked 2026-09-22, picked up the same day. Its
+  central guess (tally the Weekly Report's weekly awards) was **overturned** in the
+  spec: a per-week award tally names the wrong team for "luckiest", so the spec uses
+  season-long measures instead.
+
 ## Left this folder (promoted to plans, 2026-09-07)
 
 Both went to `claude/` once the assumption each was blocked on got **measured**

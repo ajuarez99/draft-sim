@@ -97,10 +97,16 @@ public class LeagueMatchupRepository {
      *       missing score as zero would invent a 130-point blowout for a game
      *       that has not kicked off.
      * </ul>
+     *
+     * @param bound explicit, never defaulted (specs/008-season-superlatives T011,
+     *              memory "optional params that encode rules"): {@link WeekBound#ALL_WEEKS}
+     *              for every stored week, or {@link WeekBound#through} to cap it
+     *              at, e.g., a regular-season boundary.
      */
-    public List<PairedGame> pairedWithScores(Collection<Long> leagueIds) {
+    public List<PairedGame> pairedWithScores(Collection<Long> leagueIds, WeekBound bound) {
         if (leagueIds == null || leagueIds.isEmpty()) return List.of();
         String ids = RosterWeekPointsRepository.inClause(leagueIds);
+        String weekFilter = bound.throughWeek() != null ? "and a.week <= ?" : "";
         String sql = """
                 select a.season, a.week,
                        a.roster_id, rsa.manager_id, ma.display_name, ma.avatar_id, wa.starters_points,
@@ -115,11 +121,12 @@ public class LeagueMatchupRepository {
                 left join roster_season rsb on rsb.league_id = b.league_id and rsb.roster_id = b.roster_id
                 left join manager ma on ma.id = rsa.manager_id
                 left join manager mb on mb.id = rsb.manager_id
-                where a.league_id in (%s) and a.matchup_id is not null and b.matchup_id is not null
+                where a.league_id in (%s) and a.matchup_id is not null and b.matchup_id is not null %s
                 order by a.season desc, a.week asc, a.roster_id asc
-                """.formatted(ids);
-        return db.sql(sql)
-                .params(List.copyOf(leagueIds))
+                """.formatted(ids, weekFilter);
+        var spec = db.sql(sql).params(List.copyOf(leagueIds));
+        if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
+        return spec
                 .query((rs, i) -> new PairedGame(rs.getInt(1), rs.getInt(2),
                         rs.getInt(3), (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7),
                         rs.getInt(8), (Long) rs.getObject(9), rs.getString(10), rs.getString(11), rs.getBigDecimal(12)))
