@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.config.OwnerProperties;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -34,10 +35,20 @@ public class LeagueMembership {
 
     private final JdbcClient db;
     private final DraftRepository drafts;
+    private final LeagueRepository leagues;
+    private final OwnerProperties ownerProperties;
+    private final ManagerRepository managers;
+    private final LeagueMemberRepository leagueMembers;
 
-    public LeagueMembership(JdbcClient db, DraftRepository drafts) {
+    public LeagueMembership(JdbcClient db, DraftRepository drafts, LeagueRepository leagues,
+                             OwnerProperties ownerProperties, ManagerRepository managers,
+                             LeagueMemberRepository leagueMembers) {
         this.db = db;
         this.drafts = drafts;
+        this.leagues = leagues;
+        this.ownerProperties = ownerProperties;
+        this.managers = managers;
+        this.leagueMembers = leagueMembers;
     }
 
     /**
@@ -128,6 +139,41 @@ public class LeagueMembership {
                 .param(leagueId)
                 .query(Boolean.class)
                 .single());
+    }
+
+    /**
+     * This league, if the caller may see it -- empty for both "no such league"
+     * and "not yours", which the callers turn into the same 404 for the same
+     * reason {@link #visibleDraft} does.
+     *
+     * <p>Moved here from {@code LeagueHistoryController} (specs/008-season-superlatives
+     * T009): a second caller (the superlatives endpoints) needs the same
+     * answer, which is exactly the "the moment something does" trigger this
+     * class's own javadoc named for when a local copy should stop being local.
+     */
+    public Optional<LeagueRepository.LeagueRow> visibleLeague(String sleeperId, String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
+        if (league.isEmpty()) return league;
+        return canSee(sleeperUserId, league.get().id()) ? league : Optional.empty();
+    }
+
+    /**
+     * Whether this caller may save a ranking for this league -- the header
+     * names a {@code league_member} row with {@code is_commissioner}, or
+     * equals the configured app owner. Shared between {@code GET /ballot}'s
+     * {@code canCommission} (display) and {@code POST /power/commissioner}'s
+     * own gate (enforcement), so the two can never disagree about who is
+     * allowed to save.
+     *
+     * <p>Moved here from {@code LeagueHistoryController} (specs/008-season-superlatives
+     * T009) so the conduct-list endpoints can share the same gate rather than
+     * growing their own copy.
+     */
+    public boolean canCommission(long leagueId, String sleeperUserId) {
+        if (sleeperUserId == null || sleeperUserId.isBlank()) return false;
+        if (ownerProperties.configured() && sleeperUserId.equals(ownerProperties.sleeperUserId())) return true;
+        Long managerId = managers.idsBySleeperUserId().get(sleeperUserId);
+        return managerId != null && leagueMembers.isCommissioner(leagueId, managerId);
     }
 
     /**

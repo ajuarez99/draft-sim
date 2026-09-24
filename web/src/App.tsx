@@ -14,6 +14,7 @@ import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
 import SeasonForecast from './pages/SeasonForecast'
 import WeeklyReport from './pages/WeeklyReport'
+import Superlatives from './pages/Superlatives'
 import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import ManagerComparison from './pages/ManagerComparison'
@@ -116,6 +117,10 @@ export default function App() {
               <Route
                 path="/leagues/:sleeperLeagueId/weekly-report"
                 element={<WeeklyReport />}
+              />
+              <Route
+                path="/leagues/:sleeperLeagueId/superlatives"
+                element={<Superlatives />}
               />
               {/* power-rankings-reskin.md §7: a self-check harness, not a page
                   real users should ever reach -- dev-only. */}

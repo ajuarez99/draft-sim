@@ -430,3 +430,37 @@ frontend tests, not a typecheck — TypeScript believed the field was there,
 because in the repo it *is*. `src/api.mockSport.test.ts` now pins the tolerance
 using a response body copied verbatim from the old backend while it was still
 serving.
+
+## 18. A JDBC stream that nobody closed held a pool connection per request
+
+**2026-09-23, spec 008.** `PlayerGameRepository.playersWithGames` returned
+`.query(String.class).stream().collect(toSet())`. Spring's `JdbcClient` `stream()` holds its
+connection until the `Stream` is closed, and `collect` doesn't close it. Every superlatives
+request leaked one Hikari connection, and after 10 page loads the endpoint hung while
+`/api/health` (no DB) still answered.
+
+The method had been on `main` since spec 005 with **no callers**, so it was dead code until 008
+called it. 650 green tests never saw the problem, because each makes one call. What found it was
+reloading the real page a dozen times; `pg_stat_activity` then showed all 10 connections idle
+after that exact query.
+
+**The rule:** from `JdbcClient`, use `.list()` or `.set()`; use `.stream()` only inside
+try-with-resources. The other `.stream()` sites in `store/` were all `.list().stream()`, which is
+safe. A pool-sized repeat IT (`PlayerGameRepositoryConnectionLeakIT`: pool 3, 25 calls) fails on
+the leaking form.
+
+## 19. A lenient measurement script can hide the exact shape the code gets wrong
+
+**2026-09-23, spec 008.** Research R9 measured Sleeper's per-week stats and wrote football down as
+"one entry per week". The script that took the measurement did `e = v if isinstance(v, dict)
+else v[0]`: it silently accepted both a bare object and a list. So the *difference*, that football
+weeks are bare objects while basketball weeks are lists, never reached the research text. The
+ingest, written from the text, cast every football week to a list. The first live run threw on all
+315 NFL players, stored nothing, and reported 5,670 "unclassified" weeks.
+
+**The rule:** when research records a data shape, write down the literal type the measurement saw,
+not the meaning. A script that normalises its input is measuring the normaliser. The same feature
+had a sibling: research R10's "regular contributor" denominator (*weeks he played*) became *weeks
+rostered* in code, which silently dropped the award's namesake case. Research text and code
+drifted apart and no test compared them. The review caught it by reading one against the other.
+

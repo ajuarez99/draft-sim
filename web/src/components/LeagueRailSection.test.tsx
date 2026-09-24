@@ -108,6 +108,7 @@ describe('what a league is offered', () => {
       'Expected wins',
       'Season forecast',
       'Weekly report',
+      'Superlatives',
       'Mock it',
     ])
   })

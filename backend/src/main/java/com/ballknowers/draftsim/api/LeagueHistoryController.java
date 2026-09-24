@@ -15,6 +15,7 @@ import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.WeekBound;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RankingBallotRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
@@ -75,22 +76,6 @@ public class LeagueHistoryController {
     }
 
     /**
-     * This league, if the caller may see it -- empty for both "no such league"
-     * and "not yours", which the callers turn into the same 404 for the same
-     * reason {@link LeagueMembership#visibleDraft} does.
-     *
-     * <p>Not itself a duplicate of that method: this one is addressed by a
-     * league, that one by a draft. It stays local because nothing outside this
-     * controller resolves a league this way -- the moment something does, it
-     * belongs next to visibleDraft in LeagueMembership rather than copied.
-     */
-    private Optional<LeagueRepository.LeagueRow> visibleLeague(String sleeperId, String sleeperUserId) {
-        Optional<LeagueRepository.LeagueRow> league = leagues.bySleeperId(sleeperId);
-        if (league.isEmpty()) return league;
-        return membership.canSee(sleeperUserId, league.get().id()) ? league : Optional.empty();
-    }
-
-    /**
      * Every season this DB has ingested for this league's chain, newest first,
      * each with its standings. Walked locally ({@link LeagueRepository#chainBySleeperId})
      * rather than re-hitting Sleeper -- run {@code POST /api/ingest/league-history/{id}}
@@ -103,7 +88,7 @@ public class LeagueHistoryController {
         // expands to is by definition that league's own predecessor seasons, so
         // membership in the head is what governs -- and LeagueMembership's own
         // walk already treats predecessors as yours.
-        if (visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
 
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
@@ -152,7 +137,7 @@ public class LeagueHistoryController {
         // reason the power compute endpoint below builds its response this way.
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("sleeperLeagueId", sleeperId);
-        response.put("records", recordBook(records.forChain(chainIds)));
+        response.put("records", recordBook(records.forChain(chainIds, WeekBound.ALL_WEEKS)));
         response.put("seasons", seasons);
         return ResponseEntity.ok(response);
     }
@@ -507,7 +492,7 @@ public class LeagueHistoryController {
     @GetMapping("/leagues/{sleeperId}/power")
     public ResponseEntity<?> powerRankings(@PathVariable String sleeperId,
                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
+        Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
@@ -621,21 +606,6 @@ public class LeagueHistoryController {
     }
 
     /**
-     * Whether this caller may save a ranking for this league -- the header
-     * names a {@code league_member} row with {@code is_commissioner}, or
-     * equals the configured app owner. Shared between {@code GET /ballot}'s
-     * {@code canCommission} (display) and {@code POST /power/commissioner}'s
-     * own gate (enforcement), so the two can never disagree about who is
-     * allowed to save.
-     */
-    private boolean canCommission(long leagueId, String sleeperUserId) {
-        if (sleeperUserId == null || sleeperUserId.isBlank()) return false;
-        if (ownerProperties.configured() && sleeperUserId.equals(ownerProperties.sleeperUserId())) return true;
-        Long managerId = managers.idsBySleeperUserId().get(sleeperUserId);
-        return managerId != null && leagueMembers.isCommissioner(leagueId, managerId);
-    }
-
-    /**
      * Everything the ballot board needs to render itself: whether this
      * caller can submit or commission, the roster/member list (works before
      * any history ingest -- {@link MemberRankingService#members}), and this
@@ -649,7 +619,7 @@ public class LeagueHistoryController {
     public ResponseEntity<?> ballot(@PathVariable String sleeperId,
                                     @RequestParam(required = false) Integer week,
                                     @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
+        Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
@@ -669,7 +639,7 @@ public class LeagueHistoryController {
         response.put("season", row.season());
         response.put("week", effectiveWeek);
         response.put("canSubmit", canSubmit);
-        response.put("canCommission", canCommission(row.id(), sleeperUserId));
+        response.put("canCommission", membership.canCommission(row.id(), sleeperUserId));
         response.put("commissionerKnown", leagueMembers.anyCommissioner(row.id()));
 
         List<MemberRankingService.BallotMember> members = memberRankings.members(row.id(), sleeperId, sleeperUserId);
@@ -805,7 +775,7 @@ public class LeagueHistoryController {
     public ResponseEntity<?> backfillFinalRanks(@PathVariable String sleeperId,
                                                 @RequestParam(required = false) Integer season,
                                                 @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        if (visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
 
@@ -846,7 +816,7 @@ public class LeagueHistoryController {
     public ResponseEntity<?> compute(@PathVariable String sleeperId, @RequestParam int season,
                                      @RequestParam int week,
                                      @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
+        Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
         var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
@@ -902,7 +872,7 @@ public class LeagueHistoryController {
     public ResponseEntity<?> commissioner(@PathVariable String sleeperId,
                                           @RequestBody CommissionerRanking body,
                                           @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        Optional<LeagueRepository.LeagueRow> league = visibleLeague(sleeperId, sleeperUserId);
+        Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
@@ -913,7 +883,7 @@ public class LeagueHistoryController {
             return ResponseEntity.badRequest().body(Map.of("message", "season and week are required"));
         }
 
-        if (!canCommission(row.id(), sleeperUserId)) {
+        if (!membership.canCommission(row.id(), sleeperUserId)) {
             boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
             String message = commissionerKnown
                     ? "only this league's Sleeper commissioner may save the power rankings"

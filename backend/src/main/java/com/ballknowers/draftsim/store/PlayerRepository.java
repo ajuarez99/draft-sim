@@ -68,20 +68,63 @@ public class PlayerRepository {
                 from player where sport = ?
                 """)
                 .param(sport.code())
-                .query((rs, i) -> {
-                    String[] raw = (String[]) rs.getArray("positions").getArray();
-                    List<Position> pos = Arrays.stream(raw)
-                            .map(p -> Position.fromSleeper(p, sport))
-                            .flatMap(Optional::stream)
-                            .toList();
-                    Integer age = rs.getObject("age") == null ? null : rs.getInt("age");
-                    Integer exp = rs.getObject("years_exp") == null ? null : rs.getInt("years_exp");
-                    return new Player(
-                            rs.getLong("id"), sport, rs.getString("sleeper_id"), rs.getString("name"),
-                            pos, rs.getString("team"), rs.getString("status"),
-                            rs.getString("injury_status"), age, exp);
-                })
+                .query((rs, i) -> mapRow(rs, sport))
                 .list();
+    }
+
+    /**
+     * One player, if this sport has one under this Sleeper id -- used by the
+     * conduct-list write endpoints (specs/008-season-superlatives T055) to
+     * validate a submitted playerId is a known player for the league's sport,
+     * without pulling the whole ~11k-row table for a single lookup.
+     */
+    public Optional<Player> bySleeperId(Sport sport, String sleeperId) {
+        return db.sql("""
+                select id, sleeper_id, name, positions, team, status, injury_status, age, years_exp
+                from player where sport = ? and sleeper_id = ?
+                """)
+                .params(sport.code(), sleeperId)
+                .query((rs, i) -> mapRow(rs, sport))
+                .optional();
+    }
+
+    /**
+     * Several players in one lookup, keyed by {@code sleeperId}
+     * (specs/008-season-superlatives, coordinator follow-up 2026-09-23, item
+     * 7): the conduct-list GET used to call {@link #bySleeperId} once per
+     * entry, an N+1 that grows with the list. An id this sport has no row for
+     * is simply absent from the returned map, the same "caller checks for
+     * null/absence" contract {@link #bySleeperId} already has.
+     */
+    public Map<String, Player> byIds(Sport sport, Collection<String> sleeperIds) {
+        if (sleeperIds == null || sleeperIds.isEmpty()) return Map.of();
+        String placeholders = String.join(", ", Collections.nCopies(sleeperIds.size(), "?"));
+        String sql = ("""
+                select id, sleeper_id, name, positions, team, status, injury_status, age, years_exp
+                from player where sport = ? and sleeper_id in (%s)
+                """).formatted(placeholders);
+        List<Object> params = new ArrayList<>();
+        params.add(sport.code());
+        params.addAll(sleeperIds);
+        Map<String, Player> out = new HashMap<>();
+        for (Player p : db.sql(sql).params(params).query((rs, i) -> mapRow(rs, sport)).list()) {
+            out.put(p.sleeperId(), p);
+        }
+        return out;
+    }
+
+    private static Player mapRow(java.sql.ResultSet rs, Sport sport) throws java.sql.SQLException {
+        String[] raw = (String[]) rs.getArray("positions").getArray();
+        List<Position> pos = Arrays.stream(raw)
+                .map(p -> Position.fromSleeper(p, sport))
+                .flatMap(Optional::stream)
+                .toList();
+        Integer age = rs.getObject("age") == null ? null : rs.getInt("age");
+        Integer exp = rs.getObject("years_exp") == null ? null : rs.getInt("years_exp");
+        return new Player(
+                rs.getLong("id"), sport, rs.getString("sleeper_id"), rs.getString("name"),
+                pos, rs.getString("team"), rs.getString("status"),
+                rs.getString("injury_status"), age, exp);
     }
 
     public long count(Sport sport) {

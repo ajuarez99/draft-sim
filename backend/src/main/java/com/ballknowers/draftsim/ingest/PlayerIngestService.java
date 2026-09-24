@@ -3,12 +3,16 @@ package com.ballknowers.draftsim.ingest;
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Position;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.sport.SportRules;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.BoardRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
+import com.ballknowers.draftsim.store.StatusCaptureRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -31,14 +35,48 @@ public class PlayerIngestService {
     private final SleeperClient sleeper;
     private final PlayerRepository players;
     private final BoardRepository boards;
+    private final StatusCaptureRepository statusCaptures;
+    private final SportRulesRegistry rulesRegistry;
 
-    public PlayerIngestService(SleeperClient sleeper, PlayerRepository players, BoardRepository boards) {
+    public PlayerIngestService(SleeperClient sleeper, PlayerRepository players, BoardRepository boards,
+                               StatusCaptureRepository statusCaptures, SportRulesRegistry rulesRegistry) {
         this.sleeper = sleeper;
         this.players = players;
         this.boards = boards;
+        this.statusCaptures = statusCaptures;
+        this.rulesRegistry = rulesRegistry;
     }
 
-    public record Result(int playersWritten, int ranked) {}
+    /**
+     * @param suspensionCaptured whether the /state/{sport} call and the
+     *                           status_capture/player_suspension writes
+     *                           (specs/008-season-superlatives T052, research
+     *                           R11) succeeded. False on any failure of that
+     *                           call -- it must never fail the player ingest
+     *                           itself, which is the whole reason this is a
+     *                           flag on the result rather than a thrown
+     *                           exception. Also false, deliberately, when
+     *                           {@code /state/{sport}}'s own {@code
+     *                           season_type} is not {@code "regular"}
+     *                           (coordinator follow-up 2026-09-23, item 5;
+     *                           measured live against {@code GET
+     *                           /v1/state/nba} during preseason: {@code
+     *                           {"week":1,"leg":0,"season_type":"pre",
+     *                           "season":"2026",...}} -- {@code week} alone
+     *                           reports 1 even though nothing has started,
+     *                           which would otherwise record a capture
+     *                           claiming tracking began a real week 1). The
+     *                           captured week itself, when it IS recorded, is
+     *                           {@code leg} -- Sleeper's own name for the
+     *                           fantasy scoring period -- not {@code week}
+     *                           (measured the same day against {@code GET
+     *                           /v1/state/nfl}: {@code {"week":3,"leg":3,
+     *                           "season_type":"regular",...}}; they agree for
+     *                           football today, but nothing here may assume
+     *                           they always will).
+     * @param suspendedCount     0 when suspensionCaptured is false.
+     */
+    public record Result(int playersWritten, int ranked, boolean suspensionCaptured, int suspendedCount) {}
 
     public Result ingest(Sport sport) {
         Map<String, Map<String, Object>> raw = sleeper.allPlayers(sport.code());
@@ -70,7 +108,45 @@ public class PlayerIngestService {
         log.info("wrote {} fantasy-relevant players", toWrite.size());
 
         int ranked = writeSearchRankBoard(sport, searchRanks);
-        return new Result(toWrite.size(), ranked);
+
+        boolean suspensionCaptured = false;
+        int suspendedCount = 0;
+        try {
+            Map<String, Object> state = sleeper.state(sport.code());
+            String seasonType = str(state.get("season_type"));
+            if (!"regular".equals(seasonType)) {
+                // Measured live 2026-09-23 (coordinator follow-up, item 5):
+                // GET /v1/state/nba during preseason returns {"week":1,"leg":0,
+                // "season_type":"pre",...} -- "week" alone reports 1 even
+                // though nothing has actually started, so a capture recorded
+                // from it would falsely claim tracking began week 1 of a
+                // season with zero real weeks observed. NFL today (measured
+                // the same day): {"week":3,"leg":3,"season_type":"regular"}
+                // -- unaffected by this guard.
+                log.info("suspension capture skipped for {}: season_type is '{}', not 'regular'", sport, seasonType);
+            } else {
+                int season = Integer.parseInt(String.valueOf(state.get("season")));
+                // "leg", not "week": leg is Sleeper's own name for the fantasy
+                // scoring period, which is what status_capture's own "week"
+                // column means everywhere else in this feature. They agree for
+                // NFL today, but nothing here may assume they always will.
+                int week = ((Number) state.getOrDefault("leg", 0)).intValue();
+                SportRules rules = rulesRegistry.get(sport);
+                List<String> suspended = toWrite.stream()
+                        .filter(rules::isSuspended)
+                        .map(Player::sleeperId)
+                        .toList();
+                statusCaptures.recordCapture(sport, season, week, Instant.now());
+                statusCaptures.recordSuspended(sport, season, week, suspended);
+                suspensionCaptured = true;
+                suspendedCount = suspended.size();
+                log.info("captured suspension tags for {} season {} week {}: {} suspended", sport, season, week, suspendedCount);
+            }
+        } catch (Exception e) {
+            log.warn("suspension capture failed for {} -- player ingest still succeeded: {}", sport, e.toString());
+        }
+
+        return new Result(toWrite.size(), ranked, suspensionCaptured, suspendedCount);
     }
 
     /**

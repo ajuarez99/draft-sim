@@ -1,12 +1,45 @@
 # Ball Knowers — handoff
 
-**2026-09-23, branch `008-season-superlatives`: specced, planned and tasked. Nothing built
-yet.** `specs/008-season-superlatives/` is the brief. Twelve season-to-date superlatives on
-their own page, including Allan's Waiver Wire Warrior, Joel Embiid Award and Unethical Award.
-Start at `tasks.md` T001–T003: they bring the DB up and capture the Expected wins and career
-numbers **before** the regular-season bound changes them. Read `research.md` first. Its Sleeper
-measurements (football DNP vs bye, suspension tag fields, margin spreads) were run live on
-2026-09-22; nothing was run against the app's DB.
+**2026-09-23, branch `008-season-superlatives`: built and verified live, not yet committed
+or deployed.** `specs/008-season-superlatives/` is the brief. Start with
+`verification.md`, which records every number below and says which checks were and weren't
+run.
+
+A new **Superlatives** page (rail entry after Weekly report) with twelve season-to-date
+superlatives for the regular season:
+- highest and lowest week, blowout, closest game, and per-team close wins and close losses;
+- luckiest and unluckiest, and most bench points;
+- **Waiver Wire Warrior**, **the Joel Embiid Award** (missed games) and **the Unethical Award**
+  (Sleeper suspensions plus a commissioner-kept list).
+
+**Verified live**, recounted independently in SQL or by hand on NFL 2026, NFL 2025 and NBA 2025:
+extremes, close games, luck (identical to Expected wins), waiver totals, and Embiid (Jokić 16
+and Embiid 26 missed games, hand-counted). Also verified: the commissioner flow from the page,
+403 / 404 / 400 paths, and CORS preflight. Backend **667 tests, 0 skipped**; frontend **546**.
+**Not verified:** bench points against a hand-built optimal lineup, and the stale-row cleanup on
+a live mid-season NBA ingest (no NBA season is live).
+
+**Behaviour changes to existing pages, not only additions:**
+- **Expected wins is now regular-season only.** It used to include playoff and consolation games:
+  NFL 2025 `weeksScored` went from 17 to 14, and NBA 2025's luckiest team changed. Allan
+  approved this.
+- **Career `winsAboveExpected` follows it.** Manager 7's NFL career figure went from +0.40 to
+  −0.15. Found by analysis and flagged, **not yet explicitly approved.**
+- **Player-games ingest now runs for football too**, and stores missed games (`player_absence`,
+  V22/V23). It used to drop exactly those rows. Run
+  `POST /api/ingest/player-games/{id}` per league before the Embiid card shows anything.
+- **Player ingest now records Sleeper suspension tags** each time it runs during the regular
+  season. There's no scheduler, so a week only counts as tracked if an ingest ran that week.
+
+**Deploy:** backend first, then frontend (lessons #17). Migrations V22 and V23 run on backend
+start.
+
+**Found by live verification or review that tests missed**, all fixed:
+- a JDBC connection leak (lessons #18);
+- research R9 misreading football's data shape (lessons #19);
+- the regular-contributor rule silently diverging from research R10 and dropping the award's
+  namesake case;
+- the award and the commissioner's list showing different seasons before week 1.
 
 **2026-09-19, branch `005-daily-weekly-top-players`: best nights beside best
 weeks, basketball only.** `specs/005-daily-weekly-top-players/` is the brief;

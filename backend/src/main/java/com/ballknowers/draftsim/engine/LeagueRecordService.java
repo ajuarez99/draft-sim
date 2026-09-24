@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.WeekBound;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -114,37 +115,37 @@ public class LeagueRecordService {
                              String marginsUnavailableReason, List<PointsLeaderRecord> pointsLeaders,
                              List<StreakRecord> winStreaks, List<StreakRecord> lossStreaks) {}
 
-    public RecordBook forChain(Collection<Long> leagueIds) {
-        return forChain(leagueIds, DEFAULT_LIMIT);
+    public RecordBook forChain(Collection<Long> leagueIds, WeekBound bound) {
+        return forChain(leagueIds, DEFAULT_LIMIT, bound);
     }
 
-    public RecordBook forChain(Collection<Long> leagueIds, int limit) {
-        List<WeeklyScoreRecord> highest = highestWeeks(leagueIds, limit);
-        List<WeeklyScoreRecord> lowest = lowestWeeks(leagueIds, limit);
-        List<MarginRecord> closest = closestMatchups(leagueIds, limit);
-        List<MarginRecord> blowouts = biggestBlowouts(leagueIds, limit);
-        List<PointsLeaderRecord> leaders = pointsLeaders(leagueIds, limit);
-        List<StreakRecord> wins = winStreaks(leagueIds, limit);
-        List<StreakRecord> losses = lossStreaks(leagueIds, limit);
+    public RecordBook forChain(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        List<WeeklyScoreRecord> highest = highestWeeks(leagueIds, limit, bound);
+        List<WeeklyScoreRecord> lowest = lowestWeeks(leagueIds, limit, bound);
+        List<MarginRecord> closest = closestMatchups(leagueIds, limit, bound);
+        List<MarginRecord> blowouts = biggestBlowouts(leagueIds, limit, bound);
+        List<PointsLeaderRecord> leaders = pointsLeaders(leagueIds, limit, bound);
+        List<StreakRecord> wins = winStreaks(leagueIds, limit, bound);
+        List<StreakRecord> losses = lossStreaks(leagueIds, limit, bound);
         return new RecordBook(limit, highest, lowest, closest, blowouts,
-                closest.isEmpty() ? marginsUnavailableReason(leagueIds) : null,
+                closest.isEmpty() ? marginsUnavailableReason(leagueIds, bound) : null,
                 leaders, wins, losses);
     }
 
-    public List<WeeklyScoreRecord> highestWeeks(Collection<Long> leagueIds, int limit) {
-        return weekPoints.extremes(leagueIds, true, limit).stream().map(LeagueRecordService::score).toList();
+    public List<WeeklyScoreRecord> highestWeeks(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return weekPoints.extremes(leagueIds, true, limit, bound).stream().map(LeagueRecordService::score).toList();
     }
 
-    public List<WeeklyScoreRecord> lowestWeeks(Collection<Long> leagueIds, int limit) {
-        return weekPoints.extremes(leagueIds, false, limit).stream().map(LeagueRecordService::score).toList();
+    public List<WeeklyScoreRecord> lowestWeeks(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return weekPoints.extremes(leagueIds, false, limit, bound).stream().map(LeagueRecordService::score).toList();
     }
 
-    public List<MarginRecord> closestMatchups(Collection<Long> leagueIds, int limit) {
-        return margins(leagueIds, Comparator.comparing(MarginRecord::margin), limit);
+    public List<MarginRecord> closestMatchups(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return margins(leagueIds, Comparator.comparing(MarginRecord::margin), limit, bound);
     }
 
-    public List<MarginRecord> biggestBlowouts(Collection<Long> leagueIds, int limit) {
-        return margins(leagueIds, Comparator.comparing(MarginRecord::margin).reversed(), limit);
+    public List<MarginRecord> biggestBlowouts(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return margins(leagueIds, Comparator.comparing(MarginRecord::margin).reversed(), limit, bound);
     }
 
     /**
@@ -157,9 +158,9 @@ public class LeagueRecordService {
      * next are not necessarily the same person, and summing across seasons by
      * that key would silently merge two different managers' totals.
      */
-    public List<PointsLeaderRecord> pointsLeaders(Collection<Long> leagueIds, int limit) {
+    public List<PointsLeaderRecord> pointsLeaders(Collection<Long> leagueIds, int limit, WeekBound bound) {
         if (limit <= 0) return List.of();
-        Map<String, List<RosterWeekPointsRepository.ScoreRow>> grouped = weekPoints.allScores(leagueIds).stream()
+        Map<String, List<RosterWeekPointsRepository.ScoreRow>> grouped = weekPoints.allScores(leagueIds, bound).stream()
                 .collect(Collectors.groupingBy(r -> r.managerId() != null
                         ? "m:" + r.managerId()
                         : "u:" + r.season() + ":" + r.rosterId()));
@@ -191,12 +192,12 @@ public class LeagueRecordService {
                 .toList();
     }
 
-    public List<StreakRecord> winStreaks(Collection<Long> leagueIds, int limit) {
-        return streaks(leagueIds, Outcome.WIN, limit);
+    public List<StreakRecord> winStreaks(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return streaks(leagueIds, Outcome.WIN, limit, bound);
     }
 
-    public List<StreakRecord> lossStreaks(Collection<Long> leagueIds, int limit) {
-        return streaks(leagueIds, Outcome.LOSS, limit);
+    public List<StreakRecord> lossStreaks(Collection<Long> leagueIds, int limit, WeekBound bound) {
+        return streaks(leagueIds, Outcome.LOSS, limit, bound);
     }
 
     /** One side's result in one played game, by {@code starters_points}. Never derived from roster_season.wins -- same argument {@link #margin} already makes: a season's win column is the whole year, and this is one game. */
@@ -228,9 +229,9 @@ public class LeagueRecordService {
      * breaks it too, rather than being silently skipped over -- which is
      * exactly what keeps every returned streak's weeks contiguous.
      */
-    private List<StreakRecord> streaks(Collection<Long> leagueIds, Outcome want, int limit) {
+    private List<StreakRecord> streaks(Collection<Long> leagueIds, Outcome want, int limit, WeekBound bound) {
         if (limit <= 0) return List.of();
-        List<GameOutcome> all = fixtures.pairedWithScores(leagueIds).stream()
+        List<GameOutcome> all = fixtures.pairedWithScores(leagueIds, bound).stream()
                 .flatMap(g -> outcomes(g).stream())
                 .toList();
         Map<String, List<GameOutcome>> bySeasonRoster = all.stream()
@@ -283,9 +284,9 @@ public class LeagueRecordService {
      * <p>Volume makes this safe -- the largest per-league-season population
      * measured was 288 roster-weeks, so a chain is a few hundred games.
      */
-    private List<MarginRecord> margins(Collection<Long> leagueIds, Comparator<MarginRecord> order, int limit) {
+    private List<MarginRecord> margins(Collection<Long> leagueIds, Comparator<MarginRecord> order, int limit, WeekBound bound) {
         if (limit <= 0) return List.of();
-        return fixtures.pairedWithScores(leagueIds).stream()
+        return fixtures.pairedWithScores(leagueIds, bound).stream()
                 .map(LeagueRecordService::margin)
                 .sorted(order
                         // Deterministic beyond the margin itself, for the same
@@ -320,7 +321,7 @@ public class LeagueRecordService {
      * ingested before pairings were stored" are different sentences, and the
      * second one is the common case on any league ingested before 2026-09-14.
      */
-    private String marginsUnavailableReason(Collection<Long> leagueIds) {
+    private String marginsUnavailableReason(Collection<Long> leagueIds, WeekBound bound) {
         return "Head-to-head pairings haven't been loaded for this league's seasons yet.";
     }
 }

@@ -176,6 +176,17 @@ the quickstart.
 box score. `gp` is absent in both cases, so it isn't the played signal in basketball.
 
 **Football**: one entry per week.
+
+> **Amended after build (2026-09-23), found by live ingest.** "One entry per week" was true, but the
+> *shape* was misread. A football week's value is a **bare JSON object**, where a basketball week's
+> is a list of game objects. The measurement script that produced this entry quietly handled both
+> (`e = v if isinstance(v, dict) …`), so the difference never made it into this text. The ingest,
+> written from this text, cast every football week to a list:
+> - The first live run threw `ClassCastException` on all 315 NFL players.
+> - It stored 0 games and reported 5,670 unclassified weeks.
+>
+> It's now normalised to accept both shapes, with a regression test. After the fix, NFL 2025 had
+> 315 players walked, 4,421 games stored, 936 absences, 0 failed and 0 unclassified.
 - Christian McCaffrey 2024 (id 4034), weeks 2–8 (on IR): entry present with team, opponent and date,
   `gms_active: 1.0`, but **no `gp` and no `pts_ppr`**.
 - Week 9 (SF's bye): `None`.

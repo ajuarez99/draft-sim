@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
+import com.ballknowers.draftsim.store.WeekBound;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import org.springframework.stereotype.Service;
 
@@ -139,7 +140,7 @@ public class HeadToHeadService {
             // league_id of its own, and two different league chains can share
             // the same (season, week) -- batching would risk matching a game
             // from the wrong league to this pair.
-            List<LeagueMatchupRepository.PairedGame> ours = fixtures.pairedWithScores(List.of(leagueId)).stream()
+            List<LeagueMatchupRepository.PairedGame> ours = fixtures.pairedWithScores(List.of(leagueId), WeekBound.ALL_WEEKS).stream()
                     .filter(g -> isThisPair(g.aManagerId(), g.bManagerId(), managerAId, managerBId))
                     .toList();
 

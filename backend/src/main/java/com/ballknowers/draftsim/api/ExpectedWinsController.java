@@ -28,7 +28,9 @@ public class ExpectedWinsController {
 
     @GetMapping("/leagues/{sleeperId}/expected-wins")
     public ResponseEntity<Map<String, Object>> expectedWins(@PathVariable String sleeperId) {
-        return expectedWins.forLeague(sleeperId)
+        // Regular-season bound (specs/008-season-superlatives T029): this page
+        // now shows regular-season luck, not luck padded by playoff weeks.
+        return expectedWins.forLeagueRegularSeason(sleeperId)
                 .map(r -> ResponseEntity.ok(body(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }

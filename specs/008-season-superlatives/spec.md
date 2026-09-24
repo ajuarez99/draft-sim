@@ -76,6 +76,24 @@ is left in place. These corrections take precedence where they conflict:
 12. **No `?season=` parameter.** The plan's contract promised one, but a past season is chosen by
     its own league id, the way every other season-scoped page here works.
 
+### Amended after code review (2026-09-23)
+
+The bug-hunting review (T067) found problems that changed behaviour, not just code:
+
+13. **Regular contributor, as research R10 wrote it.** The build counted a player's started weeks
+    against *every* week he was rostered. That dropped exactly the award's namesake case: a star
+    who starts 5 weeks and is then out 13 fails "half of 18". It now counts against weeks he
+    played, as R10 always said.
+14. **A game not yet played isn't a missed game.** Mid-season, Sleeper lists upcoming games with
+    empty stats. The ingest now skips future-dated entries, and it removes a stale absence row
+    once the same game shows up as played.
+15. **The commissioner's list follows the season the page is showing.** Before a new season has a
+    scored week, the page shows the previous season (the resolver walks back). The list used to
+    be the *new* season's, so an entry saved there never changed the award on screen. The list
+    now belongs to the displayed season. **Trade-off:** a new season's list can't be edited until
+    that season has a scored week. This reverses the contract's earlier "edit the new season
+    before week 1" line (contract amended).
+
 ## Problem
 
 A league chat argues about the season *while it is happening*. The app answers "what happened this

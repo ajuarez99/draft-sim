@@ -80,7 +80,7 @@ class IngestControllerTest {
 
     @Test
     void playersWithNbaReachesPlayerIngestServiceRatherThanBeingRefused() {
-        PlayerIngestService.Result stub = new PlayerIngestService.Result(2000, 1900);
+        PlayerIngestService.Result stub = new PlayerIngestService.Result(2000, 1900, true, 0);
         when(playerIngest.ingest(Sport.NBA)).thenReturn(stub);
 
         PlayerIngestService.Result result = controller().players("nba");
@@ -92,7 +92,7 @@ class IngestControllerTest {
     /** Covers both an omitted {@code ?sport=} (the default) and an explicit {@code ?sport=nfl}. */
     @Test
     void playersWithNflStillIngestsExactlyAsBefore() {
-        PlayerIngestService.Result stub = new PlayerIngestService.Result(500, 480);
+        PlayerIngestService.Result stub = new PlayerIngestService.Result(500, 480, true, 0);
         when(playerIngest.ingest(Sport.NFL)).thenReturn(stub);
 
         PlayerIngestService.Result result = controller().players("nfl");

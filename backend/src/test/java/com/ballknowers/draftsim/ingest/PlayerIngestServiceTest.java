@@ -3,8 +3,10 @@ package com.ballknowers.draftsim.ingest;
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Position;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.BoardRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
+import com.ballknowers.draftsim.store.StatusCaptureRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -33,6 +35,8 @@ class PlayerIngestServiceTest {
     @Mock private SleeperClient sleeper;
     @Mock private PlayerRepository players;
     @Mock private BoardRepository boards;
+    @Mock private StatusCaptureRepository statusCaptures;
+    @Mock private SportRulesRegistry rulesRegistry;
 
     @SuppressWarnings("unchecked")
     private List<Player> capturedPlayers() {
@@ -49,7 +53,7 @@ class PlayerIngestServiceTest {
         when(sleeper.allPlayers("nba")).thenReturn(raw);
         when(players.idsBySleeperId(Sport.NBA)).thenReturn(Map.of("1658", 100L));
 
-        PlayerIngestService service = new PlayerIngestService(sleeper, players, boards);
+        PlayerIngestService service = new PlayerIngestService(sleeper, players, boards, statusCaptures, rulesRegistry);
         PlayerIngestService.Result result = service.ingest(Sport.NBA);
 
         assertEquals(1, result.playersWritten(), "the DEF-only nba entry must not be written at all");
@@ -69,7 +73,7 @@ class PlayerIngestServiceTest {
         when(sleeper.allPlayers("nba")).thenReturn(raw);
         when(players.idsBySleeperId(Sport.NBA)).thenReturn(Map.of("1970", 200L));
 
-        PlayerIngestService service = new PlayerIngestService(sleeper, players, boards);
+        PlayerIngestService service = new PlayerIngestService(sleeper, players, boards, statusCaptures, rulesRegistry);
         service.ingest(Sport.NBA);
 
         List<Player> written = capturedPlayers();

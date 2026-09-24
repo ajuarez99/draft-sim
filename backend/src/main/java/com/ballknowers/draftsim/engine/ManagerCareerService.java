@@ -222,7 +222,11 @@ public class ManagerCareerService {
                 }
             }
 
-            Optional<ExpectedWinsService.Result> exp = expectedWins.forLeague(s.sleeperLeagueId());
+            // Regular-season bound (specs/008-season-superlatives T030): a
+            // season's career luck sums only its regular-season games, the
+            // same window the season superlatives page and the Expected wins
+            // page now both use.
+            Optional<ExpectedWinsService.Result> exp = expectedWins.forLeagueRegularSeason(s.sleeperLeagueId());
             if (exp.isPresent() && exp.get().available()) {
                 for (ExpectedWinsService.TeamRow t : exp.get().teams()) {
                     if (t.rosterId() != s.rosterId()) continue;

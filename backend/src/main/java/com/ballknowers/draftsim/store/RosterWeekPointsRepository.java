@@ -166,21 +166,27 @@ public class RosterWeekPointsRepository {
      * <p>LEFT JOIN to roster_season and manager on purpose: an unowned
      * roster-season still produced the score, and dropping it would silently
      * edit the record book.
+     *
+     * @param bound explicit, never defaulted (specs/008-season-superlatives T011,
+     *              memory "optional params that encode rules"): {@link WeekBound#ALL_WEEKS}
+     *              for every stored week, or {@link WeekBound#through} to cap it.
      */
-    public List<ScoreRow> extremes(Collection<Long> leagueIds, boolean highest, int limit) {
+    public List<ScoreRow> extremes(Collection<Long> leagueIds, boolean highest, int limit, WeekBound bound) {
         if (leagueIds == null || leagueIds.isEmpty()) return List.of();
         String direction = highest ? "desc" : "asc";
+        String weekFilter = bound.throughWeek() != null ? "and w.week <= ?" : "";
         String sql = """
                 select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points
                 from roster_week_points w
                 left join roster_season rs on rs.league_id = w.league_id and rs.roster_id = w.roster_id
                 left join manager m on m.id = rs.manager_id
-                where w.league_id in (%s)
+                where w.league_id in (%s) %s
                 order by w.starters_points %s, w.season desc, w.week asc, w.roster_id asc
                 limit %d
-                """.formatted(inClause(leagueIds), direction, Math.max(0, limit));
-        return db.sql(sql)
-                .params(List.copyOf(leagueIds))
+                """.formatted(inClause(leagueIds), weekFilter, direction, Math.max(0, limit));
+        var spec = db.sql(sql).params(List.copyOf(leagueIds));
+        if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
+        return spec
                 .query((rs, i) -> new ScoreRow(rs.getInt(1), rs.getInt(2), rs.getInt(3),
                         (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7)))
                 .list();
@@ -196,19 +202,23 @@ public class RosterWeekPointsRepository {
      * count" -- the same left join {@link #extremes} already uses, so an
      * unowned roster-season (R1) still contributes its points instead of
      * being silently dropped by an inner join.
+     *
+     * @param bound explicit, never defaulted -- see {@link #extremes}'s javadoc.
      */
-    public List<ScoreRow> allScores(Collection<Long> leagueIds) {
+    public List<ScoreRow> allScores(Collection<Long> leagueIds, WeekBound bound) {
         if (leagueIds == null || leagueIds.isEmpty()) return List.of();
+        String weekFilter = bound.throughWeek() != null ? "and w.week <= ?" : "";
         String sql = """
                 select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points
                 from roster_week_points w
                 left join roster_season rs on rs.league_id = w.league_id and rs.roster_id = w.roster_id
                 left join manager m on m.id = rs.manager_id
-                where w.league_id in (%s)
+                where w.league_id in (%s) %s
                 order by w.season asc, w.week asc, w.roster_id asc
-                """.formatted(inClause(leagueIds));
-        return db.sql(sql)
-                .params(List.copyOf(leagueIds))
+                """.formatted(inClause(leagueIds), weekFilter);
+        var spec = db.sql(sql).params(List.copyOf(leagueIds));
+        if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
+        return spec
                 .query((rs, i) -> new ScoreRow(rs.getInt(1), rs.getInt(2), rs.getInt(3),
                         (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7)))
                 .list();

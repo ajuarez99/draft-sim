@@ -16,6 +16,13 @@ All endpoints:
     id (`LeagueRepository.bySleeperId`), so a commissioner editing a new season's list before week 1
     edits that season, not last season's.
 
+    *(Amended after code review, 2026-09-23: the page no longer calls the conduct list with the
+    URL's id. It uses the payload's `leagueSleeperId`, the league-season the superlatives were
+    actually computed for, so the list shown is always the one that feeds the award on screen.
+    The endpoints still address an exact league row; what changed is which id the page sends. A
+    new season's list therefore can't be edited from this page until that season has a scored
+    week. That's spec amendment 15.)*
+
   *(Amended after analysis, 2026-09-23: this line originally promised a `?season=` resolved "the
   way `ExpectedWinsController` does". That controller takes no season parameter, and nothing in the
   resolver accepts one.)*
@@ -36,6 +43,7 @@ and can't disagree about which weeks it covers.
   "reason": null,
   "season": 2026,
   "requestedSeason": null,
+  "leagueSleeperId": "1346366555759341568",
   "sport": "nfl",
   "throughWeek": 6,
   "weeksScored": 6,
@@ -98,10 +106,10 @@ convention from spec 005).
 |---|---|---|
 | `WEEK_SCORE` | HIGHEST_WEEK, LOWEST_WEEK | `week`, `rosterId`, `points` |
 | `GAME` | BIGGEST_BLOWOUT, CLOSEST_GAME, CLOSE_WINS, CLOSE_LOSSES | as the example above |
-| `LUCK` | LUCKIEST, UNLUCKIEST | `rosterId`, `actualWins`, `expectedWins`, `winsAboveExpected`, `swingWeeks` (each `{week, result, points, weeklyRank, opponent}`), all copied unmodified from the bounded expected-wins row; `fromWeek`, `throughWeek` (the span, FR-002 as amended) |
+| `LUCK` | LUCKIEST, UNLUCKIEST | `rosterId`, `actualWins`, `expectedWins`, `winsAboveExpected`, `swingWeeks` (each `{week, result, points, weeklyRank, opponent}`), all copied unmodified from the bounded expected-wins row; `fromWeek`, `throughWeek` (the span, FR-002 as amended); `reading`, a one-line sentence built from `winsAboveExpected` -- e.g. "2.40 more wins than their scores earned" / "1.30 fewer wins than their scores earned" (added T032, not in the original contract; `web/src/api.ts`'s `SuperlativeDetail` LUCK variant must mirror it) |
 | `BENCH_TOTAL` | MOST_BENCH_POINTS | `rosterId`, `pointsLeft`, `weeksCounted`, `fromWeek`, `throughWeek`, `biggestWeek` (`{week, pointsLeft}`, the single worst week) |
-| `PICKUP` | WAIVER_WIRE_WARRIOR | `playerId`, `playerName`, `position`, `addedWeek`, `addType` (`WAIVER` \| `FREE_AGENT`), `startedWeeks`, `points`. Top 3 for each holder |
-| `ABSENCE` | JOEL_EMBIID | `playerId`, `playerName`, `position`, `gamesMissed` (the headline; in football one per week), `weeksAffected`, `pointsPerGame` (his mean per game played, league scoring), `estimatedPointsLost` (= `gamesMissed` × `pointsPerGame`), `estimated: true` |
+| `PICKUP` | WAIVER_WIRE_WARRIOR | `rosterId` (added T040: every other per-holder detail type -- `WEEK_SCORE`, `GAME`, `LUCK`, `BENCH_TOTAL`, `CONDUCT` -- carries it, and without it a tied holder's pickups can't be told apart from another holder's), `playerId`, `playerName`, `position`, `addedWeek`, `addType` (`WAIVER` \| `FREE_AGENT`), `startedWeeks`, `points`. Top 3 for each holder |
+| `ABSENCE` | JOEL_EMBIID | `rosterId` (added T049, same reasoning as PICKUP's T040 fix: every other per-holder detail type carries it), `playerId`, `playerName`, `position`, `gamesMissed` (the headline; in football one per week), `weeksAffected` (a **count** of distinct weeks touched, not a list -- equals `gamesMissed` in football, can be fewer in basketball when two missed games land in the same week; clarified T049, `web/src/api.ts`'s ABSENCE variant had guessed `number[]`), `pointsPerGame` (his mean per game played, league scoring), `estimatedPointsLost` (= `gamesMissed` × `pointsPerGame`), `estimated: true` |
 | `CONDUCT` | UNETHICAL | `playerId`, `playerName`, `rosterId`, `source` (`SUSPENDED` \| `COMMISSIONER`), `weeks` (the weeks it counted for this team), `reason` (commissioner's text, or null for `SUSPENDED`) |
 
 ### Availability reasons (examples; exact strings are the implementation's)

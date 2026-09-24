@@ -4372,3 +4372,167 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   flex: 1 1 40%;
   min-width: 0;
 }
+
+/* --- Season superlatives (specs/008-season-superlatives) -----------------
+   One card per kind, always -- an unavailable or empty kind renders its own
+   reason rather than vanishing, per memory "avoid flat uniform cards": each
+   card carries a hue-tinted left edge (per its position in the payload) so
+   twelve cards don't read as one repeated shape, and the grid collapses to a
+   single column under 375px rather than scrolling sideways. */
+
+.sl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.sl-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid oklch(60% 0.12 var(--sl-hue, 250));
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+  min-width: 0;
+}
+
+.sl-card-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.sl-card-head h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sl-subtitle {
+  font-style: italic;
+}
+
+.sl-early {
+  color: oklch(75% 0.15 80);
+}
+
+.sl-holders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* A column, not a row: a tied holder's own figure/week/opponent (FR-002)
+   prints directly beneath its name, so a reader never has to expand "Games"
+   to see the week the card is even about. */
+.sl-holder {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sl-holder-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sl-avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.sl-holder-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+.sl-holder-detail {
+  padding-left: 26px;
+}
+
+.sl-value {
+  margin: 2px 0 6px;
+  font-size: 15px;
+}
+
+.sl-coverage {
+  margin: 0 0 6px;
+}
+
+.sl-detail summary {
+  cursor: pointer;
+}
+
+.sl-detail-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* T049/T060: an unconditional line under a card's title (Embiid's "cause
+   unknown", Unethical's tracking-began line) -- not tied to holders/coverage. */
+.sl-note {
+  margin: 0 0 8px;
+}
+
+/* --- Commissioner's conduct list (specs/008-season-superlatives T060) ---- */
+
+.sl-conduct-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl-conduct-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.sl-conduct-player {
+  font-weight: 600;
+  flex: 1 1 100%;
+}
+
+.sl-conduct-remove {
+  margin-left: auto;
+}
+
+.sl-conduct-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.sl-conduct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-conduct-field label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sl-conduct-form input {
+  font: inherit;
+}

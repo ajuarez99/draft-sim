@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.WeekBound;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -49,10 +50,10 @@ class LeagueRecordServiceTest {
      */
     @Test
     void unownedRosterStillProducesARecord() {
-        when(weekPoints.extremes(anySet(), eq(true), anyInt()))
+        when(weekPoints.extremes(anySet(), eq(true), anyInt(), any()))
                 .thenReturn(List.of(row(2025, 8, 7, null, null, "205.04")));
 
-        List<LeagueRecordService.WeeklyScoreRecord> out = service().highestWeeks(Set.of(5L), 10);
+        List<LeagueRecordService.WeeklyScoreRecord> out = service().highestWeeks(Set.of(5L), 10, WeekBound.ALL_WEEKS);
 
         assertEquals(1, out.size(), "an unowned roster-season must not be dropped");
         assertEquals(7, out.get(0).rosterId(), "rosterId is always present, so the client can render something");
@@ -74,9 +75,9 @@ class LeagueRecordServiceTest {
      */
     @Test
     void seasonWithNoStoredWeeksContributesNothingRatherThanAZero() {
-        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt())).thenReturn(List.of());
+        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt(), any())).thenReturn(List.of());
 
-        LeagueRecordService.RecordBook book = service().forChain(Set.of(210L));
+        LeagueRecordService.RecordBook book = service().forChain(Set.of(210L), WeekBound.ALL_WEEKS);
 
         assertTrue(book.highestWeeks().isEmpty());
         assertTrue(book.lowestWeeks().isEmpty(), "an empty season must not produce a 0.00 low record");
@@ -90,10 +91,10 @@ class LeagueRecordServiceTest {
      */
     @Test
     void bothScoreListsAreBoundedByTheSameLimit() {
-        service().forChain(Set.of(5L, 4L), 7);
+        service().forChain(Set.of(5L, 4L), 7, WeekBound.ALL_WEEKS);
 
-        verify(weekPoints).extremes(anySet(), eq(true), eq(7));
-        verify(weekPoints).extremes(anySet(), eq(false), eq(7));
+        verify(weekPoints).extremes(anySet(), eq(true), eq(7), any());
+        verify(weekPoints).extremes(anySet(), eq(false), eq(7), any());
     }
 
     /**
@@ -103,9 +104,9 @@ class LeagueRecordServiceTest {
      */
     @Test
     void queriesTheWholeChainRatherThanOneSeason() {
-        service().forChain(List.of(4L, 5L), 10);
+        service().forChain(List.of(4L, 5L), 10, WeekBound.ALL_WEEKS);
 
-        verify(weekPoints).extremes(argThat(ids -> ids.containsAll(List.of(4L, 5L))), eq(true), anyInt());
+        verify(weekPoints).extremes(argThat(ids -> ids.containsAll(List.of(4L, 5L))), eq(true), anyInt(), any());
     }
 
     /**
@@ -115,17 +116,17 @@ class LeagueRecordServiceTest {
      */
     @Test
     void emptyMarginsCarryAReasonAndPopulatedMarginsDoNot() {
-        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt())).thenReturn(List.of());
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of());
+        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt(), any())).thenReturn(List.of());
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of());
 
-        LeagueRecordService.RecordBook empty = service().forChain(Set.of(5L));
+        LeagueRecordService.RecordBook empty = service().forChain(Set.of(5L), WeekBound.ALL_WEEKS);
         assertNotNull(empty.marginsUnavailableReason(), "an empty panel that says nothing reads as broken");
 
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 new LeagueMatchupRepository.PairedGame(2025, 17, 3, 12L, "a", null, new BigDecimal("132.58"),
                         9, 18L, "b", null, new BigDecimal("132.42"))));
 
-        LeagueRecordService.RecordBook populated = service().forChain(Set.of(5L));
+        LeagueRecordService.RecordBook populated = service().forChain(Set.of(5L), WeekBound.ALL_WEEKS);
         assertFalse(populated.closestMatchups().isEmpty());
         assertNull(populated.marginsUnavailableReason());
     }
@@ -146,9 +147,9 @@ class LeagueRecordServiceTest {
     void winnerIsTheHigherScoreRegardlessOfWhichSideTheRowPutFirst() {
         // Side A is the LOWER score here, so a mapper that trusted row order
         // would report the loser as the winner.
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(game(2025, 8, 3, "86.18", 7, "205.04")));
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(game(2025, 8, 3, "86.18", 7, "205.04")));
 
-        LeagueRecordService.MarginRecord m = service().closestMatchups(Set.of(5L), 10).get(0);
+        LeagueRecordService.MarginRecord m = service().closestMatchups(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0);
 
         assertEquals(7, m.winner().rosterId());
         assertEquals(3, m.loser().rosterId());
@@ -158,13 +159,13 @@ class LeagueRecordServiceTest {
     /** Closest ascends, blowouts descend -- not the same list ordered once. */
     @Test
     void closestAscendsAndBlowoutsDescend() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 4, 1, "118.12", 2, "117.76"),
                 game(2025, 8, 3, "205.04", 4, "86.18"),
                 game(2025, 6, 5, "176.58", 6, "88.30")));
 
-        assertEquals(new BigDecimal("0.36"), service().closestMatchups(Set.of(5L), 10).get(0).margin());
-        assertEquals(new BigDecimal("118.86"), service().biggestBlowouts(Set.of(5L), 10).get(0).margin());
+        assertEquals(new BigDecimal("0.36"), service().closestMatchups(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0).margin());
+        assertEquals(new BigDecimal("118.86"), service().biggestBlowouts(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0).margin());
     }
 
     /**
@@ -175,12 +176,12 @@ class LeagueRecordServiceTest {
      */
     @Test
     void tiedMarginsOrderDeterministically() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 14, 1, "130.20", 2, "127.74"),
                 game(2025, 9, 3, "134.86", 4, "132.40")));
 
-        List<LeagueRecordService.MarginRecord> a = service().closestMatchups(Set.of(5L), 10);
-        List<LeagueRecordService.MarginRecord> b = service().closestMatchups(Set.of(5L), 10);
+        List<LeagueRecordService.MarginRecord> a = service().closestMatchups(Set.of(5L), 10, WeekBound.ALL_WEEKS);
+        List<LeagueRecordService.MarginRecord> b = service().closestMatchups(Set.of(5L), 10, WeekBound.ALL_WEEKS);
         assertEquals(a, b);
         assertEquals(9, a.get(0).week(), "earlier week wins the tie within a season");
     }
@@ -188,12 +189,12 @@ class LeagueRecordServiceTest {
     /** The limit bounds margins too, not just the score lists. */
     @Test
     void marginListsHonourTheLimit() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 1, 1, "100.00", 2, "90.00"),
                 game(2025, 2, 3, "100.00", 4, "80.00"),
                 game(2025, 3, 5, "100.00", 6, "70.00")));
 
-        assertEquals(2, service().closestMatchups(Set.of(5L), 2).size());
+        assertEquals(2, service().closestMatchups(Set.of(5L), 2, WeekBound.ALL_WEEKS).size());
     }
 
     // ------------------------------------------------------------- T058 (US5, streaks)
@@ -207,12 +208,12 @@ class LeagueRecordServiceTest {
      */
     @Test
     void aWinStreakIsContiguousAndNamesItsStartAndEndWeek() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 3, 1, "110.00", 2, "90.00"),
                 game(2025, 4, 1, "115.00", 4, "95.00"),
                 game(2025, 5, 1, "120.00", 6, "100.00")));
 
-        LeagueRecordService.StreakRecord streak = service().winStreaks(Set.of(5L), 10).get(0);
+        LeagueRecordService.StreakRecord streak = service().winStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0);
 
         assertEquals(3, streak.length());
         assertEquals(3, streak.startWeek());
@@ -231,14 +232,14 @@ class LeagueRecordServiceTest {
      */
     @Test
     void aGapInTheScheduleBreaksAStreakRatherThanBeingSkipped() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 1, 1, "110.00", 2, "90.00"),
                 game(2025, 2, 1, "112.00", 3, "90.00"),
                 // no game for roster 1 in week 3, 4 or 5
                 game(2025, 6, 1, "118.00", 4, "90.00"),
                 game(2025, 7, 1, "119.00", 5, "90.00")));
 
-        List<LeagueRecordService.StreakRecord> streaks = service().winStreaks(Set.of(5L), 10);
+        List<LeagueRecordService.StreakRecord> streaks = service().winStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS);
 
         assertEquals(2, streaks.size(), "the gap must split one long run into two separate streaks");
         assertEquals(2, streaks.get(0).length());
@@ -253,13 +254,13 @@ class LeagueRecordServiceTest {
      */
     @Test
     void aTieBreaksAWinStreakWithoutBecomingALoss() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 1, 1, "100.00", 2, "80.00"),   // roster 1 wins
                 game(2025, 2, 1, "90.00", 3, "90.00"),    // tie -- breaks the streak
                 game(2025, 3, 1, "100.00", 4, "80.00")));  // roster 1 wins again
 
-        List<LeagueRecordService.StreakRecord> wins = service().winStreaks(Set.of(5L), 10);
-        List<LeagueRecordService.StreakRecord> losses = service().lossStreaks(Set.of(5L), 10);
+        List<LeagueRecordService.StreakRecord> wins = service().winStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS);
+        List<LeagueRecordService.StreakRecord> losses = service().lossStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS);
 
         assertEquals(2, wins.size(), "the tie must split the streak into two length-1 runs, not one length-2 run");
         assertTrue(wins.stream().allMatch(s -> s.length() == 1));
@@ -270,12 +271,12 @@ class LeagueRecordServiceTest {
     /** Longer streaks sort first, mirroring the margin lists' own ordering rule. */
     @Test
     void longerStreaksSortFirst() {
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(
                 game(2025, 1, 1, "100.00", 2, "80.00"),
                 game(2025, 2, 3, "100.00", 4, "80.00"),
                 game(2025, 3, 3, "100.00", 5, "80.00")));
 
-        LeagueRecordService.StreakRecord longest = service().winStreaks(Set.of(5L), 10).get(0);
+        LeagueRecordService.StreakRecord longest = service().winStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0);
         assertEquals(3, longest.rosterId(), "roster 3 has the 2-game streak (weeks 2-3), roster 1 only 1 game");
         assertEquals(2, longest.length());
     }
@@ -286,9 +287,9 @@ class LeagueRecordServiceTest {
         LeagueMatchupRepository.PairedGame g1 = new LeagueMatchupRepository.PairedGame(
                 2025, 1, 7, null, null, null, new BigDecimal("110.00"),
                 2, 2L, "m2", null, new BigDecimal("90.00"));
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of(g1));
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of(g1));
 
-        LeagueRecordService.StreakRecord streak = service().winStreaks(Set.of(5L), 10).get(0);
+        LeagueRecordService.StreakRecord streak = service().winStreaks(Set.of(5L), 10, WeekBound.ALL_WEEKS).get(0);
         assertEquals(7, streak.rosterId());
         assertNull(streak.managerId());
         assertNull(streak.manager());
@@ -303,11 +304,11 @@ class LeagueRecordServiceTest {
      */
     @Test
     void pointsLeaderSumsAcrossSeasonsByManagerNotByRosterId() {
-        when(weekPoints.allScores(anySet())).thenReturn(List.of(
+        when(weekPoints.allScores(anySet(), any())).thenReturn(List.of(
                 row(2024, 10, 1, 9L, "popsharky", "100.00"),
                 row(2025, 3, 4, 9L, "popsharky", "150.50")));
 
-        LeagueRecordService.PointsLeaderRecord leader = service().pointsLeaders(Set.of(5L, 4L), 10).get(0);
+        LeagueRecordService.PointsLeaderRecord leader = service().pointsLeaders(Set.of(5L, 4L), 10, WeekBound.ALL_WEEKS).get(0);
 
         assertEquals(new BigDecimal("250.50"), leader.points());
         assertEquals(List.of(2024, 2025), leader.spanSeasons());
@@ -321,11 +322,11 @@ class LeagueRecordServiceTest {
      */
     @Test
     void unownedRosterSeasonsAreNeverMergedAcrossSeasons() {
-        when(weekPoints.allScores(anySet())).thenReturn(List.of(
+        when(weekPoints.allScores(anySet(), any())).thenReturn(List.of(
                 row(2024, 10, 3, null, null, "100.00"),
                 row(2025, 3, 3, null, null, "150.00")));
 
-        List<LeagueRecordService.PointsLeaderRecord> leaders = service().pointsLeaders(Set.of(5L, 4L), 10);
+        List<LeagueRecordService.PointsLeaderRecord> leaders = service().pointsLeaders(Set.of(5L, 4L), 10, WeekBound.ALL_WEEKS);
 
         assertEquals(2, leaders.size(), "two unowned roster-seasons, two different people -- must not be summed together");
     }
@@ -333,11 +334,11 @@ class LeagueRecordServiceTest {
     /** The new lists are always present on the RecordBook, even when empty (T063). */
     @Test
     void recordBookAlwaysCarriesTheNewListsEvenWhenEmpty() {
-        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt())).thenReturn(List.of());
-        when(weekPoints.allScores(anySet())).thenReturn(List.of());
-        when(fixtures.pairedWithScores(anySet())).thenReturn(List.of());
+        when(weekPoints.extremes(anySet(), anyBoolean(), anyInt(), any())).thenReturn(List.of());
+        when(weekPoints.allScores(anySet(), any())).thenReturn(List.of());
+        when(fixtures.pairedWithScores(anySet(), any())).thenReturn(List.of());
 
-        LeagueRecordService.RecordBook book = service().forChain(Set.of(5L));
+        LeagueRecordService.RecordBook book = service().forChain(Set.of(5L), WeekBound.ALL_WEEKS);
 
         assertNotNull(book.pointsLeaders());
         assertNotNull(book.winStreaks());
@@ -345,5 +346,39 @@ class LeagueRecordServiceTest {
         assertTrue(book.pointsLeaders().isEmpty());
         assertTrue(book.winStreaks().isEmpty());
         assertTrue(book.lossStreaks().isEmpty());
+    }
+
+    // ------------------------------------------------------------- T012 (specs/008-season-superlatives)
+
+    /**
+     * A season with scores in weeks 1-16, bounded through(14), never returns a
+     * week-15 or week-16 record. The mock stands in for the repository's own
+     * SQL filter (exercised for real by RosterWeekPointsRepository /
+     * LeagueMatchupRepository's own IT coverage) -- this test pins that the
+     * SERVICE actually forwards the bound it was given rather than silently
+     * reverting to ALL_WEEKS.
+     */
+    @Test
+    void aWeekBoundExcludesWeeksAfterIt() {
+        WeekBound through14 = WeekBound.through(14);
+        when(weekPoints.extremes(anySet(), eq(true), anyInt(), eq(through14)))
+                .thenReturn(List.of(row(2025, 14, 1, 1L, "m1", "150.00")));
+        when(weekPoints.extremes(anySet(), eq(false), anyInt(), eq(through14)))
+                .thenReturn(List.of(row(2025, 3, 2, 2L, "m2", "50.00")));
+        when(fixtures.pairedWithScores(anySet(), eq(through14))).thenReturn(List.of(
+                game(2025, 14, 1, "150.00", 2, "50.00")));
+        when(weekPoints.allScores(anySet(), eq(through14))).thenReturn(List.of(
+                row(2025, 14, 1, 1L, "m1", "150.00")));
+
+        LeagueRecordService.RecordBook book = service().forChain(Set.of(5L), through14);
+
+        assertTrue(book.highestWeeks().stream().allMatch(r -> r.week() <= 14));
+        assertTrue(book.lowestWeeks().stream().allMatch(r -> r.week() <= 14));
+        assertTrue(book.closestMatchups().stream().allMatch(r -> r.week() <= 14));
+        assertTrue(book.biggestBlowouts().stream().allMatch(r -> r.week() <= 14));
+
+        // The bound was actually forwarded to the repository, not swallowed.
+        verify(weekPoints).extremes(anySet(), eq(true), anyInt(), eq(through14));
+        verify(weekPoints, never()).extremes(anySet(), eq(true), anyInt(), eq(WeekBound.ALL_WEEKS));
     }
 }
