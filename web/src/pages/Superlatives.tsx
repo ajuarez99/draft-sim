@@ -34,6 +34,9 @@ const TITLES: Record<string, { title: string; subtitle?: string; note?: string }
   UNLUCKIEST: { title: 'Unluckiest' },
   MOST_BENCH_POINTS: { title: 'Most bench points' },
   WAIVER_WIRE_WARRIOR: { title: 'Waiver Wire Warrior' },
+  // US7 (added 2026-09-28): player-headed, not team-headed -- see the
+  // isPlayerHeadedKind branch in SuperlativeCard.
+  JABARI_SMITH_JR: { title: 'The Jabari Smith Jr. Award' },
   // FR-013: this line is not a caveat that shows up only when relevant -- the
   // award's whole premise is that the source is never the injury tag, so it
   // is printed unconditionally under the title (T049), not folded into a
@@ -150,9 +153,9 @@ export default function Superlatives() {
 /** Kinds whose detail names one event per holder -- the week (and, for a game, the opponent) belongs on the card itself, not only behind "Games" (FR-002). */
 const SINGLE_EVENT_KINDS = new Set(['HIGHEST_WEEK', 'LOWEST_WEEK', 'BIGGEST_BLOWOUT', 'CLOSEST_GAME'])
 const CLOSE_GAME_KINDS = new Set(['CLOSE_WINS', 'CLOSE_LOSSES'])
-/** US2 (T035) + US3 (T040) + US4 (T049) + US6 (T060): the reading (luck), the bench span (bench), the pickup total (waiver), the cost (Embiid) or the conduct row (Unethical) is itself the per-holder figure, so the generic value line beneath the holder list would only repeat it. */
+/** US2 (T035) + US3 (T040) + US4 (T049) + US6 (T060) + US7 (T079): the reading (luck), the bench span (bench), the pickup total (waiver), the cost (Embiid), the conduct row (Unethical) or each player's own "N adds by M teams" (Jabari Smith Jr.) is itself the per-holder figure, so the generic value line beneath the holder list would only repeat it. */
 const READING_KINDS = new Set([
-  'LUCKIEST', 'UNLUCKIEST', 'MOST_BENCH_POINTS', 'WAIVER_WIRE_WARRIOR', 'JOEL_EMBIID', 'UNETHICAL',
+  'LUCKIEST', 'UNLUCKIEST', 'MOST_BENCH_POINTS', 'WAIVER_WIRE_WARRIOR', 'JABARI_SMITH_JR', 'JOEL_EMBIID', 'UNETHICAL',
 ])
 
 function SuperlativeCard({
@@ -172,6 +175,13 @@ function SuperlativeCard({
   const isCloseGameKind = CLOSE_GAME_KINDS.has(s.kind)
   const isSingleEventKind = SINGLE_EVENT_KINDS.has(s.kind)
   const isReadingKind = READING_KINDS.has(s.kind)
+  // US7 (T079): JABARI_SMITH_JR is headed by players, not teams -- `holders`
+  // is always `[]` for it, and `playerHolders` carries the winners instead
+  // (contracts/superlatives-api.md's restated invariant). Both empty is what
+  // actually means "nothing to show" now, not `holders` alone -- without this
+  // fix the award rendered its empty state while it had a real winner.
+  const isPlayerHeadedKind = s.kind === 'JABARI_SMITH_JR'
+  const isEmpty = s.holders.length === 0 && s.playerHolders.length === 0
 
   return (
     <article className="sl-card" style={{ ['--sl-hue' as string]: hue }}>
@@ -210,8 +220,53 @@ function SuperlativeCard({
 
       {!s.available ? (
         <p className="muted small">{s.reason}</p>
-      ) : s.holders.length === 0 ? (
+      ) : isEmpty ? (
         <p className="muted small">{s.emptyReason}</p>
+      ) : isPlayerHeadedKind ? (
+        <>
+          <div className="sl-holders">
+            {s.playerHolders.map((ph) => {
+              const addRows = s.detail.filter(
+                (d): d is Extract<SuperlativeDetail, { type: 'ADD' }> =>
+                  d.type === 'ADD' && d.playerId === ph.playerId,
+              )
+              return (
+                <div className="sl-holder sl-player-holder" key={ph.playerId}>
+                  <span className="sl-holder-top">
+                    <span className="sl-holder-name">
+                      {ph.playerName}
+                      {ph.position ? ` (${ph.position})` : ''}
+                    </span>
+                  </span>
+                  <span className="sl-holder-detail muted small">
+                    {/* No team shown when null, rather than "Free agent": that
+                        phrase already labels FA adds in the rows just below. */}
+                    {ph.team ? `${ph.team} · ` : ''}{ph.adds} {ph.adds === 1 ? 'add' : 'adds'} by{' '}
+                    {ph.distinctTeams} {ph.distinctTeams === 1 ? 'team' : 'teams'}
+                  </span>
+                  <ul className="sl-add-list">
+                    {addRows.map((d, i) => (
+                      <li className="sl-add-row" key={i}>
+                        <Avatar
+                          avatarId={d.avatarId}
+                          seed={d.teamName}
+                          label={d.teamName}
+                          hue={hue}
+                          className="sl-avatar"
+                        />
+                        <span className="sl-add-team">{d.teamName}</span>
+                        <span className="sl-add-meta">
+                          <span className="muted small">{`week ${d.week}`}</span>
+                          <span className="muted small">{formatAddType(d)}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )
+            })}
+          </div>
+        </>
       ) : (
         <>
           <div className="sl-holders">
@@ -403,7 +458,15 @@ function formatValue(value: number, unit: Superlative['unit']): string {
   if (unit === 'POINTS') return `${value.toFixed(2)} points`
   if (unit === 'WINS') return `${value} ${value === 1 ? 'win' : 'wins'}`
   if (unit === 'GAMES') return `${value} ${value === 1 ? 'game' : 'games'}`
+  if (unit === 'ADDS') return `${value} ${value === 1 ? 'add' : 'adds'}`
   return String(value)
+}
+
+/** JABARI_SMITH_JR (US7): "Waiver ($N)" for a bid, "Waiver" for a null bid, "Free agent" for FA. $0 is a real bid and shows "$0", never confused with a null bid. */
+function formatAddType(d: Extract<SuperlativeDetail, { type: 'ADD' }>): string {
+  if (d.addType === 'FREE_AGENT') return 'Free agent'
+  if (d.faabBid == null) return 'Waiver'
+  return `Waiver ($${d.faabBid})`
 }
 
 /** CLOSE_WINS/CLOSE_LOSSES read "win(s)"/"loss(es)" on the card -- the payload unit stays GAMES for CLOSE_LOSSES; this is display text only. */
@@ -450,7 +513,7 @@ function expandableRows(s: Superlative): string[] {
       )
   }
   if (s.kind === 'MOST_BENCH_POINTS' || s.kind === 'WAIVER_WIRE_WARRIOR'
-      || s.kind === 'JOEL_EMBIID' || s.kind === 'UNETHICAL') {
+      || s.kind === 'JABARI_SMITH_JR' || s.kind === 'JOEL_EMBIID' || s.kind === 'UNETHICAL') {
     // Already fully represented on the holder line(s) above -- nothing new
     // to say behind an expandable panel, so the card never opens an empty one.
     return []

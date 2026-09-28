@@ -4484,6 +4484,48 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   margin: 0 0 8px;
 }
 
+/* --- The Jabari Smith Jr. Award (specs/008-season-superlatives T079/US7) --
+   Player-headed, not team-headed: reuses .sl-holder for a player's own block,
+   with a per-add list of the teams that picked him up beneath it. */
+.sl-player-holder {
+  gap: 4px;
+}
+
+.sl-add-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* One line per add: the team name truncates, and week + move type stay
+   together at the end rather than wrapping back under the avatar. */
+.sl-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sl-add-team {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-add-meta {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* --- Commissioner's conduct list (specs/008-season-superlatives T060) ---- */
 
 .sl-conduct-list {

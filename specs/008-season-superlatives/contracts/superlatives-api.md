@@ -84,10 +84,14 @@ and can't disagree about which weeks it covers.
 - **`suspensionWeeksObserved`** lists the regular-season weeks that had a `status_capture` (FR-019).
   The page shows the first of them as "tracking began week N".
 
-### `superlatives[]`: always all twelve kinds, in this order
+### `superlatives[]`: always all thirteen kinds, in this order
 
 `HIGHEST_WEEK`, `LOWEST_WEEK`, `BIGGEST_BLOWOUT`, `CLOSEST_GAME`, `CLOSE_WINS`, `CLOSE_LOSSES`,
-`LUCKIEST`, `UNLUCKIEST`, `MOST_BENCH_POINTS`, `WAIVER_WIRE_WARRIOR`, `JOEL_EMBIID`, `UNETHICAL`.
+`LUCKIEST`, `UNLUCKIEST`, `MOST_BENCH_POINTS`, `WAIVER_WIRE_WARRIOR`, `JABARI_SMITH_JR`,
+`JOEL_EMBIID`, `UNETHICAL`.
+
+*(Amended 2026-09-28: `JABARI_SMITH_JR` added as the thirteenth kind, directly after the other
+waiver-wire award. Research R16.)*
 
 A kind is never omitted. It's `available: false` with a `reason`, or `holders: []` with an
 `emptyReason`. That way an absent section can't read as a broken one (the `SectionUnavailable`
@@ -95,8 +99,10 @@ convention from spec 005).
 
 | Field | Rule |
 |---|---|
-| `holders` | every tied team (FR-003); `[]` iff `emptyReason` non-null or `available` false |
-| `value` / `unit` | `POINTS` (2 dp), `WINS` (count or wins-above-expected, 2 dp), `GAMES` |
+| `holders` | every tied team (FR-003). Always `[]` for `JABARI_SMITH_JR` |
+| `playerHolders` | *(added 2026-09-28)* every tied player, `JABARI_SMITH_JR` only; `[]` for every other kind. Each `{ playerId, playerName, position, team, adds, distinctTeams }`; `team` is his real team and may be null (free agent), so the response map is built mutably |
+| emptiness | `holders` **and** `playerHolders` are both `[]` iff `emptyReason` non-null or `available` false *(restated 2026-09-28; was `holders` alone)* |
+| `value` / `unit` | `POINTS` (2 dp), `WINS` (count or wins-above-expected, 2 dp), `GAMES`, `ADDS` (count; added 2026-09-28) |
 | `early` | true only for `LUCKIEST`, `UNLUCKIEST`, `MOST_BENCH_POINTS`, `WAIVER_WIRE_WARRIOR`, `JOEL_EMBIID`, `UNETHICAL` while the window is `early` (FR-006 as amended names the same six) |
 | `coverage` | null when every scored week was usable. Otherwise `{ "weeksCovered": 5, "weeksExcluded": 1, "reasons": ["week 3: no pairings stored"] }` |
 
@@ -110,6 +116,7 @@ convention from spec 005).
 | `BENCH_TOTAL` | MOST_BENCH_POINTS | `rosterId`, `pointsLeft`, `weeksCounted`, `fromWeek`, `throughWeek`, `biggestWeek` (`{week, pointsLeft}`, the single worst week) |
 | `PICKUP` | WAIVER_WIRE_WARRIOR | `rosterId` (added T040: every other per-holder detail type -- `WEEK_SCORE`, `GAME`, `LUCK`, `BENCH_TOTAL`, `CONDUCT` -- carries it, and without it a tied holder's pickups can't be told apart from another holder's), `playerId`, `playerName`, `position`, `addedWeek`, `addType` (`WAIVER` \| `FREE_AGENT`), `startedWeeks`, `points`. Top 3 for each holder |
 | `ABSENCE` | JOEL_EMBIID | `rosterId` (added T049, same reasoning as PICKUP's T040 fix: every other per-holder detail type carries it), `playerId`, `playerName`, `position`, `gamesMissed` (the headline; in football one per week), `weeksAffected` (a **count** of distinct weeks touched, not a list -- equals `gamesMissed` in football, can be fewer in basketball when two missed games land in the same week; clarified T049, `web/src/api.ts`'s ABSENCE variant had guessed `number[]`), `pointsPerGame` (his mean per game played, league scoring), `estimatedPointsLost` (= `gamesMissed` × `pointsPerGame`), `estimated: true` |
+| `ADD` *(added 2026-09-28)* | JABARI_SMITH_JR | `playerId` (which tied player this add belongs to), `week`, `rosterId`, `teamName`, `avatarId` (the adding team's; carried on the row because these teams aren't holders), `addType` (`WAIVER` \| `FREE_AGENT`), `faabBid` (null when not a bid; 0 is a real bid). **Every** counted add, ordered by week then `created_at`, not a top 3 |
 | `CONDUCT` | UNETHICAL | `playerId`, `playerName`, `rosterId`, `source` (`SUSPENDED` \| `COMMISSIONER`), `weeks` (the weeks it counted for this team), `reason` (commissioner's text, or null for `SUSPENDED`) |
 
 ### Availability reasons (examples; exact strings are the implementation's)
@@ -117,6 +124,10 @@ convention from spec 005).
 - `WAIVER_WIRE_WARRIOR`: "no transactions stored for this season — run POST /api/ingest/transactions/{id}".
 - `JOEL_EMBIID`: "per-game records not ingested — run POST /api/ingest/player-games/{id}". Coverage
   also reports unclassified football weeks.
+- `JABARI_SMITH_JR`: the same "no transactions stored" reason as `WAIVER_WIRE_WARRIOR`. With
+  transactions stored but no eligible completed add in the window: `emptyReason` "nobody's been
+  picked up yet". With a top count of 1, `emptyReason` is "nobody's been picked up twice yet" and
+  nobody is named *(added 2026-09-28, spec clarification 18)*. No `coverage`: it doesn't read starters or scores. Never `early`.
 - `UNETHICAL`: always available. With no suspension captures and no commissioner entries it's
   `holders: []` with an `emptyReason` that names both sources.
 

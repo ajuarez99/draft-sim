@@ -212,6 +212,21 @@ public class SuperlativesController {
         for (SeasonSuperlativesService.DetailRow d : s.detail()) detail.add(detailRow(d));
         m.put("detail", detail);
         m.put("coverage", s.coverage() == null ? null : coverageRow(s.coverage()));
+        List<Map<String, Object>> playerHolders = new ArrayList<>();
+        for (SeasonSuperlativesService.PlayerHolder ph : s.playerHolders()) playerHolders.add(playerHolderRow(ph));
+        m.put("playerHolders", playerHolders);
+        return m;
+    }
+
+    /** JABARI_SMITH_JR only (US7); {@code []} for every other kind. {@code team} is nullable: a free agent has none. */
+    private static Map<String, Object> playerHolderRow(SeasonSuperlativesService.PlayerHolder ph) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("playerId", ph.playerId());
+        m.put("playerName", ph.playerName());
+        m.put("position", ph.position());
+        m.put("team", ph.team());
+        m.put("adds", ph.adds());
+        m.put("distinctTeams", ph.distinctTeams());
         return m;
     }
 
@@ -308,6 +323,15 @@ public class SuperlativesController {
             m.put("source", c.source());
             m.put("weeks", c.weeks());
             m.put("reason", c.reason());
+        } else if (d instanceof SeasonSuperlativesService.AddDetail a) {
+            m.put("type", "ADD");
+            m.put("playerId", a.playerId());
+            m.put("week", a.week());
+            m.put("rosterId", a.rosterId());
+            m.put("teamName", a.teamName());
+            m.put("avatarId", a.avatarId());
+            m.put("addType", a.addType());
+            m.put("faabBid", a.faabBid());
         }
         return m;
     }

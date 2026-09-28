@@ -25,7 +25,8 @@ function conductList(over: Partial<ConductList> = {}): ConductList {
 
 const KINDS = [
   'HIGHEST_WEEK', 'LOWEST_WEEK', 'BIGGEST_BLOWOUT', 'CLOSEST_GAME', 'CLOSE_WINS', 'CLOSE_LOSSES',
-  'LUCKIEST', 'UNLUCKIEST', 'MOST_BENCH_POINTS', 'WAIVER_WIRE_WARRIOR', 'JOEL_EMBIID', 'UNETHICAL',
+  'LUCKIEST', 'UNLUCKIEST', 'MOST_BENCH_POINTS', 'WAIVER_WIRE_WARRIOR', 'JABARI_SMITH_JR',
+  'JOEL_EMBIID', 'UNETHICAL',
 ] as const
 
 function notBuiltYet(kind: (typeof KINDS)[number]): Superlative {
@@ -39,7 +40,7 @@ function notBuiltYet(kind: (typeof KINDS)[number]): Superlative {
     holders: [],
     emptyReason: null,
     detail: [],
-    coverage: null,
+    coverage: null, playerHolders: [],
   }
 }
 
@@ -126,7 +127,7 @@ describe('Superlatives', () => {
         { type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 },
         { type: 'WEEK_SCORE', week: 4, rosterId: 2, points: 180.5 },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), tied))
     render(<Superlatives />)
@@ -151,7 +152,7 @@ describe('Superlatives', () => {
           points: 118.4, opponentPoints: 112.1, margin: 6.3,
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     const data = withKind(baseline(), closeWins)
     data.closeGameMargin = 15
@@ -178,6 +179,7 @@ describe('Superlatives', () => {
         },
       ],
       coverage: { weeksCovered: 5, weeksExcluded: 1, reasons: ['week 3: no pairings stored'] },
+      playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -196,7 +198,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
       emptyReason: null,
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     const data = baseline()
     data.early = true
@@ -217,7 +219,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no close games yet',
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -255,7 +257,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Master Bates', avatarId: null }],
       emptyReason: null,
       detail: [{ type: 'WEEK_SCORE', week: 1, rosterId: 1, points: 164.96 }],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), highest))
     render(<Superlatives />)
@@ -280,7 +282,7 @@ describe('Superlatives', () => {
           opponentTeamName: 'Dart has hit anotha Bower', points: 150, opponentPoints: 50.32, margin: 99.68,
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -308,7 +310,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 4, rosterId: 2, opponentRosterId: 8, opponentTeamName: 'Y', points: 88, opponentPoints: 87.5, margin: 0.5 },
         { type: 'GAME', week: 7, rosterId: 3, opponentRosterId: 7, opponentTeamName: 'Z', points: 77, opponentPoints: 76.5, margin: 0.5 },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closest))
     render(<Superlatives />)
@@ -333,7 +335,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 9, rosterId: 4, opponentRosterId: 2, opponentTeamName: 'Y', points: 101, opponentPoints: 97, margin: 4 },
         { type: 'GAME', week: 13, rosterId: 4, opponentRosterId: 3, opponentTeamName: 'Z', points: 102, opponentPoints: 99, margin: 3 },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -357,7 +359,7 @@ describe('Superlatives', () => {
       detail: [
         { type: 'GAME', week: 2, rosterId: 6, opponentRosterId: 1, opponentTeamName: 'X', points: 95, opponentPoints: 100, margin: 5 },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     const { container } = render(<Superlatives />)
@@ -382,7 +384,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 5, rosterId: 6, opponentRosterId: 2, opponentTeamName: 'Y', points: 96, opponentPoints: 99, margin: 3 },
         { type: 'GAME', week: 8, rosterId: 6, opponentRosterId: 3, opponentTeamName: 'Z', points: 97, opponentPoints: 98, margin: 1 },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     render(<Superlatives />)
@@ -410,7 +412,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -437,7 +439,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -466,7 +468,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, biggestWeek: { week: 4, pointsLeft: 55.2 },
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), bench))
     render(<Superlatives />)
@@ -498,7 +500,7 @@ describe('Superlatives', () => {
           addedWeek: 2, addType: 'FREE_AGENT', startedWeeks: [3], points: 36.3,
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -525,7 +527,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: null,
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -533,6 +535,150 @@ describe('Superlatives', () => {
     expect(
       await screen.findByText(/no transactions stored for this season/),
     ).toBeInTheDocument()
+  })
+
+  // T080 (US7): JABARI_SMITH_JR is player-headed -- `holders` stays `[]` and
+  // `playerHolders` carries the tied winners, each with its own add list.
+  it('renders two tied players for the Jabari Smith Jr. Award, each with its own adds', async () => {
+    const jabari: Superlative = {
+      kind: 'JABARI_SMITH_JR',
+      available: true,
+      reason: null,
+      early: false,
+      value: 14,
+      unit: 'ADDS',
+      holders: [],
+      emptyReason: null,
+      detail: [
+        {
+          type: 'ADD', playerId: 'p1', week: 1, rosterId: 2, teamName: 'Team A', avatarId: null,
+          addType: 'WAIVER', faabBid: 12,
+        },
+        {
+          type: 'ADD', playerId: 'p1', week: 3, rosterId: 5, teamName: 'Team B', avatarId: null,
+          addType: 'FREE_AGENT', faabBid: null,
+        },
+        {
+          type: 'ADD', playerId: 'p2', week: 2, rosterId: 4, teamName: 'Team C', avatarId: null,
+          addType: 'WAIVER', faabBid: 0,
+        },
+      ],
+      coverage: null,
+      playerHolders: [
+        { playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
+        { playerId: 'p2', playerName: 'Brice Sensabaugh', position: 'SF', team: 'UTA', adds: 14, distinctTeams: 8 },
+      ],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
+    render(<Superlatives />)
+
+    expect(await screen.findByText('The Jabari Smith Jr. Award')).toBeInTheDocument()
+    expect(screen.getByText('Jake LaRavia (PF)')).toBeInTheDocument()
+    expect(screen.getByText('Brice Sensabaugh (SF)')).toBeInTheDocument()
+    expect(screen.getByText('MEM · 14 adds by 8 teams')).toBeInTheDocument()
+    expect(screen.getByText('UTA · 14 adds by 8 teams')).toBeInTheDocument()
+
+    // Each player's own adds render, not interleaved with the other's.
+    expect(screen.getByText('Team A')).toBeInTheDocument()
+    expect(screen.getByText('Team B')).toBeInTheDocument()
+    expect(screen.getByText('Team C')).toBeInTheDocument()
+  })
+
+  it('renders "Waiver ($N)" for a bid, "Waiver" for a null bid, and "Free agent" for FA -- $0 is a real bid', async () => {
+    const jabari: Superlative = {
+      kind: 'JABARI_SMITH_JR',
+      available: true,
+      reason: null,
+      early: false,
+      value: 3,
+      unit: 'ADDS',
+      holders: [],
+      emptyReason: null,
+      detail: [
+        {
+          type: 'ADD', playerId: 'p1', week: 1, rosterId: 2, teamName: 'Team A', avatarId: null,
+          addType: 'WAIVER', faabBid: 12,
+        },
+        {
+          type: 'ADD', playerId: 'p1', week: 2, rosterId: 3, teamName: 'Team B', avatarId: null,
+          addType: 'WAIVER', faabBid: null,
+        },
+        {
+          type: 'ADD', playerId: 'p1', week: 3, rosterId: 4, teamName: 'Team C', avatarId: null,
+          addType: 'WAIVER', faabBid: 0,
+        },
+        {
+          type: 'ADD', playerId: 'p1', week: 4, rosterId: 5, teamName: 'Team D', avatarId: null,
+          addType: 'FREE_AGENT', faabBid: null,
+        },
+      ],
+      coverage: null,
+      playerHolders: [
+        { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: null, adds: 4, distinctTeams: 4 },
+      ],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
+    render(<Superlatives />)
+
+    expect(await screen.findByText('Some Guy (C)')).toBeInTheDocument()
+    // No real-life team: the team is left out, not shown as "Free agent",
+    // which the rows below already use for the FA add type.
+    expect(screen.getByText('4 adds by 4 teams')).toBeInTheDocument()
+    expect(screen.getByText('Waiver ($12)')).toBeInTheDocument()
+    expect(screen.getByText('Waiver')).toBeInTheDocument()
+    expect(screen.getByText('Waiver ($0)')).toBeInTheDocument()
+    expect(screen.getByText('Free agent')).toBeInTheDocument()
+  })
+
+  it('shows the emptyReason for the Jabari Smith Jr. Award when nobody has been added', async () => {
+    const jabari: Superlative = {
+      kind: 'JABARI_SMITH_JR',
+      available: true,
+      reason: null,
+      early: false,
+      value: null,
+      unit: 'ADDS',
+      holders: [],
+      emptyReason: "nobody's been picked up yet",
+      detail: [],
+      coverage: null,
+      playerHolders: [],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
+    render(<Superlatives />)
+
+    expect(await screen.findByText("nobody's been picked up yet")).toBeInTheDocument()
+  })
+
+  // T079 fix: `holders` alone used to decide "empty". A kind with playerHolders
+  // non-empty but holders == [] (true for every JABARI_SMITH_JR result) must
+  // never render the empty state.
+  it('does not render the empty state when playerHolders is non-empty but holders is empty', async () => {
+    const jabari: Superlative = {
+      kind: 'JABARI_SMITH_JR',
+      available: true,
+      reason: null,
+      early: false,
+      value: 1,
+      unit: 'ADDS',
+      holders: [],
+      emptyReason: "nobody's been picked up yet",
+      detail: [
+        {
+          type: 'ADD', playerId: 'p1', week: 1, rosterId: 2, teamName: 'Team A', avatarId: null,
+          addType: 'WAIVER', faabBid: null,
+        },
+      ],
+      coverage: null,
+      playerHolders: [
+        { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: 'BOS', adds: 1, distinctTeams: 1 },
+      ],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
+    render(<Superlatives />)
+
+    expect(await screen.findByText('Some Guy (C)')).toBeInTheDocument()
+    expect(screen.queryByText("nobody's been picked up yet")).not.toBeInTheDocument()
   })
 
   // T049 (US4): the "cause unknown" line is unconditional -- present even
@@ -554,7 +700,7 @@ describe('Superlatives', () => {
           gamesMissed: 6, weeksAffected: 5, pointsPerGame: 10.4, estimatedPointsLost: 62.4, estimated: true,
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
@@ -577,7 +723,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "nobody's been bitten yet",
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
@@ -623,7 +769,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "suspension tracking hasn't covered a scored week yet, and the commissioner's list is empty",
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -646,7 +792,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no suspensions or commissioner entries yet',
       detail: [],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     const data = baseline()
     data.suspensionWeeksObserved = [3, 4, 6]
@@ -684,7 +830,7 @@ describe('Superlatives', () => {
           source: 'SUSPENDED', weeks: [3, 7, 9], reason: null,
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -782,7 +928,7 @@ describe('Superlatives', () => {
   it('refetches the superlatives payload after saving a commissioner entry', async () => {
     const emptyUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null,
+      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [],
     }
     const filledUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: 1, unit: 'GAMES',
@@ -794,7 +940,7 @@ describe('Superlatives', () => {
           source: 'COMMISSIONER', weeks: [2], reason: 'reasons',
         },
       ],
-      coverage: null,
+      coverage: null, playerHolders: [],
     }
     fetchSuperlatives
       .mockResolvedValueOnce(withKind({ ...baseline(), commissionerListAvailable: true }, emptyUnethical))
@@ -822,7 +968,7 @@ describe('Superlatives', () => {
   it('refetches the superlatives payload after removing a commissioner entry', async () => {
     const emptyUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null,
+      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [],
     }
     fetchSuperlatives
       .mockResolvedValueOnce(

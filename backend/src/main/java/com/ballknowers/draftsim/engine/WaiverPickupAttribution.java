@@ -41,41 +41,65 @@ public final class WaiverPickupAttribution {
     /** One roster's total pickup points, and the players who made it up. */
     public record RosterTotal(int rosterId, double totalPoints, List<PlayerContribution> contributions) {}
 
-    private record ParsedTx(int week, Instant createdAt, String type, Map<String, Integer> adds) {}
+    /**
+     * One completed add, out of a {@code league_transaction} row's {@code adds} map
+     * (specs/008-season-superlatives US7, T073). A row can in principle carry more than
+     * one add -- this method doesn't assume otherwise -- so it's one {@code CompletedAdd}
+     * per (row, added player) pair, not one per row. {@code rosterId} is the roster that
+     * gained him, read from the {@code adds} map's value, never {@code Row.rosterId()}
+     * (research R8/R16). {@code faabBid} passes {@link LeagueTransactionRepository.Row#faabBid()}
+     * through unmodified: {@code null} means "not a bid", never {@code 0} (V19's comment).
+     */
+    public record CompletedAdd(int week, Instant createdAt, String type, String playerId,
+                               int rosterId, Integer faabBid) {}
 
     private record Used(int transactionWeek, String type) {}
 
     /**
+     * Every completed ({@code status = 'complete'}) add across these rows, one entry per
+     * (row, added player) pair. A row whose {@code adds} is empty or blank contributes
+     * nothing, and a non-numeric roster value for a given player is skipped (T073). Shared
+     * by {@link #attribute} (which additionally needs TRADE/COMMISSIONER adds, to let a
+     * later one disqualify an earlier pickup) and {@link MostAddedPlayers}, which filters
+     * to WAIVER/FREE_AGENT itself -- this is the one place a completed pickup is parsed
+     * out of the stored JSON (research R16 decision 4).
+     */
+    public static List<CompletedAdd> completedAdds(List<LeagueTransactionRepository.Row> rows) {
+        List<CompletedAdd> out = new ArrayList<>();
+        for (LeagueTransactionRepository.Row r : rows) {
+            if (!"complete".equals(r.status())) continue;
+            Map<String, Object> addsRaw = (r.addsJson() == null || r.addsJson().isBlank())
+                    ? Map.of() : JsonUtil.readMap(r.addsJson());
+            if (addsRaw.isEmpty()) continue;
+            addsRaw.forEach((playerId, rosterObj) -> {
+                if (rosterObj instanceof Number n) {
+                    out.add(new CompletedAdd(r.week(), r.createdAt(), r.type(), playerId, n.intValue(), r.faabBid()));
+                }
+            });
+        }
+        return out;
+    }
+
+    /**
      * @param transactions every stored transaction for the league-season (any status/type -- this
-     *                     method applies research R8's {@code status = 'complete'} filter itself)
+     *                     method applies research R8's {@code status = 'complete'} filter itself,
+     *                     via {@link #completedAdds})
      * @param starterWeeks every (week, roster)'s stored starters and points, already bounded to
      *                     whatever window the caller wants (T039 bounds this to the season window)
      */
     public static Map<Integer, RosterTotal> attribute(List<LeagueTransactionRepository.Row> transactions,
                                                        List<StarterWeek> starterWeeks) {
-        List<ParsedTx> parsed = new ArrayList<>();
-        for (LeagueTransactionRepository.Row r : transactions) {
-            if (!"complete".equals(r.status())) continue;
-            Map<String, Object> addsRaw = (r.addsJson() == null || r.addsJson().isBlank())
-                    ? Map.of() : JsonUtil.readMap(r.addsJson());
-            Map<String, Integer> adds = new HashMap<>();
-            addsRaw.forEach((playerId, rosterObj) -> {
-                if (rosterObj instanceof Number n) adds.put(playerId, n.intValue());
-            });
-            if (adds.isEmpty()) continue;
-            parsed.add(new ParsedTx(r.week(), r.createdAt(), r.type(), adds));
-        }
+        List<CompletedAdd> parsed = completedAdds(transactions);
 
         // (rosterId + ":" + playerId) -> startedWeek -> which transaction won that week's lookup.
         Map<String, TreeMap<Integer, Used>> usedByKey = new HashMap<>();
 
         for (StarterWeek sw : starterWeeks) {
             for (String playerId : sw.starterIds()) {
-                ParsedTx best = null;
-                for (ParsedTx tx : parsed) {
+                CompletedAdd best = null;
+                for (CompletedAdd tx : parsed) {
                     if (tx.week() > sw.week()) continue;
-                    Integer toRoster = tx.adds().get(playerId);
-                    if (toRoster == null || toRoster != sw.rosterId()) continue;
+                    if (!tx.playerId().equals(playerId) || tx.rosterId() != sw.rosterId()) continue;
                     if (best == null || isMoreRecent(tx, best)) best = tx;
                 }
                 if (best == null) continue; // drafted, or never stored as added to this roster
@@ -121,7 +145,7 @@ public final class WaiverPickupAttribution {
     }
 
     /** {@code candidate} beats {@code current} when it's later by (week, createdAt); a null createdAt sorts first. */
-    private static boolean isMoreRecent(ParsedTx candidate, ParsedTx current) {
+    private static boolean isMoreRecent(CompletedAdd candidate, CompletedAdd current) {
         if (candidate.week() != current.week()) return candidate.week() > current.week();
         Instant a = candidate.createdAt();
         Instant b = current.createdAt();

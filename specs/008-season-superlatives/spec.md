@@ -94,6 +94,27 @@ The bug-hunting review (T067) found problems that changed behaviour, not just co
     that season has a scored week. This reverses the contract's earlier "edit the new season
     before week 1" line (contract amended).
 
+### Added after build (2026-09-28): the Jabari Smith Jr. Award
+
+Allan asked for a thirteenth superlative after the first twelve were built and verified: "another
+award the jabari smith jr award. where its the actualy nba player that got picked up the most in
+wavier wire/ add ons", then "and who picked him up". It's User Story 7 and FR-020 to FR-024 below.
+Planning measured Sleeper before settling the rule ([research.md](research.md) R16), and Allan made
+two calls on 2026-09-28:
+
+16. **Count every completed add, re-adds included.** On NBA 2025 that gives a tie at 14 (Jake
+    LaRavia, Brice Sensabaugh), and both are named. Counting distinct teams would have named Isaiah
+    Stewart (9 teams) instead. Distinct teams is shown beside the count, not used to rank.
+17. **Football team defenses aren't eligible.** "The actual player" means a person. On NFL 2025 the
+    five most-added entries were all D/ST units (Jaguars, 5 adds). Excluding them names Kareem Hunt
+    (3 adds). Kickers are people and still count. *(Corrected after live verification, 2026-09-28:
+    it's a six-way tie at 3, not Hunt alone. The measurement printed only the top 8 entries.
+    See verification.md, US7.)*
+18. **Nobody is named until someone has been added twice** (decided by Allan, 2026-09-28, after
+    live verification). Through week 2 of NFL 2026, the top was 1 add, which made a 25-way tie.
+    With a top of 1, the award now says "nobody's been picked up twice yet". The threshold of 2 is
+    hand-set and labelled arbitrary (`MostAddedPlayers.MIN_ADDS_TO_NAME`).
+
 ## Problem
 
 A league chat argues about the season *while it is happening*. The app answers "what happened this
@@ -353,6 +374,43 @@ a qualifying week.
 
 ---
 
+### User Story 7 - The Jabari Smith Jr. Award (Priority: P3, added 2026-09-28)
+
+The section names the **player** (not a team) picked up off waivers or free agency the most times
+this season, and lists who picked him up: every add, with the week, the team and whether it was a
+waiver claim (with its FAAB bid) or a free-agent add.
+
+**Why this priority**: Allan asked for it after the first twelve shipped. It needs no new stored
+data, since every add is already in `league_transaction`. It's the page's only player-headed
+superlative, so the payload and page need a small shape change (research R16).
+
+**Independent Test**: For the named player, list the league's completed waiver and free-agent adds
+from Sleeper's transactions feed (or the Roster management page's adds, filtered to completed) for
+weeks 1 to the section's last covered week, and check the count and each listed add.
+
+**Acceptance Scenarios**:
+
+1. **Given** Jake LaRavia and Brice Sensabaugh were each added 14 times in NBA 2025's regular season
+   and nobody more, **When** the section is opened for that season, **Then** "The Jabari Smith Jr.
+   Award" names both with "14 adds", each with how many different teams added him, and lists every
+   add (week, team, waiver or free agent, FAAB bid where there was one).
+2. **Given** a team added the same player three times in one week, **When** adds are counted,
+   **Then** all three count (clarification 16), and the list shows all three.
+3. **Given** a waiver claim that failed, **When** adds are counted, **Then** it doesn't count. Only
+   a completed add puts a player on a roster.
+4. **Given** a player arrived by trade or commissioner move, **When** adds are counted, **Then**
+   that move doesn't count, the same rule as the Waiver Wire Warrior (FR-012).
+5. **Given** a football league where a team defense was added most, **When** the section is opened,
+   **Then** the defense isn't eligible and the award names the most-added player (clarification 17).
+6. **Given** no completed waiver or free-agent add of an eligible player in the covered weeks,
+   **When** the section is opened, **Then** the award says so rather than naming a player with 0.
+6a. **Given** the most-added player has only 1 add (clarification 18), **When** the section is
+    opened, **Then** the award says "nobody's been picked up twice yet" and names nobody.
+7. **Given** no transactions are stored for the season, **When** the section is opened, **Then**
+   the award is unavailable with the same reason the Waiver Wire Warrior gives.
+
+---
+
 ### Edge Cases
 
 - **No week fully scored yet** (preseason, or week 1 in progress): the section says so plainly
@@ -431,6 +489,20 @@ a qualifying week.
 - **FR-019**: The award MUST state the week suspension tracking began for the season, and MUST NOT
   imply that no suspensions happened before it.
 
+- **FR-020** *(added 2026-09-28)*: The Jabari Smith Jr. Award MUST name the player with the most
+  completed `WAIVER` or `FREE_AGENT` adds in the section's covered weeks, counting every add,
+  including repeat adds by the same team. Failed claims, trades and commissioner moves MUST NOT count.
+  It MUST NOT name anyone while the top count is below a hand-set minimum of 2 (clarification 18).
+- **FR-021**: It MUST list every counted add for each named player: week, the team that added him,
+  and the move type, plus the FAAB bid for a waiver claim that had one. It MUST also show the number
+  of distinct teams that added him, but that number MUST NOT decide the ranking.
+- **FR-022**: Football team defenses MUST NOT be eligible. The test is the player's stored
+  positions, which are already sport-mapped at ingest (`Position.fromSleeper`), not a second
+  sport check.
+- **FR-023**: Its "is this move a completed pickup" test MUST be the same code the Waiver Wire
+  Warrior uses (FR-004), not a second parse of `league_transaction`.
+- **FR-024**: Ties MUST name every tied player (FR-003's rule, applied to players).
+
 ### Key Entities
 
 - **Season superlative**: a title (e.g. "Heartbreak kid"), the team(s) holding it, the figure, the
@@ -445,6 +517,8 @@ a qualifying week.
   captured from when this ships and never backfilled.
 - **Commissioner's list entry**: a league, a player, a short reason, the date it applies from, and
   who added it.
+- **Pickup event** *(added 2026-09-28)*: one completed waiver or free-agent add: player, week, the
+  team that added him, move type, FAAB bid if any.
 - **Coverage note**: for a superlative that couldn't use every week, how many weeks it used and why
   the others were left out.
 
@@ -501,4 +575,5 @@ a qualifying week.
   data shape and not verified. No suspended player has been looked at in this app's data. Check it
   in planning against a known suspended player.
 - **Superlative titles** ("Escape artist", "Heartbreak kid", "Waiver Wire Warrior", "The Joel Embiid
-  Award", "The Unethical Award") are working names. The last three are Allan's.
+  Award", "The Unethical Award") are working names. The last three are Allan's, and so is "The
+  Jabari Smith Jr. Award" (2026-09-28).

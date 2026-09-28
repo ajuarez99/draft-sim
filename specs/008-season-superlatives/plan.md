@@ -44,6 +44,61 @@ Research changed three things the spec assumed (spec.md "Amended after planning"
 changes those too. That's covered by a task and a before/after, and shown to Allan with the Expected
 wins change (spec amendment 11).
 
+## Amendment: the Jabari Smith Jr. Award (planned 2026-09-28)
+
+Added after the first twelve were built and verified. Spec: User Story 7, FR-020–FR-024,
+clarifications 16–17. Research: R16.
+
+**What it is.** A thirteenth kind, `JABARI_SMITH_JR`. It names the player with the most completed
+waiver/free-agent adds in the covered weeks, and lists every add with the team that made it.
+
+**Decided by Allan (2026-09-28)**, each from a measurement run that day:
+- **Count total adds, re-adds included.** NBA 2025 gives a 14–14 tie (LaRavia, Sensabaugh), and
+  both are named. Distinct teams would have named Isaiah Stewart (9) instead. It's shown, not ranked.
+- **Football D/ST ineligible.** NFL 2025's five most-added entries were defenses.
+
+**Technical shape.** No migration, no new ingest, no new endpoint, no new `SportRules` method.
+- **Backend**:
+  - `WaiverPickupAttribution` gains a public, pure `completedAdds(rows)`, and `attribute` is
+    refactored onto it. Behaviour must be unchanged, so the warrior's NBA 2025 numbers are captured
+    first.
+  - A new pure `MostAddedPlayers.rank(adds, throughWeek, eligible)` counts, ties and groups.
+  - `SeasonSuperlativesService` adds the kind, the `ADD` detail row and `Superlative.playerHolders`.
+  - The D/ST test is `positions.contains(Position.DEF)`, sport-safe because `Position.fromSleeper`
+    already maps positions per sport (R16, decision 2).
+- **Contract**: `playerHolders`, a restated emptiness invariant, unit `ADDS`, detail type `ADD`.
+- **Web**:
+  - `api.ts` mirrors all of it in the same change (`SuperlativeKind`, `unit`, `playerHolders`, the
+    `ADD` variant).
+  - `Superlatives.tsx` gets a player-headed card: name, position, team, then "N adds by M teams".
+    Its add list is grouped per player.
+  - `Superlatives.test.tsx` covers ties and the empty case.
+- **Performance**: one more in-memory pass over the season's transactions (1,353 waiver/FA rows in
+  NBA 2025, measured) and no extra query, since `forSeason` is already called for the warrior.
+  Pass the list in rather than querying twice. Not timed.
+
+**Constitution/conventions re-check for the amendment**: passes.
+
+| Convention | How the amendment satisfies it |
+|---|---|
+| One declaration per rule | "Completed pickup" is one method shared with the warrior (FR-023). D/ST reuses `Position.fromSleeper`'s sport mapping rather than adding a check |
+| No defaulted rule params | `throughWeek` and the eligibility predicate are explicit arguments to `MostAddedPlayers.rank` |
+| Count and label, one source | Bounded to 1..`throughWeek`, the title's number |
+| `Map.of` null | `team` (free agent), `faabBid`, `avatarId` are nullable. Build maps mutably |
+| `api.ts` mirrors Java | Same change |
+| Wrong-thing-displayed (lessons #5) | The adding teams aren't put in `holders`, which the page renders as winners |
+| Verified vs assumed | R16 marks what was measured on Sleeper vs read in code. The stored-row recount is owed (quickstart §8) |
+
+**Build order**, appended to the one below:
+8. Capture the warrior's NBA 2025 payload.
+9. Extract `completedAdds` and confirm the warrior is unchanged.
+10. Add `MostAddedPlayers` and its tests: a preference-ordering test (the most adds wins, not the
+    most teams), a re-add counts, a failed claim doesn't, a trade doesn't, D/ST is excluded, and a
+    tie names both.
+11. Wire it into the service and payload.
+12. Update `api.ts` and the page.
+13. Run quickstart §8.
+
 ## Technical Context
 
 **Language/Version**: Java 21 (Spring Boot 3.5, virtual threads), TypeScript (React + Vite, strict)
@@ -145,7 +200,9 @@ backend/src/main/java/com/ballknowers/draftsim/
 │   ├── RosterWeekPointsRepository.java          # extremes(...) takes an explicit week ceiling
 │   └── LeagueMatchupRepository.java             # pairedWithScores(...) week ceiling, if the margin query lives here
 ├── engine/
-│   ├── SeasonSuperlativesService.java           # new: composes the twelve kinds
+│   ├── SeasonSuperlativesService.java           # new: composes the twelve kinds (+ JABARI_SMITH_JR, 2026-09-28)
+│   ├── WaiverPickupAttribution.java             # 2026-09-28: + public completedAdds(rows), shared with the award
+│   ├── MostAddedPlayers.java                    # 2026-09-28, new: pure count/tie/group for JABARI_SMITH_JR
 │   ├── ExpectedWinsService.java                 # explicit regular-season bound (R3; approved)
 │   ├── ManagerCareerService.java                # passes the same bound; career luck changes too (analysis H1)
 │   └── LeagueRecordService.java                 # explicit week ceiling threaded through
@@ -156,7 +213,8 @@ backend/src/main/java/com/ballknowers/draftsim/
 
 backend/src/test/java/com/ballknowers/draftsim/...
 ├── engine/SeasonSuperlativesServiceTest.java    # ordering tests: most close wins wins, luckiest = max WAE, ties name all
-├── engine/WaiverWarriorRuleTest.java            # drafted / waiver / FA / traded-after-add / re-add / commissioner
+├── engine/WaiverPickupAttributionTest.java       # (named WaiverWarriorRuleTest when planned) drafted / waiver / FA / traded-after-add / re-add / commissioner
+├── engine/MostAddedPlayersTest.java             # 2026-09-28: most adds beats most teams; re-add; failed; trade; D/ST; tie
 ├── engine/AbsenceCostTest.java                  # stash never counts; each missed night costs, even in a week he played
 ├── ingest/PlayerGameIngestServiceTest.java      # Embiid-shaped NBA entries, McCaffrey/Mahomes-shaped NFL entries (fixtures from research R9)
 └── api/SuperlativesControllerIT.java            # scoping 404, commissioner 403, cross-league entry id 404

@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.domain.Player;
+import com.ballknowers.draftsim.domain.Position;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import com.ballknowers.draftsim.domain.LeagueSettings;
 
@@ -82,7 +84,7 @@ public class SeasonSuperlativesService {
 
     public enum Kind {
         HIGHEST_WEEK, LOWEST_WEEK, BIGGEST_BLOWOUT, CLOSEST_GAME, CLOSE_WINS, CLOSE_LOSSES,
-        LUCKIEST, UNLUCKIEST, MOST_BENCH_POINTS, WAIVER_WIRE_WARRIOR, JOEL_EMBIID, UNETHICAL
+        LUCKIEST, UNLUCKIEST, MOST_BENCH_POINTS, WAIVER_WIRE_WARRIOR, JABARI_SMITH_JR, JOEL_EMBIID, UNETHICAL
     }
 
     /** The six kinds FR-006 marks as "mostly noise" while the season window is early. */
@@ -96,7 +98,8 @@ public class SeasonSuperlativesService {
 
     /** One row of a superlative's supporting detail. Discriminated on the wire by a "type" field the controller adds. */
     public sealed interface DetailRow
-            permits WeekScoreDetail, GameDetail, LuckDetail, BenchTotalDetail, PickupDetail, AbsenceDetail, ConductDetail {}
+            permits WeekScoreDetail, GameDetail, LuckDetail, BenchTotalDetail, PickupDetail, AbsenceDetail,
+            ConductDetail, AddDetail {}
 
     public record WeekScoreDetail(int week, int rosterId, double points) implements DetailRow {}
 
@@ -140,8 +143,33 @@ public class SeasonSuperlativesService {
     public record ConductDetail(String playerId, String playerName, int rosterId, String source,
                                 List<Integer> weeks, String reason) implements DetailRow {}
 
+    /**
+     * One counted add for JABARI_SMITH_JR (US7, research R16 decision 6). Unlike every other
+     * detail row, the team here isn't a holder (the award is player-headed) -- {@code
+     * teamName}/{@code avatarId} are carried on the row itself, the same reasoning GameDetail's
+     * {@code opponentTeamName} already uses for a team that's an opponent, not a holder.
+     */
+    public record AddDetail(String playerId, int week, int rosterId, String teamName, String avatarId,
+                            String addType, Integer faabBid) implements DetailRow {}
+
+    /**
+     * @param playerHolders JABARI_SMITH_JR only (research R16 decision 6): every tied-top player,
+     *                       {@code []} for every other kind. {@code holders} stays {@code []} for
+     *                       this kind -- the award is headed by players, not teams.
+     */
     public record Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
-                              List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage) {}
+                              List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
+                              List<PlayerHolder> playerHolders) {
+        /** Old 10-argument shape, kept so the 17 existing call sites don't all need touching (T076). */
+        public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
+                           List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage) {
+            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, List.of());
+        }
+    }
+
+    /** One tied-top player for JABARI_SMITH_JR. {@code team} is nullable: a free agent has none. */
+    public record PlayerHolder(String playerId, String playerName, String position, String team,
+                               int adds, int distinctTeams) {}
 
     /**
      * @param leagueSleeperId the Sleeper id of the league-season the resolver
@@ -252,8 +280,16 @@ public class SeasonSuperlativesService {
         addLuckSuperlatives(built, sleeperLeagueId, bound, throughWeek, early);
         built.put(Kind.MOST_BENCH_POINTS, benchSuperlative(league, leagueBreakdowns, playersBySleeperId, throughWeek,
                 early, nameByRoster, avatarByRoster, managerByRoster));
-        built.put(Kind.WAIVER_WIRE_WARRIOR, waiverSuperlative(league, sleeperLeagueId, parsedWeeks, playersBySleeperId,
-                early, nameByRoster, avatarByRoster, managerByRoster));
+
+        // Fetched once (T076 coordinator instruction): both WAIVER_WIRE_WARRIOR and
+        // JABARI_SMITH_JR read this league-season's transactions, and the second
+        // award adds no second query.
+        List<LeagueTransactionRepository.Row> txRows = transactions.forSeason(league.id(), league.season());
+        built.put(Kind.WAIVER_WIRE_WARRIOR, waiverSuperlative(league, sleeperLeagueId, txRows, parsedWeeks,
+                playersBySleeperId, early, nameByRoster, avatarByRoster, managerByRoster));
+        built.put(Kind.JABARI_SMITH_JR, mostAddedSuperlative(sleeperLeagueId, txRows, throughWeek,
+                playersBySleeperId, nameByRoster, avatarByRoster));
+
         built.put(Kind.JOEL_EMBIID, absenceSuperlative(league, sleeperLeagueId, rules, scoredWeeksFinal, parsedWeeks,
                 playersBySleeperId, early, nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.UNETHICAL, unethicalSuperlative(league, parsedWeeks, playersBySleeperId, early,
@@ -564,10 +600,10 @@ public class SeasonSuperlativesService {
      * its output into the wire's PICKUP detail rows.
      */
     private Superlative waiverSuperlative(LeagueRepository.LeagueRow league, String sleeperLeagueId,
-                                          List<ParsedWeek> parsedWeeks, Map<String, Player> playersBySleeperId,
-                                          boolean early, Map<Integer, String> nameByRoster,
-                                          Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
-        List<LeagueTransactionRepository.Row> txRows = transactions.forSeason(league.id(), league.season());
+                                          List<LeagueTransactionRepository.Row> txRows, List<ParsedWeek> parsedWeeks,
+                                          Map<String, Player> playersBySleeperId, boolean early,
+                                          Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                          Map<Integer, Long> managerByRoster) {
         if (txRows.isEmpty()) {
             return unavailable(Kind.WAIVER_WIRE_WARRIOR,
                     "no transactions stored for this season — run POST /api/ingest/transactions/" + sleeperLeagueId);
@@ -640,6 +676,68 @@ public class SeasonSuperlativesService {
             }
         }
         return detail;
+    }
+
+    // ---------------------------------------------------------------- US7
+
+    /**
+     * JABARI_SMITH_JR (T076), per research R16: the player picked up the most times off waivers
+     * or free agency, across the covered weeks. The rule itself is {@link MostAddedPlayers#rank}
+     * -- pure and tested without Postgres (T074); this method's own job is gathering that pure
+     * function's inputs from the already-fetched transaction rows (research R16 decision 4: one
+     * "completed pickup" parse, shared with {@link #waiverSuperlative}) and shaping its output
+     * into ADD detail rows.
+     *
+     * <p>Not early-eligible (research R16 decision 5): a plain count of events, like CLOSE_WINS,
+     * not a model or season total that gets noisier the fewer weeks there are.
+     */
+    static Superlative mostAddedSuperlative(String sleeperLeagueId, List<LeagueTransactionRepository.Row> txRows,
+                                             int throughWeek, Map<String, Player> playersBySleeperId,
+                                             Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster) {
+        if (txRows.isEmpty()) {
+            return unavailable(Kind.JABARI_SMITH_JR,
+                    "no transactions stored for this season — run POST /api/ingest/transactions/" + sleeperLeagueId);
+        }
+
+        List<WaiverPickupAttribution.CompletedAdd> completedAdds = WaiverPickupAttribution.completedAdds(txRows);
+
+        // research R16 decision 2: a player whose stored positions include DEF is a football
+        // team defense, never an eligible "player". An unknown id (not in `player`) stays
+        // eligible and is named "Unknown player" below -- no sport comparison here, since
+        // Position.fromSleeper already mapped positions per sport at ingest.
+        Predicate<String> eligible = playerId -> {
+            Player p = playersBySleeperId.get(playerId);
+            return p == null || !p.positions().contains(Position.DEF);
+        };
+
+        List<MostAddedPlayers.Ranked> ranked = MostAddedPlayers.rank(completedAdds, throughWeek, eligible);
+
+        if (ranked.isEmpty()) {
+            return new Superlative(Kind.JABARI_SMITH_JR, true, null, false, null, "ADDS", List.of(),
+                    "nobody's been picked up yet", List.of(), null, List.of());
+        }
+        // Spec clarification 18: a top of 1 add is an every-pickup tie (25 players
+        // on NFL 2026 through week 2), not a most-added player. Say so instead.
+        if (ranked.get(0).adds() < MostAddedPlayers.MIN_ADDS_TO_NAME) {
+            return new Superlative(Kind.JABARI_SMITH_JR, true, null, false, null, "ADDS", List.of(),
+                    "nobody's been picked up twice yet", List.of(), null, List.of());
+        }
+
+        List<PlayerHolder> playerHolders = new ArrayList<>();
+        List<DetailRow> detail = new ArrayList<>();
+        for (MostAddedPlayers.Ranked r : ranked) {
+            Player p = playersBySleeperId.get(r.playerId());
+            playerHolders.add(new PlayerHolder(r.playerId(), p == null ? "Unknown player" : p.name(),
+                    p == null ? null : p.primary().name(), p == null ? null : p.team(), r.adds(), r.distinctTeams()));
+            for (WaiverPickupAttribution.CompletedAdd a : r.counted()) {
+                detail.add(new AddDetail(r.playerId(), a.week(), a.rosterId(),
+                        nameByRoster.getOrDefault(a.rosterId(), "Roster " + a.rosterId()),
+                        avatarByRoster.get(a.rosterId()), a.type(), a.faabBid()));
+            }
+        }
+
+        return new Superlative(Kind.JABARI_SMITH_JR, true, null, false, (double) ranked.get(0).adds(), "ADDS",
+                List.of(), null, detail, null, playerHolders);
     }
 
     // ---------------------------------------------------------------- US4
