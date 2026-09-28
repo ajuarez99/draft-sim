@@ -182,3 +182,40 @@ sums `winsAboveExpected` across a manager's seasons. Compare
 `GET /api/managers/{managerId}/history` for one manager against the step 1 capture, and write that
 before/after down too. Allan approved the Expected wins page changing; this second change was found
 by analysis, so show it to him explicitly.
+
+## 8. The Jabari Smith Jr. Award (US7, added 2026-09-28)
+
+Rules and shape: [research.md](research.md) R16 and the contract's `ADD` row. Expected numbers were
+**measured against Sleeper's feed on 2026-09-28**, not the app's stored rows. A mismatch here means
+either the ingest or the rule is wrong, so find which before changing either.
+
+1. **Ingest first**, for both seasons, so the stored rows are complete:
+   `POST /api/ingest/transactions/1229352720222134272` and `.../1254190892974084096`.
+2. **NBA 2025**: `GET /api/leagues/1229352720222134272/superlatives`, kind `JABARI_SMITH_JR`.
+   - Expect `playerHolders` = Jake LaRavia and Brice Sensabaugh, both `adds: 14`,
+     `distinctTeams: 8`. Expect `holders: []` and `early: false`.
+   - Expect 28 `ADD` rows, 14 per player. Sensabaugh's include three week-15 adds by the same team.
+3. **NFL 2025**: `GET /api/leagues/1254190892974084096/superlatives`.
+   - Expect no D/ST in `playerHolders`. Expect Kareem Hunt and Matt Prater at 3, or whoever else
+     ties at 3 once D/ST is removed. The Sleeper measurement listed only the top 8 entries, so a
+     third player at 3 is possible. Recount in SQL rather than trusting this line.
+   - **D/ST ids in `player`**: check that every D/ST id added this season (e.g. `JAX`, `LAC`, `BAL`)
+     exists in `player` with position `DEF`. One that's missing would be counted as an "Unknown
+     player" (R16) and could win. Run
+     `select sleeper_id, positions from player where sport='nfl' and sleeper_id in ('JAX','LAC','BAL','LAR','ARI','TB');`
+     and adapt it to the table's real column names.
+4. **Recount in SQL**: for the stored league-season, count completed `WAIVER`/`FREE_AGENT` rows per
+   `jsonb_object_keys(adds)` over weeks 1..`throughWeek`. The top player and count must equal the
+   payload's (SC-007's rule, applied to this award).
+5. **Same answer as Roster management**: on that page's adds list, filtered to completed, count the
+   winner's rows. It must match `adds` (research R16, decision 4).
+6. **Current season**: open NFL 2026 (`1346366555759341568`). An add made in the in-progress week
+   must not be counted until that week is fully scored. Read the add's week off Sleeper's feed and
+   compare with the title's "through week N".
+7. **Page**, in the browser: the award names the player(s), not a team, and says "N adds by M teams"
+   next to each name. The list shows each add's week, team avatar and name, "Waiver ($bid)" or
+   "Free agent". Check it at phone width, since 14 rows per player is the page's longest list. Tied
+   players are grouped separately, not interleaved.
+8. **Suites**: the pure test (below) and the existing `WaiverPickupAttributionTest` must both pass
+   after the `completedAdds` extraction. The warrior's numbers on NBA 2025 must be unchanged. Capture
+   them before the extraction.

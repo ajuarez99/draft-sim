@@ -367,3 +367,134 @@ its own, not folded into this feature.
 payloads in the same change as the Java records (AGENTS.md hard rule). A component test asserts that
 every superlative renders its coverage note, so a dropped field fails loudly instead of rendering as
 absent.
+
+---
+
+## R16 — The Jabari Smith Jr. Award (US7, added 2026-09-28)
+
+The app's database wasn't running on 2026-09-28 either (5433 down; the unrelated 5432 left alone).
+Everything **measured** below was run against Sleeper's `/league/{id}/transactions/{week}` feed on
+2026-09-28, regular-season weeks only: NBA 2025 (`1229352720222134272`) weeks 1–18, NFL 2025
+(`1254190892974084096`) weeks 1–14. That feed is what `TransactionIngestService` stores, so the
+stored rows should give the same counts. That's checked in quickstart §8, not assumed.
+
+### What the feed holds (measured)
+
+| | NBA 2025 | NFL 2025 |
+|---|---|---|
+| Completed free-agent moves | 1,200 | 228 |
+| Completed waiver claims | 104 | 92 |
+| Failed waiver claims | 49 | 59 |
+| Trades / commissioner moves | 18 / 6 | 5 / 6 |
+| Waiver/FA moves with **0** adds (drop only) | 290 | 60 |
+| Waiver/FA moves with **2+** adds | 0 | 0 |
+| Players added at least once | 273 | 178 |
+
+- **Every waiver/FA move adds at most one player** in both leagues. `TransactionAnalysisService`
+  already assumes that when it takes `adds`' first key. This award reads every entry anyway, so it
+  doesn't depend on the assumption.
+- **Drop-only moves are common** (290 in NBA 2025) and add nobody, so they're skipped.
+
+### Decision 1: count every completed add (decided by Allan, 2026-09-28)
+
+**Top of NBA 2025, measured:**
+
+| Player | Adds | Distinct teams |
+|---|---|---|
+| Jake LaRavia | 14 | 8 |
+| Brice Sensabaugh | 14 | 8 |
+| Moses Moody | 13 | 8 |
+| Luka Garza | 13 | 7 |
+| Rui Hachimura | 12 | 7 |
+| Isaiah Stewart | 11 | **9** |
+
+- **Rule**: count each completed `WAIVER` or `FREE_AGENT` add. A team re-adding the same player
+  counts again. One team added Sensabaugh three times in week 15, which is streaming, and it's what
+  "picked up the most" literally means.
+- **Tie at the top**: LaRavia and Sensabaugh at 14. FR-003 names both. No tiebreaker is invented,
+  including distinct teams.
+- **Alternative rejected**: rank by distinct teams, the "passed around the league" reading. It names
+  Isaiah Stewart (9 teams) and ignores that the same team kept coming back. Allan chose total adds.
+  Distinct teams is still shown beside the count (FR-021), because "14 adds by 8 teams" answers
+  "who picked him up" better than 14 alone.
+
+### Decision 2: football team defenses aren't eligible (decided by Allan, 2026-09-28)
+
+**Top of NFL 2025, measured:** Jaguars D/ST 5 adds, Chargers D/ST 4, Ravens D/ST 4, Rams D/ST 3,
+Cardinals D/ST 3, then **Kareem Hunt 3** (3 teams) and Buccaneers D/ST 3, Matt Prater 3.
+
+- Streaming defenses would win this every football season. "The actual player" means a person.
+- **Rule**: a player whose stored `positions` contains `Position.DEF` is ineligible.
+- **Read, not run**: that's a sport-safe test without a new `SportRules` method.
+  `Position.fromSleeper` already maps positions per sport at ingest, and it drops the ~30 NBA archive
+  entries tagged `DEF` rather than mapping them to football's `DEF` (`Position.java:50–77`). So
+  `DEF` in `positions` can only mean a football team unit. Adding a `SportRules` method would be a
+  second declaration of a rule that already lives in one place.
+- **Kickers stay eligible.** They're people. On NFL 2025, Matt Prater ties Kareem Hunt at 3 and
+  both are named.
+- **A player id not in the `player` table** (never refreshed): counted, named "Unknown player".
+  Whether Sleeper's D/ST ids (team abbreviations such as `JAX`) are all in `player` isn't
+  verified. If one is missing, it would count as an unknown *player*. Quickstart §8 checks this.
+
+### Decision 3: which weeks
+
+- **Weeks 1 to `throughWeek`**, the same window as every other kind (FR-001). An add in the
+  in-progress week waits until that week is fully scored, so the count and the title's
+  "through week N" always agree ("count and label, one source").
+- Playoff-week adds are left out with the rest of the playoffs.
+- **Difference from the Waiver Wire Warrior (read)**: the warrior reads every transaction up to each
+  started week and bounds by starters, not by transaction week. That's correct for it, since an add
+  only matters once he starts. This award counts the adds themselves, so it bounds them directly.
+
+### Decision 4: one "completed pickup" test (FR-023)
+
+- `WaiverPickupAttribution.attribute` parses `league_transaction` rows inline: status `complete`,
+  `adds` read as `{player: roster}`, type checked against `WAIVER`/`FREE_AGENT` later.
+- **Decision**: extract that into one public, pure `WaiverPickupAttribution.completedAdds(rows)`
+  returning `(week, createdAt, type, playerId, rosterId, faabBid)` per add. Both the warrior and this
+  award call it. The warrior still needs trade and commissioner adds (a later trade disqualifies
+  an earlier pickup), so the extraction returns every completed add with its type, and each caller
+  filters.
+- The roster that gained him comes from the `adds` map value, not `league_transaction.roster_id`,
+  the same as the warrior.
+- **Not unified**: the Roster management page's adds list (`TransactionAnalysisService`, spec 004
+  US6) deliberately includes failed claims and reads only the first add. Its job is different. SC-007
+  only needs the two to agree on completed adds, which quickstart §8 checks.
+
+### Decision 5: not early-season-eligible
+
+- The award is a plain count of events, like `CLOSE_WINS`, not a model or a season total. So it
+  doesn't get FR-006's "mostly noise" caveat.
+- A three-way tie at 2 adds in week 2 is simply true, and FR-003 already handles it.
+- **Alternative rejected**: marking it early like `UNETHICAL`. That caveat exists because a
+  suspension tally claims something about conduct. A pickup count doesn't.
+
+### Decision 6: payload shape — the one player-headed kind
+
+- Every existing kind is headed by teams (`holders`). This one is headed by players, with the
+  teams in its detail.
+- **Decision**: add `playerHolders` to `Superlative`: `[{ playerId, playerName, position, team,
+  adds, distinctTeams }]`. It's `[]` for every other kind. For this kind `holders` is `[]` and
+  `playerHolders` carries the winners.
+- The contract's invariant is restated: "`holders` **and** `playerHolders` are both empty iff
+  `emptyReason` is non-null or `available` is false".
+- **Detail rows**: a new `ADD` type: `playerId`, `week`, `rosterId`, `teamName`, `avatarId`,
+  `addType` (`WAIVER` | `FREE_AGENT`), `faabBid` (nullable; null ≠ 0, as V19 documents). Sorted
+  by week, then `created_at`, and grouped per player on the page.
+- `ADD` carries `teamName`/`avatarId` itself because, unlike every other detail type, its teams
+  aren't holders, so the page has nothing to look them up in. `GAME` rows carry
+  `opponentTeamName` for the same reason.
+- `unit` gains `ADDS`.
+- **Alternative rejected**: put the adding teams in `holders`. `Holder` means "holds this
+  superlative", and the page renders holders as the winners. Eight teams named as winners of a
+  player's award is the wrong-thing-displayed class (lessons #5).
+- **Kind order**: `JABARI_SMITH_JR` goes directly after `WAIVER_WIRE_WARRIOR`, the other
+  waiver-wire award.
+
+### Not built
+
+- **Most-wanted**: failed claims as a measure of demand. Few in these leagues (49 and 59 total).
+  Allan didn't ask for it.
+- **Player headshots**: the web app renders no Sleeper player images today (searched
+  `sleepercdn.com/content` in `web/src`), so the award shows name, position and team like every
+  other player row here.

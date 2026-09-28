@@ -92,10 +92,11 @@ other analytics page here.
 
 | Field | Notes |
 |---|---|
-| `kind` | `HIGHEST_WEEK`, `LOWEST_WEEK`, `BIGGEST_BLOWOUT`, `CLOSEST_GAME`, `CLOSE_WINS`, `CLOSE_LOSSES`, `LUCKIEST`, `UNLUCKIEST`, `MOST_BENCH_POINTS`, `WAIVER_WIRE_WARRIOR`, `JOEL_EMBIID`, `UNETHICAL` |
+| `kind` | `HIGHEST_WEEK`, `LOWEST_WEEK`, `BIGGEST_BLOWOUT`, `CLOSEST_GAME`, `CLOSE_WINS`, `CLOSE_LOSSES`, `LUCKIEST`, `UNLUCKIEST`, `MOST_BENCH_POINTS`, `WAIVER_WIRE_WARRIOR`, `JABARI_SMITH_JR` (added 2026-09-28), `JOEL_EMBIID`, `UNETHICAL` |
 | `available` | false, with a `reason`, when it can't be computed at all (FR-008) |
-| `holders` | every tied team (FR-003); empty with an `emptyReason` when nobody qualifies ("no close games yet", "nobody's been bitten yet") |
-| `value`, `unit` | the exact figure (`POINTS`, `WINS`, `GAMES`) |
+| `holders` | every tied team (FR-003); empty with an `emptyReason` when nobody qualifies ("no close games yet", "nobody's been bitten yet"). Always empty for `JABARI_SMITH_JR` |
+| `playerHolders` | *(added 2026-09-28)* every tied player, for `JABARI_SMITH_JR` only: `playerId`, `playerName`, `position`, `team` (his real team), `adds`, `distinctTeams`. `[]` for every other kind |
+| `value`, `unit` | the exact figure (`POINTS`, `WINS`, `GAMES`, and `ADDS` from 2026-09-28) |
 | `detail` | the rows behind it: games, pickups, absences or conduct entries, each with week(s) (FR-002) |
 | `coverage` | `{ weeksCovered, weeksExcluded, reasons[] }` whenever fewer than `weeksScored` weeks were usable (FR-005) |
 | `early` | true for the kinds FR-006 names, while the season window is `early` |
@@ -115,6 +116,11 @@ other analytics page here.
   contributor while on that roster, each at his estimated mean points per game played, scored by
   `GameScoringService` (FR-013/014/015; research R10, amended 2026-09-23). It never reads
   `player.injury_status`.
+- **Jabari Smith Jr. Award** *(added 2026-09-28)*: `JABARI_SMITH_JR` counts completed `WAIVER`
+  and `FREE_AGENT` adds in weeks 1..`throughWeek`, re-adds included, from
+  `WaiverPickupAttribution.completedAdds`, the same test the warrior uses (FR-020, FR-023). A
+  player whose `positions` contains `DEF` is ineligible (FR-022). `ADD` detail rows list every
+  counted add (FR-021). Research R16.
 - **Unethical Award**: `UNETHICAL` detail rows each carry `source: SUSPENDED | COMMISSIONER`
   (FR-016), plus the weeks that qualified. The payload lists `suspensionWeeksObserved` (FR-019).
 
@@ -127,3 +133,6 @@ Only `league_conduct_entry` has any:
 - **present → absent**: commissioner removes.
 
 Every other new table is append/upsert-only ingest output.
+
+**The Jabari Smith Jr. Award (2026-09-28) adds no stored data and no migration.** It reads
+`league_transaction` (V19) and `player`, both already populated by existing ingests.
