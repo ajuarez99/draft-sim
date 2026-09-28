@@ -19,6 +19,28 @@ and Embiid 26 missed games, hand-counted). Also verified: the commissioner flow 
 **Not verified:** bench points against a hand-built optimal lineup, and the stale-row cleanup on
 a live mid-season NBA ingest (no NBA season is live).
 
+**2026-09-28: a thirteenth kind, the Jabari Smith Jr. Award** (spec US7, research R16,
+tasks T071–T083). It names the player picked up off waivers/free agency the most times, and lists
+every add with its week and team. The counting rule was Allan's call: total adds, re-adds included,
+and football team defenses excluded.
+- **Verified live**:
+  - NBA 2025: LaRavia and Sensabaugh tie at 14 (8 teams each).
+  - NFL 2025: a **six-way tie at 3** (Burden, Prater, Brissett, Hunt, Darnold, Kirk), no D/ST.
+    Research R16 had named only two of them, because its script printed the top 8 entries and
+    five were defenses.
+  - Both seasons recounted in SQL and matched against Roster management's adds list.
+  - The Waiver Wire Warrior is byte-identical before and after the shared-parse refactor.
+  - Browser, desktop and phone width.
+  - Backend **681 tests, 0 skipped**; frontend **550**.
+- **No migration, no ingest change.** It reads `league_transaction` and `player`. Ingest
+  transactions (`POST /api/ingest/transactions/{id}`) before the card shows anything.
+- **Early-season ties**: NFL 2026, through week 2, tied 25 players at 1 add. Allan approved
+  naming nobody until someone has 2 adds. The card now says "nobody's been picked up twice yet"
+  (T084, verified live).
+- **Not verified live**: the award's own "add after the last scored week" filter.
+  `TransactionIngestService` never stores those weeks, so it's covered by `MostAddedPlayersTest`
+  only.
+
 **Behaviour changes to existing pages, not only additions:**
 - **Expected wins is now regular-season only.** It used to include playoff and consolation games:
   NFL 2025 `weeksScored` went from 17 to 14, and NBA 2025's luckiest team changed. Allan

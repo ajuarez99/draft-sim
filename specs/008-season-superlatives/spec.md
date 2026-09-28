@@ -107,7 +107,13 @@ two calls on 2026-09-28:
     Stewart (9 teams) instead. Distinct teams is shown beside the count, not used to rank.
 17. **Football team defenses aren't eligible.** "The actual player" means a person. On NFL 2025 the
     five most-added entries were all D/ST units (Jaguars, 5 adds). Excluding them names Kareem Hunt
-    (3 adds). Kickers are people and still count.
+    (3 adds). Kickers are people and still count. *(Corrected after live verification, 2026-09-28:
+    it's a six-way tie at 3, not Hunt alone. The measurement printed only the top 8 entries.
+    See verification.md, US7.)*
+18. **Nobody is named until someone has been added twice** (decided by Allan, 2026-09-28, after
+    live verification). Through week 2 of NFL 2026, the top was 1 add, which made a 25-way tie.
+    With a top of 1, the award now says "nobody's been picked up twice yet". The threshold of 2 is
+    hand-set and labelled arbitrary (`MostAddedPlayers.MIN_ADDS_TO_NAME`).
 
 ## Problem
 
@@ -398,6 +404,8 @@ weeks 1 to the section's last covered week, and check the count and each listed 
    **Then** the defense isn't eligible and the award names the most-added player (clarification 17).
 6. **Given** no completed waiver or free-agent add of an eligible player in the covered weeks,
    **When** the section is opened, **Then** the award says so rather than naming a player with 0.
+6a. **Given** the most-added player has only 1 add (clarification 18), **When** the section is
+    opened, **Then** the award says "nobody's been picked up twice yet" and names nobody.
 7. **Given** no transactions are stored for the season, **When** the section is opened, **Then**
    the award is unavailable with the same reason the Waiver Wire Warrior gives.
 
@@ -484,6 +492,7 @@ weeks 1 to the section's last covered week, and check the count and each listed 
 - **FR-020** *(added 2026-09-28)*: The Jabari Smith Jr. Award MUST name the player with the most
   completed `WAIVER` or `FREE_AGENT` adds in the section's covered weeks, counting every add,
   including repeat adds by the same team. Failed claims, trades and commissioner moves MUST NOT count.
+  It MUST NOT name anyone while the top count is below a hand-set minimum of 2 (clarification 18).
 - **FR-021**: It MUST list every counted add for each named player: week, the team that added him,
   and the move type, plus the FAAB bid for a waiver claim that had one. It MUST also show the number
   of distinct teams that added him, but that number MUST NOT decide the ranking.

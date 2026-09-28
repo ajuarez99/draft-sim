@@ -1754,13 +1754,23 @@ export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
 export type SuperlativeKind =
   | 'HIGHEST_WEEK' | 'LOWEST_WEEK' | 'BIGGEST_BLOWOUT' | 'CLOSEST_GAME'
   | 'CLOSE_WINS' | 'CLOSE_LOSSES' | 'LUCKIEST' | 'UNLUCKIEST' | 'MOST_BENCH_POINTS'
-  | 'WAIVER_WIRE_WARRIOR' | 'JOEL_EMBIID' | 'UNETHICAL'
+  | 'WAIVER_WIRE_WARRIOR' | 'JABARI_SMITH_JR' | 'JOEL_EMBIID' | 'UNETHICAL'
 
 export type SuperlativeHolder = {
   rosterId: number
   managerId: number | null
   teamName: string
   avatarId: string | null
+}
+
+/** JABARI_SMITH_JR only (added 2026-09-28, research R16): `[]` for every other kind. `team` is nullable -- a free agent has none. */
+export type SuperlativePlayerHolder = {
+  playerId: string
+  playerName: string
+  position: string | null
+  team: string | null
+  adds: number
+  distinctTeams: number
 }
 
 /** Present only when fewer than the season's scored weeks were usable for a pairing-based kind. */
@@ -1846,6 +1856,19 @@ export type SuperlativeDetail =
       weeks: number[]
       reason: string | null
     }
+  | {
+      type: 'ADD'
+      /** Which tied player (from `Superlative.playerHolders`) this add belongs to -- added 2026-09-28, US7. */
+      playerId: string
+      week: number
+      rosterId: number
+      /** The adding team's own name/avatar, carried on the row -- these teams aren't holders here, so the page has nothing else to look them up in (same reasoning as GAME's opponentTeamName). */
+      teamName: string
+      avatarId: string | null
+      addType: 'WAIVER' | 'FREE_AGENT'
+      /** null when not a bid (a free-agent add, or a waiver claim with no FAAB); 0 is a real bid, never confused with null. */
+      faabBid: number | null
+    }
 
 export type Superlative = {
   kind: SuperlativeKind
@@ -1853,11 +1876,13 @@ export type Superlative = {
   reason?: string | null
   early: boolean
   value: number | null
-  unit: 'POINTS' | 'WINS' | 'GAMES' | null
+  unit: 'POINTS' | 'WINS' | 'GAMES' | 'ADDS' | null
   holders: SuperlativeHolder[]
   emptyReason?: string | null
   detail: SuperlativeDetail[]
   coverage: SuperlativeCoverage | null
+  /** JABARI_SMITH_JR only (added 2026-09-28); `[]` for every other kind. `holders` and `playerHolders` are both `[]` iff `emptyReason` is non-null or `available` is false. */
+  playerHolders: SuperlativePlayerHolder[]
 }
 
 export type SuperlativesResponse = {

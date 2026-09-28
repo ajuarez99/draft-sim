@@ -602,12 +602,12 @@ Jake LaRavia and Brice Sensabaugh at 14 adds and 8 teams each. On NFL 2025
 **No migration, no ingest change, no new endpoint.** Everything reads `league_transaction` (V19)
 and `player`.
 
-- [ ] T071 [US7] Capture the before-numbers. With the backend running on the current tree, run
+- [X] T071 [US7] Capture the before-numbers. With the backend running on the current tree, run
   `POST /api/ingest/transactions/1229352720222134272` and `.../1254190892974084096`. Then save both
   seasons' `GET /api/leagues/{id}/superlatives` `WAIVER_WIRE_WARRIOR` entries (value, holders,
   every `PICKUP` row) to `specs/008-season-superlatives/verification.md` under a new "US7" heading.
   T073 must leave them byte-identical. **Run this before T073**, or the comparison is lost.
-- [ ] T072 [P] [US7] Add tests to `test/…/engine/WaiverPickupAttributionTest.java` for the new
+- [X] T072 [P] [US7] Add tests to `test/…/engine/WaiverPickupAttributionTest.java` for the new
   public `completedAdds(rows)`:
   - a `failed` row yields nothing;
   - a drop-only row (`adds` = `{}`) yields nothing;
@@ -616,7 +616,7 @@ and `player`.
   - the roster comes from the `adds` map value, not `Row.rosterId`. Use a row whose `rosterId` is
     null and whose `adds` is `{"p1": 4}`: expect roster 4;
   - `faabBid` passes through, and null stays null, never 0 (V19's comment).
-- [ ] T073 [US7] In `…/engine/WaiverPickupAttribution.java`, extract the parse loop at the top of
+- [X] T073 [US7] In `…/engine/WaiverPickupAttribution.java`, extract the parse loop at the top of
   `attribute` into
   `public static List<CompletedAdd> completedAdds(List<LeagueTransactionRepository.Row> rows)`:
   - `public record CompletedAdd(int week, Instant createdAt, String type, String playerId,
@@ -626,7 +626,7 @@ and `player`.
 
   Rebuild `attribute`'s internal `ParsedTx` list from `completedAdds`, so there's one "completed
   pickup" parse (FR-023). The existing `WaiverPickupAttributionTest` cases must pass unchanged.
-- [ ] T074 [P] [US7] Add `test/…/engine/MostAddedPlayersTest.java`, pure, no Postgres, over
+- [X] T074 [P] [US7] Add `test/…/engine/MostAddedPlayersTest.java`, pure, no Postgres, over
   `CompletedAdd` lists:
   - **Preference ordering (AGENTS.md bug class #1)**: player A added 3 times by one team beats
     player B added twice by two teams. That's total adds, not distinct teams (spec clarification 16).
@@ -641,7 +641,7 @@ and `player`.
   - Each player's adds are ordered by `week`, then `createdAt`, with a null `createdAt` first (the
     same ordering as `WaiverPickupAttribution.isMoreRecent`).
   - No eligible adds gives an empty result.
-- [ ] T075 [US7] Create `…/engine/MostAddedPlayers.java` as a pure, static
+- [X] T075 [US7] Create `…/engine/MostAddedPlayers.java` as a pure, static
   `rank(List<WaiverPickupAttribution.CompletedAdd> adds, int throughWeek,
   Predicate<String> eligiblePlayerId)`:
   - It returns the tied-top players, each as `record Ranked(String playerId, int adds,
@@ -649,7 +649,7 @@ and `player`.
   - `throughWeek` and the predicate are required arguments, never defaulted (plan's conventions
     table).
   - The javadoc cites research R16 decisions 1–3.
-- [ ] T076 [US7] Wire `JABARI_SMITH_JR` into `…/engine/SeasonSuperlativesService.java`:
+- [X] T076 [US7] Wire `JABARI_SMITH_JR` into `…/engine/SeasonSuperlativesService.java`:
   - **Kind order**: add `JABARI_SMITH_JR` to `Kind`, directly after `WAIVER_WIRE_WARRIOR`. It is
     **not** in `EARLY_ELIGIBLE` (research R16, decision 5).
   - **`Superlative` record**: add the `List<PlayerHolder> playerHolders` component, with
@@ -679,17 +679,17 @@ and `player`.
       player as `AddDetail`, with team name and avatar from `nameByRoster`/`avatarByRoster`.
     - `coverage` is null in every state.
   - **Window**: `throughWeek` is the season window's `throughWeek`, the same number the title shows.
-- [ ] T077 [US7] Serialize the new shape in `…/api/SuperlativesController.java`:
+- [X] T077 [US7] Serialize the new shape in `…/api/SuperlativesController.java`:
   - add `playerHolders` to every superlative map, as `[]` for other kinds;
   - add an `AddDetail` branch writing `type: "ADD"`.
   - Build the maps mutably: `team`, `avatarId` and `faabBid` can be null (AGENTS.md `Map.of` rule).
-- [ ] T078 [US7] In the same change as T076/T077, mirror it all in `web/src/api.ts`:
+- [X] T078 [US7] In the same change as T076/T077, mirror it all in `web/src/api.ts`:
   - `'JABARI_SMITH_JR'` in `SuperlativeKind`;
   - `'ADDS'` in `Superlative.unit`;
   - `playerHolders: SuperlativePlayerHolder[]` on `Superlative`, and the new
     `SuperlativePlayerHolder` type (`team: string | null`);
   - an `ADD` variant in the detail union (`faabBid: number | null`, `avatarId: string | null`).
-- [ ] T079 [US7] Render the award in `web/src/pages/Superlatives.tsx`:
+- [X] T079 [US7] Render the award in `web/src/pages/Superlatives.tsx`:
   - Add a `JABARI_SMITH_JR: { title: 'The Jabari Smith Jr. Award' }` entry and add the kind to the
     ordered kind list (line ~155) after `WAIVER_WIRE_WARRIOR`.
   - The emptiness checks at lines ~204 and ~213 currently read only `s.holders.length`. Make them
@@ -702,27 +702,33 @@ and `player`.
   - The list must stay readable at phone width, since up to 14 rows per player is the page's
     longest list. Follow the existing row styles, not a new flat card (memory:
     avoid-flat-uniform-cards).
-- [ ] T080 [US7] Extend `web/src/pages/Superlatives.test.tsx`:
+- [X] T080 [US7] Extend `web/src/pages/Superlatives.test.tsx`:
   - two tied players both render, each with its own adds;
   - a null `faabBid` on a waiver renders "Waiver", not "$0";
   - a `$0` bid renders "$0";
   - the empty state renders the `emptyReason`;
   - a superlative with `playerHolders` non-empty and `holders` empty does **not** render the empty
     state (the T079 invariant fix).
-- [ ] T081 [US7] Restart the backend (`bootRun` doesn't hot-reload; AGENTS.md), then:
+- [X] T081 [US7] Restart the backend (`bootRun` doesn't hot-reload; AGENTS.md), then:
   - Confirm T071's `WAIVER_WIRE_WARRIOR` captures are unchanged.
   - Run quickstart §8 steps 2–6 (NBA 2025 tie, NFL 2025 no D/ST, the D/ST-ids-in-`player` check,
     the SQL recount, agreement with Roster management, the in-progress-week bound on NFL 2026).
   - Record every number in `verification.md` under "US7", measured versus expected. If the NFL
     top differs from R16's "Hunt and Prater at 3", report the recounted answer; don't adjust the
     rule to match R16 (AGENTS.md: don't retune to agree with an earlier guess).
-- [ ] T082 [US7] Run quickstart §8 step 7 in the browser (hard refresh after any vite restart) on
+- [X] T082 [US7] Run quickstart §8 step 7 in the browser (hard refresh after any vite restart) on
   NBA 2025 and NFL 2025, at desktop and phone width. Then run step 8's suites, reading the backend
   skip count (memory: backend suite skips ITs silently) and `cd web && npx tsc -b && npm run build
   && npx vitest run`.
-- [ ] T083 [US7] Run a bug-hunting review (`/code-review`) of the US7 diff. Then update `HANDOFF.md`
+- [X] T083 [US7] Run a bug-hunting review (`/code-review`) of the US7 diff. Then update `HANDOFF.md`
   (a thirteenth kind, what was verified versus assumed) and the memory
   `project_season_superlatives.md` from "planned" to its real state.
+
+- [X] T084 [US7] *(Added 2026-09-28 after T081 found a 25-way tie on NFL 2026; Allan approved
+  the fix.)* Add `MostAddedPlayers.MIN_ADDS_TO_NAME = 2` (hand-set, arbitrary). Make
+  `SeasonSuperlativesService.mostAddedSuperlative` static, and return `emptyReason` "nobody's
+  been picked up twice yet" when the top count is below it. Test in
+  `test/…/engine/SeasonSuperlativesMostAddedTest.java`, then check live on NFL 2026.
 
 **Checkpoint**: the page shows thirteen kinds. The Waiver Wire Warrior's numbers are unchanged from
 T071.

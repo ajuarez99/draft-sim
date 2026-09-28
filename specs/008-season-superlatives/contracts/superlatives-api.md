@@ -126,7 +126,8 @@ convention from spec 005).
   also reports unclassified football weeks.
 - `JABARI_SMITH_JR`: the same "no transactions stored" reason as `WAIVER_WIRE_WARRIOR`. With
   transactions stored but no eligible completed add in the window: `emptyReason` "nobody's been
-  picked up yet". No `coverage`: it doesn't read starters or scores. Never `early`.
+  picked up yet". With a top count of 1, `emptyReason` is "nobody's been picked up twice yet" and
+  nobody is named *(added 2026-09-28, spec clarification 18)*. No `coverage`: it doesn't read starters or scores. Never `early`.
 - `UNETHICAL`: always available. With no suspension captures and no commissioner entries it's
   `holders: []` with an `emptyReason` that names both sources.
 

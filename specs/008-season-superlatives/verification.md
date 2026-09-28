@@ -410,3 +410,108 @@ failing first.
 | 7 | N+1 player lookups in the conduct list | Batch test. |
 | 8 | An edit overwrote "added by" | `LeagueConductRepositoryIT`. |
 | 9 (from finding 4) | Award and commissioner list could be different seasons | `/leagues/1339351318115946496/superlatives` (NBA 2026, unscored) shows 2025 with `leagueSleeperId` = 2025's id. The list requests go to the 2025 league and the page says why. Spec amendment 15 records the trade-off. |
+
+## US7: the Jabari Smith Jr. Award (2026-09-28)
+
+### Before the change (T071)
+
+Backend on `afc3d17` (no US7 code), Postgres on 5433 via `docker compose`. Transactions re-ingested
+for both seasons first (`stored: 91` NBA, `19` NFL, which are only the weeks not already held).
+
+**Stored rows match Sleeper's feed exactly**, regular-season weeks only, recounted in SQL:
+- NBA 2025: FREE_AGENT 1,200, WAIVER 104 complete + 49 failed, TRADE 18, COMMISSIONER 6.
+- NFL 2025: FREE_AGENT 228, WAIVER 92 complete + 59 failed, TRADE 5, COMMISSIONER 6.
+
+These are the same numbers research R16 measured on Sleeper, so the stored rows and that
+measurement describe the same data.
+
+**D/ST ids in `player`** (quickstart §8 step 3): `JAX`, `LAC`, `BAL`, `LAR`, `ARI`, `TB` are all
+present with `positions = {DEF}`. R16's "unknown id could win" risk doesn't apply to these six.
+
+**Waiver Wire Warrior, before** (saved in full as JSON, for T081's byte comparison):
+- NBA 2025 (through week 18): 1,587.5, KATastrophe Krew. Top pickups: Collin Gillespie 318.0,
+  Nickeil Alexander-Walker 279.0, Moussa Diabaté 141.0.
+- NFL 2025 (through week 14): 522.2, She Sutton on my Dicker. Top pickups: RJ Harvey 98.8,
+  Hunter Henry 74.7, Michael Wilson 65.6.
+
+### Build (T072–T080)
+
+Written by a Sonnet subagent (AGENTS.md). The parent session read the whole diff, and changed two
+things:
+- **A null real-life team** no longer prints "Free agent" on the player line. That phrase
+  already labels FA adds in the rows below, so the team is now left out.
+- **Add rows stay on one line.** The first render let "Free agent" wrap back under the avatar
+  (seen in the browser on "FentMachines5:SoFkingOver" rows). The team name now truncates, and
+  the week and move type stay together.
+
+Checked in review, not changed:
+- `completedAdds` keeps `attribute`'s iteration order, so tie-breaking between same-week,
+  same-`created_at` transactions is unchanged.
+- `playersBySleeperId` is `players.findAll(sport)`, so every D/ST is known. None can slip through
+  as an "Unknown player".
+- `primary()` falls back to `WR` for an empty positions list. It's the same call the existing
+  PICKUP/ABSENCE rows make, and `player` has **0** rows with empty positions in either sport
+  (SQL, 2026-09-28).
+
+### Live (T081), backend restarted on the new code
+
+- **Waiver Wire Warrior is byte-identical** to T071's capture for both seasons (`cmp` on the
+  sorted JSON of the kind; `playerHolders`, a new key, was excluded from the comparison).
+- **Kind order**: `JABARI_SMITH_JR` is index 10 of 13, directly after the warrior. Every kind
+  carries `playerHolders`.
+- **NBA 2025**: `value` 14, `unit` ADDS, `early` false, `holders` [], `coverage` null.
+  - `playerHolders`: Jake LaRavia (SF, LAL) and Brice Sensabaugh (PF, UTA), each 14 adds and 8
+    teams.
+  - 28 `ADD` rows, 14 per player, including KATastrophe Krew's two week-15 Sensabaugh adds.
+  - **SQL recount agrees**: 14/14, then Moody and Garza at 13.
+- **NFL 2025: six-way tie at 3, not the two players research R16 named.**
+  - The six: Luther Burden, Matt Prater, Jacoby Brissett, Kareem Hunt, Sam Darnold and Christian
+    Kirk. No D/ST.
+  - **SQL recount agrees**: with DEF excluded, exactly 6 players at the max of 3.
+  - **R16 was incomplete, not wrong about the rule.** Its measurement script printed only the top
+    8 entries, and 5 of those were defenses, so four of the tied players never appeared. The rule
+    wasn't changed to match R16's list (AGENTS.md).
+  - Waiver claims there render "Waiver" with no bid: that league's bids are all null (no FAAB),
+    which matches Sleeper.
+- **Roster management agrees**: its `/transactions` adds list, filtered to completed adds in weeks
+  1..throughWeek, gives LaRavia 14, Sensabaugh 14, Hunt 3, Prater 3. Unfiltered it gives 15 for
+  the two NBA players, the extra being one playoff-week add each.
+- **In-progress week (NFL 2026)**: Sleeper is in week 3, and the page is through week 2. The
+  award's adds max out at week 2.
+  - This doesn't exercise the award's own bound. `TransactionIngestService` only stores weeks up
+    to the last scored one (`TransactionIngestService.java:65`), so Sleeper's 26 week-3 moves
+    aren't stored at all.
+  - The award's `week > throughWeek` filter is covered by `MostAddedPlayersTest` only, not live.
+- **NFL 2026 is a 25-way tie at 1 add.** Two weeks in, nobody has been added twice. That's correct
+  by FR-024, but the card lists 25 players. Raised with Allan rather than changed (see HANDOFF).
+
+### Browser (T082)
+
+Signed in locally as `popsharky`, the username the repo's own tests use.
+- **NBA 2025, desktop**: the card renders both tied players, each with its own 14 rows. Rows are
+  grouped per player, not interleaved.
+- **NBA 2025, phone (375×812)**: `document.scrollWidth` 375, so no horizontal scroll. 0 of 28 add
+  rows overflow. Long team names truncate with an ellipsis.
+- **NFL 2025, desktop**: six players, 3 rows each, no defense in the card text.
+
+### Suites (T082)
+
+Run by the parent session after its own edits:
+- `./gradlew cleanTest test`: **681 tests, 0 failures, 0 errors, 0 skipped** (ITs ran; Postgres
+  on 5433).
+- `npx tsc -b`: clean. `npm run build`: built. `npx vitest run`: **46 files, 550 tests passed**.
+
+### Minimum of 2 adds (T084, spec clarification 18), 2026-09-28
+
+Allan approved the fix after T081 found a 25-way tie on NFL 2026.
+- `SeasonSuperlativesMostAddedTest`: 3/3.
+  - 25 one-add players name nobody, with "nobody's been picked up twice yet".
+  - A top of 2 is named.
+  - No counted adds keeps "nobody's been picked up yet".
+- Also green: `MostAddedPlayersTest` 9/9 and `NoSportNameInSuperlativesTest` 5/5.
+- **Live, backend restarted**:
+  - NFL 2026 (through week 2): `emptyReason` "nobody's been picked up twice yet",
+    `playerHolders` [].
+  - NBA 2025 and NFL 2025 are unchanged (14/14 LaRavia and Sensabaugh; the six-way tie at 3).
+- **Browser**: the NFL 2026 card reads "The Jabari Smith Jr. Award / nobody's been picked up
+  twice yet".

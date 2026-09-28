@@ -159,4 +159,69 @@ class WaiverPickupAttributionTest {
 
         assertTrue(result.get(2).totalPoints() > result.get(1).totalPoints());
     }
+
+    // ------------------------------------------------------ completedAdds (T072, US7)
+
+    private static Row txFaab(int week, String txId, String type, String status, Integer rosterId,
+                              String addsJson, Instant createdAt, Integer faabBid) {
+        return new Row(LEAGUE, SEASON, week, txId, type, status, rosterId, null, addsJson, "{}", faabBid, createdAt);
+    }
+
+    @Test
+    void completedAdds_failedRowYieldsNothing() {
+        List<Row> rows = List.of(
+                txFaab(1, "t1", "WAIVER", "failed", 1, "{\"100\":1}", Instant.parse("2026-09-01T00:00:00Z"), 5));
+
+        List<WaiverPickupAttribution.CompletedAdd> out = WaiverPickupAttribution.completedAdds(rows);
+
+        assertTrue(out.isEmpty());
+    }
+
+    @Test
+    void completedAdds_dropOnlyRowYieldsNothing() {
+        List<Row> rows = List.of(
+                txFaab(1, "t1", "FREE_AGENT", "complete", 1, "{}", Instant.parse("2026-09-01T00:00:00Z"), null));
+
+        List<WaiverPickupAttribution.CompletedAdd> out = WaiverPickupAttribution.completedAdds(rows);
+
+        assertTrue(out.isEmpty());
+    }
+
+    @Test
+    void completedAdds_tradeAndCommissionerRowsEachYieldAnAdd() {
+        List<Row> rows = List.of(
+                txFaab(2, "t1", "TRADE", "complete", null, "{\"100\":2}", Instant.parse("2026-09-08T00:00:00Z"), null),
+                txFaab(3, "t2", "COMMISSIONER", "complete", null, "{\"100\":3}", Instant.parse("2026-09-15T00:00:00Z"), null));
+
+        List<WaiverPickupAttribution.CompletedAdd> out = WaiverPickupAttribution.completedAdds(rows);
+
+        assertEquals(2, out.size());
+        assertEquals("TRADE", out.get(0).type());
+        assertEquals("COMMISSIONER", out.get(1).type());
+    }
+
+    @Test
+    void completedAdds_rosterComesFromTheAddsMapValueNotRowRosterId() {
+        List<Row> rows = List.of(
+                txFaab(4, "t1", "WAIVER", "complete", null, "{\"p1\":4}", Instant.parse("2026-09-22T00:00:00Z"), null));
+
+        List<WaiverPickupAttribution.CompletedAdd> out = WaiverPickupAttribution.completedAdds(rows);
+
+        assertEquals(1, out.size());
+        assertEquals(4, out.get(0).rosterId());
+        assertEquals("p1", out.get(0).playerId());
+    }
+
+    @Test
+    void completedAdds_faabBidPassesThroughAndNullStaysNullNeverZero() {
+        List<Row> rows = List.of(
+                txFaab(1, "t1", "WAIVER", "complete", 1, "{\"100\":1}", Instant.parse("2026-09-01T00:00:00Z"), 12),
+                txFaab(2, "t2", "FREE_AGENT", "complete", 1, "{\"200\":1}", Instant.parse("2026-09-08T00:00:00Z"), null));
+
+        List<WaiverPickupAttribution.CompletedAdd> out = WaiverPickupAttribution.completedAdds(rows);
+
+        assertEquals(2, out.size());
+        assertEquals(12, out.get(0).faabBid());
+        assertNull(out.get(1).faabBid());
+    }
 }

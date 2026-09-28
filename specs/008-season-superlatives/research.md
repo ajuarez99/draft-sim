@@ -498,3 +498,19 @@ Cardinals D/ST 3, then **Kareem Hunt 3** (3 teams) and Buccaneers D/ST 3, Matt P
 - **Player headshots**: the web app renders no Sleeper player images today (searched
   `sleepercdn.com/content` in `web/src`), so the award shows name, position and team like every
   other player row here.
+
+### Decision 7: name nobody until someone has 2 adds (decided by Allan, 2026-09-28)
+
+**Measured live, after the build**: NFL 2026 through week 2 has 33 completed eligible adds spread
+over 25 players, each with 1 add. FR-024 names every tie, so the card listed all 25.
+
+- **Rule**: if the top count is below `MostAddedPlayers.MIN_ADDS_TO_NAME` (2, hand-set,
+  arbitrary), the award is `holders: []`, `playerHolders: []`, with `emptyReason` "nobody's been
+  picked up twice yet".
+- **Why 2**: one add is just a roster move. The award is about a player the league keeps coming
+  back to.
+- **Where the rule lives**: in the service's result state, not in `rank`. The counting stays
+  pure, and "no adds at all" keeps its own reason.
+- **Alternatives rejected**:
+  - Keep naming every tie: correct, but 25 names two weeks in says nothing.
+  - Cap the list: that's the invented tiebreaker FR-024 rules out.
