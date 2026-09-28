@@ -68,7 +68,7 @@ export default function SignIn() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && submit()}
-                placeholder="e.g. popsharky"
+                placeholder="Username or profile link"
                 autoFocus
                 size={24}
               />
