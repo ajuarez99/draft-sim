@@ -1500,7 +1500,17 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
-  }).then(json<{ week0: number; realized: number; realizedSkipped?: string }>)
+  }).then(
+    json<{
+      week0: number
+      realized: number
+      realizedSkipped?: string
+      /** The week the odds were computed through: the requested week only when it is final. */
+      playoffOddsThroughWeek?: number
+      /** Present instead of `playoffOddsThroughWeek` when no week is final yet. */
+      playoffOddsSkipped?: string
+    }>,
+  )
 
 export const saveCommissionerRanking = (
   sleeperLeagueId: string,
