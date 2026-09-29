@@ -217,6 +217,29 @@ Two things break, both known:
   secret every visitor holds. The real fix is a server-side proxy or real auth,
   not a longer string.
 
+### Security headers
+
+The frontend's response headers (CSP, `X-Content-Type-Options`, `Referrer-Policy`,
+HSTS) live in **`web/serve.json`**, copied into the runtime image by
+`web/Dockerfile` and passed to `serve` with `--config ../serve.json` (resolved
+relative to the served `dist/` directory). The file is deliberately not in
+`public/`, or it would be published. `serve` is pinned (`serve@14.2.6`) so the
+flag behaviour is stable. Verified locally, not yet on production.
+
+- **The CSP is `Content-Security-Policy-Report-Only`, not enforcing.** It stays
+  report-only until every page (sign-in, leagues, board, mock, live, /managers,
+  power rankings, weekly report, history) has been clicked through on production
+  with DevTools open and shown zero violations. Only then rename the header to
+  `Content-Security-Policy`. Note `frame-ancestors` is ignored in report-only
+  mode, so clickjacking protection starts only when it is enforced.
+- **Adding a new external origin (API host, CDN, font, image host) means
+  updating the CSP in `web/serve.json`.** Today: `https://api.ballknowers.co`
+  (connect), `https://sleepercdn.com` (img), Google Fonts (style and font).
+- HSTS is `max-age=31536000` with no `includeSubDomains`, until every
+  `*.ballknowers.co` host is confirmed HTTPS-only.
+- The backend (`api.ballknowers.co`) is a separate service and sends none of
+  these; that is a separate decision.
+
 ## Things that will probably bite
 
 **Memory.** `POST /api/ingest/players` pulls Sleeper's ~5MB player dump and
