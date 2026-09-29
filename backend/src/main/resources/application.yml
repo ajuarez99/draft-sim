@@ -31,6 +31,11 @@ draftsim:
     # long random string and every /api/** route except /api/health starts
     # requiring "Authorization: Bearer <token>".
     token: ${API_TOKEN:}
+  admin:
+    # Server-side operator secret, sent as X-Admin-Token. Blank means admin is
+    # DISABLED and every admin-only route refuses (fail closed) -- unlike
+    # `security.token` above, where blank turns the gate off. Never a VITE_ var.
+    token: ${ADMIN_TOKEN:}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   owner:
