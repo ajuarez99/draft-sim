@@ -50,6 +50,9 @@ public class WeeklyReportController {
         out.put("season", r.season());
         out.put("requestedSeason", r.requestedSeason());
         out.put("week", r.week());
+        // The newest week with stored scores, 0 when none: the page's default week and the top of
+        // its week input. Present on every shape.
+        out.put("latestScoredWeek", r.latestScoredWeek());
         out.put("sport", r.sport().code());
         // Stated rather than inferred: the client renders from a fact the server
         // asserts, not by guessing the sport's rules from which arrays it finds.

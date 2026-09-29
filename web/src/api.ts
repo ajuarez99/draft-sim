@@ -1838,7 +1838,10 @@ export type WeeklyReport = {
   reason?: string | null
   season: number
   requestedSeason?: number | null
+  /** The week this report is about. For a request of week 0 ("latest"), the resolved week. */
   week: number
+  /** The newest week with stored scores, 0 when none: the default week and the input's top. */
+  latestScoredWeek: number
   sport: Sport
   playersPlayMultiplePerPeriod: boolean
   matchups: WeeklyMatchup[]
@@ -1856,6 +1859,7 @@ export type WeeklyReport = {
   awardsOmitted: WeeklyOmittedAward[]
 }
 
+/** `week` 0 asks for the latest scored week; the response's `week` says which that was. */
 export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-report/${week}`).then(json<WeeklyReport>)
 

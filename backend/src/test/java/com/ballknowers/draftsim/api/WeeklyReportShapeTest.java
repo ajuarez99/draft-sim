@@ -131,6 +131,22 @@ class WeeklyReportShapeTest {
         assertEquals("PER_GAME_DETAIL_MISSING", gaps.get(0).get("reason"));
     }
 
+    /** The page opens on this week and caps its input at it; it rides every shape. */
+    @Test
+    void latestScoredWeekRidesBothTheAvailableAndTheUnavailableShape() {
+        WeeklyReportService.Result behind = new WeeklyReportService.Result(
+                true, null, 2026, null, 1, Sport.NFL, false, List.of(), List.of(),
+                null, null, null, null, List.of(), List.of(), 2);
+        assertEquals(2, WeeklyReportController.body(behind).get("latestScoredWeek"));
+
+        WeeklyReportService.Result none = new WeeklyReportService.Result(
+                false, "no week has been scored for this league yet", 2026, null, 0, Sport.NFL, false,
+                List.of(), List.of(), null, null, null, null, List.of(), List.of(), 0);
+        Map<String, Object> body = WeeklyReportController.body(none);
+        assertEquals(0, body.get("latestScoredWeek"), "zero, not absent: nothing scored is a fact");
+        assertEquals(0, body.get("week"));
+    }
+
     /** An unscored week still answers, and still states the cadence. */
     @Test
     void anUnavailableWeekStillStatesTheCadence() {
