@@ -10,6 +10,8 @@ import {
   type LeagueTransactions,
   type MovedPlayer,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -32,7 +34,7 @@ export default function RosterManagement() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<Data | null>(null)
   const [tx, setTx] = useState<LeagueTransactions | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -47,7 +49,7 @@ export default function RosterManagement() {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -79,6 +81,8 @@ export default function RosterManagement() {
   // comparable across the league rather than each row normalising to itself.
   const scale = Math.max(1, ...(data?.teams ?? []).map((t) => t.potentialPoints))
 
+  if (notFound) return <NotFound what="league" />
+
   return (
     <div className="content">
       <PageHeader
@@ -89,7 +93,7 @@ export default function RosterManagement() {
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 

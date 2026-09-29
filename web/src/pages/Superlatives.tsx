@@ -13,6 +13,8 @@ import {
   type SuperlativeDetail,
   type ConductList,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
@@ -49,7 +51,7 @@ const TITLES: Record<string, { title: string; subtitle?: string; note?: string }
 export default function Superlatives() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<SuperlativesResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -66,7 +68,7 @@ export default function Superlatives() {
       setData(d)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     }
   }, [sleeperLeagueId])
 
@@ -80,7 +82,7 @@ export default function Superlatives() {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -89,6 +91,8 @@ export default function Superlatives() {
       cancelled = true
     }
   }, [sleeperLeagueId, dataVersion])
+
+  if (notFound) return <NotFound what="league" />
 
   return (
     <div className="content">
@@ -100,7 +104,7 @@ export default function Superlatives() {
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -587,7 +591,7 @@ function ConductListSection({
   onChanged: () => void | Promise<void>
 }) {
   const [list, setList] = useState<ConductList | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, setError, fail } = useFailure()
   const [formOpen, setFormOpen] = useState(false)
   const [playerId, setPlayerId] = useState('')
   const [reason, setReason] = useState('')
@@ -609,7 +613,7 @@ function ConductListSection({
         if (!cancelled) setList(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
     return () => {
       cancelled = true
@@ -633,7 +637,7 @@ function ConductListSection({
       setAppliesFromWeek(1)
       setFormOpen(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setSaving(false)
     }
@@ -646,7 +650,7 @@ function ConductListSection({
       await refresh()
       await onChanged()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     }
   }
 

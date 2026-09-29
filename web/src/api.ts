@@ -1,5 +1,6 @@
 // Types mirror the Java records in engine/SimulationResult.java. They are
 // hand-maintained; if you change a record over there, change it here.
+import { ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
 
@@ -153,11 +154,16 @@ export type SimRequest = {
   seed?: number
 }
 
+export { ApiError, isNotFound }
+
+async function apiError(res: Response): Promise<ApiError> {
+  // Several controllers answer 404 with an empty body, so a parse failure is normal.
+  const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
+  return new ApiError(res.status, body.error ?? body.message ?? undefined)
+}
+
 async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
-  }
+  if (!res.ok) throw await apiError(res)
   return res.json() as Promise<T>
 }
 
@@ -1450,8 +1456,7 @@ export async function streamSimulation(
     signal,
   })
   if (!res.ok || !res.body) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -2004,8 +2009,7 @@ export const fetchConductList = (sleeperLeagueId: string) =>
  */
 async function conductListResult<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }))
-    throw new Error(body.message ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
   // DELETE returns 204 with no body.
   if (res.status === 204) return undefined as T

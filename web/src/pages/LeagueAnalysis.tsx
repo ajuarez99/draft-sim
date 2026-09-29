@@ -16,7 +16,6 @@ import {
 } from '../managerColor'
 import {
   getLeagueAnalysis,
-  ingestLeagueHistory,
   type LeagueAnalysis as LeagueAnalysisData,
   type AnalysisProjections,
   type AnalysisRankingScores,
@@ -28,6 +27,8 @@ import {
   type AnalysisScores,
   type AnalysisWeekTotal,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
@@ -1003,8 +1004,7 @@ function HeadToHead({ block }: { block: AnalysisProjections }) {
 export default function LeagueAnalysis() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<LeagueAnalysisData | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
+  const { error, notFound, setError, fail } = useFailure()
   // Only the matchup block moves with the chosen week, so only it is refetched
   // and swapped in. Replacing the whole response would reset every open lineup
   // drawer to answer a question that did not touch them.
@@ -1033,7 +1033,7 @@ export default function LeagueAnalysis() {
     const chosen = weekRef.current
     ;(chosen == null ? getLeagueAnalysis(sleeperLeagueId) : getLeagueAnalysis(sleeperLeagueId, chosen))
       .then(setData)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => fail(e))
   }, [sleeperLeagueId, dataVersion])
 
   async function pickWeek(next: number) {
@@ -1045,29 +1045,15 @@ export default function LeagueAnalysis() {
       const fresh = await getLeagueAnalysis(sleeperLeagueId, next)
       setData((prev) => (prev == null ? fresh : { ...prev, matchups: fresh.matchups }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setWeekLoading(false)
     }
   }
 
-  // Same convention as LeagueHistory: a button that fires the ingest, never a
-  // curl line printed for the reader to run.
-  async function loadHistory() {
-    if (!sleeperLeagueId) return
-    setLoading(true)
-    setError(null)
-    try {
-      await ingestLeagueHistory(sleeperLeagueId)
-      setData(await getLeagueAnalysis(sleeperLeagueId))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const window = data?.window
+
+  if (notFound) return <NotFound what="league" />
 
   return (
     <div className="content">
@@ -1079,10 +1065,7 @@ export default function LeagueAnalysis() {
 
       {error && (
         <div className="error history-error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
-          <button className="action-button" onClick={loadHistory} disabled={loading}>
-            {loading ? 'Loading…' : 'Load this league'}
-          </button>
+          <span>{error}</span>
         </div>
       )}
 

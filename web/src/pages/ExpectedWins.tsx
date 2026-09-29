@@ -3,6 +3,8 @@ import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -22,7 +24,7 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
 export default function ExpectedWins() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<Data | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -37,7 +39,7 @@ export default function ExpectedWins() {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -52,6 +54,8 @@ export default function ExpectedWins() {
     ...(data?.teams ?? []).map((t) => Math.abs(t.winsAboveExpected)),
   )
 
+  if (notFound) return <NotFound what="league" />
+
   return (
     <div className="content">
       <PageHeader
@@ -62,7 +66,7 @@ export default function ExpectedWins() {
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 
