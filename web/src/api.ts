@@ -3,6 +3,12 @@
 import { ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
+import {
+  askForCommissionerKey,
+  clearCommissionerKey,
+  getCommissionerKey,
+  setCommissionerKey,
+} from './commissionerKey'
 
 export type PlayerRef = {
   id: number
@@ -202,6 +208,49 @@ function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   return fetch(apiUrl(path), { ...init, headers })
 }
 
+/**
+ * True when the server refused because the request lacked a valid admin token
+ * (claude/audit-2026-09-28/04, option D) -- as opposed to any other 403, such as
+ * "you are not this league's commissioner". Reads a clone, so the caller can still
+ * read the body.
+ */
+async function isAdminRefusal(res: Response): Promise<boolean> {
+  if (res.status !== 403) return false
+  const body: { code?: string } = await res.clone().json().catch(() => ({}))
+  return body.code === 'admin_token_required'
+}
+
+/**
+ * `apiFetch` for the commissioner-only actions, and only those: sends the saved
+ * commissioner key as `X-Admin-Token`. If the server refuses for want of a valid
+ * key, asks for it ONCE, saves it (see commissionerKey.ts) and retries once; a key
+ * that is refused again is forgotten so it is not silently resent forever.
+ *
+ * Every other call stays on plain `apiFetch`, so the key never rides along on a
+ * request that does not need it. Returns the final response either way; the caller
+ * turns a still-refused 403 into an error with the server's message.
+ */
+async function commissionerFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const send = (): Promise<Response> => {
+    const headers = new Headers(init.headers)
+    const key = getCommissionerKey()
+    if (key) headers.set('X-Admin-Token', key)
+    return apiFetch(path, { ...init, headers })
+  }
+
+  let res = await send()
+  if (!(await isAdminRefusal(res))) return res
+
+  const hadKey = getCommissionerKey() != null
+  const entered = askForCommissionerKey(hadKey)
+  if (!entered) return res
+  setCommissionerKey(entered)
+
+  res = await send()
+  if (await isAdminRefusal(res)) clearCommissionerKey()
+  return res
+}
+
 export const getSeats = (draftId: string) =>
   apiFetch(`/api/drafts/${draftId}/seats`).then(json<SeatsResponse>)
 
@@ -373,18 +422,23 @@ export type TrackResponse = {
 export const trackDraft = (sleeperDraftId: string) =>
   apiFetch(`/api/drafts/${sleeperDraftId}/track`, { method: 'POST' }).then(json<TrackResponse>)
 
+// The setup stages below call /api/setup/*, NOT /api/ingest/*. The ingest routes
+// now need the server's admin token (claude/audit-2026-09-28/01), which a browser
+// must never hold; the setup routes do the same work but are authorised by
+// membership instead (MemberSetupController): the caller must be signed in and
+// appear in the league, by our own data or by Sleeper's league-users list.
+//
 // Scoped to the one league being added -- unlike /api/ingest/all, this doesn't
 // re-download the entire player pool or rebuild the global board/profiles.
 export const ingestLeague = (sleeperLeagueId: string) =>
-  apiFetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
-// The three other /api/ingest/* sub-routes, called individually rather than
-// through /api/ingest/all/{id} -- claude/user-identity-and-onboarding.md §5d:
-// `all` runs three sequential Sleeper crawls plus a rebuild and can exceed a
-// 30-60s platform HTTP timeout on a first-ever ingest, and these sub-routes
-// exist precisely so a caller can split it and show staged progress instead.
-export const ingestPlayers = (sport: Sport) =>
-  apiFetch(`/api/ingest/players?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+// The other setup stages, called individually rather than through one combined
+// call -- claude/user-identity-and-onboarding.md §5d: `all` runs three sequential
+// Sleeper crawls plus a rebuild and can exceed a 30-60s platform HTTP timeout on
+// a first-ever ingest, and splitting it lets the UI show staged progress instead.
+// (The player list is `refreshPlayers` below; there is no browser-facing twin of
+// /api/ingest/players any more.)
 
 /**
  * Mirrors RefreshController.players's body (contracts/refresh-api.md). `detail` is
@@ -400,23 +454,23 @@ export type RefreshPlayersResult = {
 /**
  * The setup flow's player-list fetch, gated to once per sport per UTC day so a
  * burst of new leagues costs Sleeper one request, not one each (FR-009).
- * `ingestPlayers` above is unchanged and still always fetches.
+ * Needs a signed-in identity (the server refuses a header-less caller).
  */
 export const refreshPlayers = (sport: Sport) =>
   apiFetch(`/api/refresh/players?sport=${sport}`, { method: 'POST' }).then(json<RefreshPlayersResult>)
 
 export const ingestAdp = (sport: Sport) =>
-  apiFetch(`/api/ingest/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export const ingestBoard = (sport: Sport) =>
-  apiFetch(`/api/ingest/board?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/board?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 // Walks a league's `previous_league_id` chain and stores each season's
 // standings. Backs the "Load past seasons" button on the history page --
 // which used to be a `POST /api/ingest/league-history/{id}` printed on screen
-// for the reader to run in a terminal.
+// for the reader to run in a terminal. Now the membership-checked setup twin.
 export const ingestLeagueHistory = (sleeperLeagueId: string) =>
-  apiFetch(`/api/ingest/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export type ManualTendencies = {
   reachBias: number | null
@@ -1440,7 +1494,7 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
   ).then(json<LeagueAnalysis>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
   }).then(json<{ week0: number; realized: number; realizedSkipped?: string }>)
 
@@ -1450,7 +1504,7 @@ export const saveCommissionerRanking = (
   week: number,
   rosterIds: number[],
 ) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ season, week, rosterIds }),
@@ -2043,7 +2097,7 @@ export const saveConductEntry = (
   sleeperLeagueId: string,
   entry: { playerId: string; reason: string; appliesFromWeek: number },
 ) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
@@ -2051,7 +2105,7 @@ export const saveConductEntry = (
 
 /** 204 on success; throws with the server's message on 403, or a 404 when entryId belongs to a different league. */
 export const deleteConductEntry = (sleeperLeagueId: string, entryId: number) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
     method: 'DELETE',
   }).then((res) => conductListResult<void>(res))
 

@@ -15,6 +15,7 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import CommissionerKeyNote from '../components/CommissionerKeyNote'
 import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -682,6 +683,8 @@ function ConductListSection({
           No commissioner is known for this league, so the list can&apos;t be edited.
         </p>
       )}
+
+      {canEdit && <CommissionerKeyNote />}
 
       {list && list.entries.length === 0 ? (
         <p className="muted small">Nobody&apos;s on the list.</p>

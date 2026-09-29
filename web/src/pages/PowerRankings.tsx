@@ -15,6 +15,7 @@ import {
   type StandingRow,
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
+import CommissionerKeyNote from '../components/CommissionerKeyNote'
 import Avatar from '../components/Avatar'
 import { managerHues } from '../managerColor'
 import BumpChart, { segmentsOf, type Series, type SeriesPoint } from '../components/BumpChart'
@@ -26,6 +27,14 @@ export { segmentsOf }
 export type { SeriesPoint }
 import { useUser } from '../user'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+
+/**
+ * Ballots stay on the honour system (claude/audit-2026-09-28/04, option D covers
+ * commissioner actions only): the server maps a ballot to whatever Sleeper id the
+ * request names, and league members' ids are public. Said where it is submitted.
+ */
+const BALLOT_HONOUR_NOTE =
+  "Ballots aren't verified: anyone who knows a member's Sleeper name could submit as them, so this runs on trust."
 
 /**
  * power-rankings-reskin.md. This used to be a page that explained its own
@@ -926,6 +935,7 @@ export default function PowerRankings() {
                   {computing ? 'Computing…' : `Recompute ${weekIn(currentWeek)} (commissioner)`}
                 </button>
               )}
+              {ballot?.canCommission && <CommissionerKeyNote />}
             </div>
 
             {/* The ladder deliberately shows the latest week this mode HAS,
@@ -1392,6 +1402,7 @@ export default function PowerRankings() {
             {blockState === 'ok' && !ballot?.mine && (
               <p className="muted small">Nothing submitted yet for {weekPhrase(currentWeek)}.</p>
             )}
+            {blockState === 'ok' && <p className="tiny muted">{BALLOT_HONOUR_NOTE}</p>}
             {blockState === 'loading' && <p className="muted small">Loading your ballot…</p>}
             {blockState === 'signed-out' && (
               <>
@@ -1514,6 +1525,7 @@ export default function PowerRankings() {
                 <p className="tiny muted">
                   Drag by the grip, or tap a team and use ↑ / ↓ to move it. Escape drops the selection.
                 </p>
+                <p className="tiny muted">{BALLOT_HONOUR_NOTE}</p>
                 {saveMessage && <p className="small muted">{saveMessage}</p>}
               </>
             ) : blockState === 'signed-out' ? (
