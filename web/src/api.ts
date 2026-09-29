@@ -512,7 +512,11 @@ export type ManagerSummary = {
 export const getManagers = (sport: Sport) =>
   apiFetch(`/api/managers?sport=${sport}`).then(json<ManagerSummary[]>)
 
-export const setTendencies = (managerId: number, sport: Sport, body: ManualTendencies) =>
+// Only `note` is writable. The server answers 400 to a body carrying a non-null
+// reachBias or unpredictability (claude/audit-2026-09-28/02), and a note is
+// private to the caller (V25): the `note` and `stated.note` fields on
+// ManagerSummary are always the signed-in user's own.
+export const setTendencies = (managerId: number, sport: Sport, body: { note: string | null }) =>
   apiFetch(`/api/managers/${managerId}/tendencies?sport=${sport}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
