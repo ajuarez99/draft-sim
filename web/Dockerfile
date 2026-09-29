@@ -15,8 +15,12 @@ RUN npm run build
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
-RUN npm install -g serve
+RUN npm install -g serve@14.2.6
 COPY --from=build /app/dist ./dist
+# Security headers live here, deliberately outside dist/ and public/ so the file
+# is not itself published. See DEPLOY.md "Security headers".
+COPY serve.json ./serve.json
 # Railway assigns PORT at runtime; -s enables SPA fallback to index.html for
-# react-router-dom's client-side routes.
-CMD ["sh", "-c", "serve -s dist -l ${PORT:-3000}"]
+# react-router-dom's client-side routes. --config is resolved relative to the
+# served directory (dist), hence ../serve.json.
+CMD ["sh", "-c", "serve -s dist --config ../serve.json -l ${PORT:-3000}"]
