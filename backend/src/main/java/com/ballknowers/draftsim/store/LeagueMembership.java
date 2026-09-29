@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.config.AdminAccess;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -39,16 +40,18 @@ public class LeagueMembership {
     private final OwnerProperties ownerProperties;
     private final ManagerRepository managers;
     private final LeagueMemberRepository leagueMembers;
+    private final AdminAccess admin;
 
     public LeagueMembership(JdbcClient db, DraftRepository drafts, LeagueRepository leagues,
                              OwnerProperties ownerProperties, ManagerRepository managers,
-                             LeagueMemberRepository leagueMembers) {
+                             LeagueMemberRepository leagueMembers, AdminAccess admin) {
         this.db = db;
         this.drafts = drafts;
         this.leagues = leagues;
         this.ownerProperties = ownerProperties;
         this.managers = managers;
         this.leagueMembers = leagueMembers;
+        this.admin = admin;
     }
 
     /**
@@ -124,15 +127,22 @@ public class LeagueMembership {
     /**
      * Whether this caller may see this league.
      *
-     * A null or blank {@code sleeperUserId} -- no {@code X-Sleeper-User} header
-     * at all -- is allowed through unchanged. That is the pre-identity contract
-     * every endpoint had, it is what the {@code APP_OWNER_SLEEPER_USER_ID}
-     * fallback and the curl-driven draft-night escape hatches rely on, and it is
-     * deliberately not a hole this method can close: an unauthenticated header
-     * is not something to build a boundary on either way.
+     * <p><b>A null or blank {@code sleeperUserId} sees nothing.</b> This used to
+     * return {@code true} -- "no header means the pre-identity contract" -- which
+     * meant a caller who simply left {@code X-Sleeper-User} off got MORE than a
+     * signed-in stranger did (measured on production 2026-09-28: 200 with the
+     * header absent, 404 with a stranger's id). Fail-open on a missing identity
+     * rewards opting out, which is worse than no scoping at all
+     * (claude/audit-2026-09-28/01, claude/lessons.md). The browser always sends
+     * the header once signed in and the sign-in gate blocks everything before
+     * that, so denying is safe for real traffic.
+     *
+     * <p>The one exception is an operator: a request carrying a valid
+     * {@code X-Admin-Token} ({@link AdminAccess}) is let through, which is what
+     * DEPLOY.md's curl escape hatches (a manual pick on draft night) run on.
      */
     public boolean canSee(String sleeperUserId, long leagueId) {
-        if (anonymous(sleeperUserId)) return true;
+        if (anonymous(sleeperUserId)) return admin.isAdmin();
         return Boolean.TRUE.equals(db.sql(MEMBER_LEAGUE_IDS_CTE
                         + "select exists (select 1 from chain where id = ?)")
                 .param(sleeperUserId)
@@ -188,7 +198,7 @@ public class LeagueMembership {
      * growing a second, subtly different one.
      */
     public boolean canSeeManager(String sleeperUserId, long managerId) {
-        if (anonymous(sleeperUserId)) return true;
+        if (anonymous(sleeperUserId)) return admin.isAdmin();
         Set<Long> mine = leagueIdsFor(sleeperUserId);
         if (mine.isEmpty()) return false;
         return !Collections.disjoint(mine, leagueIdsForManager(managerId));
@@ -223,7 +233,17 @@ public class LeagueMembership {
         return canSee(sleeperUserId, found.get().leagueId()) ? found : Optional.empty();
     }
 
-    private static boolean anonymous(String sleeperUserId) {
+    /** Whether this request carries a valid {@code X-Admin-Token} -- the operator override. */
+    public boolean isAdminRequest() {
+        return admin.isAdmin();
+    }
+
+    /** No identity at all. Public so the routes that list rather than address a league can share the one definition. */
+    public static boolean isAnonymous(String sleeperUserId) {
         return sleeperUserId == null || sleeperUserId.isBlank();
+    }
+
+    private static boolean anonymous(String sleeperUserId) {
+        return isAnonymous(sleeperUserId);
     }
 }

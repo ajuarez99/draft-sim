@@ -107,9 +107,18 @@ class LeagueControllerSeatsOwnerConfiguredIT {
         jdbc.update("delete from manager where id in (?, ?)", ownerManagerId, otherManagerId);
     }
 
+    // Both tests below call seats() with NO X-Sleeper-User, because the configured owner is only
+    // consulted as the seat-preselect fallback when the header is blank. A blank caller is no longer
+    // let through (claude/audit-2026-09-28/01), so they run as the operator (admin token) -- the only
+    // caller left for whom "no header" reaches the fallback at all. A signed-in caller never falls
+    // back to the owner: OwnerSlot.resolve prefers the header.
+
     @Test
     void configuredOwnerPresentInLeagueYieldsTheirSlot() {
-        ResponseEntity<?> response = controller.seats(draftWithOwnerId, null);
+        ResponseEntity<?> response;
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            response = controller.seats(draftWithOwnerId, null);
+        }
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
@@ -120,7 +129,10 @@ class LeagueControllerSeatsOwnerConfiguredIT {
 
     @Test
     void configuredOwnerAbsentFromLeagueYieldsNullMySlot() {
-        ResponseEntity<?> response = controller.seats(draftWithoutOwnerId, null);
+        ResponseEntity<?> response;
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            response = controller.seats(draftWithoutOwnerId, null);
+        }
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")

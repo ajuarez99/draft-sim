@@ -4,6 +4,8 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.ExpectedWinsService;
 import com.ballknowers.draftsim.engine.RosterManagementService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
+import com.ballknowers.draftsim.store.LeagueMembership;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -37,8 +39,23 @@ class LeagueAnalyticsContractTest {
     @Mock private RosterManagementService rosterManagement;
     @Mock private TransactionAnalysisService transactionAnalysis;
     @Mock private ExpectedWinsService expectedWins;
+    @Mock private LeagueMembership membership;
 
     private static final String LEAGUE = "L1";
+
+    /**
+     * These tests pin response SHAPES, so the caller is always allowed in. The league routes now
+     * refuse a caller who cannot see the league (claude/audit-2026-09-28/01 -- they had no
+     * scoping at all), which has its own test at the bottom of this class.
+     */
+    private static final String USER = "tester";
+
+    @org.junit.jupiter.api.BeforeEach
+    void callerCanSeeTheLeague() {
+        org.mockito.Mockito.lenient().when(membership.visibleLeague(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Optional.of(new LeagueRepository.LeagueRow(
+                        1L, Sport.NFL, LEAGUE, "Ball Knowers", 2025, 12, List.of(), 0.0, null, null)));
+    }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> bodyOf(ResponseEntity<Map<String, Object>> r) {
@@ -56,8 +73,8 @@ class LeagueAnalyticsContractTest {
                                 164.96, 174.16, 0.947, 1, List.of(2))))));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .rosterManagement(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .rosterManagement(LEAGUE, USER));
 
         assertEquals(true, body.get("available"));
         assertEquals(2026, body.get("season"));
@@ -92,8 +109,8 @@ class LeagueAnalyticsContractTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> team = ((List<Map<String, Object>>) bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .rosterManagement(LEAGUE)).get("teams")).getFirst();
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .rosterManagement(LEAGUE, USER)).get("teams")).getFirst();
 
         assertTrue(team.containsKey("efficiency"), "the key must exist even when the value is null");
         assertNull(team.get("efficiency"));
@@ -107,8 +124,8 @@ class LeagueAnalyticsContractTest {
                         2026, null, Sport.NBA, 0, List.of())));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .rosterManagement(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .rosterManagement(LEAGUE, USER));
 
         assertEquals(false, body.get("available"));
         assertEquals("no scored weeks yet for this league", body.get("reason"));
@@ -129,8 +146,8 @@ class LeagueAnalyticsContractTest {
                                 5339.5, 5547.0, 0.963, 21, List.of())))));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .rosterManagement(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .rosterManagement(LEAGUE, USER));
 
         assertEquals(2025, body.get("season"), "the season actually answered about");
         assertEquals(2026, body.get("requestedSeason"), "the season the reader asked for");
@@ -142,8 +159,8 @@ class LeagueAnalyticsContractTest {
                 new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, 1, List.of())));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .rosterManagement(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .rosterManagement(LEAGUE, USER));
 
         assertTrue(body.containsKey("requestedSeason"));
         assertNull(body.get("requestedSeason"));
@@ -152,8 +169,8 @@ class LeagueAnalyticsContractTest {
     @Test
     void anUnknownLeagueIs404RatherThanAnEmptyBody() {
         when(rosterManagement.forLeague("nope")).thenReturn(Optional.empty());
-        assertEquals(404, new RosterManagementController(rosterManagement, transactionAnalysis)
-                .rosterManagement("nope").getStatusCode().value());
+        assertEquals(404, new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                .rosterManagement("nope", USER).getStatusCode().value());
     }
 
     // ------------------------------------------------------ expected wins
@@ -167,7 +184,7 @@ class LeagueAnalyticsContractTest {
                                 ExpectedWinsService.LuckSource.SWING_WEEKS,
                                 List.of(new ExpectedWinsService.SwingWeek(1, true, 146.16, 7, "She Hocken")))))));
 
-        Map<String, Object> body = bodyOf(new ExpectedWinsController(expectedWins).expectedWins(LEAGUE));
+        Map<String, Object> body = bodyOf(new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER));
         assertEquals(130.1, body.get("leagueAveragePpg"));
 
         @SuppressWarnings("unchecked")
@@ -201,7 +218,7 @@ class LeagueAnalyticsContractTest {
 
         @SuppressWarnings("unchecked")
         Map<String, Object> team = ((List<Map<String, Object>>) bodyOf(
-                new ExpectedWinsController(expectedWins).expectedWins(LEAGUE)).get("teams")).getFirst();
+                new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER)).get("teams")).getFirst();
 
         assertEquals("CONSISTENT_OPPONENT_SCORING", team.get("luckSource"));
         assertEquals(List.of(), team.get("swingWeeks"));
@@ -223,8 +240,8 @@ class LeagueAnalyticsContractTest {
                         "LOWER_IS_BETTER")));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .transactions(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .transactions(LEAGUE, USER));
 
         // Stated on the wire, because a 2 beside a name is otherwise ambiguous.
         assertEquals("LOWER_IS_BETTER", body.get("rankDirection"));
@@ -263,8 +280,8 @@ class LeagueAnalyticsContractTest {
                 TransactionAnalysisServiceResults.unavailable()));
 
         Map<String, Object> body = bodyOf(
-                new RosterManagementController(rosterManagement, transactionAnalysis)
-                        .transactions(LEAGUE));
+                new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                        .transactions(LEAGUE, USER));
 
         assertEquals(false, body.get("available"));
         assertEquals("LOWER_IS_BETTER", body.get("rankDirection"));
@@ -277,5 +294,31 @@ class LeagueAnalyticsContractTest {
             return new TransactionAnalysisService.Result(false, "Transactions for this league haven't loaded yet.",
                     2026, Sport.NFL, List.of(), List.of(), List.of(), "LOWER_IS_BETTER");
         }
+    }
+    // ------------------------------------------------------ league scoping (audit 2026-09-28/01)
+
+    /**
+     * roster-management, transactions, expected-wins, forecast and weekly-report had no
+     * scoping whatsoever: any caller, signed in or not, read any league. Each now answers the
+     * same 404 as a league that does not exist when the caller cannot see it -- and asks the
+     * service nothing, so it cannot even confirm the league is real.
+     */
+    @Test
+    void aCallerWhoCannotSeeTheLeagueGets404AndTheServiceIsNeverAsked() {
+        org.mockito.Mockito.when(membership.visibleLeague(LEAGUE, null)).thenReturn(Optional.empty());
+        org.mockito.Mockito.when(membership.visibleLeague(LEAGUE, "stranger")).thenReturn(Optional.empty());
+        var roster = new RosterManagementController(rosterManagement, transactionAnalysis, membership);
+        var expected = new ExpectedWinsController(expectedWins, membership);
+        var weekly = new WeeklyReportController(org.mockito.Mockito.mock(com.ballknowers.draftsim.engine.WeeklyReportService.class), membership);
+        var forecast = new SeasonForecastController(org.mockito.Mockito.mock(com.ballknowers.draftsim.engine.PlayoffOddsService.class), membership);
+
+        for (String who : new String[] {null, "stranger"}) {
+            assertEquals(404, roster.rosterManagement(LEAGUE, who).getStatusCode().value());
+            assertEquals(404, roster.transactions(LEAGUE, who).getStatusCode().value());
+            assertEquals(404, expected.expectedWins(LEAGUE, who).getStatusCode().value());
+            assertEquals(404, weekly.weeklyReport(LEAGUE, 1, who).getStatusCode().value());
+            assertEquals(404, forecast.forecast(LEAGUE, who).getStatusCode().value());
+        }
+        org.mockito.Mockito.verifyNoInteractions(rosterManagement, transactionAnalysis, expectedWins);
     }
 }

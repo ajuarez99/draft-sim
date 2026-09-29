@@ -125,13 +125,48 @@ class LeagueMembershipIT {
         assertTrue(membership.leagueIdsFor("it-user-mem-nobody").isEmpty());
     }
 
+    /**
+     * Was noIdentityHeaderAtAllIsAllowedThrough, which pinned "the pre-identity
+     * contract, kept deliberately". That contract is the bug
+     * (claude/audit-2026-09-28/01): on production a header-less GET of a league's
+     * analysis answered 200 while a stranger's id answered 404, so leaving the header
+     * off got MORE than signing in as nobody. No identity now sees nothing, on every
+     * door that goes through this class.
+     */
     @Test
-    void noIdentityHeaderAtAllIsAllowedThrough() {
-        // The pre-identity contract, kept deliberately -- see LeagueMembership's
-        // own comment. Not a hole this method could close anyway.
-        assertTrue(membership.canSee(null, unrelatedLeagueId));
-        assertTrue(membership.canSee("  ", unrelatedLeagueId));
-        assertTrue(membership.canSeeManager(null, managerB));
+    void noIdentityHeaderAtAllSeesNothing() {
+        for (String blank : new String[] {null, "", "  "}) {
+            assertFalse(membership.canSee(blank, unrelatedLeagueId), "canSee");
+            assertFalse(membership.canSee(blank, rosterSeasonLeagueId), "canSee, even a real league");
+            assertFalse(membership.canSeeManager(blank, managerB), "canSeeManager");
+            assertTrue(membership.visibleLeague("it-league-mem-roster", blank).isEmpty(), "visibleLeague");
+            assertTrue(membership.visibleDraft(blank, "it-draft-mem-roster").isEmpty(), "visibleDraft");
+        }
+    }
+
+    @Test
+    void aValidAdminTokenIsTheOnlyWayAroundABlankIdentity() {
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            assertTrue(membership.canSee(null, unrelatedLeagueId));
+            assertTrue(membership.canSeeManager(null, managerB));
+            assertTrue(membership.visibleLeague("it-league-mem-roster", null).isPresent());
+            assertTrue(membership.visibleDraft(null, "it-draft-mem-roster").isPresent());
+        }
+        try (var wrong = com.ballknowers.draftsim.TestAdmin.withToken("not-the-token")) {
+            assertFalse(membership.canSee(null, unrelatedLeagueId), "a wrong token is no token");
+        }
+        try (var blank = com.ballknowers.draftsim.TestAdmin.withToken("")) {
+            assertFalse(membership.canSee(null, unrelatedLeagueId), "a blank presented token never matches");
+        }
+        assertFalse(membership.canSee(null, unrelatedLeagueId), "and with no request at all, nobody is admin");
+    }
+
+    /** The token overrides only a BLANK identity; a named stranger is still a stranger. */
+    @Test
+    void theAdminTokenDoesNotWidenASignedInStrangersView() {
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            assertFalse(membership.canSee("it-user-mem-a", unrelatedLeagueId));
+        }
     }
 
     @Test

@@ -1,9 +1,11 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.ExpectedWinsService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,13 +23,20 @@ import java.util.Map;
 public class ExpectedWinsController {
 
     private final ExpectedWinsService expectedWins;
+    private final LeagueMembership membership;
 
-    public ExpectedWinsController(ExpectedWinsService expectedWins) {
+    public ExpectedWinsController(ExpectedWinsService expectedWins, LeagueMembership membership) {
         this.expectedWins = expectedWins;
+        this.membership = membership;
     }
 
     @GetMapping("/leagues/{sleeperId}/expected-wins")
-    public ResponseEntity<Map<String, Object>> expectedWins(@PathVariable String sleeperId) {
+    public ResponseEntity<Map<String, Object>> expectedWins(@PathVariable String sleeperId,
+                                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped like every other league route: no identity, or an identity that is not in
+        // this league, is the same 404 as a league that does not exist. This route had no
+        // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         // Regular-season bound (specs/008-season-superlatives T029): this page
         // now shows regular-season luck, not luck padded by playoff weeks.
         return expectedWins.forLeagueRegularSeason(sleeperId)

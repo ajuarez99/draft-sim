@@ -203,7 +203,7 @@ class MockDraftServiceTest {
         assertTrue(created.isUsersTurn());
         String firstAvailable = created.available().get(0).sleeperId();
 
-        MockSessionState after = service.submitPick(created.id(), firstAvailable, null).orElseThrow();
+        MockSessionState after = service.submitPick(created.id(), firstAvailable, "tester").orElseThrow();
 
         // Pick 1 (the user's) plus bots for slots 2-8 must all be in by the time
         // it's the user's turn again (pick 16 of a snake 8-team draft: round 2
@@ -230,36 +230,36 @@ class MockDraftServiceTest {
         repo.advanceCurrentPick(created.id(), 6, "IN_PROGRESS");  // force onto slot 6, a bot seat
 
         String someone = created.available().get(0).sleeperId();
-        assertThrows(IllegalStateException.class, () -> service.submitPick(created.id(), someone, null));
+        assertThrows(IllegalStateException.class, () -> service.submitPick(created.id(), someone, "tester"));
     }
 
     @Test
     void submitPickRejectsAnUnknownPlayer() {
         MockSessionState created = service.createSession(8, 1, Map.of(), null);
         assertThrows(IllegalArgumentException.class,
-                () -> service.submitPick(created.id(), "no-such-sleeper-id", null));
+                () -> service.submitPick(created.id(), "no-such-sleeper-id", "tester"));
     }
 
     @Test
     void submitPickRejectsAPlayerAlreadyDraftedInThisSession() {
         MockSessionState created = service.createSession(8, 1, Map.of(), null);
         String player = created.available().get(0).sleeperId();
-        MockSessionState afterFirst = service.submitPick(created.id(), player, null).orElseThrow();
+        MockSessionState afterFirst = service.submitPick(created.id(), player, "tester").orElseThrow();
 
         // Slot 1 (an 8-team snake) comes back around at pick 16 -- still the
         // same lone USER seat, so it is genuinely the user's turn again.
         assertTrue(afterFirst.isUsersTurn(), "slot 1's next pick comes back around to the user");
-        assertThrows(IllegalArgumentException.class, () -> service.submitPick(created.id(), player, null));
+        assertThrows(IllegalArgumentException.class, () -> service.submitPick(created.id(), player, "tester"));
     }
 
     @Test
     void submitPickReturnsEmptyForAnUnknownSession() {
-        assertTrue(service.submitPick(999L, "whatever", null).isEmpty());
+        assertTrue(service.submitPick(999L, "whatever", "tester").isEmpty());
     }
 
     @Test
     void getReturnsEmptyForAnUnknownSession() {
-        assertTrue(service.get(999L, null).isEmpty());
+        assertTrue(service.get(999L, "tester").isEmpty());
     }
 
     // --- V8 session ownership -------------------------------------------------
@@ -299,20 +299,51 @@ class MockDraftServiceTest {
         assertTrue(service.submitPick(mine.id(), available, "user-a").isPresent());
     }
 
+    /**
+     * Was aCallerWithNoIdentityHeaderStillSeesEverything, which pinned the pre-V8
+     * contract "nothing that never signs in changes behavior". That contract is
+     * the bug (claude/audit-2026-09-28/01): a caller who left the header off saw
+     * and could pick into every session, i.e. got MORE than a signed-in stranger
+     * did. It now sees and can do nothing, and an unowned session is not a way
+     * around that.
+     */
     @Test
-    void aCallerWithNoIdentityHeaderStillSeesEverything() {
-        // The pre-V8 contract, kept deliberately: nothing that never signs in
-        // changes behavior, and the configured-owner fallback still works.
+    void aCallerWithNoIdentityHeaderSeesAndDoesNothing() {
         MockSessionState theirs = service.createSession(8, 1, Map.of(), "user-a");
+        String available = theirs.available().get(0).sleeperId();
+
+        for (String blank : new String[] {null, "", "  "}) {
+            assertTrue(service.get(theirs.id(), blank).isEmpty(), "blank identity must not read a session");
+            assertTrue(service.submitPick(theirs.id(), available, blank).isEmpty(), "blank identity must not pick");
+            assertTrue(service.listSessions(blank).isEmpty(), "blank identity lists nothing");
+        }
+        assertEquals(theirs.currentPickNo(), service.get(theirs.id(), "user-a").orElseThrow().currentPickNo(),
+                "and the session is untouched");
+    }
+
+    @Test
+    void aBlankIdentityCannotReachAnUnownedLegacySessionEither() {
+        MockSessionState legacy = service.createSession(8, 1, Map.of(), null);   // null owner: V8's legacy rows
+
+        assertTrue(service.get(legacy.id(), null).isEmpty());
+        assertTrue(service.listSessions(null).isEmpty());
+    }
+
+    @Test
+    void anAdminTokenIsTheOperatorOverrideForABlankIdentity() {
+        MockSessionState theirs = service.createSession(8, 1, Map.of(), "user-a");
+        when(membership.isAdminRequest()).thenReturn(true);
 
         assertTrue(service.get(theirs.id(), null).isPresent());
         assertTrue(service.listSessions(null).stream().anyMatch(s -> s.id() == theirs.id()));
+        assertTrue(service.submitPick(theirs.id(), theirs.available().get(0).sleeperId(), null).isPresent());
     }
 
     @Test
     void anUnownedSessionStaysVisibleToEveryone() {
         // V8's closed set: rows created before the column existed. Preserving
         // them beats orphaning in-progress work, and the population cannot grow.
+        // Usable by any SIGNED-IN identity; a blank one is refused (tests above).
         MockSessionState legacy = service.createSession(8, 1, Map.of(), null);
 
         assertTrue(service.get(legacy.id(), "anyone").isPresent());
@@ -330,7 +361,7 @@ class MockDraftServiceTest {
             assertTrue(state.isUsersTurn(), "the loop only ever feeds a pick when it's genuinely the user's turn");
             int before = drafted.size();
             String pick = state.available().get(0).sleeperId();
-            state = service.submitPick(state.id(), pick, null).orElseThrow();
+            state = service.submitPick(state.id(), pick, "tester").orElseThrow();
 
             drafted.clear();
             for (var p : state.picks()) {
@@ -539,9 +570,9 @@ class MockDraftServiceTest {
         // 24. Pick 17 belongs to slot 8 under the reversal, to slot 1 without it
         // -- and slot 1 is the user, so a plain-snake engine would not even stop
         // here for the user's third pick.
-        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), null).orElseThrow();
+        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), "tester").orElseThrow();
         assertEquals(16, state.currentPickNo());
-        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), null).orElseThrow();
+        state = service.submitPick(state.id(), state.available().get(0).sleeperId(), "tester").orElseThrow();
         assertEquals(24, state.currentPickNo(), "round 3 must open on slot 8, not slot 1");
 
         var pick17 = state.picks().stream().filter(p -> p.pickNo() == 17).findFirst().orElseThrow();
@@ -560,7 +591,7 @@ class MockDraftServiceTest {
     void gettingAnNbaSessionListsNbaPlayersAsAvailable() {
         MockSessionState created = service.createSession(Sport.NBA, 8, 1, Map.of(), null, null);
 
-        MockSessionState fetched = service.get(created.id(), null).orElseThrow();
+        MockSessionState fetched = service.get(created.id(), "tester").orElseThrow();
 
         assertEquals(Sport.NBA, fetched.sport());
         assertFalse(fetched.available().isEmpty());

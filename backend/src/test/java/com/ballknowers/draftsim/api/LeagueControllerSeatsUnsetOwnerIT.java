@@ -104,9 +104,16 @@ class LeagueControllerSeatsUnsetOwnerIT {
         jdbc.update("delete from manager where id = ?", managerId);
     }
 
+    // These two call seats() with no X-Sleeper-User to exercise the "no owner configured, no caller
+    // identity" path. A blank caller is no longer let through (claude/audit-2026-09-28/01), so they
+    // run as the operator (admin token), the one caller for whom a blank identity still reaches it.
+
     @Test
     void unsetOwnerConfigYieldsNullMySlotAndTheResponseActuallySerializes() throws Exception {
-        ResponseEntity<?> response = controller.seats(sleeperDraftId, null);
+        ResponseEntity<?> response;
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            response = controller.seats(sleeperDraftId, null);
+        }
 
         assertEquals(200, response.getStatusCode().value());
         Object body = response.getBody();
@@ -137,7 +144,10 @@ class LeagueControllerSeatsUnsetOwnerIT {
         jdbc.update("update draft set status = null where sleeper_draft_id = ?", sleeperDraftId);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) controller.seats(sleeperDraftId, null).getBody();
+        Map<String, Object> body;
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            body = (Map<String, Object>) controller.seats(sleeperDraftId, null).getBody();
+        }
         assertNotNull(body);
         assertNull(body.get("status"), "a null status column must stay null, not become \"null\"");
 

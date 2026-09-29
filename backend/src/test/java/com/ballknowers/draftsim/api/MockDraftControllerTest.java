@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -28,6 +29,15 @@ import static org.mockito.Mockito.when;
 class MockDraftControllerTest {
 
     @Mock private MockDraftService mocks;
+    @Mock private com.ballknowers.draftsim.store.LeagueMembership membership;
+
+    /**
+     * Creating a mock now needs an identity (claude/audit-2026-09-28/01): a header-less
+     * create used to mint an unowned session that every caller could read and pick
+     * into. These tests are about how the controller delegates, so they present a
+     * signed-in caller; the refusal has its own tests at the bottom.
+     */
+    private static final String USER = "tester";
 
     private MockSessionState sampleState(long id) {
         return new MockSessionState(id, Sport.NFL, "IN_PROGRESS", 8, 15, List.of("QB", "BN"), 1, List.of(1),
@@ -37,42 +47,42 @@ class MockDraftControllerTest {
 
     @Test
     void createDelegatesTeamsAndUserSlotToTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), null, null)).thenReturn(sampleState(1));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), USER, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(null, 8, 3, Map.of(), null), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(null, 8, 3, Map.of(), null), USER);
 
         assertEquals(1, result.id());
     }
 
     @Test
     void createDelegatesManagerSeatsToTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(5, 42L), null, null)).thenReturn(sampleState(1));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(5, 42L), USER, null)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.create(new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(5, 42L), null), null);
+        MockSessionState result = controller.create(new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(5, 42L), null), USER);
 
         assertEquals(1, result.id());
     }
 
     @Test
     void createDelegatesSourceLeagueIdToTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), null, "123456")).thenReturn(sampleState(1));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), USER, "123456")).thenReturn(sampleState(1));
 
         MockSessionState result = controller.create(
-                new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(), "123456"), null);
+                new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(), "123456"), USER);
 
         assertEquals(1, result.id());
     }
 
     @Test
     void createPassesTheRequestedSportThroughRatherThanAssumingFootball() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSession(Sport.NBA, 12, 3, Map.of(), null, "nba-league")).thenReturn(sampleState(7));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSession(Sport.NBA, 12, 3, Map.of(), USER, "nba-league")).thenReturn(sampleState(7));
 
         MockSessionState result = controller.create(
-                new MockDraftController.CreateRequest(Sport.NBA, 12, 3, Map.of(), "nba-league"), null);
+                new MockDraftController.CreateRequest(Sport.NBA, 12, 3, Map.of(), "nba-league"), USER);
 
         assertEquals(7, result.id());
     }
@@ -93,27 +103,27 @@ class MockDraftControllerTest {
 
     @Test
     void createFromDraftDelegatesDraftIdAndOptionalMySlotToTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSessionFromDraft("sleeper-draft-1", 3, null)).thenReturn(sampleState(1));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSessionFromDraft("sleeper-draft-1", 3, USER)).thenReturn(sampleState(1));
 
-        MockSessionState result = controller.createFromDraft("sleeper-draft-1", 3, null);
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", 3, USER);
 
         assertEquals(1, result.id());
     }
 
     @Test
     void createFromDraftPassesNullMySlotWhenOmitted() {
-        MockDraftController controller = new MockDraftController(mocks);
-        when(mocks.createSessionFromDraft("sleeper-draft-1", null, null)).thenReturn(sampleState(2));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(mocks.createSessionFromDraft("sleeper-draft-1", null, USER)).thenReturn(sampleState(2));
 
-        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null, null);
+        MockSessionState result = controller.createFromDraft("sleeper-draft-1", null, USER);
 
         assertEquals(2, result.id());
     }
 
     @Test
     void createFromDraftPassesTheSleeperUserHeaderThrough() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         when(mocks.createSessionFromDraft("sleeper-draft-1", null, "1122386008709910528")).thenReturn(sampleState(3));
 
         MockSessionState result = controller.createFromDraft("sleeper-draft-1", null, "1122386008709910528");
@@ -123,13 +133,13 @@ class MockDraftControllerTest {
 
     @Test
     void createRejectsAMissingBody() {
-        MockDraftController controller = new MockDraftController(mocks);
-        assertThrows(IllegalArgumentException.class, () -> controller.create(null, null));
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        assertThrows(IllegalArgumentException.class, () -> controller.create(null, USER));
     }
 
     @Test
     void getReturns200WithTheStateWhenTheSessionExists() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         when(mocks.get(5L, null)).thenReturn(Optional.of(sampleState(5)));
 
         ResponseEntity<MockSessionState> response = controller.get(5L, null);
@@ -140,7 +150,7 @@ class MockDraftControllerTest {
 
     @Test
     void getReturns404WhenTheSessionDoesNotExist() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         when(mocks.get(404L, null)).thenReturn(Optional.empty());
 
         assertEquals(404, controller.get(404L, null).getStatusCode().value());
@@ -148,7 +158,7 @@ class MockDraftControllerTest {
 
     @Test
     void pickRejectsAMissingSleeperPlayerIdWithoutCallingTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
 
         ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest(""), null);
 
@@ -158,7 +168,7 @@ class MockDraftControllerTest {
 
     @Test
     void pickReturns404WhenTheSessionDoesNotExist() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         when(mocks.submitPick(1L, "abc", null)).thenReturn(Optional.empty());
 
         ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"), null);
@@ -168,7 +178,7 @@ class MockDraftControllerTest {
 
     @Test
     void pickReturns200WithTheAdvancedStateOnSuccess() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         when(mocks.submitPick(1L, "abc", null)).thenReturn(Optional.of(sampleState(1)));
 
         ResponseEntity<?> response = controller.pick(1L, new MockDraftController.PickRequest("abc"), null);
@@ -179,10 +189,33 @@ class MockDraftControllerTest {
 
     @Test
     void listDelegatesToTheService() {
-        MockDraftController controller = new MockDraftController(mocks);
+        MockDraftController controller = new MockDraftController(mocks, membership);
         var summary = new MockDraftRepository.SessionSummary(1, Sport.NFL, "IN_PROGRESS", 8, 15, 1, 1, null, null, null);
         when(mocks.listSessions(null)).thenReturn(List.of(summary));
 
         assertEquals(List.of(summary), controller.list(null));
+    }
+    @Test
+    void createWithoutAnIdentityIsRefusedAndNeverReachesTheService() {
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        var body = new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(), null);
+
+        for (String blank : new String[] {null, "", "   "}) {
+            var e = assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                    () -> controller.create(body, blank));
+            assertEquals(401, e.getStatusCode().value());
+        }
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> controller.createFromDraft("sleeper-draft-1", null, null));
+        verifyNoInteractions(mocks);
+    }
+
+    @Test
+    void anAdminTokenLetsAnOperatorCreateWithoutAnIdentity() {
+        MockDraftController controller = new MockDraftController(mocks, membership);
+        when(membership.isAdminRequest()).thenReturn(true);
+        when(mocks.createSession(Sport.NFL, 8, 3, Map.of(), null, null)).thenReturn(sampleState(9));
+
+        assertEquals(9, controller.create(new MockDraftController.CreateRequest(Sport.NFL, 8, 3, Map.of(), null), null).id());
     }
 }

@@ -81,14 +81,18 @@ public class LeagueController {
      * Every draft in the DB, newest first, scoped to the requesting Sleeper
      * user's own leagues when {@code X-Sleeper-User} is sent
      * (claude/user-identity-and-onboarding.md §4b/§4c). Absent header ⇒ the
-     * unfiltered list, unchanged from before this header existed.
+     * <b>An absent header now
+     * yields an empty list</b> (claude/audit-2026-09-28/01: it used to be every
+     * league's drafts, so leaving the header off got more than a stranger did).
+     * A valid {@code X-Admin-Token} still gets the unfiltered list, for the operator.
      */
     @GetMapping("/drafts")
     public List<DraftRepository.DraftSummary> drafts(
             @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        return sleeperUserId == null || sleeperUserId.isBlank()
-                ? drafts.allWithLeague()
-                : drafts.allWithLeagueFor(sleeperUserId);
+        if (LeagueMembership.isAnonymous(sleeperUserId)) {
+            return membership.isAdminRequest() ? drafts.allWithLeague() : List.of();
+        }
+        return drafts.allWithLeagueFor(sleeperUserId);
     }
 
     /** Seats with their profiles. draftsObserved is here so the UI can be honest. */
@@ -581,7 +585,7 @@ public class LeagueController {
         // draft exists, and this caller has already been shown the whole board,
         // so there is nothing left to conceal and a reason they can act on is
         // worth more.
-        if (!OwnerSlot.mayActAsSlot(draft, managers, sleeperUserId, slot)) {
+        if (!membership.isAdminRequest() && !OwnerSlot.mayActAsSlot(draft, managers, sleeperUserId, slot)) {
             return ResponseEntity.status(403).body(Map.of("message",
                     "pick " + pickNo + " belongs to draft slot " + slot + ", which is not your seat"));
         }

@@ -67,7 +67,13 @@ class RefreshControllerOnVisitDisabledIT {
     @Test
     @SuppressWarnings("unchecked")
     void aPostStartsNothingWhenRefreshOnVisitIsOff() {
-        ResponseEntity<?> response = controller.trigger(LEAGUE, null);
+        // This league has no members, so the only caller who can reach it with no identity is the
+        // operator (admin token): a blank identity no longer sees every league
+        // (claude/audit-2026-09-28/01). The test is about the on-visit switch, not scoping.
+        ResponseEntity<?> response;
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            response = controller.trigger(LEAGUE, null);
+        }
 
         assertEquals(200, response.getStatusCode().value());
         Map<String, Object> body = (Map<String, Object>) response.getBody();
