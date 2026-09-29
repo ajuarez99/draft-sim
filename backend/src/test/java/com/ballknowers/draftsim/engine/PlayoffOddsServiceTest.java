@@ -35,6 +35,7 @@ class PlayoffOddsServiceTest {
     @Mock private PlayoffOddsRepository odds;
     @Mock private com.ballknowers.draftsim.store.LeagueMemberRepository members;
     @Mock private LeagueSeasonResolver seasons;
+    @Mock private ScoredWeeks scoredWeeks;
 
     private PlayoffOddsService service;
 
@@ -43,7 +44,7 @@ class PlayoffOddsServiceTest {
     @BeforeEach
     void setUp() {
         service = new PlayoffOddsService(leagues, rosterSeasons, weekPoints, fixtures, odds, members, seasons,
-                org.mockito.Mockito.mock(ScoredWeeks.class));
+                scoredWeeks);
     }
 
     private static LeagueRepository.PlayoffFormat plainFormat() {
@@ -152,6 +153,7 @@ class PlayoffOddsServiceTest {
     /** Odds come from the stored snapshot on read -- never recomputed on a page load. */
     @Test
     void readingOddsNeverRecomputes() {
+        when(scoredWeeks.of(LEAGUE)).thenReturn(new ScoredWeeks.Snapshot(1, 1, java.util.Set.of(1)));
         when(odds.madePctByWeek(LEAGUE, 2026)).thenReturn(java.util.Map.of(1, java.util.Map.of(3, 62.5)));
 
         assertEquals(62.5, service.madePctByWeek(LEAGUE, 2026).get(1).get(3));

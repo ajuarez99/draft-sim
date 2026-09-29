@@ -510,7 +510,14 @@ public class LeagueHistoryController {
         LeagueRepository.LeagueRow row = league.get();
 
         PowerRankingService.SportState state = power.sportState(row.sport());
-        var snapshots = power.snapshots(row.id());
+        // A computed (COMPUTED_REALIZED) ranking for a week past the latest FINAL one was written
+        // from a partial or unplayed week; ignored on read, kept in the table. Week 0 (the
+        // preseason baseline) and the human rankings (COMMISSIONER, MEMBER), which are opinions
+        // about the open week, are never filtered.
+        int latestFinal = scoredWeeks.of(row.id()).latestFinal();
+        var snapshots = power.snapshots(row.id()).stream()
+                .filter(s -> !("COMPUTED_REALIZED".equals(s.kind()) && s.week() > 0 && s.week() > latestFinal))
+                .toList();
 
         List<Map<String, Object>> entries = new ArrayList<>(
                 snapshots.stream().map(LeagueHistoryController::snapshotRow).toList());
