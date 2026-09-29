@@ -107,7 +107,7 @@ function ManagerRow({ m, onChanged }: RowProps) {
   const label = PROVENANCE_LABEL[m.provenance]
   const cmp = comparison(m)
 
-  const canClear = m.provenance === 'STATED' || m.provenance === 'BLENDED'
+  const canClear = m.stated.note != null
 
   // The axis draws a number on a fixed scale, which is a claim that the number
   // was measured. It is only measured when this manager has scoreable picks,
@@ -203,7 +203,7 @@ function ManagerRow({ m, onChanged }: RowProps) {
           <button
             className="seat-edit"
             onClick={() => setEditing((v) => !v)}
-            title={editing ? 'Stop editing without saving' : "Edit this manager's stated tendencies"}
+            title={editing ? 'Stop editing without saving' : 'Edit your private note about this manager'}
           >
             {editing ? 'Cancel' : 'Edit'}
           </button>
@@ -353,13 +353,15 @@ export default function ManagerTendencies() {
       <PageHeader
         eyebrow="Across your leagues"
         title="Manager tendencies"
-        sub="What a manager's own draft history says, fitted by the engine — reach bias and unpredictability aren't something you type in, only something you can watch. A note is a reminder for yourself; it never changes how a mock or live sim drafts."
+        sub="What a manager's own draft history says, fitted by the engine — reach bias and unpredictability aren't something you type in, only something you can watch. A note is a reminder for yourself: only you can see it, and it never changes how a mock or live sim drafts."
       />
 
       <section className="panel">
         <p className="muted small">
           Football and basketball are fitted separately and listed together; the same person
-          appears once per sport.
+          appears once per sport. Only managers who share a league with you are listed.
+
+
         </p>
 
         {error && <div className="error">{error}</div>}

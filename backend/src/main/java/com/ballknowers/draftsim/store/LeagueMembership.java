@@ -205,6 +205,23 @@ public class LeagueMembership {
     }
 
     /**
+     * Of these candidate managers, the ones this caller may see -- {@link #canSeeManager}
+     * applied to each, with the caller's own league set computed once instead of once
+     * per candidate. Anonymous callers see nobody unless they carry the admin token,
+     * which sees everyone.
+     */
+    public Set<Long> visibleManagerIds(String sleeperUserId, java.util.Collection<Long> candidates) {
+        if (anonymous(sleeperUserId)) return admin.isAdmin() ? Set.copyOf(candidates) : Set.of();
+        Set<Long> mine = leagueIdsFor(sleeperUserId);
+        if (mine.isEmpty()) return Set.of();
+        Set<Long> out = new java.util.HashSet<>();
+        for (Long id : candidates) {
+            if (!Collections.disjoint(mine, leagueIdsForManager(id))) out.add(id);
+        }
+        return out;
+    }
+
+    /**
      * The draft behind this Sleeper id, if this caller may see it -- empty both
      * when no such draft is ingested and when it belongs to a league that isn't
      * theirs.

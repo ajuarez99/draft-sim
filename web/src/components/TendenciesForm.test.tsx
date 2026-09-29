@@ -41,7 +41,7 @@ describe('TendenciesForm', () => {
     expect(screen.queryByLabelText('Unpredictability')).not.toBeInTheDocument()
   })
 
-  it('saves the note and round-trips reachBias/unpredictability from initial unchanged', async () => {
+  it('saves only the note, never sending reachBias or unpredictability (the server 400s on them)', async () => {
     const user = userEvent.setup()
     const onDone = vi.fn()
     setTendencies.mockResolvedValue(undefined)
@@ -63,21 +63,17 @@ describe('TendenciesForm', () => {
     // basketball seat wrote to that manager's football row instead. Ten of the
     // twelve Ball Knowers managers are the same Sleeper id in both leagues, so
     // that was the common case, not the edge (multi-sport-and-rebrand.md 6b).
-    expect(setTendencies).toHaveBeenCalledWith(9, 'nba', {
-      reachBias: 4.8,
-      unpredictability: 1.6,
-      note: 'Reaches for his old team',
-    })
+    expect(setTendencies).toHaveBeenCalledWith(9, 'nba', { note: 'Reaches for his old team' })
     expect(onDone).toHaveBeenCalled()
   })
 
-  it('saves a blank note as null without inventing a reach/unpredictability value', async () => {
+  it('saves a blank note as null', async () => {
     const user = userEvent.setup()
     const onDone = vi.fn()
     setTendencies.mockResolvedValue(undefined)
     render(<TendenciesForm managerId={9} sport="nfl" initial={emptyInitial} canClear={false} onDone={onDone} onCancel={vi.fn()} />)
     await user.click(screen.getByRole('button', { name: 'Save' }))
-    expect(setTendencies).toHaveBeenCalledWith(9, 'nfl', { reachBias: null, unpredictability: null, note: null })
+    expect(setTendencies).toHaveBeenCalledWith(9, 'nfl', { note: null })
     expect(onDone).toHaveBeenCalled()
   })
 

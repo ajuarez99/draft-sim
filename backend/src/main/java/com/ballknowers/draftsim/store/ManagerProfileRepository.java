@@ -9,9 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * feature_json and manual_json are written by different code paths on purpose:
- * ingest owns the fitted half, the API owns the stated half, and neither upsert
- * touches the other's column. Re-running ingest can never wipe what the user typed.
+ * feature_json and manual_json are separate columns on purpose: ingest owns the fitted
+ * half and never touches manual_json. Nothing writes manual_json any more -- the API
+ * rejects stated tendencies and V25 stripped what was stored (notes now live in
+ * manager_note, private per author) -- but the engine still reads it, so an
+ * operator-edited value would still steer sims.
  */
 @Repository
 public class ManagerProfileRepository {
@@ -32,57 +34,6 @@ public class ManagerProfileRepository {
                     updated_at = now()
                 """)
                 .params(managerId, sport.code(), featureJson, draftsObserved)
-                .update();
-    }
-
-    /**
-     * Merges the stated tendencies into manual_json rather than replacing the column.
-     *
-     * The three keys this record owns are always written, explicit nulls included
-     * (Jackson serializes them, and {@link #parse} reads a null as "no opinion"), so
-     * a PUT still fully replaces reachBias/unpredictability/note exactly as it did
-     * when this was a whole-column overwrite. What changes is that any OTHER key in
-     * manual_json survives the write.
-     *
-     * That matters because Java only ever round-trips three fields: anything else
-     * stored alongside them -- a note's structured reading, per
-     * claude/player-affinity.md -- would otherwise be destroyed by the next save
-     * from either tendencies UI, silently, with no error and no way to notice. Same
-     * failure shape as the adp_at_time null-wipe in HANDOFF.md, and the reason
-     * `||` is a merge here instead of an assignment.
-     *
-     * To wipe everything including those other keys, use {@link #clearManual}.
-     */
-    public void saveManual(long managerId, Sport sport, ManualTendencies manual) {
-        db.sql("""
-                insert into manager_profile (manager_id, sport, manual_json, updated_at)
-                values (?, ?, ?::jsonb, now())
-                on conflict (manager_id, sport) do update set
-                    manual_json = manager_profile.manual_json || excluded.manual_json,
-                    updated_at = now()
-                """)
-                .params(managerId, sport.code(), JsonUtil.write(manual))
-                .update();
-    }
-
-    /**
-     * Hard-resets manual_json to {}, dropping every key including ones this class
-     * does not know about.
-     *
-     * DELETE /tendencies means "forget what I said about this seat", and a reading
-     * derived from a note that no longer exists is garbage, not state worth
-     * preserving -- so this is deliberately a replace where {@link #saveManual} is
-     * a merge.
-     */
-    public void clearManual(long managerId, Sport sport) {
-        db.sql("""
-                insert into manager_profile (manager_id, sport, manual_json, updated_at)
-                values (?, ?, '{}'::jsonb, now())
-                on conflict (manager_id, sport) do update set
-                    manual_json = '{}'::jsonb,
-                    updated_at = now()
-                """)
-                .params(managerId, sport.code())
                 .update();
     }
 
