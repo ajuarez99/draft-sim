@@ -1505,7 +1505,17 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
-  }).then(json<{ week0: number; realized: number; realizedSkipped?: string }>)
+  }).then(
+    json<{
+      week0: number
+      realized: number
+      realizedSkipped?: string
+      /** The week the odds were computed through: the requested week only when it is final. */
+      playoffOddsThroughWeek?: number
+      /** Present instead of `playoffOddsThroughWeek` when no week is final yet. */
+      playoffOddsSkipped?: string
+    }>,
+  )
 
 export const saveCommissionerRanking = (
   sleeperLeagueId: string,
@@ -1785,6 +1795,18 @@ export type SeasonForecast = {
   iterations?: number
   model?: string | null
   teams: ForecastTeam[]
+  /**
+   * The newest week with stored scores (0 when none), in progress or not. `week` is the
+   * week the stored snapshot was taken at. Present on every shape, refusals included.
+   */
+  latestScoredWeek: number
+  /**
+   * The newest FINAL week (0 when none): the one the "behind" notice counts against and the
+   * recompute targets, so an in-progress week never reads as a week scored since the forecast.
+   */
+  latestFinalWeek: number
+  /** Display only: whether to offer the recompute button. The route re-checks. */
+  canCommission: boolean
 }
 
 export const getSeasonForecast = (sleeperLeagueId: string) =>
@@ -1868,7 +1890,14 @@ export type WeeklyReport = {
   reason?: string | null
   season: number
   requestedSeason?: number | null
+  /** The week this report is about. For a request of week 0 ("latest"), the resolved week. */
   week: number
+  /** The newest STORED week, 0 when none: the top of the week input (an in-progress week can be viewed on purpose). */
+  latestScoredWeek: number
+  /** The newest FINAL week, 0 when none: what week 0 ("latest") resolves to when any week is final. */
+  latestFinalWeek: number
+  /** Whether `week` is final. False means scores can still change; the page says so. */
+  weekFinal: boolean
   sport: Sport
   playersPlayMultiplePerPeriod: boolean
   matchups: WeeklyMatchup[]
@@ -1886,6 +1915,7 @@ export type WeeklyReport = {
   awardsOmitted: WeeklyOmittedAward[]
 }
 
+/** `week` 0 asks for the latest scored week; the response's `week` says which that was. */
 export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-report/${week}`).then(json<WeeklyReport>)
 

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SeasonForecast from './SeasonForecast'
 import type { SeasonForecast as Data, ForecastTeam } from '../api'
@@ -8,8 +8,10 @@ vi.mock('react-router-dom', () => ({
 }))
 
 const getSeasonForecast = vi.fn()
+const computePowerRankings = vi.fn()
 vi.mock('../api', () => ({
   getSeasonForecast: (...args: unknown[]) => getSeasonForecast(...args),
+  computePowerRankings: (...args: unknown[]) => computePowerRankings(...args),
 }))
 
 function team(over: Partial<ForecastTeam> = {}): ForecastTeam {
@@ -38,12 +40,18 @@ function data(over: Partial<Data> = {}): Data {
     iterations: 10000,
     model: 'shrunk-normal-v1',
     teams: [team()],
+    latestScoredWeek: 1,
+    latestFinalWeek: 1,
+    canCommission: false,
     ...over,
   }
 }
 
 describe('Season forecast', () => {
-  beforeEach(() => getSeasonForecast.mockReset())
+  beforeEach(() => {
+    getSeasonForecast.mockReset()
+    computePowerRankings.mockReset()
+  })
 
   it('shows odds, average wins, range, seed and No. 1 odds', async () => {
     getSeasonForecast.mockResolvedValue(data())
@@ -114,5 +122,113 @@ describe('Season forecast', () => {
     const row = await screen.findByRole('row', { name: /Hoop Dreams/ })
     expect(within(row).getByText('62.5%')).toBeInTheDocument()
     expect(within(row).getByText('11.40')).toBeInTheDocument()
+  })
+
+  describe('a forecast that trails the league', () => {
+    it('names both weeks when the snapshot is behind', async () => {
+      getSeasonForecast.mockResolvedValue(data({ week: 1, latestScoredWeek: 3, latestFinalWeek: 3 }))
+      render(<SeasonForecast />)
+
+      expect(await screen.findByText(/2 weeks scored since this forecast/)).toBeInTheDocument()
+      expect(screen.getByText(/as of week 1/)).toBeInTheDocument()
+    })
+
+    it('counts only FINAL weeks: an in-progress week is not a week scored since the forecast', async () => {
+      getSeasonForecast.mockResolvedValue(
+        data({ week: 1, latestScoredWeek: 3, latestFinalWeek: 2, canCommission: true }),
+      )
+      render(<SeasonForecast />)
+
+      expect(await screen.findByText(/1 week scored since this forecast/)).toBeInTheDocument()
+      // The button targets the latest FINAL week, not the stored in-progress one.
+      expect(screen.getByRole('button', { name: 'Recompute through week 2' })).toBeInTheDocument()
+    })
+
+    it('says nothing when the only newer week is still in progress', async () => {
+      getSeasonForecast.mockResolvedValue(
+        data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 1, canCommission: true }),
+      )
+      render(<SeasonForecast />)
+
+      await screen.findByRole('row', { name: /Master Bates/ })
+      expect(screen.queryByText(/scored since this forecast/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
+    })
+
+    it('uses the singular for one week behind', async () => {
+      getSeasonForecast.mockResolvedValue(data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2 }))
+      render(<SeasonForecast />)
+      expect(await screen.findByText(/1 week scored since this forecast/)).toBeInTheDocument()
+    })
+
+    it('says nothing when the snapshot is current', async () => {
+      getSeasonForecast.mockResolvedValue(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }))
+      render(<SeasonForecast />)
+
+      await screen.findByRole('row', { name: /Master Bates/ })
+      expect(screen.queryByText(/scored since this forecast/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
+    })
+
+    it('shows no notice when there is no forecast at all', async () => {
+      getSeasonForecast.mockResolvedValue(
+        data({ available: false, reason: 'NO_SCORED_WEEKS', teams: [], latestScoredWeek: 0, latestFinalWeek: 0 }),
+      )
+      render(<SeasonForecast />)
+
+      await screen.findByText(/No week has been scored yet/)
+      expect(screen.queryByText(/scored since this forecast/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
+    })
+
+    it('offers a commissioner the recompute, and a member only the notice', async () => {
+      getSeasonForecast.mockResolvedValue(data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }))
+      const { unmount } = render(<SeasonForecast />)
+      expect(await screen.findByRole('button', { name: 'Recompute through week 2' })).toBeInTheDocument()
+      unmount()
+
+      getSeasonForecast.mockResolvedValue(data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: false }))
+      render(<SeasonForecast />)
+      expect(await screen.findByText(/1 week scored since this forecast/)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
+    })
+
+    it('recomputes through the latest scored week, then re-reads the forecast', async () => {
+      getSeasonForecast
+        .mockResolvedValueOnce(data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }))
+        .mockResolvedValueOnce(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }))
+      computePowerRankings.mockResolvedValue({ week0: 0, realized: 12 })
+      render(<SeasonForecast />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Recompute through week 2' }))
+
+      await waitFor(() => expect(computePowerRankings).toHaveBeenCalledWith('L1', 2026, 2))
+      expect(await screen.findByText(/Through week 2/)).toBeInTheDocument()
+      expect(screen.queryByText(/scored since this forecast/)).not.toBeInTheDocument()
+    })
+
+    it('does not recompute just by loading', async () => {
+      getSeasonForecast.mockResolvedValue(data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }))
+      render(<SeasonForecast />)
+      await screen.findByText(/2 weeks|1 week scored since/)
+      expect(computePowerRankings).not.toHaveBeenCalled()
+    })
+
+    it('offers the first compute on a played season with no snapshot', async () => {
+      getSeasonForecast.mockResolvedValue(
+        data({ available: false, reason: 'NOT_COMPUTED', teams: [], latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true }),
+      )
+      render(<SeasonForecast />)
+      expect(await screen.findByRole('button', { name: 'Recompute through week 2' })).toBeInTheDocument()
+    })
+
+    it('hides the button on a fallback season the recompute route would not act on', async () => {
+      getSeasonForecast.mockResolvedValue(
+        data({ week: 1, latestScoredWeek: 2, latestFinalWeek: 2, canCommission: true, season: 2025, requestedSeason: 2026 }),
+      )
+      render(<SeasonForecast />)
+      await screen.findByText(/1 week scored since this forecast/)
+      expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
+    })
   })
 })

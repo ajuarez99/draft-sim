@@ -42,17 +42,29 @@ public class SeasonForecastController {
         // Scoped like every other league route: no identity, or an identity that is not in
         // this league, is the same 404 as a league that does not exist. This route had no
         // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
-        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        var visible = membership.visibleLeague(sleeperId, sleeperUserId);
+        if (visible.isEmpty()) return ResponseEntity.notFound().build();
+        // Display only: whether to OFFER the recompute button. The route itself enforces
+        // the admin token and the commissioner identity (POST /power/compute).
+        boolean canCommission = membership.canCommission(visible.get().id(), sleeperUserId);
         return playoffOdds.forecast(sleeperId)
-                .map(f -> ResponseEntity.ok(body(f)))
+                .map(f -> ResponseEntity.ok(body(f, canCommission)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private static Map<String, Object> body(PlayoffOddsService.Forecast f) {
+    /* package-private so the contract test can pin the shape without a database. */
+    static Map<String, Object> body(PlayoffOddsService.Forecast f, boolean canCommission) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("available", f.available());
         out.put("season", f.season());
         out.put("requestedSeason", f.requestedSeason());
+        // How far the league has scored, beside the week the snapshot was taken at, so the page
+        // can say the forecast is behind. Present on every shape, refusals included.
+        // Stored, and FINAL (see ScoredWeeks): the notice counts final weeks only, so an
+        // in-progress week never reads as "a week scored since this forecast".
+        out.put("latestScoredWeek", f.latestScoredWeek());
+        out.put("latestFinalWeek", f.latestFinalWeek());
+        out.put("canCommission", canCommission);
         if (!f.available()) {
             // A named reason, not an empty table: "this league's seeding is not
             // modelled" and "no week has been scored" call for different words

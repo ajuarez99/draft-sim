@@ -42,7 +42,8 @@ class PlayoffOddsServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new PlayoffOddsService(leagues, rosterSeasons, weekPoints, fixtures, odds, members, seasons);
+        service = new PlayoffOddsService(leagues, rosterSeasons, weekPoints, fixtures, odds, members, seasons,
+                org.mockito.Mockito.mock(ScoredWeeks.class));
     }
 
     private static LeagueRepository.PlayoffFormat plainFormat() {

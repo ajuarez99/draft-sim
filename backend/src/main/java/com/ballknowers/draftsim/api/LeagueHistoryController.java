@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueRecordService;
 import com.ballknowers.draftsim.engine.ManagerCareerService;
 import com.ballknowers.draftsim.engine.MemberRankingService;
+import com.ballknowers.draftsim.engine.ScoredWeeks;
 import com.ballknowers.draftsim.engine.PlayoffOddsService;
 import com.ballknowers.draftsim.engine.PowerRankingService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
@@ -51,6 +52,7 @@ public class LeagueHistoryController {
     private final PlayoffOddsService playoffOdds;
     private final LeagueRecordService records;
     private final ManagerCareerService careers;
+    private final ScoredWeeks scoredWeeks;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                    PowerRankingService power, ProfileService profiles,
@@ -58,7 +60,8 @@ public class LeagueHistoryController {
                                    LeagueMemberRepository leagueMembers, RankingBallotRepository ballots,
                                    MemberRankingService memberRankings, OwnerProperties ownerProperties,
                                    PlayoffOddsService playoffOdds, LeagueRecordService records,
-                                   ManagerCareerService careers) {
+                                   ManagerCareerService careers, ScoredWeeks scoredWeeks) {
+        this.scoredWeeks = scoredWeeks;
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
@@ -857,11 +860,25 @@ public class LeagueHistoryController {
                     "only this league's Sleeper commissioner may recompute the power rankings"));
         }
 
+        // The week-0 preseason baseline does not depend on the requested week or on finality.
         var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
-        var realized = power.computeRealized(league.get().id(), season, week);
+
+        // The server, not the caller, keeps a partial week out of a snapshot: a request for an
+        // in-progress week (the power rankings button sends the open week) writes no realized
+        // ranking for it, and odds run through the latest FINAL week instead. Finality is
+        // ScoredWeeks' (spec 009 WeekFinality; no fetch rows or loaded_complete = all final).
+        var scored = scoredWeeks.of(league.get().id());
+        boolean weekFinal = scored.isFinal(week);
+        int oddsThrough = weekFinal ? week : Math.min(week, scored.latestFinal());
+
+        var realized = weekFinal
+                ? power.computeRealized(league.get().id(), season, week)
+                : new com.ballknowers.draftsim.store.PowerRankingRepository.Entry[0];
         // Same trigger as the box-score snapshot, deliberately: odds are never
         // computed on a page load (claude/playoff-odds.md).
-        var odds = playoffOdds.compute(league.get().id(), season, week);
+        var odds = oddsThrough >= 1
+                ? playoffOdds.compute(league.get().id(), season, oddsThrough)
+                : java.util.List.<com.ballknowers.draftsim.store.PlayoffOddsRepository.Entry>of();
 
         // LinkedHashMap, not Map.of: the reason below is legitimately absent on
         // the happy path, and Map.of throws on a null value.
@@ -869,13 +886,23 @@ public class LeagueHistoryController {
         response.put("week0", week0.entries().length);
         response.put("realized", realized.length);
         response.put("playoffOdds", odds.size());
+        // The week the odds were ACTUALLY computed through, which is the requested week only
+        // when that week is final. Absent when no week is final yet, with the reason beside it.
+        if (oddsThrough >= 1) {
+            response.put("playoffOddsThroughWeek", oddsThrough);
+        } else {
+            response.put("playoffOddsSkipped", "no week of this season is final yet, so there is nothing to forecast from");
+        }
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess
         // whether the snapshot failed to persist. A zero at week 0 usually
         // means it was already set (write-once), which is not a gap -- but it
         // can also mean the league has not drafted, and that one IS reported.
-        if (realized.length == 0) {
+        if (!weekFinal) {
+            response.put("realizedSkipped", "week " + week + " is not final yet (scores can still change), so no ranking was saved for it"
+                    + (oddsThrough >= 1 ? "; odds ran through week " + oddsThrough : ""));
+        } else if (realized.length == 0) {
             response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
         }
         // Week 0 has one gap worth reporting and only one: a league that has
