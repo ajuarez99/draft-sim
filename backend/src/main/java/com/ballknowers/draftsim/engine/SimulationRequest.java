@@ -32,8 +32,17 @@ public record SimulationRequest(
         List<String> excludePlayerIds,
         Long seed
 ) {
+    /**
+     * Hand-set, not measured against production: 2.5x the largest value the UI
+     * ever sends (the DraftView runs select tops out at 2,000). It used to be
+     * 20,000, which one caller could spend as ~6s of every core. Clamped, not
+     * rejected, as before; the clamped value is what the {@code started} event
+     * and {@link SimulationResult#iterations()} report.
+     */
+    public static final int MAX_ITERATIONS = 5000;
+
     public SimulationRequest {
         if (iterations <= 0) iterations = 1000;
-        if (iterations > 20000) iterations = 20000;
+        if (iterations > MAX_ITERATIONS) iterations = MAX_ITERATIONS;
     }
 }

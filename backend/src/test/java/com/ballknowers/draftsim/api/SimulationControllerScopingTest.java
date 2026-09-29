@@ -42,7 +42,7 @@ class SimulationControllerScopingTest {
             new SimulationRequest("someone-elses-draft", 3, 100, null, Map.of(), null, null);
 
     private SimulationController controller() {
-        return new SimulationController(sims, membership);
+        return new SimulationController(sims, membership, new SimulationPermits(2));
     }
 
     private static DraftRepository.DraftRow row() {
@@ -61,7 +61,7 @@ class SimulationControllerScopingTest {
         // genuinely isn't ingested. A distinct "forbidden" would confirm the draft
         // exists, which is most of what enumerating draft ids wanted.
         assertTrue(e.getMessage().contains("isn't loaded yet"), e.getMessage());
-        verify(sims, never()).simulate(any(), any());
+        verify(sims, never()).simulate(any(), any(), any());
     }
 
     @Test
@@ -72,7 +72,7 @@ class SimulationControllerScopingTest {
         // worker thread: otherwise the refusal arrives as an `error` event on a
         // stream that opened with 200, which no caller treats as a denial.
         assertThrows(IllegalArgumentException.class, () -> controller().stream(REQUEST, "visitor"));
-        verify(sims, never()).simulate(any(), any());
+        verify(sims, never()).simulate(any(), any(), any());
     }
 
     @Test
@@ -81,7 +81,7 @@ class SimulationControllerScopingTest {
 
         controller().run(REQUEST, "member");
 
-        verify(sims).simulate(REQUEST, null);
+        verify(sims).simulate(eq(REQUEST), isNull(), any());
     }
 
     /**
@@ -97,6 +97,6 @@ class SimulationControllerScopingTest {
 
         controller().run(REQUEST, null);
 
-        verify(sims).simulate(REQUEST, null);
+        verify(sims).simulate(eq(REQUEST), isNull(), any());
     }
 }

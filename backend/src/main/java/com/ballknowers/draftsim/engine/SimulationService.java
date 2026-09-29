@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 
 @Service
@@ -43,6 +44,11 @@ public class SimulationService {
     }
 
     public SimulationResult simulate(SimulationRequest req, IntConsumer onProgress) {
+        return simulate(req, onProgress, () -> false);
+    }
+
+    /** @param cancelled polled by the runner every iteration; true stops the run early. */
+    public SimulationResult simulate(SimulationRequest req, IntConsumer onProgress, BooleanSupplier cancelled) {
         long setupStart = System.nanoTime();
 
         DraftRepository.DraftRow draft = drafts.bySleeperId(req.draftSleeperId())
@@ -87,7 +93,7 @@ public class SimulationService {
         log.info("request setup (board + profiles + Postgres): {} ms", setupMs);
 
         return runner.run(ctx, req.mySlot(), req.iterations(), temperature, seed,
-                buildConfidence(bySlot, fit, settings), onProgress);
+                buildConfidence(bySlot, fit, settings), onProgress, cancelled);
     }
 
     /**

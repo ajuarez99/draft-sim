@@ -82,6 +82,29 @@ class MonteCarloRunnerTest {
         }
     }
 
+    /** Cancellation must stop the work, not just the reporting: later iterations do nothing. */
+    @Test
+    void aCancelledRunStopsEarlyAndSaysSo() {
+        DraftContext c = ctx(14, 15);
+        java.util.concurrent.atomic.AtomicInteger seen = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.atomic.AtomicBoolean cancel = new java.util.concurrent.atomic.AtomicBoolean();
+        // Cancel from the progress callback, i.e. mid-run, as a dead SSE client would.
+        assertThrows(SimulationCancelledException.class, () -> new MonteCarloRunner()
+                .run(c, 11, 2000, 1.0, 3L, CONFIDENCE, done -> {
+                    seen.set(done);
+                    cancel.set(true);
+                }, cancel::get));
+        assertTrue(seen.get() > 0 && seen.get() < 2000, "expected a mid-run stop, done=" + seen.get());
+    }
+
+    @Test
+    void aRunThatIsNeverCancelledBehavesAsBefore() {
+        DraftContext c = ctx(14, 15);
+        SimulationResult viaOld = new MonteCarloRunner().run(c, 11, 50, 1.0, 9L, CONFIDENCE, null);
+        SimulationResult viaNew = new MonteCarloRunner().run(c, 11, 50, 1.0, 9L, CONFIDENCE, null, () -> false);
+        assertEquals(viaOld, viaNew);
+    }
+
     @Test
     void aggregationCoversEveryRequestedPick() {
         DraftContext c = ctx(14, 15);

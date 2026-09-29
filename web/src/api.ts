@@ -165,7 +165,12 @@ export { ApiError, isNotFound }
 async function apiError(res: Response): Promise<ApiError> {
   // Several controllers answer 404 with an empty body, so a parse failure is normal.
   const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
-  return new ApiError(res.status, body.error ?? body.message ?? undefined)
+  const retryAfter = Number(res.headers?.get?.('Retry-After'))
+  return new ApiError(
+    res.status,
+    body.error ?? body.message ?? undefined,
+    Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+  )
 }
 
 async function json<T>(res: Response): Promise<T> {
@@ -1571,6 +1576,39 @@ export async function streamSimulation(
 
   if (!result) throw new Error('stream ended without a result')
   return result
+}
+
+/**
+ * `streamSimulation` for a resim the user did not explicitly ask for (a pick
+ * landing, a locked-in choice). The backend waits briefly for a simulation
+ * permit and then answers 429 + Retry-After (audit 05); on draft night every
+ * tab resimulates at once, so a 429 here is expected weather, not a failure.
+ * Retry quietly, up to `maxRetries` times, honouring Retry-After with a capped
+ * backoff. The caller keeps its previous board on screen meanwhile. Anything
+ * other than a 429, or a 429 that survives every retry, is thrown as-is.
+ * A user-initiated "Run" should call `streamSimulation` directly and show the
+ * error at once.
+ */
+export async function streamSimulationQuietly(
+  req: SimRequest,
+  onProgress: (fraction: number) => void,
+  signal?: AbortSignal,
+  opts: { maxRetries?: number; capMs?: number } = {},
+): Promise<SimulationResult> {
+  const maxRetries = opts.maxRetries ?? 3
+  const capMs = opts.capMs ?? 8000
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await streamSimulation(req, onProgress, signal)
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 429 || attempt >= maxRetries || signal?.aborted) throw e
+      const waitMs = Math.min(capMs, (e.retryAfterSeconds ?? 2) * 1000 * (attempt + 1))
+      await new Promise<void>((resolve, reject) => {
+        const id = setTimeout(resolve, waitMs)
+        signal?.addEventListener('abort', () => { clearTimeout(id); reject(e) }, { once: true })
+      })
+    }
+  }
 }
 
 // --- claude/power-rankings-ballots.md: member ballots (power-ranking mode 2) ---

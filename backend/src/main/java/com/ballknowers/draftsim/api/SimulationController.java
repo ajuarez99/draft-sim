@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.engine.SimulationCancelledException;
 import com.ballknowers.draftsim.engine.SimulationRequest;
 import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.engine.SimulationService;
@@ -21,10 +22,12 @@ public class SimulationController {
 
     private final SimulationService sims;
     private final LeagueMembership membership;
+    private final SimulationPermits permits;
 
-    public SimulationController(SimulationService sims, LeagueMembership membership) {
+    public SimulationController(SimulationService sims, LeagueMembership membership, SimulationPermits permits) {
         this.sims = sims;
         this.membership = membership;
+        this.permits = permits;
     }
 
     /**
@@ -53,7 +56,9 @@ public class SimulationController {
     public SimulationResult run(@RequestBody SimulationRequest request,
                                 @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         requireVisible(request, sleeperUserId);
-        return sims.simulate(request, null);
+        try (SimulationPermits.Lease lease = permits.acquire(sleeperUserId, request.draftSleeperId())) {
+            return sims.simulate(request, null, lease::cancelled);
+        }
     }
 
     /**
@@ -67,49 +72,72 @@ public class SimulationController {
         // stream it carries a real header and can fail as an ordinary 400 rather
         // than as an `error` event on a stream that opened successfully.
         requireVisible(request, sleeperUserId);
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
-
-        Thread.ofVirtual().name("sim-stream").start(() -> {
-            try {
-                emitter.send(SseEmitter.event().name("started")
-                        .data(Map.of("iterations", request.iterations())));
-
-                SimulationResult result = sims.simulate(request, done -> {
-                    try {
-                        emitter.send(SseEmitter.event().name("progress").data(Map.of(
-                                "completed", done,
-                                "total", request.iterations(),
-                                "fraction", done / (double) request.iterations())));
-                    } catch (Exception e) {
-                        // client went away; the run will finish and be discarded.
-                        // Exception, not IOException: send() on an already-completed
-                        // emitter throws IllegalStateException, which a narrower
-                        // catch lets escape -- out of the progress callback, up
-                        // through SimulationService, killing the run.
-                    }
-                });
-
-                emitter.send(SseEmitter.event().name("result").data(result));
-                emitter.complete();
-            } catch (Exception e) {
-                log.warn("simulation stream failed", e);
-                try {
-                    // Map.of rejects a null value, and a message-less exception has one —
-                    // fall back to the class name rather than the literal string "null".
-                    String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-                    emitter.send(SseEmitter.event().name("error")
-                            .data(Map.of("message", message)));
-                } catch (Exception ignored) {
-                    // Nothing left to tell. Exception rather than IOException for the
-                    // same reason as above: this send happens on the failure path,
-                    // where the emitter is most likely to be already completed, and
-                    // an escaping IllegalStateException here would skip
-                    // completeWithError below and leak the emitter until timeout.
-                }
-                emitter.completeWithError(e);
-            }
-        });
-
+        // Also before the emitter, for the same reason: a 429 has to be a real
+        // status. Released in the worker's finally, or here if it never starts.
+        SimulationPermits.Lease lease = permits.acquire(sleeperUserId, request.draftSleeperId());
+        SseEmitter emitter;
+        try {
+            emitter = new SseEmitter(SSE_TIMEOUT_MS);
+            // The client going away stops the run (and frees the permit) rather
+            // than letting it finish into the void.
+            emitter.onCompletion(lease::cancel);
+            emitter.onTimeout(lease::cancel);
+            emitter.onError(t -> lease.cancel());
+            SseEmitter e = emitter;
+            Thread.ofVirtual().name("sim-stream").start(() -> runStream(request, e, lease));
+        } catch (RuntimeException | Error t) {
+            lease.close();
+            throw t;
+        }
         return emitter;
+    }
+
+    private void runStream(SimulationRequest request, SseEmitter emitter, SimulationPermits.Lease lease) {
+        try {
+            emitter.send(SseEmitter.event().name("started")
+                    .data(Map.of("iterations", request.iterations())));
+
+            SimulationResult result = sims.simulate(request, done -> {
+                try {
+                    emitter.send(SseEmitter.event().name("progress").data(Map.of(
+                            "completed", done,
+                            "total", request.iterations(),
+                            "fraction", done / (double) request.iterations())));
+                } catch (Exception e) {
+                    // Client went away: stop the run so it stops costing CPU and
+                    // gives its permit back, instead of finishing into the void.
+                    // Exception, not IOException: send() on an already-completed
+                    // emitter throws IllegalStateException, which a narrower
+                    // catch lets escape -- out of the progress callback, up
+                    // through SimulationService, killing the run.
+                    lease.cancel();
+                }
+            }, lease::cancelled);
+
+            emitter.send(SseEmitter.event().name("result").data(result));
+            emitter.complete();
+        } catch (Exception e) {
+            if (e instanceof SimulationCancelledException) {
+                log.info("simulation stream stopped early (client gone or replaced by a newer run)");
+            } else {
+                log.warn("simulation stream failed", e);
+            }
+            try {
+                // Map.of rejects a null value, and a message-less exception has one --
+                // fall back to the class name rather than the literal string "null".
+                String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                emitter.send(SseEmitter.event().name("error")
+                        .data(Map.of("message", message)));
+            } catch (Exception ignored) {
+                // Nothing left to tell. Exception rather than IOException for the
+                // same reason as above: this send happens on the failure path,
+                // where the emitter is most likely to be already completed, and
+                // an escaping IllegalStateException here would skip
+                // completeWithError below and leak the emitter until timeout.
+            }
+            emitter.completeWithError(e);
+        } finally {
+            lease.close();
+        }
     }
 }

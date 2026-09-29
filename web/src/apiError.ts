@@ -5,10 +5,13 @@
  */
 export class ApiError extends Error {
   readonly status: number
-  constructor(status: number, message?: string) {
+  /** Seconds from a `Retry-After` header, when the server sent a numeric one. */
+  readonly retryAfterSeconds?: number
+  constructor(status: number, message?: string, retryAfterSeconds?: number) {
     super(message || `HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 

@@ -86,7 +86,7 @@ class SimulationServiceTest {
         assertDoesNotThrow(() -> service.simulate(req, null));
 
         ArgumentCaptor<DraftContext> ctxCaptor = ArgumentCaptor.forClass(DraftContext.class);
-        verify(runner).run(ctxCaptor.capture(), eq(1), eq(100), anyDouble(), anyLong(), any(), any());
+        verify(runner).run(ctxCaptor.capture(), eq(1), eq(100), anyDouble(), anyLong(), any(), any(), any());
 
         DraftContext ctx = ctxCaptor.getValue();
         assertEquals(Map.of(1, 501L), ctx.completedPicks(),

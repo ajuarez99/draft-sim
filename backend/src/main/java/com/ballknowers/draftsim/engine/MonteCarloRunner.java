@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 
 /**
@@ -34,6 +35,22 @@ public class MonteCarloRunner {
                                 long seed,
                                 SimulationResult.Confidence confidence,
                                 IntConsumer onProgress) {
+        return run(ctx, mySlot, iterations, temperature, seed, confidence, onProgress, () -> false);
+    }
+
+    /**
+     * @param cancelled polled before every iteration. Once it answers true the
+     *                  remaining iterations return immediately without doing
+     *                  work and the run ends in {@link SimulationCancelledException}.
+     */
+    public SimulationResult run(DraftContext ctx,
+                                int mySlot,
+                                int iterations,
+                                double temperature,
+                                long seed,
+                                SimulationResult.Confidence confidence,
+                                IntConsumer onProgress,
+                                BooleanSupplier cancelled) {
 
         int teams = ctx.settings().teams();
         int rounds = ctx.settings().rounds();
@@ -51,6 +68,7 @@ public class MonteCarloRunner {
             for (int i = 0; i < iterations; i++) {
                 long runSeed = seed + i * 0x9E3779B97F4A7C15L;
                 futures.add(pool.submit(() -> {
+                    if (cancelled.getAsBoolean()) return null;
                     DraftSimulator.RunResult r =
                             new DraftSimulator(ctx, scorer, temperature, runSeed).run(myPicks, SNAPSHOT_DEPTH);
                     int n = done.incrementAndGet();
@@ -60,7 +78,8 @@ public class MonteCarloRunner {
             }
             for (Future<DraftSimulator.RunResult> f : futures) {
                 try {
-                    results.add(f.get());
+                    DraftSimulator.RunResult r = f.get();
+                    if (r != null) results.add(r);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("simulation interrupted", e);
@@ -68,6 +87,10 @@ public class MonteCarloRunner {
                     throw new IllegalStateException("simulation failed", e.getCause());
                 }
             }
+        }
+        if (cancelled.getAsBoolean()) {
+            log.info("{} iteration run cancelled after {} ms", iterations, (System.nanoTime() - loopStart) / 1_000_000);
+            throw new SimulationCancelledException();
         }
         long loopMs = (System.nanoTime() - loopStart) / 1_000_000;
 
