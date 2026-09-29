@@ -35,6 +35,8 @@ function data(over: Partial<Data> = {}): Data {
     season: 2026,
     week: 1,
     latestScoredWeek: 1,
+    latestFinalWeek: 1,
+    weekFinal: true,
     sport: 'nfl',
     playersPlayMultiplePerPeriod: false,
     matchups: [
@@ -122,6 +124,7 @@ describe('Weekly report', () => {
         reason: 'week 9 has not been scored for this league',
         week: 9,
         latestScoredWeek: 2,
+        latestFinalWeek: 2,
         matchups: [],
         topPerformers: [],
         awards: [],
@@ -165,7 +168,7 @@ describe('Weekly report week selection', () => {
   const weekInput = () => screen.findByLabelText('Week') as Promise<HTMLInputElement>
 
   it('opens on the latest scored week when the URL names none', async () => {
-    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2 }))
+    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2 }))
     renderPage()
 
     expect((await weekInput()).value).toBe('2')
@@ -222,11 +225,30 @@ describe('Weekly report week selection', () => {
   })
 
   it('ignores a ?week= that is not a whole week and falls back to the latest', async () => {
-    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2 }))
+    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2 }))
     renderPage('/leagues/L1/weekly-report?week=abc')
 
     expect((await weekInput()).value).toBe('2')
     expect(getWeeklyReport).toHaveBeenCalledWith('L1', 0)
+  })
+
+  it('defaults to the latest FINAL week, with no in-progress label, while a later week is in progress', async () => {
+    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 3, latestFinalWeek: 2, weekFinal: true }))
+    renderPage()
+
+    const input = await weekInput()
+    expect(input.value).toBe('2')
+    expect(input.max).toBe('3') // the in-progress week can still be opened on purpose
+    expect(screen.queryByText(/scores can still change/)).not.toBeInTheDocument()
+  })
+
+  it('labels an in-progress week, whether chosen on purpose or the fallback when nothing is final', async () => {
+    getWeeklyReport.mockResolvedValue(data({ week: 1, latestScoredWeek: 1, latestFinalWeek: 0, weekFinal: false }))
+    renderPage()
+
+    expect(await screen.findByText(/scores can still change/)).toBeInTheDocument()
+    expect(screen.getByText('Week 1 matchups')).toBeInTheDocument()
+    expect((await weekInput()).max).toBe('1')
   })
 
   it('shows a plain "nothing scored" panel, and no week picker, before any week is scored', async () => {
@@ -236,6 +258,8 @@ describe('Weekly report week selection', () => {
         reason: 'no week has been scored for this league yet',
         week: 0,
         latestScoredWeek: 0,
+        latestFinalWeek: 0,
+        weekFinal: false,
         matchups: [],
         topPerformers: [],
         awards: [],

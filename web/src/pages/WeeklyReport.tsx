@@ -125,6 +125,11 @@ export default function WeeklyReport() {
 
       {data && data.available && (
         <>
+          {!data.weekFinal && (
+            <p className="wr-inprogress small" role="status">
+              <strong>In progress</strong> — scores can still change until the week closes.
+            </p>
+          )}
           <section className="panel">
             <h3 className="cond">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />

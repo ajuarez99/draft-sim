@@ -136,12 +136,15 @@ class WeeklyReportShapeTest {
     void latestScoredWeekRidesBothTheAvailableAndTheUnavailableShape() {
         WeeklyReportService.Result behind = new WeeklyReportService.Result(
                 true, null, 2026, null, 1, Sport.NFL, false, List.of(), List.of(),
-                null, null, null, null, List.of(), List.of(), 2);
-        assertEquals(2, WeeklyReportController.body(behind).get("latestScoredWeek"));
+                null, null, null, null, List.of(), List.of(), 2, 1, false);
+        Map<String, Object> inProgress = WeeklyReportController.body(behind);
+        assertEquals(2, inProgress.get("latestScoredWeek"));
+        assertEquals(1, inProgress.get("latestFinalWeek"));
+        assertEquals(false, inProgress.get("weekFinal"));
 
         WeeklyReportService.Result none = new WeeklyReportService.Result(
                 false, "no week has been scored for this league yet", 2026, null, 0, Sport.NFL, false,
-                List.of(), List.of(), null, null, null, null, List.of(), List.of(), 0);
+                List.of(), List.of(), null, null, null, null, List.of(), List.of(), 0, 0, false);
         Map<String, Object> body = WeeklyReportController.body(none);
         assertEquals(0, body.get("latestScoredWeek"), "zero, not absent: nothing scored is a fact");
         assertEquals(0, body.get("week"));

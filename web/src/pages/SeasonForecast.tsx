@@ -96,12 +96,12 @@ export default function SeasonForecast() {
           season={data.season}
           requestedSeason={data.requestedSeason}
           notice={
-            data.reason === 'NOT_COMPUTED' && data.latestScoredWeek > 0 ? (
+            data.reason === 'NOT_COMPUTED' && data.latestFinalWeek > 0 ? (
               <RecomputeControl
                 data={data}
                 computing={computing}
                 onRecompute={recompute}
-                label={`Recompute through week ${data.latestScoredWeek}`}
+                label={`Recompute through week ${data.latestFinalWeek}`}
               />
             ) : null
           }
@@ -188,7 +188,7 @@ function StaleNotice({
   onRecompute: (season: number, throughWeek: number) => void
 }) {
   const snapshotWeek = data.week ?? 0
-  const behind = data.latestScoredWeek - snapshotWeek
+  const behind = data.latestFinalWeek - snapshotWeek
   if (behind <= 0) return null
   return (
     <div className="sf-stale" role="status">
@@ -200,7 +200,7 @@ function StaleNotice({
         data={data}
         computing={computing}
         onRecompute={onRecompute}
-        label={`Recompute through week ${data.latestScoredWeek}`}
+        label={`Recompute through week ${data.latestFinalWeek}`}
       />
     </div>
   )
@@ -229,7 +229,7 @@ function RecomputeControl({
         type="button"
         className="action-button"
         disabled={computing}
-        onClick={() => onRecompute(data.season, data.latestScoredWeek)}
+        onClick={() => onRecompute(data.season, data.latestFinalWeek)}
       >
         {computing ? 'Computing…' : label}
       </button>{' '}

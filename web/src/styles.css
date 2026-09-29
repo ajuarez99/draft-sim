@@ -4599,3 +4599,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .sf-stale p { margin: 0; }
 .sf-stale p + p { margin-top: 6px; }
+
+.wr-inprogress {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}

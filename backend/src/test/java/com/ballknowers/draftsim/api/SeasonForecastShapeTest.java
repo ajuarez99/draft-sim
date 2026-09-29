@@ -20,7 +20,7 @@ class SeasonForecastShapeTest {
 
     private static PlayoffOddsService.Forecast available(int snapshotWeek, int latest) {
         return new PlayoffOddsService.Forecast(true, null, 2026, null, snapshotWeek, 10000,
-                "shrunk-normal-v1", null, List.of(), latest);
+                "shrunk-normal-v1", null, List.of(), latest, latest);
     }
 
     @Test
@@ -33,10 +33,11 @@ class SeasonForecastShapeTest {
     @Test
     void aRefusalStillCarriesTheLatestScoredWeek() {
         var f = new PlayoffOddsService.Forecast(false, PlayoffOddsService.Unavailable.NOT_COMPUTED,
-                2026, null, 0, 0, null, null, List.of(), 3);
+                2026, null, 0, 0, null, null, List.of(), 3, 2);
         Map<String, Object> body = SeasonForecastController.body(f, true);
         assertEquals("NOT_COMPUTED", body.get("reason"));
         assertEquals(3, body.get("latestScoredWeek"));
+        assertEquals(2, body.get("latestFinalWeek"), "final can trail stored: week 3 is in progress");
     }
 
     /** Display flag only; the route's own gates (admin token, identity) are tested elsewhere. */

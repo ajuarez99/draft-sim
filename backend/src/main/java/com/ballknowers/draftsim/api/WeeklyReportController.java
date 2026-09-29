@@ -53,6 +53,10 @@ public class WeeklyReportController {
         // The newest week with stored scores, 0 when none: the page's default week and the top of
         // its week input. Present on every shape.
         out.put("latestScoredWeek", r.latestScoredWeek());
+        // Final, and whether THIS week is: an in-progress week is shown on purpose or as the
+        // fallback when nothing is final yet, and the page has to say scores can still change.
+        out.put("latestFinalWeek", r.latestFinalWeek());
+        out.put("weekFinal", r.weekFinal());
         out.put("sport", r.sport().code());
         // Stated rather than inferred: the client renders from a fact the server
         // asserts, not by guessing the sport's rules from which arrays it finds.

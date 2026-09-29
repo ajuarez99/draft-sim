@@ -1748,11 +1748,15 @@ export type SeasonForecast = {
   model?: string | null
   teams: ForecastTeam[]
   /**
-   * The newest week with stored scores (0 when none). `week` is the week the stored
-   * snapshot was taken at, so `latestScoredWeek > week` means the forecast is behind.
-   * Present on every shape, refusals included.
+   * The newest week with stored scores (0 when none), in progress or not. `week` is the
+   * week the stored snapshot was taken at. Present on every shape, refusals included.
    */
   latestScoredWeek: number
+  /**
+   * The newest FINAL week (0 when none): the one the "behind" notice counts against and the
+   * recompute targets, so an in-progress week never reads as a week scored since the forecast.
+   */
+  latestFinalWeek: number
   /** Display only: whether to offer the recompute button. The route re-checks. */
   canCommission: boolean
 }
@@ -1840,8 +1844,12 @@ export type WeeklyReport = {
   requestedSeason?: number | null
   /** The week this report is about. For a request of week 0 ("latest"), the resolved week. */
   week: number
-  /** The newest week with stored scores, 0 when none: the default week and the input's top. */
+  /** The newest STORED week, 0 when none: the top of the week input (an in-progress week can be viewed on purpose). */
   latestScoredWeek: number
+  /** The newest FINAL week, 0 when none: what week 0 ("latest") resolves to when any week is final. */
+  latestFinalWeek: number
+  /** Whether `week` is final. False means scores can still change; the page says so. */
+  weekFinal: boolean
   sport: Sport
   playersPlayMultiplePerPeriod: boolean
   matchups: WeeklyMatchup[]

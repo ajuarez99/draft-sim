@@ -60,7 +60,10 @@ public class SeasonForecastController {
         out.put("requestedSeason", f.requestedSeason());
         // How far the league has scored, beside the week the snapshot was taken at, so the page
         // can say the forecast is behind. Present on every shape, refusals included.
+        // Stored, and FINAL (see ScoredWeeks): the notice counts final weeks only, so an
+        // in-progress week never reads as "a week scored since this forecast".
         out.put("latestScoredWeek", f.latestScoredWeek());
+        out.put("latestFinalWeek", f.latestFinalWeek());
         out.put("canCommission", canCommission);
         if (!f.available()) {
             // A named reason, not an empty table: "this league's seeding is not
