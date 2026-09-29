@@ -94,18 +94,24 @@ designed.
 
 Filling it is two POSTs, **and the order matters**:
 
-    curl -X POST "https://api.ballknowers.co/api/ingest/league-history/<sleeperLeagueId>"
-    curl -X POST "https://api.ballknowers.co/api/ingest/projections?sport=nfl&season=2026&fromWeek=<lastScored+1>&toWeek=<playoffWeekStart-1>"
+    curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" "https://api.ballknowers.co/api/ingest/league-history/<sleeperLeagueId>"
+    curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" "https://api.ballknowers.co/api/ingest/projections?sport=nfl&season=2026&fromWeek=<lastScored+1>&toWeek=<playoffWeekStart-1>"
+
+`/api/ingest/**` needs the admin token (see "The security posture" below): without
+the `X-Admin-Token` header, or with `ADMIN_TOKEN` unset on the backend, every one of
+these answers 403. `$ADMIN_TOKEN` here is the same value the `draft-sim` service has.
 
 The history ingest is what sets `lastScored`, which decides the right `fromWeek`
 for projections. Ask for that window rather than guessing it: after the history
-ingest, `GET /api/leagues/<id>/analysis` reports it as `window.fromWeek`.
+ingest, `GET /api/leagues/<id>/analysis` (which needs `X-Sleeper-User: <a member's id>`, or the
+admin token) reports it as `window.fromWeek`.
 
 Measured against production: 2 seasons / 24 rosters / 216 weeks / 156 fixtures,
 then 13 weeks / 6,044 projection rows in about two seconds. Both are idempotent.
 
 In PowerShell, `curl` is an alias for `Invoke-WebRequest` and has no `-X`. Use
-`curl.exe -X POST "..."` or `Invoke-RestMethod -Method Post -Uri "..."`.
+`curl.exe -X POST -H "X-Admin-Token: $env:ADMIN_TOKEN" "..."` or
+`Invoke-RestMethod -Method Post -Headers @{'X-Admin-Token'=$env:ADMIN_TOKEN} -Uri "..."`.
 
 ### Repairing the league-seasons that lost their pairings
 
@@ -129,7 +135,7 @@ derive it from and no backup. The values exist only in Sleeper's matchups
 endpoint, so repair means asking Sleeper again:
 
     DATABASE_URL="<prod url>" API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh
-    DATABASE_URL="<prod url>" API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh --apply
+    ADMIN_TOKEN="<the backend's ADMIN_TOKEN>" DATABASE_URL="<prod url>" API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh --apply
 
 Without `--apply` it reports and changes nothing. It finds the affected seasons,
 collapses them to chain **heads** (the ingest walks `previous_league_id`
@@ -159,13 +165,15 @@ Set on the `draft-sim` (backend) service unless noted.
 | Variable | Notes |
 |---|---|
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | Railway reference variables off the Postgres plugin |
-| `API_TOKEN` | **Currently blank in production — authentication is OFF.** See below |
+| `API_TOKEN` | **Currently blank in production — the shared bearer gate is OFF.** See below |
+| `ADMIN_TOKEN` | **The operator secret.** Sent as `X-Admin-Token`; gates `/api/ingest/**` and the commissioner-only actions, and overrides the membership checks for curl. **Blank means admin is DISABLED and every one of those refuses** (fail closed, the opposite of `API_TOKEN`). Server-side only: never a `VITE_` variable. **Not yet set in production** — set it before the next ingest, or none can be run |
+| `REFRESH_SECRET` | The daily GitHub Action's secret, `X-Refresh-Secret`; blank means `/api/refresh/daily` does not exist. Deliberately separate from `ADMIN_TOKEN`: the cron should not hold a secret that can rewrite picks |
 | `CORS_ORIGINS` | Exact frontend origin, scheme included, no trailing slash |
 | `PORT` | Railway injects it; the app reads it |
 | `LOG_LEVEL` | `INFO` in production; defaults to `DEBUG` |
 | `WEIGHTS_FILE` | The image sets it to `/app/config/weights.yml` |
 | `DB_POOL_SIZE` | Defaults to 10 |
-| `APP_OWNER_SLEEPER_USER_ID` | Fallback identity only; `X-Sleeper-User` wins when present |
+| `APP_OWNER_SLEEPER_USER_ID` | **A seat-preselect default only, never an authorization.** It picks which draft seat to highlight; a header-less request is no longer let through because of it. (It still satisfies the commissioner *identity* check, but that check is now backed by `ADMIN_TOKEN`, which is what actually gates) |
 | `VITE_API_BASE` | **Frontend service.** Baked in at Docker *build* time |
 
 **`VITE_API_BASE` is inlined by Vite at build time**, so changing it requires a
@@ -177,32 +185,85 @@ anything unexpected before assuming the Dockerfile is broken.
 
 ## The security posture, stated plainly
 
-`API_TOKEN` is blank, so **every route is open to the internet**, including
-`/api/ingest/*` — anyone can make the server crawl an arbitrary Sleeper league
-into the shared database. The app logs which mode it started in; check the logs
-rather than assuming.
+**Verified** means run against a real Postgres and the real filters/CORS mapping in the test
+suite; **assumed** means reasoned from the code and not executed. Where a line is assumed it
+says so.
 
-Sign-in is **identification, not authentication** (claude/user-identity-and-onboarding.md):
-anyone can type `popsharky` and get Allan's seat highlighting and league list.
-There is no password and nothing is hidden. That is an accepted tradeoff for a
-friends-and-league-mates tool and stops being acceptable the moment anything
-private lands in the database.
+**Three separate mechanisms, easy to confuse:**
 
-**What scoping does exist, and what it is worth.** Every league- and
-draft-addressed route answers 404 for a signed-in caller who is not in that
-league — the draft list and each `/api/drafts/{id}/…` route, `/leagues/{id}/history`,
-`/power`, `/analysis`, `/api/managers/{id}/history`, and forking a live draft
-into a mock. Mock sessions are owned (V8). The rule lives in one place,
-`store/LeagueMembership`, pinned by `LeagueMembershipIT`.
+| Mechanism | Header | Blank/unset means | Protects |
+|---|---|---|---|
+| Sign-in identity | `X-Sleeper-User` | **the request sees nothing league-scoped** (it used to see everything) | league, draft, mock, refresh, manager routes |
+| Admin token (`ADMIN_TOKEN`) | `X-Admin-Token` | admin **disabled**, its routes refuse | `/api/ingest/**`, commissioner-only actions, curl override |
+| Shared bearer (`API_TOKEN`) | `Authorization: Bearer` | gate **off**, every route open | a blanket gate; currently unused in production |
 
-Deliberately unscoped: `/api/ingest/*`, `/api/board`, `/api/sims`, and
-`GET`/`PUT`/`DELETE /api/managers` — manager profiles are a shared model layer,
-not a per-league resource.
+**What changed on 2026-09-29 (claude/audit-2026-09-28/01 and /04, option D).** Before it,
+leaving `X-Sleeper-User` off got *more* than signing in as a stranger: production answered
+200 to a header-less `GET /api/leagues/<id>/analysis` and 404 to a stranger's id, and a
+header-less caller could read and pick into anyone's mock, or write any seat's manual pick.
+Now a blank identity is refused on every scoped route (verified by `AccessControlMvcIT`). The
+only override is a valid `X-Admin-Token`.
 
-**Treat all of it as scoping, not security.** `X-Sleeper-User` is an unverified
-claim and Sleeper ids are public, so anyone who wants a league's data can present
-a member's id and get it. What it buys is that the app no longer hands every
-visitor every league by default. A real boundary needs real auth.
+**What is protected now:**
+
+- **Every league- and draft-addressed route** answers 404 for a caller who is not in that
+  league *or has no identity*: the draft list (empty), each `/api/drafts/{id}/...` route
+  including the live SSE stream's `?user=`, `/leagues/{id}/history`, `/power`, `/analysis`,
+  `/ballot`, `/superlatives`, `/conduct-list`, `/roster-management`, `/transactions`,
+  `/expected-wins`, `/forecast`, `/weekly-report/{week}`, the refresh routes,
+  `/api/managers/{id}/history`, and forking a live draft into a mock. (`roster-management`,
+  `transactions`, `expected-wins`, `forecast` and `weekly-report` had **no scoping at all**
+  until this change.) The rule lives in `store/LeagueMembership`, pinned by
+  `LeagueMembershipIT`.
+- **Mock drafts:** listing shows nothing without an identity, reading and picking are the
+  owner's only, and creating one needs an identity. An *unowned* legacy session (V8's closed
+  set, owner null) is still usable by any signed-in identity, deliberately: it has no owner to
+  defer to and can no longer be created.
+- **`/api/ingest/**` needs the admin token.** A browser never holds it. The web app's own
+  add-a-league, setup and "Load past seasons" calls go to `/api/setup/**` instead: the same
+  work, authorised by membership (the caller must be signed in and appear in the league, by
+  our data or by Sleeper's public league-users list). `POST /api/refresh/players` needs an
+  identity.
+- **Commissioner-only actions** (conduct-list add/remove, the commissioner ranking, and
+  "Recompute", i.e. `/power/compute`, which used to check membership only) need the admin
+  token **and** the commissioner identity. The identity is a header anyone can copy out of
+  Sleeper's public `GET /league/{id}/users` (`is_owner: true`), so the token is what actually
+  gates. In the browser the commissioner is asked for the key once; it is kept in
+  `localStorage` on that device, with a Clear control beside the controls.
+
+**Operator escape hatches (curl).** A valid `X-Admin-Token` lets a request with *no*
+`X-Sleeper-User` through the membership checks. This is the draft-night manual pick:
+
+    curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+         -d '{"pickNo":17,"sleeperPlayerId":"4046"}' https://api.ballknowers.co/api/drafts/<id>/picks
+
+The token overrides only a *blank* identity; a named stranger stays a stranger. A commissioner
+action from curl needs the commissioner's `X-Sleeper-User` as well as the token.
+
+**Local dev:** `ADMIN_TOKEN` defaults to blank, so locally `/api/ingest/**` **refuses** too. Set
+one in the shell that runs `bootRun` (`ADMIN_TOKEN=dev ./gradlew bootRun`) and pass
+`-H "X-Admin-Token: dev"` when you curl an ingest. The test JVM sets its own
+(`build.gradle.kts`), so the suite does not depend on your environment.
+
+**What is still only scoping, not security (assumed, and stated so):**
+
+- `X-Sleeper-User` is an unverified claim and Sleeper ids are public. Sign-in is
+  *identification, not authentication* (claude/user-identity-and-onboarding.md): anyone can type
+  `popsharky` and get that manager's league list and seat highlighting. Anyone who wants a
+  league's data can present a member's id. What the scoping buys is that the app no longer
+  hands every visitor every league, and no longer gives anonymous callers *more* than members.
+- **Ballots are on the honour system.** `POST /leagues/{id}/ballot` maps to whatever member id
+  the request names, so a member's id (public) is enough to submit or overwrite their ballot.
+  Option D covers commissioner actions only; the ballot UI now says ballots are not verified.
+  Real protection needs identity the app issues itself (audit plan 04, option B).
+- The setup routes are bounded by membership, not by rate: a member can re-run their own
+  league's ingest as often as they like. `POST /api/refresh/players` is "once per sport per UTC
+  day" only in the steady state: concurrent first calls, and calls while Sleeper's player
+  endpoint is failing, each fetch (idempotent, but real traffic; not measured).
+- Deliberately unscoped: `/api/board`, `/api/sims` beyond its draft check, and
+  `GET`/`PUT`/`DELETE /api/managers`. Manager profiles are a shared model layer, not a
+  per-league resource (audit plan 02 covers the tendency writes).
+- `/api/health`, `/api/sleeper/user/*` (needed before sign-in) and CORS preflights stay open.
 
 ### If `API_TOKEN` is ever switched on
 
@@ -249,7 +310,8 @@ comfortable, 256MB may OOM. `JAVA_OPTS` sets `-XX:MaxRAMPercentage=75`.
 **Request timeouts on ingest.** `/api/ingest/all/...` does three sequential
 Sleeper crawls plus a board rebuild. If a platform timeout cuts it short, call
 the three sub-endpoints separately — `/api/ingest/players`, `/api/ingest/league/{id}`,
-`/api/ingest/board` — which is exactly why they exist as separate routes.
+`/api/ingest/board` — which is exactly why they exist as separate routes. (All need
+`X-Admin-Token`.)
 
 **SSE through a proxy.** `/api/sims/stream` is a long-lived streaming response
 and some platforms buffer it, turning live progress into one delayed dump.

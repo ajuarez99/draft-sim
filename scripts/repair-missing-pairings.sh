@@ -16,6 +16,9 @@
 #   DATABASE_URL=... API=https://api.ballknowers.co ./scripts/repair-missing-pairings.sh
 #   ./scripts/repair-missing-pairings.sh --apply        # actually run the ingests
 #
+# --apply needs ADMIN_TOKEN in the environment (the same value the backend service
+# has): /api/ingest/** refuses any request without it (claude/audit-2026-09-28/01).
+#
 # Without --apply it prints what it would do and changes nothing.
 
 set -euo pipefail
@@ -73,6 +76,11 @@ fi
 echo "${#heads[@]} chain(s) need re-ingesting:"
 printf '  %s\n' "${heads[@]}"
 
+if [ "$APPLY" = "--apply" ] && [ -z "${ADMIN_TOKEN:-}" ]; then
+    echo "ADMIN_TOKEN is not set; /api/ingest/** refuses requests without it." >&2
+    exit 1
+fi
+
 if [ "$APPLY" != "--apply" ]; then
     echo
     echo "Dry run. Re-run with --apply to perform the ingests."
@@ -83,7 +91,7 @@ for head in "${heads[@]}"; do
     echo
     echo "Re-ingesting $head ..."
     # Idempotent: every write on this path is an upsert, so re-running is safe.
-    curl -fsS -X POST "$API/api/ingest/league-history/$head"
+    curl -fsS -X POST -H "X-Admin-Token: $ADMIN_TOKEN" "$API/api/ingest/league-history/$head"
     echo
 done
 

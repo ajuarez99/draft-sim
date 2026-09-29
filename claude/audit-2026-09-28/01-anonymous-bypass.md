@@ -149,3 +149,25 @@ Run each check against a real `bootRun`, not only tests:
       the league rail, start and resume a mock. All still work, with no console errors.
 - [ ] A CORS preflight from `http://localhost:5173` still passes.
 - [ ] Backend suite: **0 skipped** (see memory "backend suite skips ITs silently").
+
+## Implemented 2026-09-29
+
+Built as amended, with these differences from the text above. Verified = run in the test suite
+(`AccessControlMvcIT` and friends); the live `bootRun` and browser checks are the parent's.
+
+- **The admin token is `X-Admin-Token`, not `Authorization: Bearer`.** `Authorization` is already
+  the `API_TOKEN` bearer channel, and reusing it would have made turning that gate on collide with
+  admin. Blank `ADMIN_TOKEN` means admin is disabled (fail closed). It is a separate secret from
+  `REFRESH_SECRET`, sharing one constant-time helper (`config/SecretCompare`).
+- **The plan said five leagues routes were scoped; five were not.** `roster-management`,
+  `transactions`, `expected-wins`, `forecast` and `weekly-report/{week}` never went through
+  `visibleLeague`, so they answered any caller, signed in or not. They are scoped now.
+- **Ingest callers.** `/api/ingest/**` needs the token; the browser's add-a-league, setup stages
+  and "Load past seasons" go to new membership-checked `/api/setup/**` routes
+  (`MemberSetupController`). `POST /api/refresh/players` now needs an identity.
+- **The "Load this league" button at `LeagueAnalysis.tsx:1067` no longer exists in this tree**
+  (wave 1's not-found work replaced it), so that bullet had nothing to change.
+- **Unowned legacy mock sessions stay usable by any signed-in identity** (documented in
+  `MockDraftService.mayUse`); creating a mock now needs an identity so none can be minted.
+- **Test infrastructure:** the test JVM sets a known admin token and a small Hikari pool
+  (see claude/lessons.md #21).

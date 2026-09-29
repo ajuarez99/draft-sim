@@ -58,3 +58,16 @@ is picked, do A's copy for everything left uncovered (under D, that's ballots).
 ## Decided 2026-09-29 (Allan)
 
 **Option D.** Commissioner-only actions require the server-side admin secret from plan 01. That covers the conduct list, the commissioner ranking, and the "Recompute week N (commissioner)" route (`POST /power/compute`), which plan 10 found only checks membership. Ballots stay on the honour system, and the page should say so.
+
+## Implemented 2026-09-29 (option D)
+
+`POST`/`DELETE /leagues/{id}/conduct-list`, `POST /power/commissioner` and
+`POST /power/compute` now need the admin token (`X-Admin-Token`, from `ADMIN_TOKEN`) **and** the
+existing commissioner identity; the token is what actually gates. `compute` had no commissioner
+check at all before; it now has both. `/power/backfill` is deliberately NOT admin-gated: it is a
+member-facing "complete my history" button that calls no Sleeper API and is idempotent.
+
+The browser asks for the key once when the server answers `403` with
+`code: "admin_token_required"`, keeps it in `localStorage` on that device, and offers a Clear
+control. It is never a `VITE_` variable. Ballots are unchanged and the ballot UI says they are not
+verified. Not built: option B (issued sessions), which is what would protect ballots.
