@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import {
@@ -15,6 +15,7 @@ import {
 } from '../api'
 import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -392,15 +393,22 @@ export default function LeagueHistory() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [computing, setComputing] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes
+  // (specs/009-auto-data-refresh): refetch, but keep what is on screen.
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
+  const loadedFor = useRef<string | null>(null)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
-    setHistory(null)
+    if (loadedFor.current !== sleeperLeagueId) {
+      loadedFor.current = sleeperLeagueId
+      setHistory(null)
+    }
     setError(null)
     getLeagueHistory(sleeperLeagueId)
       .then(setHistory)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   // Backs the error state's own button. Same call the page used to print as a
   // curl line for the reader to run in a terminal.
@@ -478,7 +486,7 @@ export default function LeagueHistory() {
         )}
 
         {history && history.seasons.length === 0 && (
-          <p className="muted">No seasons ingested for this league yet.</p>
+          <p className="muted">No seasons loaded for this league yet.</p>
         )}
 
         {history &&

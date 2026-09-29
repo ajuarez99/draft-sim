@@ -380,6 +380,25 @@ export const ingestLeague = (sleeperLeagueId: string) =>
 export const ingestPlayers = (sport: Sport) =>
   apiFetch(`/api/ingest/players?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
+/**
+ * Mirrors RefreshController.players's body (contracts/refresh-api.md). `detail` is
+ * null when the day's fetch was already done, and the backend builds this body
+ * from a mutable map for that reason. A `FAILED` outcome comes with a 500, so a
+ * caller normally sees it as a rejected promise rather than as this value.
+ */
+export type RefreshPlayersResult = {
+  outcome: 'DONE' | 'SKIPPED_ALREADY_TODAY' | 'FAILED'
+  detail: string | null
+}
+
+/**
+ * The setup flow's player-list fetch, gated to once per sport per UTC day so a
+ * burst of new leagues costs Sleeper one request, not one each (FR-009).
+ * `ingestPlayers` above is unchanged and still always fetches.
+ */
+export const refreshPlayers = (sport: Sport) =>
+  apiFetch(`/api/refresh/players?sport=${sport}`, { method: 'POST' }).then(json<RefreshPlayersResult>)
+
 export const ingestAdp = (sport: Sport) =>
   apiFetch(`/api/ingest/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
@@ -1915,6 +1934,39 @@ export type SuperlativesResponse = {
 
 export const fetchSuperlatives = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/superlatives`).then(json<SuperlativesResponse>)
+
+// --- specs/009-auto-data-refresh T024: refresh on visit ---
+
+/**
+ * Mirrors refresh/LeagueRefreshService.State. FAILED means the last attempt
+ * failed and no newer success exists; COMPLETE means the season is fully loaded
+ * and is never fetched again.
+ */
+export type RefreshState = 'FRESH' | 'RUNNING' | 'FAILED' | 'COMPLETE'
+
+/**
+ * Mirrors RefreshController's body (contracts/refresh-api.md). `leagueSleeperId`
+ * and `season` name the league-season the pages show after the resolver walks
+ * back, not necessarily the URL's. Both timestamps are null until the first
+ * success or failure, and the backend builds this body from a mutable map for
+ * that reason.
+ */
+export type RefreshStatus = {
+  state: RefreshState
+  leagueSleeperId: string
+  season: number
+  lastSuccessAt: string | null
+  lastFailureAt: string | null
+  seasons: { leagueSleeperId: string; season: number; state: RefreshState }[]
+}
+
+/** Starts a background refresh if the league is stale and returns at once. Called once per league change by the rail. */
+export const refreshLeague = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/refresh`, { method: 'POST' }).then(json<RefreshStatus>)
+
+/** Same body, starts nothing. The rail polls this while a refresh runs. */
+export const getLeagueRefresh = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/refresh`).then(json<RefreshStatus>)
 
 // --- specs/008-season-superlatives T059: the commissioner's conduct list (UNETHICAL) ---
 

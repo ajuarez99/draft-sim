@@ -45,3 +45,13 @@ sleeper:
 logging:
   level:
     com.ballknowers.draftsim: ${LOG_LEVEL:DEBUG}
+
+# Automatic data refresh (specs/009-auto-data-refresh). The staleness / retry /
+# week-finality / concurrency figures are constants in RefreshProperties, each
+# labelled hand-set and arbitrary, not settings.
+refresh:
+  on-visit:
+    # Tests set this false via a system property in build.gradle.kts (research R12).
+    enabled: true
+  # Blank means the daily route does not exist (research R8).
+  secret: ${REFRESH_SECRET:}

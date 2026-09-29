@@ -1,5 +1,51 @@
 # Ball Knowers — handoff
 
+**2026-09-28, branch `009-auto-data-refresh`: built and verified locally, not yet committed or
+deployed.** `specs/009-auto-data-refresh/` is the brief. `verification.md` records every number
+and says which checks ran.
+
+The app now refreshes its own data:
+- **Refresh on visit**, from the rail.
+- **A daily GitHub Action** for the player list (with suspensions), ADP and the board.
+- **A rebuilt per-game ingest** on Sleeper's per-week stats and schedule: about 26 calls per
+  sport-season, shared by every league, instead of 331 per league. Parity with the old walk was
+  verified row for row.
+- **Week finality**: a week stored mid-week is refetched until it's been fetched after it closed.
+- **Plain wording** everywhere. A guard test fails the build on "/api/ingest" or "ingest" in a
+  user-facing sentence.
+
+**Why it was needed (measured, read-only, on production 2026-09-28)**: NBA 2025 has adds for
+weeks 1–9 only (week 10 has 24 of 53; weeks 11–21 have none), and points for weeks 8, 9 and 19
+don't match Sleeper. Sleeper *revised* some weeks after the fact, and every earlier copy kept the
+old numbers; the local database had the same stale weeks. Spec 008's figures on production are
+therefore wrong until this ships.
+
+**To deploy** (task T046; ask Allan first, since merging to `main` deploys both Railway services):
+1. **Set `REFRESH_SECRET`** on the Railway backend service **and** as a GitHub repository secret.
+2. **V24 runs** on backend start.
+3. **The first visit per league is a full load**, measured at about 2 minutes locally for a
+   three-season NBA chain. Visit each production league once, off-peak.
+4. **Cold start is about 5 minutes on production** (measured). The workflow retries only
+   502/503/504 or no connection, for up to 15 minutes.
+5. **Run `scripts/check-weeks-vs-sleeper.py https://api.ballknowers.co <id>`** for NBA 2025 and
+   NFL 2025. It must PASS (T054).
+
+**Month-later checks** (T047, can't run yet):
+- SC-005: Railway compute stays within the $5 included, and under $1 over the ~$1.20/month pace.
+- SC-006: at least 29 of 30 scheduled runs are green.
+- SC-007: the backend still sleeps between runs.
+
+**Not verified live**: the resolver-before-week-1 case (no league is there right now), the
+`API_TOKEN` bypass of the daily route (integration test only), and an FFC failure during the
+daily job (unit test only).
+
+**Also noticed, not fixed**: `LeagueMembership.visibleLeague` lets anyone see a league with no
+stored members (`fantasy😍` answered 200 for a non-member). That's existing scoping behaviour,
+worth its own look.
+
+---
+
+
 **2026-09-23, branch `008-season-superlatives`: built and verified live, not yet committed
 or deployed.** `specs/008-season-superlatives/` is the brief. Start with
 `verification.md`, which records every number below and says which checks were and weren't

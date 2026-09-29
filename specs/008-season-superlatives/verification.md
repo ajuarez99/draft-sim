@@ -417,6 +417,11 @@ failing first.
 
 Backend on `afc3d17` (no US7 code), Postgres on 5433 via `docker compose`. Transactions re-ingested
 for both seasons first (`stored: 91` NBA, `19` NFL, which are only the weeks not already held).
+*(Corrected 2026-09-28, found by spec 009's analysis: "only the weeks not already held" is wrong.
+The same ingest printed `stored: 91` again on a later run. It refetches the last scored week
+every time, so 91 is that week's rows, not a gap being filled. The local data was already
+complete, and the stored-row counts below stand. Production is what's partial: see
+`specs/009-auto-data-refresh/research.md` R14.)*
 
 **Stored rows match Sleeper's feed exactly**, regular-season weeks only, recounted in SQL:
 - NBA 2025: FREE_AGENT 1,200, WAIVER 104 complete + 49 failed, TRADE 18, COMMISSIONER 6.

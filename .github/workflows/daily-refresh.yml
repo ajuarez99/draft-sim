@@ -1,0 +1,44 @@
+name: daily-refresh
+
+# specs/009-auto-data-refresh US3: once a day, capture what Sleeper doesn't keep
+# (the player list with its suspension tags, and ADP via the board rebuild).
+# This repo is public: nothing sensitive may appear here. The secret lives in
+# repository Secrets and is passed through the environment, never inline.
+
+on:
+  schedule:
+    - cron: "0 11 * * *"   # 11:00 UTC, after the last NBA game and Sleeper's overnight processing
+  workflow_dispatch: {}
+
+permissions: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Call the daily refresh endpoint
+        env:
+          REFRESH_SECRET: ${{ secrets.REFRESH_SECRET }}
+        # Retry ONLY what a Railway cold start produces: 502/503/504 or no connection
+        # (measured: about 4.7 minutes of 502s after idle). Anything else is the real
+        # answer and must not be retried: a 500 means a refresh step failed, and
+        # retrying it would rebuild the board and hit FFC over and over.
+        # 30 attempts x 30 s covers 15 minutes, inside the 20-minute job timeout.
+        run: |
+          code=000
+          for attempt in $(seq 1 30); do
+            code=$(curl -sS -o body.json -w '%{http_code}' --max-time 180 -X POST \
+              https://api.ballknowers.co/api/refresh/daily \
+              -H "X-Refresh-Secret: ${REFRESH_SECRET}") || code=000
+            case "$code" in
+              000|502|503|504)
+                echo "attempt ${attempt}: HTTP ${code} (cold start?), retrying in 30 s"
+                sleep 30 ;;
+              *) break ;;
+            esac
+          done
+          echo "final HTTP ${code}"
+          cat body.json 2>/dev/null || true
+          echo
+          test "$code" = "200"

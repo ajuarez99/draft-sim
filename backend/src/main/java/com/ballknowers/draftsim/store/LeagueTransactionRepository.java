@@ -7,8 +7,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Roster moves: waiver claims, free-agent adds and drops, and trades
@@ -58,21 +56,6 @@ public class LeagueTransactionRepository {
                         r.status(), r.rosterId(), r.managerId(), r.addsJson(), r.dropsJson(),
                         r.faabBid(), r.createdAt() == null ? null : java.sql.Timestamp.from(r.createdAt()))
                 .update();
-    }
-
-    /**
-     * Weeks already ingested for this league-season.
-     *
-     * <p>Keyed on THIS table, deliberately, not on roster_week_points' gate.
-     * Reusing that one would be research R6's bug in a new place: a week with
-     * scores but no transactions would look settled and never be fetched.
-     */
-    public Set<Integer> storedWeeks(long leagueId, int season) {
-        return db.sql("select distinct week from league_transaction where league_id = ? and season = ?")
-                .params(leagueId, season)
-                .query(Integer.class)
-                .list()
-                .stream().collect(Collectors.toSet());
     }
 
     /**

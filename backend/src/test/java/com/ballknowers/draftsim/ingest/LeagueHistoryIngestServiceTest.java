@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.LeagueWeekFetchRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
@@ -35,13 +36,14 @@ class LeagueHistoryIngestServiceTest {
     @Mock private RosterWeekPointsRepository weekPoints;
     @Mock private LeagueMatchupRepository fixtures;
     @Mock private TransactionIngestService transactions;
+    @Mock private LeagueWeekFetchRepository weekFetches;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions);
+                weekPoints, fixtures, transactions, weekFetches);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
     }
@@ -103,7 +105,7 @@ class LeagueHistoryIngestServiceTest {
                 rosterObject(1, "u1", 8, 6, 1500, 42),
                 rosterObject(2, "u2", 10, 4, 1600, 5)));
 
-        service.ingestChain(Sport.NFL, "L1");
+        service.ingestChain(Sport.NFL, "L1", Set.of());
 
         ArgumentCaptor<List<RosterSeasonRepository.Upsert>> captor = ArgumentCaptor.forClass(List.class);
         verify(rosterSeasons).upsertAll(captor.capture());
@@ -150,7 +152,7 @@ class LeagueHistoryIngestServiceTest {
                 rosterObject(1, "u1", 8, 6, 1500, 42),
                 rosterObject(2, "u2", 1, 0, 190, 0)));
 
-        service.ingestChain(Sport.NFL, "L1b");
+        service.ingestChain(Sport.NFL, "L1b", Set.of());
 
         ArgumentCaptor<List<RosterSeasonRepository.Upsert>> captor = ArgumentCaptor.forClass(List.class);
         verify(rosterSeasons).upsertAll(captor.capture());
@@ -177,7 +179,7 @@ class LeagueHistoryIngestServiceTest {
         when(weekPoints.storedWeeks(55L)).thenReturn(Set.of());
         when(sleeper.matchups(eq("L2"), anyInt())).thenReturn(List.of());
 
-        service.ingestChain(Sport.NFL, "L2");
+        service.ingestChain(Sport.NFL, "L2", Set.of());
 
         verify(sleeper, times(1)).matchups("L2", 1);
         verify(sleeper, times(1)).matchups("L2", 2);
@@ -186,7 +188,7 @@ class LeagueHistoryIngestServiceTest {
     }
 
     @Test
-    void reRunningSkipsAlreadyStoredWeeksExceptTheMostRecentlyScoredOne() {
+    void reRunningSkipsFinalSettledWeeksAndRefetchesTheOneThatIsNotFinal() {
         Map<String, Object> league = leagueObject("L3", 2025, Map.of("last_scored_leg", 4), Map.of());
         when(sleeper.leagueChain("L3")).thenReturn(List.of(league));
         when(sleeper.leagueUsers("L3")).thenReturn(List.of());
@@ -201,14 +203,76 @@ class LeagueHistoryIngestServiceTest {
         // specs/004-ffwrapped-feature-parity V18 put a third thing in a
         // roster-week, so "settled" means all three are present.
         when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of(1, 2, 3));
+        // Weeks 1-3 were fetched after the league moved on (final). Week 4 has no
+        // fetch record: it is fetched, exactly like the last scored leg used to be.
+        when(weekFetches.finalWeeks(55L, LeagueWeekFetchRepository.POINTS)).thenReturn(Set.of(1, 2, 3));
         when(sleeper.matchups(eq("L3"), anyInt())).thenReturn(List.of());
 
-        service.ingestChain(Sport.NFL, "L3");
+        service.ingestChain(Sport.NFL, "L3", Set.of());
 
         verify(sleeper, never()).matchups("L3", 1);
         verify(sleeper, never()).matchups("L3", 2);
         verify(sleeper, never()).matchups("L3", 3);
         verify(sleeper, times(1)).matchups("L3", 4);
+    }
+
+    /**
+     * specs/009-auto-data-refresh T051 / FR-016: settled is not enough. A week
+     * whose rows, pairings and starters are all present but which was stored
+     * while it was still the last scored leg is partial (NBA scores during the
+     * week), and no fetch record says otherwise.
+     */
+    @Test
+    void reRunningRefetchesSettledWeeksThatWereNeverRecordedFinal() {
+        Map<String, Object> league = leagueObject("L3e", 2025, Map.of("last_scored_leg", 4), Map.of());
+        when(sleeper.leagueChain("L3e")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3e")).thenReturn(List.of());
+        when(sleeper.rosters("L3e")).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3, 4));
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2, 3, 4));
+        when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of(1, 2, 3, 4));
+        when(weekFetches.finalWeeks(55L, LeagueWeekFetchRepository.POINTS)).thenReturn(Set.of(1, 2));
+        when(sleeper.matchups(eq("L3e"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3e", Set.of());
+
+        verify(sleeper, never()).matchups("L3e", 1);
+        verify(sleeper, never()).matchups("L3e", 2);
+        verify(sleeper, times(1)).matchups("L3e", 3);
+        verify(sleeper, times(1)).matchups("L3e", 4);
+    }
+
+    /** ...and the other half of "final AND settled": final but unsettled is still fetched. */
+    @Test
+    void reRunningRefetchesFinalWeeksThatAreNotSettled() {
+        Map<String, Object> league = leagueObject("L3f", 2025, Map.of("last_scored_leg", 2), Map.of());
+        when(sleeper.leagueChain("L3f")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3f")).thenReturn(List.of());
+        when(sleeper.rosters("L3f")).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2));
+        when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of());
+        when(weekFetches.finalWeeks(55L, LeagueWeekFetchRepository.POINTS)).thenReturn(Set.of(1, 2));
+        when(sleeper.matchups(eq("L3f"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3f", Set.of());
+
+        verify(sleeper, times(1)).matchups("L3f", 1);
+        verify(sleeper, times(1)).matchups("L3f", 2);
+    }
+
+    /** specs/009 T021: a skipped (loaded_complete) season makes no per-season Sleeper call. */
+    @Test
+    void aSkippedSeasonIsNotWalked() {
+        Map<String, Object> league = leagueObject("L3g", 2024, Map.of("last_scored_leg", 4), Map.of());
+        when(sleeper.leagueChain("L3g")).thenReturn(List.of(league));
+
+        LeagueHistoryIngestService.Result r = service.ingestChain(Sport.NFL, "L3g", Set.of("L3g"));
+
+        assertEquals(1, r.seasons());
+        verify(sleeper, never()).leagueUsers(any());
+        verify(sleeper, never()).rosters(any());
+        verify(sleeper, never()).matchups(any(), anyInt());
+        verify(transactions, never()).ingest(any());
     }
 
     /**
@@ -236,7 +300,7 @@ class LeagueHistoryIngestServiceTest {
         when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of());
         when(sleeper.matchups(eq("L3b"), anyInt())).thenReturn(List.of());
 
-        service.ingestChain(Sport.NFL, "L3b");
+        service.ingestChain(Sport.NFL, "L3b", Set.of());
 
         verify(sleeper, times(1)).matchups("L3b", 1);
         verify(sleeper, times(1)).matchups("L3b", 2);
@@ -269,7 +333,7 @@ class LeagueHistoryIngestServiceTest {
         when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of());
         when(sleeper.matchups(eq("L3d"), anyInt())).thenReturn(List.of());
 
-        service.ingestChain(Sport.NFL, "L3d");
+        service.ingestChain(Sport.NFL, "L3d", Set.of());
 
         verify(sleeper, times(1)).matchups("L3d", 1);
         verify(sleeper, times(1)).matchups("L3d", 2);
@@ -292,7 +356,7 @@ class LeagueHistoryIngestServiceTest {
         when(fixtures.scheduledWeeks(55L, 2025)).thenReturn(Set.of(1, 2));
         when(sleeper.matchups(eq("L3c"), anyInt())).thenReturn(List.of());
 
-        service.ingestChain(Sport.NFL, "L3c");
+        service.ingestChain(Sport.NFL, "L3c", Set.of());
 
         verify(sleeper, times(1)).matchups("L3c", 1);
         verify(sleeper, times(1)).matchups("L3c", 2);
@@ -308,7 +372,7 @@ class LeagueHistoryIngestServiceTest {
         when(sleeper.matchups("L4", 1)).thenReturn(List.of(
                 matchup(1, 101.5), matchup(2, 88.25)));
 
-        service.ingestChain(Sport.NFL, "L4");
+        service.ingestChain(Sport.NFL, "L4", Set.of());
 
         ArgumentCaptor<RosterWeekPointsRepository.Row> captor = ArgumentCaptor.forClass(RosterWeekPointsRepository.Row.class);
         verify(weekPoints, times(2)).upsert(captor.capture());
@@ -349,7 +413,7 @@ class LeagueHistoryIngestServiceTest {
         when(transactions.ingest("L9")).thenReturn(4);
         when(transactions.ingest("L9-2024")).thenReturn(7);
 
-        LeagueHistoryIngestService.Result result = service.ingestChain(Sport.NFL, "L9");
+        LeagueHistoryIngestService.Result result = service.ingestChain(Sport.NFL, "L9", Set.of());
 
         verify(transactions, times(1)).ingest("L9");
         verify(transactions, times(1)).ingest("L9-2024");

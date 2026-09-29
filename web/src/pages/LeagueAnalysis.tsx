@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
@@ -28,6 +28,7 @@ import {
   type AnalysisScores,
   type AnalysisWeekTotal,
 } from '../api'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -1009,20 +1010,36 @@ export default function LeagueAnalysis() {
   // drawer to answer a question that did not touch them.
   const [week, setWeek] = useState<number | null>(null)
   const [weekLoading, setWeekLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes
+  // (specs/009-auto-data-refresh). A refetch must not close open lineup
+  // drawers or drop the chosen week, so the resets below run per league only.
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
+  const loadedFor = useRef<string | null>(null)
+  // The chosen week, readable inside the effect without making the effect
+  // re-run (and refetch) every time the user steps the week.
+  const weekRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
-    setData(null)
+    if (loadedFor.current !== sleeperLeagueId) {
+      loadedFor.current = sleeperLeagueId
+      setData(null)
+      setWeek(null)
+      weekRef.current = null
+    }
     setError(null)
-    setWeek(null)
-    getLeagueAnalysis(sleeperLeagueId)
+    // A data-version bump keeps the chosen week, so the refetch must ask for it:
+    // otherwise the stepper highlights week 5 over the default week's matchups.
+    const chosen = weekRef.current
+    ;(chosen == null ? getLeagueAnalysis(sleeperLeagueId) : getLeagueAnalysis(sleeperLeagueId, chosen))
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   async function pickWeek(next: number) {
     if (!sleeperLeagueId) return
     setWeek(next)
+    weekRef.current = next
     setWeekLoading(true)
     try {
       const fresh = await getLeagueAnalysis(sleeperLeagueId, next)

@@ -27,4 +27,8 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<Test> { useJUnitPlatform() }
+tasks.withType<Test> {
+    useJUnitPlatform()
+    // specs/009-auto-data-refresh R12: no test may trigger a background refresh by visiting a page.
+    systemProperty("refresh.on-visit.enabled", "false")
+}

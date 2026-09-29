@@ -1,6 +1,16 @@
-import { waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
-import { draftSummary, renderAtPath, resetRail } from '../testRailHelpers'
+import { act, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { useLeagueDataVersion } from '../leagueDataVersion'
+import {
+  draftSummary,
+  getLeagueRefreshSpy,
+  refreshLeagueSpy,
+  refreshStatus,
+  renderAtPath,
+  resetRail,
+} from '../testRailHelpers'
+import { REFRESH_POLL_MS } from './LeagueRailSection'
 
 /*
  * The question this whole feature is about: standing on this URL, does the rail
@@ -158,5 +168,131 @@ describe('routes with no league at all', () => {
 
     await waitFor(() => expect(rail()).not.toBeNull())
     expect(leagueSection()).toBeNull()
+  })
+})
+
+
+/*
+ * specs/009-auto-data-refresh T026/T028: the rail starts a refresh when it lands
+ * in a league, follows it while it runs, and tells the pages when it is done.
+ */
+describe('refresh on visit', () => {
+  function VersionProbe() {
+    return <p data-testid="version">{useLeagueDataVersion('L_NFL')}</p>
+  }
+
+  const flush = () =>
+    act(async () => {
+      await Promise.resolve()
+    })
+
+  it('calls refreshLeague once per league, and again when the league changes', async () => {
+    renderAtPath('/leagues/L_NFL/history', { drafts: [NFL, NBA] })
+
+    await waitFor(() => expect(refreshLeagueSpy).toHaveBeenCalledTimes(1))
+    expect(refreshLeagueSpy).toHaveBeenCalledWith('L_NFL')
+
+    // Same league, further renders (the switcher opening): still one.
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: /switch/i }))
+    expect(refreshLeagueSpy).toHaveBeenCalledTimes(1)
+
+    await user.click(await screen.findByRole('menuitem', { name: /Hoops League/ }))
+    await waitFor(() => expect(refreshLeagueSpy).toHaveBeenCalledTimes(2))
+    expect(refreshLeagueSpy).toHaveBeenLastCalledWith('L_NBA')
+  })
+
+  it('polls while RUNNING, bumps the data version on FRESH, and stops polling', async () => {
+    const running = refreshStatus({ state: 'RUNNING', leagueSleeperId: 'L_NFL' })
+    const fresh = refreshStatus({
+      state: 'FRESH',
+      leagueSleeperId: 'L_NFL',
+      lastSuccessAt: new Date().toISOString(),
+    })
+
+    // The rail's poll is one setTimeout(REFRESH_POLL_MS) at a time. Catch just
+    // those and fire them by hand: fake timers would also stall waitFor and
+    // testing-library's own scheduling, and a real 3 s wait is a slow test.
+    const pending: Array<() => void> = []
+    const realSetTimeout = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms === REFRESH_POLL_MS) {
+        pending.push(fn)
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }
+      return realSetTimeout(fn, ms, ...rest)
+    }) as unknown as typeof setTimeout)
+    const firePoll = () =>
+      act(async () => {
+        pending.shift()!()
+        await Promise.resolve()
+      })
+
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', {
+      drafts: [NFL],
+      refresh: running,
+      polls: [running, fresh],
+      page: <VersionProbe />,
+    })
+    await waitFor(() => expect(leagueSection()?.textContent).toContain('Updating…'))
+    expect(pending).toHaveLength(1)
+    expect(getLeagueRefreshSpy).not.toHaveBeenCalled()
+    expect(screen.getByTestId('version')).toHaveTextContent('0')
+
+    await firePoll()
+    await waitFor(() => expect(getLeagueRefreshSpy).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('version')).toHaveTextContent('0')
+    expect(leagueSection()?.textContent).toContain('Updating…')
+    expect(pending).toHaveLength(1)
+
+    await firePoll()
+    await waitFor(() => expect(screen.getByTestId('version')).toHaveTextContent('1'))
+    expect(getLeagueRefreshSpy).toHaveBeenCalledTimes(2)
+    expect(leagueSection()?.textContent).toContain('Updated just now')
+    expect(leagueSection()?.textContent).not.toContain('Updating…')
+    expect(pending).toHaveLength(0)
+  })
+
+  it('does not bump the data version when a refresh was never running', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', {
+      drafts: [NFL],
+      refresh: refreshStatus({ state: 'FRESH', leagueSleeperId: 'L_NFL', lastSuccessAt: new Date().toISOString() }),
+      page: <VersionProbe />,
+    })
+    await waitFor(() => expect(leagueSection()?.textContent).toContain('Updated just now'))
+
+    expect(screen.getByTestId('version')).toHaveTextContent('0')
+    expect(getLeagueRefreshSpy).not.toHaveBeenCalled()
+  })
+
+  it('renders the could-not-reach-Sleeper line with the age of the data on FAILED', async () => {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600_000).toISOString()
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', {
+      drafts: [NFL],
+      refresh: refreshStatus({
+        state: 'FAILED',
+        leagueSleeperId: 'L_NFL',
+        lastSuccessAt: threeHoursAgo,
+        lastFailureAt: new Date().toISOString(),
+      }),
+    })
+
+    await waitFor(() =>
+      expect(leagueSection()?.textContent).toContain("Couldn't reach Sleeper — data from 3 h ago"),
+    )
+  })
+
+  it('shows nothing, and does not retry, when the POST fails', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    // Before the league resolves, so the rail's one POST hits the failing stub.
+    refreshLeagueSpy.mockRejectedValue(new Error('network'))
+
+    await waitFor(() => expect(refreshLeagueSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    await flush()
+
+    expect(leagueSection()?.querySelector('.rail-league-refresh')).toBeNull()
+    expect(getLeagueRefreshSpy).not.toHaveBeenCalled()
+    expect(refreshLeagueSpy).toHaveBeenCalledTimes(1)
   })
 })

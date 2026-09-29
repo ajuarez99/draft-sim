@@ -100,14 +100,15 @@ class PowerRankingServiceTest {
     }
 
     @Test
-    void realizedGapPointsAtTheIngestWhenNoWeeksAreStoredAtAll() {
+    void realizedGapSaysNoWeekHasLoadedWhenNoWeeksAreStoredAtAll() {
         when(weekPoints.through(1L, 1)).thenReturn(List.of());
         when(weekPoints.storedWeeks(1L)).thenReturn(Set.of());
 
         String gap = service.realizedGap(1L, 1);
 
         assertNotNull(gap);
-        assertTrue(gap.contains("league-history"), gap);
+        assertEquals("No week of this season has loaded yet.", gap);
+        assertFalse(gap.contains("/api/"), gap);
     }
 
     /** Null, not a string, when there is genuinely nothing wrong. */

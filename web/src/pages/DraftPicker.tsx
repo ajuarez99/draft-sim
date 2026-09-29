@@ -19,7 +19,8 @@ import {
   ingestAdp,
   ingestBoard,
   ingestLeague,
-  ingestPlayers,
+  refreshLeague,
+  refreshPlayers,
   trackDraft,
   type DraftSummary,
   type MockSessionSummary,
@@ -35,10 +36,15 @@ import {
 // Each stage's own function closes over the league being set up.
 function setupStages(l: SleeperLeague) {
   return [
-    { label: 'Fetching players', run: () => ingestPlayers(l.sport) },
+    { label: 'Fetching players', run: () => refreshPlayers(l.sport) },
     { label: "Reading your league's history", run: () => ingestLeague(l.sleeperLeagueId) },
     { label: 'Checking market prices', run: () => ingestAdp(l.sport) },
     { label: 'Building the board', run: () => ingestBoard(l.sport) },
+    // Starts the background refresh of every past season and returns at once,
+    // so setup doesn't wait for it; the rail shows its progress once a league
+    // page opens. Best-effort: a failure here must not fail a league whose
+    // setup is otherwise complete, and refresh-on-visit retries it.
+    { label: 'Loading past seasons', run: () => refreshLeague(l.sleeperLeagueId).then(() => undefined, () => undefined) },
   ]
 }
 

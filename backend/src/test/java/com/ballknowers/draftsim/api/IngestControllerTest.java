@@ -47,7 +47,8 @@ class IngestControllerTest {
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
-                projectionIngest, transactionIngest, playerGameIngest);
+                projectionIngest, transactionIngest, playerGameIngest,
+                new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles));
     }
 
     // ---- POST /api/ingest/adp ----

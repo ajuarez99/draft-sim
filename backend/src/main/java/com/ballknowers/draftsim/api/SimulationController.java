@@ -44,7 +44,7 @@ public class SimulationController {
      */
     private void requireVisible(SimulationRequest request, String sleeperUserId) {
         if (membership.visibleDraft(sleeperUserId, request.draftSleeperId()).isEmpty()) {
-            throw new IllegalArgumentException("draft " + request.draftSleeperId() + " not ingested");
+            throw new IllegalArgumentException("draft " + request.draftSleeperId() + " isn't loaded yet");
         }
     }
 

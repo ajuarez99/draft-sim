@@ -606,7 +606,7 @@ public class SeasonSuperlativesService {
                                           Map<Integer, Long> managerByRoster) {
         if (txRows.isEmpty()) {
             return unavailable(Kind.WAIVER_WIRE_WARRIOR,
-                    "no transactions stored for this season — run POST /api/ingest/transactions/" + sleeperLeagueId);
+                    "Transactions for this season haven't loaded yet.");
         }
 
         // Coverage: a week with no stored starters is excluded outright, never
@@ -696,7 +696,7 @@ public class SeasonSuperlativesService {
                                              Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster) {
         if (txRows.isEmpty()) {
             return unavailable(Kind.JABARI_SMITH_JR,
-                    "no transactions stored for this season — run POST /api/ingest/transactions/" + sleeperLeagueId);
+                    "Transactions for this season haven't loaded yet.");
         }
 
         List<WaiverPickupAttribution.CompletedAdd> completedAdds = WaiverPickupAttribution.completedAdds(txRows);
@@ -808,7 +808,7 @@ public class SeasonSuperlativesService {
 
         if (!allPlayerIds.isEmpty() && neverWalked.size() == allPlayerIds.size()) {
             return unavailable(Kind.JOEL_EMBIID,
-                    "per-game records not ingested — run POST /api/ingest/player-games/" + sleeperLeagueId);
+                    "Game-by-game records for this season haven't loaded yet.");
         }
 
         // Coordinator follow-up 2026-09-23, item 4: bounded to THIS payload's
@@ -860,7 +860,7 @@ public class SeasonSuperlativesService {
         // from (and reported alongside) the per-holder unclassified-week notes.
         List<String> leagueLevelReasons = neverWalked.isEmpty() ? List.of() : List.of(
                 neverWalked.size() + " rostered player" + (neverWalked.size() == 1 ? "" : "s")
-                        + " have no per-game records — run POST /api/ingest/player-games/" + sleeperLeagueId);
+                        + " have no game-by-game records yet.");
 
         if (byRoster.isEmpty()) {
             Coverage emptyCoverage = leagueLevelReasons.isEmpty() ? null

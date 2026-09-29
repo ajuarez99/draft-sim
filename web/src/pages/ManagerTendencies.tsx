@@ -367,7 +367,7 @@ export default function ManagerTendencies() {
         {sorted && sorted.length === 0 && (
           <p className="muted">
             {sportFilter === 'all'
-              ? 'No managers ingested yet.'
+              ? 'No managers loaded yet.'
               : `No ${sportFilter.toUpperCase()} managers with anything to show yet.`}
           </p>
         )}

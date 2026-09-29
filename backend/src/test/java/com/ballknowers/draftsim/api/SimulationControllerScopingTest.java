@@ -60,7 +60,7 @@ class SimulationControllerScopingTest {
         // Deliberately the same message SimulationService throws for a draft that
         // genuinely isn't ingested. A distinct "forbidden" would confirm the draft
         // exists, which is most of what enumerating draft ids wanted.
-        assertTrue(e.getMessage().contains("not ingested"), e.getMessage());
+        assertTrue(e.getMessage().contains("isn't loaded yet"), e.getMessage());
         verify(sims, never()).simulate(any(), any());
     }
 

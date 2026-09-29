@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Superlatives from './Superlatives'
+import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import type { ConductList, Superlative, SuperlativesResponse } from '../api'
 
 vi.mock('react-router-dom', () => ({
@@ -520,7 +521,7 @@ describe('Superlatives', () => {
     const waiver: Superlative = {
       kind: 'WAIVER_WIRE_WARRIOR',
       available: false,
-      reason: 'no transactions stored for this season — run POST /api/ingest/transactions/{id}',
+      reason: "Transactions for this season haven't loaded yet.",
       early: false,
       value: null,
       unit: null,
@@ -533,7 +534,7 @@ describe('Superlatives', () => {
     render(<Superlatives />)
 
     expect(
-      await screen.findByText(/no transactions stored for this season/),
+      await screen.findByText(/Transactions for this season haven't loaded yet/),
     ).toBeInTheDocument()
   })
 
@@ -1085,5 +1086,35 @@ describe('Superlatives', () => {
 
     await screen.findByText("Commissioner's list")
     expect(screen.queryByText(/Showing the .* season/)).not.toBeInTheDocument()
+  })
+
+  // specs/009-auto-data-refresh T027/T028: the rail bumps a league's data
+  // version when its background refresh finishes, and the page refetches.
+  it('refetches when the rail bumps its league data version, and not for another league', async () => {
+    function Bumper() {
+      const bump = useBumpLeagueDataVersion()
+      return (
+        <>
+          <button onClick={() => bump('L1')}>bump L1</button>
+          <button onClick={() => bump('OTHER')}>bump other</button>
+        </>
+      )
+    }
+    fetchSuperlatives.mockResolvedValue(baseline())
+    render(
+      <LeagueDataVersionProvider>
+        <Bumper />
+        <Superlatives />
+      </LeagueDataVersionProvider>,
+    )
+    await screen.findByText('Highest week')
+    expect(fetchSuperlatives).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(screen.getByText('bump other'))
+    expect(fetchSuperlatives).toHaveBeenCalledTimes(1)
+
+    await userEvent.click(screen.getByText('bump L1'))
+    await waitFor(() => expect(fetchSuperlatives).toHaveBeenCalledTimes(2))
+    expect(fetchSuperlatives).toHaveBeenLastCalledWith('L1')
   })
 })

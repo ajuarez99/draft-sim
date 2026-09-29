@@ -1,48 +1,60 @@
 package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.refresh.RefreshProperties;
+import com.ballknowers.draftsim.refresh.SingleFlight;
 import com.ballknowers.draftsim.sport.SportRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
+import com.ballknowers.draftsim.store.JsonUtil;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
-import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.SportWeekStatsRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
 
+import java.util.concurrent.CompletionException;
+
+
 /**
- * Per-game stat lines for the players a league actually rostered
- * (specs/005-daily-weekly-top-players, US1; specs/008-season-superlatives,
- * research R9).
+ * Per-game stat lines, rebuilt on Sleeper's per-week stats plus the season
+ * schedule (specs/009-auto-data-refresh, research R6; before that
+ * specs/005-daily-weekly-top-players US1 and specs/008-season-superlatives R9).
  *
- * <p><b>Deliberately not part of any ingest chain.</b> This costs one upstream
- * call per player -- measured 331 players for the reference league's 2025
- * season, 280 for 2024 -- and serves one page for one sport. Feature 004 made
- * the opposite call for transactions and wired them into
- * {@link LeagueHistoryIngestService}, correctly: those are week-level data on
- * the same cadence as the weekly points that walk already fetches. These are
- * not. Folding them in would make every routine league ingest hundreds of calls
- * slower for data most leagues never read.
+ * <p><b>What changed, and what did not.</b> The old version made one upstream
+ * call per rostered player (331 for the reference league's 2025 season, ~101 s)
+ * and could not be made incremental, because each call returns a player's whole
+ * season. This one fetches one call per <i>week</i> of the sport-season -- every
+ * player's entries at once -- plus one schedule call, and it skips weeks that
+ * are already {@code final}. It is shared by every league in the sport, not run
+ * per league.
  *
- * <p>The player set is league-scoped only in how it is <i>chosen</i>. The rows
- * written are not: a game belongs to a sport and a season, and two leagues
- * share it.
+ * <p>The source of the entries, of {@code is_away} (now the schedule, because
+ * the per-week payload has no {@code is_away_team}) and of bye evidence (now the
+ * schedule, instead of other walked players' entries) changed. The rules did
+ * not: {@link SportRules#playedIn} routing, the future-or-today guard,
+ * the {@code deleteByGame}/{@code deleteWeeklyBasis} clean-up, and a
+ * {@code None} week's team coming from the player's nearest stored entry are the
+ * old walk's, kept so that a parity diff against the old walk's rows can be
+ * empty (task T016).
  *
- * <p><b>Also writes {@code player_absence} rows now (research R9).</b> The old
- * version of this walk discarded a missed game outright: basketball's
- * {@code stats: {}} failed the (pre-existing) "non-empty stats" gate in
- * {@link #toRow}, and football's DNP entries (non-empty {@code stats} with no
- * {@code gp}) would have been silently stored as games played had anything
- * ever read them. Both are fixed by routing the "did he play" question through
- * {@link SportRules#playedIn}: a played entry becomes a {@code player_game}
- * row, and anything else becomes a {@code player_absence} row instead of being
- * thrown away.
+ * <p><b>Rows.</b> {@code player_game} and {@code ENTRY_WITHOUT_PLAY} absences are
+ * written for <i>every</i> entry in a week's payload, not only rostered players
+ * (which also means a player rostered mid-season already has his earlier games
+ * stored). {@code TEAM_PLAYED_NO_ENTRY} and {@code UNCLASSIFIED} can only be
+ * judged for players we know about, so they are computed only for players
+ * rostered in any league of the sport-season.
+ *
+ * <p>Also writes {@code player_absence} rows (research R9 of spec 008): a played
+ * entry becomes a {@code player_game} row, and anything else becomes a
+ * {@code player_absence} row instead of being thrown away.
  */
 @Service
 public class PlayerGameIngestService {
@@ -54,16 +66,28 @@ public class PlayerGameIngestService {
     private final RosterWeekPointsRepository weekPoints;
     private final PlayerGameRepository games;
     private final PlayerAbsenceRepository absences;
+    private final SportWeekStatsRepository weekStats;
     private final SportRulesRegistry rulesRegistry;
+
+    /**
+     * Single-flight keyed {@code sport:season} (specs/009 research R4, T013/T020):
+     * a second caller for the same sport-season while one is running waits for
+     * and shares that run's result rather than starting an interleaving walk
+     * (research R11). Its own instance, not shared with the league-chain flight
+     * that waits on it -- see {@link SingleFlight}.
+     */
+    private final SingleFlight inFlight = new SingleFlight();
 
     public PlayerGameIngestService(SleeperPlayerStatsClient stats, LeagueRepository leagues,
                                    RosterWeekPointsRepository weekPoints, PlayerGameRepository games,
-                                   PlayerAbsenceRepository absences, SportRulesRegistry rulesRegistry) {
+                                   PlayerAbsenceRepository absences, SportWeekStatsRepository weekStats,
+                                   SportRulesRegistry rulesRegistry) {
         this.stats = stats;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.games = games;
         this.absences = absences;
+        this.weekStats = weekStats;
         this.rulesRegistry = rulesRegistry;
     }
 
@@ -72,232 +96,403 @@ public class PlayerGameIngestService {
      * result of is how feature 004 ended up with five leagues holding zero
      * transactions while the suite stayed green.
      *
-     * @param absencesStored   {@code player_absence} rows written this run
-     *                         (both bases combined)
+     * @param weeksFetched      per-week payloads fetched this run (final weeks are
+     *                          skipped and not counted); was {@code playersWalked}
+     * @param weeksFailed       weeks whose fetch failed and were left un-marked, so
+     *                          the next run retries them; was {@code playersFailed}
+     *                          when the unit of work was a player
+     * @param absencesStored    {@code player_absence} rows written this run
+     *                          (both bases combined)
      * @param weeksUnclassified football {@code None} weeks whose player's own
      *                          team could not be determined from any of his
      *                          other entries -- not counted either way, and
      *                          reported so a coverage gap is visible rather
      *                          than silently folded into "bye" (research R9)
      */
-    public record Result(int playersWalked, int gamesStored, int playersFailed,
+    public record Result(int weeksFetched, int gamesStored, int weeksFailed,
                          int absencesStored, int weeksUnclassified) {}
 
+    /**
+     * The manual endpoint's entry point. Resolves the league's sport (and its
+     * season, unless one is requested) and runs the shared sport-season
+     * refresh. There is no separate per-league path (research R9).
+     */
     public Result ingest(String sleeperLeagueId, Integer requestedSeason) {
         Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
         if (found.isEmpty()) return new Result(0, 0, 0, 0, 0);
         LeagueRepository.LeagueRow league = found.get();
         int season = requestedSeason == null ? league.season() : requestedSeason;
-        Sport sport = league.sport();
-        SportRules rules = rulesRegistry.get(sport);
-
-        Set<String> playerIds = rosteredPlayers(league.id(), season);
-
-        // Pass 1: fetch every walked player's raw season-by-week payload. One
-        // upstream call each; a player's failure here must not cost the rest.
-        //
-        // Stored as Map<String, Object> per player, NOT the client's declared
-        // Map<String, List<...>> -- that declared type is an unchecked cast
-        // over a raw Jackson Map<String,Object> with no runtime enforcement,
-        // and at least one real player's payload has carried a week value that
-        // was not a JSON array. Iterating it as a generic List blows up with a
-        // ClassCastException at the first element access (erasure inserts the
-        // checkcast there), discovered live 2026-09-23 running this walk
-        // against real Sleeper data -- every access below checks
-        // {@code instanceof List} first rather than trusting the client's type.
-        Map<String, Map<String, Object>> raw = new LinkedHashMap<>();
-        int failed = 0;
-        for (String playerId : playerIds) {
-            try {
-                Map<String, List<Map<String, Object>>> byWeek =
-                        stats.seasonByWeek(sport.code(), playerId, season);
-                if (byWeek != null) {
-                    @SuppressWarnings({"unchecked", "rawtypes"})
-                    Map<String, Object> asObjectMap = (Map) byWeek;
-                    raw.put(playerId, asObjectMap);
-                }
-            } catch (RuntimeException e) {
-                failed++;
-                log.warn("player-games: {} season {} player {} failed: {}",
-                        sleeperLeagueId, season, playerId, e.toString());
-            }
-        }
-
-        // Pass 2: build the (team, week) played-set every walked entry gives
-        // evidence for -- an entry present at all (played OR a DNP entry that
-        // still carries team/opponent/date) means that team had a game that
-        // week. Also record, per player, the (week -> team) pairs his own
-        // entries carry, so a football `None` week can borrow the nearest
-        // neighbour's team (research R9).
-        Set<String> teamWeekPlayed = new HashSet<>();
-        Map<String, TreeMap<Integer, String>> teamByPlayerWeek = new HashMap<>();
-        for (Map.Entry<String, Map<String, Object>> pe : raw.entrySet()) {
-            TreeMap<Integer, String> teamWeeks = new TreeMap<>();
-            for (Object weekValue : pe.getValue().values()) {
-                List<Map<String, Object>> entries = asEntryList(weekValue);
-                if (entries == null) continue;
-                for (Map<String, Object> entry : entries) {
-                    Integer wk = weekOf(entry);
-                    String team = stringOrNull(entry.get("team"));
-                    if (wk == null || team == null) continue;
-                    teamWeeks.put(wk, team);
-                    teamWeekPlayed.add(team + "|" + wk);
-                }
-            }
-            teamByPlayerWeek.put(pe.getKey(), teamWeeks);
-        }
-
-        // Pass 3: write player_game / player_absence rows.
-        int stored = 0, absencesStored = 0, weeksUnclassified = 0;
-        for (Map.Entry<String, Map<String, Object>> pe : raw.entrySet()) {
-            String playerId = pe.getKey();
-            TreeMap<Integer, String> teamWeeks = teamByPlayerWeek.getOrDefault(playerId, new TreeMap<>());
-
-            for (Map.Entry<String, Object> we : pe.getValue().entrySet()) {
-                List<Map<String, Object>> entries = asEntryList(we.getValue());
-
-                if (entries == null || entries.isEmpty()) {
-                    // A football `None` week (or an empty list): classify it,
-                    // never invent it as a game.
-                    Integer wk = parseWeekKey(we.getKey());
-                    if (wk == null) continue;
-                    String team = nearestTeam(teamWeeks, wk);
-                    if (team == null) {
-                        // Coordinator follow-up 2026-09-23: persisted, not just
-                        // counted, so the superlatives payload can report a real
-                        // number instead of a standing, unbacked caveat (V23).
-                        absences.upsert(new PlayerAbsenceRepository.Row(
-                                sport, season, wk, playerId, null, null, null, "UNCLASSIFIED"));
-                        weeksUnclassified++;
-                        absencesStored++;
-                        continue;
-                    }
-                    if (teamWeekPlayed.contains(team + "|" + wk)) {
-                        absences.upsert(new PlayerAbsenceRepository.Row(
-                                sport, season, wk, playerId, null, null, team, "TEAM_PLAYED_NO_ENTRY"));
-                        absencesStored++;
-                    }
-                    // else: his team had no evidence of a game that week -- a bye. Write nothing.
-                    continue;
-                }
-
-                for (Map<String, Object> entry : entries) {
-                    Object statsObj = entry.get("stats");
-                    if (!(statsObj instanceof Map<?, ?> rawStats)) continue;
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> statsMap = (Map<String, Object>) rawStats;
-
-                    PlayerGameRepository.Row row = toRow(sport, season, playerId, entry);
-                    if (row == null) continue; // missing an identifying field -- dropped, not invented
-
-                    if (rules.playedIn(statsMap)) {
-                        games.upsert(row);
-                        stored++;
-                        // Coordinator follow-up 2026-09-23, item 2: a game
-                        // Sleeper once reported as {stats: {}} (stored as an
-                        // ENTRY_WITHOUT_PLAY absence) may since have been
-                        // played -- without this delete, both rows exist and
-                        // the award charges a game he actually played.
-                        absences.deleteByGame(sport, season, playerId, row.gameId());
-                        // Real per-entry evidence for this week now exists, so
-                        // any earlier neighbour-team-inferred week-level row
-                        // (TEAM_PLAYED_NO_ENTRY/UNCLASSIFIED, no game_id) is
-                        // stale -- clear it rather than double-count the week.
-                        absences.deleteWeeklyBasis(sport, season, playerId, row.week());
-                    } else if (isFutureOrToday(row.gameDate())) {
-                        // A scheduled game that has not been played yet is not
-                        // a missed one (coordinator follow-up 2026-09-23, item
-                        // 2) -- Sleeper can list an upcoming game as
-                        // {stats: {}} before it happens. Nothing is written or
-                        // deleted here: there is no new evidence yet, either way.
-                        continue;
-                    } else {
-                        String team = stringOrNull(entry.get("team"));
-                        absences.upsert(new PlayerAbsenceRepository.Row(
-                                sport, season, row.week(), playerId, row.gameId(), row.gameDate(), team,
-                                "ENTRY_WITHOUT_PLAY"));
-                        absencesStored++;
-                        // The mirror of the played branch above: a game once
-                        // stored as PLAYED may since have been corrected to a
-                        // DNP -- delete the stale player_game row for it.
-                        games.deleteByGame(sport, season, playerId, row.gameId());
-                        absences.deleteWeeklyBasis(sport, season, playerId, row.week());
-                    }
-                }
-            }
-        }
-
-        log.info("player-games: league {} season {} -- {} players walked, {} games stored, {} failed, "
-                        + "{} absences stored, {} weeks unclassified",
-                sleeperLeagueId, season, playerIds.size(), stored, failed, absencesStored, weeksUnclassified);
-        return new Result(playerIds.size(), stored, failed, absencesStored, weeksUnclassified);
+        return refreshSportSeason(league.sport(), season, Instant.now());
     }
 
     /**
-     * Every player who appears in the league's stored weekly points for the
-     * season -- which is exactly the set whose games anyone could ask about,
-     * and no wider.
+     * Refreshes one sport-season's per-game data. Single-flight per
+     * {@code sport:season}: a concurrent caller shares the running result.
      */
-    private Set<String> rosteredPlayers(long leagueId, int season) {
+    public Result refreshSportSeason(Sport sport, int season, Instant now) {
+        String key = sport.code() + ":" + season;
+        try {
+            return inFlight.run(key, () -> doRefresh(sport, season, now)).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException re) throw re;
+            throw e;
+        }
+    }
+
+    private Result doRefresh(Sport sport, int season, Instant now) {
+        SportRules rules = rulesRegistry.get(sport);
+        String code = sport.code();
+        // "Today" is read in UTC, chosen over the host machine's local zone so the
+        // future-or-today guard does not drift with where the process is deployed;
+        // taken from the caller's `now` so it is the same instant everything else
+        // in the run is judged at.
+        LocalDate today = now.atZone(ZoneOffset.UTC).toLocalDate();
+
+        // 1. The schedule, once. A schedule failure fails the whole run: without
+        //    it there is no week range, no is_away and no bye evidence.
+        Schedule schedule = Schedule.parse(stats.schedule(code, season));
+        int lastWeek = schedule.lastStartedWeek(today);
+
+        Set<String> rostered = rosteredPlayers(sport, season);
+
+        Map<Integer, SportWeekStatsRepository.Row> known = new HashMap<>();
+        for (SportWeekStatsRepository.Row r : weekStats.forSeason(sport, season)) known.put(r.week(), r);
+
+        // The absence rows that already exist, read once, so the clean-up
+        // deletes below run only when there is something to delete instead of
+        // three statements per entry across ~2,000 entries a week. Nothing else
+        // writes these tables during this run (single-flight per sport-season).
+        Set<String> absenceByGame = new HashSet<>();   // "player|gameId"
+        Set<String> weeklyBasis = new HashSet<>();     // "player|week", game_id null
+        for (PlayerAbsenceRepository.Row a : absences.forSeason(sport, season)) {
+            if (a.gameId() != null) absenceByGame.add(a.playerId() + "|" + a.gameId());
+            else weeklyBasis.add(a.playerId() + "|" + a.week());
+        }
+
+        // What this run saw for rostered players, for the no-entry pass. Final
+        // (skipped) weeks are covered by what is already stored.
+        Map<String, TreeMap<Integer, String>> teamByPlayerWeek = new HashMap<>();
+        Set<String> entrySeen = new HashSet<>();       // "player|week"
+
+        // Weeks whose data is in storage: fetched before or fetched now. A week whose
+        // fetch failed is not one, so nobody is judged "missing" from data we don't have.
+        Set<Integer> loadedWeeks = new HashSet<>(known.keySet());
+
+        int fetched = 0, failed = 0, stored = 0, absencesStored = 0, weeksUnclassified = 0;
+
+        // 2. Weeks 1..(last week with a started game), skipping final ones.
+        for (int week = 1; week <= lastWeek; week++) {
+            SportWeekStatsRepository.Row prior = known.get(week);
+            if (prior != null && prior.fin()) continue;
+
+            List<Map<String, Object>> entries;
+            try {
+                entries = stats.week(code, season, week);
+            } catch (RuntimeException e) {
+                failed++;
+                log.warn("player-games: {} {} week {} failed: {}", code, season, week, e.toString());
+                continue;
+            }
+            // A schedule that says a game finished, against a payload with no entries at all,
+            // is a bad answer (an empty list, or a non-list that mapsOf turned into one), not a
+            // quiet week. Treated as a failed fetch: not marked, not judged (review 2026-09-28).
+            if (entries.isEmpty() && schedule.hasCompleteGame(week)) {
+                failed++;
+                log.warn("player-games: {} {} week {} came back empty though the schedule has a completed game",
+                        code, season, week);
+                continue;
+            }
+            fetched++;
+            loadedWeeks.add(week);
+
+            Set<String> gameKeys = new HashSet<>();    // "player|gameId" already stored this week
+            for (PlayerGameRepository.Row g : games.forWeek(sport, season, week)) {
+                gameKeys.add(g.sleeperPlayerId() + "|" + g.gameId());
+            }
+
+            for (Map<String, Object> entry : entries) {
+                Object pid = entry.get("player_id");
+                if (pid == null) continue;
+                String playerId = String.valueOf(pid);
+
+                Integer entryWeek = weekOf(entry);
+                String entryTeam = stringOrNull(entry.get("team"));
+                if (rostered.contains(playerId) && entryWeek != null) {
+                    entrySeen.add(playerId + "|" + entryWeek);
+                    if (entryTeam != null) {
+                        teamByPlayerWeek.computeIfAbsent(playerId, k -> new TreeMap<>()).put(entryWeek, entryTeam);
+                    }
+                }
+
+                Object statsObj = entry.get("stats");
+                if (!(statsObj instanceof Map<?, ?> rawStats)) continue;
+                @SuppressWarnings("unchecked")
+                Map<String, Object> statsMap = (Map<String, Object>) rawStats;
+
+                Boolean isAway = schedule.isAway(stringOrNull(entry.get("game_id")), entryTeam);
+                PlayerGameRepository.Row row = toRow(sport, season, playerId, entry, isAway);
+                if (row == null) continue; // missing an identifying field -- dropped, not invented
+
+                String gameKey = playerId + "|" + row.gameId();
+                String weekKey = playerId + "|" + row.week();
+
+                if (rules.playedIn(statsMap)) {
+                    games.upsert(row);
+                    gameKeys.add(gameKey);
+                    stored++;
+                    // A game Sleeper once reported as an empty box score (stored
+                    // as an ENTRY_WITHOUT_PLAY absence) may since have been
+                    // played -- without this delete, both rows exist and the
+                    // award charges a game he actually played.
+                    if (absenceByGame.remove(gameKey)) {
+                        absences.deleteByGame(sport, season, playerId, row.gameId());
+                    }
+                    // Real per-entry evidence for this week now exists, so any
+                    // earlier neighbour-team-inferred week-level row is stale.
+                    if (weeklyBasis.remove(weekKey)) {
+                        absences.deleteWeeklyBasis(sport, season, playerId, row.week());
+                    }
+                } else if (!row.gameDate().isBefore(today)) {
+                    // A scheduled game not yet played is not a missed one:
+                    // nothing is written or deleted, there is no new evidence.
+                    continue;
+                } else {
+                    absences.upsert(new PlayerAbsenceRepository.Row(
+                            sport, season, row.week(), playerId, row.gameId(), row.gameDate(), entryTeam,
+                            "ENTRY_WITHOUT_PLAY"));
+                    absenceByGame.add(gameKey);
+                    absencesStored++;
+                    // The mirror of the played branch: a game once stored as
+                    // PLAYED may since have been corrected to a DNP.
+                    if (gameKeys.remove(gameKey)) {
+                        games.deleteByGame(sport, season, playerId, row.gameId());
+                    }
+                    if (weeklyBasis.remove(weekKey)) {
+                        absences.deleteWeeklyBasis(sport, season, playerId, row.week());
+                    }
+                }
+            }
+
+            weekStats.upsert(new SportWeekStatsRepository.Row(
+                    sport, season, week, now, schedule.isFinal(week, now)));
+        }
+
+        // 3. Weeks a rostered player has no entry for: the football None week,
+        //    now judged against the schedule instead of other players' entries.
+        if (!rostered.isEmpty() && lastWeek > 0) {
+            Map<String, TreeMap<Integer, String>> teams = new HashMap<>();
+            Map<String, Set<Integer>> haveEntry = new HashMap<>();
+            for (PlayerGameRepository.Row g : games.forPlayers(sport, season, rostered)) {
+                haveEntry.computeIfAbsent(g.sleeperPlayerId(), k -> new HashSet<>()).add(g.week());
+                String team = schedule.teamOf(g.gameId(), g.opponent());
+                if (team != null) {
+                    teams.computeIfAbsent(g.sleeperPlayerId(), k -> new TreeMap<>()).put(g.week(), team);
+                }
+            }
+            for (PlayerAbsenceRepository.Row a : absences.forPlayers(sport, season, rostered)) {
+                if (a.gameId() == null) continue; // week-level rows are conclusions, not evidence
+                haveEntry.computeIfAbsent(a.playerId(), k -> new HashSet<>()).add(a.week());
+                if (a.team() != null) {
+                    teams.computeIfAbsent(a.playerId(), k -> new TreeMap<>()).put(a.week(), a.team());
+                }
+            }
+            // This run's own entries win over what was derived from storage: they
+            // carry the team as Sleeper stated it, and include entries that wrote
+            // no row (today's or a future game).
+            for (Map.Entry<String, TreeMap<Integer, String>> e : teamByPlayerWeek.entrySet()) {
+                teams.computeIfAbsent(e.getKey(), k -> new TreeMap<>()).putAll(e.getValue());
+            }
+
+            for (String playerId : rostered) {
+                TreeMap<Integer, String> teamWeeks = teams.getOrDefault(playerId, new TreeMap<>());
+                Set<Integer> have = haveEntry.getOrDefault(playerId, Set.of());
+                // Weeks 1..lastWeek is the range the old walk saw too: its payload
+                // keyed every week of the season, including the empty ones. A week
+                // after a player's season ended is one of those, so it is judged
+                // the same way (his last team, and whether that team played).
+                for (int week = 1; week <= lastWeek; week++) {
+                    if (!loadedWeeks.contains(week)) continue;
+                    if (have.contains(week) || entrySeen.contains(playerId + "|" + week)) continue;
+                    String team = nearestTeam(teamWeeks, week);
+                    if (team == null) {
+                        absences.upsert(new PlayerAbsenceRepository.Row(
+                                sport, season, week, playerId, null, null, null, "UNCLASSIFIED"));
+                        weeksUnclassified++;
+                        absencesStored++;
+                    } else if (schedule.teamPlayed(week, team)) {
+                        absences.upsert(new PlayerAbsenceRepository.Row(
+                                sport, season, week, playerId, null, null, team, "TEAM_PLAYED_NO_ENTRY"));
+                        absencesStored++;
+                    }
+                    // else: his team had no game that week -- a bye. Write nothing.
+                }
+            }
+        }
+
+        log.info("player-games: {} {} -- {} weeks fetched (of {}), {} games stored, {} weeks failed, "
+                        + "{} absences stored, {} weeks unclassified",
+                code, season, fetched, lastWeek, stored, failed, absencesStored, weeksUnclassified);
+        return new Result(fetched, stored, failed, absencesStored, weeksUnclassified);
+    }
+
+    /**
+     * Every player who appears in any league of this sport-season's stored
+     * weekly points -- the set whose no-entry weeks anyone could ask about.
+     */
+    private Set<String> rosteredPlayers(Sport sport, int season) {
         Set<String> ids = new LinkedHashSet<>();
-        for (RosterWeekPointsRepository.WeekBreakdown w : weekPoints.breakdownsFor(leagueId, season)) {
-            if (w.playersPointsJson() == null || w.playersPointsJson().isBlank()) continue;
-            ids.addAll(JsonUtil.readMap(w.playersPointsJson()).keySet());
+        for (LeagueRepository.LeagueRow l : leagues.all()) {
+            if (l.sport() != sport) continue;
+            for (RosterWeekPointsRepository.WeekBreakdown w : weekPoints.breakdownsFor(l.id(), season)) {
+                if (w.playersPointsJson() == null || w.playersPointsJson().isBlank()) continue;
+                ids.addAll(JsonUtil.readMap(w.playersPointsJson()).keySet());
+            }
         }
         return ids;
     }
 
     /**
-     * A week's raw value, defensively normalized to a list of per-game entry
-     * maps.
+     * A season's schedule, indexed by game and by week. Pure: built from the raw
+     * maps, so it is testable against a trimmed fixture.
      *
-     * <p><b>Measured live 2026-09-23, correcting research R9's description.</b>
-     * R9 said football carries "one entry per week"; measured directly
-     * against {@code /stats/nfl/player/4034}, a football week's value is a
-     * bare JSON <i>object</i> (one entry, not wrapped in an array) --
-     * basketball's is the one that comes back as an array, because several
-     * games can fall in one fantasy week. A {@code null} value is a football
-     * {@code None} week (or a genuinely absent key) either way. Anything else
-     * this service cannot recognize is dropped, never guessed at.
+     * <p>The home/away value's shape differs by sport in Sleeper's payload -- a
+     * nested object carrying {@code team}, or a bare team-code string -- and
+     * {@link #sideTeam} resolves either, by looking at the value rather than at
+     * which sport it came from.
      */
-    @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> asEntryList(Object weekValue) {
-        if (weekValue instanceof List<?> list) {
-            List<Map<String, Object>> out = new ArrayList<>(list.size());
-            for (Object o : list) {
-                if (o instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
+    static final class Schedule {
+
+        /** Statuses that will not become "played" in this week: settled for finality purposes. */
+        private static final Set<String> SETTLED = Set.of("complete", "postponed", "canceled");
+
+        record Game(String gameId, int week, LocalDate date, String status, String home, String away) {}
+
+        private final Map<String, Game> byId = new HashMap<>();
+        private final Map<Integer, List<Game>> byWeek = new TreeMap<>();
+
+        static Schedule parse(List<Map<String, Object>> raw) {
+            Schedule s = new Schedule();
+            for (Map<String, Object> g : raw) {
+                Object id = g.get("game_id");
+                Object wk = g.get("week");
+                if (id == null || !(wk instanceof Number w)) continue;
+                LocalDate date = null;
+                Object d = g.get("date");
+                if (d != null) {
+                    String ds = String.valueOf(d);
+                    try {
+                        date = LocalDate.parse(ds.length() > 10 ? ds.substring(0, 10) : ds);
+                    } catch (RuntimeException e) {
+                        date = null;
+                    }
+                }
+                Game game = new Game(String.valueOf(id), w.intValue(), date,
+                        stringOrNull(g.get("status")), sideTeam(g.get("home")), sideTeam(g.get("away")));
+                s.byId.put(game.gameId(), game);
+                s.byWeek.computeIfAbsent(game.week(), k -> new ArrayList<>()).add(game);
             }
-            return out;
+            return s;
         }
-        if (weekValue instanceof Map<?, ?> m) {
-            return List.of((Map<String, Object>) m);
+
+        /** A side's team code from either payload shape; null if it has none. */
+        static String sideTeam(Object side) {
+            if (side instanceof Map<?, ?> m) return stringOrNull(m.get("team"));
+            return stringOrNull(side);
         }
-        return null;
+
+        /** The last week with a game that has started: complete, or dated today or earlier. */
+        int lastStartedWeek(LocalDate today) {
+            int last = 0;
+            for (Map.Entry<Integer, List<Game>> e : byWeek.entrySet()) {
+                for (Game g : e.getValue()) {
+                    boolean started = "complete".equals(g.status())
+                            || (g.date() != null && !g.date().isAfter(today));
+                    if (started) last = Math.max(last, e.getKey());
+                }
+            }
+            return last;
+        }
+
+        /**
+         * Whether this player's team was the away side of the game, from the
+         * schedule. Unknown (null) rather than defaulted to home when the game or
+         * team can't be matched.
+         */
+        Boolean isAway(String gameId, String team) {
+            if (gameId == null || team == null) return null;
+            Game g = byId.get(gameId);
+            if (g == null) return null;
+            if (team.equals(g.home())) return false;
+            if (team.equals(g.away())) return true;
+            return null;
+        }
+
+        /** A player's team in a game, given the opponent he faced; null if it can't be told. */
+        String teamOf(String gameId, String opponent) {
+            if (gameId == null || opponent == null) return null;
+            Game g = byId.get(gameId);
+            if (g == null) return null;
+            if (opponent.equals(g.home())) return g.away();
+            if (opponent.equals(g.away())) return g.home();
+            return null;
+        }
+
+        /** Whether any game in the week is {@code complete}. */
+        boolean hasCompleteGame(int week) {
+            for (Game g : byWeek.getOrDefault(week, List.of())) {
+                if ("complete".equals(g.status())) return true;
+            }
+            return false;
+        }
+
+        /**
+         * Whether {@code team} played a completed game in the week. A merely
+         * scheduled, postponed or canceled game is not a played one, so a rostered
+         * player's missing entry for it is not an absence.
+         */
+        boolean teamPlayed(int week, String team) {
+            for (Game g : byWeek.getOrDefault(week, List.of())) {
+                if ("complete".equals(g.status()) && (team.equals(g.home()) || team.equals(g.away()))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * A week is final once every game in it is settled and the fetch happened
+         * at least {@link RefreshProperties#WEEK_FINAL_AFTER} after the end of the
+         * week's last game date (specs/009 research R6).
+         *
+         * <p>Two readings, both chosen to err toward refetching. "Settled" counts
+         * {@code postponed} and {@code canceled} as well as {@code complete}:
+         * measured 2026-09-28, the reference basketball season's schedule keeps
+         * three postponed games in weeks 12 and 14 and one canceled game in week
+         * 17 forever, so requiring {@code complete} alone would refetch those
+         * weeks on every run and defeat the "an up-to-date season fetches
+         * nothing" goal. A postponed game that is later played arrives as entries
+         * in the week it was played (the entry's own {@code week}), and that week
+         * stays non-final until its own games settle. And "after the last game
+         * date" is measured from the <i>end</i> of that (date-only) day in UTC,
+         * not its start, so the window never begins before the game finished.
+         */
+        boolean isFinal(int week, Instant fetchedAt) {
+            List<Game> gs = byWeek.get(week);
+            if (gs == null || gs.isEmpty()) return false;
+            LocalDate last = null;
+            for (Game g : gs) {
+                if (g.status() == null || !SETTLED.contains(g.status())) return false;
+                if (g.date() == null) return false;
+                if (last == null || g.date().isAfter(last)) last = g.date();
+            }
+            Instant weekEnded = last.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+            return !fetchedAt.isBefore(weekEnded.plus(RefreshProperties.WEEK_FINAL_AFTER));
+        }
     }
 
     private static Integer weekOf(Map<String, Object> entry) {
         Object week = entry.get("week");
         return week instanceof Number w ? w.intValue() : null;
-    }
-
-    private static Integer parseWeekKey(String key) {
-        try {
-            return Integer.parseInt(key);
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    /**
-     * Whether {@code gameDate} is today or later (coordinator follow-up
-     * 2026-09-23, item 2). "Today" is read in UTC ({@link ZoneOffset#UTC}),
-     * chosen over the host machine's local zone so this comparison does not
-     * drift with wherever the process happens to be deployed -- a date-only
-     * comparison has no meaningful "half a day early/late" case to get right,
-     * just a stable, deployment-independent definition of "today."
-     */
-    private static boolean isFutureOrToday(LocalDate gameDate) {
-        return !gameDate.isBefore(LocalDate.now(ZoneOffset.UTC));
     }
 
     private static String stringOrNull(Object o) {
@@ -307,7 +502,7 @@ public class PlayerGameIngestService {
     /**
      * The nearest week (by absolute distance, ties favouring the earlier one)
      * this player is known to have played for -- the "neighbouring entry" the
-     * data model describes for classifying a football {@code None} week.
+     * data model describes for classifying a week with no entry.
      */
     static String nearestTeam(TreeMap<Integer, String> teamWeeks, int week) {
         if (teamWeeks.isEmpty()) return null;
@@ -328,16 +523,17 @@ public class PlayerGameIngestService {
      * played rather than the week it was scheduled, without this service
      * knowing anything about calendars (research R6).
      *
-     * <p><b>No longer rejects an empty {@code stats} map</b> (research R9,
-     * amended from spec 005): an empty map is exactly how basketball marks a
-     * missed game, and dropping it here is what threw the Embiid award's data
-     * away before it could ever be read. Whether an entry with usable stats
-     * counts as a game <i>played</i> is {@link SportRules#playedIn}'s call, made
-     * by the caller -- this method only says whether the entry is well-formed
-     * enough to become a row at all.
+     * <p><b>Does not reject an empty {@code stats} map</b> (spec 008 research
+     * R9): an empty map is exactly how basketball marks a missed game. Whether
+     * an entry with usable stats counts as a game <i>played</i> is
+     * {@link SportRules#playedIn}'s call, made by the caller -- this method only
+     * says whether the entry is well-formed enough to become a row at all.
+     *
+     * @param isAway from the schedule (the per-week payload carries no
+     *               {@code is_away_team}); null when unknown, never defaulted
      */
     static PlayerGameRepository.Row toRow(Sport sport, int season, String playerId,
-                                          Map<String, Object> entry) {
+                                          Map<String, Object> entry, Boolean isAway) {
         Object gameId = entry.get("game_id");
         Object date = entry.get("date");
         Object week = entry.get("week");
@@ -357,12 +553,11 @@ public class PlayerGameIngestService {
         }
 
         Object opponent = entry.get("opponent");
-        Object away = entry.get("is_away_team");
 
         return new PlayerGameRepository.Row(
                 sport, season, w.intValue(), playerId, String.valueOf(gameId), gameDate,
                 opponent == null ? null : String.valueOf(opponent),
-                away instanceof Boolean b ? b : null,
+                isAway,
                 JsonUtil.write(m));
     }
 }

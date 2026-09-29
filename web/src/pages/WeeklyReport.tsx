@@ -9,6 +9,7 @@ import {
   type WeeklyMatchup,
   type WeeklySide,
 } from '../api'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * specs/004-ffwrapped-feature-parity US5: one week, read back.
@@ -28,6 +29,8 @@ export default function WeeklyReport() {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -47,7 +50,7 @@ export default function WeeklyReport() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId, week])
+  }, [sleeperLeagueId, week, dataVersion])
 
   return (
     <div className="content">

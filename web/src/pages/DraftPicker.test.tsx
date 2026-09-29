@@ -28,7 +28,8 @@ const EMPTY_LOCATION = { key: 'test', pathname: '/', search: '', hash: '', state
 const getDrafts = vi.fn()
 const getMockSessions = vi.fn()
 const getSleeperUserLeagues = vi.fn()
-const ingestPlayers = vi.fn()
+const refreshPlayers = vi.fn()
+const refreshLeague = vi.fn()
 const ingestLeague = vi.fn()
 const ingestAdp = vi.fn()
 const ingestBoard = vi.fn()
@@ -36,7 +37,8 @@ vi.mock('../api', () => ({
   getDrafts: (...args: unknown[]) => getDrafts(...args),
   getMockSessions: (...args: unknown[]) => getMockSessions(...args),
   getSleeperUserLeagues: (...args: unknown[]) => getSleeperUserLeagues(...args),
-  ingestPlayers: (...args: unknown[]) => ingestPlayers(...args),
+  refreshPlayers: (...args: unknown[]) => refreshPlayers(...args),
+  refreshLeague: (...args: unknown[]) => refreshLeague(...args),
   ingestLeague: (...args: unknown[]) => ingestLeague(...args),
   ingestAdp: (...args: unknown[]) => ingestAdp(...args),
   ingestBoard: (...args: unknown[]) => ingestBoard(...args),
@@ -63,7 +65,8 @@ beforeEach(() => {
   getDrafts.mockReset().mockResolvedValue([])
   getMockSessions.mockReset().mockResolvedValue([])
   getSleeperUserLeagues.mockReset().mockResolvedValue([nbaLeague])
-  ingestPlayers.mockReset().mockResolvedValue({})
+  refreshPlayers.mockReset().mockResolvedValue({ outcome: 'DONE', detail: null })
+  refreshLeague.mockReset().mockResolvedValue({})
   ingestLeague.mockReset().mockResolvedValue({})
   ingestAdp.mockReset().mockResolvedValue({})
   ingestBoard.mockReset().mockResolvedValue({})
@@ -85,24 +88,26 @@ describe('DraftPicker "From Sleeper"', () => {
     expect(screen.queryByText('From Sleeper')).not.toBeInTheDocument()
   })
 
-  it('Set up runs all four ingest stages in order, then re-fetches both lists', async () => {
+  it('Set up runs all five stages in order, then re-fetches both lists', async () => {
     const user = userEvent.setup()
     render(<DraftPicker />)
 
     await user.click(await screen.findByRole('button', { name: 'Set up' }))
 
-    await waitFor(() => expect(ingestBoard).toHaveBeenCalledWith('nba'))
-    expect(ingestPlayers).toHaveBeenCalledWith('nba')
+    await waitFor(() => expect(refreshLeague).toHaveBeenCalledWith('999'))
+    expect(ingestBoard).toHaveBeenCalledWith('nba')
+    expect(refreshPlayers).toHaveBeenCalledWith('nba')
     expect(ingestLeague).toHaveBeenCalledWith('999')
     expect(ingestAdp).toHaveBeenCalledWith('nba')
 
-    const playersOrder = ingestPlayers.mock.invocationCallOrder[0]
+    const playersOrder = refreshPlayers.mock.invocationCallOrder[0]
     const leagueOrder = ingestLeague.mock.invocationCallOrder[0]
     const adpOrder = ingestAdp.mock.invocationCallOrder[0]
     const boardOrder = ingestBoard.mock.invocationCallOrder[0]
     expect(playersOrder).toBeLessThan(leagueOrder)
     expect(leagueOrder).toBeLessThan(adpOrder)
     expect(adpOrder).toBeLessThan(boardOrder)
+    expect(boardOrder).toBeLessThan(refreshLeague.mock.invocationCallOrder[0])
 
     // getDrafts/getSleeperUserLeagues: once on mount, once after setup succeeds.
     await waitFor(() => expect(getDrafts).toHaveBeenCalledTimes(2))
@@ -121,5 +126,18 @@ describe('DraftPicker "From Sleeper"', () => {
     // The failed stage must not fall through to later stages.
     expect(ingestAdp).not.toHaveBeenCalled()
     expect(ingestBoard).not.toHaveBeenCalled()
+    expect(refreshLeague).not.toHaveBeenCalled()
+  })
+
+  it('a failed past-seasons refresh does not fail setup', async () => {
+    refreshLeague.mockRejectedValue(new Error('refresh unavailable'))
+    const user = userEvent.setup()
+    render(<DraftPicker />)
+
+    await user.click(await screen.findByRole('button', { name: 'Set up' }))
+
+    await waitFor(() => expect(refreshLeague).toHaveBeenCalledWith('999'))
+    await waitFor(() => expect(getDrafts).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
   })
 })

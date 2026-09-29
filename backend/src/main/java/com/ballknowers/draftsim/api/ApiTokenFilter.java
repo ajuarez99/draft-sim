@@ -15,10 +15,14 @@ import java.io.IOException;
 /**
  * Shared-token gate on /api/**.
  *
- * Two routes stay open on purpose:
- *   /api/health   so a platform health check works without holding the secret
- *   OPTIONS       so the CORS preflight is never rejected before the real
- *                 request gets a chance to present its token
+ * Three routes stay open on purpose:
+ *   /api/health         so a platform health check works without holding the secret
+ *   /api/refresh/daily  the scheduled job (a GitHub Actions cron) can't hold the
+ *                       web app's bearer token; the route has its own
+ *                       X-Refresh-Secret and answers 404 when none is configured
+ *                       (specs/009-auto-data-refresh research R8)
+ *   OPTIONS             so the CORS preflight is never rejected before the real
+ *                       request gets a chance to present its token
  *
  * With no token configured the filter is inert, which keeps local development
  * exactly as it was.
@@ -35,7 +39,8 @@ public class ApiTokenFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         if (!security.enabled()) return true;
         if (HttpMethod.OPTIONS.matches(request.getMethod())) return true;
-        return "/api/health".equals(request.getRequestURI());
+        String uri = request.getRequestURI();
+        return "/api/health".equals(uri) || "/api/refresh/daily".equals(uri);
     }
 
     @Override

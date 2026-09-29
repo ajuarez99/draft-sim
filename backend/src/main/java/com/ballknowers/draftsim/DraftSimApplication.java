@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim;
 
 import com.ballknowers.draftsim.config.*;
+import com.ballknowers.draftsim.refresh.RefreshProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,7 +15,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         PriorProperties.class,
         ApiSecurityProperties.class,
         CorsProperties.class,
-        OwnerProperties.class
+        OwnerProperties.class,
+        RefreshProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

@@ -7,6 +7,7 @@ import { PageActionSlotContext, RailContextSlotContext, RailLeagueHintContext } 
 import { useAllLeagues, useRailLeague } from '../railLeague'
 import { useSearchIndex } from '../searchIndex'
 import { clearUser, useUser } from '../user'
+import { LeagueDataVersionProvider } from '../leagueDataVersion'
 import type { Sport } from '../api'
 
 const RAIL_KEY = 'bk-rail'
@@ -182,7 +183,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // looks like working navigation to pages the gate won't serve.
   if (!user) return <>{children}</>
 
+  // The provider wraps the rail AND the routes: the rail bumps a league's data
+  // version when its refresh finishes, and the pages inside <main> read it
+  // (specs/009-auto-data-refresh T025).
   return (
+    <LeagueDataVersionProvider>
     <div className="app-shell">
       <Rail
         username={user.username}
@@ -238,5 +243,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <JumpTo index={jumpIndex} loading={jumpLoading} onClose={() => setJumpOpen(false)} />
       )}
     </div>
+    </LeagueDataVersionProvider>
   )
 }
