@@ -960,7 +960,7 @@ export default function PowerRankings() {
                   <span>Record</span>
                   {memberSpace ? (
                     <>
-                      <span className="pr-score-head">Avg</span>
+                      <span className="pr-score-head">Avg rank</span>
                       <span className="pr-score-head">Your ballot</span>
                       {/* The axis lives under the column title and inside the
                           bar's own grid track, so "1st" and "12th" sit over the
@@ -1043,7 +1043,7 @@ export default function PowerRankings() {
                       </span>
                       {space ? (
                         <>
-                          <span className="mono pr-avg">{scoreLabel(e, 'MEMBER')}</span>
+                          <span className="mono pr-avg">{e.score == null ? '' : e.score.toFixed(2)}</span>
                           <span className="pr-your-ballot">
                             {myRank == null ? (
                               <span className="tiny muted">{viewedBallot?.mine ? '—' : 'No ballot'}</span>
