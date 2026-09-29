@@ -197,13 +197,35 @@ function LuckCard({ team }: { team: ExpectedWinsTeam }) {
           ))}
         </ul>
       ) : (
-        <p className="muted small">
-          No single week did this — they consistently faced{' '}
-          {wae >= 0 ? 'lower-scoring' : 'higher-scoring'} opponents than the rest of the league.
-        </p>
+        <p className="muted small">{noSwingCopy(wae, team.strengthOfSchedule)}</p>
       )}
     </article>
   )
+}
+
+/** Hand-set, not principled: below this a schedule number is too small to name a direction. */
+const SOS_NEAR_ZERO = 1
+
+/**
+ * No swing week means luck has no single cause, and the sign of luck says
+ * nothing about the schedule, so the direction comes from strengthOfSchedule
+ * (positive = harder). When the two disagree the schedule isn't blamed.
+ */
+function noSwingCopy(wae: number, sos: number): string {
+  const lead = 'No single week did this'
+  if (Math.abs(sos) < SOS_NEAR_ZERO) {
+    return `${lead}, and the schedule was close to average (${signed(sos)}). The gap came from close weeks near the middle of the league's scores.`
+  }
+  const harder = sos > 0
+  const agrees = wae >= 0 ? !harder : harder
+  if (agrees) {
+    return `${lead} — their opponents averaged ${Math.abs(sos).toFixed(1)} ${harder ? 'more' : 'fewer'} points than the league (${signed(sos)}, ${harder ? 'harder' : 'easier'} schedule).`
+  }
+  return `${lead}, and the schedule ran the other way (${signed(sos)}, ${harder ? 'harder' : 'easier'}). The ${wae >= 0 ? 'edge' : 'shortfall'} came from ${wae >= 0 ? 'winning' : 'losing'} close weeks near the middle of the league's scores.`
+}
+
+function signed(n: number): string {
+  return `${n >= 0 ? '+' : ''}${n.toFixed(1)}`
 }
 
 function ordinal(n: number): string {

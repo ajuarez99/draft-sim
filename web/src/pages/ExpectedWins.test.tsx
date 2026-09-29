@@ -89,6 +89,25 @@ describe('Expected wins', () => {
     expect(screen.queryByText(/that week\)/)).not.toBeInTheDocument()
   })
 
+  describe.each([
+    ['luck + / SOS + (disagree)', 0.45, 7.17, /schedule ran the other way \(\+7\.2, harder\)/, /lower-scoring|higher-scoring|fewer points|more points/],
+    ['luck - / SOS - (disagree)', -0.6, -5.3, /schedule ran the other way \(-5\.3, easier\)/, /lower-scoring|higher-scoring|fewer points|more points/],
+    ['luck + / SOS - (agree)', 0.5, -6.2, /averaged 6\.2 fewer points than the league/, /ran the other way/],
+    ['luck - / SOS + (agree)', -0.5, 6.2, /averaged 6\.2 more points than the league/, /ran the other way/],
+    ['SOS near zero', 0.3, 0.4, /close to average/, /fewer points|more points|ran the other way/],
+  ])('no-swing copy, %s', (_n, wae, sos, yes, no) => {
+    it('names only what the numbers support', async () => {
+      getExpectedWins.mockResolvedValue(
+        data({
+          teams: [team({ winsAboveExpected: wae, strengthOfSchedule: sos, luckSource: 'CONSISTENT_OPPONENT_SCORING', swingWeeks: [] })],
+        }),
+      )
+      render(<ExpectedWins />)
+      expect(await screen.findByText(yes)).toBeInTheDocument()
+      expect(screen.queryByText(no)).not.toBeInTheDocument()
+    })
+  })
+
   it('explains itself when no games have been played', async () => {
     getExpectedWins.mockResolvedValue(
       data({ available: false, reason: 'no completed games for this league yet', teams: [], weeksScored: 0 }),

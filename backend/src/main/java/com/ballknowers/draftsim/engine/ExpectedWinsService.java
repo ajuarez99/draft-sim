@@ -53,7 +53,11 @@ public class ExpectedWinsService {
     /** One played, scored game. The pure core's only input. */
     public record Game(int week, int aRosterId, double aPoints, int bRosterId, double bPoints) {}
 
-    /** Why a team's record diverged from its expectation. Exactly one applies. */
+    /**
+     * Why a team's record diverged from its expectation. Exactly one applies.
+     * CONSISTENT_OPPONENT_SCORING means only "no swing weeks; cause not attributed"
+     * (the name predates that; renaming the wire string is a separate change).
+     */
     public enum LuckSource { SWING_WEEKS, CONSISTENT_OPPONENT_SCORING }
 
     public record SwingWeek(int week, boolean won, double points, int weeklyRank, String opponent) {}
