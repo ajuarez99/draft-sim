@@ -255,7 +255,7 @@ public class PlayoffOddsService {
      */
     public enum Unavailable { UNMODELLED_SEEDING, NO_SCORED_WEEKS, NOT_COMPUTED }
 
-    public record ForecastTeam(int rosterId, Long managerId, String teamName, String avatarId,
+    public record ForecastTeam(int rosterId, Long managerId, String teamName, String username, String avatarId,
                                double playoffOdds, double averageWins, double projectedPoints,
                                Integer winP10, Integer winP90, Double averageSeed,
                                double seedOnePct, Map<Integer, Double> seedOdds) {}
@@ -316,8 +316,10 @@ public class PlayoffOddsService {
         Map<Integer, Long> managerByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
         for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
             managerByRoster.put(r.rosterId(), r.managerId());
+            usernameByRoster.put(r.rosterId(), r.managerName());
             avatarByRoster.put(r.rosterId(), r.avatarId());
             String name = r.managerId() == null ? null : teamNameByManager.get(r.managerId());
             if (name == null) name = r.managerName();
@@ -332,6 +334,7 @@ public class PlayoffOddsService {
                     e.rosterId(),
                     managerByRoster.get(e.rosterId()),
                     nameByRoster.getOrDefault(e.rosterId(), "Roster " + e.rosterId()),
+                    usernameByRoster.get(e.rosterId()),
                     avatarByRoster.get(e.rosterId()),
                     e.madePct(), e.projWins(), e.projPoints(),
                     percentile(wins, 0.10), percentile(wins, 0.90),

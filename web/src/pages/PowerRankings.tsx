@@ -108,7 +108,7 @@ function buildSeries(
     if (e.kind !== kind || e.season !== season) continue
     let s = byRoster.get(e.rosterId)
     if (!s) {
-      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.manager, hue: hues.get(e.rosterId)?.hue ?? 0, points: [] }
+      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.teamName?.trim() || e.manager, hue: hues.get(e.rosterId)?.hue ?? 0, points: [] }
       byRoster.set(e.rosterId, s)
     }
     const ballotCount = e.ballotCount ?? null
@@ -303,7 +303,9 @@ export function computeWeeklyStory(currentRows: PowerRankingEntry[], previousRow
   return { top, newTop: !!(top && prevTop && top.rosterId !== prevTop.rosterId), riser, faller, divisive }
 }
 
-const nameOf = (e: PowerRankingEntry) => e.manager ?? `roster ${e.rosterId}`
+// Team name first, on every page; the username is the second line where a row has room for one.
+const nameOf = (e: PowerRankingEntry) => e.teamName?.trim() || e.manager || `roster ${e.rosterId}`
+const userOf = (e: PowerRankingEntry) => (e.manager && e.manager.toLowerCase() !== nameOf(e).toLowerCase() ? e.manager : '')
 const weekTitle = (week: number) => (week === 0 ? 'Preseason' : `Week ${week}`)
 
 export function buildHeadline(story: WeeklyStory, week: number): string {
@@ -719,7 +721,7 @@ export default function PowerRankings() {
 
   // ---- per-team compare (regression #9; no slot in the mockups, so it's a
   // disclosure a pinned row reveals rather than a page-level view toggle) ----
-  const teamViewOptions = [...new Map(data.entries.map((e) => [e.rosterId, e.manager ?? `roster ${e.rosterId}`])).entries()]
+  const teamViewOptions = [...new Map(data.entries.map((e) => [e.rosterId, nameOf(e)])).entries()]
   const teamViewRosterId = highlighted
   const teamSeries: Series[] =
     compareOpen && teamViewRosterId != null
@@ -796,7 +798,7 @@ export default function PowerRankings() {
               <div className="pr-number-one-id">
                 <div className="pr-number-one-name">{nameOf(story.top)}</div>
                 <div className="pr-number-one-meta">
-                  {story.top.manager ? `${story.top.manager} · ` : ''}
+                  {userOf(story.top) ? `${userOf(story.top)} · ` : ''}
                   <span className="mono">{recordLabel(standings?.get(story.top.rosterId))}</span>
                   {scoreLabel(story.top, 'MEMBER') && (
                     <>
@@ -832,7 +834,7 @@ export default function PowerRankings() {
       {myEntry && (
         <div className="pr-your-team">
           <span className="pr-your-team-label cond">Your team</span>
-          <span className="pr-your-team-name">{myEntry.manager ?? `roster ${myEntry.rosterId}`}</span>
+          <span className="pr-your-team-name">{nameOf(myEntry)}</span>
           <span className="pr-your-team-detail">
             {ordinal(myEntry.rank)} of {gridRows}
             {(() => {
@@ -994,7 +996,6 @@ export default function PowerRankings() {
                     // different weeks or different orderings.
                     console.warn('[power] implausible movement delta', { rosterId: e.rosterId, rank: e.rank, refRank })
                   }
-                  const member = ballot?.members.find((m) => m.rosterId === e.rosterId)
                   const pct = e.makesPlayoffsPct
                   const myRank = myRankByRoster.get(e.rosterId) ?? null
                   const space = memberSpace ? spaceStatsFor(e, gridRows, myRank) : null
@@ -1014,16 +1015,16 @@ export default function PowerRankings() {
                         <Avatar
                           avatarId={e.avatarId}
                           seed={String(e.managerId ?? e.rosterId)}
-                          label={e.manager ?? `R${e.rosterId}`}
+                          label={e.teamName?.trim() || e.manager || `R${e.rosterId}`}
                           isMe={isMe}
                         />
                         <span className="pr-team-text">
                           <span className="pr-team-name">
-                            <span className="pr-team-name-text">{e.manager ?? `roster ${e.rosterId}`}</span>
+                            <span className="pr-team-name-text">{nameOf(e)}</span>
                             {isMe && <span className="cond pr-you-tag">You</span>}
                           </span>
                           <span className="pr-team-sub">
-                            {member?.teamName && member.teamName.toUpperCase() !== 'TBD' ? member.teamName : e.manager ?? ''}
+                            {userOf(e)}
                           </span>
                         </span>
                       </span>
@@ -1296,7 +1297,7 @@ export default function PowerRankings() {
                       const pct = Math.min(50, Math.abs(bias) * 6)
                       return (
                         <div className="pr-homer" key={e.rosterId}>
-                          <span className="pr-homer-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                          <span className="pr-homer-name">{nameOf(e)}</span>
                           <span className="pr-homer-track">
                             <span className="pr-homer-mid" />
                             <span
@@ -1323,7 +1324,7 @@ export default function PowerRankings() {
                 <h2>Homer of the week</h2>
                 <span className="small muted">{weekPhrase(heroWeek)}</span>
               </div>
-              <div className="pr-homer-of-week-name">{topHomer.manager ?? `roster ${topHomer.rosterId}`}</div>
+              <div className="pr-homer-of-week-name">{nameOf(topHomer)}</div>
               <p className="muted small">
                 Ranked their own team {Math.abs(topHomer.selfRankBias!)} spot{Math.abs(topHomer.selfRankBias!) === 1 ? '' : 's'}{' '}
                 {topHomer.selfRankBias! < 0 ? 'higher' : 'lower'} than the room did.
@@ -1334,7 +1335,7 @@ export default function PowerRankings() {
                   const pct = Math.min(50, Math.abs(bias) * 6)
                   return (
                     <div className="pr-homer" key={e.rosterId}>
-                      <span className="pr-homer-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                      <span className="pr-homer-name">{nameOf(e)}</span>
                       <span className="pr-homer-track">
                         <span className="pr-homer-mid" />
                         <span

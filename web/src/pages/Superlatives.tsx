@@ -13,6 +13,9 @@ import {
   type SuperlativeDetail,
   type ConductList,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
@@ -49,7 +52,7 @@ const TITLES: Record<string, { title: string; subtitle?: string; note?: string }
 export default function Superlatives() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<SuperlativesResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -66,7 +69,7 @@ export default function Superlatives() {
       setData(d)
       setError(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     }
   }, [sleeperLeagueId])
 
@@ -80,7 +83,7 @@ export default function Superlatives() {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -90,17 +93,19 @@ export default function Superlatives() {
     }
   }, [sleeperLeagueId, dataVersion])
 
+  if (notFound) return <NotFound what="league" />
+
   return (
     <div className="content">
       <PageHeader
         eyebrow="League"
         title="Superlatives"
-        sub="Season-long facts, one card per award. A card that isn't built yet says so, rather than going missing."
+        sub="Season-long awards, one card each: the highs and lows, the closest games, luck, the bench and the waiver wire. If an award can't be worked out yet, its card says why."
       />
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -285,7 +290,7 @@ function SuperlativeCard({
                       hue={hue}
                       className="sl-avatar"
                     />
-                    <span className="sl-holder-name">{h.teamName}</span>
+                    <span className="sl-holder-name"><PersonName teamName={h.teamName} username={h.username} /></span>
                   </span>
                   {/* Each mapped to its own line, not joined -- WAIVER_WIRE_WARRIOR
                       returns a total line plus up to three pickup lines (T040);
@@ -355,14 +360,14 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
     const weeks = rows
       .filter((d): d is Extract<SuperlativeDetail, { type: 'GAME' }> => d.type === 'GAME')
       .map((d) => d.week)
-    return weeks.length > 0 ? [`weeks ${weeks.join(', ')}`] : []
+    return weeks.length > 0 ? [weeksLabel(weeks)] : []
   }
   // US2 (T035): the reading itself IS the figure -- "2.40 more wins than
   // their scores earned" -- so it belongs inline, with the span it covers.
   if (s.kind === 'LUCKIEST' || s.kind === 'UNLUCKIEST') {
     return rows
       .filter((d): d is Extract<SuperlativeDetail, { type: 'LUCK' }> => d.type === 'LUCK')
-      .map((d) => `${d.reading} · weeks ${d.fromWeek}–${d.throughWeek}`)
+      .map((d) => `${d.reading} · ${weekSpan(d.fromWeek, d.throughWeek)}`)
   }
   if (s.kind === 'MOST_BENCH_POINTS') {
     return rows
@@ -371,7 +376,7 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
         const worst = d.biggestWeek
           ? ` · worst: week ${d.biggestWeek.week} (${d.biggestWeek.pointsLeft.toFixed(2)})`
           : ''
-        return `${d.pointsLeft.toFixed(2)} points left on the bench · weeks ${d.fromWeek}–${d.throughWeek}${worst}`
+        return `${d.pointsLeft.toFixed(2)} points left on the bench · ${weekSpan(d.fromWeek, d.throughWeek)}${worst}`
       })
   }
   // US3 (T040): a total line, then up to three pickup lines (the backend
@@ -431,6 +436,11 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
       })
   }
   return []
+}
+
+/** "week 3" for a single week, "weeks 3–5" for a run -- never "weeks 3–3". */
+function weekSpan(from: number, to: number): string {
+  return from === to ? `week ${from}` : `weeks ${from}–${to}`
 }
 
 /**
@@ -587,7 +597,7 @@ function ConductListSection({
   onChanged: () => void | Promise<void>
 }) {
   const [list, setList] = useState<ConductList | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, setError, fail } = useFailure()
   const [formOpen, setFormOpen] = useState(false)
   const [playerId, setPlayerId] = useState('')
   const [reason, setReason] = useState('')
@@ -609,7 +619,7 @@ function ConductListSection({
         if (!cancelled) setList(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
     return () => {
       cancelled = true
@@ -633,7 +643,7 @@ function ConductListSection({
       setAppliesFromWeek(1)
       setFormOpen(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setSaving(false)
     }
@@ -646,7 +656,7 @@ function ConductListSection({
       await refresh()
       await onChanged()
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     }
   }
 
@@ -656,7 +666,7 @@ function ConductListSection({
     <section className="panel sl-conduct">
       <h3 className="cond">Commissioner&apos;s list</h3>
       <p className="muted small">
-        This list is for this season only -- a new season starts with an empty one.
+        This list is for this season only — a new season starts with an empty one.
       </p>
 
       {requestedSeason != null && (

@@ -62,7 +62,7 @@ public class ExpectedWinsService {
 
     public record SwingWeek(int week, boolean won, double points, int weeklyRank, String opponent) {}
 
-    public record TeamRow(int rosterId, Long managerId, String teamName, String avatarId,
+    public record TeamRow(int rosterId, Long managerId, String teamName, String username, String avatarId,
                           double expectedWins, double actualWins, double winsAboveExpected,
                           double strengthOfSchedule, LuckSource luckSource, List<SwingWeek> swingWeeks) {}
 
@@ -262,8 +262,10 @@ public class ExpectedWinsService {
         Map<Integer, Long> managerByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
         for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
             managerByRoster.put(s.rosterId(), s.managerId());
+            usernameByRoster.put(s.rosterId(), s.managerName());
             avatarByRoster.put(s.rosterId(), s.avatarId());
             String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
             if (name == null) name = s.managerName();
@@ -283,6 +285,7 @@ public class ExpectedWinsService {
                     rosterId,
                     managerByRoster.get(rosterId),
                     nameByRoster.getOrDefault(rosterId, "Roster " + rosterId),
+                    usernameByRoster.get(rosterId),
                     avatarByRoster.get(rosterId),
                     round2(exp), act, round2(act - exp),
                     round2(sos.getOrDefault(rosterId, 0.0)),

@@ -73,7 +73,7 @@ public class RosterManagementService {
      *                      an excluded week must be visible, not silently
      *                      missing from a total (FR-007, US2.5).
      */
-    public record TeamRow(int rosterId, Long managerId, String teamName, String avatarId,
+    public record TeamRow(int rosterId, Long managerId, String teamName, String username, String avatarId,
                           double totalPoints, double potentialPoints, Double efficiency,
                           int weeksCounted, List<Integer> weeksExcluded) {}
 
@@ -168,8 +168,10 @@ public class RosterManagementService {
         Map<Integer, Long> managerByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> teamNameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
         for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
             managerByRoster.put(s.rosterId(), s.managerId());
+            usernameByRoster.put(s.rosterId(), s.managerName());
             avatarByRoster.put(s.rosterId(), s.avatarId());
             String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
             if (name == null) name = s.managerName();
@@ -208,6 +210,7 @@ public class RosterManagementService {
                     rosterId,
                     managerByRoster.get(rosterId),
                     teamNameByRoster.getOrDefault(rosterId, "Roster " + rosterId),
+                    usernameByRoster.get(rosterId),
                     avatarByRoster.get(rosterId),
                     round2(total), round2(potential), efficiency,
                     countedByRoster.getOrDefault(rosterId, 0),

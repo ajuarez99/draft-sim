@@ -61,7 +61,7 @@ public class WeeklyReportService {
         this.gameScoring = gameScoring;
     }
 
-    public record Side(int rosterId, String teamName, String avatarId, String record, double points) {}
+    public record Side(int rosterId, String teamName, String username, String avatarId, String record, double points) {}
 
     public record Matchup(Side home, Side away) {}
 
@@ -147,6 +147,7 @@ public class WeeklyReportService {
         }
 
         Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> recordByRoster = new HashMap<>();
         Map<Long, String> teamNameByManager = new HashMap<>();
@@ -159,6 +160,7 @@ public class WeeklyReportService {
             String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
             if (name == null) name = s.managerName();
             nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
+            usernameByRoster.put(s.rosterId(), s.managerName());
             avatarByRoster.put(s.rosterId(), s.avatarId());
             recordByRoster.put(s.rosterId(), recordAfter(all, league.season(), week, s.rosterId(),
                     matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)));
@@ -175,9 +177,11 @@ public class WeeklyReportService {
             if (p.season() != league.season() || p.week() != week) continue;
             games.add(new Matchup(
                     new Side(p.aRosterId(), nameByRoster.getOrDefault(p.aRosterId(), "Roster " + p.aRosterId()),
+                            usernameByRoster.get(p.aRosterId()),
                             avatarByRoster.get(p.aRosterId()), recordByRoster.get(p.aRosterId()),
                             p.aPoints() == null ? 0 : p.aPoints().doubleValue()),
                     new Side(p.bRosterId(), nameByRoster.getOrDefault(p.bRosterId(), "Roster " + p.bRosterId()),
+                            usernameByRoster.get(p.bRosterId()),
                             avatarByRoster.get(p.bRosterId()), recordByRoster.get(p.bRosterId()),
                             p.bPoints() == null ? 0 : p.bPoints().doubleValue())));
         }

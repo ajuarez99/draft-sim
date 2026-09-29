@@ -17,6 +17,7 @@ function team(over: Partial<ExpectedWinsTeam> = {}): ExpectedWinsTeam {
     rosterId: 1,
     managerId: 10,
     teamName: 'jpelwell',
+    username: null,
     avatarId: null,
     expectedWins: 0.45,
     actualWins: 1,

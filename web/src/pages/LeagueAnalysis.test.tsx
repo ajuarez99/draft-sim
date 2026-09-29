@@ -73,6 +73,7 @@ function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
   return {
     season: 2026,
     scoringKey: 'PPR',
+    teams: [],
     window: { fromWeek: 2, toWeek: 14, weeks: 13, scoredWeeks: 1 },
     rankingScores: {
       available: false,
@@ -142,11 +143,38 @@ describe('LeagueAnalysis', () => {
     expect(screen.queryByRole('columnheader', { name: 'Score' })).not.toBeInTheDocument()
   })
 
-  /** Withheld or not, the formula is shown -- it is the reader's way of judging it. */
-  it('shows the formula even when the score is withheld', async () => {
+  /** One naming rule on every page: team name first, the Sleeper username under it. */
+  it('names a manager by team name, with the username as the second line', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        teams: [
+          { rosterId: 1, teamName: 'Kier Kings', username: 'kieriskash' },
+          { rosterId: 2, teamName: 'jstrobe', username: 'jstrobe' },
+        ],
+      }),
+    )
+    render(<LeagueAnalysis />)
+
+    expect((await screen.findAllByText('Kier Kings')).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('kieriskash').length).toBeGreaterThan(0)
+    // jstrobe never set a team name, so the username is not printed twice under itself.
+    const row = screen.getAllByText('jstrobe')[0].closest('.person-name') as HTMLElement
+    expect(row.querySelectorAll('.person-user')).toHaveLength(0)
+  })
+
+  /**
+   * Withheld or not, the formula is shown -- it is the reader's way of judging it.
+   * In words up front; ffwrapped's verbatim string (code variable names and all)
+   * stays one click away under its own label.
+   */
+  it('shows the formula in words even when the score is withheld, with the verbatim one behind a label', async () => {
     getLeagueAnalysis.mockResolvedValue(data())
     render(<LeagueAnalysis />)
-    expect(await screen.findByText(/avgWeeklyScore \* 6/)).toBeInTheDocument()
+    expect(await screen.findByText(/average week × 6, plus \(best week \+ worst week\) × 2/)).toBeInTheDocument()
+    const summary = screen.getByText(/ffwrapped's formula, as published/)
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    expect(within(details).getByText(/avgWeeklyScore \* 6/)).toBeInTheDocument()
   })
 
   /**

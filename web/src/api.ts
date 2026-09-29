@@ -1,5 +1,6 @@
 // Types mirror the Java records in engine/SimulationResult.java. They are
 // hand-maintained; if you change a record over there, change it here.
+import { ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
 
@@ -153,11 +154,16 @@ export type SimRequest = {
   seed?: number
 }
 
+export { ApiError, isNotFound }
+
+async function apiError(res: Response): Promise<ApiError> {
+  // Several controllers answer 404 with an empty body, so a parse failure is normal.
+  const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
+  return new ApiError(res.status, body.error ?? body.message ?? undefined)
+}
+
 async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
-  }
+  if (!res.ok) throw await apiError(res)
   return res.json() as Promise<T>
 }
 
@@ -690,6 +696,8 @@ export type StandingRow = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** This season's team name (league history rows only; manager-history rows omit it). */
+  teamName?: string | null
   avatarId: string | null
   wins: number | null
   losses: number | null
@@ -1181,6 +1189,8 @@ export type PowerRankingEntry = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** Sleeper team name for this league, falling back to the username; null for an unowned roster. */
+  teamName: string | null
   avatarId: string | null
   rank: number
   score: number | null
@@ -1408,6 +1418,14 @@ export type LeagueAnalysis = {
   projections: AnalysisProjections
   matchups: AnalysisMatchups
   scores: AnalysisScores
+  /** Every roster's two names, present even when a block is unavailable. */
+  teams: AnalysisTeamLabel[]
+}
+
+export type AnalysisTeamLabel = {
+  rosterId: number
+  teamName: string
+  username: string | null
 }
 
 /**
@@ -1450,8 +1468,7 @@ export async function streamSimulation(
     signal,
   })
   if (!res.ok || !res.body) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -1564,6 +1581,8 @@ export type RosterManagementTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   totalPoints: number
   potentialPoints: number
@@ -1608,6 +1627,8 @@ export type ExpectedWinsTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   expectedWins: number
   actualWins: number
@@ -1646,6 +1667,8 @@ export type ForecastTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   playoffOdds: number
   averageWins: number
@@ -1676,6 +1699,8 @@ export const getSeasonForecast = (sleeperLeagueId: string) =>
 export type WeeklySide = {
   rosterId: number
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   record: string
   points: number
@@ -1779,6 +1804,8 @@ export type SuperlativeHolder = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
 }
 
@@ -2004,8 +2031,7 @@ export const fetchConductList = (sleeperLeagueId: string) =>
  */
 async function conductListResult<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }))
-    throw new Error(body.message ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
   // DELETE returns 204 with no body.
   if (res.status === 204) return undefined as T

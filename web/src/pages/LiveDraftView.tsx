@@ -10,6 +10,8 @@ import {
   type SeatsResponse,
   type SimulationResult,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import AvailabilityPanel from '../components/AvailabilityPanel'
 import DraftBoard from '../components/DraftBoard'
 import LiveStatusBar from '../components/LiveStatusBar'
@@ -74,7 +76,7 @@ export default function LiveDraftView() {
   const [result, setResult] = useState<SimulationResult | null>(null)
   const [resimming, setResimming] = useState(false)
   const [resimProgress, setResimProgress] = useState(0)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
   const [openSeatSlot, setOpenSeatSlot] = useState<number | null>(null)
   const [forking, setForking] = useState(false)
@@ -133,7 +135,7 @@ export default function LiveDraftView() {
   }, [])
 
   useEffect(() => {
-    getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
+    getSeats(draftId).then(setSeats).catch(fail)
     // Only for the pre-draft "starts at ..." line -- the live stream carries no
     // start time, and hardcoding one would be a lie in the source. A failure
     // here is not worth surfacing: the waiting copy just drops the clause.
@@ -173,7 +175,7 @@ export default function LiveDraftView() {
       setError(null)
     } catch (e) {
       if (ac.signal.aborted || !mountedRef.current || seq !== requestSeqRef.current) return
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       resimmingRef.current = false
       if (mountedRef.current && seq === requestSeqRef.current) setResimming(false)
@@ -399,6 +401,8 @@ export default function LiveDraftView() {
       : live.seatsMapped === 0
         ? 'Waiting for the commissioner to set the draft order.'
         : `${live.seatsMapped} seats mapped${startsAt ? ` · starts ${startsAt}` : ''}`
+
+  if (notFound) return <NotFound what="draft" />
 
   return (
     <>

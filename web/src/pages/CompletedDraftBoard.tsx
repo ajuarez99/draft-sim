@@ -7,6 +7,8 @@ import {
   type RealDraftBoard,
   type SeatsResponse,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import PlayerCard from '../components/PlayerCard'
 import { LoadingScreen } from '../components/Skeleton'
@@ -22,7 +24,7 @@ export default function CompletedDraftBoard() {
   const { draftId = '' } = useParams<{ draftId: string }>()
   const [seats, setSeats] = useState<SeatsResponse | null>(null)
   const [board, setBoard] = useState<RealDraftBoard | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
 
   useEffect(() => {
@@ -34,9 +36,10 @@ export default function CompletedDraftBoard() {
         setSeats(s)
         setBoard(b)
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => fail(e))
   }, [draftId])
 
+  if (notFound) return <NotFound what="draft" />
   if (error) {
     return (
       <div className="content">

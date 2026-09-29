@@ -92,7 +92,8 @@ public class SeasonSuperlativesService {
             Kind.LUCKIEST, Kind.UNLUCKIEST, Kind.MOST_BENCH_POINTS,
             Kind.WAIVER_WIRE_WARRIOR, Kind.JOEL_EMBIID, Kind.UNETHICAL);
 
-    public record Holder(int rosterId, Long managerId, String teamName, String avatarId) {}
+    /** {@code username} is the Sleeper display name, the secondary line under the team name; filled in once, in {@link #withUsernames}. */
+    public record Holder(int rosterId, Long managerId, String teamName, String username, String avatarId) {}
 
     public record Coverage(int weeksCovered, int weeksExcluded, List<String> reasons) {}
 
@@ -295,9 +296,13 @@ public class SeasonSuperlativesService {
         built.put(Kind.UNETHICAL, unethicalSuperlative(league, parsedWeeks, playersBySleeperId, early,
                 nameByRoster, avatarByRoster, managerByRoster));
 
+        Map<Integer, String> usernameByRoster = new HashMap<>();
+        for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
+            usernameByRoster.put(s.rosterId(), s.managerName());
+        }
         List<Superlative> superlatives = new ArrayList<>();
         for (Kind kind : Kind.values()) {
-            superlatives.add(built.getOrDefault(kind, notBuiltYet(kind)));
+            superlatives.add(withUsernames(built.getOrDefault(kind, notBuiltYet(kind)), usernameByRoster));
         }
 
         return Optional.of(new Result(true, null, league.season(), requestedSeason, league.sport(),
@@ -481,7 +486,7 @@ public class SeasonSuperlativesService {
                 .sorted(Comparator.comparingInt(ExpectedWinsService.TeamRow::rosterId))
                 .toList();
         List<Holder> holders = tied.stream()
-                .map(t -> new Holder(t.rosterId(), t.managerId(), t.teamName(), t.avatarId()))
+                .map(t -> new Holder(t.rosterId(), t.managerId(), t.teamName(), t.username(), t.avatarId()))
                 .toList();
         List<DetailRow> detail = tied.stream()
                 .<DetailRow>map(t -> new LuckDetail(t.rosterId(), t.actualWins(), t.expectedWins(),
@@ -1186,7 +1191,17 @@ public class SeasonSuperlativesService {
     private static Holder holder(int rosterId, Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
                                  Map<Integer, Long> managerByRoster) {
         return new Holder(rosterId, managerByRoster.get(rosterId),
-                nameByRoster.getOrDefault(rosterId, "Roster " + rosterId), avatarByRoster.get(rosterId));
+                nameByRoster.getOrDefault(rosterId, "Roster " + rosterId), null, avatarByRoster.get(rosterId));
+    }
+
+    /** Fills each holder's username after the kinds are built, so the kind builders keep their signatures. */
+    static Superlative withUsernames(Superlative s, Map<Integer, String> usernameByRoster) {
+        List<Holder> holders = s.holders().stream()
+                .map(h -> h.username() != null ? h
+                        : new Holder(h.rosterId(), h.managerId(), h.teamName(), usernameByRoster.get(h.rosterId()), h.avatarId()))
+                .toList();
+        return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), holders,
+                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders());
     }
 
     /** Same fallback chain as {@link ExpectedWinsService#forLeague}: member team name, else manager name, else "Roster N". */

@@ -52,7 +52,7 @@ class LeagueAnalyticsContractTest {
     void rosterManagementCarriesEveryFieldThePageReads() {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, 1, List.of(
-                        new RosterManagementService.TeamRow(4, 17L, "Master Bates", "abc",
+                        new RosterManagementService.TeamRow(4, 17L, "Master Bates", "abc-user", "abc",
                                 164.96, 174.16, 0.947, 1, List.of(2))))));
 
         Map<String, Object> body = bodyOf(
@@ -69,6 +69,7 @@ class LeagueAnalyticsContractTest {
         assertEquals(4, team.get("rosterId"));
         assertEquals(17L, team.get("managerId"));
         assertEquals("Master Bates", team.get("teamName"));
+        assertEquals("abc-user", team.get("username"));
         assertEquals("abc", team.get("avatarId"));
         assertEquals(164.96, team.get("totalPoints"));
         assertEquals(174.16, team.get("potentialPoints"));
@@ -86,7 +87,7 @@ class LeagueAnalyticsContractTest {
     void anEfficiencyOfNullIsCarriedAsAnExplicitNull() {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, 1, List.of(
-                        new RosterManagementService.TeamRow(4, null, "Roster 4", null,
+                        new RosterManagementService.TeamRow(4, null, "Roster 4", null, null,
                                 0, 0, null, 0, List.of())))));
 
         @SuppressWarnings("unchecked")
@@ -124,7 +125,7 @@ class LeagueAnalyticsContractTest {
     void aSeasonFallbackIsCarriedSoThePageCanAnnounceIt() {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2025, 2026, Sport.NBA, 21, List.of(
-                        new RosterManagementService.TeamRow(1, 3L, "Fat Slovenian Revenge", null,
+                        new RosterManagementService.TeamRow(1, 3L, "Fat Slovenian Revenge", "fatslovenian", null,
                                 5339.5, 5547.0, 0.963, 21, List.of())))));
 
         Map<String, Object> body = bodyOf(
@@ -161,7 +162,7 @@ class LeagueAnalyticsContractTest {
     void expectedWinsCarriesTheLuckDiscriminatorAndItsWeeks() {
         when(expectedWins.forLeagueRegularSeason(LEAGUE)).thenReturn(Optional.of(
                 new ExpectedWinsService.Result(true, null, 2026, null, Sport.NFL, 1, 130.1, List.of(
-                        new ExpectedWinsService.TeamRow(6, 9L, "jpelwell", null,
+                        new ExpectedWinsService.TeamRow(6, 9L, "jpelwell", "jpelwell", null,
                                 0.45, 1.0, 0.55, -12.4,
                                 ExpectedWinsService.LuckSource.SWING_WEEKS,
                                 List.of(new ExpectedWinsService.SwingWeek(1, true, 146.16, 7, "She Hocken")))))));
@@ -193,7 +194,7 @@ class LeagueAnalyticsContractTest {
     void consistentOpponentScoringCarriesNoSwingWeeks() {
         when(expectedWins.forLeagueRegularSeason(LEAGUE)).thenReturn(Optional.of(
                 new ExpectedWinsService.Result(true, null, 2026, null, Sport.NBA, 3, 228.0, List.of(
-                        new ExpectedWinsService.TeamRow(2, 3L, "Hoop Dreams", null,
+                        new ExpectedWinsService.TeamRow(2, 3L, "Hoop Dreams", "hoopuser", null,
                                 2.4, 2.0, -0.4, 5.1,
                                 ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING,
                                 List.of())))));

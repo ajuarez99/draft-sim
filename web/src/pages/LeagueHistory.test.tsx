@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LeagueHistory from './LeagueHistory'
+import { ApiError } from '../apiError'
 import type {
   LeagueHistory as LeagueHistoryData,
   LeagueRecords,
@@ -300,7 +301,7 @@ describe('streaks', () => {
 
 describe('loading and error states', () => {
   it('offers a button rather than printing an endpoint when seasons are missing', async () => {
-    getLeagueHistory.mockRejectedValue(new Error('404 not found'))
+    getLeagueHistory.mockRejectedValue(new ApiError(404))
     render(<LeagueHistory />)
 
     expect(await screen.findByRole('button', { name: /load past seasons/i })).toBeTruthy()
