@@ -53,7 +53,7 @@ describe('RankBoard gesture gating', () => {
     vi.useFakeTimers()
     try {
       const { container } = renderBoard()
-      const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+      const chip = screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ })
 
       fireEvent.pointerDown(chip, { pointerId: 1, button: 0, pointerType: 'touch', clientX: 50, clientY: 50 })
       expect(isDragging(container)).toBe(false) // nothing yet -- this could still be a scroll
@@ -72,7 +72,7 @@ describe('RankBoard gesture gating', () => {
     vi.useFakeTimers()
     try {
       const { container, board } = renderBoard()
-      const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+      const chip = screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ })
 
       fireEvent.pointerDown(chip, { pointerId: 1, button: 0, pointerType: 'touch', clientX: 50, clientY: 50 })
       fireEvent.pointerMove(board, { pointerId: 1, pointerType: 'touch', clientX: 50, clientY: 90 })
@@ -91,7 +91,7 @@ describe('RankBoard gesture gating', () => {
     // which is why the board could not be read on a phone without disturbing
     // it -- every row is a 44px full-width target and they tile the list.
     const { container, board } = renderBoard()
-    const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+    const chip = screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ })
 
     pressAndMove(chip, board, 'touch')
 
@@ -112,7 +112,7 @@ describe('RankBoard gesture gating', () => {
     // FR-021: the handle is a touch affordance and must cost the pointer path
     // nothing -- no delay, no smaller grab area.
     const { container, board } = renderBoard()
-    const chip = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+    const chip = screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ })
 
     pressAndMove(chip, board, 'mouse')
 
@@ -146,54 +146,54 @@ describe('RankBoard tap route', () => {
     // Not a swap: Alice goes to rank 3 and Bob/Cleo each move up one, which
     // is what `move()` in rankOrder.ts does and what FR-005 requires.
     const { container } = renderBoard()
-    fireEvent.click(screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Cleo, Team C, rank 3 of 4/ }))
-    expect(names(container)).toEqual(['Bob', 'Cleo', 'Alice', 'Dev'])
+    fireEvent.click(screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Team C, Cleo, rank 3 of 4/ }))
+    expect(names(container)).toEqual(['Team B', 'Team C', 'Team A', 'Team D'])
   })
 
   it('clears the selection without moving anything when the same chip is tapped twice', () => {
     const { container } = renderBoard()
-    const alice = screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ })
+    const alice = screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ })
     fireEvent.click(alice)
     expect(alice).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(alice)
     expect(alice).toHaveAttribute('aria-pressed', 'false')
-    expect(names(container)).toEqual(['Alice', 'Bob', 'Cleo', 'Dev'])
+    expect(names(container)).toEqual(['Team A', 'Team B', 'Team C', 'Team D'])
   })
 
   it('shows nudge buttons only on the selected chip, and moves one rank per press', () => {
     const { container } = renderBoard()
     expect(container.querySelectorAll('.rankboard-nudge')).toHaveLength(0)
 
-    fireEvent.click(screen.getByRole('button', { name: /Cleo, Team C, rank 3 of 4/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Team C, Cleo, rank 3 of 4/ }))
     expect(container.querySelectorAll('.rankboard-nudge')).toHaveLength(1)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move Cleo up one rank' }))
-    expect(names(container)).toEqual(['Alice', 'Cleo', 'Bob', 'Dev'])
+    fireEvent.click(screen.getByRole('button', { name: 'Move Team C up one rank' }))
+    expect(names(container)).toEqual(['Team A', 'Team C', 'Team B', 'Team D'])
 
-    fireEvent.click(screen.getByRole('button', { name: 'Move Cleo down one rank' }))
-    expect(names(container)).toEqual(['Alice', 'Bob', 'Cleo', 'Dev'])
+    fireEvent.click(screen.getByRole('button', { name: 'Move Team C down one rank' }))
+    expect(names(container)).toEqual(['Team A', 'Team B', 'Team C', 'Team D'])
   })
 
   it('disables the nudge that would run off the end of the board', () => {
     renderBoard()
-    fireEvent.click(screen.getByRole('button', { name: /Alice, Team A, rank 1 of 4/ }))
-    expect(screen.getByRole('button', { name: 'Move Alice up one rank' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Move Alice down one rank' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: /Team A, Alice, rank 1 of 4/ }))
+    expect(screen.getByRole('button', { name: 'Move Team A up one rank' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Move Team A down one rank' })).toBeEnabled()
   })
 
   it('keeps ArrowUp/ArrowDown working on a focused chip', () => {
     // FR-017: the keyboard path is a floor. The buttons call the same
     // moveChipBy, so this is the one rule reached two ways, not two rules.
     const { container } = renderBoard()
-    fireEvent.keyDown(screen.getByRole('button', { name: /Dev, Team D, rank 4 of 4/ }), { key: 'ArrowUp' })
-    expect(names(container)).toEqual(['Alice', 'Bob', 'Dev', 'Cleo'])
+    fireEvent.keyDown(screen.getByRole('button', { name: /Team D, Dev, rank 4 of 4/ }), { key: 'ArrowUp' })
+    expect(names(container)).toEqual(['Team A', 'Team B', 'Team D', 'Team C'])
   })
 
   it('announces a completed move to assistive technology', () => {
     const { container } = renderBoard()
-    fireEvent.keyDown(screen.getByRole('button', { name: /Dev, Team D, rank 4 of 4/ }), { key: 'ArrowUp' })
-    expect(container.querySelector('.rankboard-sr-only')?.textContent).toBe('Placed Dev 3rd of 4.')
+    fireEvent.keyDown(screen.getByRole('button', { name: /Team D, Dev, rank 4 of 4/ }), { key: 'ArrowUp' })
+    expect(container.querySelector('.rankboard-sr-only')?.textContent).toBe('Placed Team D 3rd of 4.')
   })
 })
 

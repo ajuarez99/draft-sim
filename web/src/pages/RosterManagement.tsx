@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -266,7 +267,7 @@ function Row({ team, hue, scale }: { team: RosterManagementTeam; hue: number; sc
           hue={hue}
           className="rm-avatar"
         />
-        <span className="rm-name">{team.teamName}</span>
+        <span className="rm-name"><PersonName teamName={team.teamName} username={team.username} /></span>
       </th>
       <td className="rm-num">{team.totalPoints.toFixed(2)}</td>
       <td className="rm-num">{team.potentialPoints.toFixed(2)}</td>

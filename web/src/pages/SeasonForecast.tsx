@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar'
 import { getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -157,7 +158,7 @@ function Row({ team, hue, maxWins }: { team: ForecastTeam; hue: number; maxWins:
           hue={hue}
           className="sf-avatar"
         />
-        <span className="sf-name">{team.teamName}</span>
+        <span className="sf-name"><PersonName teamName={team.teamName} username={team.username} /></span>
       </th>
       <td className="sf-num sf-odds">{(team.playoffOdds).toFixed(1)}%</td>
       <td className="sf-num">{team.averageWins.toFixed(2)}</td>

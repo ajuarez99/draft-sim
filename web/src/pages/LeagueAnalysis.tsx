@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
+import PersonName from '../components/PersonName'
 import { useLeagueLinkState } from '../railLeague'
 import BumpChart, { type Series } from '../components/BumpChart'
 import {
@@ -25,6 +26,7 @@ import {
   type AnalysisMatchup,
   type AnalysisSide,
   type AnalysisScores,
+  type AnalysisTeamLabel,
   type AnalysisWeekTotal,
 } from '../api'
 import { useFailure } from '../useFailure'
@@ -49,8 +51,21 @@ const SCORING_LABEL: Record<string, string> = {
   STANDARD: 'standard',
 }
 
-function managerName(manager: string | null, rosterId: number) {
-  return manager ?? `roster ${rosterId}`
+/**
+ * Every roster's team name and Sleeper username, keyed by roster id. The
+ * payload carries them once (`teams`) rather than on each of the block shapes
+ * that name a manager, so every block on the page can put the team name first.
+ */
+const TeamLabelsContext = createContext<ReadonlyMap<number, AnalysisTeamLabel>>(new Map())
+
+/** The team name for a roster, falling back to the username, then "roster N". */
+function useTeamName() {
+  const labels = useContext(TeamLabelsContext)
+  return useCallback(
+    (manager: string | null, rosterId: number) =>
+      labels.get(rosterId)?.teamName ?? manager ?? `roster ${rosterId}`,
+    [labels],
+  )
 }
 
 const pts = (n: number) => n.toFixed(1)
@@ -97,15 +112,17 @@ function ManagerLink({
   avatarId: string | null
   isMe?: boolean
 }) {
-  const name = managerName(manager, rosterId)
+  const teamName = useTeamName()
+  const username = useContext(TeamLabelsContext).get(rosterId)?.username ?? manager
+  const name = teamName(manager, rosterId)
   // Carries this league to the manager's own page -- see RecordWho in
   // LeagueHistory, which does the same for the same reason.
   const linkState = useLeagueLinkState()
   if (managerId == null) return <span className="muted">{name}</span>
   return (
     <Link to={`/managers/${managerId}/history`} state={linkState} className="standings-manager">
-      <Avatar avatarId={avatarId} seed={String(managerId)} label={manager} isMe={isMe} />
-      {name}
+      <Avatar avatarId={avatarId} seed={String(managerId)} label={name} isMe={isMe} />
+      <PersonName teamName={name} username={username} />
     </Link>
   )
 }
@@ -395,6 +412,7 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
  * the bug this repo keeps re-shipping.
  */
 function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
+  const teamName = useTeamName()
   const [selection, setSelection] = useState<PinSlots>(NO_PINS)
   const toggle = (rosterId: number) => setSelection((s) => toggleSelection(s, rosterId))
 
@@ -406,7 +424,7 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
       block.rosters.map((r) => ({
         rosterId: r.rosterId,
         managerId: r.managerId,
-        manager: r.manager,
+        manager: teamName(r.manager, r.rosterId),
         hue: hues.get(r.rosterId)?.hue ?? 0,
         points: r.byWeek.map((w) => ({
           week: w.week,
@@ -417,7 +435,7 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
           thin: false,
         })),
       })),
-    [block.rosters, hues],
+    [block.rosters, hues, teamName],
   )
 
   if (!block.available) return <NotYet reason={block.reason} />
@@ -480,6 +498,7 @@ function BumpLegend({
   meRosterId: number | null
   onToggle: (rosterId: number) => void
 }) {
+  const teamName = useTeamName()
   const full = pinsFull(selection)
   const pinned = pinnedCount(selection)
   const hues = managerHues(rosters)
@@ -507,8 +526,8 @@ function BumpLegend({
               atCap
                 ? `Three is the most that stay reliably distinguishable. Unpin one first.`
                 : on
-                  ? `Unpin ${managerName(r.manager, r.rosterId)}`
-                  : `Pin ${managerName(r.manager, r.rosterId)}`
+                  ? `Unpin ${teamName(r.manager, r.rosterId)}`
+                  : `Pin ${teamName(r.manager, r.rosterId)}`
             }
             style={on ? ({ '--pin': FOCUS_SLOTS[slot] } as React.CSSProperties) : undefined}
             onClick={() => onToggle(r.rosterId)}
@@ -521,7 +540,7 @@ function BumpLegend({
               isMe={mine}
               className="bump-legend-avatar"
             />
-            {managerName(r.manager, r.rosterId)}
+            {teamName(r.manager, r.rosterId)}
             {mine && <span className="cond">you</span>}
           </button>
         )
@@ -531,6 +550,7 @@ function BumpLegend({
 }
 
 function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
+  const teamName = useTeamName()
   if (!block.available) return <NotYet reason={block.reason} />
   const teams = block.rosters.length
 
@@ -550,7 +570,7 @@ function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
         <tbody>
           {block.rosters.map((r) => (
             <tr key={r.rosterId}>
-              <td>{managerName(r.manager, r.rosterId)}</td>
+              <td>{teamName(r.manager, r.rosterId)}</td>
               {block.positionGroups.map((g) => {
                 const rank = r.rankByPosition[g] ?? 0
                 const points = r.byPosition[g] ?? 0
@@ -563,7 +583,7 @@ function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
                     key={g}
                     className={`analysis-cell pos-${g}`}
                     style={{ '--tint': `${Math.round(strength * 26)}%` } as React.CSSProperties}
-                    title={`${managerName(r.manager, r.rosterId)} — ${g}: ${pts(points)} projected points, ${rank} of ${teams}`}
+                    title={`${teamName(r.manager, r.rosterId)} — ${g}: ${pts(points)} projected points, ${rank} of ${teams}`}
                   >
                     <span className="mono analysis-cell-rank">{rank}</span>
                     <span className="mono analysis-cell-points">{points.toFixed(0)}</span>
@@ -587,6 +607,7 @@ function topStarter(side: AnalysisSide): AnalysisLineupPlayer | null {
 }
 
 function GameCard({ game }: { game: AnalysisMatchup }) {
+  const teamName = useTeamName()
   const [a, b] = game.sides
   const mine = game.sides.some((s) => s.isMe)
 
@@ -650,7 +671,7 @@ function GameCard({ game }: { game: AnalysisMatchup }) {
       <div
         className="analysis-game-split"
         role="img"
-        aria-label={`${managerName(a.manager, a.rosterId)} ${pts(a.projected)}, ${managerName(b.manager, b.rosterId)} ${pts(b.projected)}`}
+        aria-label={`${teamName(a.manager, a.rosterId)} ${pts(a.projected)}, ${teamName(b.manager, b.rosterId)} ${pts(b.projected)}`}
       >
         <span className="analysis-game-fill" style={{ width: `${share}%` }} />
       </div>
@@ -660,7 +681,7 @@ function GameCard({ game }: { game: AnalysisMatchup }) {
           <span className="muted small">Dead level on projection.</span>
         ) : (
           <>
-            <strong>{managerName(a.manager, a.rosterId)}</strong>
+            <strong>{teamName(a.manager, a.rosterId)}</strong>
             <span className="muted small"> projected ahead by </span>
             <span className="mono">{pts(margin)}</span>
           </>
@@ -687,6 +708,7 @@ function MatchupsBlock({ block }: { block: AnalysisMatchups }) {
  * dense will not give up on its own.
  */
 function ScoresBlock({ block }: { block: AnalysisScores }) {
+  const teamName = useTeamName()
   const [selection, setSelection] = useState<PinSlots>(NO_PINS)
   const toggle = (rosterId: number) => setSelection((s) => toggleSelection(s, rosterId))
 
@@ -698,7 +720,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
       block.rosters.map((r) => ({
         rosterId: r.rosterId,
         managerId: r.managerId,
-        manager: r.manager,
+        manager: teamName(r.manager, r.rosterId),
         hue: hues.get(r.rosterId)?.hue ?? 0,
         // `thin` and `note` belong to power rankings' ballot coverage; a scored
         // week has no such notion, so every point here is solid.
@@ -711,7 +733,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
           thin: false,
         })),
       })),
-    [block.rosters, hues],
+    [block.rosters, hues, teamName],
   )
 
   if (!block.available) return <NotYet reason={block.reason} />
@@ -774,7 +796,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
                       <td
                         key={w}
                         className={`mono analysis-scores-cell${cell.rank === 1 ? ' best' : ''}`}
-                        title={`${managerName(r.manager, r.rosterId)} — week ${w}: ${pts(cell.points)}, ${cell.rank} of ${block.rosters.length}`}
+                        title={`${teamName(r.manager, r.rosterId)} — week ${w}: ${pts(cell.points)}, ${cell.rank} of ${block.rosters.length}`}
                       >
                         {pts(cell.points)}
                       </td>
@@ -870,6 +892,7 @@ function CompareCell({ player, won }: { player: AnalysisLineupPlayer | null; won
  * way, which is the whole reason it costs no request.
  */
 function HeadToHead({ block }: { block: AnalysisProjections }) {
+  const teamName = useTeamName()
   const rosters = block.rosters
 
   // Your roster against the league leader, and rank 1 against rank 2 for a
@@ -901,7 +924,7 @@ function HeadToHead({ block }: { block: AnalysisProjections }) {
       <select value={value} onChange={(e) => onChange(Number(e.target.value))}>
         {rosters.map((r) => (
           <option key={r.rosterId} value={r.rosterId}>
-            {r.rank}. {managerName(r.manager, r.rosterId)}
+            {r.rank}. {teamName(r.manager, r.rosterId)}
             {r.isMe ? ' (you)' : ''}
           </option>
         ))}
@@ -941,7 +964,7 @@ function HeadToHead({ block }: { block: AnalysisProjections }) {
               <span className="mono analysis-vs-margin-n">{pts(Math.abs(margin))}</span>
               <span className="muted small">
                 {' '}
-                ahead for {managerName(ahead.manager, ahead.rosterId)}
+                ahead for {teamName(ahead.manager, ahead.rosterId)}
               </span>
             </>
           )}
@@ -977,8 +1000,8 @@ function HeadToHead({ block }: { block: AnalysisProjections }) {
       {/* The column is signed against the left roster, so the page says so
           rather than leaving the reader to infer it from one row. */}
       <p className="muted small analysis-vs-groups-note">
-        Difference is {managerName(left.manager, left.rosterId)} minus{' '}
-        {managerName(right.manager, right.rosterId)}.
+        Difference is {teamName(left.manager, left.rosterId)} minus{' '}
+        {teamName(right.manager, right.rosterId)}.
       </p>
       <div className="analysis-vs-groups">
         {block.positionGroups.map((g) => {
@@ -1052,10 +1075,15 @@ export default function LeagueAnalysis() {
   }
 
   const window = data?.window
+  const labels = useMemo(
+    () => new Map((data?.teams ?? []).map((t) => [t.rosterId, t] as const)),
+    [data],
+  )
 
   if (notFound) return <NotFound what="league" />
 
   return (
+    <TeamLabelsContext.Provider value={labels}>
     <div className="content">
       <PageHeader
         eyebrow="League"
@@ -1212,5 +1240,6 @@ export default function LeagueAnalysis() {
         </>
       )}
     </div>
+    </TeamLabelsContext.Provider>
   )
 }

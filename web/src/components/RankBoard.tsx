@@ -189,15 +189,19 @@ type DragSession = {
 
 type HitResult = { kind: 'slot'; index: number } | { kind: 'tray' } | null
 
+/** Team name first (Sleeper's, "TBD" treated as absent), then the username, then "Roster N". */
 function chipName(m: RankBoardMember | undefined, chipId: ChipId): string {
+  const team = m?.teamName?.trim()
+  if (team && team.toUpperCase() !== 'TBD') return team
   const name = m?.manager?.trim()
   return name && name.length > 0 ? name : `Roster ${chipId}`
 }
 
-function chipTeam(m: RankBoardMember | undefined): string | null {
-  const t = m?.teamName?.trim()
-  if (!t || t.toUpperCase() === 'TBD') return null
-  return t
+/** The Sleeper username as the secondary line; null when it would only repeat the team name. */
+function chipUser(m: RankBoardMember | undefined, chipId: ChipId): string | null {
+  const user = m?.manager?.trim()
+  if (!user || user.toLowerCase() === chipName(m, chipId).toLowerCase()) return null
+  return user
 }
 
 function buildInitialOrder(members: RankBoardMember[], initialOrder: number[] | undefined): RankOrder {
@@ -801,7 +805,7 @@ export default function RankBoard({
   function renderChip(m: RankBoardMember, slotIndex: number | null) {
     const chipId = m.rosterId
     const name = chipName(m, chipId)
-    const team = chipTeam(m)
+    const team = chipUser(m, chipId)
     const isSelected = selected === chipId
     const isDragSource = draggingChipId === chipId
     const classes = [

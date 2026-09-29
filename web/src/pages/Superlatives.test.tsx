@@ -120,8 +120,8 @@ describe('Superlatives', () => {
       value: 180.5,
       unit: 'POINTS',
       holders: [
-        { rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null },
-        { rosterId: 2, managerId: 20, teamName: 'Team B', avatarId: null },
+        { rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null },
+        { rosterId: 2, managerId: 20, teamName: 'Team B', username: null, avatarId: null },
       ],
       emptyReason: null,
       detail: [
@@ -145,7 +145,7 @@ describe('Superlatives', () => {
       early: false,
       value: 3,
       unit: 'WINS',
-      holders: [{ rosterId: 4, managerId: 17, teamName: 'Escape Artists', avatarId: null }],
+      holders: [{ rosterId: 4, managerId: 17, teamName: 'Escape Artists', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -171,7 +171,7 @@ describe('Superlatives', () => {
       early: false,
       value: 55.2,
       unit: 'POINTS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -196,7 +196,7 @@ describe('Superlatives', () => {
       early: true,
       value: 2.4,
       unit: 'WINS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [],
       coverage: null, playerHolders: [],
@@ -255,7 +255,7 @@ describe('Superlatives', () => {
       early: false,
       value: 164.96,
       unit: 'POINTS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Master Bates', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Master Bates', username: null, avatarId: null }],
       emptyReason: null,
       detail: [{ type: 'WEEK_SCORE', week: 1, rosterId: 1, points: 164.96 }],
       coverage: null, playerHolders: [],
@@ -275,7 +275,7 @@ describe('Superlatives', () => {
       early: false,
       value: 99.68,
       unit: 'POINTS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -301,9 +301,9 @@ describe('Superlatives', () => {
       value: 0.5,
       unit: 'POINTS',
       holders: [
-        { rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null },
-        { rosterId: 2, managerId: 20, teamName: 'Team B', avatarId: null },
-        { rosterId: 3, managerId: 30, teamName: 'Team C', avatarId: null },
+        { rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null },
+        { rosterId: 2, managerId: 20, teamName: 'Team B', username: null, avatarId: null },
+        { rosterId: 3, managerId: 30, teamName: 'Team C', username: null, avatarId: null },
       ],
       emptyReason: null,
       detail: [
@@ -329,7 +329,7 @@ describe('Superlatives', () => {
       early: false,
       value: 3,
       unit: 'WINS',
-      holders: [{ rosterId: 4, managerId: 17, teamName: 'Escape Artists', avatarId: null }],
+      holders: [{ rosterId: 4, managerId: 17, teamName: 'Escape Artists', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         { type: 'GAME', week: 4, rosterId: 4, opponentRosterId: 1, opponentTeamName: 'X', points: 100, opponentPoints: 95, margin: 5 },
@@ -355,7 +355,7 @@ describe('Superlatives', () => {
       early: false,
       value: 1,
       unit: 'GAMES',
-      holders: [{ rosterId: 6, managerId: 60, teamName: 'Heartbreak Kid', avatarId: null }],
+      holders: [{ rosterId: 6, managerId: 60, teamName: 'Heartbreak Kid', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         { type: 'GAME', week: 2, rosterId: 6, opponentRosterId: 1, opponentTeamName: 'X', points: 95, opponentPoints: 100, margin: 5 },
@@ -378,7 +378,7 @@ describe('Superlatives', () => {
       early: false,
       value: 3,
       unit: 'GAMES',
-      holders: [{ rosterId: 6, managerId: 60, teamName: 'Heartbreak Kid', avatarId: null }],
+      holders: [{ rosterId: 6, managerId: 60, teamName: 'Heartbreak Kid', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         { type: 'GAME', week: 2, rosterId: 6, opponentRosterId: 1, opponentTeamName: 'X', points: 95, opponentPoints: 100, margin: 5 },
@@ -404,7 +404,7 @@ describe('Superlatives', () => {
       early: false,
       value: 2.4,
       unit: 'WINS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -431,7 +431,7 @@ describe('Superlatives', () => {
       early: false,
       value: 2.4,
       unit: 'WINS',
-      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', avatarId: null }],
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -461,7 +461,7 @@ describe('Superlatives', () => {
       early: false,
       value: 210.55,
       unit: 'POINTS',
-      holders: [{ rosterId: 2, managerId: 20, teamName: 'Bench Warmers', avatarId: null }],
+      holders: [{ rosterId: 2, managerId: 20, teamName: 'Bench Warmers', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -489,7 +489,7 @@ describe('Superlatives', () => {
       early: false,
       value: 88.4,
       unit: 'POINTS',
-      holders: [{ rosterId: 3, managerId: 30, teamName: 'Waiver Wire Warriors', avatarId: null }],
+      holders: [{ rosterId: 3, managerId: 30, teamName: 'Waiver Wire Warriors', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -693,7 +693,7 @@ describe('Superlatives', () => {
       early: false,
       value: 62.4,
       unit: 'POINTS',
-      holders: [{ rosterId: 5, managerId: 50, teamName: 'Process Trusters', avatarId: null }],
+      holders: [{ rosterId: 5, managerId: 50, teamName: 'Process Trusters', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -815,7 +815,7 @@ describe('Superlatives', () => {
       early: false,
       value: 2,
       unit: 'GAMES',
-      holders: [{ rosterId: 7, managerId: 70, teamName: 'Bad Actors', avatarId: null }],
+      holders: [{ rosterId: 7, managerId: 70, teamName: 'Bad Actors', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {
@@ -933,7 +933,7 @@ describe('Superlatives', () => {
     }
     const filledUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: 1, unit: 'GAMES',
-      holders: [{ rosterId: 9, managerId: 90, teamName: 'Team X', avatarId: null }],
+      holders: [{ rosterId: 9, managerId: 90, teamName: 'Team X', username: null, avatarId: null }],
       emptyReason: null,
       detail: [
         {

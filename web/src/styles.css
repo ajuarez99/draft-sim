@@ -4581,3 +4581,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .sl-conduct-form input {
   font: inherit;
 }
+
+/* PersonName: team name first, Sleeper username as a muted second line. */
+.person-name { display: inline-flex; flex-direction: column; min-width: 0; max-width: 100%; line-height: 1.25; vertical-align: middle; }
+.person-team, .person-user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-user { font-size: 11px; font-weight: 400; color: var(--muted); }

@@ -160,6 +160,7 @@ public class WeeklyReportController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("rosterId", s.rosterId());
         out.put("teamName", s.teamName());
+        out.put("username", s.username());
         out.put("avatarId", s.avatarId());
         out.put("record", s.record());
         out.put("points", s.points());

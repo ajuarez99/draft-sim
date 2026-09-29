@@ -11,6 +11,7 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
@@ -276,7 +277,7 @@ function TeamLine({ side, won }: { side: WeeklySide; won: boolean }) {
         label={side.teamName}
         className="wr-avatar"
       />
-      <span className="wr-team">{side.teamName}</span>
+      <span className="wr-team"><PersonName teamName={side.teamName} username={side.username} /></span>
       <span className="wr-record muted">({side.record})</span>
       <span className="wr-points">{side.points.toFixed(2)}</span>
     </div>

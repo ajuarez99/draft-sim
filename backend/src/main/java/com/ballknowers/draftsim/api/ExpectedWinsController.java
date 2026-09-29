@@ -54,6 +54,7 @@ public class ExpectedWinsController {
             row.put("rosterId", t.rosterId());
             row.put("managerId", t.managerId());
             row.put("teamName", t.teamName());
+            row.put("username", t.username());
             row.put("avatarId", t.avatarId());
             row.put("expectedWins", t.expectedWins());
             row.put("actualWins", t.actualWins());

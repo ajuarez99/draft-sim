@@ -115,8 +115,18 @@ public class LeagueHistoryController {
             // from this response; reading the always-null r.complete() instead
             // would have made every league-scoped season silently lose its
             // champion, finished or not.
+            // Team name first, username second on every league page: this
+            // season's own team name (it changes year to year), falling back to
+            // the username the row already carries.
+            Map<Long, String> teamNames = teamNamesByManager(league.id());
             List<Map<String, Object>> standings = rosterSeasons.forLeague(league.id()).stream()
-                    .map(r -> withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks))
+                    .map(r -> {
+                        Map<String, Object> row = withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks);
+                        // Mutable map: teamName is legitimately null for an unowned roster.
+                        row.put("teamName", r.managerId() == null ? null
+                                : teamNames.getOrDefault(r.managerId(), r.managerName()));
+                        return row;
+                    })
                     .toList();
             Map<String, Object> season = new LinkedHashMap<>();
             season.put("season", league.season());
@@ -516,6 +526,14 @@ public class LeagueHistoryController {
         // week are the odds AS OF that week, never last week's borrowed.
         attachPlayoffOdds(entries, playoffOdds.madePctByWeek(row.id(), row.season()));
 
+        // Every entry (computed and MEMBER alike) names its team, so the page can
+        // put the team first and the username second without a second lookup.
+        Map<Long, String> teamNames = teamNamesByManager(row.id());
+        for (Map<String, Object> e : entries) {
+            Object managerId = e.get("managerId");
+            e.put("teamName", managerId == null ? null : teamNames.getOrDefault((Long) managerId, (String) e.get("manager")));
+        }
+
         Map<String, Object> sportState = new LinkedHashMap<>();
         sportState.put("week", state.week());
         sportState.put("season", state.season());
@@ -550,6 +568,15 @@ public class LeagueHistoryController {
             Double pct = week.get((Integer) entry.get("rosterId"));
             if (pct != null) entry.put("makesPlayoffsPct", pct);
         }
+    }
+
+    /** Sleeper's per-league team name by manager; the ingest already falls back to the display name and drops "TBD". */
+    private Map<Long, String> teamNamesByManager(long leagueId) {
+        Map<Long, String> out = new HashMap<>();
+        for (com.ballknowers.draftsim.store.LeagueMemberRepository.MemberRow m : leagueMembers.forLeague(leagueId)) {
+            if (m.teamName() != null && !m.teamName().isBlank()) out.put(m.managerId(), m.teamName());
+        }
+        return out;
     }
 
     private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {

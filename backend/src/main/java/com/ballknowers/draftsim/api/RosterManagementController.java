@@ -70,6 +70,7 @@ public class RosterManagementController {
             row.put("rosterId", t.rosterId());
             row.put("managerId", t.managerId());
             row.put("teamName", t.teamName());
+            row.put("username", t.username());
             row.put("avatarId", t.avatarId());
             row.put("totalPoints", t.totalPoints());
             row.put("potentialPoints", t.potentialPoints());

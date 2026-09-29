@@ -24,8 +24,8 @@ function data(over: Partial<Data> = {}): Data {
     playersPlayMultiplePerPeriod: false,
     matchups: [
       {
-        home: { rosterId: 1, teamName: 'Dart has hit anotha Bower', avatarId: null, record: '1-0', points: 157.4 },
-        away: { rosterId: 2, teamName: 'Justice for Wags', avatarId: null, record: '0-1', points: 147.9 },
+        home: { rosterId: 1, teamName: 'Dart has hit anotha Bower', username: null, avatarId: null, record: '1-0', points: 157.4 },
+        away: { rosterId: 2, teamName: 'Justice for Wags', username: null, avatarId: null, record: '0-1', points: 147.9 },
       },
     ],
     topPerformers: [
@@ -123,8 +123,8 @@ describe('Weekly report', () => {
         sport: 'nba',
         matchups: [
           {
-            home: { rosterId: 1, teamName: 'Hoop Dreams', avatarId: null, record: '1-0', points: 228 },
-            away: { rosterId: 2, teamName: 'Rim Reapers', avatarId: null, record: '0-1', points: 211 },
+            home: { rosterId: 1, teamName: 'Hoop Dreams', username: null, avatarId: null, record: '1-0', points: 228 },
+            away: { rosterId: 2, teamName: 'Rim Reapers', username: null, avatarId: null, record: '0-1', points: 211 },
           },
         ],
       }),

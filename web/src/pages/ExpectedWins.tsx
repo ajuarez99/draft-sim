@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar'
 import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -149,7 +150,7 @@ function Row({ team, hue, widest }: { team: ExpectedWinsTeam; hue: number; wides
           hue={hue}
           className="ew-avatar"
         />
-        <span className="ew-name">{team.teamName}</span>
+        <span className="ew-name"><PersonName teamName={team.teamName} username={team.username} /></span>
       </th>
       <td className="ew-num">{team.actualWins}</td>
       <td className="ew-num">{team.expectedWins.toFixed(2)}</td>
@@ -184,7 +185,7 @@ function LuckCard({ team }: { team: ExpectedWinsTeam }) {
   return (
     <article className="ew-luck-card">
       <header>
-        <span className="ew-luck-name">{team.teamName}</span>
+        <span className="ew-luck-name"><PersonName teamName={team.teamName} username={team.username} /></span>
         <span className={wae >= 0 ? 'ew-delta ew-up' : 'ew-delta ew-down'}>
           {wae >= 0 ? '+' : ''}
           {wae.toFixed(2)}

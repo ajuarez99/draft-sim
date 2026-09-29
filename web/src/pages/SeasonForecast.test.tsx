@@ -17,6 +17,7 @@ function team(over: Partial<ForecastTeam> = {}): ForecastTeam {
     rosterId: 1,
     managerId: 10,
     teamName: 'Master Bates',
+    username: null,
     avatarId: null,
     playoffOdds: 95.4,
     averageWins: 9.92,

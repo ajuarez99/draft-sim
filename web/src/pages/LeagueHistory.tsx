@@ -14,6 +14,7 @@ import {
   type WeeklyScoreRecord,
 } from '../api'
 import { useFailure } from '../useFailure'
+import PersonName from '../components/PersonName'
 import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -366,8 +367,8 @@ function StandingsTable({
                       state={linkState}
                       className="standings-manager"
                     >
-                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.manager} />
-                      {r.manager ?? `roster ${r.rosterId}`}
+                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.teamName ?? r.manager} />
+                      <PersonName teamName={r.teamName} username={r.manager} fallback={`roster ${r.rosterId}`} />
                     </Link>
                   ) : (
                     <span className="muted">roster {r.rosterId} (unowned)</span>

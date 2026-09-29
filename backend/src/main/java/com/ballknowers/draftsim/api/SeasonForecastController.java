@@ -61,6 +61,7 @@ public class SeasonForecastController {
             row.put("rosterId", t.rosterId());
             row.put("managerId", t.managerId());
             row.put("teamName", t.teamName());
+            row.put("username", t.username());
             row.put("avatarId", t.avatarId());
             row.put("playoffOdds", t.playoffOdds());
             row.put("averageWins", t.averageWins());

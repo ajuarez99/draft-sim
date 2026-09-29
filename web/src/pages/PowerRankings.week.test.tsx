@@ -46,6 +46,7 @@ const memberEntries = (week: number) =>
     rosterId: i + 1,
     managerId: i + 1,
     manager,
+    teamName: null,
     avatarId: null,
     rank: i + 1,
     score: SCORES[i],

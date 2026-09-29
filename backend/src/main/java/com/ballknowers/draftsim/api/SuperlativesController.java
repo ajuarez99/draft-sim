@@ -235,6 +235,7 @@ public class SuperlativesController {
         m.put("rosterId", h.rosterId());
         m.put("managerId", h.managerId());
         m.put("teamName", h.teamName());
+        m.put("username", h.username());
         m.put("avatarId", h.avatarId());
         return m;
     }

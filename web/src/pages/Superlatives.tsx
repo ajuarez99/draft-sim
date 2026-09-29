@@ -15,6 +15,7 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
@@ -289,7 +290,7 @@ function SuperlativeCard({
                       hue={hue}
                       className="sl-avatar"
                     />
-                    <span className="sl-holder-name">{h.teamName}</span>
+                    <span className="sl-holder-name"><PersonName teamName={h.teamName} username={h.username} /></span>
                   </span>
                   {/* Each mapped to its own line, not joined -- WAIVER_WIRE_WARRIOR
                       returns a total line plus up to three pickup lines (T040);

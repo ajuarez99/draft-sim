@@ -696,6 +696,8 @@ export type StandingRow = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** This season's team name (league history rows only; manager-history rows omit it). */
+  teamName?: string | null
   avatarId: string | null
   wins: number | null
   losses: number | null
@@ -1187,6 +1189,8 @@ export type PowerRankingEntry = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** Sleeper team name for this league, falling back to the username; null for an unowned roster. */
+  teamName: string | null
   avatarId: string | null
   rank: number
   score: number | null
@@ -1414,6 +1418,14 @@ export type LeagueAnalysis = {
   projections: AnalysisProjections
   matchups: AnalysisMatchups
   scores: AnalysisScores
+  /** Every roster's two names, present even when a block is unavailable. */
+  teams: AnalysisTeamLabel[]
+}
+
+export type AnalysisTeamLabel = {
+  rosterId: number
+  teamName: string
+  username: string | null
 }
 
 /**
@@ -1569,6 +1581,8 @@ export type RosterManagementTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   totalPoints: number
   potentialPoints: number
@@ -1613,6 +1627,8 @@ export type ExpectedWinsTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   expectedWins: number
   actualWins: number
@@ -1651,6 +1667,8 @@ export type ForecastTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   playoffOdds: number
   averageWins: number
@@ -1681,6 +1699,8 @@ export const getSeasonForecast = (sleeperLeagueId: string) =>
 export type WeeklySide = {
   rosterId: number
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   record: string
   points: number
@@ -1784,6 +1804,8 @@ export type SuperlativeHolder = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
 }
 
