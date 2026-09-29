@@ -149,7 +149,25 @@ public class PlayoffOddsService {
      * already building.
      */
     public Map<Integer, Map<Integer, Double>> madePctByWeek(long leagueId, int season) {
-        return odds.madePctByWeek(leagueId, season);
+        // A snapshot for a week beyond the latest FINAL one describes a week that is unplayed or
+        // still in progress (an earlier button passed the open ballot week). Ignored on read,
+        // not deleted: it is reversible and needs no migration. See finalBound.
+        int bound = finalBound(leagueId);
+        Map<Integer, Map<Integer, Double>> kept = new HashMap<>();
+        odds.madePctByWeek(leagueId, season).forEach((week, pcts) -> {
+            if (week <= bound) kept.put(week, pcts);
+        });
+        return kept;
+    }
+
+    /**
+     * The newest week a stored snapshot may be for: the latest FINAL scored week, with
+     * {@link ScoredWeeks}' rules (a league with no fetch rows, or a loaded_complete season, has
+     * every stored week final). Without this, the highest-week snapshot wins even when it is for
+     * a week that has not been played, and hides every valid snapshot below it for good.
+     */
+    private int finalBound(long leagueId) {
+        return scoredWeeks.of(leagueId).latestFinal();
     }
 
     /**
@@ -168,12 +186,13 @@ public class PlayoffOddsService {
      * odds it is displaying.
      */
     public Optional<Summary> summary(long leagueId, int season) {
-        return odds.latest(leagueId, season)
+        return odds.latestThrough(leagueId, season, finalBound(leagueId))
                 .map(s -> new Summary(s.week(), s.iterations(), s.model(), weeksOfScoring(leagueId, s.week())));
     }
 
     /** rosterId -> made-playoffs percentage for one week, empty when that week has no snapshot. */
     public Map<Integer, Double> madePctByRoster(long leagueId, int season, int week) {
+        if (week > finalBound(leagueId)) return Map.of();
         return odds.forWeek(leagueId, season, week)
                 .map(s -> {
                     Map<Integer, Double> out = new HashMap<>();
@@ -302,7 +321,8 @@ public class PlayoffOddsService {
                     found.get().requestedSeason(), scored.latestStored(), scored.latestFinal()));
         }
 
-        Optional<PlayoffOddsRepository.Snapshot> snap = odds.latest(league.id(), season);
+        // Only snapshots for weeks up to the latest final one count; a higher-week row is ignored.
+        Optional<PlayoffOddsRepository.Snapshot> snap = odds.latestThrough(league.id(), season, scored.latestFinal());
         if (snap.isEmpty() || snap.get().entries().isEmpty()) {
             // Which refusal depends on WHY there is no snapshot.
             boolean played = scored.latestStored() > 0;
