@@ -29,7 +29,7 @@ class MonteCarloRunnerTest {
             12.0, 3.0, 60.0, 0.15, 6, 0.85,
             Map.of("K", 3, "DEF", 4), 1.0, 30);
 
-    private static List<BoardEntry> board(int n) {
+    static List<BoardEntry> board(int n) {
         Position[] cycle = {
                 Position.RB, Position.WR, Position.WR, Position.RB, Position.TE,
                 Position.WR, Position.RB, Position.QB, Position.WR, Position.RB};
@@ -48,7 +48,7 @@ class MonteCarloRunnerTest {
         return profiles;
     }
 
-    private static DraftContext ctx(int teams, int rounds) {
+    static DraftContext ctx(int teams, int rounds) {
         LeagueSettings settings = new LeagueSettings(Sport.NFL, teams, rounds, SLOTS, 1.0);
         return new DraftContext(
                 board(400), settings, profilesFor(teams), PositionalPriors.uniform(Sport.NFL),
@@ -56,7 +56,7 @@ class MonteCarloRunnerTest {
                 List.of(), Map.of());
     }
 
-    private static final SimulationResult.Confidence CONFIDENCE = new SimulationResult.Confidence(
+    static final SimulationResult.Confidence CONFIDENCE = new SimulationResult.Confidence(
             0, 0, 0, 0, 14, 14, "test", List.of());
 
     @Test
@@ -95,6 +95,33 @@ class MonteCarloRunnerTest {
                     cancel.set(true);
                 }, cancel::get));
         assertTrue(seen.get() > 0 && seen.get() < 2000, "expected a mid-run stop, done=" + seen.get());
+    }
+
+    /**
+     * The live shape: a real run with all iterations submitted, cancelled from
+     * ANOTHER thread while CPU-bound tasks are executing (no progress callback
+     * involved). It must stop well before a full run would have finished.
+     */
+    @Test
+    void aRunCancelledFromAnotherThreadStopsWellBeforeAFullRun() throws Exception {
+        DraftContext c = ctx(14, 15);
+        int n = 5000;
+        long t0 = System.nanoTime();
+        new MonteCarloRunner().run(c, 11, n, 1.0, 4L, CONFIDENCE, null);
+        long fullMs = (System.nanoTime() - t0) / 1_000_000;
+
+        java.util.concurrent.atomic.AtomicBoolean cancel = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread canceller = new Thread(() -> {
+            try { Thread.sleep(Math.max(20, fullMs / 5)); } catch (InterruptedException ignored) { }
+            cancel.set(true);
+        });
+        long t1 = System.nanoTime();
+        canceller.start();
+        assertThrows(SimulationCancelledException.class,
+                () -> new MonteCarloRunner().run(c, 11, n, 1.0, 4L, CONFIDENCE, null, cancel::get));
+        long cancelledMs = (System.nanoTime() - t1) / 1_000_000;
+        assertTrue(cancelledMs < fullMs * 0.6,
+                "cancelled run took " + cancelledMs + " ms against a full run of " + fullMs + " ms");
     }
 
     @Test

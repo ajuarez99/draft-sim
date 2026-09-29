@@ -63,7 +63,23 @@ public class MonteCarloRunner {
         List<DraftSimulator.RunResult> results = new ArrayList<>(iterations);
         AtomicInteger done = new AtomicInteger();
 
-        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+        // PLATFORM threads, one per core, deliberately not a virtual thread per
+        // iteration. The app runs Tomcat on virtual threads (application.yml), and
+        // 5,000 CPU-bound virtual threads never yield: they filled the shared
+        // scheduler, so any request handler needing a carrier again after a JDBC
+        // round trip queued behind them -- a replacement request could not even
+        // reach SimulationPermits.acquire() until the run it meant to cancel had
+        // finished (found in live verification of audit 05). OS-scheduled worker
+        // threads leave the request threads their share of the CPU, and bound the
+        // queue to a list of tasks instead of thousands of threads.
+        int workers = Math.max(1, Math.min(iterations, Runtime.getRuntime().availableProcessors()));
+        AtomicInteger workerNo = new AtomicInteger();
+        ThreadFactory factory = r -> {
+            Thread t = new Thread(r, "sim-worker-" + workerNo.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
+        try (ExecutorService pool = Executors.newFixedThreadPool(workers, factory)) {
             List<Future<DraftSimulator.RunResult>> futures = new ArrayList<>(iterations);
             for (int i = 0; i < iterations; i++) {
                 long runSeed = seed + i * 0x9E3779B97F4A7C15L;
@@ -77,12 +93,18 @@ public class MonteCarloRunner {
                 }));
             }
             for (Future<DraftSimulator.RunResult> f : futures) {
+                if (cancelled.getAsBoolean()) {
+                    pool.shutdownNow();   // drop everything still queued
+                    break;
+                }
                 try {
                     DraftSimulator.RunResult r = f.get();
                     if (r != null) results.add(r);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException("simulation interrupted", e);
+                } catch (CancellationException e) {
+                    break;   // only shutdownNow() cancels; the post-loop check reports it
                 } catch (ExecutionException e) {
                     throw new IllegalStateException("simulation failed", e.getCause());
                 }
