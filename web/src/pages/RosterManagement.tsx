@@ -221,7 +221,7 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
               <Rank player={a.added} />
               {a.dropped && <span className="muted small tx-dropped">for {a.dropped.playerName}</span>}
               <span className="tx-team muted">{a.teamName}</span>
-              {a.faabBid != null && <span className="tx-faab">${a.faabBid}</span>}
+              {a.faabBid != null && <span className="tx-faab">${a.faabBid} FAAB</span>}
             </li>
           ))}
         </ul>
@@ -244,10 +244,13 @@ function Rank({ player }: { player: MovedPlayer }) {
     )
   }
   return (
-    <span className="tx-rank">
+    <span
+      className="tx-rank"
+      title={`Average finish among ${player.position ?? 'his position'} since the move. Lower is better.`}
+    >
       {player.position ?? ''}
       {player.postMovePositionalRank.toFixed(1)}
-      <span className="muted"> · {player.weeksCounted} wk</span>
+      <span className="muted"> avg over {player.weeksCounted} wk</span>
     </span>
   )
 }

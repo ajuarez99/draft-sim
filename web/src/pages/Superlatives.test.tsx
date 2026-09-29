@@ -423,6 +423,32 @@ describe('Superlatives', () => {
     ).toBeInTheDocument()
   })
 
+  it('reads "week 3", not "weeks 3–3", when the span is a single week', async () => {
+    const luckiest: Superlative = {
+      kind: 'LUCKIEST',
+      available: true,
+      reason: null,
+      early: true,
+      value: 0.8,
+      unit: 'WINS',
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
+      emptyReason: null,
+      detail: [
+        {
+          type: 'LUCK', rosterId: 1, actualWins: 1, expectedWins: 0.2, winsAboveExpected: 0.8,
+          swingWeeks: [], fromWeek: 3, throughWeek: 3, reading: '0.80 more wins than their scores earned',
+        },
+      ],
+      coverage: null, playerHolders: [],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
+    render(<Superlatives />)
+
+    expect(
+      await screen.findByText('0.80 more wins than their scores earned · week 3'),
+    ).toBeInTheDocument()
+  })
+
   it('puts swing weeks in the expandable detail, not on the card itself', async () => {
     const luckiest: Superlative = {
       kind: 'LUCKIEST',

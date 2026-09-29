@@ -162,11 +162,19 @@ describe('LeagueAnalysis', () => {
     expect(row.querySelectorAll('.person-user')).toHaveLength(0)
   })
 
-  /** Withheld or not, the formula is shown -- it is the reader's way of judging it. */
-  it('shows the formula even when the score is withheld', async () => {
+  /**
+   * Withheld or not, the formula is shown -- it is the reader's way of judging it.
+   * In words up front; ffwrapped's verbatim string (code variable names and all)
+   * stays one click away under its own label.
+   */
+  it('shows the formula in words even when the score is withheld, with the verbatim one behind a label', async () => {
     getLeagueAnalysis.mockResolvedValue(data())
     render(<LeagueAnalysis />)
-    expect(await screen.findByText(/avgWeeklyScore \* 6/)).toBeInTheDocument()
+    expect(await screen.findByText(/average week × 6, plus \(best week \+ worst week\) × 2/)).toBeInTheDocument()
+    const summary = screen.getByText(/ffwrapped's formula, as published/)
+    const details = summary.closest('details') as HTMLDetailsElement
+    expect(details.open).toBe(false)
+    expect(within(details).getByText(/avgWeeklyScore \* 6/)).toBeInTheDocument()
   })
 
   /**

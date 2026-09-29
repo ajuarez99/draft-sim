@@ -127,12 +127,33 @@ function ManagerLink({
   )
 }
 
+/**
+ * The ranking score's formula in words, with ffwrapped's own string kept one
+ * click away. The verbatim text is provenance (the formula is theirs, kept
+ * as published on purpose -- LeagueAnalysisService), not something to read
+ * cold: it names code variables. The plain sentence below restates it and must
+ * change with it.
+ */
+function FormulaNote({ formula }: { formula: string }) {
+  return (
+    <div className="muted small analysis-formula">
+      <p>
+        Score = average week × 6, plus (best week + worst week) × 2, plus win % × 400, all ÷ 10.
+      </p>
+      <details>
+        <summary>ffwrapped&apos;s formula, as published</summary>
+        <code className="mono">{formula}</code>
+      </details>
+    </div>
+  )
+}
+
 function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
   if (!block.available) {
     return (
       <>
         <NotYet reason={block.reason} />
-        <p className="muted small analysis-formula mono">{block.formula}</p>
+        <FormulaNote formula={block.formula} />
       </>
     )
   }
@@ -182,7 +203,7 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
           </tbody>
         </table>
       </div>
-      <p className="muted small analysis-formula mono">{block.formula}</p>
+      <FormulaNote formula={block.formula} />
     </>
   )
 }

@@ -100,7 +100,7 @@ export default function Superlatives() {
       <PageHeader
         eyebrow="League"
         title="Superlatives"
-        sub="Season-long facts, one card per award. A card that isn't built yet says so, rather than going missing."
+        sub="Season-long awards, one card each: the highs and lows, the closest games, luck, the bench and the waiver wire. If an award can't be worked out yet, its card says why."
       />
 
       {error && (
@@ -360,14 +360,14 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
     const weeks = rows
       .filter((d): d is Extract<SuperlativeDetail, { type: 'GAME' }> => d.type === 'GAME')
       .map((d) => d.week)
-    return weeks.length > 0 ? [`weeks ${weeks.join(', ')}`] : []
+    return weeks.length > 0 ? [weeksLabel(weeks)] : []
   }
   // US2 (T035): the reading itself IS the figure -- "2.40 more wins than
   // their scores earned" -- so it belongs inline, with the span it covers.
   if (s.kind === 'LUCKIEST' || s.kind === 'UNLUCKIEST') {
     return rows
       .filter((d): d is Extract<SuperlativeDetail, { type: 'LUCK' }> => d.type === 'LUCK')
-      .map((d) => `${d.reading} · weeks ${d.fromWeek}–${d.throughWeek}`)
+      .map((d) => `${d.reading} · ${weekSpan(d.fromWeek, d.throughWeek)}`)
   }
   if (s.kind === 'MOST_BENCH_POINTS') {
     return rows
@@ -376,7 +376,7 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
         const worst = d.biggestWeek
           ? ` · worst: week ${d.biggestWeek.week} (${d.biggestWeek.pointsLeft.toFixed(2)})`
           : ''
-        return `${d.pointsLeft.toFixed(2)} points left on the bench · weeks ${d.fromWeek}–${d.throughWeek}${worst}`
+        return `${d.pointsLeft.toFixed(2)} points left on the bench · ${weekSpan(d.fromWeek, d.throughWeek)}${worst}`
       })
   }
   // US3 (T040): a total line, then up to three pickup lines (the backend
@@ -436,6 +436,11 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
       })
   }
   return []
+}
+
+/** "week 3" for a single week, "weeks 3–5" for a run -- never "weeks 3–3". */
+function weekSpan(from: number, to: number): string {
+  return from === to ? `week ${from}` : `weeks ${from}–${to}`
 }
 
 /**
@@ -661,7 +666,7 @@ function ConductListSection({
     <section className="panel sl-conduct">
       <h3 className="cond">Commissioner&apos;s list</h3>
       <p className="muted small">
-        This list is for this season only -- a new season starts with an empty one.
+        This list is for this season only — a new season starts with an empty one.
       </p>
 
       {requestedSeason != null && (
