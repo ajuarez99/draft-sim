@@ -1692,6 +1692,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    exactly the column the rows used to form as direct children of the section.
    It exists for the phone breakpoint, which turns it into a scroll lane. */
 .app-rail-pages { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Wraps the lane plus the phone-only "All pages" chip. `display: contents`
+   keeps the desktop column exactly as it was; the 860px block makes it a row. */
+.app-rail-pages-wrap { display: contents; }
+.app-rail-allpages { display: none; }
 .app-rail-label, .jumpto-group-label {
   font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--muted); padding: 0 6px 6px;
@@ -1957,21 +1961,32 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    * permanently on navigation is worse than navigation you scroll back up to
    * reach."
    *
-   * Laid end to end the links are ~1130px, so they will not fit any phone at
-   * any font size. A lane you swipe keeps every destination one gesture away
-   * and costs one 36px line instead of five. `flex: 0 0 100%` puts the lane on
-   * its own row beneath the league's identity; `min-width: 0` is what actually
-   * lets it scroll rather than stretch its parent.
+   * Laid end to end the links are ~1250px (measured 1249 at 375px, 2026-09-28;
+   * it was ~1130 before Season forecast / Weekly report / Superlatives), so
+   * they will not fit any phone at any font size. A lane you swipe keeps
+   * every destination one gesture away and costs one line instead of five.
+   * The wrapper's `flex: 0 0 100%` puts the lane on its own row beneath the
+   * league's identity; `min-width: 0` is what actually lets it scroll rather
+   * than stretch its parent.
+   *
+   * A swipe lane hides what is off its edge, so it says so: an edge fade on
+   * whichever side still has pages (data-overflow-start/-end, set from the
+   * scroll position), the current page is scrolled into view on navigation,
+   * and a trailing "All pages" chip -- outside the scroller, so always on
+   * screen -- opens Jump to, which lists every page by name.
    */
   /* The rail and its sections must not be widened by their own contents --
      without this the lane's `100%` resolves against a section that has already
-     stretched to the full 1130px of links, so nothing ever clips and the whole
+     stretched to the full width of the links, so nothing ever clips and the whole
      page scrolls sideways instead. */
   .app-rail { max-width: 100%; box-sizing: border-box; }
   .app-rail-section { min-width: 0; max-width: 100%; }
 
+  .app-rail-pages-wrap {
+    display: flex; flex: 0 0 100%; min-width: 0; max-width: 100%; align-items: center; gap: 6px;
+  }
   .app-rail-pages {
-    flex: 0 0 100%; min-width: 0; max-width: 100%;
+    flex: 1 1 0; min-width: 0; max-width: 100%;
     flex-direction: row; flex-wrap: nowrap;
     overflow-x: auto; overflow-y: hidden;
     gap: 4px; padding-bottom: 2px;
@@ -1980,6 +1995,34 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   }
   .app-rail-pages::-webkit-scrollbar { display: none; }
   .app-rail-pages .app-rail-row { flex: 0 0 auto; }
+  /* Fade only the edge that still has content behind it. */
+  .app-rail-pages[data-overflow-end]:not([data-overflow-start]) {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-pages[data-overflow-start]:not([data-overflow-end]) {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-pages[data-overflow-start][data-overflow-end] {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-allpages {
+    display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 4px;
+    min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 999px;
+    font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+    color: var(--text);
+    background: color-mix(in oklch, var(--teal) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line));
+  }
+  .app-rail-allpages:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* Tap targets: 44px is the floor for a finger, on the bar and the lane both. */
+  .app-rail-row, .rail-jumpto, .rail-switcher-toggle, .app-wordmark, .rail-league-id, .league-season-link {
+    min-height: 44px; box-sizing: border-box;
+  }
+  .app-rail-row { min-width: 44px; }
 }
 
 @media (max-width: 700px) {
@@ -2007,15 +2050,46 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .rail-league-seasons { display: none; }
   .rail-league-sub { display: none; }
 
-  /* Icon-only for the global menu -- NOT the league lane, whose labels are the
-     only thing distinguishing nine destinations from each other. */
-  .app-rail-section:not(.app-rail-league) .app-rail-row-label { display: none; }
-  .app-rail-section:not(.app-rail-league) .app-rail-row { padding: 9px 10px; gap: 0; }
+  /* The global menu keeps a short label under its glyph. It was icon-only (24-27px
+     wide, unlabelled ◆ ● ▶), which is neither tappable nor readable. Each is a
+     44px-min tinted pill; the glyph goes on top so the label is what you read. */
+  .app-rail-section:not(.app-rail-league) .app-rail-row {
+    flex-direction: column; justify-content: center; gap: 3px;
+    min-width: 56px; padding: 5px 10px; border-radius: 12px; text-align: center;
+    background: color-mix(in oklch, var(--line) 35%, transparent);
+  }
+  .app-rail-section:not(.app-rail-league) .app-rail-row.on {
+    background: color-mix(in oklch, var(--teal) 16%, transparent);
+  }
+  .app-rail-section:not(.app-rail-league) .app-rail-glyph { width: auto; font-size: 12px; }
+  .app-rail-section:not(.app-rail-league) .app-rail-row-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
+  .app-wordmark { display: flex; align-items: center; }
 
+  /* Account: the avatar is a 44px button; Sign out lives in its popover. */
   .app-account-name { display: none; }
-  .app-signout .app-rail-row-label { display: none; }
-  .app-signout-glyph { display: block; }
-  .app-signout { padding: 0 8px; }
+  .app-account-wrap { position: relative; }
+  .app-account-button {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; padding: 0; border-radius: 50%; cursor: pointer;
+    background: none; border: 1px solid var(--line);
+  }
+  .app-account-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .app-account-menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 180px;
+    display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 28px oklch(0% 0 0 / 0.45);
+  }
+  .app-account-menu-name {
+    padding: 4px 8px; font-size: 12px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .app-account-menu-item {
+    min-height: 44px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer; text-align: left;
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+    background: color-mix(in oklch, var(--crimson) 18%, transparent);
+  }
+  .app-account-menu-item:hover { background: color-mix(in oklch, var(--crimson) 30%, transparent); }
+  .app-account-menu-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
 
   .app-rail { gap: 8px 12px; padding: 10px 14px; }
   .rail-league-id { padding: 0 6px 0 0; }
@@ -2429,10 +2503,25 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* `.app-main` is the scrolling pane now, so this no longer needs to be one --
    a nested scroller here put a second scrollbar inside the first and stranded
    the pane's bottom padding. `overflow-x` stays: PowerRankings' wide rows
-   still must not push the page sideways. */
-.content.scrolls { overflow-x: hidden; }
+   still must not push the page sideways.
+
+   `clip`, not `hidden`: CSS computes a `visible` overflow-y next to a `hidden`
+   overflow-x as `auto`, which silently made `.content` a scroll container.
+   With `.content`'s `min-height: 0` and `.app-main`'s `flex: 1 1 0`, on a phone
+   (where `.app` is `height: auto; min-height: 100vh`) that box shrank to the
+   viewport minus the header and scrolled internally -- the 597px inner scroller
+   under a 215px header, with the document itself never growing past 812.
+   `clip` clips sideways overflow without creating a scroll container. */
+.content.scrolls { overflow-x: clip; }
 @media (max-width: 700px) {
   .content.scrolls { -webkit-overflow-scrolling: touch; }
+  /* With `clip` the document scrolls again, but `.app-main` (flex: 1 1 0) is
+     still only viewport-minus-header tall while its content overflows it, so
+     its 32px bottom padding sat at the old fold and the page ended flush
+     against the last row (measured). Let a stacked page's pane grow to its
+     content. Scoped to `.scrolls` pages: the draft pages rely on the pane's
+     fixed height. */
+  .app-main:has(> .content.scrolls) { flex: 1 0 auto; }
 }
 
 @media (max-width: 700px) {

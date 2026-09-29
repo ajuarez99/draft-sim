@@ -14,6 +14,7 @@ import type { RailLeague } from '../railLeague'
 import { getLeagueRefresh, refreshLeague, type DraftSummary, type RefreshStatus } from '../api'
 import { useBumpLeagueDataVersion } from '../leagueDataVersion'
 import { relativeTime } from '../relativeTime'
+import { laneOverflow, type LaneOverflow } from '../railLane'
 
 type Props = {
   league: RailLeague
@@ -24,6 +25,9 @@ type Props = {
   /** Every league the signed-in user can see, for the switcher. Empty until
    *  the draft list resolves, which just means no switcher yet. */
   allLeagues?: LeagueLineage[]
+  /** Opens the jump-to palette. The phone lane's trailing "All pages" chip is
+   *  the guaranteed way to a page the swipe lane has scrolled out of view. */
+  onOpenJumpTo?: () => void
 }
 
 /** Hand-set, arbitrary (specs/009 refresh contract): how often the rail asks how a running refresh is going. */
@@ -177,6 +181,7 @@ export default function LeagueRailSection({
   collapsed,
   onMockIt,
   allLeagues = [],
+  onOpenJumpTo,
 }: Props) {
   const { lineage, season } = league
   const d = lineage.current
@@ -256,6 +261,38 @@ export default function LeagueRailSection({
       document.removeEventListener('keydown', onKey)
     }
   }, [switcherOpen])
+
+  // Phone lane: which edges still have pages behind them, and keep the current
+  // page on screen. Both are no-ops wherever the lane is not horizontally
+  // scrollable (every desktop layout), so they cost nothing there.
+  const laneRef = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState<LaneOverflow>({ start: false, end: false })
+
+  useEffect(() => {
+    const lane = laneRef.current
+    if (!lane) return
+    function measure() {
+      const el = laneRef.current
+      if (!el) return
+      const next = laneOverflow(el.scrollLeft, el.clientWidth, el.scrollWidth)
+      setOverflow((prev) => (prev.start === next.start && prev.end === next.end ? prev : next))
+    }
+    measure()
+    lane.addEventListener('scroll', measure, { passive: true })
+    window.addEventListener('resize', measure)
+    return () => {
+      lane.removeEventListener('scroll', measure)
+      window.removeEventListener('resize', measure)
+    }
+  }, [pathname, collapsed])
+
+  // `block: 'nearest'` matters: the default ('start') would also scroll the
+  // page vertically to the lane, which is a jump nobody asked for.
+  useEffect(() => {
+    const lane = laneRef.current
+    if (!lane || lane.scrollWidth <= lane.clientWidth) return
+    lane.querySelector<HTMLElement>('.app-rail-row.on')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
+  }, [pathname])
 
   const currentKey: DestinationKey | null = destinationFromPath(pathname)
   const others = allLeagues.filter((l) => l.current.sleeperLeagueId !== d.sleeperLeagueId)
@@ -439,7 +476,23 @@ export default function LeagueRailSection({
           scrolling lane. As siblings they wrapped onto five stacked lines at
           375px -- about 200px of an 812px screen spent on page links alone.
           The wrapper reproduces the column layout it replaced on desktop. */}
-      <div className="app-rail-pages">{destinations.map(rowFor)}</div>
+      <div className="app-rail-pages-wrap">
+        <div
+          className="app-rail-pages"
+          ref={laneRef}
+          data-overflow-start={overflow.start ? 'true' : undefined}
+          data-overflow-end={overflow.end ? 'true' : undefined}
+        >
+          {destinations.map(rowFor)}
+        </div>
+        {/* Phone only (CSS). The lane hides pages off its right edge; this is
+            the chip that is always on screen and lists all of them. */}
+        {onOpenJumpTo && (
+          <button type="button" className="app-rail-allpages" onClick={onOpenJumpTo} aria-label="All pages">
+            All pages <span aria-hidden="true">▾</span>
+          </button>
+        )}
+      </div>
     </div>
   )
 }
