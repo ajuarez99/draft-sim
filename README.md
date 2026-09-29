@@ -84,7 +84,11 @@ Ingest order matters the first time: players -> leagues -> board. `/api/ingest/a
 does all three. It is idempotent; re-run it whenever you want a fresh board.
 
 `/api/ingest/**` needs the admin token, and a blank `ADMIN_TOKEN` (the default) makes it refuse.
-Start the backend with one (`ADMIN_TOKEN=dev ./gradlew bootRun`) to run the curl above. The
+Start the backend with one to run the curl above:
+`./gradlew bootRun --args=--draftsim.admin.token=dev`. Prefer that to `ADMIN_TOKEN=dev ./gradlew
+bootRun`. The environment-variable form can silently not arrive: `bootRun` inherits its
+environment from the Gradle daemon, and a daemon started earlier without `ADMIN_TOKEN` keeps
+refusing (measured 2026-09-29). The startup log says "Admin token ENABLED" or "DISABLED". The
 browser's own setup flows use `/api/setup/**`, which checks league membership instead.
 
 No environment variables are needed locally — every deployment-varying value has a

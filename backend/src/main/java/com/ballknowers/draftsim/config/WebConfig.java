@@ -71,6 +71,15 @@ public class WebConfig implements WebMvcConfigurer {
             log.warn("API token auth DISABLED -- every endpoint is open. "
                     + "Set API_TOKEN before exposing this beyond localhost.");
         }
+        // Say which mode the admin gate is in, for the same reason as above: a
+        // blank ADMIN_TOKEN fails closed, and "every ingest is 403" should be
+        // one log line away from its cause, not a debugging session.
+        if (admin.enabled()) {
+            log.info("Admin token ENABLED (X-Admin-Token gates /api/ingest/** and commissioner actions)");
+        } else {
+            log.warn("Admin token DISABLED -- /api/ingest/** and commissioner actions refuse every request. "
+                    + "Set ADMIN_TOKEN to enable them.");
+        }
         return reg;
     }
 }

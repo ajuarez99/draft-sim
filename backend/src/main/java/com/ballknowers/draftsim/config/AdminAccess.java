@@ -31,6 +31,11 @@ public class AdminAccess {
         this.props = props;
     }
 
+    /** Whether an admin token is configured at all. Blank means every admin-only route refuses. */
+    public boolean enabled() {
+        return props.enabled();
+    }
+
     public boolean matches(String presentedToken) {
         return props.matches(presentedToken);
     }
