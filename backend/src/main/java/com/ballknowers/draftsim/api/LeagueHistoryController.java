@@ -846,6 +846,17 @@ public class LeagueHistoryController {
         Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
+        // The UI labels this "Recompute (commissioner)" and shows it only when
+        // ballot.canCommission, but the route used to check membership alone
+        // (claude/audit-2026-09-28/10). Same two gates as the other commissioner
+        // writes: the admin token gates, the commissioner identity backs it up.
+        // An operator curling this passes the commissioner's X-Sleeper-User too.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        if (!membership.canCommission(league.get().id(), sleeperUserId)) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "only this league's Sleeper commissioner may recompute the power rankings"));
+        }
+
         var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
         var realized = power.computeRealized(league.get().id(), season, week);
         // Same trigger as the box-score snapshot, deliberately: odds are never
@@ -885,8 +896,8 @@ public class LeagueHistoryController {
      * <p><b>claude/plan-review-power-rankings-ballots.md finding 11.2 and
      * 11.3 -- both deliberate regressions from today's behaviour, on
      * purpose.</b> This endpoint used to accept ANY caller, including
-     * anonymous ({@code visibleLeague}'s {@code canSee} returns true for a
-     * blank header) and ANY week. After the ballots feature both are gated:
+     * anonymous ({@code visibleLeague}'s {@code canSee} used to return true for a
+     * blank header; it no longer does) and ANY week. After the ballots feature both are gated:
      * only a Sleeper commissioner (or the configured app owner) may save,
      * and only for the current week -- the same "no backdating after seeing
      * how the games went" argument {@code POST /ballot} makes for twelve
@@ -910,6 +921,10 @@ public class LeagueHistoryController {
             return ResponseEntity.badRequest().body(Map.of("message", "season and week are required"));
         }
 
+        // The admin token is what actually gates (claude/audit-2026-09-28/04, option
+        // D): the commissioner identity below is a header anyone can copy from
+        // Sleeper's public league-users list. Both are required.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
         if (!membership.canCommission(row.id(), sleeperUserId)) {
             boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
             String message = commissionerKnown

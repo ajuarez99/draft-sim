@@ -94,6 +94,22 @@ class SuperlativesControllerIT {
                 Long.class, PLAYER_SLEEPER_ID, "IT Conduct Player");
     }
 
+    /**
+     * Every conduct-list write now needs the admin token as well as the commissioner
+     * identity (claude/audit-2026-09-28/04, option D), so the tests that exercise the
+     * write path itself run inside a request that carries it. The tests at the bottom
+     * that are about the token drop it via {@link com.ballknowers.draftsim.TestAdmin#withToken}.
+     */
+    @BeforeEach
+    void bindAdminRequest() {
+        com.ballknowers.draftsim.TestAdmin.asAdmin();
+    }
+
+    @AfterEach
+    void unbindRequest() {
+        org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes();
+    }
+
     @AfterEach
     void tearDown() {
         jdbc.update("delete from league where id in (?, ?)", leagueId, otherLeagueId);
@@ -186,5 +202,79 @@ class SuperlativesControllerIT {
         Map<String, Object> memberBody = (Map<String, Object>) memberList.getBody();
         assertNotNull(memberBody);
         assertEquals(false, memberBody.get("canEdit"));
+    }
+
+    // --- the admin token (claude/audit-2026-09-28/04, option D) ---------------------------------
+
+    /**
+     * The commissioner identity is a header anyone can copy out of Sleeper's public
+     * league-users list (`is_owner: true`), so on its own it proves nothing. The true
+     * commissioner presenting no admin token must be refused, and nothing written.
+     */
+    @Test
+    void theRealCommissionerWithoutTheAdminTokenIsRefusedOnBothWrites() {
+        try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
+            ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "spoofed", 1), COMMISSIONER_USER);
+            assertEquals(403, post.getStatusCode().value());
+            assertAdminRequired(post);
+
+            ResponseEntity<?> delete = controller.deleteConductEntry(LEAGUE_SLEEPER_ID, 1L, COMMISSIONER_USER);
+            assertEquals(403, delete.getStatusCode().value());
+            assertAdminRequired(delete);
+        }
+        try (var asAdmin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> list = (Map<String, Object>) controller.conductList(LEAGUE_SLEEPER_ID, COMMISSIONER_USER).getBody();
+            assertEquals(0, ((List<?>) list.get("entries")).size(), "the refused POST must not have written anything");
+        }
+    }
+
+    @Test
+    void aWrongAdminTokenIsRefusedLikeAMissingOne() {
+        try (var wrong = com.ballknowers.draftsim.TestAdmin.withToken("not-the-token")) {
+            ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), COMMISSIONER_USER);
+            assertEquals(403, post.getStatusCode().value());
+            assertAdminRequired(post);
+        }
+        try (var blank = com.ballknowers.draftsim.TestAdmin.withToken("")) {
+            assertEquals(403, controller.deleteConductEntry(LEAGUE_SLEEPER_ID, 1L, COMMISSIONER_USER)
+                    .getStatusCode().value(), "a blank presented token must never match");
+        }
+    }
+
+    /** The token alone is not enough either: defence in depth keeps the commissioner identity check. */
+    @Test
+    void theAdminTokenWithANonCommissionerIdentityIsStillRefused() {
+        ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), MEMBER_USER);
+        assertEquals(403, response.getStatusCode().value());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertNotEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"),
+                "this is the not-the-commissioner refusal, not the missing-token one");
+    }
+
+    /** Reads stay open to any member: only the writes moved behind the token. */
+    @Test
+    void readingTheListNeedsNoAdminToken() {
+        try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
+            assertEquals(200, controller.conductList(LEAGUE_SLEEPER_ID, MEMBER_USER).getStatusCode().value());
+        }
+    }
+
+    @Test
+    void aBlankIdentityCannotReadTheListWithoutTheAdminToken() {
+        try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
+            assertEquals(404, controller.conductList(LEAGUE_SLEEPER_ID, null).getStatusCode().value());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertAdminRequired(ResponseEntity<?> response) {
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertNotNull(body);
+        assertEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"));
     }
 }
