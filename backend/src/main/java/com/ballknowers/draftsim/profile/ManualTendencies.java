@@ -15,7 +15,10 @@ package com.ballknowers.draftsim.profile;
  *                        rather than an absolute so the global chaos slider keeps
  *                        its meaning — at temperature 0 the board is still modal
  *                        no matter what any seat claims.
- * @param note            not used by the engine. A reminder on the seat card.
+ * @param note            legacy: notes moved to manager_note (private per author, V25)
+ *                        and this is always null when read from manual_json.
+ *                        reachBias/unpredictability are likewise no longer writable
+ *                        through the API; V25 cleared what was stored.
  */
 public record ManualTendencies(
         Double reachBias,
