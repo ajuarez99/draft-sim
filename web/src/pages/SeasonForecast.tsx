@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
-import { getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
+import { computePowerRankings, getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
+import CommissionerKeyNote from '../components/CommissionerKeyNote'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import PersonName from '../components/PersonName'
@@ -26,6 +27,9 @@ export default function SeasonForecast() {
   const [data, setData] = useState<Data | null>(null)
   const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
+  // Bumped after a commissioner recompute so the page re-reads the new snapshot.
+  const [reloads, setReloads] = useState(0)
+  const [computing, setComputing] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
@@ -47,12 +51,26 @@ export default function SeasonForecast() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId, dataVersion])
+  }, [sleeperLeagueId, dataVersion, reloads])
 
   const maxWins = Math.max(
     1,
     ...(data?.teams ?? []).map((t) => t.winRange.p90 ?? t.averageWins),
   )
+
+  async function recompute(season: number, throughWeek: number) {
+    if (!sleeperLeagueId) return
+    setComputing(true)
+    setError(null)
+    try {
+      await computePowerRankings(sleeperLeagueId, season, throughWeek)
+      setReloads((n) => n + 1)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setComputing(false)
+    }
+  }
 
   if (notFound) return <NotFound what="league" />
 
@@ -77,6 +95,16 @@ export default function SeasonForecast() {
           reason={data.reason ?? null}
           season={data.season}
           requestedSeason={data.requestedSeason}
+          notice={
+            data.reason === 'NOT_COMPUTED' && data.latestScoredWeek > 0 ? (
+              <RecomputeControl
+                data={data}
+                computing={computing}
+                onRecompute={recompute}
+                label={`Recompute through week ${data.latestScoredWeek}`}
+              />
+            ) : null
+          }
         />
       )}
 
@@ -86,6 +114,7 @@ export default function SeasonForecast() {
             Through week {data.week} · {(data.iterations ?? 0).toLocaleString()} simulated seasons
           </h3>
           <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
+          <StaleNotice data={data} computing={computing} onRecompute={recompute} />
 
           <table className="sf-table">
             <thead>
@@ -121,10 +150,12 @@ function Refusal({
   reason,
   season,
   requestedSeason,
+  notice,
 }: {
   reason: string | null
   season: number
   requestedSeason?: number | null
+  notice?: ReactNode
 }) {
   const body =
     reason === 'UNMODELLED_SEEDING'
@@ -137,7 +168,73 @@ function Refusal({
       <h3 className="cond">No forecast for this league</h3>
       <SeasonFallbackNote season={season} requestedSeason={requestedSeason} />
       <p className="muted small">{body}</p>
+      {notice}
     </section>
+  )
+}
+
+/**
+ * The stored snapshot is only rewritten by a commissioner recompute, never on a
+ * page load (claude/playoff-odds.md), so it can trail the league. Say by how much.
+ * Nothing here recomputes; the button is the commissioner's own explicit action.
+ */
+function StaleNotice({
+  data,
+  computing,
+  onRecompute,
+}: {
+  data: Data
+  computing: boolean
+  onRecompute: (season: number, throughWeek: number) => void
+}) {
+  const snapshotWeek = data.week ?? 0
+  const behind = data.latestScoredWeek - snapshotWeek
+  if (behind <= 0) return null
+  return (
+    <div className="sf-stale" role="status">
+      <p className="small">
+        {behind} {behind === 1 ? 'week' : 'weeks'} scored since this forecast. The odds below are as
+        of week {snapshotWeek}.
+      </p>
+      <RecomputeControl
+        data={data}
+        computing={computing}
+        onRecompute={onRecompute}
+        label={`Recompute through week ${data.latestScoredWeek}`}
+      />
+    </div>
+  )
+}
+
+/**
+ * Only for a commissioner, and only on the season the page was asked for: a fallback
+ * season is a different league row than the one the recompute route would act on.
+ */
+function RecomputeControl({
+  data,
+  computing,
+  onRecompute,
+  label,
+}: {
+  data: Data
+  computing: boolean
+  onRecompute: (season: number, throughWeek: number) => void
+  label: string
+}) {
+  const onRequestedSeason = data.requestedSeason == null || data.requestedSeason === data.season
+  if (!data.canCommission || !onRequestedSeason) return null
+  return (
+    <p className="small">
+      <button
+        type="button"
+        className="action-button"
+        disabled={computing}
+        onClick={() => onRecompute(data.season, data.latestScoredWeek)}
+      >
+        {computing ? 'Computing…' : label}
+      </button>{' '}
+      <CommissionerKeyNote />
+    </p>
   )
 }
 

@@ -262,16 +262,17 @@ public class PlayoffOddsService {
 
     public record Forecast(boolean available, Unavailable reason, int season, Integer requestedSeason,
                            int week, int iterations, String model, String snapshotAt,
-                           List<ForecastTeam> teams) {
+                           List<ForecastTeam> teams, int latestScoredWeek) {
 
         static Forecast no(Unavailable reason, int season) {
-            return no(reason, season, null);
+            return no(reason, season, null, 0);
         }
 
         /** A refusal announces the season fallback too: the reader still needs
          *  to know the answer is about a different year than the one clicked. */
-        static Forecast no(Unavailable reason, int season, Integer requestedSeason) {
-            return new Forecast(false, reason, season, requestedSeason, 0, 0, null, null, List.of());
+        static Forecast no(Unavailable reason, int season, Integer requestedSeason, int latestScoredWeek) {
+            return new Forecast(false, reason, season, requestedSeason, 0, 0, null, null, List.of(),
+                    latestScoredWeek);
         }
     }
 
@@ -294,16 +295,17 @@ public class PlayoffOddsService {
         Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
         if (format.isEmpty() || !format.get().modelable()) {
             return Optional.of(Forecast.no(Unavailable.UNMODELLED_SEEDING, season,
-                    found.get().requestedSeason()));
+                    found.get().requestedSeason(), latestScoredWeek(league.id())));
         }
 
         Optional<PlayoffOddsRepository.Snapshot> snap = odds.latest(league.id(), season);
         if (snap.isEmpty() || snap.get().entries().isEmpty()) {
             // Which refusal depends on WHY there is no snapshot.
-            boolean played = !weekPoints.storedWeeks(league.id()).isEmpty();
+            int latest = latestScoredWeek(league.id());
+            boolean played = latest > 0;
             return Optional.of(Forecast.no(
                     played ? Unavailable.NOT_COMPUTED : Unavailable.NO_SCORED_WEEKS, season,
-                    found.get().requestedSeason()));
+                    found.get().requestedSeason(), latest));
         }
         PlayoffOddsRepository.Snapshot s = snap.get();
 
@@ -344,7 +346,16 @@ public class PlayoffOddsService {
         }
 
         return Optional.of(new Forecast(true, null, s.season(), found.get().requestedSeason(),
-                s.week(), s.iterations(), s.model(), null, teams));
+                s.week(), s.iterations(), s.model(), null, teams, latestScoredWeek(league.id())));
+    }
+
+    /**
+     * The highest week with stored scores for this league, 0 when none. Read
+     * so the page can say how far behind the stored snapshot is; it computes
+     * nothing (FR-009). Same source the other pages count "weeks scored" from.
+     */
+    private int latestScoredWeek(long leagueId) {
+        return weekPoints.storedWeeks(leagueId).stream().mapToInt(Integer::intValue).max().orElse(0);
     }
 
     /** {@code "3": 412} -> {3: 412}. Null (a pre-V17 snapshot) is an empty map. */

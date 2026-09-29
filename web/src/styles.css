@@ -4590,3 +4590,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-formula p { margin: 0 0 4px; }
 .analysis-formula summary { cursor: pointer; }
 .analysis-formula code { display: block; margin-top: 4px; }
+
+.sf-stale {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sf-stale p { margin: 0; }
+.sf-stale p + p { margin-top: 6px; }

@@ -1747,6 +1747,14 @@ export type SeasonForecast = {
   iterations?: number
   model?: string | null
   teams: ForecastTeam[]
+  /**
+   * The newest week with stored scores (0 when none). `week` is the week the stored
+   * snapshot was taken at, so `latestScoredWeek > week` means the forecast is behind.
+   * Present on every shape, refusals included.
+   */
+  latestScoredWeek: number
+  /** Display only: whether to offer the recompute button. The route re-checks. */
+  canCommission: boolean
 }
 
 export const getSeasonForecast = (sleeperLeagueId: string) =>
