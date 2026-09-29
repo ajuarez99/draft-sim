@@ -8,27 +8,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * One player's season, game by game (specs/005-daily-weekly-top-players, US1).
+ * Sleeper's unversioned stats and schedule endpoints
+ * (specs/005-daily-weekly-top-players, US1; rebuilt for
+ * specs/009-auto-data-refresh, research R6).
  *
  * <p>Deliberately not a method on {@link SleeperClient}, for exactly the reason
  * {@link SleeperProjectionClient} gives about its own endpoint: that client is
- * pinned to {@code /v1}, and this endpoint lives outside it, carries no version
- * in its path, and is absent from Sleeper's public docs. Folding it in would
- * lend it the stability the documented surface has and hide, at the call site,
- * that this can vanish without a deprecation.
+ * pinned to {@code /v1}, and these endpoints live outside it, carry no version
+ * in their path, and are absent from Sleeper's public docs. Folding them in would
+ * lend them the stability the documented surface has and hide, at the call site,
+ * that they can vanish without a deprecation.
  *
- * <p>Measured 2026-09-19 against nba player 1658: 200 with no auth, ~83 KB for
- * season 2024 and ~92 KB for 2025, in ~300 ms. The response is an object keyed
- * by fantasy week ({@code "1"}..{@code "25"}), each value a <b>list of per-game
- * entries</b> carrying {@code date}, {@code opponent}, {@code is_away_team},
- * {@code game_id}, {@code week} and a full {@code stats} box score.
- *
- * <p>This shape is why the feature is affordable: one call returns a player's
- * whole season, so a league-season backfill costs one call per player (~331 for
- * the reference league) rather than one per player per week. Two alternatives
- * were measured and rejected -- the bulk weekly endpoint carries no {@code date}
- * at all, and {@code ?date=} on the season endpoint is ignored, returning
- * byte-identical season totals for different dates.
+ * <p>The per-player season endpoint ({@code /stats/{sport}/player/{id}}) this
+ * client used to wrap was removed: it cost one call per player per league and
+ * could not be made incremental. The per-week endpoint returns every player's
+ * entries for a week in one call.
  */
 @Component
 public class SleeperPlayerStatsClient {
@@ -41,23 +35,54 @@ public class SleeperPlayerStatsClient {
     }
 
     /**
-     * Every game one player played in a season, keyed by fantasy week.
+     * Every player's per-game entries for one week of one season, from the
+     * per-week endpoint (specs/009-auto-data-refresh, research R6, measured
+     * 2026-09-28): {@code GET /stats/{sport}/{season}/{week}?season_type=regular}.
      *
-     * <p>Returned raw. Which entries are usable is the ingest service's job, so
-     * that "how many games did this player actually have" stays a measurable
-     * number rather than something this client silently decides.
+     * <p>A JSON array of entries with the same fields as the per-player
+     * endpoint ({@code player_id}, {@code game_id}, {@code date}, {@code team},
+     * {@code opponent}, {@code week}, {@code stats}) except {@code is_away_team},
+     * which only the per-player endpoint carries -- {@code is_away} comes from
+     * {@link #schedule}. Empty-stats entries (a DNP) are included.
      *
-     * @param sport Sleeper's own path segment ({@code "nba"}), not this app's enum
+     * <p>Defensively typed: the body is read as an untyped {@code Object} and
+     * only elements that really are maps are kept, never trusting a declared
+     * generic type (see the note in {@code PlayerGameIngestService}).
+     *
+     * @param sport Sleeper's own path segment, not this app's enum
      */
-    @SuppressWarnings("unchecked")
-    public Map<String, List<Map<String, Object>>> seasonByWeek(String sport, String playerId, int season) {
-        return http.get()
-                .uri(b -> b.path("/stats/{sport}/player/{playerId}")
+    public List<Map<String, Object>> week(String sport, int season, int week) {
+        Object body = http.get()
+                .uri(b -> b.path("/stats/{sport}/{season}/{week}")
                         .queryParam("season_type", "regular")
-                        .queryParam("season", season)
-                        .queryParam("grouping", "week")
-                        .build(sport, playerId))
+                        .build(sport, season, week))
                 .retrieve()
-                .body(Map.class);
+                .body(Object.class);
+        return mapsOf(body);
+    }
+
+    /**
+     * A season's regular-season schedule: {@code GET /schedule/{sport}/regular/{season}}.
+     * One array of games carrying {@code game_id}, {@code week}, {@code date},
+     * {@code status} and home/away. The home/away value's shape differs by sport
+     * (a nested object with {@code team}, or a bare team code); resolving that is
+     * the caller's job, not this client's -- it returns the raw maps.
+     */
+    public List<Map<String, Object>> schedule(String sport, int season) {
+        Object body = http.get()
+                .uri(b -> b.path("/schedule/{sport}/regular/{season}").build(sport, season))
+                .retrieve()
+                .body(Object.class);
+        return mapsOf(body);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> mapsOf(Object body) {
+        if (!(body instanceof List<?> list)) return List.of();
+        List<Map<String, Object>> out = new java.util.ArrayList<>(list.size());
+        for (Object o : list) {
+            if (o instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
+        }
+        return out;
     }
 }

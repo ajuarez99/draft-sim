@@ -887,7 +887,7 @@ public class LeagueHistoryController {
             boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
             String message = commissionerKnown
                     ? "only this league's Sleeper commissioner may save the power rankings"
-                    : "no commissioner detected for this league -- re-run league ingest";
+                    : "No commissioner is recorded for this league yet.";
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("message", message);
             response.put("commissionerKnown", commissionerKnown);

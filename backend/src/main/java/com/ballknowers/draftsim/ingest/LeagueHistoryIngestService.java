@@ -3,8 +3,10 @@ package com.ballknowers.draftsim.ingest;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.JsonUtil;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
+import com.ballknowers.draftsim.refresh.WeekFinality;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.LeagueWeekFetchRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
@@ -54,12 +56,14 @@ public class LeagueHistoryIngestService {
     private final RosterWeekPointsRepository weekPoints;
     private final LeagueMatchupRepository fixtures;
     private final TransactionIngestService transactions;
+    private final LeagueWeekFetchRepository weekFetches;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                       ManagerRepository managers, LeagueMemberRepository leagueMembers,
                                       RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints,
                                       LeagueMatchupRepository fixtures,
-                                      TransactionIngestService transactions) {
+                                      TransactionIngestService transactions,
+                                      LeagueWeekFetchRepository weekFetches) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
@@ -68,12 +72,23 @@ public class LeagueHistoryIngestService {
         this.weekPoints = weekPoints;
         this.fixtures = fixtures;
         this.transactions = transactions;
+        this.weekFetches = weekFetches;
     }
 
     public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested,
                          int transactionsIngested) {}
 
-    public Result ingestChain(Sport sport, String currentLeagueId) {
+    /**
+     * @param skip Sleeper league ids of chain seasons already {@code loaded_complete}
+     *             (specs/009-auto-data-refresh research R2, FR-011): their league
+     *             row is still upserted from the chain payload this walk already
+     *             fetched, but no per-season call is made -- no managers, standings,
+     *             points, fixtures or transactions. A rule, not a value, so it has
+     *             no default: every caller states it. Manual and full re-ingests
+     *             pass {@code Set.of()}
+     */
+    public Result ingestChain(Sport sport, String currentLeagueId, Set<String> skip) {
+        Objects.requireNonNull(skip, "skip must be stated explicitly; pass Set.of() to skip nothing");
         int seasons = 0, rosterCount = 0, weekCount = 0, fixtureCount = 0, txCount = 0;
 
         for (Map<String, Object> league : sleeper.leagueChain(currentLeagueId)) {
@@ -81,6 +96,7 @@ public class LeagueHistoryIngestService {
             long leagueId = LeagueMapper.upsert(leagues, sport, league);
             String sleeperLeagueId = String.valueOf(league.get("league_id"));
             int season = Integer.parseInt(String.valueOf(league.get("season")));
+            if (skip.contains(sleeperLeagueId)) continue;
 
             Map<String, Long> managerByUserId = upsertManagers(leagueId, sleeperLeagueId);
             rosterCount += ingestStandings(leagueId, sleeperLeagueId, league, managerByUserId);
@@ -190,10 +206,9 @@ public class LeagueHistoryIngestService {
      * Bounded by {@code settings.last_scored_leg} -- never looped until an
      * empty response, which claude/plan-review-league-suite.md's finding 2
      * measured returning real (but never-played) data past that point on Ball
-     * Knowers 2025 week 18. The most recently scored week is always re-fetched
-     * even if already cached, since it may have been ingested while Sleeper
-     * was still finalizing that week's scores; every earlier stored week is
-     * settled and skipped (finding 5).
+     * Knowers 2025 week 18. A week that was fetched while it was still the
+     * last scored leg is re-fetched until it is final (see the finality note
+     * in the body); every final, settled week is skipped (finding 5).
      *
      * <p><b>The skip gate tests BOTH tables, not just one</b>
      * (specs/002-league-history-record-book, research D2). This loop writes two
@@ -215,6 +230,12 @@ public class LeagueHistoryIngestService {
         int lastScoredLeg = LeagueMapper.asInt(settings.get("last_scored_leg"), 0);
         if (lastScoredLeg < 1) return 0;
 
+        // A week is skipped only if it is FINAL (fetched after the league moved on,
+        // see WeekFinality -- specs/009 FR-016, research R14) AND settled
+        // (the conditions below). "Has rows" alone froze a week stored mid-week as
+        // partial forever: production NBA 2025 weeks 8-9 were off by up to 31
+        // points, and every week with no fetch record is fetched once to heal.
+        Set<Integer> finalWeeks = weekFetches.finalWeeks(leagueId, LeagueWeekFetchRepository.POINTS);
         Set<Integer> stored = weekPoints.storedWeeks(leagueId);
         // The gate asks about the STARTERS column too, not just about rows
         // existing. specs/004-ffwrapped-feature-parity R6: V18 added
@@ -230,7 +251,7 @@ public class LeagueHistoryIngestService {
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
             boolean settled = stored.contains(week) && paired.contains(week) && withStarters.contains(week);
-            if (settled && week != lastScoredLeg) continue;
+            if (settled && finalWeeks.contains(week)) continue;
             List<Map<String, Object>> matchups = sleeper.matchups(sleeperLeagueId, week);
             if (matchups == null) continue;
             for (Map<String, Object> m : matchups) {
@@ -259,6 +280,8 @@ public class LeagueHistoryIngestService {
                         leagueId, season, week, rosterId, asIntOrNull(m.get("matchup_id"))));
                 count++;
             }
+            weekFetches.record(leagueId, LeagueWeekFetchRepository.POINTS, week, java.time.Instant.now(),
+                    WeekFinality.isFinal(week, lastScoredLeg));
         }
         return count;
     }

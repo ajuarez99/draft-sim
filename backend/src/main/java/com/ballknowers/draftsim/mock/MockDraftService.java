@@ -146,11 +146,11 @@ public class MockDraftService {
         if (sourceSleeperLeagueId != null && !sourceSleeperLeagueId.isBlank()) {
             LeagueRepository.LeagueRow league = leagues.bySleeperId(sourceSleeperLeagueId)
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "league " + sourceSleeperLeagueId + " not ingested"));
-            // Same answer as "not ingested" for a league that isn't the
+                            "league " + sourceSleeperLeagueId + " isn't loaded yet"));
+            // Same answer as "isn't loaded yet" for a league that isn't the
             // caller's, matching createSessionFromDraft's own membership check.
             if (!membership.canSee(sleeperUserId, league.id())) {
-                throw new IllegalArgumentException("league " + sourceSleeperLeagueId + " not ingested");
+                throw new IllegalArgumentException("league " + sourceSleeperLeagueId + " isn't loaded yet");
             }
             // The sport arrives explicitly AND is implied by the league. If they
             // disagree, something upstream picked one of them wrongly -- and a
@@ -226,13 +226,13 @@ public class MockDraftService {
     @Transactional
     public MockSessionState createSessionFromDraft(String sleeperDraftId, Integer mySlotOverride, String sleeperUserId) {
         DraftRepository.DraftRow draft = drafts.bySleeperId(sleeperDraftId)
-                .orElseThrow(() -> new IllegalArgumentException("draft " + sleeperDraftId + " not ingested"));
+                .orElseThrow(() -> new IllegalArgumentException("draft " + sleeperDraftId + " isn't loaded yet"));
 
-        // Same answer as "not ingested" for a draft in a league that isn't the
+        // Same answer as "isn't loaded yet" for a draft in a league that isn't the
         // caller's: forking copies that draft's picks into a session this caller
         // then owns and reads, so it is a read of the whole board by another name.
         if (!membership.canSee(sleeperUserId, draft.leagueId())) {
-            throw new IllegalArgumentException("draft " + sleeperDraftId + " not ingested");
+            throw new IllegalArgumentException("draft " + sleeperDraftId + " isn't loaded yet");
         }
 
         if (!"drafting".equals(draft.status())) {
@@ -461,7 +461,7 @@ public class MockDraftService {
         // any row is written, rather than confusingly on the first pick.
         if (board.isEmpty()) {
             throw new IllegalArgumentException("no " + shape.sport().code()
-                    + " board has been built yet -- ingest players and rebuild the board first");
+                    + " board is available yet -- player data is still loading, try again shortly");
         }
         ProfileService.Fit fit = profiles.fit(shape.sport());
         return contexts.build(shape, seats, fit.profiles(), fit.priors(), board, completed);

@@ -14,6 +14,7 @@ import {
   type ConductList,
 } from '../api'
 import { hueForIndex } from '../hue'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * specs/008-season-superlatives US1: the season's extremes and close games.
@@ -50,6 +51,8 @@ export default function Superlatives() {
   const [data, setData] = useState<SuperlativesResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   // Shared by the mount effect below AND by ConductListSection after a
   // successful save/remove (live-check finding, 2026-09-23): a commissioner
@@ -85,7 +88,7 @@ export default function Superlatives() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   return (
     <div className="content">

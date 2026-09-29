@@ -246,7 +246,7 @@ public class LeagueAnalysisService {
      */
     private Scores scores(LeagueRepository.LeagueRow league, int lastScored, String sleeperUserId) {
         if (lastScored < 1) {
-            return new Scores(false, "no week of this season has been ingested yet, so there is nothing to read"
+            return new Scores(false, "No week of this season has loaded yet, so there is nothing to read"
                     + " week by week", List.of(), List.of());
         }
 
@@ -298,8 +298,7 @@ public class LeagueAnalysisService {
         String formula = "((avgWeeklyScore * 6) + ((highScore + lowScore) * 2) + (winPct * 400)) / 10";
         if (weeksScored < MIN_SCORED_WEEKS) {
             String reason = weeksScored == 0
-                    ? "no week of this season has been ingested yet -- run POST /api/ingest/league-history/"
-                            + league.sleeperId()
+                    ? "No week of this season has loaded yet."
                     : weeksScored + " week" + (weeksScored == 1 ? "" : "s")
                             + " scored. The formula weighs a team's best and worst week against its average,"
                             + " which cannot mean anything until those are three different numbers;"
@@ -442,10 +441,7 @@ public class LeagueAnalysisService {
     }
 
     private static String noProjectionsStored(LeagueRepository.LeagueRow league, int fromWeek, int toWeek) {
-        return "no projections stored for " + league.sport().code() + " " + league.season()
-                + " weeks " + fromWeek + "-" + toWeek + " -- run POST /api/ingest/projections?sport="
-                + league.sport().code() + "&season=" + league.season()
-                + "&fromWeek=" + fromWeek + "&toWeek=" + toWeek;
+        return "Projections aren't available for weeks " + fromWeek + "–" + toWeek + ".";
     }
 
     /**
@@ -471,9 +467,8 @@ public class LeagueAnalysisService {
             // scheduled yet with every matchup_id null, and
             // LeagueMatchupRepository deliberately refuses to count that as
             // cached rather than poisoning the schedule forever.
-            return new Matchups(false, "no pairings stored for week " + week
-                    + " -- Sleeper publishes a week's schedule shortly before it, and it is stored by"
-                    + " POST /api/ingest/league-history/" + league.sleeperId(), week, List.of());
+            return new Matchups(false, "No pairings for week " + week
+                    + " yet. Sleeper publishes a week's schedule shortly before it starts.", week, List.of());
         }
 
         Map<String, Double> weekly =

@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import LeagueAnalysis from './LeagueAnalysis'
+import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import type { AnalysisLineupPlayer, LeagueAnalysis as LeagueAnalysisData } from '../api'
 
 vi.mock('react-router-dom', () => ({
@@ -428,6 +429,33 @@ describe('LeagueAnalysis', () => {
 
     expect(getLeagueAnalysis).toHaveBeenLastCalledWith('L1', 6)
     await waitFor(() => expect(screen.getByText('Week 6 matchups')).toBeInTheDocument())
+  })
+
+  /** A background-refresh bump refetches with the week the user chose, not the default week. */
+  it('refetches with the chosen week when the data version bumps', async () => {
+    const user = userEvent.setup()
+    function Bump() {
+      const bump = useBumpLeagueDataVersion()
+      return <button onClick={() => bump('L1')}>bump</button>
+    }
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(
+      <LeagueDataVersionProvider>
+        <Bump />
+        <LeagueAnalysis />
+      </LeagueDataVersionProvider>,
+    )
+    await screen.findByText('Week 2 matchups')
+    getLeagueAnalysis.mockResolvedValue(
+      data({ matchups: { available: true, reason: null, week: 6, matchups: [] } }),
+    )
+    await user.click(screen.getByRole('button', { name: '6' }))
+    await screen.findByText('Week 6 matchups')
+
+    getLeagueAnalysis.mockClear()
+    await user.click(screen.getByRole('button', { name: 'bump' }))
+
+    await waitFor(() => expect(getLeagueAnalysis).toHaveBeenCalledWith('L1', 6))
   })
 
   /**

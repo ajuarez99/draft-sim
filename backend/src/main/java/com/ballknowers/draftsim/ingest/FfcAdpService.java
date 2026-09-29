@@ -35,8 +35,21 @@ public class FfcAdpService {
 
     private record Miss(double adp, String name, String position, String team) {}
 
+    /** Prefix of {@link Result#derivation()} when the fetch threw; see {@link Result#fetchFailed()}. */
+    static final String FETCH_FAILED_PREFIX = "fetch failed: ";
+
     public record Result(boolean enabled, int rows, int matched, int unmatched, int sampleDrafts,
                          boolean derived, String derivation, List<String> topMisses) {
+        /**
+         * True when {@link #ingest} caught a failure and dropped FFC out of the blend.
+         * {@code ingest} never throws (best-effort by design), so this is the only
+         * failure signal a caller gets -- the daily job reads it (spec amendment 8).
+         * Not a record component, so it isn't serialized.
+         */
+        public boolean fetchFailed() {
+            return derivation != null && derivation.startsWith(FETCH_FAILED_PREFIX);
+        }
+
         static Result disabled() {
             return new Result(false, 0, 0, 0, 0, false, "FFC disabled in weights.yml", List.of());
         }
@@ -74,7 +87,7 @@ public class FfcAdpService {
             return ingestOrThrow(sport);
         } catch (Exception e) {
             log.warn("FFC ingest failed, board falls back to search_rank + observed order: {}", e.toString());
-            return new Result(true, 0, 0, 0, 0, true, "fetch failed: " + e.getMessage(), List.of());
+            return new Result(true, 0, 0, 0, 0, true, FETCH_FAILED_PREFIX + e.getMessage(), List.of());
         }
     }
 

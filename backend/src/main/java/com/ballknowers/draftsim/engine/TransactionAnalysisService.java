@@ -226,7 +226,7 @@ public class TransactionAnalysisService {
                 transactions.forSeason(league.id(), league.season());
         if (rows.isEmpty()) {
             return Optional.of(Result.unavailable(
-                    "no transactions ingested for this league yet", league.season(), sport));
+                    "Transactions for this league haven't loaded yet.", league.season(), sport));
         }
 
         Map<String, Player> playersBySleeperId = new HashMap<>();

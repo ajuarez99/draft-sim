@@ -106,6 +106,29 @@ plainly" before sharing the URL more widely.
 Note that **a deploy ships code, not data**: production has its own Postgres, and a
 league's history and projections have to be ingested against the live API separately.
 
+### How data stays current (spec 009)
+
+The app refreshes itself from Sleeper. Nothing runs on a timer inside the backend, so Railway's
+serverless mode can still put it to sleep.
+
+- **On visit**: opening any league page asks `POST /api/leagues/{id}/refresh`. Every season in
+  that league's chain older than an hour is refreshed in the background: scores, pairings,
+  transactions and per-game stats. The rail says "Updating…" and the page refetches itself when
+  it's done.
+  - A completed season is fetched until it has loaded fully (every week final), then never again.
+  - A week stored while it was still being played is refetched until it's been fetched after it
+    closed. That's the gap that left production's NBA 2025 wrong.
+- **Daily**: `.github/workflows/daily-refresh.yml` calls `POST /api/refresh/daily` at 11:00 UTC.
+  That refreshes the player list (once a day at most, as Sleeper asks; it also records
+  suspension tags) and ADP plus the draft board. Those are the only data Sleeper doesn't keep.
+  - The call needs `REFRESH_SECRET`, set in **both** the Railway backend service and the GitHub
+    repository secrets. With it unset, the route answers 404.
+  - GitHub disables scheduled workflows in a public repo after 60 days without repository
+    activity.
+- **Checking a league against Sleeper**: `python scripts/check-weeks-vs-sleeper.py <base-url>
+  <league-id>` compares every regular-season week's adds and team points. It's read-only.
+- The manual `/api/ingest/*` endpoints still exist, for development.
+
 ## Layout
 
     config/weights.yml   every scoring weight and model constant, external by design

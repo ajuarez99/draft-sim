@@ -97,7 +97,7 @@ public class DraftContextFactory {
 
     private void validate(LeagueSettings settings, List<SeatSpec> seats, List<BoardEntry> board) {
         if (board == null || board.isEmpty()) {
-            throw new IllegalStateException("board is empty — run ingest first");
+            throw new IllegalStateException("The draft board for this sport hasn't been built yet.");
         }
 
         int totalPicks = settings.teams() * settings.rounds();

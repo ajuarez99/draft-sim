@@ -12,6 +12,7 @@ import {
 } from '../api'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * specs/004-ffwrapped-feature-parity US2: what each team scored, what it could
@@ -33,6 +34,8 @@ export default function RosterManagement() {
   const [tx, setTx] = useState<LeagueTransactions | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -52,7 +55,7 @@ export default function RosterManagement() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   // Transactions are a separate call on purpose: they are a separate ingest,
   // and the standings half of this page must still render when they have not
@@ -70,7 +73,7 @@ export default function RosterManagement() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   // The widest potential sets the scale, so every row's pair of bars is
   // comparable across the league rather than each row normalising to itself.

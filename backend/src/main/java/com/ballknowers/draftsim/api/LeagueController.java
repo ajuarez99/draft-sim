@@ -557,7 +557,7 @@ public class LeagueController {
         Long playerId = players.idsBySleeperId(sport).get(body.sleeperPlayerId());
         if (playerId == null) {
             return badRequest("unknown sleeperPlayerId: " + body.sleeperPlayerId()
-                    + " -- re-run POST /api/ingest/players if this is a new player");
+                    + ". This player isn't in the player list yet. It refreshes daily.");
         }
 
         int pickNo = body.pickNo();

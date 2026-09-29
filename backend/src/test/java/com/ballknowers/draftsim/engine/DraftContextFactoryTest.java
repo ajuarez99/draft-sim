@@ -145,11 +145,12 @@ class DraftContextFactoryTest {
     }
 
     @Test
-    void anEmptyBoardIsRefusedWithTheIngestHint() {
+    void anEmptyBoardIsRefusedWithAPlainReason() {
         IllegalStateException e = assertThrows(IllegalStateException.class,
                 () -> factory.build(LeagueShape.standard(8), List.of(),
                         Map.of(), PositionalPriors.uniform(Sport.NFL), List.of(), Map.of()));
-        assertTrue(e.getMessage().contains("ingest"), e.getMessage());
+        // specs/009 FR-007: says what's missing in plain words, never "run ingest".
+        assertTrue(e.getMessage().contains("draft board") && !e.getMessage().contains("ingest"), e.getMessage());
     }
 
     @Test

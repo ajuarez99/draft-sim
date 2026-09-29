@@ -273,7 +273,7 @@ class LeagueAnalyticsContractTest {
     /** The package-private factory is not reachable from here; build the record directly. */
     private static final class TransactionAnalysisServiceResults {
         static TransactionAnalysisService.Result unavailable() {
-            return new TransactionAnalysisService.Result(false, "no transactions ingested for this league yet",
+            return new TransactionAnalysisService.Result(false, "Transactions for this league haven't loaded yet.",
                     2026, Sport.NFL, List.of(), List.of(), List.of(), "LOWER_IS_BETTER");
         }
     }

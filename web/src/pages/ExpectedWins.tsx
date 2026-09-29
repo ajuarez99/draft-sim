@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar'
 import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * specs/004-ffwrapped-feature-parity US3: expected wins, schedule luck and
@@ -23,6 +24,8 @@ export default function ExpectedWins() {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -42,7 +45,7 @@ export default function ExpectedWins() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   const widest = Math.max(
     0.5,

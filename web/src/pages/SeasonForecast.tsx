@@ -5,6 +5,7 @@ import Avatar from '../components/Avatar'
 import { getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * specs/004-ffwrapped-feature-parity US4: where the season is heading.
@@ -22,6 +23,8 @@ export default function SeasonForecast() {
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -41,7 +44,7 @@ export default function SeasonForecast() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId])
+  }, [sleeperLeagueId, dataVersion])
 
   const maxWins = Math.max(
     1,

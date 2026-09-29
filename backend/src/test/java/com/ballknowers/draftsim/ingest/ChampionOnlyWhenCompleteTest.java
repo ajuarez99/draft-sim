@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.LeagueWeekFetchRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
@@ -45,13 +46,14 @@ class ChampionOnlyWhenCompleteTest {
     @Mock private RosterWeekPointsRepository weekPoints;
     @Mock private LeagueMatchupRepository fixtures;
     @Mock private TransactionIngestService transactions;
+    @Mock private LeagueWeekFetchRepository weekFetches;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions);
+                weekPoints, fixtures, transactions, weekFetches);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
         lenient().when(sleeper.leagueUsers(anyString())).thenReturn(List.of(
@@ -91,7 +93,7 @@ class ChampionOnlyWhenCompleteTest {
 
     private List<RosterSeasonRepository.Upsert> ingestAndCapture(Map<String, Object> league, String leagueId) {
         when(sleeper.leagueChain(leagueId)).thenReturn(List.of(league));
-        service.ingestChain(Sport.NFL, leagueId);
+        service.ingestChain(Sport.NFL, leagueId, Set.of());
         ArgumentCaptor<List<RosterSeasonRepository.Upsert>> captor = ArgumentCaptor.forClass(List.class);
         verify(rosterSeasons).upsertAll(captor.capture());
         return captor.getValue();

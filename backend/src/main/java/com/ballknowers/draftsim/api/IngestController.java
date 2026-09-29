@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.ingest.BoardRefresh;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
@@ -32,13 +33,15 @@ public class IngestController {
     private final ProjectionIngestService projectionIngest;
     private final TransactionIngestService transactionIngest;
     private final PlayerGameIngestService playerGameIngest;
+    private final BoardRefresh boardRefresh;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
                             FfcAdpService ffcAdp, BoardService boards, ProfileService profiles,
                             ProjectionIngestService projectionIngest,
                             TransactionIngestService transactionIngest,
-                            PlayerGameIngestService playerGameIngest) {
+                            PlayerGameIngestService playerGameIngest,
+                            BoardRefresh boardRefresh) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -48,6 +51,7 @@ public class IngestController {
         this.projectionIngest = projectionIngest;
         this.transactionIngest = transactionIngest;
         this.playerGameIngest = playerGameIngest;
+        this.boardRefresh = boardRefresh;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -85,12 +89,15 @@ public class IngestController {
      * transactions without re-walking players, leagues and the board.
      */
     /**
-     * Per-game stat lines for one league-season (specs/005, US1).
+     * Per-game stat lines for one sport-season (specs/005, US1; rebuilt in
+     * specs/009-auto-data-refresh, research R6/R9).
      *
-     * <p>Its own endpoint, and never part of {@code /all} or
-     * {@code /league-history}: this is one upstream call per player, measured at
-     * 331 players for the reference league's 2025 season. Run deliberately, not
-     * as a side effect of a routine ingest.
+     * <p>Resolves the league's sport and season and refreshes that sport-season:
+     * one Sleeper call per week not yet final, plus one schedule call, shared by
+     * every league in the sport. The response's {@code weeksFetched} was
+     * {@code playersWalked} and {@code weeksFailed} was {@code playersFailed}
+     * when the unit of work was a player. Still its own endpoint, never part of
+     * {@code /all} or {@code /league-history}.
      */
     @PostMapping("/player-games/{sleeperLeagueId}")
     public PlayerGameIngestService.Result playerGames(@PathVariable String sleeperLeagueId,
@@ -106,7 +113,8 @@ public class IngestController {
     @PostMapping("/league-history/{sleeperLeagueId}")
     public LeagueHistoryIngestService.Result leagueHistory(@PathVariable String sleeperLeagueId) {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
-        return leagueHistoryIngest.ingestChain(sport, sleeperLeagueId);
+        // A manual re-ingest skips nothing: it is how a suspect season gets rebuilt.
+        return leagueHistoryIngest.ingestChain(sport, sleeperLeagueId, java.util.Set.of());
     }
 
     /**
@@ -147,10 +155,8 @@ public class IngestController {
     @PostMapping("/board")
     public Map<String, Object> board(@RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
-        FfcAdpService.Result adp = ffcAdp.ingest(s);
-        BoardService.Result result = boards.rebuild(s);
-        int written = profiles.persistFitted(s);
-        return Map.of("adp", adp, "board", result, "profilesWritten", written);
+        BoardRefresh.Result r = boardRefresh.run(s);
+        return Map.of("adp", r.adp(), "board", r.board(), "profilesWritten", r.profilesWritten());
     }
 
     /**
@@ -171,9 +177,12 @@ public class IngestController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("players", playerIngest.ingest(sport));
         out.put("league", leagueIngest.ingestChain(sport, sleeperLeagueId));
-        out.put("adp", ffcAdp.ingest(sport));
-        out.put("board", boards.rebuild(sport));
-        out.put("profilesWritten", profiles.persistFitted(sport));
+        // Same sequence as /board and the daily job (specs/009 research R15): one
+        // implementation, so the three can't drift apart.
+        BoardRefresh.Result board = boardRefresh.run(sport);
+        out.put("adp", board.adp());
+        out.put("board", board.board());
+        out.put("profilesWritten", board.profilesWritten());
         return out;
     }
 }

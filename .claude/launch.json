@@ -65,6 +65,33 @@
       "port": 5180
     },
     {
+      "name": "draft-sim-api-refresh-secret",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set REFRESH_SECRET=local-test-secret&& cd backend && .\\gradlew.bat bootRun"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "draft-sim-api-8083-no-sleeper",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set SLEEPER_BASE_URL=http://127.0.0.1:9&& set SLEEPER_STATS_BASE_URL=http://127.0.0.1:9&& set SERVER_PORT=8083&& set CORS_ORIGINS=http://localhost:5182&& cd backend && .\\gradlew.bat bootRun"
+      ],
+      "port": 8083
+    },
+    {
+      "name": "draft-sim-web-8083",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd web && set DRAFTSIM_PROXY_TARGET=http://localhost:8083 && npm run dev -- --port 5182 --strictPort"
+      ],
+      "port": 5182
+    },
+    {
       "name": "draft-sim-web-8099",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

@@ -1,9 +1,10 @@
+import type { ReactNode } from 'react'
 import { render, type RenderResult } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi, type MockInstance } from 'vitest'
 import AppShell from './components/AppShell'
 import * as api from './api'
-import type { DraftSummary, ManagerSummary } from './api'
+import type { DraftSummary, ManagerSummary, RefreshStatus } from './api'
 import { invalidateRailLeagues } from './railLeague'
 import { invalidateSearchIndex } from './searchIndex'
 import { clearUser, setUser } from './user'
@@ -45,12 +46,33 @@ export type RenderAtPathOptions = {
   managers?: ManagerSummary[]
   /** Route state, for the destinations that carry their league that way. */
   state?: unknown
+  /** What `refreshLeague` (the rail's on-visit POST) resolves to. Defaults to FRESH. */
+  refresh?: RefreshStatus
+  /** What each `getLeagueRefresh` poll resolves to, in order; the last one repeats. */
+  polls?: RefreshStatus[]
+  /** What renders inside the shell's page area. Defaults to a bare paragraph. */
+  page?: ReactNode
+}
+
+/** A refresh status body with every field the rail reads, overridable per test. */
+export function refreshStatus(over: Partial<RefreshStatus> = {}): RefreshStatus {
+  return {
+    state: 'FRESH',
+    leagueSleeperId: 'L1',
+    season: 2026,
+    lastSuccessAt: null,
+    lastFailureAt: null,
+    seasons: [],
+    ...over,
+  }
 }
 
 /** The spies the last `renderAtPath` installed -- so a test can count calls
  *  and assert what was and wasn't fetched. */
 export let getDraftsSpy: MockInstance<typeof api.getDrafts>
 export let getManagersSpy: MockInstance<typeof api.getManagers>
+export let refreshLeagueSpy: MockInstance<typeof api.refreshLeague>
+export let getLeagueRefreshSpy: MockInstance<typeof api.getLeagueRefresh>
 
 export type RenderedRail = RenderResult & {
   /** The rail element, or null when the shell rendered none. */
@@ -86,6 +108,16 @@ export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}
   getDraftsSpy = vi.spyOn(api, 'getDrafts').mockResolvedValue(drafts)
   getManagersSpy = vi.spyOn(api, 'getManagers').mockResolvedValue(options.managers ?? [])
 
+  // The rail POSTs a refresh on every league it lands in. Stubbed for every
+  // test so none of them reaches for the network, and so a test can count calls.
+  refreshLeagueSpy = vi.spyOn(api, 'refreshLeague').mockResolvedValue(options.refresh ?? refreshStatus())
+  getLeagueRefreshSpy = vi.spyOn(api, 'getLeagueRefresh')
+  const polls = options.polls ?? [options.refresh ?? refreshStatus()]
+  let pollIndex = 0
+  getLeagueRefreshSpy.mockImplementation(() =>
+    Promise.resolve(polls[Math.min(pollIndex++, polls.length - 1)]),
+  )
+
   setUser({
     sleeperUserId: 'U1',
     username: 'tester',
@@ -96,7 +128,7 @@ export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}
   const result = render(
     <MemoryRouter initialEntries={[{ pathname, state: options.state ?? null }]}>
       <AppShell>
-        <p>page</p>
+        {options.page ?? <p>page</p>}
       </AppShell>
     </MemoryRouter>,
   )

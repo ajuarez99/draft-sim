@@ -1766,6 +1766,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    spend a card's padding on a three-letter badge. */
 .rail-league-sub .sport-pill { font-size: 8.5px; padding: 1px 4px; }
 
+/* specs/009: the refresh state under the league name -- the rail's existing small muted line. */
+.rail-league-refresh { font-size: 10.5px; color: var(--muted); padding: 0 6px 6px; }
+
 .rail-league-seasons { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 8px; }
 
 /* The live dot stands in for a glyph on the Follow-live row, so it has to

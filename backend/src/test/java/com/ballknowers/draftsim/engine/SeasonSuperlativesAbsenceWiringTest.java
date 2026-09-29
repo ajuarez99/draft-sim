@@ -109,7 +109,7 @@ class SeasonSuperlativesAbsenceWiringTest {
                 new SeasonSuperlativesService.Coverage(14, 0, List.of("roster 4: 2 weeks couldn't be classified as a bye or a missed game"));
 
         SeasonSuperlativesService.Coverage merged = SeasonSuperlativesService.mergeCoverage(
-                List.of("3 rostered players have no per-game records — run POST /api/ingest/player-games/X"),
+                List.of("3 rostered players have no game-by-game records yet."),
                 unclassified, 14);
 
         assertEquals(2, merged.reasons().size());

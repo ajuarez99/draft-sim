@@ -47,7 +47,7 @@ public class SimulationService {
 
         DraftRepository.DraftRow draft = drafts.bySleeperId(req.draftSleeperId())
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "draft " + req.draftSleeperId() + " not ingested"));
+                        "draft " + req.draftSleeperId() + " isn't loaded yet"));
 
         LeagueRepository.LeagueRow leagueRow = leagues.all().stream()
                 .filter(l -> l.id() == draft.leagueId())
@@ -64,7 +64,7 @@ public class SimulationService {
         // parameter of their own.
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, draft.rounds(), draft.reversalRound());
         List<BoardEntry> board = boards.currentBoard(sport);
-        if (board.isEmpty()) throw new IllegalStateException("board is empty — run ingest first");
+        if (board.isEmpty()) throw new IllegalStateException("The draft board for this sport hasn't been built yet.");
 
         // Drop anyone the caller has already accounted for (keepers, mistaken entries).
         if (req.excludePlayerIds() != null && !req.excludePlayerIds().isEmpty()) {

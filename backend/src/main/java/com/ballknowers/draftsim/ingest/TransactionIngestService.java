@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.ingest;
 
+import com.ballknowers.draftsim.refresh.WeekFinality;
 import com.ballknowers.draftsim.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,16 @@ import java.util.*;
  * empty, and skipping weeks already stored. The skip gate is keyed on
  * <b>this</b> table's own weeks -- reusing the results gate would be research
  * R6's bug in a new place, since a week can have scores and no transactions.
+ *
+ * <p><b>The skip gate is week finality, not "has rows"</b>
+ * (specs/009-auto-data-refresh FR-016, research R14). A week is skipped only
+ * once it is recorded in {@code league_week_fetch} as {@code final}: fetched
+ * while {@code last_scored_leg} was already past it, or while the league was
+ * {@code complete}. A week stored while it was still the last scored leg (NBA
+ * scores during the week) is partial, and the old "has rows and is not the
+ * last leg" gate froze it that way forever -- production NBA 2025 held 24 of
+ * 53 moves for week 10 and none for weeks 11-21. A week with no fetch record
+ * is fetched, which heals weeks stored before the record existed.
  */
 @Service
 public class TransactionIngestService {
@@ -32,16 +43,19 @@ public class TransactionIngestService {
     private final LeagueTransactionRepository transactions;
     private final ManagerRepository managers;
     private final RosterSeasonRepository rosterSeasons;
+    private final LeagueWeekFetchRepository weekFetches;
 
     public TransactionIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                     LeagueTransactionRepository transactions,
                                     ManagerRepository managers,
-                                    RosterSeasonRepository rosterSeasons) {
+                                    RosterSeasonRepository rosterSeasons,
+                                    LeagueWeekFetchRepository weekFetches) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.transactions = transactions;
         this.rosterSeasons = rosterSeasons;
         this.managers = managers;
+        this.weekFetches = weekFetches;
     }
 
     /** @return how many transactions were stored */
@@ -60,13 +74,10 @@ public class TransactionIngestService {
             if (s.managerId() != null) managerByRoster.put(s.rosterId(), s.managerId());
         }
 
-        Set<Integer> stored = transactions.storedWeeks(league.id(), league.season());
+        Set<Integer> finalWeeks = weekFetches.finalWeeks(league.id(), LeagueWeekFetchRepository.TRANSACTIONS);
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
-            // The most recent scored week is always refetched: a waiver run may
-            // still have been settling when it was first ingested. Same rule
-            // the results walk applies, for the same reason.
-            if (stored.contains(week) && week != lastScoredLeg) continue;
+            if (finalWeeks.contains(week)) continue;
             List<Map<String, Object>> payload = sleeper.transactions(sleeperLeagueId, week);
             if (payload == null) continue;
             for (Map<String, Object> t : payload) {
@@ -75,6 +86,8 @@ public class TransactionIngestService {
                 transactions.upsert(row);
                 count++;
             }
+            weekFetches.record(league.id(), LeagueWeekFetchRepository.TRANSACTIONS, week, Instant.now(),
+                    WeekFinality.isFinal(week, lastScoredLeg));
         }
         log.info("transactions: league {} season {} -- {} stored through week {}",
                 league.id(), league.season(), count, lastScoredLeg);

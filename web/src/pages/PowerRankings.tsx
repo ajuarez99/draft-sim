@@ -25,6 +25,7 @@ import BumpChart, { segmentsOf, type Series, type SeriesPoint } from '../compone
 export { segmentsOf }
 export type { SeriesPoint }
 import { useUser } from '../user'
+import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
  * power-rankings-reskin.md. This used to be a page that explained its own
@@ -378,6 +379,8 @@ export default function PowerRankings() {
   const [homersOpen, setHomersOpen] = useState(false)
   const [howOpen, setHowOpen] = useState(false)
   const [ballotModalOpen, setBallotModalOpen] = useState(false)
+  // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
+  const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
   // Take the rail off the page entirely while the ballot is open.
   //
@@ -442,7 +445,7 @@ export default function PowerRankings() {
   // accounts (Sign out -> sign in as someone else) without leaving this page
   // used to leave `ballot` exactly as the old identity had fetched it, since
   // this effect never re-ran.
-  useEffect(refetch, [sleeperLeagueId, user?.sleeperUserId])
+  useEffect(refetch, [sleeperLeagueId, user?.sleeperUserId, dataVersion])
 
   const season = useMemo(() => {
     if (!data || data.entries.length === 0) return Number(data?.sportState.season ?? new Date().getFullYear())
@@ -464,7 +467,7 @@ export default function PowerRankings() {
         setLeagueName(null)
         setStandings(null)
       })
-  }, [sleeperLeagueId, season])
+  }, [sleeperLeagueId, season, dataVersion])
 
   // `?? 1` only covers "no data yet". Once data is here, week 0 is a real
   // value and must survive -- `data.sportState.week || 1` would quietly send
@@ -1316,7 +1319,7 @@ export default function PowerRankings() {
             </div>
             {!ballot?.commissionerKnown ? (
               <p className="muted small">
-                No commissioner detected for this league -- re-run league ingest to pick one up from Sleeper.
+                No commissioner is recorded for this league yet. It is read from Sleeper whenever the league refreshes.
               </p>
             ) : commissionerTop ? (
               <>
@@ -1365,8 +1368,8 @@ export default function PowerRankings() {
             )}
             {blockState === 'not-member' && (
               <p className="muted small">
-                Signed in as <strong>{user?.displayName ?? user?.username}</strong>, who isn't on a roster here. Ask the
-                commissioner to re-run league ingest if that's wrong.
+                Signed in as <strong>{user?.displayName ?? user?.username}</strong>, who isn't on a roster here. Rosters are read from
+                Sleeper whenever the league refreshes, so if you just joined, check back shortly.
               </p>
             )}
             {blockState === 'voting-closed' && (
@@ -1440,7 +1443,7 @@ export default function PowerRankings() {
                 <p className="muted small">
                   {ballot?.commissionerKnown
                     ? "Only this league's commissioner can set this ranking."
-                    : 'No commissioner detected for this league -- re-run league ingest to pick one up from Sleeper.'}
+                    : 'No commissioner is recorded for this league yet. It is read from Sleeper whenever the league refreshes.'}
                 </p>
               )
             ) : blockState === 'ok' ? (
@@ -1487,8 +1490,8 @@ export default function PowerRankings() {
               </>
             ) : blockState === 'not-member' ? (
               <p className="muted small">
-                Signed in as <strong>{user?.displayName ?? user?.username}</strong>, who isn't on a roster here. Ask the
-                commissioner to re-run league ingest if that's wrong.
+                Signed in as <strong>{user?.displayName ?? user?.username}</strong>, who isn't on a roster here. Rosters are read from
+                Sleeper whenever the league refreshes, so if you just joined, check back shortly.
               </p>
             ) : blockState === 'voting-closed' ? (
               <p className="muted small">Voting is closed for {weekPhrase(currentWeek)}.</p>

@@ -103,13 +103,13 @@ describe('MockSetup', () => {
   })
 
   it('shows an error message and re-enables the form when creation fails', async () => {
-    createMockSession.mockRejectedValue(new Error('board is empty — run ingest first'))
+    createMockSession.mockRejectedValue(new Error("The draft board for this sport hasn't been built yet."))
     const user = userEvent.setup()
     render(<MockSetup />)
 
     await user.click(screen.getByRole('button', { name: /start the draft/i }))
 
-    expect(await screen.findByText('board is empty — run ingest first')).toBeInTheDocument()
+    expect(await screen.findByText("The draft board for this sport hasn't been built yet.")).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /start the draft/i })).not.toBeDisabled()
   })
 

@@ -266,9 +266,7 @@ public class PowerRankingService {
 
         Set<Integer> stored = weekPoints.storedWeeks(leagueId);
         if (stored.isEmpty()) {
-            return "no weekly scoring is stored for this league -- run"
-                    + " POST /api/ingest/league-history/{sleeperLeagueId}; it ingests only weeks"
-                    + " Sleeper has already scored, so a season that has not kicked off yields none";
+            return "No week of this season has loaded yet.";
         }
         return "weekly scoring is stored for week(s) " + stored.stream().sorted().toList()
                 + ", none of them at or before week " + week;

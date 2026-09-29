@@ -1,0 +1,335 @@
+{
+ "stats": [
+  {
+   "status": null,
+   "date": "2025-10-02",
+   "stats": {
+    "rush_lng": 8.0,
+    "pos_rank_std": 6.0,
+    "gp": 1.0,
+    "rec_0_4": 1.0,
+    "tm_def_snp": 68.0,
+    "gms_active": 1.0,
+    "rec_td": 1.0,
+    "rec_ypt": 9.11,
+    "pos_rank_half_ppr": 6.0,
+    "pass_rush_yd": 57.0,
+    "pts_std": 19.9,
+    "rec_lng": 16.0,
+    "tm_st_snp": 29.0,
+    "bonus_rush_rec_yd_100": 1.0,
+    "rush_fd": 2.0,
+    "rec": 8.0,
+    "rec_yar": 80.0,
+    "rec_fd": 4.0,
+    "rush_att": 22.0,
+    "rec_5_9": 3.0,
+    "rush_ypa": 2.59,
+    "gs": 1.0,
+    "tm_off_snp": 86.0,
+    "pos_rank_ppr": 4.0,
+    "rec_rz_tgt": 1.0,
+    "off_snp": 76.0,
+    "rush_tkl_loss_yd": -4.0,
+    "rush_yac": 35.0,
+    "pts_half_ppr": 23.9,
+    "rec_air_yd": 2.0,
+    "rec_ypr": 10.25,
+    "rec_10_19": 4.0,
+    "rec_td_lng": 1.0,
+    "rush_rz_att": 5.0,
+    "rush_rec_yd": 139.0,
+    "anytime_tds": 1.0,
+    "bonus_rush_att_20": 1.0,
+    "rush_yd": 57.0,
+    "bonus_rec_rb": 8.0,
+    "rec_tgt": 9.0,
+    "pts_ppr": 27.9,
+    "rec_yd": 82.0,
+    "bonus_fd_rb": 6.0,
+    "rush_tkl_loss": 2.0
+   },
+   "category": "stat",
+   "last_modified": 1759522132679,
+   "week": 5,
+   "season": "2025",
+   "season_type": "regular",
+   "sport": "nfl",
+   "team": "SF",
+   "player_id": "4034",
+   "opponent": "LAR",
+   "updated_at": 1759522132679,
+   "game_id": "202510532",
+   "week_shard": "5_2",
+   "company": "sportradar"
+  },
+  {
+   "status": null,
+   "date": "2025-10-02",
+   "stats": {
+    "gms_active": 1.0,
+    "pos_rank_half_ppr": 999.0,
+    "pos_rank_ppr": 999.0,
+    "pos_rank_std": 999.0,
+    "tm_def_snp": 68.0,
+    "tm_off_snp": 86.0,
+    "tm_st_snp": 29.0
+   },
+   "category": "stat",
+   "last_modified": 1759504129595,
+   "week": 5,
+   "season": "2025",
+   "season_type": "regular",
+   "sport": "nfl",
+   "team": "SF",
+   "player_id": "11065",
+   "opponent": "LAR",
+   "updated_at": 1759504129595,
+   "game_id": "202510532",
+   "week_shard": "5_5",
+   "company": "sportradar"
+  }
+ ],
+ "schedule": [
+  {
+   "game_id": "202510401",
+   "week": 4,
+   "date": "2025-09-25",
+   "status": "complete",
+   "home": "ARI",
+   "away": "SEA"
+  },
+  {
+   "game_id": "202510402",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "ATL",
+   "away": "WAS"
+  },
+  {
+   "game_id": "202510404",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "BUF",
+   "away": "NO"
+  },
+  {
+   "game_id": "202510409",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "DAL",
+   "away": "GB"
+  },
+  {
+   "game_id": "202510410",
+   "week": 4,
+   "date": "2025-09-29",
+   "status": "complete",
+   "home": "DEN",
+   "away": "CIN"
+  },
+  {
+   "game_id": "202510411",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "DET",
+   "away": "CLE"
+  },
+  {
+   "game_id": "202510413",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "HOU",
+   "away": "TEN"
+  },
+  {
+   "game_id": "202510416",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "KC",
+   "away": "BAL"
+  },
+  {
+   "game_id": "202510419",
+   "week": 4,
+   "date": "2025-09-29",
+   "status": "complete",
+   "home": "MIA",
+   "away": "NYJ"
+  },
+  {
+   "game_id": "202510421",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "NE",
+   "away": "CAR"
+  },
+  {
+   "game_id": "202510423",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "NYG",
+   "away": "LAC"
+  },
+  {
+   "game_id": "202510425",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "LV",
+   "away": "CHI"
+  },
+  {
+   "game_id": "202510428",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "PIT",
+   "away": "MIN"
+  },
+  {
+   "game_id": "202510431",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "SF",
+   "away": "JAX"
+  },
+  {
+   "game_id": "202510432",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "LAR",
+   "away": "IND"
+  },
+  {
+   "game_id": "202510433",
+   "week": 4,
+   "date": "2025-09-28",
+   "status": "complete",
+   "home": "TB",
+   "away": "PHI"
+  },
+  {
+   "game_id": "202510501",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "ARI",
+   "away": "TEN"
+  },
+  {
+   "game_id": "202510503",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "BAL",
+   "away": "HOU"
+  },
+  {
+   "game_id": "202510504",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "BUF",
+   "away": "NE"
+  },
+  {
+   "game_id": "202510505",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "CAR",
+   "away": "MIA"
+  },
+  {
+   "game_id": "202510507",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "CIN",
+   "away": "DET"
+  },
+  {
+   "game_id": "202510508",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "CLE",
+   "away": "MIN"
+  },
+  {
+   "game_id": "202510514",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "IND",
+   "away": "LV"
+  },
+  {
+   "game_id": "202510515",
+   "week": 5,
+   "date": "2025-10-06",
+   "status": "complete",
+   "home": "JAX",
+   "away": "KC"
+  },
+  {
+   "game_id": "202510522",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "NO",
+   "away": "NYG"
+  },
+  {
+   "game_id": "202510524",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "NYJ",
+   "away": "DAL"
+  },
+  {
+   "game_id": "202510526",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "PHI",
+   "away": "DEN"
+  },
+  {
+   "game_id": "202510529",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "LAC",
+   "away": "WAS"
+  },
+  {
+   "game_id": "202510530",
+   "week": 5,
+   "date": "2025-10-05",
+   "status": "complete",
+   "home": "SEA",
+   "away": "TB"
+  },
+  {
+   "game_id": "202510532",
+   "week": 5,
+   "date": "2025-10-02",
+   "status": "complete",
+   "home": "LAR",
+   "away": "SF"
+  }
+ ]
+}

@@ -62,7 +62,7 @@ public class BoardService {
 
         LocalDate srDate = boards.latestCapture(sport, BoardRepository.SOURCE_SEARCH_RANK)
                 .orElseThrow(() -> new IllegalStateException(
-                        "no search_rank snapshot — ingest players first"));
+                        "The player list hasn't loaded yet, so the draft board can't be built."));
         Map<Long, Double> searchRank = new LinkedHashMap<>();
         boards.load(sport, BoardRepository.SOURCE_SEARCH_RANK, srDate)
                 .forEach(r -> searchRank.put(r.playerId(), r.adp()));
@@ -291,7 +291,7 @@ public class BoardService {
     /** The current board, ready for the engine. */
     public List<BoardEntry> currentBoard(Sport sport) {
         LocalDate date = boards.latestCapture(sport, BoardRepository.SOURCE_BLEND)
-                .orElseThrow(() -> new IllegalStateException("no blended board — run /api/ingest/board"));
+                .orElseThrow(() -> new IllegalStateException("The draft board for this sport hasn't been built yet."));
         Map<Long, Player> byId = new HashMap<>();
         players.findAll(sport).forEach(p -> byId.put(p.id(), p));
 
