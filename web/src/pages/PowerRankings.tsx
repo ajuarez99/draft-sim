@@ -363,6 +363,15 @@ export function ballotBlockState(signedIn: boolean, ballot: BallotState | null, 
   return 'ok'
 }
 
+/** Value and unit from one switch: what `score` means depends on the kind.
+ *  Empty string when there is no honest number to print. */
+export function scoreLabel(e: { score: number | null; week: number }, kind: PowerRankingKind | null): string {
+  if (e.score == null || kind == null) return ''
+  if (kind === 'MEMBER') return `avg rank ${e.score.toFixed(2)}`
+  if (kind === 'COMPUTED_REALIZED') return e.week === 0 ? `lineup value ${Math.round(e.score)}` : `${e.score.toFixed(2)} pts`
+  return ''
+}
+
 export default function PowerRankings() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const user = useUser()
@@ -473,6 +482,34 @@ export default function PowerRankings() {
   // value and must survive -- `data.sportState.week || 1` would quietly send
   // every basketball ballot to week 1 all offseason.
   const currentWeek = data?.sportState.week ?? 1
+
+  // The week the hero and the League-vote ladder show: the latest week with
+  // ballots. Distinct from `currentWeek` (the open week `ballot` answers for),
+  // so "Your ballot" needs its own fetch keyed to it. `===` elsewhere: week 0 is real.
+  const viewedWeek = useMemo(() => {
+    if (!data) return null
+    const weeks = data.entries.filter((e) => e.kind === 'MEMBER' && e.season === season).map((e) => e.week)
+    return weeks.length > 0 ? Math.max(...weeks) : null
+  }, [data, season])
+  const [viewedBallotState, setViewedBallotState] = useState<{ week: number; ballot: BallotState } | null>(null)
+  useEffect(() => {
+    if (!sleeperLeagueId || viewedWeek == null || viewedWeek === currentWeek) {
+      setViewedBallotState(null)
+      return
+    }
+    let cancelled = false
+    getBallot(sleeperLeagueId, viewedWeek)
+      .then((b) => {
+        if (!cancelled) setViewedBallotState({ week: viewedWeek, ballot: b })
+      })
+      // Cleared on failure, like `ballot`: never leave another identity's ballot up.
+      .catch(() => {
+        if (!cancelled) setViewedBallotState(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sleeperLeagueId, viewedWeek, currentWeek, user?.sleeperUserId, dataVersion])
 
   async function compute() {
     if (!sleeperLeagueId) return
@@ -614,7 +651,9 @@ export default function PowerRankings() {
   // data behind it (bestRank/worstRank/stdev) is MEMBER-only, and Box
   // score/Commissioner keep today's row untouched.
   const memberSpace = ladderMode === 'MEMBER'
-  const myRankByRoster = new Map<number, number>(ballot?.mine?.rosterIds.map((rosterId, i) => [rosterId, i + 1]) ?? [])
+  const viewedBallot =
+    viewedWeek === currentWeek ? ballot : viewedBallotState?.week === viewedWeek ? viewedBallotState.ballot : null
+  const myRankByRoster = new Map<number, number>(viewedBallot?.mine?.rosterIds.map((rosterId, i) => [rosterId, i + 1]) ?? [])
 
   // ---- the hero (headline / #1 / your-team strip / story cards) is always
   // League vote, independent of which ladder tab is selected -- it is "state
@@ -648,7 +687,7 @@ export default function PowerRankings() {
   }
 
   const myEntry = heroRows.find((e) => ballot?.members.some((m) => m.isMe && m.rosterId === e.rosterId))
-  const myBallotRank = ballot?.mine ? ballot.mine.rosterIds.indexOf(myEntry?.rosterId ?? -1) : -1
+  const myBallotRank = viewedBallot?.mine ? viewedBallot.mine.rosterIds.indexOf(myEntry?.rosterId ?? -1) : -1
 
   // The footnote's second sentence, built from the snapshot that actually
   // produced the numbers. When there is no snapshot the sentence is absent --
@@ -710,12 +749,6 @@ export default function PowerRankings() {
   // Trend chart is a line chart: below two weeks there is no line to draw.
   const chartReady = ladderWeeks.length >= 2
 
-  function scoreLabel(e: PowerRankingEntry): string {
-    if (e.score == null) return '--'
-    if (e.week === 0) return String(Math.round(e.score))
-    return e.score.toFixed(2)
-  }
-
   function openBallotModal() {
     setSaveMessage(null)
     setBallotModalOpen(true)
@@ -764,8 +797,12 @@ export default function PowerRankings() {
                 <div className="pr-number-one-name">{nameOf(story.top)}</div>
                 <div className="pr-number-one-meta">
                   {story.top.manager ? `${story.top.manager} · ` : ''}
-                  <span className="mono">{recordLabel(standings?.get(story.top.rosterId))}</span> ·{' '}
-                  <span className="mono">{scoreLabel(story.top)}</span> pts
+                  <span className="mono">{recordLabel(standings?.get(story.top.rosterId))}</span>
+                  {scoreLabel(story.top, 'MEMBER') && (
+                    <>
+                      {' '}· <span className="mono">{scoreLabel(story.top, 'MEMBER')}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1005,10 +1042,10 @@ export default function PowerRankings() {
                       </span>
                       {space ? (
                         <>
-                          <span className="mono pr-avg">{scoreLabel(e)}</span>
+                          <span className="mono pr-avg">{scoreLabel(e, 'MEMBER')}</span>
                           <span className="pr-your-ballot">
                             {myRank == null ? (
-                              <span className="tiny muted">{ballot?.mine ? '—' : 'No ballot'}</span>
+                              <span className="tiny muted">{viewedBallot?.mine ? '—' : 'No ballot'}</span>
                             ) : (
                               <>
                                 <span className="mono">{ordinal(myRank)}</span>
@@ -1152,7 +1189,7 @@ export default function PowerRankings() {
                               />
                             )}
                           </span>
-                          <span className="pr-score mono">{f.entry ? scoreLabel(f.entry) : 'no score'}</span>
+                          <span className="pr-score mono">{(f.entry && scoreLabel(f.entry, f.kind)) || 'no score'}</span>
                         </div>
                       ))}
                       <div className="pr-axis-ends mono">
