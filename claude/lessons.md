@@ -516,3 +516,24 @@ cause: it was not "Postgres is down", it was "Postgres is full".
 **The rule:** after adding a `@SpringBootTest` variant, read the skipped count, not just the
 build line. The test JVM now sets `spring.datasource.hikari.maximum-pool-size=3`
 (`build.gradle.kts`), which leaves room for many more contexts.
+
+## 22. An IT run applied a destructive migration to the shared dev database
+
+**2026-09-29.** V25 (`manager_note_private`) deletes every existing manager note, because old
+notes have no recorded author. It was meant to run on the next deploy. Instead, it ran the moment
+the implementing agent ran its integration tests. The ITs boot Spring with Flyway against
+`localhost:5433/draftsim`, the same database the dev servers and every other session on this
+machine use.
+
+The two local notes were gone before anyone had reviewed the migration. Nothing else broke. Flyway
+ignores applied migrations newer than a branch's own (`*:future`), so a pre-V25 branch still booted
+and passed `LeagueMembershipIT` with 0 skipped.
+
+**The rule:**
+- A migration that deletes or rewrites data is live on the shared dev DB as soon as its tests
+  run, not when it merges.
+- Before running the suite on such a branch, snapshot what it will touch:
+  `pg_dump -t <table>`, or copy the rows you care about.
+- Or point the ITs at a scratch database.
+
+Review a destructive migration before its tests run, not after.
