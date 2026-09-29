@@ -319,3 +319,42 @@ messages (`LeagueIngestService`, `LiveDraftPoller`) were left as they are.
 
 **Suites after the fixes**: backend **754 tests, 0 failures, 0 errors, 0 skipped**; web **46 files,
 558 passed**.
+
+## Production after deploy (T046, T054), 2026-09-29
+
+Merged to `main` as `dc02573`. Both Railway services redeployed, the backend first and the
+frontend about 20 s later (polled). `REFRESH_SECRET` was set by Allan: the daily route now answers
+**401** to a wrong secret, where before it answered 404.
+
+**First loads**, triggered with `POST /api/leagues/{id}/refresh`, the same call a page visit
+makes:
+
+| Chain | Seasons | Wall time | Result |
+|---|---|---|---|
+| NBA (from the 2026 id) | 2026, 2025, 2024 | about 6 min | 2025 and 2024 **COMPLETE**, 2026 FRESH |
+| NFL (from the 2026 id) | 2026, 2025 | about 3.5 min | 2025 **COMPLETE**, 2026 FRESH |
+
+No failures. Railway was roughly 2–3× slower than local, where the NBA chain took about 2 min.
+
+**SC-008 / T054, `scripts/check-weeks-vs-sleeper.py` against production:**
+- NBA 2025, weeks 1–18: **PASS**. Before the fix, adds failed on weeks 10–21 and points on weeks
+  8, 9 and 19.
+- NFL 2025, weeks 1–14: **PASS**.
+
+**SC-001**: production NBA 2025 Superlatives:
+- **Jabari Smith Jr. Award**: Jake LaRavia and Brice Sensabaugh, 14 adds by 8 teams each. Correct.
+- **Waiver Wire Warrior**: KATastrophe Krew, **1,576.5**. The spec expected 1,587.5, the figure
+  verified locally in spec 008.
+  - **The difference is Sleeper's stat revisions, not a bug.** Collin Gillespie's pickup points
+    went from 318.0 to 317.5, and the other top pickups are unchanged.
+  - Those are the same weeks whose team points differed from Sleeper before this feature and match
+    exactly now (PASS above). 1,587.5 was computed on the outdated scores, so 1,576.5 is the
+    corrected figure.
+  - SC-001's expected total is wrong for the same reason, and is corrected here rather than
+    silently changed.
+
+**Still owed:**
+- SC-003 on production: time an ordinary stale visit.
+- A manual `workflow_dispatch` of `daily-refresh` from a sleeping backend, which also measures the
+  cold start through the workflow.
+- T047's month-later checks.
