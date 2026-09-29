@@ -289,4 +289,109 @@ class LeagueControllerManualPickTest {
                 .recordPick("nope", new LeagueController.ManualPick(1, "4046"), null)
                 .getStatusCode().value());
     }
+
+    private static DraftRepository.DraftRow rowWithStatus(String status) {
+        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, status,
+                Map.of("1", 101, "3", 103, "12", 112));
+    }
+
+    /** The finished-draft hole: no poller heals it and fitting reads it. Nothing may be written. */
+    @Test
+    void aCompleteDraftRefusesAManualPickWith409() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("complete")));
+
+        ResponseEntity<?> response = controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(3, "4046"), null);
+
+        assertEquals(409, response.getStatusCode().value());
+        assertTrue(response.getBody().toString().contains("complete"), "names the actual status");
+        verify(drafts, never()).upsertPicks(anyLong(), any());
+    }
+
+    @Test
+    void aPreDraftDraftRefusesAManualPickWith409() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+
+        assertEquals(409, controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(3, "4046"), null)
+                .getStatusCode().value());
+        verify(drafts, never()).upsertPicks(anyLong(), any());
+    }
+
+    @Test
+    void aPausedDraftIsStillLiveAndAcceptsAPick() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("paused")));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("4046", 55L));
+
+        assertEquals(200, controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(3, "4046"), null)
+                .getStatusCode().value());
+    }
+
+    @Test
+    void aNullStatusIsRefusedNotTreatedAsLive() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus(null)));
+
+        assertEquals(409, controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(3, "4046"), null)
+                .getStatusCode().value());
+    }
+
+    @Test
+    void aPlayerAlreadyOnAnotherPickIs409NamingThatPickAndWritesNothing() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("4046", 55L));
+        when(drafts.otherPickOfPlayer(1L, 55L, 17)).thenReturn(Optional.of(1));
+
+        ResponseEntity<?> response = controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(17, "4046"), null);
+
+        assertEquals(409, response.getStatusCode().value());
+        assertTrue(response.getBody().toString().contains("already pick 1"));
+        verify(drafts, never()).upsertPicks(anyLong(), any());
+    }
+
+    /** The guard excludes the pick being written, so the same player at the same pick stays a 200. */
+    @Test
+    void theSamePlayerAtTheSamePickStaysIdempotent200() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("4046", 55L));
+        // otherPickOfPlayer(..., exceptPickNo = 17) answers empty: the only row is pick 17 itself.
+
+        assertEquals(200, controllerAsOperator()
+                .recordPick("d1", new LeagueController.ManualPick(17, "4046"), null)
+                .getStatusCode().value());
+        verify(drafts).otherPickOfPlayer(1L, 55L, 17);
+    }
+
+    @Test
+    void aNonOwnerOnALiveDraftIsStill403() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("4046", 55L));
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of("u-alice", 103L, "u-bob", 101L));
+
+        assertEquals(403, controller()
+                .recordPick("d1", new LeagueController.ManualPick(3, "4046"), "u-bob")
+                .getStatusCode().value());
+    }
+
+    @Test
+    void reversalRoundOnACompleteDraftIs409() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("complete")));
+
+        assertEquals(409, controller()
+                .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
+                .getStatusCode().value());
+        verify(drafts, never()).setReversalRoundOverride(anyLong(), any());
+    }
+
+    @Test
+    void reversalRoundOnAPreDraftDraftIsStillAccepted() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+
+        assertEquals(200, controller()
+                .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
+                .getStatusCode().value());
+        verify(drafts).setReversalRoundOverride(1L, 3);
+    }
 }

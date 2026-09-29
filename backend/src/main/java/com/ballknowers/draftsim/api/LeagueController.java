@@ -207,6 +207,17 @@ public class LeagueController {
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
 
+        // 409 on a finished draft. The board places every cell by recomputing its
+        // pick number from (round, slot, reversalRound) -- DraftBoard.tsx's
+        // pickNoAt -- not from the stored draft_slot, so an override here re-lays
+        // the completed board for every viewer. (Fitting is unaffected:
+        // allCompletedPicks reads the stored draft_slot.) pre_draft and drafting
+        // stay open: that is when Sleeper's value is still being corrected.
+        if ("complete".equals(draft.status())) {
+            return ResponseEntity.status(409).body(Map.of("message",
+                    "draft " + sleeperDraftId + " is complete -- its reversal round can no longer be overridden"));
+        }
+
         Integer override = body == null ? null : body.reversalRound();
         // Upper bound is `rounds`, not unbounded: a value past the last round
         // is inert rather than wrong, and silently accepting a typo that does
@@ -528,15 +539,29 @@ public class LeagueController {
      * when the poller lags a pick that is already visible in Sleeper's own UI.
      *
      * A DB write rather than an in-memory override because every consumer (sim
-     * resume-from-state, seats, the board) already reads the DB, and because it
-     * self-heals: the poller re-upserts the full pick list every tick, so this row
-     * is overwritten with the truth as soon as Sleeper catches up.
+     * resume-from-state, seats, the board) already reads the DB.
      *
-     * Safety: this writes into real {@code draft_pick} for a live, `drafting`
-     * draft. It cannot contaminate fitted manager profiles while the draft is
-     * running, because {@code DraftRepository.allCompletedPicks} filters on
-     * {@code d.status = 'complete'} -- pinned by
-     * {@code DraftRepositoryUpsertPicksIT.allCompletedPicksExcludesPicksFromANonCompleteDraft}.
+     * Enforced here, in this order:
+     * <ul>
+     *   <li>409 unless the draft is live ({@link #MANUAL_PICK_STATUSES}). A
+     *       {@code complete} draft has no poller loop to heal a bad row, and
+     *       {@code DraftRepository.allCompletedPicks} feeds manager-profile fitting
+     *       from exactly those drafts; {@code pre_draft} has nothing to reconcile
+     *       against. The message names the actual status.</li>
+     *   <li>403 unless the caller owns the pick's seat, or holds the admin token
+     *       (see {@code OwnerSlot.mayActAsSlot}); a seat Sleeper has not mapped to
+     *       a manager stays open to any league member.</li>
+     *   <li>409 if the player already sits on a different pick of this draft
+     *       (no DB constraint backs this -- see
+     *       {@code DraftRepository.otherPickOfPlayer}). Re-posting the same player
+     *       at the same pick is an idempotent 200.</li>
+     * </ul>
+     *
+     * How a bad row heals: while the draft is live, the poller re-upserts the full
+     * pick list every tick, overwriting this row with Sleeper's. After the draft
+     * completes, a later full league ingest also overwrites it ({@code replacePicks}
+     * re-writes every pick_no) -- but only if someone runs one. Nothing else heals
+     * it, which is why a completed draft is refused rather than trusted to heal.
      */
     @PostMapping("/drafts/{sleeperDraftId}/picks")
     public ResponseEntity<?> recordPick(@PathVariable String sleeperDraftId,
@@ -545,6 +570,13 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
+
+        if (draft.status() == null || !MANUAL_PICK_STATUSES.contains(draft.status())) {
+            return ResponseEntity.status(409).body(Map.of("message",
+                    "draft " + sleeperDraftId + " is "
+                            + (draft.status() == null ? "not tracked" : draft.status())
+                            + ", not live -- manual picks are only accepted while it is drafting"));
+        }
 
         int totalPicks = draft.teams() * draft.rounds();
         if (body == null || body.pickNo() == null || body.pickNo() < 1 || body.pickNo() > totalPicks) {
@@ -565,6 +597,12 @@ public class LeagueController {
         }
 
         int pickNo = body.pickNo();
+
+        Optional<Integer> elsewhere = drafts.otherPickOfPlayer(draft.id(), playerId, pickNo);
+        if (elsewhere.isPresent()) {
+            return ResponseEntity.status(409).body(Map.of("message",
+                    "player " + body.sleeperPlayerId() + " is already pick " + elsewhere.get()));
+        }
         int round = DraftSlot.round(pickNo, draft.teams());
         // draft.reversalRound() -- this is a real, persisted draft, and a
         // manually-recorded pick needs the same slot math the simulator and
@@ -606,6 +644,20 @@ public class LeagueController {
         response.put("playerId", playerId);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Statuses in which a manual pick is accepted. Evidence: (1) this codebase only
+     * ever writes Sleeper's raw status (LiveDraftPoller.pollOnce ->
+     * DraftRepository.updateStatus), and its only special cases are "pre_draft"
+     * (no picks fetched) and "complete" (final fetch, then stop) -- every other
+     * value is polled as live; (2) Sleeper's draft object carries pre_draft,
+     * drafting, paused, complete per its API docs (a live GET of draft
+     * 1339351318128517120 returned "pre_draft"; "paused" appears nowhere in the
+     * repo's fixtures or tests, so it is admitted from the docs, not observed).
+     * A paused draft is still in progress and its poller keeps running.
+     * Anything else -- including null and any status Sleeper adds later -- is a 409.
+     */
+    static final java.util.Set<String> MANUAL_PICK_STATUSES = java.util.Set.of("drafting", "paused");
 
     /** Body of POST /api/drafts/{id}/picks. */
     public record ManualPick(Integer pickNo, String sleeperPlayerId) {}

@@ -165,6 +165,11 @@ class AccessControlMvcIT {
         String body = "{\"pickNo\":1,\"sleeperPlayerId\":\"it-acl-no-such-player\"}";
         mvc.perform(post("/api/drafts/it-acl-draft/picks").contentType("application/json").content(body))
                 .andExpect(status().isNotFound());
+        // The fixture draft is pre_draft, which manual picks now refuse (audit 03): 409, not a write.
+        mvc.perform(post("/api/drafts/it-acl-draft/picks").contentType("application/json").content(body)
+                        .header("X-Admin-Token", TestAdmin.TOKEN))
+                .andExpect(status().isConflict());
+        jdbc.update("update draft set status = 'drafting' where sleeper_draft_id = 'it-acl-draft'");
         // With the token the request gets past the membership check: the unknown player is then a 400,
         // not the 404 above -- proof it reached the write path without writing anything.
         mvc.perform(post("/api/drafts/it-acl-draft/picks").contentType("application/json").content(body)

@@ -86,3 +86,27 @@ Run each check against a real `bootRun`, not only tests:
       player at another pick, the same-pick re-post, and that `allCompletedPicks` is
       unchanged after a refused write. Extend `LeagueControllerManualPickTest` for the 409s.
 - [ ] Backend suite: **0 skipped**.
+
+## Implementation notes (added on build)
+
+- Status gate allows `drafting` and `paused` only (`LeagueController.MANUAL_PICK_STATUSES`);
+  null/`pre_draft`/`complete`/anything else is a 409 naming the status. `paused` is admitted from
+  Sleeper's documented status set, not observed anywhere in this repo's fixtures.
+- `PUT .../reversal-round` is a 409 on `complete` only. Finding: `DraftBoard.tsx` places each cell by
+  recomputing the pick number from `(round, slot, reversalRound)` (`pickNoAt`) and looking it up in
+  `byPick`; it does not use the stored `draft_slot`. So an override on a finished draft re-lays the board
+  for everyone, while fitting (`allCompletedPicks`, stored `draft_slot`) is unaffected.
+- No DB unique constraint added (see "Not in scope").
+
+### Existing-duplicate check (read-only; NOT run against prod by the implementer)
+
+```sql
+select p.draft_id, d.sleeper_draft_id, p.player_id, count(*) as picks,
+       array_agg(p.pick_no order by p.pick_no) as pick_nos
+from draft_pick p
+join draft d on d.id = p.draft_id
+where p.player_id is not null
+group by p.draft_id, d.sleeper_draft_id, p.player_id
+having count(*) > 1
+order by p.draft_id, p.player_id;
+```
