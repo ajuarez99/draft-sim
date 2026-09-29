@@ -537,3 +537,29 @@ and passed `LeagueMembershipIT` with 0 skipped.
 - Or point the ITs at a scratch database.
 
 Review a destructive migration before its tests run, not after.
+
+## 23. CPU-bound work on virtual threads starved every other request
+
+**2026-09-29.** Tomcat runs request handlers on virtual threads (`spring.threads.virtual.enabled`),
+and `MonteCarloRunner` started one virtual thread per iteration. That meant 5,000 CPU-bound tasks
+that never yield, sharing the same few carrier threads as every request handler. While a sim ran,
+unrelated requests queued behind it.
+
+Measured locally on 12 cores, loading Expected wins:
+- idle: 0.037 s;
+- during a 5,000-iteration sim: 0.61 s;
+- during a 20,000-iteration sim (the old cap, still what production accepts): 3.7 s.
+
+It surfaced as a different bug. A "replace my run" request couldn't get a carrier back after its
+own JDBC calls, so it reached the cancel only after the old run had finished. The lease logic was
+correct, and every unit test passed, because none of them ran the runner and a request handler on
+the same scheduler.
+
+After moving iterations to a fixed platform-thread pool, one thread per core, the same page load
+during a 5,000-iteration sim took 0.23 s, and replacement cancels the old run live (409 at 0.86 s).
+
+**The rule:**
+- Virtual threads are for blocking I/O, not CPU-bound fan-out.
+- Heavy compute goes on a bounded platform pool.
+- A test of cancellation or fairness has to put the heavy work and a request handler on the same
+  scheduler, or it can't see this.
