@@ -4,7 +4,7 @@ import {
   createMockSessionFromDraft,
   getDrafts,
   getSeats,
-  streamSimulation,
+  streamSimulationQuietly,
   type PredictedPick,
   type RealPick,
   type SeatsResponse,
@@ -156,7 +156,7 @@ export default function LiveDraftView() {
     setResimming(true)
     setResimProgress(0)
     try {
-      const r = await streamSimulation(
+      const r = await streamSimulationQuietly(
         {
           draftSleeperId: draftId,
           mySlot: mySlotRef.current,

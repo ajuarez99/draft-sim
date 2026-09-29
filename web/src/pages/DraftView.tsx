@@ -5,6 +5,7 @@ import {
   getSeats,
   setReversalRound,
   streamSimulation,
+  streamSimulationQuietly,
   type PlayerRef,
   type PredictedPick,
   type SeatsResponse,
@@ -240,7 +241,7 @@ export default function DraftView() {
         if (predicted) startState[n] = predicted.player.sleeperId
       }
 
-      const r2 = await streamSimulation(
+      const r2 = await streamSimulationQuietly(
         {
           draftSleeperId: draftId,
           // Both frozen to what produced the prefix being locked in, not live

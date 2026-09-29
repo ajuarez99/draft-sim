@@ -56,7 +56,7 @@ public class SimulationController {
     public SimulationResult run(@RequestBody SimulationRequest request,
                                 @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         requireVisible(request, sleeperUserId);
-        try (SimulationPermits.Lease lease = permits.acquire(sleeperUserId)) {
+        try (SimulationPermits.Lease lease = permits.acquire(sleeperUserId, request.draftSleeperId())) {
             return sims.simulate(request, null, lease::cancelled);
         }
     }
@@ -74,7 +74,7 @@ public class SimulationController {
         requireVisible(request, sleeperUserId);
         // Also before the emitter, for the same reason: a 429 has to be a real
         // status. Released in the worker's finally, or here if it never starts.
-        SimulationPermits.Lease lease = permits.acquire(sleeperUserId);
+        SimulationPermits.Lease lease = permits.acquire(sleeperUserId, request.draftSleeperId());
         SseEmitter emitter;
         try {
             emitter = new SseEmitter(SSE_TIMEOUT_MS);

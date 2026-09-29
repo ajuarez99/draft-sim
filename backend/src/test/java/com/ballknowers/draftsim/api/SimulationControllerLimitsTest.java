@@ -98,4 +98,60 @@ class SimulationControllerLimitsTest {
                 new SimulationRequest("d", 1, 20000, null, null, null, null).iterations());
         assertEquals(1000, new SimulationRequest("d", 1, 0, null, null, null, null).iterations());
     }
+
+    /** Draft night: 12 tabs resim at once against 2 permits; every one must succeed inside the wait window. */
+    @Test
+    void twelveSimultaneousRequestsAtTwoPermitsAllSucceed() throws Exception {
+        SimulationPermits two = new SimulationPermits(2, 3000, 8);
+        LeagueMembership membership = mock(LeagueMembership.class);
+        when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
+                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+        when(sims.simulate(any(SimulationRequest.class), any(), any())).thenAnswer(inv -> {
+            Thread.sleep(200);   // stands in for a short run
+            return mock(SimulationResult.class);
+        });
+        MockMvc m = MockMvcBuilders.standaloneSetup(new SimulationController(sims, membership, two))
+                .setControllerAdvice(new ErrorHandler()).build();
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(12);
+        java.util.List<java.util.concurrent.Future<Integer>> results = new java.util.ArrayList<>();
+        java.util.concurrent.CountDownLatch go = new java.util.concurrent.CountDownLatch(1);
+        for (int i = 0; i < 12; i++) {
+            String user = "manager" + i;
+            results.add(pool.submit(() -> {
+                go.await();
+                return m.perform(post("/api/sims").contentType(MediaType.APPLICATION_JSON).content(BODY)
+                        .header("X-Sleeper-User", user)).andReturn().getResponse().getStatus();
+            }));
+        }
+        go.countDown();
+        for (java.util.concurrent.Future<Integer> f : results) assertEquals(200, f.get(10, java.util.concurrent.TimeUnit.SECONDS));
+        pool.shutdown();
+        assertEquals(2, two.available());
+        assertEquals(0, two.waiting());
+    }
+
+    @Test
+    void aFloodPastTheWaitingCapGetsAnImmediate429() throws Exception {
+        SimulationPermits tight = new SimulationPermits(1, 30_000, 1);   // 1 permit, 1 waiter
+        LeagueMembership membership = mock(LeagueMembership.class);
+        when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
+                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+        MockMvc m = MockMvcBuilders.standaloneSetup(new SimulationController(sims, membership, tight))
+                .setControllerAdvice(new ErrorHandler()).build();
+        SimulationPermits.Lease held = tight.acquire("holder", "d1");
+        Thread waiter = new Thread(() -> { try { tight.acquire("waiter", "d1").close(); } catch (RuntimeException ignored) { } });
+        waiter.start();
+        long deadline = System.currentTimeMillis() + 5000;
+        while (tight.waiting() < 1 && System.currentTimeMillis() < deadline) Thread.sleep(5);
+
+        long t0 = System.nanoTime();
+        m.perform(post("/api/sims").contentType(MediaType.APPLICATION_JSON).content(BODY)
+                        .header("X-Sleeper-User", "flooder"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "2"));
+        assertEquals(true, (System.nanoTime() - t0) / 1_000_000 < 1000);
+        held.close();
+        waiter.join(5000);
+    }
 }
