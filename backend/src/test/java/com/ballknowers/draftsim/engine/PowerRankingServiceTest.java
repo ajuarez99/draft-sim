@@ -244,8 +244,12 @@ class PowerRankingServiceTest {
     // ---- specs/002-league-history-record-book US2: final-rank status ----
 
     private static LeagueRepository.LeagueRow leagueRow(long id, int season) {
+        return leagueRow(id, season, null);
+    }
+
+    private static LeagueRepository.LeagueRow leagueRow(long id, int season, String status) {
         return new LeagueRepository.LeagueRow(id, Sport.NFL, "S" + id, "L" + id, season,
-                12, List.of(), 1.0, null, null);
+                12, List.of(), 1.0, null, status);
     }
 
     private static PowerRankingRepository.FinalRank fr(int rosterId, int rank, int week) {
@@ -278,7 +282,6 @@ class PowerRankingServiceTest {
      */
     @Test
     void theHeadOfTheChainIsInProgressRatherThanMissing() {
-        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
 
         PowerRankingService.SeasonRanks out = service.finalRankForSeason(4L, true);
 
@@ -314,8 +317,7 @@ class PowerRankingServiceTest {
     @Test
     void backfillComputesAtTheSeasonsLastStoredWeekNotAFixedOne() {
         LeagueRepository.LeagueRow head = leagueRow(4L, 2026);
-        LeagueRepository.LeagueRow nba = leagueRow(212L, 2024);
-        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
+        LeagueRepository.LeagueRow nba = leagueRow(212L, 2024, "complete");
         when(rankings.finalRealizedRanks(212L)).thenReturn(List.of());
         when(weekPoints.storedWeeks(212L)).thenReturn(Set.of(1, 12, 24));
         when(rosterSeasons.forLeague(212L)).thenReturn(List.of());
@@ -337,8 +339,7 @@ class PowerRankingServiceTest {
     @Test
     void everySkippedSeasonCarriesAReason() {
         LeagueRepository.LeagueRow head = leagueRow(4L, 2026);
-        LeagueRepository.LeagueRow empty = leagueRow(210L, 2025);
-        when(rankings.finalRealizedRanks(4L)).thenReturn(List.of());
+        LeagueRepository.LeagueRow empty = leagueRow(210L, 2025, "complete");
         when(rankings.finalRealizedRanks(210L)).thenReturn(List.of());
         when(weekPoints.storedWeeks(210L)).thenReturn(Set.of());
 
@@ -346,5 +347,38 @@ class PowerRankingServiceTest {
 
         assertEquals(2, out.size());
         assertTrue(out.stream().allMatch(r -> r.reason() != null && !r.reason().isBlank()));
+    }
+
+    /**
+     * A live season that already has a week-1 REALIZED snapshot is still
+     * IN_PROGRESS: an in-season power rank is not a final standing. Before the
+     * fix the snapshot check ran first and this came back RANKED.
+     */
+    @Test
+    void aLiveSeasonWithASnapshotIsStillInProgress() {
+        lenient().when(rankings.finalRealizedRanks(4L)).thenReturn(List.of(fr(7, 1, 1), fr(3, 2, 1)));
+
+        PowerRankingService.SeasonRanks out = service.finalRankForSeason(4L, true);
+
+        assertEquals(PowerRankingService.RankStatus.IN_PROGRESS, out.status());
+        assertNull(out.week());
+        assertTrue(out.byRoster().isEmpty());
+    }
+
+    /** The backfill decides "live" from the row's status, not its position in the chain. */
+    @Test
+    void backfillTreatsANonCompleteSeasonAsInProgressWhereverItSits() {
+        LeagueRepository.LeagueRow live = leagueRow(4L, 2026, "in_season");
+        LeagueRepository.LeagueRow done = leagueRow(5L, 2025, "complete");
+        lenient().when(rankings.finalRealizedRanks(4L)).thenReturn(List.of(fr(7, 1, 1)));
+        when(rankings.finalRealizedRanks(5L)).thenReturn(List.of(fr(7, 1, 17)));
+
+        // Live season deliberately NOT first: the old `i == 0` proxy would call it complete.
+        List<PowerRankingService.BackfilledSeason> out = service.backfillFinalRanks(List.of(done, live), null);
+
+        assertTrue(out.stream().anyMatch(r -> r.season() == 2026
+                && "season is still in progress".equals(r.reason())));
+        assertTrue(out.stream().anyMatch(r -> r.season() == 2025
+                && r.reason().startsWith("already computed")));
     }
 }
