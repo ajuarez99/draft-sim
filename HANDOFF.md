@@ -1,5 +1,26 @@
 # Ball Knowers — handoff
 
+**2026-09-30, branch `011-season-scoped-rail-links` (worktree
+`.claude/worktrees/011-season-scoped-rail-links`, off `origin/main` `587fbc3`): built and
+verified locally, not deployed.** The brief is `claude/season-scoped-rail-links.md`, and
+its amendment sections record every measurement. The tasks are in
+`specs/011-season-scoped-rail-links/tasks.md`.
+
+- **The reported bug is fixed and checked live.** Picking 2025 and then any one-season
+  tab stays on 2025, and a year link keeps the page you're on. From a draft or mock page
+  it goes to that year's board. From History it stays on History.
+- Every one-season page's eyebrow names the season the response resolved to
+  (`League · 2025`). A finished season's Forecast says it's over and links to History.
+  The payload has a new `seasonComplete` field, and there is no migration.
+- **Power rankings still links to the current season on purpose.** On a finished season,
+  `/ballot` answers `canSubmit: true`, which is a write path into a completed season.
+  That is filed as its own task and isn't fixed here.
+- Tests: web vitest 656/656, and `tsc` and the build are clean. Backend: 880 tests, 0
+  skipped, 1 failure, `RefreshControllerIT`, which fails identically on the base commit.
+- To run it locally, `.claude/launch.json` in the main checkout has `wt011-api` and
+  `wt011-web` entries that `cd` into this worktree. They're uncommitted, and preview_start
+  always reads the main checkout's launch.json.
+
 **2026-09-28, branch `009-auto-data-refresh`: built and verified locally, not yet committed or
 deployed.** `specs/009-auto-data-refresh/` is the brief. `verification.md` records every number
 and says which checks ran.

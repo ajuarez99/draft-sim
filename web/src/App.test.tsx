@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, useLocation } from 'react-router-dom'
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { clearUser, setUser, type BkUser } from './user'
@@ -14,8 +15,14 @@ import { clearUser, setUser, type BkUser } from './user'
 vi.mock('./pages/DraftPicker', () => ({
   default: () => <div>draft picker</div>,
 }))
+// Stamps each mount with a serial number, so a test can tell "the same instance
+// re-rendered" from "a fresh one mounted" -- the difference a route key makes.
+const powerMounts = vi.hoisted(() => ({ n: 0 }))
 vi.mock('./pages/PowerRankings', () => ({
-  default: () => <div>power rankings</div>,
+  default: function PowerRankingsStub() {
+    const [instance] = useState(() => ++powerMounts.n)
+    return <div data-instance={instance}>power rankings</div>
+  },
 }))
 // Mounted by the rail-collapse test below; the real one fetches on mount.
 vi.mock('./pages/DraftView', () => ({
@@ -184,5 +191,31 @@ describe('App sign-out gating', () => {
       </MemoryRouter>,
     )
     expect(await screen.findByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+  })
+})
+
+describe('league routes remount on a league change', () => {
+  // Spec 011: the rail's year links switch seasons on the SAME route
+  // (/leagues/<2026>/power -> /leagues/<2025>/power). Unkeyed, React Router
+  // reuses the page component, so the old season's data and in-flight effects
+  // outlive the switch.
+  it('going from one league id to another on the same page path mounts a fresh page', async () => {
+    setUser(sampleUser)
+    const user = userEvent.setup()
+    function GoTo() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate('/leagues/2/power')}>go to 2025</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/leagues/1/power']}>
+        <App />
+        <GoTo />
+      </MemoryRouter>,
+    )
+
+    const before = (await screen.findByText('power rankings')).getAttribute('data-instance')
+    await user.click(screen.getByRole('button', { name: 'go to 2025' }))
+
+    expect(screen.getByText('power rankings').getAttribute('data-instance')).not.toBe(before)
   })
 })

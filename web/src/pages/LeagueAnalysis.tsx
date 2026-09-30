@@ -1107,7 +1107,7 @@ export default function LeagueAnalysis() {
     <TeamLabelsContext.Provider value={labels}>
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="League analysis"
         sub="What each roster is made of: a composite ranking score from games already played, the rest of the regular season projected onto the lineup each manager would actually start, and next week's games read off those lineups. Who is best — the ladders, the vote, the bump chart — is Power rankings."
       />

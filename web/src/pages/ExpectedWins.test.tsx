@@ -135,3 +135,24 @@ describe('Expected wins', () => {
     expect(screen.getByText(/228.40 points per game/)).toBeInTheDocument()
   })
 })
+
+describe('Expected wins eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    getExpectedWins.mockResolvedValue(data({ season: 2025 }))
+    render(<ExpectedWins />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    getExpectedWins.mockResolvedValue(data({ season: 2025, requestedSeason: 2026 }))
+    render(<ExpectedWins />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    getExpectedWins.mockReturnValue(new Promise(() => {}))
+    render(<ExpectedWins />)
+    expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})

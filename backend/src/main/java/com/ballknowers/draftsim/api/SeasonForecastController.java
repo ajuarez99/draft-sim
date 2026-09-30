@@ -64,6 +64,9 @@ public class SeasonForecastController {
         // in-progress week never reads as "a week scored since this forecast".
         out.put("latestScoredWeek", f.latestScoredWeek());
         out.put("latestFinalWeek", f.latestFinalWeek());
+        // A finished season has nothing left to simulate; the page says so instead of showing
+        // the final snapshot as a live forecast. The league row's own status, on every shape.
+        out.put("seasonComplete", f.seasonComplete());
         out.put("canCommission", canCommission);
         if (!f.available()) {
             // A named reason, not an empty table: "this league's seeding is not

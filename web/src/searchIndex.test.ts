@@ -82,6 +82,21 @@ describe('league destinations', () => {
     expect(boards.find((b) => b.label === '2025 board')?.href).toBe('/drafts/D25/board')
   })
 
+  // specs/011 T010: the palette means "this league, now", so its league-page
+  // results always use the newest season (searchIndex.ts builds
+  // `{ lineage, season: current }`), whatever year the rail is showing.
+  it('points every league-page result at the newest season of a multi-season league', () => {
+    const rows = leagueDestinations([
+      draft({ sleeperLeagueId: 'L26', sleeperDraftId: 'D26', season: 2026, previousLeagueId: 'L25' }),
+      draft({ id: 2, leagueId: 2, sleeperLeagueId: 'L25', sleeperDraftId: 'D25', season: 2025 }),
+    ]).filter((r) => r.kind === 'league-page')
+    const leagueRows = rows.filter((r) => r.href.startsWith('/leagues/'))
+    expect(leagueRows.length).toBeGreaterThan(5)
+    for (const r of leagueRows) {
+      expect(r.href, r.label).toMatch(/^\/leagues\/L26\//)
+    }
+  })
+
   it('does not list seasons for a league that has only one', () => {
     expect(leagueDestinations([draft()]).filter((r) => r.kind === 'season-board')).toEqual([])
   })

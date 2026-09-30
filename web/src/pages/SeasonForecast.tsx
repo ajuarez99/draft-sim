@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import { computePowerRankings, getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
@@ -77,7 +77,7 @@ export default function SeasonForecast() {
   return (
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="Season forecast"
         sub="The rest of the schedule, simulated from every team's scoring so far. These are the odds as of the last recompute — the page reads a stored simulation rather than running a new one."
       />
@@ -95,8 +95,12 @@ export default function SeasonForecast() {
           reason={data.reason ?? null}
           season={data.season}
           requestedSeason={data.requestedSeason}
+          // Never offer a recompute for a finished season: there is nothing left
+          // to forecast, so the button would contradict the season-over line.
           notice={
-            data.reason === 'NOT_COMPUTED' && data.latestFinalWeek > 0 ? (
+            data.seasonComplete ? (
+              <SeasonOver season={data.season} sleeperLeagueId={sleeperLeagueId} />
+            ) : data.reason === 'NOT_COMPUTED' && data.latestFinalWeek > 0 ? (
               <RecomputeControl
                 data={data}
                 computing={computing}
@@ -108,7 +112,15 @@ export default function SeasonForecast() {
         />
       )}
 
-      {data && data.available && (
+      {data && data.available && data.seasonComplete && (
+        <section className="panel">
+          <h3 className="cond">Nothing left to forecast</h3>
+          <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
+          <SeasonOver season={data.season} sleeperLeagueId={sleeperLeagueId} />
+        </section>
+      )}
+
+      {data && data.available && !data.seasonComplete && (
         <section className="panel">
           <h3 className="cond">
             Through week {data.week} · {(data.iterations ?? 0).toLocaleString()} simulated seasons
@@ -142,6 +154,19 @@ export default function SeasonForecast() {
         </section>
       )}
     </div>
+  )
+}
+
+/** The finished-season line, shared by the available panel and a refusal on a complete season. */
+function SeasonOver({ season, sleeperLeagueId }: { season: number; sleeperLeagueId?: string }) {
+  return (
+    <>
+      <p>The {season} season is over, so there is nothing left to forecast.</p>
+      <p className="muted small">
+        How it ended — the champion and the final standings — is in{' '}
+        <Link to={`/leagues/${sleeperLeagueId}/history`}>History</Link>.
+      </p>
+    </>
   )
 }
 

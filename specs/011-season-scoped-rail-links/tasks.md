@@ -58,7 +58,7 @@ on **Sonnet** subagents (coding tasks), a bug-hunting review (T030) and live ver
 
 ## Phase 1: Setup
 
-- [ ] T001 Adversarial review of `claude/season-scoped-rail-links.md`: read it cold
+- [X] T001 Adversarial review of `claude/season-scoped-rail-links.md`: read it cold
   against `587fbc3` and look for gaps before any code. Check at least these:
   (a) every `/leagues/:id/*` page's fetch honours the URL id, not only the five the doc
   lists (Analysis goes through `LeagueAnalysisService:209` `bySleeperId`, which has no
@@ -69,7 +69,7 @@ on **Sonnet** subagents (coding tasks), a bug-hunting review (T030) and live ver
   finished season).
   Append findings to the doc as an "Amended after review" note. Don't rewrite text
   silently.
-- [ ] T002 Confirm the dev environment before trusting any live check. Postgres on
+- [X] T002 Confirm the dev environment before trusting any live check. Postgres on
   `localhost:5433`, not 5432. Run `curl localhost:8080/api/health` and confirm
   `weightsLoaded:true`. Run `POST /api/ingest/all/{sleeperLeagueId}` for "(Foot) Ball
   Knowers" and "Ball Knowers" (NBA) so both have 2025 + 2026 in their lineage. Per
@@ -84,15 +84,15 @@ on **Sonnet** subagents (coding tasks), a bug-hunting review (T030) and live ver
 **Purpose**: The doc says its "already works" section is read, not run, and that the
 first build step is to confirm it. Nothing in US1 is safe to build until these hold.
 
-- [ ] T003 [P] Run each one-season endpoint with a 2025 league id and record the
+- [X] T003 [P] Run each one-season endpoint with a 2025 league id and record the
   `season` / `requestedSeason` each returns in the doc's amendment section:
   `curl -H "X-Sleeper-User: <member>" localhost:8080/api/leagues/<2025 id>/{superlatives,weekly-report,expected-wins,roster-management,forecast,analysis}`.
   The answer must be about 2025, or name its fallback (`SeasonFallbackNote`). It must
   never be silently 2026.
-- [ ] T004 [P] Add a test in `web/src/railLeague.test.ts`: `useRailLeague` on
+- [X] T004 [P] Add a test in `web/src/railLeague.test.ts`: `useRailLeague` on
   `/leagues/<older id>/superlatives` resolves `season` to the older lineage entry, not
   `lineage.current`. This pins the claim at `web/src/railLeague.ts:210-214`.
-- [ ] T005 [P] Add a test in `web/src/components/LeagueRailSection.test.tsx`: a FRESH
+- [X] T005 [P] Add a test in `web/src/components/LeagueRailSection.test.tsx`: a FRESH
   refresh bumps the data version for an **older** season id too. It extends the existing
   "polls while RUNNING, bumps the data version on FRESH" test at `:205`, using
   `useLeagueDataVersion('<older id>')`. This pins `LeagueRailSection.tsx:71`.
@@ -114,18 +114,18 @@ fixing only one does not fix the bug.
 
 ### Tests for User Story 1 (write first, confirm they fail)
 
-- [ ] T006 [P] [US1] In `web/src/destinations.test.ts`, rewrite the test at `:139` to
+- [X] T006 [P] [US1] In `web/src/destinations.test.ts`, rewrite the test at `:139` to
   cover the new split and keep its History assertion. For a two-season lineage viewing
   the older season: `history.href` is still `/leagues/L_NEW/history`, the board is still
   `/drafts/D_OLD/board`, and each of `analysis`, `rosterManagement`, `expectedWins`,
   `forecast`, `weeklyReport` and `superlatives` gives `/leagues/L_OLD/<path>`. Retitle it
   so the title says the new rule.
-- [ ] T007 [P] [US1] In `web/src/destinations.test.ts`, add a test that iterates
+- [X] T007 [P] [US1] In `web/src/destinations.test.ts`, add a test that iterates
   `LEAGUE_DESTINATIONS` and asserts each non-action `/leagues/` row's href carries
   `ctx.season.sleeperLeagueId`, except the explicit chain-wide set
   `{ history }` (plus `power` if T019 decides so). A new row then has to choose a side.
   It can't inherit one silently.
-- [ ] T008 [P] [US1] In `web/src/components/LeagueRailSection.test.tsx`, add a
+- [X] T008 [P] [US1] In `web/src/components/LeagueRailSection.test.tsx`, add a
   `describe('year links keep the page')` block. For an NFL two-season lineage it covers
   these cases:
   (a) on `/leagues/<current>/superlatives`, the 2025 year-row link href is
@@ -137,7 +137,7 @@ fixing only one does not fix the bug.
   (g) on `/leagues/<2026 id>/weekly-report?week=5`, the 2025 year link's href is exactly
   `/leagues/<2025 id>/weekly-report`, with no query string. Week 5 of another season is a
   different week (doc A5).
-- [ ] T009 [P] [US1] In the same file, add these cases:
+- [X] T009 [P] [US1] In the same file, add these cases:
   (e) the flyout "Seasons" items (open the Switch menu, collapsed rail) give the same
   hrefs as (a) and (b);
   (f1) on `/drafts/<2026 draft>/live` (2026 is `pre_draft`), the 2025 year link (complete)
@@ -146,23 +146,23 @@ fixing only one does not fix the bug.
   (f2) a direct `switchTarget('analysis', nbaCtx)` returns the NBA lineage's History
   href. The test comment should say this is **Leagues flyout** coverage: year links
   can't cross sports, because a lineage is one sport (doc A2).
-- [ ] T010 [P] [US1] In `web/src/searchIndex.test.ts`, add a test that pins the
+- [X] T010 [P] [US1] In `web/src/searchIndex.test.ts`, add a test that pins the
   palette's "this league, now" meaning. Build the index for a two-season lineage and
   assert every league-page result uses `lineage.current`'s id (`searchIndex.ts:85`).
 
 ### Implementation for User Story 1 (Sonnet subagent)
 
-- [ ] T011 [US1] In `web/src/destinations.ts`, change the `href` of `analysis` (`:158`),
+- [X] T011 [US1] In `web/src/destinations.ts`, change the `href` of `analysis` (`:158`),
   `rosterManagement` (`:174`), `expectedWins` (`:188`), `forecast` (`:202`),
   `weeklyReport` (`:215`) and `superlatives` (`:228`) from
   `ctx.lineage.current.sleeperLeagueId` to `ctx.season.sleeperLeagueId`. Leave `history`
   (`:128`) as is. Leave `power` (`:139`) until T019.
-- [ ] T012 [US1] In `web/src/destinations.ts:92-97`, rewrite the header comment to name
+- [X] T012 [US1] In `web/src/destinations.ts:92-97`, rewrite the header comment to name
   both rules and each row's rule. History is chain-wide and uses `lineage.current`. The
   one-season rows and the board use the viewed season. State power's rule once T019
   decides it. Add a one-line `// one season` or `// whole chain` note on each `/leagues/`
   row so the rule is visible where it's applied.
-- [ ] T011a [P] [US1] Write a failing test for each one-season page (doc A1). The
+- [X] T011a [P] [US1] Write a failing test for each one-season page (doc A1). The
   `PageHeader` eyebrow names the season from the **response payload**, not the URL. When
   the payload's `season` differs from `requestedSeason` (resolver fallback), the header
   shows the resolved season and `SeasonFallbackNote` still shows. Put one test per page
@@ -170,7 +170,7 @@ fixing only one does not fix the bug.
   modelled on `web/src/pages/SeasonForecast.test.tsx`). The pages are `Superlatives.tsx`,
   `WeeklyReport.tsx`, `ExpectedWins.tsx`, `RosterManagement.tsx`, `SeasonForecast.tsx` and
   `LeagueAnalysis.tsx`.
-- [ ] T011b [US1] Make T011a pass. In each of those six pages, set the `PageHeader`
+- [X] T011b [US1] Make T011a pass. In each of those six pages, set the `PageHeader`
   eyebrow to `League · <season>` using the payload's resolved season (Superlatives
   already has `data.season`, `Superlatives.tsx:126`). **Check each payload type in
   `web/src/api.ts` first.** If a page's response has no season field, don't read the
@@ -178,7 +178,7 @@ fixing only one does not fix the bug.
   field to the backend record, which would need a matching edit in `api.ts` in the same
   change. Keep the eyebrow unchanged while the page is loading or shows an error. This is
   a label, not the in-page picker ruled out under "Not building". Sonnet subagent.
-- [ ] T013 [US1] In `web/src/components/LeagueRailSection.tsx`, replace `seasonHref(s)`
+- [X] T013 [US1] In `web/src/components/LeagueRailSection.tsx`, replace `seasonHref(s)`
   at the year row (`:399`) and at the flyout Seasons group (`:440`) with
   `switchTarget(currentKey, { lineage, season: s })`. In the same task, change the
   fallback in `switchTarget` (`LeagueRailSection.tsx:149-155`, doc A3). When the current
@@ -189,10 +189,10 @@ fixing only one does not fix the bug.
   live on one league to a league whose draft is done lands on its board. Update the year-row comment
   (`:387-393`), which currently says years are links because "every season is its own
   Sleeper league with its own board", so that it describes keeping the page.
-- [ ] T014 [US1] Delete `seasonHref` and its doc comment
+- [X] T014 [US1] Delete `seasonHref` and its doc comment
   (`web/src/components/LeagueRailSection.tsx:131-137`). It has no callers after T013 and
   duplicates `draftRoute`. Confirm with a grep for `seasonHref` across `web/src`.
-- [ ] T015 [US1] Run `cd web && npx vitest run`. T006–T010, T011a and T004–T005 must
+- [X] T015 [US1] Run `cd web && npx vitest run`. T006–T010, T011a and T004–T005 must
   now pass, and nothing else may regress. T004 and T005 pin behavior that already
   exists, so they should have passed when written. Here they're only a regression check. Then run `npx tsc -b && npm run build`. Record the actual
   test count, pass or fail, in the doc.
@@ -212,20 +212,20 @@ build time").
 2025 (one-season) or visibly shows the current season, with the rail highlighting the
 year it shows (chain-wide). It must never highlight 2025 while showing 2026.
 
-- [ ] T016 [US2] Investigate first. Run
+- [X] T016 [US2] Investigate first. Run
   `curl localhost:8080/api/leagues/<2025 id>/power` and the history endpoint with the 2025
   id. Record what `data.entries[].season` and `sportState.season` contain. The page
   derives `season` as `max(entries.season)` (`web/src/pages/PowerRankings.tsx:470-473`),
   so a 2025 id may still render 2026. Check the ballot/week logic (`:490-493`, uses
   `sportState.week`) for what a past season means.
-- [ ] T017 [P] [US2] Only if T016 shows the endpoint can scope to one season: write a
+- [X] T017 (SKIPPED: T019 kept Power chain-wide) [P] [US2] Only if T016 shows the endpoint can scope to one season: write a
   failing test in `web/src/pages/PowerRankings.test.tsx` (create it if absent) asserting
   that the page opened on an older season's id shows that season's standings. Model it
   on an existing page test such as `web/src/pages/SeasonForecast.test.tsx`.
-- [ ] T018 [US2] Only if T016 supports it: make `web/src/pages/PowerRankings.tsx` start
+- [X] T018 (SKIPPED: T019 kept Power chain-wide) [US2] Only if T016 supports it: make `web/src/pages/PowerRankings.tsx` start
   on the URL id's own season instead of `max(entries.season)`. Keep ballot voting on the
   current week only. A past season is read-only (doc's "Recommended" option).
-- [ ] T019 [US2] Record the power decision in `claude/season-scoped-rail-links.md` as an
+- [X] T019 [US2] Record the power decision in `claude/season-scoped-rail-links.md` as an
   amendment: what T016 found, and chain-wide or one-season. Apply it to
   `destinations.ts:139`, the header comment (T012) and the T007 exception set.
   If power stays chain-wide, confirm the rail on `/leagues/<current>/power` highlights
@@ -244,39 +244,39 @@ present odds for a finished season as if they were live (doc Design C).
 or says "this season is over, here's how it ended". It never shows a live-looking odds
 table.
 
-- [ ] T020 [US3] Investigate. Run
+- [X] T020 [US3] Investigate. Run
   `curl -H "X-Sleeper-User: <member>" localhost:8080/api/leagues/<2025 id>/forecast` for
   both leagues and record `available`, `reason`, `season`, `requestedSeason` and `week`.
   `PlayoffOddsService.Unavailable` currently has no "season complete" reason
   (`backend/src/main/java/com/ballknowers/draftsim/engine/PlayoffOddsService.java:277`).
   Check whether a stored snapshot for a finished season comes back `available:true`.
-- [ ] T020b [P] [US3] Investigate Analysis on a finished season (doc A4). Run
+- [X] T020b [P] [US3] Investigate Analysis on a finished season (doc A4). Run
   `curl -H "X-Sleeper-User: <member>" localhost:8080/api/leagues/<2025 NFL id>/analysis`
   and open `/leagues/<2025 NFL id>/analysis` in the browser. Record what the two
   rest-of-season projection blocks show for a completed season: whether they refuse,
   explain themselves, or show projections as if they were live.
-- [ ] T021 [US3] Decide and record the Design C amendment in
+- [X] T021 [US3] Decide and record the Design C amendment in
   `claude/season-scoped-rail-links.md`, for both Forecast (T020) and Analysis (T020b).
   For each page, if it already refuses or explains itself, record that and stop there.
   If Forecast needs work, do T022–T025. If Analysis needs work, apply the same
   "season is over" treatment in `web/src/pages/LeagueAnalysis.tsx`, with a failing test
   first, and add those tasks here as T024a/T024b. Mark any skipped task with the reason.
-- [ ] T022 [P] [US3] (Only if needed) Write a failing test in
+- [X] T022 [P] [US3] (Only if needed) Write a failing test in
   `web/src/pages/SeasonForecast.test.tsx`: when the forecast payload is for a season
   whose league is complete, the page renders a "this season is over" line with the final
   placements instead of the odds table.
-- [ ] T023 [US3] (Only if needed) Backend: expose "season complete" on the forecast
+- [X] T023 [US3] (Only if needed) Backend: expose "season complete" on the forecast
   payload from the V21 `league.status` (the `complete()` flag). Do it by adding a new
   `Unavailable.SEASON_COMPLETE` reason, or a `complete` boolean, in
   `PlayoffOddsService.java` and `SeasonForecastController.body()`
   (`backend/src/main/java/com/ballknowers/draftsim/api/SeasonForecastController.java`).
   Update `SeasonForecastShapeTest.java` to pin the new field. No schema migration should
   be needed. If one is, it's the next `V<n+1>` and existing migrations must not be edited.
-- [ ] T024 [US3] (Only if needed) Mirror the new field in `web/src/api.ts` field-for-field
+- [X] T024 [US3] (Only if needed) Mirror the new field in `web/src/api.ts` field-for-field
   in the same change (AGENTS.md hard rule). Render it in `web/src/pages/SeasonForecast.tsx`.
   Keep the tab offered, as the doc says: don't add a league-status gate to
   `destinations.ts`.
-- [ ] T025 [US3] (Only if T023 ran) Run `cd backend && ./gradlew test`, and check the
+- [X] T025 (backend 880 tests, 0 skipped, 1 failure: RefreshControllerIT.aChainRunShowsRunning…, which fails identically on base e140fc1, so it was there before this branch) [US3] (Only if T023 ran) Run `cd backend && ./gradlew test`, and check the
   **skipped** count: ITs skip silently when Postgres is down (memory). Restart `bootRun`
   so the running server isn't serving stale bytecode.
 
@@ -286,32 +286,32 @@ table.
 
 ## Phase 6: Polish, review & live verification
 
-- [ ] T026 [P] Check the doc's "Resolver fallback on a new season" risk. Open
+- [X] T026 [P] Check the doc's "Resolver fallback on a new season" risk. Open
   `/leagues/<2026 id>/superlatives` before 2026 week 1 is scored (NBA is the likely
   case). The rail must highlight **2026**, and `SeasonFallbackNote` must name 2025.
-- [ ] T027 [P] Check the "Commissioner conduct list" risk. On
+- [X] T027 [P] Check the "Commissioner conduct list" risk. On
   `/leagues/<2025 id>/superlatives` as commissioner, confirm the list edits 2025's row
   (`web/src/pages/Superlatives.tsx:557-579`). Record in the doc that this is intended.
-- [ ] T028 [P] Check that an older-season page refetches after a refresh. Trigger a
+- [X] T028 (checked live: backdated the 2026 league_refresh row 2h in the local DB, then opened 2025 Weekly report. The refresh ran (log 11:11:57, "1 season(s) refreshed, 1 skipped as complete") and the page made a third weekly-report request at +6.2s after the two initial ones. Refresh and refetch are linked by timing, not a trace.) [P] Check that an older-season page refetches after a refresh. Trigger a
   refresh while on `/leagues/<2025 id>/weekly-report` and confirm a re-request in
   `read_network_requests`. This is the live counterpart of T005.
-- [ ] T029 Update `HANDOFF.md` and `claude/season-scoped-rail-links.md`: set the status
+- [X] T029 Update `HANDOFF.md` and `claude/season-scoped-rail-links.md`: set the status
   line to built, fill in the amendments from T001, T003, T019 and T021, and keep
   "verified" and "assumed" separate.
-- [ ] T030 Run a bug-hunting code review (not a style pass) over the branch diff, as a
+- [X] T030 (4 findings: 3 fixed test-first, 1 left with reason; see the doc's T030 amendment) Run a bug-hunting code review (not a style pass) over the branch diff, as a
   separate pass. Fix findings on a Sonnet subagent and re-run T015.
-- [ ] T031 Live check, "(Foot) Ball Knowers": click 2025, then Superlatives. The header
+- [X] T031 Live check, "(Foot) Ball Knowers": click 2025, then Superlatives. The header
   eyebrow must read "League · 2025" (T011b) and the cards must be 2025's. Also from
   Follow live, if a pre-draft season exists, click a completed year: it must land on
   that year's board (A3). Then go to Weekly report, which must still
   be 2025. Then click 2026, which must land on 2026's Weekly report. The year row must
   highlight the shown year each time. Screenshot the 2025 Superlatives.
-- [ ] T032 Run the same sequence as T031 on "Ball Knowers" (NBA), and also confirm
+- [X] T032 Run the same sequence as T031 on "Ball Knowers" (NBA), and also confirm
   Analysis isn't offered.
-- [ ] T033 Live check of the flyout path: with the rail collapsed (draft room), use
+- [X] T033 Live check of the flyout path: with the rail collapsed (draft room), use
   Switch → Seasons from Superlatives and confirm it keeps the page. Then use Switch →
   Leagues and confirm it still keeps the page across leagues, as it did before.
-- [ ] T034 Hard-refresh (Ctrl+Shift+R) any tab open from before a vite restart before
+- [X] T034 Hard-refresh (Ctrl+Shift+R) any tab open from before a vite restart before
   concluding a live check failed. See AGENTS.md on stale HMR tabs.
 
 ---

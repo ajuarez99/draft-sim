@@ -1,3 +1,4 @@
+import type { ComponentType } from 'react'
 import { Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
@@ -57,6 +58,19 @@ function KeyedMockDraftView() {
   return <MockDraftView key={sessionId} />
 }
 
+// One generic remount wrapper for every /leagues/:sleeperLeagueId/* page. The
+// rail's year links (spec 011) switch seasons on the SAME route --
+// /leagues/<2026>/expected-wins -> /leagues/<2025>/expected-wins -- and an
+// unkeyed route element is reused across a param-only change: the old season's
+// data stays up while the new one loads, an error banner can sit over the other
+// season's numbers, and an effect still in flight for the old id (LeagueAnalysis
+// has a few) can land late and overwrite the new season. Keying on the id gives
+// the same clean slate the draft routes above get.
+function KeyedByLeague({ page: Page }: { page: ComponentType }) {
+  const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
+  return <Page key={sleeperLeagueId} />
+}
+
 export default function App() {
   const user = useUser()
 
@@ -67,7 +81,7 @@ export default function App() {
   // its children while signed out, so SignIn is still the whole screen.
   //
   // AppShell wraps `<Routes>` rather than sitting inside a route element: the
-  // four Keyed* wrappers below exist to force remounts, and the shell must
+  // Keyed* wrappers above exist to force remounts, and the shell must
   // not be caught up in them.
   return (
     <div className="app">
@@ -100,33 +114,33 @@ export default function App() {
                   for pages reached from inside one league -- see that file's
                   own header comment). */}
               <Route path="/managers/:aId/versus/:bId" element={<ManagerComparison />} />
-              <Route path="/leagues/:sleeperLeagueId/history" element={<LeagueHistory />} />
-              <Route path="/leagues/:sleeperLeagueId/power" element={<PowerRankings />} />
-              <Route path="/leagues/:sleeperLeagueId/analysis" element={<LeagueAnalysis />} />
+              <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
+              <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
+              <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} />} />
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
-                element={<RosterManagement />}
+                element={<KeyedByLeague page={RosterManagement} />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/expected-wins"
-                element={<ExpectedWins />}
+                element={<KeyedByLeague page={ExpectedWins} />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/forecast"
-                element={<SeasonForecast />}
+                element={<KeyedByLeague page={SeasonForecast} />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/weekly-report"
-                element={<WeeklyReport />}
+                element={<KeyedByLeague page={WeeklyReport} />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/superlatives"
-                element={<Superlatives />}
+                element={<KeyedByLeague page={Superlatives} />}
               />
               {/* power-rankings-reskin.md §7: a self-check harness, not a page
                   real users should ever reach -- dev-only. */}
               {import.meta.env.DEV && (
-                <Route path="/leagues/:sleeperLeagueId/power/verify" element={<PowerRankingsVerify />} />
+                <Route path="/leagues/:sleeperLeagueId/power/verify" element={<KeyedByLeague page={PowerRankingsVerify} />} />
               )}
               {/* React Router's own fallback renders a bare "Not Found" with no
                   way back -- on a mistyped draft id that was the whole screen. */}

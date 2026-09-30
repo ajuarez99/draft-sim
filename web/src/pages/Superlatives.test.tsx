@@ -1144,3 +1144,24 @@ describe('Superlatives', () => {
     expect(fetchSuperlatives).toHaveBeenLastCalledWith('L1')
   })
 })
+
+describe('Superlatives eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    fetchSuperlatives.mockResolvedValue({ ...baseline(), season: 2025 })
+    render(<Superlatives />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    fetchSuperlatives.mockResolvedValue({ ...baseline(), season: 2025, requestedSeason: 2026 })
+    render(<Superlatives />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    fetchSuperlatives.mockReturnValue(new Promise(() => {}))
+    render(<Superlatives />)
+    expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})
