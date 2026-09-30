@@ -372,11 +372,18 @@ public class LeagueHistoryController {
         // uncached; the seats endpoint already pays for one on every call.
         List<Map<String, Object>> draftHistory = new ArrayList<>();
         for (Sport sport : Sport.values()) {
-            ManagerProfile fitted = profiles.fit(sport).profiles().get(managerId);
+            ProfileService.Fit fit = profiles.fit(sport);
+            ManagerProfile fitted = fit.profiles().get(managerId);
             if (fitted == null || fitted.draftsObserved() == 0) continue;
             Map<String, Object> derived = new LinkedHashMap<>();
             derived.put("sport", sport);
             derived.put("reachBias", round2(fitted.reachBias()));
+            // Room-relative reach and its standard error (audit 11); null when
+            // there are no scoreable picks / fewer than 2. Mutable map: null-safe.
+            Double rel = fit.relativeReachBias().get(managerId);
+            Double se = fit.relativeReachStdErr().get(managerId);
+            derived.put("relativeReachBias", rel == null ? null : round2(rel));
+            derived.put("relativeReachStdErr", se == null ? null : round2(se));
             derived.put("positionalTilt", fitted.positionalTilt());
             derived.put("draftsObserved", fitted.draftsObserved());
             // Carried so the client can tell "drafts the board" from "no reach

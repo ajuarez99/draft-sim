@@ -262,30 +262,64 @@ public class BoardService {
      * Public because {@link LeagueIngestService#ingestChain} now calls it too: a
      * league ingest inserts picks with adp_at_time null (PickMapper never sets
      * one), and until this ran at the end of a *board rebuild* those picks were
-     * invisible to profile fitting with nothing reporting it. The UPDATE is
-     * unconditional rather than {@code where adp_at_time is null}, so calling it
-     * more often only refreshes values against the newest in-range snapshot.
+     * invisible to profile fitting with nothing reporting it.
+     *
+     * Each draft is stamped from exactly ONE blend snapshot: the in-window one
+     * whose captured_on is nearest the draft's start date, the earlier date on a
+     * tie (claude/audit-2026-09-28/11-reach-bias-baseline.md). The old join matched
+     * every in-window snapshot and Postgres kept whichever row it visited last, so
+     * the choice was arbitrary (locally it settled on the OLDEST board, not the
+     * newest as this comment used to claim) and a re-run could flip it. The UPDATE
+     * is still unconditional rather than {@code where adp_at_time is null}, so
+     * calling it more often re-stamps against the same nearest snapshot: idempotent
+     * as long as the set of snapshots is unchanged. A pick whose player is absent
+     * from that draft's chosen snapshot is left as it was, not nulled.
+     *
+     * "Nearest" is not "before the draft": for a draft older than the first
+     * snapshot the nearest one is still a post-draft board.
      */
     public int backfillAdpAtTime(Sport sport) {
+        return backfillAdpAtTime(sport, null);
+    }
+
+    /** As {@link #backfillAdpAtTime(Sport)}, optionally limited to one draft row id (tests). */
+    int backfillAdpAtTime(Sport sport, Long onlyDraftId) {
         // Postgres will not let the UPDATE target be referenced from inside a
         // JOIN's ON clause ("invalid reference to FROM-clause entry for table
-        // dp"), so the two FROM relations are comma-joined and every predicate
-        // lives in WHERE. Verified against Postgres 16.
+        // dp"), so the FROM relations are comma-joined and every predicate
+        // referencing dp lives in WHERE. The nearest-snapshot subquery does not
+        // reference dp, so it can use ordinary JOIN ... ON.
+        String draftFilter = onlyDraftId == null ? "" : " and d.id = ?";
+        List<Object> args = new ArrayList<>(List.of(
+                sport.code(), BoardRepository.SOURCE_BLEND, cfg.maxBoardLagDays(), cfg.maxBoardLagDays(),
+                sport.code()));
+        if (onlyDraftId != null) args.add(onlyDraftId);
+        args.add(sport.code());
+        args.add(BoardRepository.SOURCE_BLEND);
         return jdbc.update("""
                 update draft_pick dp
                 set adp_at_time = s.adp
-                from draft d, adp_snapshot s
-                where d.id = dp.draft_id
+                from (
+                    select distinct on (d.id) d.id as draft_id, s2.captured_on
+                    from draft d
+                    join league l on l.id = d.league_id
+                    join adp_snapshot s2 on s2.sport = ?
+                                        and s2.source = ?
+                                        and s2.captured_on between (d.start_time::date - make_interval(days => ?))
+                                                               and (d.start_time::date + make_interval(days => ?))
+                    where d.start_time is not null
+                      and l.sport = ?
+                """ + draftFilter + """
+
+                    order by d.id, abs(s2.captured_on - d.start_time::date), s2.captured_on
+                ) n, adp_snapshot s
+                where dp.draft_id = n.draft_id
+                  and s.captured_on = n.captured_on
                   and s.player_id = dp.player_id
                   and s.sport = ?
                   and s.source = ?
-                  and s.captured_on between (d.start_time::date - make_interval(days => ?))
-                                        and (d.start_time::date + make_interval(days => ?))
                   and dp.player_id is not null
-                  and d.start_time is not null
-                """,
-                sport.code(), BoardRepository.SOURCE_BLEND,
-                cfg.maxBoardLagDays(), cfg.maxBoardLagDays());
+                """, args.toArray());
     }
 
     /** The current board, ready for the engine. */

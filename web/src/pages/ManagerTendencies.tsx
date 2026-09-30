@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { getManagers, type ManagerSummary, type Sport } from '../api'
 import { PROVENANCE_LABEL } from '../provenance'
-import { reachGapText } from '../managerBehaviour'
+import { reachGapText, relativeReachRead } from '../managerBehaviour'
 import TendenciesForm from '../components/TendenciesForm'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
@@ -39,40 +39,52 @@ function comparison(m: SportManager) {
 // Fixed, not derived from the data: a per-render max would rescale every card
 // whenever one manager's number moved, so two screenshots of this page could
 // not be compared and a bar's length would mean something different each
-// visit. +-8 picks covers every fitted value observed (widest so far ~14, which
-// clamps and is labelled as over the edge).
-const REACH_SCALE = 8
+// visit. The figure is picks earlier/later than the manager's own draft room
+// (audit 11); measured spread on the local league is roughly +-25 with most
+// managers inside +-10, so +-15 keeps the bars readable and a value past the
+// edge clamps and is labelled with a trailing "+".
+const REACH_SCALE = 15
 
-/** One manager's reach bias on the scale every other card uses. */
-function ReachAxis({ reach }: { reach: number }) {
-  const clamped = Math.max(-REACH_SCALE, Math.min(REACH_SCALE, reach))
+/**
+ * One manager's reach relative to their draft room, on the scale every other
+ * card uses. The shaded band is one standard error either side of zero: a bar
+ * that does not leave it is not distinguishable from the room, and the caption
+ * says "drafts like the room" instead of a number.
+ */
+function ReachAxis({ rel, se }: { rel: number; se: number | null }) {
+  const read = relativeReachRead(rel, se)
+  if (!read) return null
+  const clamped = Math.max(-REACH_SCALE, Math.min(REACH_SCALE, rel))
   const half = (Math.abs(clamped) / REACH_SCALE) * 50
   const early = clamped > 0
-  const near = Math.abs(reach) <= 0.5
+  const drawn = read.kind === 'early' || read.kind === 'late'
+  const bandHalf = se == null ? 0 : (Math.min(se, REACH_SCALE) / REACH_SCALE) * 50
   return (
     <div className="reach">
       <div className="reach-track" aria-hidden="true">
+        {bandHalf > 0 && (
+          <span className="reach-band" style={{ left: `${50 - bandHalf}%`, width: `${bandHalf * 2}%` }} />
+        )}
         <span className="reach-zero" />
-        {!near && (
+        {drawn && (
           <span
             className={`reach-fill${early ? ' early' : ' late'}`}
-            // Grows out from the centre in the direction it means: early
-            // (reaching) right, late (waiting) left. A single left-anchored
-            // bar would make "waits 5 picks" and "reaches 5 picks" look the
-            // same, which is the one distinction this page is about.
+            // Grows out from the centre in the direction it means: earlier than
+            // the room right, later left. A single left-anchored bar would make
+            // "5 later" and "5 earlier" look the same, which is the one
+            // distinction this page is about.
             style={early ? { left: '50%', width: `${half}%` } : { right: '50%', width: `${half}%` }}
           />
         )}
       </div>
       <div className="reach-caption">
-        <span className="muted">waits</span>
-        <b className={near ? 'muted' : early ? 'early' : 'late'}>
-          {near
-            ? 'drafts the board'
-            : `${Math.abs(reach).toFixed(1)} picks ${early ? 'early' : 'late'}`}
-          {Math.abs(reach) > REACH_SCALE ? ' +' : ''}
+        <span className="muted">later</span>
+        <b className={drawn ? (early ? 'early' : 'late') : 'muted'}>
+          {read.text}
+          {Math.abs(rel) > REACH_SCALE ? ' +' : ''}
+          {se != null && <span className="muted mono reach-se"> (±{se.toFixed(1)})</span>}
         </b>
-        <span className="muted">reaches</span>
+        <span className="muted">earlier</span>
       </div>
     </div>
   )
@@ -117,7 +129,7 @@ function ManagerRow({ m, onChanged }: RowProps) {
   // freshness window (multi-sport-and-rebrand.md, "Basketball has no reach
   // signal"). Drawing a bar at 0 there would read as "drafts the board", which
   // is the single most misleading thing this page could say.
-  const hasReachNumber = m.picksScored > 0 || m.stated.reachBias != null
+  const hasReachNumber = m.relativeReachBias != null
   const gap = reachGapText(m)
 
   return (
@@ -171,7 +183,7 @@ function ManagerRow({ m, onChanged }: RowProps) {
                not a bar at zero. */
             <>
               {hasReachNumber ? (
-                <ReachAxis reach={m.effectiveReachBias} />
+                <ReachAxis rel={m.relativeReachBias as number} se={m.relativeReachStdErr} />
               ) : (
                 // Clamped, with the full sentence on hover. Every basketball
                 // manager gets one of these and they are near-identical, so
@@ -267,7 +279,7 @@ function hasAnythingToSay(m: SportManager): boolean {
  * still carrying a real positional tilt fitted from two seasons of picks.
  */
 function rank(m: SportManager): number {
-  if (m.picksScored > 0 || m.stated.reachBias != null) return 0
+  if (m.relativeReachBias != null) return 0
   if (m.draftsObserved > 0) return 1
   return 2
 }
@@ -326,7 +338,7 @@ export default function ManagerTendencies() {
         // order down the page agrees with what the axes show across it.
         // Alphabetical scattered the biggest reachers among the mildest ones
         // and made the shared scale harder to read than it needed to be.
-        if (ar === 0) return Math.abs(b.effectiveReachBias) - Math.abs(a.effectiveReachBias)
+        if (ar === 0) return Math.abs(b.relativeReachBias ?? 0) - Math.abs(a.relativeReachBias ?? 0)
         // Within the group that has history but no reach number there is no
         // shared scale to agree with, so order by how much history there is.
         if (ar === 1) return b.draftsObserved - a.draftsObserved
@@ -362,6 +374,13 @@ export default function ManagerTendencies() {
           appears once per sport. Only managers who share a league with you are listed.
 
 
+        </p>
+
+        <p className="muted small reach-note">
+          Reach is measured against the other managers in the same draft, not the market board.
+          The board itself runs several picks off for every room, so an absolute figure would
+          mostly measure that. The shaded band is one standard error: with about 15 picks per
+          draft most managers sit inside it, and that reads as “drafts like the room”.
         </p>
 
         {error && <div className="error">{error}</div>}

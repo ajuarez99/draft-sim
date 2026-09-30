@@ -28,6 +28,8 @@ function manager(over: Partial<ManagerSummary> = {}): ManagerSummary {
     provenance: 'FITTED',
     effectiveReachBias: 0,
     empiricalReachBias: null,
+    relativeReachBias: null,
+    relativeReachStdErr: null,
     unpredictability: 1,
     positionalTilt: {},
     note: null,

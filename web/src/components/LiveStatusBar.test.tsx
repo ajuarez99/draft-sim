@@ -18,6 +18,8 @@ const seats: Seat[] = [
     avatarId: null,
     provenance: 'FITTED',
     reachBias: 4.8,
+    relativeReachBias: 3.1,
+    relativeReachStdErr: 4.2,
     unpredictability: 1,
     positionalTilt: {},
     note: null,
