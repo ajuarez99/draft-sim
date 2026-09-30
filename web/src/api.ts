@@ -102,6 +102,10 @@ export type Seat = {
   avatarId: string | null
   provenance: Provenance
   reachBias: number
+  /** Picks earlier (+) or later (-) than the OTHER managers in the same draft room. Null with no scoreable picks. Display only. */
+  relativeReachBias: number | null
+  /** Standard error of relativeReachBias; null with fewer than 2 scoreable picks. Inside one SE reads as "drafts like the room". */
+  relativeReachStdErr: number | null
   unpredictability: number
   positionalTilt: Record<string, number>
   note: string | null
@@ -497,6 +501,12 @@ export type ManagerSummary = {
   // scoreable picks. Compare against stated.reachBias; do not confuse with
   // effectiveReachBias, which is already blended with any stated value.
   empiricalReachBias: number | null
+  // Reach measured against the other managers in the same draft room, not the
+  // market board (audit 11: the board runs several picks off for every room).
+  // Positive = earlier than the room. Null with no scoreable picks.
+  relativeReachBias: number | null
+  // Standard error of relativeReachBias; null with fewer than 2 scoreable picks.
+  relativeReachStdErr: number | null
   unpredictability: number
   positionalTilt: Record<string, number>
   note: string | null
@@ -1107,6 +1117,10 @@ export type ManagerHistory = {
   draftHistory: {
     sport: Sport
     reachBias: number | null
+    /** Room-relative reach (audit 11); null with no scoreable picks. */
+    relativeReachBias: number | null
+    /** Its standard error; null with fewer than 2 scoreable picks. */
+    relativeReachStdErr: number | null
     positionalTilt: Record<string, number> | null
     draftsObserved: number
     /** 0 means reachBias is the league mean, not a measurement. See managerBehaviour.ts. */

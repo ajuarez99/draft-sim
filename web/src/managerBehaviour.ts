@@ -23,7 +23,15 @@
  */
 
 export type BehaviourInputs = {
-  reachBias: number
+  /**
+   * Picks earlier (+) or later (-) than the other managers in the same draft
+   * room (claude/audit-2026-09-28/11-reach-bias-baseline.md). Not the absolute
+   * distance from the market board: that figure is mostly a baseline offset
+   * every room shares, so nearly every manager read as a reacher.
+   */
+  relativeReachBias: number | null
+  /** Its standard error; null with fewer than 2 scoreable picks. */
+  relativeReachStdErr: number | null
   unpredictability: number
   positionalTilt: Record<string, number>
   /**
@@ -34,12 +42,36 @@ export type BehaviourInputs = {
   picksScored: number
 }
 
+export type ReachRead = {
+  /** 'room' = within one standard error of the room; 'thin' = too few picks to say. */
+  kind: 'early' | 'late' | 'room' | 'thin'
+  text: string
+}
+
+/**
+ * The one place the reach wording and the "drafts like the room" band live, so
+ * the seat popover, /managers and the manager page cannot disagree. Null when
+ * there is no figure (no scoreable picks): the caller says why, never a zero.
+ *
+ * The band is inclusive: |relative| <= one standard error reads as "drafts like
+ * the room". With 15 picks a standard error is typically ~7 picks, so most
+ * managers land in the band -- that is the honest reading of thin data.
+ */
+export function relativeReachRead(rel: number | null, se: number | null): ReachRead | null {
+  if (rel == null) return null
+  if (se == null) return { kind: 'thin', text: 'too few picks to compare with their room' }
+  if (Math.abs(rel) <= se) return { kind: 'room', text: 'drafts like the room' }
+  const n = Math.abs(rel).toFixed(1)
+  return rel > 0
+    ? { kind: 'early', text: `${n} picks earlier than their draft room` }
+    : { kind: 'late', text: `${n} picks later than their draft room` }
+}
+
 export function behaviourText(m: BehaviourInputs): string {
   const bits: string[] = []
   if (m.picksScored > 0) {
-    if (m.reachBias > 0.5) bits.push(`reaches ~${m.reachBias.toFixed(1)} picks early`)
-    else if (m.reachBias < -0.5) bits.push(`waits ~${Math.abs(m.reachBias).toFixed(1)} picks past board`)
-    else bits.push('drafts close to the board')
+    const read = relativeReachRead(m.relativeReachBias, m.relativeReachStdErr)
+    if (read) bits.push(read.text)
   }
 
   if (m.unpredictability >= 1.25) bits.push('erratic')

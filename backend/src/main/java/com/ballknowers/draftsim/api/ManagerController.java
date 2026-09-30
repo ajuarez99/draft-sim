@@ -61,7 +61,7 @@ public class ManagerController {
         fit.profiles().values().stream()
                 .filter(p -> visible.contains(p.managerId()))
                 .forEach(p -> out.add(describe(p, repo.manualFor(p.managerId(), s),
-                        fit.empiricalReachBias().get(p.managerId()), mine.get(p.managerId()))));
+                        fit, mine.get(p.managerId()))));
         out.sort(Comparator.comparing(m -> String.valueOf(m.get("manager"))));
         return out;
     }
@@ -140,7 +140,7 @@ public class ManagerController {
     private Map<String, Object> respond(long managerId, Sport s, String note) {
         ProfileService.Fit fit = profiles.fit(s);
         if (fit.profiles().get(managerId) instanceof ManagerProfile p) {
-            return describe(p, repo.manualFor(managerId, s), fit.empiricalReachBias().get(managerId), note);
+            return describe(p, repo.manualFor(managerId, s), fit, note);
         }
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("managerId", managerId);
@@ -148,8 +148,11 @@ public class ManagerController {
         return m;
     }
 
-    private static Map<String, Object> describe(ManagerProfile p, ManualTendencies manual, Double empiricalReachBias,
+    private static Map<String, Object> describe(ManagerProfile p, ManualTendencies manual, ProfileService.Fit fit,
                                                 String callerNote) {
+        Double empiricalReachBias = fit.empiricalReachBias().get(p.managerId());
+        Double relativeReachBias = fit.relativeReachBias().get(p.managerId());
+        Double relativeReachStdErr = fit.relativeReachStdErr().get(p.managerId());
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("managerId", p.managerId());
         m.put("manager", p.displayName());
@@ -161,6 +164,13 @@ public class ManagerController {
         // they normally pick," independent of any stated belief. Null with no
         // scoreable picks.
         m.put("empiricalReachBias", empiricalReachBias == null ? null : Math.round(empiricalReachBias * 100) / 100.0);
+        // Reach measured against the OTHER managers in the same draft(s), not the market
+        // board (audit 11: the board runs several picks off for every room). Positive =
+        // earlier than the room. The standard error rides with it so the client can say
+        // "drafts like the room" inside one SE. Both null with no scoreable picks; the
+        // SE is also null with fewer than 2. Display only -- the engine never reads these.
+        m.put("relativeReachBias", relativeReachBias == null ? null : Math.round(relativeReachBias * 100) / 100.0);
+        m.put("relativeReachStdErr", relativeReachStdErr == null ? null : Math.round(relativeReachStdErr * 100) / 100.0);
         m.put("unpredictability", p.unpredictability());
         m.put("positionalTilt", p.positionalTilt());
         // The caller's own private note, never anything shared.

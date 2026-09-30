@@ -11,7 +11,7 @@ import {
   type Unavailable,
   type WaiverTendency,
 } from '../api'
-import { reachGapText } from '../managerBehaviour'
+import { reachGapText, relativeReachRead } from '../managerBehaviour'
 import { ordinal } from '../rankOrder'
 import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
@@ -285,8 +285,11 @@ export default function ManagerHistory() {
                 <span className={`sport-pill ${h.sport}`}>{h.sport.toUpperCase()}</span>
                 {h.picksScored > 0 ? (
                   <>
-                    Reach bias: <span className="mono">{h.reachBias?.toFixed(2) ?? '—'}</span> over{' '}
-                    {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} ({h.provenance.toLowerCase()})
+                    Reach vs. their draft room:{' '}
+                    <span className="mono">
+                      {relativeReachRead(h.relativeReachBias, h.relativeReachStdErr)?.text ?? '—'}
+                    </span>{' '}
+                    over {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} ({h.provenance.toLowerCase()})
                   </>
                 ) : (
                   // No reach number rather than a reach number of zero -- with

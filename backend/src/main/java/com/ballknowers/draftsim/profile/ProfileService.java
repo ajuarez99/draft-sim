@@ -68,9 +68,66 @@ public class ProfileService {
      *                           against -- this field exists only so a stated value
      *                           can be compared against the real number it would
      *                           otherwise be blended with.
+     * @param relativeReachBias  claude/audit-2026-09-28/11-reach-bias-baseline.md. The mean,
+     *                           over a manager's scoreable picks, of
+     *                           {@code (adpAtTime - pickNo) - roomMean[draft]}, where
+     *                           {@code roomMean[draft]} is the mean of {@code adpAtTime - pickNo}
+     *                           over EVERY scoreable pick (of any manager) in that draft. Positive =
+     *                           took players earlier than the rest of the same draft room did.
+     *                           DISPLAY ONLY: nothing in the engine reads it. Each draft carries
+     *                           its own baseline offset (which board, whether this league's own
+     *                           draft is blended in, undrafted top-N players), so the absolute
+     *                           figure mostly measures the baseline, not the manager.
+     * @param relativeReachStdErr sample standard deviation of those per-pick residuals divided by
+     *                           sqrt(n). Absent when the manager has fewer than 2 scoreable picks.
+     *                           Within one standard error of zero reads as "drafts like the room".
      */
     public record Fit(Map<Long, ManagerProfile> profiles, PositionalPriors priors, int scoreablePicks,
-                       Map<Long, Double> empiricalReachBias) {}
+                       Map<Long, Double> empiricalReachBias,
+                       Map<Long, Double> relativeReachBias,
+                       Map<Long, Double> relativeReachStdErr) {
+        /** Engine-side callers and tests that have no use for the display-only relative figures. */
+        public Fit(Map<Long, ManagerProfile> profiles, PositionalPriors priors, int scoreablePicks,
+                   Map<Long, Double> empiricalReachBias) {
+            this(profiles, priors, scoreablePicks, empiricalReachBias, Map.of(), Map.of());
+        }
+    }
+
+    /** One scoreable pick's raw reach, kept with its draft and manager for the room-relative pass. */
+    record ScoredPick(long managerId, long draftId, double reach) {}
+
+    /**
+     * The room baseline is the mean of raw reach over every scoreable pick in a draft, so
+     * each draft's own offset (which board stamped it, whether it blends this league's own
+     * draft, board players nobody drafted) cancels. A manager's figure is the mean residual
+     * against their own rooms; its standard error is the sample SD of those residuals over
+     * sqrt(n), absent for n &lt; 2.
+     */
+    static void computeRelativeReach(List<ScoredPick> scored, Map<Long, Double> relative,
+                                     Map<Long, Double> stdErr) {
+        Map<Long, double[]> roomSums = new HashMap<>();   // draftId -> {sum, count}
+        for (ScoredPick sp : scored) {
+            double[] acc = roomSums.computeIfAbsent(sp.draftId(), k -> new double[2]);
+            acc[0] += sp.reach();
+            acc[1] += 1;
+        }
+        Map<Long, List<Double>> residuals = new HashMap<>();
+        for (ScoredPick sp : scored) {
+            double[] acc = roomSums.get(sp.draftId());
+            residuals.computeIfAbsent(sp.managerId(), k -> new ArrayList<>())
+                    .add(sp.reach() - acc[0] / acc[1]);
+        }
+        residuals.forEach((managerId, rs) -> {
+            int n = rs.size();
+            double mean = rs.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            relative.put(managerId, mean);
+            if (n >= 2) {
+                double ss = 0;
+                for (double r : rs) ss += (r - mean) * (r - mean);
+                stdErr.put(managerId, Math.sqrt(ss / (n - 1)) / Math.sqrt(n));
+            }
+        });
+    }
 
     public Fit fit(Sport sport) {
         List<DraftRepository.CompletedPick> picks = drafts.allCompletedPicks(sport);
@@ -85,6 +142,7 @@ public class ProfileService {
         // --- reach bias -------------------------------------------------
         Map<Long, List<Double>> reachByManager = new HashMap<>();
         Map<Long, Set<Long>> draftsByManager = new HashMap<>();
+        List<ScoredPick> scoredPicks = new ArrayList<>();
         int scoreable = 0;
 
         for (DraftRepository.CompletedPick p : picks) {
@@ -107,7 +165,13 @@ public class ProfileService {
             // round at 8), which is a modelling question, not a unit error.
             reachByManager.computeIfAbsent(p.managerId(), k -> new ArrayList<>())
                     .add(p.adpAtTime() - p.pickNo());
+            scoredPicks.add(new ScoredPick(p.managerId(), p.draftId(), p.adpAtTime() - p.pickNo()));
         }
+
+        // Room-relative reach (display only; audit 11). Never feeds ManagerProfile.
+        Map<Long, Double> relativeReach = new HashMap<>();
+        Map<Long, Double> relativeStdErr = new HashMap<>();
+        computeRelativeReach(scoredPicks, relativeReach, relativeStdErr);
 
         double leagueMeanReach = reachByManager.values().stream()
                 .flatMap(List::stream)
@@ -171,7 +235,7 @@ public class ProfileService {
 
         log.info("profiles: {} managers, {} scoreable picks, league mean reach {}, {} with stated tendencies",
                 out.size(), scoreable, String.format("%.2f", leagueMeanReach), manual.size());
-        return new Fit(out, priors, scoreable, empirical);
+        return new Fit(out, priors, scoreable, empirical, relativeReach, relativeStdErr);
     }
 
     /**

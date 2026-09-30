@@ -127,6 +127,11 @@ public class LeagueController {
             seat.put("avatarId", p.avatarId());
             seat.put("provenance", p.provenance().name());
             seat.put("reachBias", round2(p.reachBias()));
+            // Display-only room-relative reach and its standard error (audit 11).
+            Double rel = fit.relativeReachBias().get(id);
+            Double se = fit.relativeReachStdErr().get(id);
+            seat.put("relativeReachBias", rel == null ? null : round2(rel));
+            seat.put("relativeReachStdErr", se == null ? null : round2(se));
             seat.put("unpredictability", p.unpredictability());
             seat.put("positionalTilt", p.positionalTilt());
             seat.put("note", p.note());

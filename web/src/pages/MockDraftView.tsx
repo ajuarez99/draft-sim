@@ -36,6 +36,8 @@ function toBoardSeat(s: MockSeat): Seat {
     avatarId: s.avatarId,
     provenance: 'NEUTRAL',
     reachBias: 0,
+    relativeReachBias: null,
+    relativeReachStdErr: null,
     unpredictability: 1,
     positionalTilt: {},
     note: null,

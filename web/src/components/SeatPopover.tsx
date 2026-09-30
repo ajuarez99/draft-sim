@@ -20,7 +20,8 @@ import Avatar from './Avatar'
  */
 function behaviour(s: Seat) {
   return behaviourText({
-    reachBias: s.reachBias,
+    relativeReachBias: s.relativeReachBias,
+    relativeReachStdErr: s.relativeReachStdErr,
     unpredictability: s.unpredictability,
     positionalTilt: s.positionalTilt,
     picksScored: s.picksScored,
