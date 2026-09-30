@@ -1,7 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import Superlatives from './Superlatives'
+import Superlatives, { standingFigure } from './Superlatives'
 import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import type { ConductList, Superlative, SuperlativesResponse } from '../api'
 
@@ -41,7 +41,7 @@ function notBuiltYet(kind: (typeof KINDS)[number]): Superlative {
     holders: [],
     emptyReason: null,
     detail: [],
-    coverage: null, playerHolders: [],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [],
   }
 }
 
@@ -128,7 +128,7 @@ describe('Superlatives', () => {
         { type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 },
         { type: 'WEEK_SCORE', week: 4, rosterId: 2, points: 180.5 },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), tied))
     render(<Superlatives />)
@@ -153,7 +153,7 @@ describe('Superlatives', () => {
           points: 118.4, opponentPoints: 112.1, margin: 6.3,
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     const data = withKind(baseline(), closeWins)
     data.closeGameMargin = 15
@@ -180,7 +180,7 @@ describe('Superlatives', () => {
         },
       ],
       coverage: { weeksCovered: 5, weeksExcluded: 1, reasons: ['week 3: no pairings stored'] },
-      playerHolders: [],
+      playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -199,7 +199,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     const data = baseline()
     data.early = true
@@ -220,7 +220,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no close games yet',
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -258,7 +258,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Master Bates', username: null, avatarId: null }],
       emptyReason: null,
       detail: [{ type: 'WEEK_SCORE', week: 1, rosterId: 1, points: 164.96 }],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), highest))
     render(<Superlatives />)
@@ -283,7 +283,7 @@ describe('Superlatives', () => {
           opponentTeamName: 'Dart has hit anotha Bower', points: 150, opponentPoints: 50.32, margin: 99.68,
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -311,7 +311,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 4, rosterId: 2, opponentRosterId: 8, opponentTeamName: 'Y', points: 88, opponentPoints: 87.5, margin: 0.5 },
         { type: 'GAME', week: 7, rosterId: 3, opponentRosterId: 7, opponentTeamName: 'Z', points: 77, opponentPoints: 76.5, margin: 0.5 },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closest))
     render(<Superlatives />)
@@ -336,7 +336,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 9, rosterId: 4, opponentRosterId: 2, opponentTeamName: 'Y', points: 101, opponentPoints: 97, margin: 4 },
         { type: 'GAME', week: 13, rosterId: 4, opponentRosterId: 3, opponentTeamName: 'Z', points: 102, opponentPoints: 99, margin: 3 },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -360,7 +360,7 @@ describe('Superlatives', () => {
       detail: [
         { type: 'GAME', week: 2, rosterId: 6, opponentRosterId: 1, opponentTeamName: 'X', points: 95, opponentPoints: 100, margin: 5 },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     const { container } = render(<Superlatives />)
@@ -385,7 +385,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 5, rosterId: 6, opponentRosterId: 2, opponentTeamName: 'Y', points: 96, opponentPoints: 99, margin: 3 },
         { type: 'GAME', week: 8, rosterId: 6, opponentRosterId: 3, opponentTeamName: 'Z', points: 97, opponentPoints: 98, margin: 1 },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     render(<Superlatives />)
@@ -413,7 +413,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -439,7 +439,7 @@ describe('Superlatives', () => {
           swingWeeks: [], fromWeek: 3, throughWeek: 3, reading: '0.80 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -466,7 +466,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -495,7 +495,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, biggestWeek: { week: 4, pointsLeft: 55.2 },
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), bench))
     render(<Superlatives />)
@@ -527,7 +527,7 @@ describe('Superlatives', () => {
           addedWeek: 2, addType: 'FREE_AGENT', startedWeeks: [3], points: 36.3,
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -554,7 +554,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: null,
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -595,6 +595,7 @@ describe('Superlatives', () => {
         { playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
         { playerId: 'p2', playerName: 'Brice Sensabaugh', position: 'SF', team: 'UTA', adds: 14, distinctTeams: 8 },
       ],
+      standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -643,6 +644,7 @@ describe('Superlatives', () => {
       playerHolders: [
         { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: null, adds: 4, distinctTeams: 4 },
       ],
+      standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -669,7 +671,7 @@ describe('Superlatives', () => {
       emptyReason: "nobody's been picked up yet",
       detail: [],
       coverage: null,
-      playerHolders: [],
+      playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -700,6 +702,7 @@ describe('Superlatives', () => {
       playerHolders: [
         { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: 'BOS', adds: 1, distinctTeams: 1 },
       ],
+      standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -727,7 +730,7 @@ describe('Superlatives', () => {
           gamesMissed: 6, weeksAffected: 5, pointsPerGame: 10.4, estimatedPointsLost: 62.4, estimated: true,
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
@@ -750,7 +753,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "nobody's been bitten yet",
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
@@ -796,7 +799,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "suspension tracking hasn't covered a scored week yet, and the commissioner's list is empty",
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -819,7 +822,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no suspensions or commissioner entries yet',
       detail: [],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     const data = baseline()
     data.suspensionWeeksObserved = [3, 4, 6]
@@ -857,7 +860,7 @@ describe('Superlatives', () => {
           source: 'SUSPENDED', weeks: [3, 7, 9], reason: null,
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -955,7 +958,7 @@ describe('Superlatives', () => {
   it('refetches the superlatives payload after saving a commissioner entry', async () => {
     const emptyUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [],
+      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     const filledUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: 1, unit: 'GAMES',
@@ -967,7 +970,7 @@ describe('Superlatives', () => {
           source: 'COMMISSIONER', weeks: [2], reason: 'reasons',
         },
       ],
-      coverage: null, playerHolders: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives
       .mockResolvedValueOnce(withKind({ ...baseline(), commissionerListAvailable: true }, emptyUnethical))
@@ -995,7 +998,7 @@ describe('Superlatives', () => {
   it('refetches the superlatives payload after removing a commissioner entry', async () => {
     const emptyUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [],
+      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [],
     }
     fetchSuperlatives
       .mockResolvedValueOnce(
@@ -1142,5 +1145,274 @@ describe('Superlatives', () => {
     await userEvent.click(screen.getByText('bump L1'))
     await waitFor(() => expect(fetchSuperlatives).toHaveBeenCalledTimes(2))
     expect(fetchSuperlatives).toHaveBeenLastCalledWith('L1')
+  })
+
+  // specs/010-superlatives-full-standings T021/T026: the "See all" standings modal.
+  describe('full standings modal', () => {
+    const holder = (id: number, name: string) => ({
+      rosterId: id, managerId: id * 10, teamName: name, username: null, avatarId: null,
+    })
+    const row = (
+      rank: number | null, id: number, name: string, value: number | null, note: string | null = null,
+      missingReason: string | null = null,
+    ) => ({ rank, team: holder(id, name), value, note, hasValue: value != null, missingReason })
+
+    function highestWeek(over: Partial<Superlative> = {}): Superlative {
+      return {
+        kind: 'HIGHEST_WEEK',
+        available: true,
+        reason: null,
+        early: false,
+        value: 180.5,
+        unit: 'POINTS',
+        holders: [holder(1, 'Team A')],
+        emptyReason: null,
+        detail: [{ type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 }],
+        coverage: null,
+        playerHolders: [],
+        standings: [
+          row(1, 1, 'Team A', 180.5, 'week 3'),
+          row(2, 2, 'Team B', 150.25, 'week 5'),
+          row(3, 3, 'Team C', 120, 'week 1'),
+        ],
+        playerStandings: [],
+        ...over,
+      }
+    }
+
+    it('opens from the See all button with every row in payload order', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const items = within(dialog).getAllByRole('listitem')
+      expect(items).toHaveLength(3)
+      expect(items[0]).toHaveTextContent('Team A')
+      expect(items[0]).toHaveTextContent('180.50 points')
+      expect(items[1]).toHaveTextContent('Team B')
+      expect(items[2]).toHaveTextContent('Team C')
+      expect(items[0]).toHaveTextContent('week 3')
+    })
+
+    it('closes on Escape and on the backdrop, but not on a click inside the dialog', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      await userEvent.click(screen.getByRole('dialog'))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      await userEvent.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+      // The backdrop click must close it and not bubble up to the card, which
+      // would reopen it.
+      await userEvent.click(screen.getByRole('button', { name: 'See all' }))
+      await userEvent.click(screen.getByRole('dialog').parentElement as HTMLElement)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('does not open from the Games summary', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByText('Games'))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('opens from a click on the card body (mouse path)', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByText('Highest week'))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('does not open from a card click while text is selected (B3)', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      const title = await screen.findByText('Highest week')
+      const spy = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'Team A' } as unknown as Selection)
+      try {
+        await userEvent.click(title)
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
+    it('stays open when a press starts inside the card and is released on the backdrop (B3)', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const backdrop = dialog.parentElement as HTMLElement
+      fireEvent.mouseDown(dialog)
+      fireEvent.mouseUp(backdrop)
+      fireEvent.click(backdrop)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('labels UNETHICAL as player-weeks and JOEL_EMBIID as estimated (B1, B4)', () => {
+      expect(standingFigure('UNETHICAL', 'GAMES', 1)).toBe('1 player-week')
+      expect(standingFigure('UNETHICAL', 'GAMES', 3)).toBe('3 player-weeks')
+      expect(standingFigure('JOEL_EMBIID', 'POINTS', 12.4)).toBe('12.40 estimated points lost')
+    })
+
+    it('has no See all on unavailable or empty cards', async () => {
+      const empty = highestWeek({ holders: [], value: null, emptyReason: 'nothing yet', detail: [], standings: [] })
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), empty))
+      render(<Superlatives />)
+
+      await screen.findByText('nothing yet')
+      // Every other kind is "not built yet" (unavailable), the one above is empty.
+      expect(screen.queryByRole('button', { name: 'See all' })).not.toBeInTheDocument()
+    })
+
+    it('shows a dash and the reason for a row with no value', async () => {
+      const s = highestWeek({
+        standings: [
+          row(1, 1, 'Team A', 180.5),
+          row(null, 4, 'Roster 4', null, null, 'no scored weeks'),
+        ],
+      })
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), s))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      expect(items[1]).toHaveTextContent('—')
+      expect(items[1]).toHaveTextContent('Roster 4')
+      expect(items[1]).toHaveTextContent('no scored weeks')
+    })
+
+    it('renders a low-to-high kind in the order given, never re-sorted', async () => {
+      const lowest = highestWeek({
+        kind: 'LOWEST_WEEK',
+        standings: [row(1, 3, 'Team C', 60), row(2, 2, 'Team B', 90), row(3, 1, 'Team A', 120)],
+      })
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), lowest))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      expect(items.map((li) => li.textContent)).toEqual([
+        expect.stringContaining('Team C'),
+        expect.stringContaining('Team B'),
+        expect.stringContaining('Team A'),
+      ])
+    })
+
+    it('signs luck figures and formats close-game counts like the card', async () => {
+      const unluckiest = highestWeek({
+        kind: 'UNLUCKIEST',
+        unit: 'WINS',
+        standings: [row(1, 1, 'Team A', -1.3, '3 actual vs 4.30 expected'), row(2, 2, 'Team B', 0.5)],
+      })
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), unluckiest))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      expect(items[0]).toHaveTextContent('−1.30 wins vs expected')
+      expect(items[1]).toHaveTextContent('+0.50 wins vs expected')
+    })
+
+    it('formats CLOSE_WINS figures with formatCloseGameCount', async () => {
+      const closeWins = highestWeek({
+        kind: 'CLOSE_WINS',
+        unit: 'WINS',
+        standings: [row(1, 1, 'Team A', 2), row(2, 2, 'Team B', 1)],
+      })
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      expect(items[0]).toHaveTextContent('2 wins')
+      expect(items[1]).toHaveTextContent('1 win')
+      expect(standingFigure('CLOSE_LOSSES', 'GAMES', 1)).toBe('1 loss')
+    })
+
+    it('opens the Jabari card on its player standings, in order, with the players subtitle', async () => {
+      const jabari: Superlative = {
+        kind: 'JABARI_SMITH_JR',
+        available: true,
+        reason: null,
+        early: false,
+        value: 14,
+        unit: 'ADDS',
+        holders: [],
+        emptyReason: null,
+        detail: [],
+        coverage: null,
+        playerHolders: [
+          { playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
+        ],
+        standings: [],
+        playerStandings: [
+          { rank: 1, playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
+          { rank: 2, playerId: 'p2', playerName: 'Some Guy', position: null, team: null, adds: 1, distinctTeams: 1 },
+        ],
+      }
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByText('This award ranks players, not teams.')).toBeInTheDocument()
+      const items = within(dialog).getAllByRole('listitem')
+      expect(items).toHaveLength(2)
+      expect(items[0]).toHaveTextContent('Jake LaRavia (PF)')
+      expect(items[0]).toHaveTextContent('14 adds by 8 teams')
+      expect(items[1]).toHaveTextContent('Some Guy')
+      expect(items[1]).toHaveTextContent('1 add by 1 team')
+    })
+
+    // T031 live finding: 41-way tie on NFL 2025.
+    function jabariWith(playerStandings: Superlative['playerStandings']): Superlative {
+      return {
+        kind: 'JABARI_SMITH_JR', available: true, reason: null, early: false, value: 3, unit: 'ADDS',
+        holders: [], emptyReason: null, detail: [], coverage: null, playerHolders: playerStandings.filter((p) => p.rank === 1).slice(0, 1), standings: [],
+        playerStandings,
+      }
+    }
+    function players(n: number, rank: number, adds: number, prefix: string) {
+      return Array.from({ length: n }, (_, i) => ({
+        rank, playerId: `${prefix}${i}`, playerName: `${prefix} ${i}`, position: 'WR', team: 'KC', adds, distinctTeams: adds,
+      }))
+    }
+
+    it('collapses a large tied tail behind a summary and expands to all rows', async () => {
+      fetchSuperlatives.mockResolvedValue(
+        withKind(baseline(), jabariWith([...players(6, 1, 3, 'Top'), ...players(41, 7, 2, 'Tail')])),
+      )
+      render(<Superlatives />)
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const lists = within(dialog).getAllByRole('list')
+      expect(within(lists[0]).getAllByRole('listitem')).toHaveLength(6)
+      const summary = within(dialog).getByText(/41 more players with 2 adds each/)
+      expect(summary).toBeInTheDocument()
+      const details = summary.closest('details') as HTMLDetailsElement
+      expect(details.open).toBe(false)
+      await userEvent.click(summary)
+      expect(details.open).toBe(true)
+      expect(screen.getByRole('dialog')).toBeInTheDocument() // did not close the modal
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(47)
+    })
+
+    it('collapses a first group over 10 as tied for the lead, with one click to see them', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabariWith(players(12, 1, 3, 'Tie'))))
+      render(<Superlatives />)
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const summary = within(dialog).getByText(/12 players tied with 3 adds each/)
+      await userEvent.click(summary)
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(12)
+    })
   })
 })

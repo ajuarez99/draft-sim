@@ -222,6 +222,39 @@ public class SuperlativesController {
         List<Map<String, Object>> playerHolders = new ArrayList<>();
         for (SeasonSuperlativesService.PlayerHolder ph : s.playerHolders()) playerHolders.add(playerHolderRow(ph));
         m.put("playerHolders", playerHolders);
+        // Spec 010 (plan amendment 6 / R1): this controller copies fields by hand, so a new record field
+        // is silently absent from the wire until it is added here.
+        List<Map<String, Object>> standings = new ArrayList<>();
+        for (SeasonSuperlativesService.Standing st : s.standings()) standings.add(standingRow(st));
+        m.put("standings", standings);
+        List<Map<String, Object>> playerStandings = new ArrayList<>();
+        for (SeasonSuperlativesService.PlayerStanding ps : s.playerStandings()) playerStandings.add(playerStandingRow(ps));
+        m.put("playerStandings", playerStandings);
+        return m;
+    }
+
+    /** LinkedHashMap, not Map.of: rank, value, note and missingReason are legitimately null on some rows. */
+    private static Map<String, Object> standingRow(SeasonSuperlativesService.Standing st) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("rank", st.rank());
+        m.put("team", holderRow(st.team()));
+        m.put("value", st.value());
+        m.put("note", st.note());
+        m.put("hasValue", st.hasValue());
+        m.put("missingReason", st.missingReason());
+        return m;
+    }
+
+    /** JABARI_SMITH_JR only; {@code position} and {@code team} are nullable (a free agent has no team). */
+    private static Map<String, Object> playerStandingRow(SeasonSuperlativesService.PlayerStanding ps) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("rank", ps.rank());
+        m.put("playerId", ps.playerId());
+        m.put("playerName", ps.playerName());
+        m.put("position", ps.position());
+        m.put("team", ps.team());
+        m.put("adds", ps.adds());
+        m.put("distinctTeams", ps.distinctTeams());
         return m;
     }
 

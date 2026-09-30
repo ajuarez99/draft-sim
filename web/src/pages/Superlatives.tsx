@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
+import SuperlativeStandingsModal from '../components/SuperlativeStandingsModal'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   fetchSuperlatives,
@@ -191,13 +192,43 @@ function SuperlativeCard({
   // fix the award rendered its empty state while it had a real winner.
   const isPlayerHeadedKind = s.kind === 'JABARI_SMITH_JR'
   const isEmpty = s.holders.length === 0 && s.playerHolders.length === 0
+  // Spec 010 (amendments 10, 12): the full standings open from a real "See all"
+  // button (the keyboard/screen-reader path); the card body also opens it, but
+  // for the mouse only -- no role or tabIndex on the <article>. State lives here
+  // so `standingFigure` closes over this card's own kind and unit.
+  const openable = s.available && !isEmpty && (s.standings.length > 0 || s.playerStandings.length > 0)
+  const [open, setOpen] = useState(false)
 
   return (
-    <article className="sl-card" style={{ ['--sl-hue' as string]: hue }}>
+    <article
+      className={`sl-card${openable ? ' sl-card-openable' : ''}`}
+      style={{ ['--sl-hue' as string]: hue }}
+      onClick={
+        openable
+          ? () => {
+              // B3: a drag-select across card text ends in a click on the article; don't open over it.
+              if (window.getSelection()?.toString()) return
+              setOpen(true)
+            }
+          : undefined
+      }
+    >
       <header className="sl-card-head">
         <h4>{meta.title}</h4>
         {meta.subtitle && <span className="sl-subtitle muted small">{meta.subtitle}</span>}
         {s.early && <span className="sl-early small">early — this is mostly noise</span>}
+        {openable && (
+          <button
+            type="button"
+            className="sl-see-all"
+            onClick={(e) => {
+              e.stopPropagation()
+              setOpen(true)
+            }}
+          >
+            See all
+          </button>
+        )}
       </header>
 
       {/* Unconditional lines, independent of available/holders state -- EXCEPT
@@ -331,6 +362,16 @@ function SuperlativeCard({
 
           {expandableRows(s).length > 0 && <DetailList s={s} />}
         </>
+      )}
+
+      {open && (
+        <SuperlativeStandingsModal
+          s={s}
+          title={meta.title}
+          hue={hue}
+          figure={(v) => standingFigure(s.kind, s.unit, v)}
+          onClose={() => setOpen(false)}
+        />
       )}
     </article>
   )
@@ -468,6 +509,24 @@ function weeksLabel(weeks: number[]): string {
   return `${sorted.length === 1 ? 'week' : 'weeks'} ${ranges.join(', ')}`
 }
 
+/**
+ * One figure per standings row (amendment 10): the card has no single value
+ * formatter -- some kinds print a shared value line, others fold the figure into
+ * each holder line -- so the modal gets its own, defined per kind. Luck is signed
+ * because the sign is the whole point of UNLUCKIEST.
+ */
+export function standingFigure(kind: Superlative['kind'], unit: Superlative['unit'], value: number): string {
+  if (CLOSE_GAME_KINDS.has(kind)) return formatCloseGameCount(kind, value)
+  if (kind === 'LUCKIEST' || kind === 'UNLUCKIEST') {
+    return `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)} wins vs expected`
+  }
+  // B1: UNETHICAL's total counts player-weeks (a player flagged for a week), not games.
+  if (kind === 'UNETHICAL') return `${value} ${value === 1 ? 'player-week' : 'player-weeks'}`
+  // B4: every Embiid figure is an estimate, same wording as the card.
+  if (kind === 'JOEL_EMBIID') return `${value.toFixed(2)} estimated points lost`
+  return formatValue(value, unit)
+}
+
 function formatValue(value: number, unit: Superlative['unit']): string {
   if (unit === 'POINTS') return `${value.toFixed(2)} points`
   if (unit === 'WINS') return `${value} ${value === 1 ? 'win' : 'wins'}`
@@ -494,7 +553,9 @@ function DetailList({ s }: { s: Superlative }) {
   const rows = expandableRows(s)
   const summary = s.kind === 'LUCKIEST' || s.kind === 'UNLUCKIEST' ? 'Swing weeks' : 'Games'
   return (
-    <details className="sl-detail">
+    // Stop clicks/keys here so opening "Games" doesn't bubble to the card's
+    // click-to-open-standings handler (amendment 12).
+    <details className="sl-detail" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
       <summary className="muted small">{summary}</summary>
       <ul className="sl-detail-list">
         {rows.map((r, i) => (

@@ -154,17 +154,50 @@ public class SeasonSuperlativesService {
                             String addType, Integer faabBid) implements DetailRow {}
 
     /**
+     * One row of a team award's full standings (spec 010). Invariants: {@code rank == null} iff
+     * {@code !hasValue}, and {@code missingReason != null} iff {@code !hasValue}. A row without a
+     * value is a roster the award couldn't measure -- listed last with the reason, never as a 0.
+     * {@code note} is the per-row context line and may be null.
+     */
+    public record Standing(Integer rank, Holder team, Double value, String note, boolean hasValue,
+                           String missingReason) {
+        public Standing {
+            if ((rank == null) == hasValue) throw new IllegalArgumentException("rank must be null iff !hasValue");
+            if ((missingReason == null) != hasValue) {
+                throw new IllegalArgumentException("missingReason must be non-null iff !hasValue");
+            }
+        }
+    }
+
+    /** One row of JABARI_SMITH_JR's player standings (spec 010). {@code position} and {@code team} are nullable. */
+    public record PlayerStanding(int rank, String playerId, String playerName, String position, String team,
+                                 int adds, int distinctTeams) {}
+
+    /**
      * @param playerHolders JABARI_SMITH_JR only (research R16 decision 6): every tied-top player,
      *                       {@code []} for every other kind. {@code holders} stays {@code []} for
      *                       this kind -- the award is headed by players, not teams.
+     * @param standings       spec 010: one row per roster in the league-season (orphans included), ranked
+     *                        for this award; {@code []} for an unavailable/empty kind and for JABARI_SMITH_JR
+     * @param playerStandings spec 010: JABARI_SMITH_JR only, {@code []} for every other kind
      */
     public record Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                               List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
-                              List<PlayerHolder> playerHolders) {
+                              List<PlayerHolder> playerHolders, List<Standing> standings,
+                              List<PlayerStanding> playerStandings) {
         /** Old 10-argument shape, kept so the 17 existing call sites don't all need touching (T076). */
         public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                            List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage) {
-            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, List.of());
+            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, List.of(),
+                    List.of(), List.of());
+        }
+
+        /** The 11-argument shape (playerHolders, no standings), for JABARI_SMITH_JR's empty/available-without-standings returns. */
+        public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
+                           List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
+                           List<PlayerHolder> playerHolders) {
+            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, playerHolders,
+                    List.of(), List.of());
         }
     }
 
@@ -234,6 +267,10 @@ public class SeasonSuperlativesService {
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, Long> managerByRoster = new HashMap<>();
         teamMaps(league.id(), nameByRoster, avatarByRoster, managerByRoster);
+        // The roster universe for every standings list (plan amendment 7 / FR-012): every roster_season
+        // row, an orphan with no manager or name included. NOT nameByRoster.keySet(), which teamMaps
+        // leaves without a roster that has no name.
+        final Set<Integer> rosterIds = Set.copyOf(managerByRoster.keySet());
 
         // Coordinator follow-up 2026-09-23, item 6: loaded once here rather
         // than once per helper method (bench/waiver/absence/unethical each
@@ -260,40 +297,56 @@ public class SeasonSuperlativesService {
 
         Map<Kind, Superlative> built = new EnumMap<>(Kind.class);
 
+        // Standings come from the SAME loaded rows the winners' populations equal (plan amendment 1):
+        // leagueBreakdowns for the week scores, games for the margins.
         built.put(Kind.HIGHEST_WEEK, weekScoreSuperlative(Kind.HIGHEST_WEEK,
-                records.highestWeeks(List.of(league.id()), 20, bound), nameByRoster, avatarByRoster, managerByRoster));
+                records.highestWeeks(List.of(league.id()), 20, bound),
+                weekScoreStandings(leagueBreakdowns, rosterIds, true, nameByRoster, avatarByRoster, managerByRoster),
+                nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.LOWEST_WEEK, weekScoreSuperlative(Kind.LOWEST_WEEK,
-                records.lowestWeeks(List.of(league.id()), 20, bound), nameByRoster, avatarByRoster, managerByRoster));
+                records.lowestWeeks(List.of(league.id()), 20, bound),
+                weekScoreStandings(leagueBreakdowns, rosterIds, false, nameByRoster, avatarByRoster, managerByRoster),
+                nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.BIGGEST_BLOWOUT, marginSuperlative(Kind.BIGGEST_BLOWOUT,
                 records.biggestBlowouts(List.of(league.id()), 20, bound), pairingCoverage,
+                marginStandings(games, rosterIds, false, nameByRoster, avatarByRoster, managerByRoster),
                 nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.CLOSEST_GAME, marginSuperlative(Kind.CLOSEST_GAME,
                 records.closestMatchups(List.of(league.id()), 20, bound), pairingCoverage,
+                marginStandings(games, rosterIds, true, nameByRoster, avatarByRoster, managerByRoster),
                 nameByRoster, avatarByRoster, managerByRoster));
 
         Map<Integer, List<GameDetail>> closeWins = closeGames(games, closeMargin, true);
         Map<Integer, List<GameDetail>> closeLosses = closeGames(games, closeMargin, false);
+        // A roster in a paired game but absent from closeWins/closeLosses is a real 0; one in no paired
+        // game at all wasn't measured (R12).
+        Set<Integer> rostersWithGames = new HashSet<>();
+        for (LeagueMatchupRepository.PairedGame g : games) {
+            rostersWithGames.add(g.aRosterId());
+            rostersWithGames.add(g.bRosterId());
+        }
         built.put(Kind.CLOSE_WINS, closeGameSuperlative(Kind.CLOSE_WINS, closeWins, "WINS", pairingCoverage,
-                nameByRoster, avatarByRoster, managerByRoster));
+                rostersWithGames, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.CLOSE_LOSSES, closeGameSuperlative(Kind.CLOSE_LOSSES, closeLosses, "GAMES", pairingCoverage,
-                nameByRoster, avatarByRoster, managerByRoster));
+                rostersWithGames, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
 
-        addLuckSuperlatives(built, sleeperLeagueId, bound, throughWeek, early);
+        addLuckSuperlatives(built, sleeperLeagueId, bound, throughWeek, early, rosterIds,
+                nameByRoster, avatarByRoster, managerByRoster);
         built.put(Kind.MOST_BENCH_POINTS, benchSuperlative(league, leagueBreakdowns, playersBySleeperId, throughWeek,
-                early, nameByRoster, avatarByRoster, managerByRoster));
+                early, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
 
         // Fetched once (T076 coordinator instruction): both WAIVER_WIRE_WARRIOR and
         // JABARI_SMITH_JR read this league-season's transactions, and the second
         // award adds no second query.
         List<LeagueTransactionRepository.Row> txRows = transactions.forSeason(league.id(), league.season());
         built.put(Kind.WAIVER_WIRE_WARRIOR, waiverSuperlative(league, sleeperLeagueId, txRows, parsedWeeks,
-                playersBySleeperId, early, nameByRoster, avatarByRoster, managerByRoster));
+                playersBySleeperId, early, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.JABARI_SMITH_JR, mostAddedSuperlative(sleeperLeagueId, txRows, throughWeek,
                 playersBySleeperId, nameByRoster, avatarByRoster));
 
         built.put(Kind.JOEL_EMBIID, absenceSuperlative(league, sleeperLeagueId, rules, scoredWeeksFinal, parsedWeeks,
-                playersBySleeperId, early, nameByRoster, avatarByRoster, managerByRoster));
-        built.put(Kind.UNETHICAL, unethicalSuperlative(league, parsedWeeks, playersBySleeperId, early,
+                playersBySleeperId, early, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
+        built.put(Kind.UNETHICAL, unethicalSuperlative(league, parsedWeeks, playersBySleeperId, early, rosterIds,
                 nameByRoster, avatarByRoster, managerByRoster));
 
         Map<Integer, String> usernameByRoster = new HashMap<>();
@@ -371,7 +424,8 @@ public class SeasonSuperlativesService {
     }
 
     private Superlative closeGameSuperlative(Kind kind, Map<Integer, List<GameDetail>> byRoster, String unit,
-                                             Coverage coverage, Map<Integer, String> nameByRoster,
+                                             Coverage coverage, Set<Integer> rostersWithGames, Set<Integer> rosterIds,
+                                             Map<Integer, String> nameByRoster,
                                              Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
         if (byRoster.isEmpty()) {
             return new Superlative(kind, true, null, false, null, unit, List.of(), "no close games yet",
@@ -392,11 +446,13 @@ public class SeasonSuperlativesService {
                 detail.add(withOpponentName(gd, nameByRoster));
             }
         }
-        return new Superlative(kind, true, null, false, (double) max, unit, holders, null, detail, coverage);
+        return new Superlative(kind, true, null, false, (double) max, unit, holders, null, detail, coverage, List.of(),
+                closeGameStandings(byRoster, rostersWithGames, rosterIds, nameByRoster, avatarByRoster, managerByRoster),
+                List.of());
     }
 
     private Superlative weekScoreSuperlative(Kind kind, List<LeagueRecordService.WeeklyScoreRecord> rows,
-                                             Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                             List<Standing> standings, Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
                                              Map<Integer, Long> managerByRoster) {
         if (rows.isEmpty()) {
             return new Superlative(kind, true, null, false, null, "POINTS", List.of(),
@@ -414,11 +470,12 @@ public class SeasonSuperlativesService {
         List<DetailRow> detail = tied.stream()
                 .<DetailRow>map(r -> new WeekScoreDetail(r.week(), r.rosterId(), r.points().doubleValue()))
                 .toList();
-        return new Superlative(kind, true, null, false, top.doubleValue(), "POINTS", holders, null, detail, null);
+        return new Superlative(kind, true, null, false, top.doubleValue(), "POINTS", holders, null, detail, null,
+                List.of(), standings, List.of());
     }
 
     private Superlative marginSuperlative(Kind kind, List<LeagueRecordService.MarginRecord> rows, Coverage coverage,
-                                          Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                          List<Standing> standings, Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
                                           Map<Integer, Long> managerByRoster) {
         if (rows.isEmpty()) {
             return new Superlative(kind, true, null, false, null, "POINTS", List.of(),
@@ -437,7 +494,8 @@ public class SeasonSuperlativesService {
                         nameByRoster.getOrDefault(r.loser().rosterId(), "Roster " + r.loser().rosterId()),
                         r.winner().points().doubleValue(), r.loser().points().doubleValue(), r.margin().doubleValue()))
                 .toList();
-        return new Superlative(kind, true, null, false, extreme.doubleValue(), "POINTS", holders, null, detail, coverage);
+        return new Superlative(kind, true, null, false, extreme.doubleValue(), "POINTS", holders, null, detail, coverage,
+                List.of(), standings, List.of());
     }
 
     private static GameDetail withOpponentName(GameDetail gd, Map<Integer, String> nameByRoster) {
@@ -455,7 +513,9 @@ public class SeasonSuperlativesService {
      * {@code swingWeeks} unmodified (FR-004). Never recomputed here.
      */
     private void addLuckSuperlatives(Map<Kind, Superlative> built, String sleeperLeagueId, WeekBound bound,
-                                     int throughWeek, boolean early) {
+                                     int throughWeek, boolean early, Set<Integer> rosterIds,
+                                     Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                     Map<Integer, Long> managerByRoster) {
         Optional<ExpectedWinsService.Result> exp = expectedWins.forLeague(sleeperLeagueId, bound);
         if (exp.isEmpty() || !exp.get().available() || exp.get().teams().isEmpty()) {
             String reason = exp.isPresent() && exp.get().reason() != null
@@ -465,8 +525,17 @@ public class SeasonSuperlativesService {
             return;
         }
         List<ExpectedWinsService.TeamRow> teams = exp.get().teams();
-        built.put(Kind.LUCKIEST, luckSuperlative(Kind.LUCKIEST, teams, true, early, throughWeek));
-        built.put(Kind.UNLUCKIEST, luckSuperlative(Kind.UNLUCKIEST, teams, false, early, throughWeek));
+        // luckSuperlative keeps its signature (SeasonSuperlativesLuckTest calls it directly); the standings
+        // are attached here, from the same TeamRows it picks the winner from.
+        built.put(Kind.LUCKIEST, withStandings(luckSuperlative(Kind.LUCKIEST, teams, true, early, throughWeek),
+                luckStandings(teams, rosterIds, false, nameByRoster, avatarByRoster, managerByRoster)));
+        built.put(Kind.UNLUCKIEST, withStandings(luckSuperlative(Kind.UNLUCKIEST, teams, false, early, throughWeek),
+                luckStandings(teams, rosterIds, true, nameByRoster, avatarByRoster, managerByRoster)));
+    }
+
+    private static Superlative withStandings(Superlative s, List<Standing> standings) {
+        return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), s.holders(),
+                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings());
     }
 
     /**
@@ -546,8 +615,8 @@ public class SeasonSuperlativesService {
     private Superlative benchSuperlative(LeagueRepository.LeagueRow league,
                                          List<RosterWeekPointsRepository.WeekBreakdown> breakdowns,
                                          Map<String, Player> playersBySleeperId, int throughWeek, boolean early,
-                                         Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
-                                         Map<Integer, Long> managerByRoster) {
+                                         Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
+                                         Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
         LeagueSettings settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
         SportRules rules = rulesRegistry.get(league.sport());
 
@@ -590,7 +659,8 @@ public class SeasonSuperlativesService {
                         byRoster.get(id).weeksCounted(), 1, throughWeek, byRoster.get(id).biggestWeek()))
                 .toList();
         return new Superlative(Kind.MOST_BENCH_POINTS, true, null, early, round2(max), "POINTS", holders, null,
-                detail, coverage);
+                detail, coverage, List.of(),
+                benchStandings(byRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster), List.of());
     }
 
     // ---------------------------------------------------------------- US3
@@ -607,8 +677,8 @@ public class SeasonSuperlativesService {
     private Superlative waiverSuperlative(LeagueRepository.LeagueRow league, String sleeperLeagueId,
                                           List<LeagueTransactionRepository.Row> txRows, List<ParsedWeek> parsedWeeks,
                                           Map<String, Player> playersBySleeperId, boolean early,
-                                          Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
-                                          Map<Integer, Long> managerByRoster) {
+                                          Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
+                                          Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
         if (txRows.isEmpty()) {
             return unavailable(Kind.WAIVER_WIRE_WARRIOR,
                     "Transactions for this season haven't loaded yet.");
@@ -636,6 +706,18 @@ public class SeasonSuperlativesService {
         Map<Integer, WaiverPickupAttribution.RosterTotal> byRoster =
                 WaiverPickupAttribution.attribute(txRows, starterWeeks);
 
+        return waiverWinners(byRoster, coverage, early, rosterIds, playersBySleeperId,
+                nameByRoster, avatarByRoster, managerByRoster);
+    }
+
+    /**
+     * The "pick winners from the per-roster map" step of {@link #waiverSuperlative}, extracted so the
+     * empty-state rule below is testable without Postgres (spec 010 T010).
+     */
+    static Superlative waiverWinners(Map<Integer, WaiverPickupAttribution.RosterTotal> byRoster, Coverage coverage,
+                                     boolean early, Set<Integer> rosterIds, Map<String, Player> playersBySleeperId,
+                                     Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                     Map<Integer, Long> managerByRoster) {
         if (byRoster.isEmpty()) {
             return new Superlative(Kind.WAIVER_WIRE_WARRIOR, true, null, early, null, "POINTS", List.of(),
                     "no starting-lineup points credited to a waiver or free-agent pickup yet", List.of(), coverage);
@@ -643,6 +725,12 @@ public class SeasonSuperlativesService {
 
         double max = byRoster.values().stream()
                 .mapToDouble(WaiverPickupAttribution.RosterTotal::totalPoints).max().orElseThrow();
+        // Plan amendment 9 (R4): the standings count an absent roster as a real 0, so a winner at or
+        // below 0 would sit level with, or behind, teams that did nothing. That is no winner at all.
+        if (max <= 0) {
+            return new Superlative(Kind.WAIVER_WIRE_WARRIOR, true, null, early, null, "POINTS", List.of(),
+                    "no started pickup has scored yet", List.of(), coverage);
+        }
         List<Integer> topRosters = byRoster.entrySet().stream()
                 .filter(e -> Double.compare(e.getValue().totalPoints(), max) == 0)
                 .map(Map.Entry::getKey)
@@ -655,7 +743,8 @@ public class SeasonSuperlativesService {
         List<DetailRow> detail = pickupDetail(topRosters, byRoster, playersBySleeperId);
 
         return new Superlative(Kind.WAIVER_WIRE_WARRIOR, true, null, early, round2(max), "POINTS", holders, null,
-                detail, coverage);
+                detail, coverage, List.of(),
+                waiverStandings(byRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster), List.of());
     }
 
     /**
@@ -741,8 +830,24 @@ public class SeasonSuperlativesService {
             }
         }
 
+        // Spec 010: the full player standings, top 10 plus anyone tied with the 10th. MostAddedPlayers.top
+        // shares rank()'s definition of which adds count, so its top tier is exactly the playerHolders
+        // above. `standings` stays [] -- this award ranks players, not teams.
+        List<PlayerStanding> playerStandings = new ArrayList<>();
+        int rank = 0;
+        int prevAdds = -1;
+        List<MostAddedPlayers.Ranked> top = MostAddedPlayers.top(completedAdds, throughWeek, eligible, 10);
+        for (int i = 0; i < top.size(); i++) {
+            MostAddedPlayers.Ranked r = top.get(i);
+            if (r.adds() != prevAdds) rank = i + 1; // competition ranks, like every other standings list
+            prevAdds = r.adds();
+            Player p = playersBySleeperId.get(r.playerId());
+            playerStandings.add(new PlayerStanding(rank, r.playerId(), p == null ? "Unknown player" : p.name(),
+                    p == null ? null : p.primary().name(), p == null ? null : p.team(), r.adds(), r.distinctTeams()));
+        }
+
         return new Superlative(Kind.JABARI_SMITH_JR, true, null, false, (double) ranked.get(0).adds(), "ADDS",
-                List.of(), null, detail, null, playerHolders);
+                List.of(), null, detail, null, playerHolders, List.of(), playerStandings);
     }
 
     // ---------------------------------------------------------------- US4
@@ -761,7 +866,7 @@ public class SeasonSuperlativesService {
     private Superlative absenceSuperlative(LeagueRepository.LeagueRow league, String sleeperLeagueId,
                                            SportRules rules, Set<Integer> scoredWeeksFinal,
                                            List<ParsedWeek> parsedWeeks, Map<String, Player> playersBySleeperId,
-                                           boolean early, Map<Integer, String> nameByRoster,
+                                           boolean early, Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
                                            Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
         Sport sport = league.sport();
 
@@ -867,14 +972,40 @@ public class SeasonSuperlativesService {
                 neverWalked.size() + " rostered player" + (neverWalked.size() == 1 ? "" : "s")
                         + " have no game-by-game records yet.");
 
+        return absenceWinners(byRoster, unclassifiedWeeksByRoster, leagueLevelReasons, scoredWeeksFinal.size(), early,
+                rosterIds, playersBySleeperId, nameByRoster, avatarByRoster, managerByRoster);
+    }
+
+    /**
+     * The "pick winners from the per-roster map" step of {@link #absenceSuperlative}, extracted so the
+     * empty-state rule below is testable without Postgres (spec 010 T010).
+     */
+    static Superlative absenceWinners(Map<Integer, AbsenceCost.RosterCost> byRoster,
+                                      Map<Integer, Set<Integer>> unclassifiedWeeksByRoster,
+                                      List<String> leagueLevelReasons, int weeksScored, boolean early,
+                                      Set<Integer> rosterIds, Map<String, Player> playersBySleeperId,
+                                      Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                      Map<Integer, Long> managerByRoster) {
+        // B6: an empty card must not read as a flat zero when some rosters' weeks are unknown, not zero.
+        long unclassifiedRosters = unclassifiedWeeksByRoster.values().stream().filter(w -> !w.isEmpty()).count();
+        List<String> emptyReasons = new ArrayList<>(leagueLevelReasons);
+        if (unclassifiedRosters > 0) {
+            emptyReasons.add(unclassifiedRosters + (unclassifiedRosters == 1 ? " roster had" : " rosters had")
+                    + " weeks that couldn't be classified as a bye or a missed game");
+        }
+        Coverage emptyCoverage = emptyReasons.isEmpty() ? null : new Coverage(weeksScored, 0, emptyReasons);
         if (byRoster.isEmpty()) {
-            Coverage emptyCoverage = leagueLevelReasons.isEmpty() ? null
-                    : new Coverage(scoredWeeksFinal.size(), 0, leagueLevelReasons);
             return new Superlative(Kind.JOEL_EMBIID, true, null, early, null, "POINTS", List.of(),
                     "nobody's been bitten yet", List.of(), emptyCoverage);
         }
 
         double max = byRoster.values().stream().mapToDouble(AbsenceCost.RosterCost::totalPointsLost).max().orElseThrow();
+        // Plan amendment 9 (R4): same rule as the waiver award -- absent rosters are a real 0 in the
+        // standings, so a best value of 0 or less crowns nobody.
+        if (max <= 0) {
+            return new Superlative(Kind.JOEL_EMBIID, true, null, early, null, "POINTS", List.of(),
+                    "no absence has cost anyone points yet", List.of(), emptyCoverage);
+        }
         List<Integer> topRosters = byRoster.entrySet().stream()
                 .filter(e -> Double.compare(e.getValue().totalPointsLost(), max) == 0)
                 .map(Map.Entry::getKey)
@@ -885,8 +1016,7 @@ public class SeasonSuperlativesService {
                 .toList();
 
         Coverage coverage = mergeCoverage(leagueLevelReasons,
-                unclassifiedCoverage(topRosters, unclassifiedWeeksByRoster, scoredWeeksFinal.size()),
-                scoredWeeksFinal.size());
+                unclassifiedCoverage(topRosters, unclassifiedWeeksByRoster, weeksScored), weeksScored);
 
         List<DetailRow> detail = new ArrayList<>();
         for (int id : topRosters) {
@@ -899,7 +1029,9 @@ public class SeasonSuperlativesService {
         }
 
         return new Superlative(Kind.JOEL_EMBIID, true, null, early, round2(max), "POINTS", holders, null,
-                detail, coverage);
+                detail, coverage, List.of(),
+                absenceStandings(byRoster, unclassifiedWeeksByRoster, rosterIds, nameByRoster, avatarByRoster,
+                        managerByRoster), List.of());
     }
 
     /**
@@ -1077,7 +1209,7 @@ public class SeasonSuperlativesService {
      */
     private Superlative unethicalSuperlative(LeagueRepository.LeagueRow league, List<ParsedWeek> parsedWeeks,
                                              Map<String, Player> playersBySleeperId, boolean early,
-                                             Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                             Set<Integer> rosterIds, Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
                                              Map<Integer, Long> managerByRoster) {
         Sport sport = league.sport();
 
@@ -1129,7 +1261,228 @@ public class SeasonSuperlativesService {
             }
         }
 
-        return new Superlative(Kind.UNETHICAL, true, null, early, (double) max, "GAMES", holders, null, detail, null);
+        return new Superlative(Kind.UNETHICAL, true, null, early, (double) max, "GAMES", holders, null, detail, null,
+                List.of(), conductStandings(totalByRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster),
+                List.of());
+    }
+
+    // ------------------------------------------------- full standings (spec 010)
+
+    /*
+     * One function per kind family, each package-private and static so a test can drive it without
+     * Postgres. Every one returns each id in rosterIds exactly once (plan amendment 7 / FR-012: the
+     * universe is every roster_season row, orphans included -- never nameByRoster.keySet()). A source
+     * row whose roster isn't in rosterIds is skipped (plan amendment 13, R11): the universe is the
+     * contract, and the IT fails loudly if the winner's roster ever falls outside it.
+     */
+
+    /** HIGHEST_WEEK / LOWEST_WEEK: each roster's best (or worst) single week, from the same rows the winner uses. */
+    static List<Standing> weekScoreStandings(List<RosterWeekPointsRepository.WeekBreakdown> rows,
+                                             Set<Integer> rosterIds, boolean highest,
+                                             Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                             Map<Integer, Long> managerByRoster) {
+        Map<Integer, Double> bestValue = new HashMap<>();
+        Map<Integer, Integer> bestWeek = new HashMap<>();
+        for (RosterWeekPointsRepository.WeekBreakdown w : rows) {
+            if (!rosterIds.contains(w.rosterId())) continue; // R11: not in the roster universe
+            double v = round2(w.startersPoints());
+            Double cur = bestValue.get(w.rosterId());
+            int c = cur == null ? 0 : Double.compare(v, cur);
+            boolean better = cur == null || (highest ? c > 0 : c < 0);
+            // A roster tying its own extreme keeps the earliest week, so the note is deterministic.
+            boolean earlierTie = cur != null && c == 0 && w.week() < bestWeek.get(w.rosterId());
+            if (better || earlierTie) {
+                bestValue.put(w.rosterId(), v);
+                bestWeek.put(w.rosterId(), w.week());
+            }
+        }
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            Double v = bestValue.get(id);
+            entries.add(v == null
+                    ? new SuperlativeStandings.Entry(team, null, null, "no scored weeks")
+                    : new SuperlativeStandings.Entry(team, v, "week " + bestWeek.get(id), null));
+        }
+        return SuperlativeStandings.rank(entries, !highest);
+    }
+
+    /** One roster's best game for BIGGEST_BLOWOUT / CLOSEST_GAME. */
+    private record MarginPick(double margin, int week, int opponentId, String verb) {}
+
+    /**
+     * BIGGEST_BLOWOUT ({@code closest == false}): each roster's largest winning margin, high to low.
+     * CLOSEST_GAME ({@code closest == true}): each roster's smallest margin in any game, win or lose,
+     * low to high -- so the loser of the closest game shares rank 1 with its winner, even though only
+     * the winner is in {@code holders} (plan amendment 2). The winner is decided exactly as
+     * {@code LeagueRecordService.margin} does ({@code aPoints >= bPoints}), and the margin is a
+     * {@code BigDecimal} subtraction (R9), so a tie the card sees is a tie here.
+     */
+    static List<Standing> marginStandings(List<LeagueMatchupRepository.PairedGame> games, Set<Integer> rosterIds,
+                                          boolean closest, Map<Integer, String> nameByRoster,
+                                          Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
+        Map<Integer, MarginPick> best = new HashMap<>();
+        for (LeagueMatchupRepository.PairedGame g : games) {
+            int cmp = g.aPoints().compareTo(g.bPoints());
+            // B5: a tie is nobody's blowout win. Degenerate case accepted: a season where every game is
+            // tied -- the card would still name a 0-margin holder while standings say "no wins yet".
+            if (!closest && cmp == 0) continue;
+            boolean aWon = cmp >= 0;
+            double margin = (aWon ? g.aPoints().subtract(g.bPoints()) : g.bPoints().subtract(g.aPoints())).doubleValue();
+            if (closest) {
+                String aVerb = cmp == 0 ? "tied with" : aWon ? "won vs" : "lost to";
+                String bVerb = cmp == 0 ? "tied with" : aWon ? "lost to" : "won vs";
+                considerMargin(best, rosterIds, g.aRosterId(), margin, g.week(), g.bRosterId(), aVerb, true);
+                considerMargin(best, rosterIds, g.bRosterId(), margin, g.week(), g.aRosterId(), bVerb, true);
+            } else {
+                considerMargin(best, rosterIds, aWon ? g.aRosterId() : g.bRosterId(), margin, g.week(),
+                        aWon ? g.bRosterId() : g.aRosterId(), "vs", false);
+            }
+        }
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            MarginPick p = best.get(id);
+            if (p == null) {
+                entries.add(new SuperlativeStandings.Entry(team, null, null, closest ? "no games yet" : "no wins yet"));
+                continue;
+            }
+            String opp = nameByRoster.getOrDefault(p.opponentId(), "Roster " + p.opponentId());
+            entries.add(new SuperlativeStandings.Entry(team, p.margin(), p.verb() + " " + opp + " · week " + p.week(), null));
+        }
+        return SuperlativeStandings.rank(entries, closest);
+    }
+
+    private static void considerMargin(Map<Integer, MarginPick> best, Set<Integer> rosterIds, int rosterId,
+                                       double margin, int week, int opponentId, String verb, boolean smallerIsBetter) {
+        if (!rosterIds.contains(rosterId)) return; // R11: not in the roster universe
+        MarginPick cur = best.get(rosterId);
+        boolean take;
+        if (cur == null) {
+            take = true;
+        } else {
+            int c = Double.compare(margin, cur.margin());
+            if (c != 0) take = smallerIsBetter ? c < 0 : c > 0;
+            else take = week < cur.week() || (week == cur.week() && opponentId < cur.opponentId());
+        }
+        if (take) best.put(rosterId, new MarginPick(margin, week, opponentId, verb));
+    }
+
+    /**
+     * CLOSE_WINS / CLOSE_LOSSES: the count of close games. A roster in a paired game but absent from
+     * {@code byRoster} is a real 0; a roster in no paired game at all wasn't measured (R12).
+     */
+    static List<Standing> closeGameStandings(Map<Integer, List<GameDetail>> byRoster, Set<Integer> rostersWithGames,
+                                             Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
+                                             Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            if (!rostersWithGames.contains(id)) {
+                entries.add(new SuperlativeStandings.Entry(team, null, null, "no games yet"));
+                continue;
+            }
+            List<GameDetail> games = byRoster.getOrDefault(id, List.of());
+            List<Integer> weeks = games.stream().map(GameDetail::week).sorted().toList();
+            String note = weeks.isEmpty() ? null
+                    : (weeks.size() == 1 ? "week " : "weeks ")
+                    + weeks.stream().map(String::valueOf).collect(Collectors.joining(", "));
+            entries.add(new SuperlativeStandings.Entry(team, (double) games.size(), note, null));
+        }
+        return SuperlativeStandings.rank(entries, false);
+    }
+
+    /**
+     * LUCKIEST ({@code ascending == false}) / UNLUCKIEST ({@code ascending == true}), from the same
+     * {@link ExpectedWinsService.TeamRow}s the winner is picked from. The value is {@code
+     * winsAboveExpected} unrounded, exactly as {@link #luckSuperlative}'s {@code extreme} is.
+     */
+    static List<Standing> luckStandings(List<ExpectedWinsService.TeamRow> teams, Set<Integer> rosterIds,
+                                        boolean ascending, Map<Integer, String> nameByRoster,
+                                        Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
+        Map<Integer, ExpectedWinsService.TeamRow> byRoster = new HashMap<>();
+        for (ExpectedWinsService.TeamRow t : teams) {
+            if (rosterIds.contains(t.rosterId())) byRoster.put(t.rosterId(), t); // R11
+        }
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            ExpectedWinsService.TeamRow t = byRoster.get(id);
+            entries.add(t == null
+                    ? new SuperlativeStandings.Entry(team, null, null, "no expected-wins row")
+                    : new SuperlativeStandings.Entry(team, t.winsAboveExpected(),
+                            winsText(t.actualWins()) + " actual vs "
+                                    + String.format(Locale.ROOT, "%.2f", t.expectedWins()) + " expected", null));
+        }
+        return SuperlativeStandings.rank(entries, ascending);
+    }
+
+    /** Actual wins can be a half (a tie counts half): "7" for a whole number, "5.5" otherwise. */
+    private static String winsText(double wins) {
+        return wins == Math.rint(wins) ? String.valueOf((long) wins) : String.format(Locale.ROOT, "%.1f", wins);
+    }
+
+    /** MOST_BENCH_POINTS: a roster with no valid lineup week wasn't measured, not a 0. */
+    static List<Standing> benchStandings(Map<Integer, BenchAgg> byRoster, Set<Integer> rosterIds,
+                                         Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                         Map<Integer, Long> managerByRoster) {
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            BenchAgg b = byRoster.get(id);
+            entries.add(b == null
+                    ? new SuperlativeStandings.Entry(team, null, null, "no usable lineup breakdown")
+                    : new SuperlativeStandings.Entry(team, round2(b.pointsLeft()),
+                            b.weeksCounted() + (b.weeksCounted() == 1 ? " week counted" : " weeks counted"), null));
+        }
+        return SuperlativeStandings.rank(entries, false);
+    }
+
+    /** WAIVER_WIRE_WARRIOR: a roster absent from the map credited nothing, which is a real 0. */
+    static List<Standing> waiverStandings(Map<Integer, WaiverPickupAttribution.RosterTotal> byRoster,
+                                          Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
+                                          Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            WaiverPickupAttribution.RosterTotal t = byRoster.get(id);
+            entries.add(new SuperlativeStandings.Entry(holder(id, nameByRoster, avatarByRoster, managerByRoster),
+                    round2(t == null ? 0.0 : t.totalPoints()), null, null));
+        }
+        return SuperlativeStandings.rank(entries, false);
+    }
+
+    /**
+     * JOEL_EMBIID: absent is 0, but absent does not always mean nothing was missed -- every roster with
+     * weeks whose absences couldn't be classified says so on its own row, winners included (plan
+     * amendment 4 / FR-010). The card today says it only for the winners.
+     */
+    static List<Standing> absenceStandings(Map<Integer, AbsenceCost.RosterCost> byRoster,
+                                           Map<Integer, Set<Integer>> unclassifiedWeeksByRoster,
+                                           Set<Integer> rosterIds, Map<Integer, String> nameByRoster,
+                                           Map<Integer, String> avatarByRoster, Map<Integer, Long> managerByRoster) {
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            AbsenceCost.RosterCost c = byRoster.get(id);
+            int unclassified = unclassifiedWeeksByRoster.getOrDefault(id, Set.of()).size();
+            String note = unclassified == 0 ? null
+                    : unclassified + (unclassified == 1 ? " week" : " weeks")
+                    + " couldn't be classified as a bye or a missed game";
+            entries.add(new SuperlativeStandings.Entry(holder(id, nameByRoster, avatarByRoster, managerByRoster),
+                    round2(c == null ? 0.0 : c.totalPointsLost()), note, null));
+        }
+        return SuperlativeStandings.rank(entries, false);
+    }
+
+    /** UNETHICAL: qualifying player-weeks per roster; a roster absent from the map has none, a real 0. */
+    static List<Standing> conductStandings(Map<Integer, Integer> totalByRoster, Set<Integer> rosterIds,
+                                           Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                           Map<Integer, Long> managerByRoster) {
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            entries.add(new SuperlativeStandings.Entry(holder(id, nameByRoster, avatarByRoster, managerByRoster),
+                    (double) totalByRoster.getOrDefault(id, 0), null, null));
+        }
+        return SuperlativeStandings.rank(entries, false);
     }
 
     // -------------------------------------------------------------- shared
@@ -1197,11 +1550,21 @@ public class SeasonSuperlativesService {
     /** Fills each holder's username after the kinds are built, so the kind builders keep their signatures. */
     static Superlative withUsernames(Superlative s, Map<Integer, String> usernameByRoster) {
         List<Holder> holders = s.holders().stream()
-                .map(h -> h.username() != null ? h
-                        : new Holder(h.rosterId(), h.managerId(), h.teamName(), usernameByRoster.get(h.rosterId()), h.avatarId()))
+                .map(h -> withUsername(h, usernameByRoster))
+                .toList();
+        // Spec 010 (plan amendment 3): the standings rows' teams need their username too, or every row
+        // after rank 1 would have none.
+        List<Standing> standings = s.standings().stream()
+                .map(r -> new Standing(r.rank(), withUsername(r.team(), usernameByRoster), r.value(), r.note(),
+                        r.hasValue(), r.missingReason()))
                 .toList();
         return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), holders,
-                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders());
+                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings());
+    }
+
+    private static Holder withUsername(Holder h, Map<Integer, String> usernameByRoster) {
+        return h.username() != null ? h
+                : new Holder(h.rosterId(), h.managerId(), h.teamName(), usernameByRoster.get(h.rosterId()), h.avatarId());
     }
 
     /** Same fallback chain as {@link ExpectedWinsService#forLeague}: member team name, else manager name, else "Roster N". */
