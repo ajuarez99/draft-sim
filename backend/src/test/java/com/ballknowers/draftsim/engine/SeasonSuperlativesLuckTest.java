@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SeasonSuperlativesLuckTest {
 
     private static ExpectedWinsService.TeamRow team(int rosterId, double winsAboveExpected) {
-        return new ExpectedWinsService.TeamRow(rosterId, (long) rosterId, "Team " + rosterId, null,
+        return new ExpectedWinsService.TeamRow(rosterId, (long) rosterId, "Team " + rosterId, null, null,
                 1.0, 1.0 + winsAboveExpected, winsAboveExpected, 0.0,
                 ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING, List.of());
     }

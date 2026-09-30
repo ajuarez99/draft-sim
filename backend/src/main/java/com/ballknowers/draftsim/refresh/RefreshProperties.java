@@ -32,6 +32,11 @@ public record RefreshProperties(@DefaultValue OnVisit onVisit, String secret) {
         return secret != null && !secret.isBlank();
     }
 
+    /** Constant-time check of the daily job's {@code X-Refresh-Secret}; a blank secret matches nothing. */
+    public boolean matchesSecret(String presented) {
+        return com.ballknowers.draftsim.config.SecretCompare.matches(secret, presented);
+    }
+
     /** Hand-set, arbitrary: an active league-season is stale after this long (FR-002, research R3). */
     public static final Duration STALE_AFTER = Duration.ofHours(1);
 

@@ -41,13 +41,15 @@ public class WeeklyReportService {
     private final LeagueSeasonResolver seasons;
     private final PlayerGameRepository playerGames;
     private final GameScoringService gameScoring;
+    private final ScoredWeeks scoredWeeks;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members, PlayerRepository players,
                                SportRulesRegistry rulesRegistry, RealizedLineupService realized,
                                LeagueSeasonResolver seasons, PlayerGameRepository playerGames,
-                               GameScoringService gameScoring) {
+                               GameScoringService gameScoring, ScoredWeeks scoredWeeks) {
+        this.scoredWeeks = scoredWeeks;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.matchups = matchups;
@@ -61,7 +63,7 @@ public class WeeklyReportService {
         this.gameScoring = gameScoring;
     }
 
-    public record Side(int rosterId, String teamName, String avatarId, String record, double points) {}
+    public record Side(int rosterId, String teamName, String username, String avatarId, String record, double points) {}
 
     public record Matchup(Side home, Side away) {}
 
@@ -118,18 +120,39 @@ public class WeeklyReportService {
                          List<Matchup> matchups, List<Performer> topPerformers,
                          List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
                          String basis, List<SectionUnavailable> sectionsUnavailable,
-                         List<Award> awards, List<OmittedAward> awardsOmitted) {
+                         List<Award> awards, List<OmittedAward> awardsOmitted,
+                         int latestScoredWeek, int latestFinalWeek, boolean weekFinal) {
 
-        static Result unavailable(String reason, int season, int week, Sport sport) {
+        /** Shape-test convenience: the latest scored week is taken to be this one. */
+        public Result(boolean available, String reason, int season, Integer requestedSeason,
+                      int week, Sport sport, boolean playersPlayMultiplePerPeriod,
+                      List<Matchup> matchups, List<Performer> topPerformers,
+                      List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
+                      String basis, List<SectionUnavailable> sectionsUnavailable,
+                      List<Award> awards, List<OmittedAward> awardsOmitted) {
+            this(available, reason, season, requestedSeason, week, sport, playersPlayMultiplePerPeriod,
+                    matchups, topPerformers, bestNights, bestWeek, basis, sectionsUnavailable,
+                    awards, awardsOmitted, available ? week : 0, available ? week : 0, available);
+        }
+
+        static Result unavailable(String reason, int season, int week, Sport sport, int latestScoredWeek,
+                                  int latestFinalWeek) {
             return new Result(false, reason, season, null, week, sport, false,
-                    List.of(), List.of(), null, null, null, null, List.of(), List.of());
+                    List.of(), List.of(), null, null, null, null, List.of(), List.of(), latestScoredWeek,
+                    latestFinalWeek, false);
         }
     }
 
     /** Reason code for an award that needs starter identity and cannot have it. */
     static final String STARTERS_NOT_STORED = "STARTERS_NOT_STORED";
 
-    public Optional<Result> forWeek(String sleeperLeagueId, int week) {
+    /**
+     * {@code week <= 0} means "the latest FINAL week", falling back to the latest stored one
+     * while nothing is final yet (an in-progress week 1), so a caller with no week in hand (the page,
+     * opened fresh) gets the most recent report and learns {@code latestScoredWeek} in one call.
+     * With nothing scored the answer is the unavailable shape at week 0.
+     */
+    public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek) {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
@@ -138,15 +161,21 @@ public class WeeklyReportService {
 
         List<RosterWeekPointsRepository.WeekBreakdown> all =
                 weekPoints.breakdownsFor(league.id(), league.season());
+        ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
+        int latestScoredWeek = scored.latestStored();
+        final int week = requestedWeek > 0 ? requestedWeek
+                : scored.latestFinal() > 0 ? scored.latestFinal() : latestScoredWeek;
         List<RosterWeekPointsRepository.WeekBreakdown> thisWeek = all.stream()
                 .filter(w -> w.week() == week).toList();
         if (thisWeek.isEmpty()) {
             return Optional.of(Result.unavailable(
-                    "week " + week + " has not been scored for this league",
-                    league.season(), week, settings.sport()));
+                    week == 0 ? "no week has been scored for this league yet"
+                            : "week " + week + " has not been scored for this league",
+                    league.season(), week, settings.sport(), latestScoredWeek, scored.latestFinal()));
         }
 
         Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> recordByRoster = new HashMap<>();
         Map<Long, String> teamNameByManager = new HashMap<>();
@@ -159,6 +188,7 @@ public class WeeklyReportService {
             String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
             if (name == null) name = s.managerName();
             nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
+            usernameByRoster.put(s.rosterId(), s.managerName());
             avatarByRoster.put(s.rosterId(), s.avatarId());
             recordByRoster.put(s.rosterId(), recordAfter(all, league.season(), week, s.rosterId(),
                     matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)));
@@ -175,9 +205,11 @@ public class WeeklyReportService {
             if (p.season() != league.season() || p.week() != week) continue;
             games.add(new Matchup(
                     new Side(p.aRosterId(), nameByRoster.getOrDefault(p.aRosterId(), "Roster " + p.aRosterId()),
+                            usernameByRoster.get(p.aRosterId()),
                             avatarByRoster.get(p.aRosterId()), recordByRoster.get(p.aRosterId()),
                             p.aPoints() == null ? 0 : p.aPoints().doubleValue()),
                     new Side(p.bRosterId(), nameByRoster.getOrDefault(p.bRosterId(), "Roster " + p.bRosterId()),
+                            usernameByRoster.get(p.bRosterId()),
                             avatarByRoster.get(p.bRosterId()), recordByRoster.get(p.bRosterId()),
                             p.bPoints() == null ? 0 : p.bPoints().doubleValue())));
         }
@@ -310,7 +342,7 @@ public class WeeklyReportService {
 
         return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
                 week, settings.sport(), multipleGames, games, topForResult,
-                bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted));
+                bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted, latestScoredWeek, scored.latestFinal(), scored.isFinal(week)));
     }
 
     /**

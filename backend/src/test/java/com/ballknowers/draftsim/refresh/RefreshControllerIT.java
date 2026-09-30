@@ -106,12 +106,45 @@ class RefreshControllerIT {
                 Long.class, LEAGUE, status);
     }
 
+    /**
+     * Several tests below drive the NEWER season of a chain (1999) as a caller with no
+     * identity. That used to work because a blank identity saw every league. It no
+     * longer does (claude/audit-2026-09-28/01), and MEMBER cannot see a successor
+     * season (membership walks previous_league_id backwards only), so those calls run
+     * as the operator: the request carries the admin token, the one caller for whom
+     * "no identity" still reaches the league.
+     */
+    private static <T> T asOperator(java.util.function.Supplier<T> call) {
+        try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+            return call.get();
+        }
+    }
+
     @Test
     void aStrangerGets404OnBothEndpointsAndStartsNothing() {
         assertEquals(404, controller.trigger(LEAGUE, STRANGER).getStatusCode().value());
         assertEquals(404, controller.status(LEAGUE, STRANGER).getStatusCode().value());
         assertEquals(404, controller.trigger("it-009-no-such-league", MEMBER).getStatusCode().value());
         verifyNoInteractions(history);
+    }
+
+    /**
+     * The header-less case that used to be the way in: no X-Sleeper-User must 404 on both
+     * routes and start nothing (claude/audit-2026-09-28/01, amendment (a)).
+     */
+    @Test
+    void aCallerWithNoIdentityGets404OnBothEndpointsAndStartsNothing() {
+        for (String blank : new String[] {null, "", "  "}) {
+            assertEquals(404, controller.trigger(LEAGUE, blank).getStatusCode().value());
+            assertEquals(404, controller.status(LEAGUE, blank).getStatusCode().value());
+        }
+        verifyNoInteractions(history);
+    }
+
+    @Test
+    void thePlayersRouteRefusesACallerWithNoIdentity() {
+        assertEquals(401, controller.players("nba", null).getStatusCode().value());
+        assertEquals(401, controller.players("nba", " ").getStatusCode().value());
     }
 
     @Test
@@ -215,7 +248,7 @@ class RefreshControllerIT {
                 release.await(20, TimeUnit.SECONDS);
                 return new LeagueHistoryIngestService.Result(2, 0, 0, 0, 0);
             });
-            controller.trigger(newer, null);
+            asOperator(() -> controller.trigger(newer, null));
             assertTrue(started.await(5, TimeUnit.SECONDS));
 
             // The 1998 page shows 1998, which is loaded_complete -- yet the chain is running.
@@ -252,7 +285,7 @@ class RefreshControllerIT {
                 return new LeagueHistoryIngestService.Result(2, 0, 0, 0, 0);
             });
 
-            controller.trigger(newer, null);
+            asOperator(() -> controller.trigger(newer, null));
             assertEquals("RUNNING", body(controller.status(LEAGUE, MEMBER)).get("state"),
                     "the older season's page must see the chain run started from the newer one");
 
@@ -276,7 +309,7 @@ class RefreshControllerIT {
             when(history.ingestChain(any(), eq(newer), any()))
                     .thenReturn(new LeagueHistoryIngestService.Result(2, 0, 0, 0, 0));
 
-            controller.trigger(newer, null);
+            asOperator(() -> controller.trigger(newer, null));
             awaitStateFor(newer, "FRESH");
 
             verify(history).ingestChain(any(), eq(newer), eq(Set.of(LEAGUE)));
@@ -295,7 +328,7 @@ class RefreshControllerIT {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         Map<String, Object> last = null;
         while (System.nanoTime() < deadline) {
-            last = body(controller.status(leagueSleeperId, null));
+            last = body(asOperator(() -> controller.status(leagueSleeperId, null)));
             if (state.equals(last.get("state"))) return last;
             Thread.sleep(25);
         }

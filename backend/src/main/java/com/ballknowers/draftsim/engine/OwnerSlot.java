@@ -66,10 +66,12 @@ public final class OwnerSlot {
      *
      * Three cases, and the last two are the ones worth being explicit about:
      * <ul>
-     *   <li>No {@code X-Sleeper-User} at all: allowed. Same pre-identity
-     *       contract every other route keeps (see
-     *       {@code LeagueMembership.canSee}), and what DEPLOY.md's curl escape
-     *       hatches run on.</li>
+     *   <li>No {@code X-Sleeper-User} at all: <b>refused</b>. This used to be
+     *       allowed ("the pre-identity contract"), which let a header-less curl
+     *       write any seat's pick (claude/audit-2026-09-28/01). The operator's
+     *       draft-night escape hatch is now the admin token, which the caller
+     *       checks before reaching this method
+     *       ({@code LeagueMembership.isAdminRequest}).</li>
      *   <li>The seat maps to no manager: allowed, by necessity. Sleeper returns
      *       a null {@code draft_order} until the commissioner sets it, and
      *       {@code LiveDraftPoller.refreshSeatMap} exists precisely because that
@@ -86,7 +88,7 @@ public final class OwnerSlot {
      */
     public static boolean mayActAsSlot(DraftRepository.DraftRow draft, ManagerRepository managers,
                                        String sleeperUserId, int slot) {
-        if (sleeperUserId == null || sleeperUserId.isBlank()) return true;
+        if (sleeperUserId == null || sleeperUserId.isBlank()) return false;
 
         Object seat = draft.slotToManager().get(String.valueOf(slot));
         if (seat == null) return true;

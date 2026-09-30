@@ -13,6 +13,8 @@ import {
   type StreakRecord,
   type WeeklyScoreRecord,
 } from '../api'
+import { useFailure } from '../useFailure'
+import PersonName from '../components/PersonName'
 import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -365,8 +367,8 @@ function StandingsTable({
                       state={linkState}
                       className="standings-manager"
                     >
-                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.manager} />
-                      {r.manager ?? `roster ${r.rosterId}`}
+                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.teamName ?? r.manager} />
+                      <PersonName teamName={r.teamName} username={r.manager} fallback={`roster ${r.rosterId}`} />
                     </Link>
                   ) : (
                     <span className="muted">roster {r.rosterId} (unowned)</span>
@@ -390,7 +392,7 @@ function StandingsTable({
 export default function LeagueHistory() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [history, setHistory] = useState<LeagueHistoryData | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   const [computing, setComputing] = useState(false)
   // Bumped by the rail when this league's background refresh finishes
@@ -407,7 +409,7 @@ export default function LeagueHistory() {
     setError(null)
     getLeagueHistory(sleeperLeagueId)
       .then(setHistory)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => fail(e))
   }, [sleeperLeagueId, dataVersion])
 
   // Backs the error state's own button. Same call the page used to print as a
@@ -420,7 +422,7 @@ export default function LeagueHistory() {
       await ingestLeagueHistory(sleeperLeagueId)
       setHistory(await getLeagueHistory(sleeperLeagueId))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setLoading(false)
     }
@@ -440,7 +442,7 @@ export default function LeagueHistory() {
       await backfillFinalRanks(sleeperLeagueId)
       setHistory(await getLeagueHistory(sleeperLeagueId))
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setComputing(false)
     }
@@ -467,7 +469,7 @@ export default function LeagueHistory() {
         {error && (
           <div className="error history-error">
             <span>
-              {error.toLowerCase().includes('not found') || error.includes('404')
+              {notFound
                 ? "This league's past seasons haven't been loaded yet."
                 : error}
             </span>

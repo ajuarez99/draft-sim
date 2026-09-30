@@ -11,8 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,10 +57,7 @@ public class RefreshController {
     @PostMapping("/refresh/daily")
     public ResponseEntity<?> daily(@RequestHeader(value = "X-Refresh-Secret", required = false) String presented) {
         if (!props.dailyRouteConfigured()) return ResponseEntity.notFound().build();
-        if (presented == null || !MessageDigest.isEqual(
-                props.secret().getBytes(StandardCharsets.UTF_8), presented.getBytes(StandardCharsets.UTF_8))) {
-            return ResponseEntity.status(401).build();
-        }
+        if (!props.matchesSecret(presented)) return ResponseEntity.status(401).build();
         DailyRefreshService.DailyResult result = daily.runAll();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("date", result.date().toString());
@@ -72,9 +67,23 @@ public class RefreshController {
         return ResponseEntity.status(result.failed() ? 500 : 200).body(out);
     }
 
-    /** The setup flow's player-list fetch, once per sport per UTC day. No secret: its worst case is one fetch a day. */
+    /**
+     * The setup flow's player-list fetch, once per sport per UTC day. No secret, but
+     * it needs a signed-in identity (a header-less caller is refused, like every
+     * other route: claude/audit-2026-09-28/01).
+     *
+     * <p>The "once a day" bound is the steady state, not a guarantee: after one
+     * success every later call that UTC day skips, but concurrent first calls and
+     * calls while Sleeper's player endpoint is failing each run a fetch
+     * ({@code DailyRefreshService.players} has no single-flight). The upsert is
+     * idempotent, so this costs Sleeper traffic, not correctness. Not measured.
+     */
     @PostMapping("/refresh/players")
-    public ResponseEntity<?> players(@RequestParam String sport) {
+    public ResponseEntity<?> players(@RequestParam String sport,
+                                     @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        if (LeagueMembership.isAnonymous(sleeperUserId)) {
+            return ResponseEntity.status(401).body(Map.of("error", "X-Sleeper-User is required"));
+        }
         DailyRefreshService.StepResult r = daily.players(Sport.fromCode(sport));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("outcome", r.outcome().name());

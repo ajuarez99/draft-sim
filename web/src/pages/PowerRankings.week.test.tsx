@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import PowerRankings, { ballotsCountedIn } from './PowerRankings'
+import PowerRankings, { ballotsCountedIn, scoreLabel } from './PowerRankings'
 
 /**
  * One week at a time.
@@ -46,6 +46,7 @@ const memberEntries = (week: number) =>
     rosterId: i + 1,
     managerId: i + 1,
     manager,
+    teamName: null,
     avatarId: null,
     rank: i + 1,
     score: SCORES[i],
@@ -69,10 +70,12 @@ const getPowerRankings = vi.fn(() =>
     playoffOdds: null,
   }),
 )
-const getBallot = vi.fn(() =>
+// Ranks popsharky (roster 2) gave in week 1; the open week has none.
+const MY_WEEK1_ORDER = [2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+const getBallot = vi.fn((_id?: string, week?: number) =>
   Promise.resolve({
     season: 2026,
-    week: currentWeek,
+    week: week ?? currentWeek,
     canSubmit: true,
     canCommission: false,
     commissionerKnown: true,
@@ -86,14 +89,15 @@ const getBallot = vi.fn(() =>
       teamName: manager,
       isMe: i === 1,
     })),
-    mine: null,
+    mine:
+      week === 1 ? { rosterIds: MY_WEEK1_ORDER, submittedAt: '2026-09-10T00:00:00Z' } : null,
   }),
 )
 
 vi.mock('../api', () => ({
   ALL_POWER_RANKING_KINDS: ['COMPUTED_REALIZED', 'COMMISSIONER', 'MEMBER'],
   getPowerRankings: (...args: unknown[]) => getPowerRankings(...(args as [])),
-  getBallot: (...args: unknown[]) => getBallot(...(args as [])),
+  getBallot: (...args: unknown[]) => getBallot(...(args as [string, number?])),
   getLeagueHistory: () => Promise.resolve({ seasons: [] }),
   computePowerRankings: vi.fn(),
   saveCommissionerRanking: vi.fn(),
@@ -164,5 +168,28 @@ describe('a shown week never borrows the live week\'s ballot count', () => {
     // Nothing anywhere claims week 1, and no lag line: one week, agreed on.
     expect(screen.queryByText(/week 1/i)).toBeNull()
     expect(screen.queryByText(/Showing /)).toBeNull()
+  })
+})
+
+describe('Your ballot reads the ladder week, not the open week', () => {
+  it('shows week-1 ranks while week 2 is open and empty', async () => {
+    render(<PowerRankings />)
+    await waitFor(() => expect(getBallot).toHaveBeenCalledWith('1346366555759341568', 1))
+    // popsharky put roster 2 (himself) first: "1st" appears in his column.
+    await waitFor(() => expect(screen.queryAllByText('No ballot').length).toBe(0))
+    expect(screen.getAllByText('1st').length).toBeGreaterThan(0)
+    expect(screen.getByText(/You voted yourself 1st\./)).toBeTruthy()
+    // The open-week editor still answers for week 2.
+    expect(screen.getByText(/Nothing submitted yet for week 2\./)).toBeTruthy()
+  })
+})
+
+describe('scoreLabel carries the unit for its kind', () => {
+  it('covers every kind', () => {
+    expect(scoreLabel({ score: 3.4, week: 1 }, 'MEMBER')).toBe('avg rank 3.40')
+    expect(scoreLabel({ score: 112.4, week: 3 }, 'COMPUTED_REALIZED')).toBe('112.40 pts')
+    expect(scoreLabel({ score: 1233.6, week: 0 }, 'COMPUTED_REALIZED')).toBe('lineup value 1234')
+    expect(scoreLabel({ score: null, week: 3 }, 'COMMISSIONER')).toBe('')
+    expect(scoreLabel({ score: 5, week: 3 }, 'COMMISSIONER')).toBe('')
   })
 })

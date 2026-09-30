@@ -464,3 +464,102 @@ had a sibling: research R10's "regular contributor" denominator (*weeks he playe
 rostered* in code, which silently dropped the award's namesake case. Research text and code
 drifted apart and no test compared them. The review caught it by reading one against the other.
 
+## 20. Fail-open on a missing identity is worse than no scoping at all
+
+**2026-09-28 audit, fixed 2026-09-29.** Every scoping check in the app read `if the header is
+blank, allow`: `LeagueMembership.canSee`, `canSeeManager`, `MockDraftService.mayUse`,
+`OwnerSlot.mayActAsSlot`, and the draft and mock lists. Each was written with a reasonable
+sentence ("the pre-identity contract; nothing that never signs in breaks"), and each was true on
+the day it was written, because the header did not exist yet. Once the header did, the rule
+inverted the incentive: **leaving the header off got more than signing in as a stranger.**
+Measured on production, GET only: `/api/leagues/<id>/analysis` was 200 with no header and 404
+with `X-Sleeper-User: 999999999999`; `/api/drafts` returned every league's drafts with no header
+and `[]` with a stranger's. Locally the same rule let a header-less caller read and pick into
+anyone's mock and write any seat's manual pick.
+
+A missing identity is not a weaker identity, it is the *absence of a claim*, and the only safe
+answer to no claim is nothing. A scoping scheme that fails open rewards opting out, so it is worse
+than none: with no scoping nobody believes the data is private, and with fail-open scoping
+everyone does while the one request shape an attacker needs (the empty one) is the most
+permissive of all. The signed-in path had been tested thoroughly for years; nobody had a reason to
+ask what the *unsigned* path returned, because every browser sent the header.
+
+**What caught it:** the audit sending a request with no header and one with a wrong header and
+diffing the answers. 800 green tests had never made that comparison, because each test named a
+caller. Fixing it found the same class one layer over: five league routes
+(`roster-management`, `transactions`, `expected-wins`, `forecast`, `weekly-report`) had **no
+scoping at all**, header or not, and `/power/compute` labelled "commissioner" checked membership
+only. The new `AccessControlMvcIT` loops every league route through no-header, blank-header and
+stranger, so adding an unscoped route is a failing test.
+
+**The rules:**
+- **No identity means no access.** The operator's way around it is a separate, explicit,
+  server-side secret (`ADMIN_TOKEN`), never "the caller left something out".
+- **Test the absent input next to the wrong one.** For any gate, assert `null`, `""`, `"  "` and
+  a stranger produce the same refusal.
+- **A secret's blank value must fail closed.** `API_TOKEN` blank means *off* (the local-dev
+  default) and `ADMIN_TOKEN` blank means *disabled*; the opposite polarity is deliberate and each
+  has a test, because a blank secret that matches a blank header is the same bug wearing a
+  different hat.
+
+## 21. Ten cached Spring contexts starved Postgres, and the ITs SKIPPED instead of failing
+
+**2026-09-29.** Adding two `@SpringBootTest` configurations (a MockMvc IT with mocked services and
+one with `draftsim.admin.token=` overridden) took 74 integration tests from *run* to *skipped* and
+left `BUILD` line reading fine. Each distinct configuration caches its own Spring context, each
+context opens a Hikari pool of `DB_POOL_SIZE` (10) that stays open for the whole test JVM, and
+Postgres's default `max_connections` is 100, so around ten cached contexts leave nothing for the
+next IT's `@BeforeAll` `DriverManager.getConnection`. That assumption fails, and the class is
+skipped with no message. Same shape as the "backend suite skips ITs silently" note, with a new
+cause: it was not "Postgres is down", it was "Postgres is full".
+
+**The rule:** after adding a `@SpringBootTest` variant, read the skipped count, not just the
+build line. The test JVM now sets `spring.datasource.hikari.maximum-pool-size=3`
+(`build.gradle.kts`), which leaves room for many more contexts.
+
+## 22. An IT run applied a destructive migration to the shared dev database
+
+**2026-09-29.** V25 (`manager_note_private`) deletes every existing manager note, because old
+notes have no recorded author. It was meant to run on the next deploy. Instead, it ran the moment
+the implementing agent ran its integration tests. The ITs boot Spring with Flyway against
+`localhost:5433/draftsim`, the same database the dev servers and every other session on this
+machine use.
+
+The two local notes were gone before anyone had reviewed the migration. Nothing else broke. Flyway
+ignores applied migrations newer than a branch's own (`*:future`), so a pre-V25 branch still booted
+and passed `LeagueMembershipIT` with 0 skipped.
+
+**The rule:**
+- A migration that deletes or rewrites data is live on the shared dev DB as soon as its tests
+  run, not when it merges.
+- Before running the suite on such a branch, snapshot what it will touch:
+  `pg_dump -t <table>`, or copy the rows you care about.
+- Or point the ITs at a scratch database.
+
+Review a destructive migration before its tests run, not after.
+
+## 23. CPU-bound work on virtual threads starved every other request
+
+**2026-09-29.** Tomcat runs request handlers on virtual threads (`spring.threads.virtual.enabled`),
+and `MonteCarloRunner` started one virtual thread per iteration. That meant 5,000 CPU-bound tasks
+that never yield, sharing the same few carrier threads as every request handler. While a sim ran,
+unrelated requests queued behind it.
+
+Measured locally on 12 cores, loading Expected wins:
+- idle: 0.037 s;
+- during a 5,000-iteration sim: 0.61 s;
+- during a 20,000-iteration sim (the old cap, still what production accepts): 3.7 s.
+
+It surfaced as a different bug. A "replace my run" request couldn't get a carrier back after its
+own JDBC calls, so it reached the cancel only after the old run had finished. The lease logic was
+correct, and every unit test passed, because none of them ran the runner and a request handler on
+the same scheduler.
+
+After moving iterations to a fixed platform-thread pool, one thread per core, the same page load
+during a 5,000-iteration sim took 0.23 s, and replacement cancels the old run live (409 at 0.86 s).
+
+**The rule:**
+- Virtual threads are for blocking I/O, not CPU-bound fan-out.
+- Heavy compute goes on a bounded platform pool.
+- A test of cancellation or fairness has to put the heavy work and a request handler on the same
+  scheduler, or it can't see this.

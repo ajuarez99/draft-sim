@@ -75,13 +75,21 @@ the leagues below need it; see `ideas/ad-hoc-league-sizing.md`.
     ./gradlew bootRun
 
     curl localhost:8080/api/health           # weightsLoaded must be true
-    curl -X POST localhost:8080/api/ingest/all/1391509063170293760
+    curl -X POST -H "X-Admin-Token: dev" localhost:8080/api/ingest/all/1391509063170293760
     curl localhost:8080/api/board?limit=40   # eyeball this before trusting a sim
 
     cd web && npm install && npm run dev      # http://localhost:5173
 
 Ingest order matters the first time: players -> leagues -> board. `/api/ingest/all/{leagueId}`
 does all three. It is idempotent; re-run it whenever you want a fresh board.
+
+`/api/ingest/**` needs the admin token, and a blank `ADMIN_TOKEN` (the default) makes it refuse.
+Start the backend with one to run the curl above:
+`./gradlew bootRun --args=--draftsim.admin.token=dev`. Prefer that to `ADMIN_TOKEN=dev ./gradlew
+bootRun`. The environment-variable form can silently not arrive: `bootRun` inherits its
+environment from the Gradle daemon, and a daemon started earlier without `ADMIN_TOKEN` keeps
+refusing (measured 2026-09-29). The startup log says "Admin token ENABLED" or "DISABLED". The
+browser's own setup flows use `/api/setup/**`, which checks league membership instead.
 
 No environment variables are needed locally — every deployment-varying value has a
 local default. `docker compose --profile full up --build` runs the production image
@@ -127,7 +135,8 @@ serverless mode can still put it to sleep.
     activity.
 - **Checking a league against Sleeper**: `python scripts/check-weeks-vs-sleeper.py <base-url>
   <league-id>` compares every regular-season week's adds and team points. It's read-only.
-- The manual `/api/ingest/*` endpoints still exist, for development.
+- The manual `/api/ingest/*` endpoints still exist, for development and operators; they need
+  `X-Admin-Token` (see DEPLOY.md's security posture).
 
 ## Layout
 

@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueRecordService;
 import com.ballknowers.draftsim.engine.ManagerCareerService;
 import com.ballknowers.draftsim.engine.MemberRankingService;
+import com.ballknowers.draftsim.engine.ScoredWeeks;
 import com.ballknowers.draftsim.engine.PlayoffOddsService;
 import com.ballknowers.draftsim.engine.PowerRankingService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
@@ -51,6 +52,7 @@ public class LeagueHistoryController {
     private final PlayoffOddsService playoffOdds;
     private final LeagueRecordService records;
     private final ManagerCareerService careers;
+    private final ScoredWeeks scoredWeeks;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                    PowerRankingService power, ProfileService profiles,
@@ -58,7 +60,8 @@ public class LeagueHistoryController {
                                    LeagueMemberRepository leagueMembers, RankingBallotRepository ballots,
                                    MemberRankingService memberRankings, OwnerProperties ownerProperties,
                                    PlayoffOddsService playoffOdds, LeagueRecordService records,
-                                   ManagerCareerService careers) {
+                                   ManagerCareerService careers, ScoredWeeks scoredWeeks) {
+        this.scoredWeeks = scoredWeeks;
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
@@ -115,8 +118,18 @@ public class LeagueHistoryController {
             // from this response; reading the always-null r.complete() instead
             // would have made every league-scoped season silently lose its
             // champion, finished or not.
+            // Team name first, username second on every league page: this
+            // season's own team name (it changes year to year), falling back to
+            // the username the row already carries.
+            Map<Long, String> teamNames = teamNamesByManager(league.id());
             List<Map<String, Object>> standings = rosterSeasons.forLeague(league.id()).stream()
-                    .map(r -> withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks))
+                    .map(r -> {
+                        Map<String, Object> row = withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks);
+                        // Mutable map: teamName is legitimately null for an unowned roster.
+                        row.put("teamName", r.managerId() == null ? null
+                                : teamNames.getOrDefault(r.managerId(), r.managerName()));
+                        return row;
+                    })
                     .toList();
             Map<String, Object> season = new LinkedHashMap<>();
             season.put("season", league.season());
@@ -497,7 +510,14 @@ public class LeagueHistoryController {
         LeagueRepository.LeagueRow row = league.get();
 
         PowerRankingService.SportState state = power.sportState(row.sport());
-        var snapshots = power.snapshots(row.id());
+        // A computed (COMPUTED_REALIZED) ranking for a week past the latest FINAL one was written
+        // from a partial or unplayed week; ignored on read, kept in the table. Week 0 (the
+        // preseason baseline) and the human rankings (COMMISSIONER, MEMBER), which are opinions
+        // about the open week, are never filtered.
+        int latestFinal = scoredWeeks.of(row.id()).latestFinal();
+        var snapshots = power.snapshots(row.id()).stream()
+                .filter(s -> !("COMPUTED_REALIZED".equals(s.kind()) && s.week() > 0 && s.week() > latestFinal))
+                .toList();
 
         List<Map<String, Object>> entries = new ArrayList<>(
                 snapshots.stream().map(LeagueHistoryController::snapshotRow).toList());
@@ -515,6 +535,14 @@ public class LeagueHistoryController {
         // with, and the client renders "--" for it -- the odds shown against a
         // week are the odds AS OF that week, never last week's borrowed.
         attachPlayoffOdds(entries, playoffOdds.madePctByWeek(row.id(), row.season()));
+
+        // Every entry (computed and MEMBER alike) names its team, so the page can
+        // put the team first and the username second without a second lookup.
+        Map<Long, String> teamNames = teamNamesByManager(row.id());
+        for (Map<String, Object> e : entries) {
+            Object managerId = e.get("managerId");
+            e.put("teamName", managerId == null ? null : teamNames.getOrDefault((Long) managerId, (String) e.get("manager")));
+        }
 
         Map<String, Object> sportState = new LinkedHashMap<>();
         sportState.put("week", state.week());
@@ -550,6 +578,15 @@ public class LeagueHistoryController {
             Double pct = week.get((Integer) entry.get("rosterId"));
             if (pct != null) entry.put("makesPlayoffsPct", pct);
         }
+    }
+
+    /** Sleeper's per-league team name by manager; the ingest already falls back to the display name and drops "TBD". */
+    private Map<Long, String> teamNamesByManager(long leagueId) {
+        Map<Long, String> out = new HashMap<>();
+        for (com.ballknowers.draftsim.store.LeagueMemberRepository.MemberRow m : leagueMembers.forLeague(leagueId)) {
+            if (m.teamName() != null && !m.teamName().isBlank()) out.put(m.managerId(), m.teamName());
+        }
+        return out;
     }
 
     private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {
@@ -819,11 +856,36 @@ public class LeagueHistoryController {
         Optional<LeagueRepository.LeagueRow> league = membership.visibleLeague(sleeperId, sleeperUserId);
         if (league.isEmpty()) return ResponseEntity.notFound().build();
 
+        // The UI labels this "Recompute (commissioner)" and shows it only when
+        // ballot.canCommission, but the route used to check membership alone
+        // (claude/audit-2026-09-28/10). Same two gates as the other commissioner
+        // writes: the admin token gates, the commissioner identity backs it up.
+        // An operator curling this passes the commissioner's X-Sleeper-User too.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        if (!membership.canCommission(league.get().id(), sleeperUserId)) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "only this league's Sleeper commissioner may recompute the power rankings"));
+        }
+
+        // The week-0 preseason baseline does not depend on the requested week or on finality.
         var week0 = power.computeWeek0IfMissing(league.get().id(), sleeperId, season);
-        var realized = power.computeRealized(league.get().id(), season, week);
+
+        // The server, not the caller, keeps a partial week out of a snapshot: a request for an
+        // in-progress week (the power rankings button sends the open week) writes no realized
+        // ranking for it, and odds run through the latest FINAL week instead. Finality is
+        // ScoredWeeks' (spec 009 WeekFinality; no fetch rows or loaded_complete = all final).
+        var scored = scoredWeeks.of(league.get().id());
+        boolean weekFinal = scored.isFinal(week);
+        int oddsThrough = weekFinal ? week : Math.min(week, scored.latestFinal());
+
+        var realized = weekFinal
+                ? power.computeRealized(league.get().id(), season, week)
+                : new com.ballknowers.draftsim.store.PowerRankingRepository.Entry[0];
         // Same trigger as the box-score snapshot, deliberately: odds are never
         // computed on a page load (claude/playoff-odds.md).
-        var odds = playoffOdds.compute(league.get().id(), season, week);
+        var odds = oddsThrough >= 1
+                ? playoffOdds.compute(league.get().id(), season, oddsThrough)
+                : java.util.List.<com.ballknowers.draftsim.store.PlayoffOddsRepository.Entry>of();
 
         // LinkedHashMap, not Map.of: the reason below is legitimately absent on
         // the happy path, and Map.of throws on a null value.
@@ -831,13 +893,23 @@ public class LeagueHistoryController {
         response.put("week0", week0.entries().length);
         response.put("realized", realized.length);
         response.put("playoffOdds", odds.size());
+        // The week the odds were ACTUALLY computed through, which is the requested week only
+        // when that week is final. Absent when no week is final yet, with the reason beside it.
+        if (oddsThrough >= 1) {
+            response.put("playoffOddsThroughWeek", oddsThrough);
+        } else {
+            response.put("playoffOddsSkipped", "no week of this season is final yet, so there is nothing to forecast from");
+        }
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess
         // whether the snapshot failed to persist. A zero at week 0 usually
         // means it was already set (write-once), which is not a gap -- but it
         // can also mean the league has not drafted, and that one IS reported.
-        if (realized.length == 0) {
+        if (!weekFinal) {
+            response.put("realizedSkipped", "week " + week + " is not final yet (scores can still change), so no ranking was saved for it"
+                    + (oddsThrough >= 1 ? "; odds ran through week " + oddsThrough : ""));
+        } else if (realized.length == 0) {
             response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
         }
         // Week 0 has one gap worth reporting and only one: a league that has
@@ -858,8 +930,8 @@ public class LeagueHistoryController {
      * <p><b>claude/plan-review-power-rankings-ballots.md finding 11.2 and
      * 11.3 -- both deliberate regressions from today's behaviour, on
      * purpose.</b> This endpoint used to accept ANY caller, including
-     * anonymous ({@code visibleLeague}'s {@code canSee} returns true for a
-     * blank header) and ANY week. After the ballots feature both are gated:
+     * anonymous ({@code visibleLeague}'s {@code canSee} used to return true for a
+     * blank header; it no longer does) and ANY week. After the ballots feature both are gated:
      * only a Sleeper commissioner (or the configured app owner) may save,
      * and only for the current week -- the same "no backdating after seeing
      * how the games went" argument {@code POST /ballot} makes for twelve
@@ -883,6 +955,10 @@ public class LeagueHistoryController {
             return ResponseEntity.badRequest().body(Map.of("message", "season and week are required"));
         }
 
+        // The admin token is what actually gates (claude/audit-2026-09-28/04, option
+        // D): the commissioner identity below is a header anyone can copy from
+        // Sleeper's public league-users list. Both are required.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
         if (!membership.canCommission(row.id(), sleeperUserId)) {
             boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
             String message = commissionerKnown

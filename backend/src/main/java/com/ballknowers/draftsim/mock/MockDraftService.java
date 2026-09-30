@@ -332,10 +332,14 @@ public class MockDraftService {
 
     /**
      * This caller's mock sessions, newest first. Backs the picker screen's
-     * "Mock drafts" list. A null {@code sleeperUserId} sees everything, as it
-     * did before sessions had owners at all (V8).
+     * "Mock drafts" list. A null or blank {@code sleeperUserId} now sees
+     * <b>nothing</b> (it used to see every session in the database --
+     * claude/audit-2026-09-28/01); a valid admin token still sees them all.
      */
     public List<MockDraftRepository.SessionSummary> listSessions(String sleeperUserId) {
+        if (sleeperUserId == null || sleeperUserId.isBlank()) {
+            return membership.isAdminRequest() ? mockDrafts.allSessionsFor(null) : List.of();
+        }
         return mockDrafts.allSessionsFor(sleeperUserId);
     }
 
@@ -355,10 +359,17 @@ public class MockDraftService {
      * Whether this caller may read or pick into this session.
      *
      * Three cases, and the middle one is the reason this exists: an owned
-     * session is only its owner's, an unowned session (V8's closed set of
-     * rows created before the column) is anyone's, and a caller with no
-     * identity header at all keeps the pre-V8 behavior so nothing that never
-     * signs in breaks.
+     * session is only its owner's, and an unowned session (V8's closed set of
+     * rows created before the column, {@code owner_sleeper_user_id is null})
+     * stays usable by ANY signed-in identity -- a deliberate, documented
+     * legacy carve-out, since those rows have no owner to defer to and cannot
+     * be created any more (create now requires an identity).
+     *
+     * <p>The third case changed (claude/audit-2026-09-28/01): a caller with
+     * <b>no identity header at all is refused</b>. It used to be allowed
+     * "so nothing that never signs in breaks", which meant an anonymous caller
+     * could read and pick into anyone's mock -- ids are a sequence, so they
+     * enumerate. A valid {@code X-Admin-Token} is the operator override.
      *
      * This is scoping, not security: {@code X-Sleeper-User} is an unverified
      * claim, so anyone who knows a Sleeper id can present it. It stops two
@@ -367,7 +378,7 @@ public class MockDraftService {
      * Real auth is the answer to that; see DEPLOY.md's "Multiple people".
      */
     private boolean mayUse(long id, String sleeperUserId) {
-        if (sleeperUserId == null || sleeperUserId.isBlank()) return true;
+        if (sleeperUserId == null || sleeperUserId.isBlank()) return membership.isAdminRequest();
         Optional<Optional<String>> owner = mockDrafts.ownerOf(id);
         if (owner.isEmpty()) return true;               // no such session; let the caller 404 it normally
         return owner.get().map(sleeperUserId::equals).orElse(true);

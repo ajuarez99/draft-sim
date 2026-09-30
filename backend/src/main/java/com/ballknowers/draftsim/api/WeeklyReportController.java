@@ -1,9 +1,11 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.WeeklyReportService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,14 +23,21 @@ import java.util.Map;
 public class WeeklyReportController {
 
     private final WeeklyReportService weeklyReport;
+    private final LeagueMembership membership;
 
-    public WeeklyReportController(WeeklyReportService weeklyReport) {
+    public WeeklyReportController(WeeklyReportService weeklyReport, LeagueMembership membership) {
         this.weeklyReport = weeklyReport;
+        this.membership = membership;
     }
 
     @GetMapping("/leagues/{sleeperId}/weekly-report/{week}")
     public ResponseEntity<Map<String, Object>> weeklyReport(@PathVariable String sleeperId,
-                                                            @PathVariable int week) {
+                                                            @PathVariable int week,
+                                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped like every other league route: no identity, or an identity that is not in
+        // this league, is the same 404 as a league that does not exist. This route had no
+        // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         return weeklyReport.forWeek(sleeperId, week)
                 .map(r -> ResponseEntity.ok(body(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -41,6 +50,13 @@ public class WeeklyReportController {
         out.put("season", r.season());
         out.put("requestedSeason", r.requestedSeason());
         out.put("week", r.week());
+        // The newest week with stored scores, 0 when none: the page's default week and the top of
+        // its week input. Present on every shape.
+        out.put("latestScoredWeek", r.latestScoredWeek());
+        // Final, and whether THIS week is: an in-progress week is shown on purpose or as the
+        // fallback when nothing is final yet, and the page has to say scores can still change.
+        out.put("latestFinalWeek", r.latestFinalWeek());
+        out.put("weekFinal", r.weekFinal());
         out.put("sport", r.sport().code());
         // Stated rather than inferred: the client renders from a fact the server
         // asserts, not by guessing the sport's rules from which arrays it finds.
@@ -160,6 +176,7 @@ public class WeeklyReportController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("rosterId", s.rosterId());
         out.put("teamName", s.teamName());
+        out.put("username", s.username());
         out.put("avatarId", s.avatarId());
         out.put("record", s.record());
         out.put("points", s.points());

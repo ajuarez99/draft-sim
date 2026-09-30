@@ -1,7 +1,14 @@
 // Types mirror the Java records in engine/SimulationResult.java. They are
 // hand-maintained; if you change a record over there, change it here.
+import { ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
+import {
+  askForCommissionerKey,
+  clearCommissionerKey,
+  getCommissionerKey,
+  setCommissionerKey,
+} from './commissionerKey'
 
 export type PlayerRef = {
   id: number
@@ -153,11 +160,21 @@ export type SimRequest = {
   seed?: number
 }
 
+export { ApiError, isNotFound }
+
+async function apiError(res: Response): Promise<ApiError> {
+  // Several controllers answer 404 with an empty body, so a parse failure is normal.
+  const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
+  const retryAfter = Number(res.headers?.get?.('Retry-After'))
+  return new ApiError(
+    res.status,
+    body.error ?? body.message ?? undefined,
+    Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+  )
+}
+
 async function json<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
-  }
+  if (!res.ok) throw await apiError(res)
   return res.json() as Promise<T>
 }
 
@@ -194,6 +211,49 @@ function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const userId = currentUserId()
   if (userId) headers.set('X-Sleeper-User', userId)
   return fetch(apiUrl(path), { ...init, headers })
+}
+
+/**
+ * True when the server refused because the request lacked a valid admin token
+ * (claude/audit-2026-09-28/04, option D) -- as opposed to any other 403, such as
+ * "you are not this league's commissioner". Reads a clone, so the caller can still
+ * read the body.
+ */
+async function isAdminRefusal(res: Response): Promise<boolean> {
+  if (res.status !== 403) return false
+  const body: { code?: string } = await res.clone().json().catch(() => ({}))
+  return body.code === 'admin_token_required'
+}
+
+/**
+ * `apiFetch` for the commissioner-only actions, and only those: sends the saved
+ * commissioner key as `X-Admin-Token`. If the server refuses for want of a valid
+ * key, asks for it ONCE, saves it (see commissionerKey.ts) and retries once; a key
+ * that is refused again is forgotten so it is not silently resent forever.
+ *
+ * Every other call stays on plain `apiFetch`, so the key never rides along on a
+ * request that does not need it. Returns the final response either way; the caller
+ * turns a still-refused 403 into an error with the server's message.
+ */
+async function commissionerFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const send = (): Promise<Response> => {
+    const headers = new Headers(init.headers)
+    const key = getCommissionerKey()
+    if (key) headers.set('X-Admin-Token', key)
+    return apiFetch(path, { ...init, headers })
+  }
+
+  let res = await send()
+  if (!(await isAdminRefusal(res))) return res
+
+  const hadKey = getCommissionerKey() != null
+  const entered = askForCommissionerKey(hadKey)
+  if (!entered) return res
+  setCommissionerKey(entered)
+
+  res = await send()
+  if (await isAdminRefusal(res)) clearCommissionerKey()
+  return res
 }
 
 export const getSeats = (draftId: string) =>
@@ -367,18 +427,23 @@ export type TrackResponse = {
 export const trackDraft = (sleeperDraftId: string) =>
   apiFetch(`/api/drafts/${sleeperDraftId}/track`, { method: 'POST' }).then(json<TrackResponse>)
 
+// The setup stages below call /api/setup/*, NOT /api/ingest/*. The ingest routes
+// now need the server's admin token (claude/audit-2026-09-28/01), which a browser
+// must never hold; the setup routes do the same work but are authorised by
+// membership instead (MemberSetupController): the caller must be signed in and
+// appear in the league, by our own data or by Sleeper's league-users list.
+//
 // Scoped to the one league being added -- unlike /api/ingest/all, this doesn't
 // re-download the entire player pool or rebuild the global board/profiles.
 export const ingestLeague = (sleeperLeagueId: string) =>
-  apiFetch(`/api/ingest/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/league/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
-// The three other /api/ingest/* sub-routes, called individually rather than
-// through /api/ingest/all/{id} -- claude/user-identity-and-onboarding.md §5d:
-// `all` runs three sequential Sleeper crawls plus a rebuild and can exceed a
-// 30-60s platform HTTP timeout on a first-ever ingest, and these sub-routes
-// exist precisely so a caller can split it and show staged progress instead.
-export const ingestPlayers = (sport: Sport) =>
-  apiFetch(`/api/ingest/players?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+// The other setup stages, called individually rather than through one combined
+// call -- claude/user-identity-and-onboarding.md §5d: `all` runs three sequential
+// Sleeper crawls plus a rebuild and can exceed a 30-60s platform HTTP timeout on
+// a first-ever ingest, and splitting it lets the UI show staged progress instead.
+// (The player list is `refreshPlayers` below; there is no browser-facing twin of
+// /api/ingest/players any more.)
 
 /**
  * Mirrors RefreshController.players's body (contracts/refresh-api.md). `detail` is
@@ -394,23 +459,23 @@ export type RefreshPlayersResult = {
 /**
  * The setup flow's player-list fetch, gated to once per sport per UTC day so a
  * burst of new leagues costs Sleeper one request, not one each (FR-009).
- * `ingestPlayers` above is unchanged and still always fetches.
+ * Needs a signed-in identity (the server refuses a header-less caller).
  */
 export const refreshPlayers = (sport: Sport) =>
   apiFetch(`/api/refresh/players?sport=${sport}`, { method: 'POST' }).then(json<RefreshPlayersResult>)
 
 export const ingestAdp = (sport: Sport) =>
-  apiFetch(`/api/ingest/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/adp?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export const ingestBoard = (sport: Sport) =>
-  apiFetch(`/api/ingest/board?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/board?sport=${sport}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 // Walks a league's `previous_league_id` chain and stores each season's
 // standings. Backs the "Load past seasons" button on the history page --
 // which used to be a `POST /api/ingest/league-history/{id}` printed on screen
-// for the reader to run in a terminal.
+// for the reader to run in a terminal. Now the membership-checked setup twin.
 export const ingestLeagueHistory = (sleeperLeagueId: string) =>
-  apiFetch(`/api/ingest/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
+  apiFetch(`/api/setup/league-history/${sleeperLeagueId}`, { method: 'POST' }).then(json<Record<string, unknown>>)
 
 export type ManualTendencies = {
   reachBias: number | null
@@ -452,7 +517,11 @@ export type ManagerSummary = {
 export const getManagers = (sport: Sport) =>
   apiFetch(`/api/managers?sport=${sport}`).then(json<ManagerSummary[]>)
 
-export const setTendencies = (managerId: number, sport: Sport, body: ManualTendencies) =>
+// Only `note` is writable. The server answers 400 to a body carrying a non-null
+// reachBias or unpredictability (claude/audit-2026-09-28/02), and a note is
+// private to the caller (V25): the `note` and `stated.note` fields on
+// ManagerSummary are always the signed-in user's own.
+export const setTendencies = (managerId: number, sport: Sport, body: { note: string | null }) =>
   apiFetch(`/api/managers/${managerId}/tendencies?sport=${sport}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -690,6 +759,8 @@ export type StandingRow = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** This season's team name (league history rows only; manager-history rows omit it). */
+  teamName?: string | null
   avatarId: string | null
   wins: number | null
   losses: number | null
@@ -1181,6 +1252,8 @@ export type PowerRankingEntry = {
   rosterId: number
   managerId: number | null
   manager: string | null
+  /** Sleeper team name for this league, falling back to the username; null for an unowned roster. */
+  teamName: string | null
   avatarId: string | null
   rank: number
   score: number | null
@@ -1408,6 +1481,14 @@ export type LeagueAnalysis = {
   projections: AnalysisProjections
   matchups: AnalysisMatchups
   scores: AnalysisScores
+  /** Every roster's two names, present even when a block is unavailable. */
+  teams: AnalysisTeamLabel[]
+}
+
+export type AnalysisTeamLabel = {
+  rosterId: number
+  teamName: string
+  username: string | null
 }
 
 /**
@@ -1422,9 +1503,19 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
   ).then(json<LeagueAnalysis>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
-  }).then(json<{ week0: number; realized: number; realizedSkipped?: string }>)
+  }).then(
+    json<{
+      week0: number
+      realized: number
+      realizedSkipped?: string
+      /** The week the odds were computed through: the requested week only when it is final. */
+      playoffOddsThroughWeek?: number
+      /** Present instead of `playoffOddsThroughWeek` when no week is final yet. */
+      playoffOddsSkipped?: string
+    }>,
+  )
 
 export const saveCommissionerRanking = (
   sleeperLeagueId: string,
@@ -1432,7 +1523,7 @@ export const saveCommissionerRanking = (
   week: number,
   rosterIds: number[],
 ) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ season, week, rosterIds }),
@@ -1450,8 +1541,7 @@ export async function streamSimulation(
     signal,
   })
   if (!res.ok || !res.body) {
-    const body = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
 
   const reader = res.body.pipeThrough(new TextDecoderStream()).getReader()
@@ -1496,6 +1586,39 @@ export async function streamSimulation(
 
   if (!result) throw new Error('stream ended without a result')
   return result
+}
+
+/**
+ * `streamSimulation` for a resim the user did not explicitly ask for (a pick
+ * landing, a locked-in choice). The backend waits briefly for a simulation
+ * permit and then answers 429 + Retry-After (audit 05); on draft night every
+ * tab resimulates at once, so a 429 here is expected weather, not a failure.
+ * Retry quietly, up to `maxRetries` times, honouring Retry-After with a capped
+ * backoff. The caller keeps its previous board on screen meanwhile. Anything
+ * other than a 429, or a 429 that survives every retry, is thrown as-is.
+ * A user-initiated "Run" should call `streamSimulation` directly and show the
+ * error at once.
+ */
+export async function streamSimulationQuietly(
+  req: SimRequest,
+  onProgress: (fraction: number) => void,
+  signal?: AbortSignal,
+  opts: { maxRetries?: number; capMs?: number } = {},
+): Promise<SimulationResult> {
+  const maxRetries = opts.maxRetries ?? 3
+  const capMs = opts.capMs ?? 8000
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await streamSimulation(req, onProgress, signal)
+    } catch (e) {
+      if (!(e instanceof ApiError) || e.status !== 429 || attempt >= maxRetries || signal?.aborted) throw e
+      const waitMs = Math.min(capMs, (e.retryAfterSeconds ?? 2) * 1000 * (attempt + 1))
+      await new Promise<void>((resolve, reject) => {
+        const id = setTimeout(resolve, waitMs)
+        signal?.addEventListener('abort', () => { clearTimeout(id); reject(e) }, { once: true })
+      })
+    }
+  }
 }
 
 // --- claude/power-rankings-ballots.md: member ballots (power-ranking mode 2) ---
@@ -1564,6 +1687,8 @@ export type RosterManagementTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   totalPoints: number
   potentialPoints: number
@@ -1608,6 +1733,8 @@ export type ExpectedWinsTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   expectedWins: number
   actualWins: number
@@ -1646,6 +1773,8 @@ export type ForecastTeam = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   playoffOdds: number
   averageWins: number
@@ -1666,6 +1795,18 @@ export type SeasonForecast = {
   iterations?: number
   model?: string | null
   teams: ForecastTeam[]
+  /**
+   * The newest week with stored scores (0 when none), in progress or not. `week` is the
+   * week the stored snapshot was taken at. Present on every shape, refusals included.
+   */
+  latestScoredWeek: number
+  /**
+   * The newest FINAL week (0 when none): the one the "behind" notice counts against and the
+   * recompute targets, so an in-progress week never reads as a week scored since the forecast.
+   */
+  latestFinalWeek: number
+  /** Display only: whether to offer the recompute button. The route re-checks. */
+  canCommission: boolean
 }
 
 export const getSeasonForecast = (sleeperLeagueId: string) =>
@@ -1676,6 +1817,8 @@ export const getSeasonForecast = (sleeperLeagueId: string) =>
 export type WeeklySide = {
   rosterId: number
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
   record: string
   points: number
@@ -1747,7 +1890,14 @@ export type WeeklyReport = {
   reason?: string | null
   season: number
   requestedSeason?: number | null
+  /** The week this report is about. For a request of week 0 ("latest"), the resolved week. */
   week: number
+  /** The newest STORED week, 0 when none: the top of the week input (an in-progress week can be viewed on purpose). */
+  latestScoredWeek: number
+  /** The newest FINAL week, 0 when none: what week 0 ("latest") resolves to when any week is final. */
+  latestFinalWeek: number
+  /** Whether `week` is final. False means scores can still change; the page says so. */
+  weekFinal: boolean
   sport: Sport
   playersPlayMultiplePerPeriod: boolean
   matchups: WeeklyMatchup[]
@@ -1765,6 +1915,7 @@ export type WeeklyReport = {
   awardsOmitted: WeeklyOmittedAward[]
 }
 
+/** `week` 0 asks for the latest scored week; the response's `week` says which that was. */
 export const getWeeklyReport = (sleeperLeagueId: string, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-report/${week}`).then(json<WeeklyReport>)
 
@@ -1779,6 +1930,8 @@ export type SuperlativeHolder = {
   rosterId: number
   managerId: number | null
   teamName: string
+  /** Sleeper username, shown under the team name; null for an unowned roster. */
+  username: string | null
   avatarId: string | null
 }
 
@@ -2004,8 +2157,7 @@ export const fetchConductList = (sleeperLeagueId: string) =>
  */
 async function conductListResult<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ message: res.statusText }))
-    throw new Error(body.message ?? `HTTP ${res.status}`)
+    throw await apiError(res)
   }
   // DELETE returns 204 with no body.
   if (res.status === 204) return undefined as T
@@ -2017,7 +2169,7 @@ export const saveConductEntry = (
   sleeperLeagueId: string,
   entry: { playerId: string; reason: string; appliesFromWeek: number },
 ) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
@@ -2025,7 +2177,7 @@ export const saveConductEntry = (
 
 /** 204 on success; throws with the server's message on 403, or a 404 when entryId belongs to a different league. */
 export const deleteConductEntry = (sleeperLeagueId: string, entryId: number) =>
-  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
+  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
     method: 'DELETE',
   }).then((res) => conductListResult<void>(res))
 

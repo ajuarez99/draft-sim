@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DraftPicker from './DraftPicker'
-import type { SleeperLeague } from '../api'
+import type { DraftSummary, SleeperLeague } from '../api'
 
 vi.mock('react-router-dom', () => ({
   // A plain <a> passthrough is enough for <Link> -- same convention as
@@ -139,5 +139,35 @@ describe('DraftPicker "From Sleeper"', () => {
     await waitFor(() => expect(refreshLeague).toHaveBeenCalledWith('999'))
     await waitFor(() => expect(getDrafts).toHaveBeenCalledTimes(2))
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument()
+  })
+})
+
+describe('DraftPicker hero subtitle', () => {
+  const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
+    id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
+    teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
+    previousLeagueId: null, sport: 'nfl', ...over,
+  })
+  const drafts = [
+    draftRow({}),
+    draftRow({ id: 2, sleeperDraftId: 'd2', leagueId: 2, leagueName: 'Hoops League', sleeperLeagueId: 'L2', sport: 'nba', rounds: 13, teams: 10 }),
+  ]
+
+  beforeEach(() => {
+    getDrafts.mockResolvedValue(drafts)
+    getSleeperUserLeagues.mockResolvedValue([])
+    localStorage.clear()
+  })
+
+  it('names no league under "All sports"', async () => {
+    render(<DraftPicker />)
+    expect(await screen.findByText(/seat the real managers from any of your leagues/)).toBeInTheDocument()
+    expect(document.querySelector('.page-head strong')).toBeNull()
+  })
+
+  it('names the newest league in the chosen sport, never a football one under NBA', async () => {
+    localStorage.setItem('bk-sport-filter', 'nba')
+    render(<DraftPicker />)
+    await waitFor(() => expect(document.querySelector('.page-head strong')?.textContent).toBe('Hoops League'))
   })
 })

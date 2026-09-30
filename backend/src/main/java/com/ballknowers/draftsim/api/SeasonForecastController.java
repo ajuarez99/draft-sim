@@ -1,9 +1,11 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.PlayoffOddsService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,23 +29,42 @@ import java.util.Map;
 public class SeasonForecastController {
 
     private final PlayoffOddsService playoffOdds;
+    private final LeagueMembership membership;
 
-    public SeasonForecastController(PlayoffOddsService playoffOdds) {
+    public SeasonForecastController(PlayoffOddsService playoffOdds, LeagueMembership membership) {
         this.playoffOdds = playoffOdds;
+        this.membership = membership;
     }
 
     @GetMapping("/leagues/{sleeperId}/forecast")
-    public ResponseEntity<Map<String, Object>> forecast(@PathVariable String sleeperId) {
+    public ResponseEntity<Map<String, Object>> forecast(@PathVariable String sleeperId,
+                                                        @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped like every other league route: no identity, or an identity that is not in
+        // this league, is the same 404 as a league that does not exist. This route had no
+        // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
+        var visible = membership.visibleLeague(sleeperId, sleeperUserId);
+        if (visible.isEmpty()) return ResponseEntity.notFound().build();
+        // Display only: whether to OFFER the recompute button. The route itself enforces
+        // the admin token and the commissioner identity (POST /power/compute).
+        boolean canCommission = membership.canCommission(visible.get().id(), sleeperUserId);
         return playoffOdds.forecast(sleeperId)
-                .map(f -> ResponseEntity.ok(body(f)))
+                .map(f -> ResponseEntity.ok(body(f, canCommission)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    private static Map<String, Object> body(PlayoffOddsService.Forecast f) {
+    /* package-private so the contract test can pin the shape without a database. */
+    static Map<String, Object> body(PlayoffOddsService.Forecast f, boolean canCommission) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("available", f.available());
         out.put("season", f.season());
         out.put("requestedSeason", f.requestedSeason());
+        // How far the league has scored, beside the week the snapshot was taken at, so the page
+        // can say the forecast is behind. Present on every shape, refusals included.
+        // Stored, and FINAL (see ScoredWeeks): the notice counts final weeks only, so an
+        // in-progress week never reads as "a week scored since this forecast".
+        out.put("latestScoredWeek", f.latestScoredWeek());
+        out.put("latestFinalWeek", f.latestFinalWeek());
+        out.put("canCommission", canCommission);
         if (!f.available()) {
             // A named reason, not an empty table: "this league's seeding is not
             // modelled" and "no week has been scored" call for different words
@@ -61,6 +82,7 @@ public class SeasonForecastController {
             row.put("rosterId", t.rosterId());
             row.put("managerId", t.managerId());
             row.put("teamName", t.teamName());
+            row.put("username", t.username());
             row.put("avatarId", t.avatarId());
             row.put("playoffOdds", t.playoffOdds());
             row.put("averageWins", t.averageWins());

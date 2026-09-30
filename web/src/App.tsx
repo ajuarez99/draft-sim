@@ -1,4 +1,4 @@
-import { Link, Route, Routes, useParams } from 'react-router-dom'
+import { Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
@@ -19,6 +19,7 @@ import PowerRankingsVerify from './pages/PowerRankings.verify'
 import ManagerHistory from './pages/ManagerHistory'
 import ManagerComparison from './pages/ManagerComparison'
 import AppShell from './components/AppShell'
+import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useUser } from './user'
 
@@ -129,19 +130,7 @@ export default function App() {
               )}
               {/* React Router's own fallback renders a bare "Not Found" with no
                   way back -- on a mistyped draft id that was the whole screen. */}
-              <Route
-                path="*"
-                element={
-                  <div className="content">
-                    <section className="panel">
-                      <h2>Nothing here</h2>
-                      <p className="muted">
-                        No draft, mock or page at this address. <Link to="/">Back to your leagues</Link>.
-                      </p>
-                    </section>
-                  </div>
-                }
-              />
+              <Route path="*" element={<NotFound what="page" />} />
             </Routes>
           </ErrorBoundary>
         ) : (

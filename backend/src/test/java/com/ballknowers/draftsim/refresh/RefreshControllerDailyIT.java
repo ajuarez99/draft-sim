@@ -159,9 +159,9 @@ class RefreshControllerDailyIT {
     @Test
     @SuppressWarnings("unchecked")
     void thePlayersRouteRunsOneSportAndSkipsTheSecondCallToday() {
-        Map<String, Object> first = (Map<String, Object>) controller.players(Sport.NBA.code()).getBody();
+        Map<String, Object> first = (Map<String, Object>) controller.players(Sport.NBA.code(), "it-user").getBody();
         assertEquals("DONE", first.get("outcome"));
-        Map<String, Object> second = (Map<String, Object>) controller.players(Sport.NBA.code()).getBody();
+        Map<String, Object> second = (Map<String, Object>) controller.players(Sport.NBA.code(), "it-user").getBody();
         assertEquals("SKIPPED_ALREADY_TODAY", second.get("outcome"));
         assertNull(second.get("detail"));
         verify(players, times(1)).ingest(Sport.NBA);

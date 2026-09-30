@@ -58,12 +58,14 @@ public class LeagueAnalysisService {
     private final LeagueMatchupRepository matchupRepo;
     private final SleeperClient sleeper;
     private final SportRulesRegistry rulesRegistry;
+    private final LeagueMemberRepository members;
 
     public LeagueAnalysisService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                  RosterWeekPointsRepository weekPoints, PlayerProjectionRepository projections,
                                  PlayerRepository players, ManagerRepository managers,
                                  LeagueMatchupRepository matchupRepo,
-                                 SleeperClient sleeper, SportRulesRegistry rulesRegistry) {
+                                 SleeperClient sleeper, SportRulesRegistry rulesRegistry,
+                                 LeagueMemberRepository members) {
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
@@ -73,13 +75,22 @@ public class LeagueAnalysisService {
         this.matchupRepo = matchupRepo;
         this.sleeper = sleeper;
         this.rulesRegistry = rulesRegistry;
+        this.members = members;
     }
 
     // ---- wire shapes ----
 
     public record Analysis(int season, String scoringKey, Window window,
                            RankingScores rankingScores, Projections projections, Matchups matchups,
-                           Scores scores) {}
+                           Scores scores, List<TeamLabel> teams) {}
+
+    /**
+     * One roster's two names, so every block on the page can put the team name first and the
+     * Sleeper username under it. A directory rather than a field on each of the four record
+     * shapes that carry {@code manager}: it is present even when the ranking block is unavailable.
+     * {@code teamName} falls back to the username, then "Roster N", exactly like the other league pages.
+     */
+    public record TeamLabel(int rosterId, String teamName, String username) {}
 
     /** The rest-of-season window, named so the page can say what it covered. */
     public record Window(int fromWeek, int toWeek, int weeks, int scoredWeeks) {}
@@ -229,7 +240,24 @@ public class LeagueAnalysisService {
         return new Analysis(league.season(), key.name(), window,
                 rankingScores(league, scored.size(), lastScored),
                 blocks.projections(), blocks.matchups(),
-                scores(league, lastScored, sleeperUserId));
+                scores(league, lastScored, sleeperUserId), teamLabels(league));
+    }
+
+    private List<TeamLabel> teamLabels(LeagueRepository.LeagueRow league) {
+        Map<Long, String> teamNameByManager = new HashMap<>();
+        for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
+            if (m.teamName() != null && !m.teamName().isBlank()) {
+                teamNameByManager.put(m.managerId(), m.teamName());
+            }
+        }
+        List<TeamLabel> out = new ArrayList<>();
+        for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
+            String name = r.managerId() == null ? null : teamNameByManager.get(r.managerId());
+            if (name == null) name = r.managerName();
+            if (name == null || name.isBlank()) name = "Roster " + r.rosterId();
+            out.add(new TeamLabel(r.rosterId(), name, r.managerName()));
+        }
+        return out;
     }
 
     // ---- the scores grid, and the rank-by-week series under it ----

@@ -44,6 +44,7 @@ function team(over: Partial<RosterManagementTeam> = {}): RosterManagementTeam {
     rosterId: 1,
     managerId: 10,
     teamName: 'Master Bates',
+    username: null,
     avatarId: null,
     totalPoints: 164.96,
     potentialPoints: 174.16,

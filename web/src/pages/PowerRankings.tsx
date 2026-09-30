@@ -15,6 +15,7 @@ import {
   type StandingRow,
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
+import CommissionerKeyNote from '../components/CommissionerKeyNote'
 import Avatar from '../components/Avatar'
 import { managerHues } from '../managerColor'
 import BumpChart, { segmentsOf, type Series, type SeriesPoint } from '../components/BumpChart'
@@ -26,6 +27,14 @@ export { segmentsOf }
 export type { SeriesPoint }
 import { useUser } from '../user'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+
+/**
+ * Ballots stay on the honour system (claude/audit-2026-09-28/04, option D covers
+ * commissioner actions only): the server maps a ballot to whatever Sleeper id the
+ * request names, and league members' ids are public. Said where it is submitted.
+ */
+const BALLOT_HONOUR_NOTE =
+  "Ballots aren't verified: anyone who knows a member's Sleeper name could submit as them, so this runs on trust."
 
 /**
  * power-rankings-reskin.md. This used to be a page that explained its own
@@ -108,7 +117,7 @@ function buildSeries(
     if (e.kind !== kind || e.season !== season) continue
     let s = byRoster.get(e.rosterId)
     if (!s) {
-      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.manager, hue: hues.get(e.rosterId)?.hue ?? 0, points: [] }
+      s = { rosterId: e.rosterId, managerId: e.managerId, manager: e.teamName?.trim() || e.manager, hue: hues.get(e.rosterId)?.hue ?? 0, points: [] }
       byRoster.set(e.rosterId, s)
     }
     const ballotCount = e.ballotCount ?? null
@@ -303,7 +312,9 @@ export function computeWeeklyStory(currentRows: PowerRankingEntry[], previousRow
   return { top, newTop: !!(top && prevTop && top.rosterId !== prevTop.rosterId), riser, faller, divisive }
 }
 
-const nameOf = (e: PowerRankingEntry) => e.manager ?? `roster ${e.rosterId}`
+// Team name first, on every page; the username is the second line where a row has room for one.
+const nameOf = (e: PowerRankingEntry) => e.teamName?.trim() || e.manager || `roster ${e.rosterId}`
+const userOf = (e: PowerRankingEntry) => (e.manager && e.manager.toLowerCase() !== nameOf(e).toLowerCase() ? e.manager : '')
 const weekTitle = (week: number) => (week === 0 ? 'Preseason' : `Week ${week}`)
 
 export function buildHeadline(story: WeeklyStory, week: number): string {
@@ -361,6 +372,15 @@ export function ballotBlockState(signedIn: boolean, ballot: BallotState | null, 
   if (!amMember) return 'not-member'
   if (!ballot.canSubmit) return 'voting-closed'
   return 'ok'
+}
+
+/** Value and unit from one switch: what `score` means depends on the kind.
+ *  Empty string when there is no honest number to print. */
+export function scoreLabel(e: { score: number | null; week: number }, kind: PowerRankingKind | null): string {
+  if (e.score == null || kind == null) return ''
+  if (kind === 'MEMBER') return `avg rank ${e.score.toFixed(2)}`
+  if (kind === 'COMPUTED_REALIZED') return e.week === 0 ? `lineup value ${Math.round(e.score)}` : `${e.score.toFixed(2)} pts`
+  return ''
 }
 
 export default function PowerRankings() {
@@ -473,6 +493,34 @@ export default function PowerRankings() {
   // value and must survive -- `data.sportState.week || 1` would quietly send
   // every basketball ballot to week 1 all offseason.
   const currentWeek = data?.sportState.week ?? 1
+
+  // The week the hero and the League-vote ladder show: the latest week with
+  // ballots. Distinct from `currentWeek` (the open week `ballot` answers for),
+  // so "Your ballot" needs its own fetch keyed to it. `===` elsewhere: week 0 is real.
+  const viewedWeek = useMemo(() => {
+    if (!data) return null
+    const weeks = data.entries.filter((e) => e.kind === 'MEMBER' && e.season === season).map((e) => e.week)
+    return weeks.length > 0 ? Math.max(...weeks) : null
+  }, [data, season])
+  const [viewedBallotState, setViewedBallotState] = useState<{ week: number; ballot: BallotState } | null>(null)
+  useEffect(() => {
+    if (!sleeperLeagueId || viewedWeek == null || viewedWeek === currentWeek) {
+      setViewedBallotState(null)
+      return
+    }
+    let cancelled = false
+    getBallot(sleeperLeagueId, viewedWeek)
+      .then((b) => {
+        if (!cancelled) setViewedBallotState({ week: viewedWeek, ballot: b })
+      })
+      // Cleared on failure, like `ballot`: never leave another identity's ballot up.
+      .catch(() => {
+        if (!cancelled) setViewedBallotState(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [sleeperLeagueId, viewedWeek, currentWeek, user?.sleeperUserId, dataVersion])
 
   async function compute() {
     if (!sleeperLeagueId) return
@@ -614,7 +662,9 @@ export default function PowerRankings() {
   // data behind it (bestRank/worstRank/stdev) is MEMBER-only, and Box
   // score/Commissioner keep today's row untouched.
   const memberSpace = ladderMode === 'MEMBER'
-  const myRankByRoster = new Map<number, number>(ballot?.mine?.rosterIds.map((rosterId, i) => [rosterId, i + 1]) ?? [])
+  const viewedBallot =
+    viewedWeek === currentWeek ? ballot : viewedBallotState?.week === viewedWeek ? viewedBallotState.ballot : null
+  const myRankByRoster = new Map<number, number>(viewedBallot?.mine?.rosterIds.map((rosterId, i) => [rosterId, i + 1]) ?? [])
 
   // ---- the hero (headline / #1 / your-team strip / story cards) is always
   // League vote, independent of which ladder tab is selected -- it is "state
@@ -648,7 +698,7 @@ export default function PowerRankings() {
   }
 
   const myEntry = heroRows.find((e) => ballot?.members.some((m) => m.isMe && m.rosterId === e.rosterId))
-  const myBallotRank = ballot?.mine ? ballot.mine.rosterIds.indexOf(myEntry?.rosterId ?? -1) : -1
+  const myBallotRank = viewedBallot?.mine ? viewedBallot.mine.rosterIds.indexOf(myEntry?.rosterId ?? -1) : -1
 
   // The footnote's second sentence, built from the snapshot that actually
   // produced the numbers. When there is no snapshot the sentence is absent --
@@ -680,7 +730,7 @@ export default function PowerRankings() {
 
   // ---- per-team compare (regression #9; no slot in the mockups, so it's a
   // disclosure a pinned row reveals rather than a page-level view toggle) ----
-  const teamViewOptions = [...new Map(data.entries.map((e) => [e.rosterId, e.manager ?? `roster ${e.rosterId}`])).entries()]
+  const teamViewOptions = [...new Map(data.entries.map((e) => [e.rosterId, nameOf(e)])).entries()]
   const teamViewRosterId = highlighted
   const teamSeries: Series[] =
     compareOpen && teamViewRosterId != null
@@ -709,12 +759,6 @@ export default function PowerRankings() {
 
   // Trend chart is a line chart: below two weeks there is no line to draw.
   const chartReady = ladderWeeks.length >= 2
-
-  function scoreLabel(e: PowerRankingEntry): string {
-    if (e.score == null) return '--'
-    if (e.week === 0) return String(Math.round(e.score))
-    return e.score.toFixed(2)
-  }
 
   function openBallotModal() {
     setSaveMessage(null)
@@ -763,9 +807,13 @@ export default function PowerRankings() {
               <div className="pr-number-one-id">
                 <div className="pr-number-one-name">{nameOf(story.top)}</div>
                 <div className="pr-number-one-meta">
-                  {story.top.manager ? `${story.top.manager} · ` : ''}
-                  <span className="mono">{recordLabel(standings?.get(story.top.rosterId))}</span> ·{' '}
-                  <span className="mono">{scoreLabel(story.top)}</span> pts
+                  {userOf(story.top) ? `${userOf(story.top)} · ` : ''}
+                  <span className="mono">{recordLabel(standings?.get(story.top.rosterId))}</span>
+                  {scoreLabel(story.top, 'MEMBER') && (
+                    <>
+                      {' '}· <span className="mono">{scoreLabel(story.top, 'MEMBER')}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -795,7 +843,7 @@ export default function PowerRankings() {
       {myEntry && (
         <div className="pr-your-team">
           <span className="pr-your-team-label cond">Your team</span>
-          <span className="pr-your-team-name">{myEntry.manager ?? `roster ${myEntry.rosterId}`}</span>
+          <span className="pr-your-team-name">{nameOf(myEntry)}</span>
           <span className="pr-your-team-detail">
             {ordinal(myEntry.rank)} of {gridRows}
             {(() => {
@@ -887,6 +935,7 @@ export default function PowerRankings() {
                   {computing ? 'Computing…' : `Recompute ${weekIn(currentWeek)} (commissioner)`}
                 </button>
               )}
+              {ballot?.canCommission && <CommissionerKeyNote />}
             </div>
 
             {/* The ladder deliberately shows the latest week this mode HAS,
@@ -921,7 +970,7 @@ export default function PowerRankings() {
                   <span>Record</span>
                   {memberSpace ? (
                     <>
-                      <span className="pr-score-head">Avg</span>
+                      <span className="pr-score-head">Avg rank</span>
                       <span className="pr-score-head">Your ballot</span>
                       {/* The axis lives under the column title and inside the
                           bar's own grid track, so "1st" and "12th" sit over the
@@ -957,7 +1006,6 @@ export default function PowerRankings() {
                     // different weeks or different orderings.
                     console.warn('[power] implausible movement delta', { rosterId: e.rosterId, rank: e.rank, refRank })
                   }
-                  const member = ballot?.members.find((m) => m.rosterId === e.rosterId)
                   const pct = e.makesPlayoffsPct
                   const myRank = myRankByRoster.get(e.rosterId) ?? null
                   const space = memberSpace ? spaceStatsFor(e, gridRows, myRank) : null
@@ -977,16 +1025,16 @@ export default function PowerRankings() {
                         <Avatar
                           avatarId={e.avatarId}
                           seed={String(e.managerId ?? e.rosterId)}
-                          label={e.manager ?? `R${e.rosterId}`}
+                          label={e.teamName?.trim() || e.manager || `R${e.rosterId}`}
                           isMe={isMe}
                         />
                         <span className="pr-team-text">
                           <span className="pr-team-name">
-                            <span className="pr-team-name-text">{e.manager ?? `roster ${e.rosterId}`}</span>
+                            <span className="pr-team-name-text">{nameOf(e)}</span>
                             {isMe && <span className="cond pr-you-tag">You</span>}
                           </span>
                           <span className="pr-team-sub">
-                            {member?.teamName && member.teamName.toUpperCase() !== 'TBD' ? member.teamName : e.manager ?? ''}
+                            {userOf(e)}
                           </span>
                         </span>
                       </span>
@@ -1005,10 +1053,10 @@ export default function PowerRankings() {
                       </span>
                       {space ? (
                         <>
-                          <span className="mono pr-avg">{scoreLabel(e)}</span>
+                          <span className="mono pr-avg">{e.score == null ? '' : e.score.toFixed(2)}</span>
                           <span className="pr-your-ballot">
                             {myRank == null ? (
-                              <span className="tiny muted">{ballot?.mine ? '—' : 'No ballot'}</span>
+                              <span className="tiny muted">{viewedBallot?.mine ? '—' : 'No ballot'}</span>
                             ) : (
                               <>
                                 <span className="mono">{ordinal(myRank)}</span>
@@ -1152,7 +1200,7 @@ export default function PowerRankings() {
                               />
                             )}
                           </span>
-                          <span className="pr-score mono">{f.entry ? scoreLabel(f.entry) : 'no score'}</span>
+                          <span className="pr-score mono">{(f.entry && scoreLabel(f.entry, f.kind)) || 'no score'}</span>
                         </div>
                       ))}
                       <div className="pr-axis-ends mono">
@@ -1259,7 +1307,7 @@ export default function PowerRankings() {
                       const pct = Math.min(50, Math.abs(bias) * 6)
                       return (
                         <div className="pr-homer" key={e.rosterId}>
-                          <span className="pr-homer-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                          <span className="pr-homer-name">{nameOf(e)}</span>
                           <span className="pr-homer-track">
                             <span className="pr-homer-mid" />
                             <span
@@ -1286,7 +1334,7 @@ export default function PowerRankings() {
                 <h2>Homer of the week</h2>
                 <span className="small muted">{weekPhrase(heroWeek)}</span>
               </div>
-              <div className="pr-homer-of-week-name">{topHomer.manager ?? `roster ${topHomer.rosterId}`}</div>
+              <div className="pr-homer-of-week-name">{nameOf(topHomer)}</div>
               <p className="muted small">
                 Ranked their own team {Math.abs(topHomer.selfRankBias!)} spot{Math.abs(topHomer.selfRankBias!) === 1 ? '' : 's'}{' '}
                 {topHomer.selfRankBias! < 0 ? 'higher' : 'lower'} than the room did.
@@ -1297,7 +1345,7 @@ export default function PowerRankings() {
                   const pct = Math.min(50, Math.abs(bias) * 6)
                   return (
                     <div className="pr-homer" key={e.rosterId}>
-                      <span className="pr-homer-name">{e.manager ?? `roster ${e.rosterId}`}</span>
+                      <span className="pr-homer-name">{nameOf(e)}</span>
                       <span className="pr-homer-track">
                         <span className="pr-homer-mid" />
                         <span
@@ -1354,6 +1402,7 @@ export default function PowerRankings() {
             {blockState === 'ok' && !ballot?.mine && (
               <p className="muted small">Nothing submitted yet for {weekPhrase(currentWeek)}.</p>
             )}
+            {blockState === 'ok' && <p className="tiny muted">{BALLOT_HONOUR_NOTE}</p>}
             {blockState === 'loading' && <p className="muted small">Loading your ballot…</p>}
             {blockState === 'signed-out' && (
               <>
@@ -1476,6 +1525,7 @@ export default function PowerRankings() {
                 <p className="tiny muted">
                   Drag by the grip, or tap a team and use ↑ / ↓ to move it. Escape drops the selection.
                 </p>
+                <p className="tiny muted">{BALLOT_HONOUR_NOTE}</p>
                 {saveMessage && <p className="small muted">{saveMessage}</p>}
               </>
             ) : blockState === 'signed-out' ? (

@@ -9,6 +9,8 @@ import {
   type PredictedPick,
   type Seat,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
@@ -45,7 +47,7 @@ function toBoardSeat(s: MockSeat): Seat {
 export default function MockDraftView() {
   const { sessionId = '' } = useParams<{ sessionId: string }>()
   const [state, setState] = useState<MockSessionState | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [submitting, setSubmitting] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
 
@@ -59,7 +61,7 @@ export default function MockDraftView() {
   useEffect(() => {
     getMockSession(Number(sessionId))
       .then(setState)
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .catch((e) => fail(e))
   }, [sessionId])
 
   async function pick(player: PlayerRef) {
@@ -71,12 +73,13 @@ export default function MockDraftView() {
       setState(next)
       setPickerOpen(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       setSubmitting(false)
     }
   }
 
+  if (notFound && !state) return <NotFound what="mock" />
   if (error && !state) {
     return (
       <div className="content">

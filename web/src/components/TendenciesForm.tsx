@@ -12,12 +12,9 @@ import { setTendencies, clearTendencies, type ManualTendencies, type Sport } fro
  * someone who hasn't read the engine, and Allan's call (2026-09-07) is that a
  * human shouldn't be typing numbers into a model; the engine should fit them
  * from history instead (see `ManagerTendencies.tsx`'s empiricalReachBias
- * comparison). The PUT endpoint still replaces all three fields on every call
- * (`ManagerController.set`'s javadoc: "omitting it is the same as sending
- * null"), so `save` below round-trips `initial.reachBias`/`unpredictability`
- * unchanged rather than sending null -- otherwise editing just the note on a
- * seat that already has a stated reach (set before this change, or by a
- * future non-UI path) would silently wipe it.
+ * comparison). Since claude/audit-2026-09-28/02 the server enforces that: PUT
+ * answers 400 to a body carrying either number, so `save` sends only `note`.
+ * The note is private to the signed-in user (manager_note, V25).
  *
  * The two call sites read from differently-shaped API types (Seat vs
  * ManagerSummary). managerBehaviour.ts already solved that same mismatch for
@@ -42,7 +39,7 @@ export type TendenciesFormProps = {
    */
   sport: Sport
   initial: ManualTendencies
-  /** STATED/BLENDED seats have something typed-in to delete; FITTED/NEUTRAL don't. */
+  /** Whether you have a note to delete. */
   canClear: boolean
   /** Save or Clear went through -- caller closes edit mode and refetches. */
   onDone: () => void
@@ -60,8 +57,6 @@ export default function TendenciesForm({ managerId, sport, initial, canClear, on
     setError(null)
     try {
       await setTendencies(managerId, sport, {
-        reachBias: initial.reachBias,
-        unpredictability: initial.unpredictability,
         note: note.trim() === '' ? null : note.trim(),
       })
       onDone()
@@ -89,22 +84,23 @@ export default function TendenciesForm({ managerId, sport, initial, canClear, on
     <div className="seat-form">
       <label className="small">
         Note
-        {/* Clamped to 280 server-side by ManualTendencies -- without this the
-            box would let you type text that gets silently cut on save. */}
-        <input type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} />
+        {/* The server refuses anything over 140 (ManagerController.MAX_NOTE_LENGTH);
+            the cap here keeps you from typing what it would reject. Only you
+            can see what you write. */}
+        <input type="text" maxLength={140} value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
 
       {error && <p className="seat-form-error small">{error}</p>}
 
       <div className="seat-form-actions">
-        <button onClick={() => void save()} disabled={saving} title="Save this note for this manager">
+        <button onClick={() => void save()} disabled={saving} title="Save your private note about this manager">
           {saving ? 'Saving…' : 'Save'}
         </button>
         {canClear && (
           <button
             onClick={() => void clear()}
             disabled={saving}
-            title="Delete what you entered and fall back to history or the league average"
+            title="Delete your note about this manager"
           >
             Clear
           </button>

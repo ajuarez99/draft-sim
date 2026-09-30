@@ -2,9 +2,6 @@ package com.ballknowers.draftsim.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-
 /**
  * A single shared bearer token. Deliberately not Spring Security: there is one
  * user, there is no user model, and a filter plus a constant-time compare is the
@@ -25,10 +22,7 @@ public record ApiSecurityProperties(String token) {
      * real thing and avoiding it costs nothing.
      */
     public boolean matches(String presented) {
-        if (!enabled() || presented == null) return false;
-        return MessageDigest.isEqual(
-                token.getBytes(StandardCharsets.UTF_8),
-                presented.getBytes(StandardCharsets.UTF_8));
+        return SecretCompare.matches(token, presented);
     }
 
     /** Pulls the token out of "Authorization: Bearer xyz". Null if absent or malformed. */

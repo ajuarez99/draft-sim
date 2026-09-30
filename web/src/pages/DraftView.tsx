@@ -5,11 +5,14 @@ import {
   getSeats,
   setReversalRound,
   streamSimulation,
+  streamSimulationQuietly,
   type PlayerRef,
   type PredictedPick,
   type SeatsResponse,
   type SimulationResult,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
 import SeatPopover from '../components/SeatPopover'
@@ -62,7 +65,7 @@ export default function DraftView() {
   const [result, setResult] = useState<SimulationResult | null>(null)
   const [progress, setProgress] = useState(0)
   const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [seatsDirty, setSeatsDirty] = useState(false)
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
   const [userPicks, setUserPicks] = useState<Record<number, PlayerRef>>({})
@@ -120,7 +123,7 @@ export default function DraftView() {
   const reveal = useRevealedBoard(result?.board, maxPickNo, result?.myPicks, runSeq)
 
   function refetchSeats() {
-    getSeats(draftId).then(setSeats).catch((e) => setError(e.message))
+    getSeats(draftId).then(setSeats).catch(fail)
   }
 
   function handleSeatsChanged() {
@@ -238,7 +241,7 @@ export default function DraftView() {
         if (predicted) startState[n] = predicted.player.sleeperId
       }
 
-      const r2 = await streamSimulation(
+      const r2 = await streamSimulationQuietly(
         {
           draftSleeperId: draftId,
           // Both frozen to what produced the prefix being locked in, not live
@@ -272,7 +275,7 @@ export default function DraftView() {
       reveal.resume()
     } catch (e) {
       if (seq !== requestSeqRef.current) return // a newer request already owns the screen
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
       reveal.resume() // don't strand the user paused forever; continue against the stale board
     } finally {
       if (seq === requestSeqRef.current) setResimming(false)
@@ -301,7 +304,7 @@ export default function DraftView() {
       setRunSeq((n) => n + 1)
     } catch (e) {
       if (seq !== requestSeqRef.current) return
-      setError(e instanceof Error ? e.message : String(e))
+      fail(e)
     } finally {
       if (seq === requestSeqRef.current) setRunning(false)
     }
@@ -437,6 +440,8 @@ export default function DraftView() {
   // "you" here would be exactly the flash this feature is meant to avoid, so
   // no header is marked "you" for that one short window instead of guessing.
   const slotKnown = slotParam != null || seats != null
+
+  if (notFound) return <NotFound what="draft" />
 
   return (
     <>

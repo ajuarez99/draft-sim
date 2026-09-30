@@ -2,9 +2,11 @@ package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.RosterManagementService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -31,15 +33,23 @@ public class RosterManagementController {
 
     private final RosterManagementService rosterManagement;
     private final TransactionAnalysisService transactions;
+    private final LeagueMembership membership;
 
     public RosterManagementController(RosterManagementService rosterManagement,
-                                      TransactionAnalysisService transactions) {
+                                      TransactionAnalysisService transactions,
+                                      LeagueMembership membership) {
         this.rosterManagement = rosterManagement;
         this.transactions = transactions;
+        this.membership = membership;
     }
 
     @GetMapping("/leagues/{sleeperId}/roster-management")
-    public ResponseEntity<Map<String, Object>> rosterManagement(@PathVariable String sleeperId) {
+    public ResponseEntity<Map<String, Object>> rosterManagement(@PathVariable String sleeperId,
+                                                                @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped like every other league route: no identity, or an identity that is not in
+        // this league, is the same 404 as a league that does not exist. This route had no
+        // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         return rosterManagement.forLeague(sleeperId)
                 .map(r -> ResponseEntity.ok(body(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -70,6 +80,7 @@ public class RosterManagementController {
             row.put("rosterId", t.rosterId());
             row.put("managerId", t.managerId());
             row.put("teamName", t.teamName());
+            row.put("username", t.username());
             row.put("avatarId", t.avatarId());
             row.put("totalPoints", t.totalPoints());
             row.put("potentialPoints", t.potentialPoints());
@@ -89,7 +100,12 @@ public class RosterManagementController {
      * adds are sections of the same view (contracts/destinations.md).
      */
     @GetMapping("/leagues/{sleeperId}/transactions")
-    public ResponseEntity<Map<String, Object>> transactions(@PathVariable String sleeperId) {
+    public ResponseEntity<Map<String, Object>> transactions(@PathVariable String sleeperId,
+                                                            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        // Scoped like every other league route: no identity, or an identity that is not in
+        // this league, is the same 404 as a league that does not exist. This route had no
+        // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
+        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         return transactions.forLeague(sleeperId)
                 .map(r -> ResponseEntity.ok(transactionsBody(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());

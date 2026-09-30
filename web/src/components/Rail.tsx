@@ -1,6 +1,22 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import Avatar from './Avatar'
+
+/** Same breakpoint as styles.css's phone-chrome block. Sign out lives behind the avatar at or below it. */
+const PHONE_QUERY = '(max-width: 700px)'
+
+function useIsPhone(): boolean {
+  const [phone, setPhone] = useState(() => window.matchMedia?.(PHONE_QUERY).matches ?? false)
+  useEffect(() => {
+    const mq = window.matchMedia?.(PHONE_QUERY)
+    if (!mq) return
+    const onChange = () => setPhone(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+  return phone
+}
 
 type Props = {
   username: string
@@ -63,6 +79,29 @@ export default function Rail({
 }: Props) {
   const location = useLocation()
   const name = displayName || username
+  const phone = useIsPhone()
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
+
+  // A menu, not a mode: navigating, Escape or a tap elsewhere closes it.
+  useEffect(() => {
+    setAccountOpen(false)
+  }, [location.pathname])
+  useEffect(() => {
+    if (!accountOpen) return
+    function onDown(e: MouseEvent) {
+      if (!accountRef.current?.contains(e.target as Node)) setAccountOpen(false)
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAccountOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [accountOpen])
 
   // `.startsWith` on Managers so its own sub-route (/managers/:id/history)
   // still marks the row current, the same way a browser tab would -- carried
@@ -155,16 +194,53 @@ export default function Rail({
 
       <div className="app-rail-spacer" />
 
-      <div className="app-account" title={name}>
-        <Avatar avatarId={avatarId} seed={username} label={name} />
-        <span className="app-account-name app-rail-row-label">{name}</span>
-      </div>
-      <button type="button" className="app-signout" onClick={onSignOut} title="Sign out" aria-label="Sign out">
-        <span className="app-rail-row-label">Sign out</span>
-        <span className="app-signout-glyph" aria-hidden="true">
-          ⏻
-        </span>
-      </button>
+      {phone ? (
+        // Phone: Sign out is not a control of its own. Next to Home / Managers
+        // / Mock drafts a one-tap ⏻ signed you out by accident; behind the
+        // avatar it takes a deliberate second tap.
+        <div className="app-account-wrap" ref={accountRef}>
+          <button
+            type="button"
+            className="app-account-button"
+            onClick={() => setAccountOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={accountOpen}
+            aria-label={`Account: ${name}`}
+            title={name}
+          >
+            <Avatar avatarId={avatarId} seed={username} label={name} />
+          </button>
+          {accountOpen && (
+            <div className="app-account-menu" role="menu">
+              <span className="app-account-menu-name">{name}</span>
+              <button
+                type="button"
+                role="menuitem"
+                className="app-account-menu-item"
+                onClick={() => {
+                  setAccountOpen(false)
+                  onSignOut()
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="app-account" title={name}>
+            <Avatar avatarId={avatarId} seed={username} label={name} />
+            <span className="app-account-name app-rail-row-label">{name}</span>
+          </div>
+          <button type="button" className="app-signout" onClick={onSignOut} title="Sign out" aria-label="Sign out">
+            <span className="app-rail-row-label">Sign out</span>
+            <span className="app-signout-glyph" aria-hidden="true">
+              ⏻
+            </span>
+          </button>
+        </>
+      )}
     </nav>
   )
 }

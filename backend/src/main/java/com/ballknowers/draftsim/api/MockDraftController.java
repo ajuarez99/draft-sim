@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.mock.MockDraftService;
 import com.ballknowers.draftsim.mock.MockSessionState;
+import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.MockDraftRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,9 +22,25 @@ import java.util.Map;
 public class MockDraftController {
 
     private final MockDraftService mocks;
+    private final LeagueMembership membership;
 
-    public MockDraftController(MockDraftService mocks) {
+    public MockDraftController(MockDraftService mocks, LeagueMembership membership) {
         this.mocks = mocks;
+        this.membership = membership;
+    }
+
+    /**
+     * Creating a mock needs an identity: a session with no owner is open to
+     * every signed-in caller (the legacy carve-out in {@code MockDraftService.mayUse}),
+     * so header-less creation would mint public rooms. A valid admin token is the
+     * operator override. 401, not 404: there is no resource to hide yet.
+     */
+    private void requireIdentityToCreate(String sleeperUserId) {
+        if (LeagueMembership.isAnonymous(sleeperUserId) && !membership.isAdminRequest()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.UNAUTHORIZED,
+                    "X-Sleeper-User is required to create a mock draft");
+        }
     }
 
     /**
@@ -49,6 +66,7 @@ public class MockDraftController {
     @PostMapping
     public MockSessionState create(@RequestBody CreateRequest body,
                                    @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        requireIdentityToCreate(sleeperUserId);
         if (body == null) throw new IllegalArgumentException("request body is required");
         return mocks.createSession(body.sport(), body.teams(), body.userSlot(), body.managerSeats(), sleeperUserId,
                 body.sourceSleeperLeagueId());
@@ -89,6 +107,7 @@ public class MockDraftController {
     public MockSessionState createFromDraft(@PathVariable String sleeperDraftId,
                                             @RequestParam(required = false) Integer mySlot,
                                             @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        requireIdentityToCreate(sleeperUserId);
         return mocks.createSessionFromDraft(sleeperDraftId, mySlot, sleeperUserId);
     }
 

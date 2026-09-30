@@ -284,7 +284,12 @@ export default function DraftPicker() {
   // newest-first off the backend (DraftRepository.allWithLeague: start_time
   // desc, season desc, id desc), so the first row IS "the league you were
   // last looking at" -- no separate last-used tracking to build or fake.
-  const recentLeague = drafts && drafts.length > 0 ? drafts[0] : null
+  //
+  // Only ever named for a chosen sport: under "All sports" there is no one
+  // league that is "the" league, and drafts[0] could be a football league while
+  // the NBA filter is on, so the newest draft IN the filtered sport is used.
+  const recentLeague =
+    drafts && sportFilter !== 'all' ? (drafts.find((d) => d.sport === sportFilter) ?? null) : null
 
   return (
     <>
@@ -319,6 +324,8 @@ export default function DraftPicker() {
                 {recentLeague.rounds}-round league — get more reps before its next draft, in a
                 room only you control.
               </>
+            ) : drafts.length > 0 && sportFilter === 'all' ? (
+              'Bots fill every seat but yours, or seat the real managers from any of your leagues below.'
             ) : (
               'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
             )

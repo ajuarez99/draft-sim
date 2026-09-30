@@ -39,6 +39,14 @@ public class LeagueWeekFetchRepository {
                 .list());
     }
 
+    /** Whether any week of this kind has ever been recorded for the league. */
+    public boolean hasAny(long leagueId, String kind) {
+        return Boolean.TRUE.equals(db.sql("select exists (select 1 from league_week_fetch where league_id = ? and kind = ?)")
+                .params(leagueId, kind)
+                .query(Boolean.class)
+                .single());
+    }
+
     /** Never flips {@code final} back to false. */
     public void record(long leagueId, String kind, int week, Instant fetchedAt, boolean fin) {
         db.sql("""

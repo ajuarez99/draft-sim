@@ -10,6 +10,9 @@ import {
   type LeagueTransactions,
   type MovedPlayer,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -32,7 +35,7 @@ export default function RosterManagement() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<Data | null>(null)
   const [tx, setTx] = useState<LeagueTransactions | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -47,7 +50,7 @@ export default function RosterManagement() {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -79,6 +82,8 @@ export default function RosterManagement() {
   // comparable across the league rather than each row normalising to itself.
   const scale = Math.max(1, ...(data?.teams ?? []).map((t) => t.potentialPoints))
 
+  if (notFound) return <NotFound what="league" />
+
   return (
     <div className="content">
       <PageHeader
@@ -89,7 +94,7 @@ export default function RosterManagement() {
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -216,7 +221,7 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
               <Rank player={a.added} />
               {a.dropped && <span className="muted small tx-dropped">for {a.dropped.playerName}</span>}
               <span className="tx-team muted">{a.teamName}</span>
-              {a.faabBid != null && <span className="tx-faab">${a.faabBid}</span>}
+              {a.faabBid != null && <span className="tx-faab">${a.faabBid} FAAB</span>}
             </li>
           ))}
         </ul>
@@ -239,10 +244,13 @@ function Rank({ player }: { player: MovedPlayer }) {
     )
   }
   return (
-    <span className="tx-rank">
+    <span
+      className="tx-rank"
+      title={`Average finish among ${player.position ?? 'his position'} since the move. Lower is better.`}
+    >
       {player.position ?? ''}
       {player.postMovePositionalRank.toFixed(1)}
-      <span className="muted"> · {player.weeksCounted} wk</span>
+      <span className="muted"> avg over {player.weeksCounted} wk</span>
     </span>
   )
 }
@@ -262,7 +270,7 @@ function Row({ team, hue, scale }: { team: RosterManagementTeam; hue: number; sc
           hue={hue}
           className="rm-avatar"
         />
-        <span className="rm-name">{team.teamName}</span>
+        <span className="rm-name"><PersonName teamName={team.teamName} username={team.username} /></span>
       </th>
       <td className="rm-num">{team.totalPoints.toFixed(2)}</td>
       <td className="rm-num">{team.potentialPoints.toFixed(2)}</td>

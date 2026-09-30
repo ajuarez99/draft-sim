@@ -102,4 +102,32 @@ class OwnerSlotTest {
 
         assertEquals(7, slot);
     }
+
+    // --- mayActAsSlot (claude/audit-2026-09-28/01) --------------------------------
+
+    /**
+     * resolve() may still fall back to the configured owner for a blank header: that is the
+     * seat PRESELECT, harmless. mayActAsSlot is the write gate, and it used to answer "allowed"
+     * for a blank identity, so a header-less caller could write any seat. It must not.
+     */
+    @Test
+    void aBlankIdentityMayNotActAsAnySeat() {
+        DraftRepository.DraftRow d = draft(Map.of("1", 501L));
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, null, 1));
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, "", 1));
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, "  ", 1));
+        // An unmapped seat stays open to a NAMED caller only -- being unmapped is not a blank pass.
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, null, 2));
+    }
+
+    @Test
+    void aNamedCallerStillActsOnlyAsTheirOwnSeatOrAnUnmappedOne() {
+        lenient().when(managers.idsBySleeperUserId()).thenReturn(Map.of("u-a", 501L, "u-b", 502L));
+        DraftRepository.DraftRow d = draft(Map.of("1", 501L));
+
+        assertTrue(OwnerSlot.mayActAsSlot(d, managers, "u-a", 1), "their own seat");
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, "u-b", 1), "someone else's seat");
+        assertTrue(OwnerSlot.mayActAsSlot(d, managers, "u-b", 2), "a seat Sleeper has not mapped yet");
+        assertFalse(OwnerSlot.mayActAsSlot(d, managers, "u-unknown", 1), "no manager row");
+    }
 }

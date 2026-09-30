@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
@@ -9,6 +9,9 @@ import {
   type WeeklyMatchup,
   type WeeklySide,
 } from '../api'
+import { useFailure } from '../useFailure'
+import NotFound from '../components/NotFound'
+import PersonName from '../components/PersonName'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
@@ -25,9 +28,13 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
  */
 export default function WeeklyReport() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
-  const [week, setWeek] = useState(1)
+  // The chosen week lives in the URL so a link reproduces the view. Absent (or not a
+  // whole number >= 1) means "the latest scored week", which the server resolves.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const parsed = Number(searchParams.get('week'))
+  const requestedWeek = Number.isInteger(parsed) && parsed >= 1 ? parsed : null
   const [data, setData] = useState<Data | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -37,12 +44,12 @@ export default function WeeklyReport() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    getWeeklyReport(sleeperLeagueId, week)
+    getWeeklyReport(sleeperLeagueId, requestedWeek ?? 0)
       .then((d) => {
         if (!cancelled) setData(d)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e))
+        if (!cancelled) fail(e)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -50,7 +57,28 @@ export default function WeeklyReport() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId, week, dataVersion])
+  }, [sleeperLeagueId, requestedWeek, dataVersion])
+
+  const latest = data?.latestScoredWeek ?? 0
+
+  // A link (or a stale bookmark) past the last scored week is pulled back to it rather
+  // than left showing "week 99 has not been scored".
+  useEffect(() => {
+    if (requestedWeek != null && latest > 0 && requestedWeek > latest) {
+      const next = new URLSearchParams(searchParams)
+      next.set('week', String(latest))
+      setSearchParams(next, { replace: true })
+    }
+  }, [requestedWeek, latest, searchParams, setSearchParams])
+
+  function pickWeek(raw: string) {
+    const n = Math.min(latest, Math.max(1, Math.trunc(Number(raw)) || 1))
+    const next = new URLSearchParams(searchParams)
+    next.set('week', String(n))
+    setSearchParams(next)
+  }
+
+  if (notFound) return <NotFound what="league" />
 
   return (
     <div className="content">
@@ -59,23 +87,26 @@ export default function WeeklyReport() {
         title="Weekly report"
         sub="Every matchup, the week's best performances, and the awards nobody wants — read back from what actually happened."
         actions={
-          <div className="wr-weekpick">
-            <label htmlFor="wr-week">Week</label>
-            <input
-              id="wr-week"
-              type="number"
-              min={1}
-              max={18}
-              value={week}
-              onChange={(e) => setWeek(Math.max(1, Number(e.target.value) || 1))}
-            />
-          </div>
+          // Nothing scored means no week to pick, so no input rather than a week 0.
+          latest > 0 ? (
+            <div className="wr-weekpick">
+              <label htmlFor="wr-week">Week</label>
+              <input
+                id="wr-week"
+                type="number"
+                min={1}
+                max={latest}
+                value={requestedWeek ?? data?.week ?? latest}
+                onChange={(e) => pickWeek(e.target.value)}
+              />
+            </div>
+          ) : undefined
         }
       />
 
       {error && (
         <div className="error">
-          <span>{error.includes('404') ? "This league hasn't been loaded yet." : error}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -83,7 +114,9 @@ export default function WeeklyReport() {
 
       {data && !data.available && (
         <section className="panel">
-          <h3 className="cond">Week {data.week} has not been scored</h3>
+          <h3 className="cond">
+            {data.week === 0 ? 'No week has been scored yet' : `Week ${data.week} has not been scored`}
+          </h3>
           <p className="muted small">
             {data.reason ?? 'No results stored for this week yet.'}
           </p>
@@ -92,6 +125,11 @@ export default function WeeklyReport() {
 
       {data && data.available && (
         <>
+          {!data.weekFinal && (
+            <p className="wr-inprogress small" role="status">
+              <strong>In progress</strong> — scores can still change until the week closes.
+            </p>
+          )}
           <section className="panel">
             <h3 className="cond">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
@@ -272,7 +310,7 @@ function TeamLine({ side, won }: { side: WeeklySide; won: boolean }) {
         label={side.teamName}
         className="wr-avatar"
       />
-      <span className="wr-team">{side.teamName}</span>
+      <span className="wr-team"><PersonName teamName={side.teamName} username={side.username} /></span>
       <span className="wr-record muted">({side.record})</span>
       <span className="wr-points">{side.points.toFixed(2)}</span>
     </div>

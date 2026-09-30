@@ -279,6 +279,20 @@ public class DraftRepository {
                 .optional();
     }
 
+    /**
+     * The pick_no this player already occupies in the draft, other than
+     * {@code exceptPickNo}, if any. draft_pick has no (draft_id, player_id)
+     * constraint on purpose (a poller batch can briefly hold a stale manual row
+     * and Sleeper's true row for one player, and a constraint would fail the whole
+     * tick), so the manual-pick endpoint checks here instead.
+     */
+    public Optional<Integer> otherPickOfPlayer(long draftId, long playerId, int exceptPickNo) {
+        return db.sql("select pick_no from draft_pick where draft_id = ? and player_id = ? and pick_no <> ? order by pick_no limit 1")
+                .param(draftId).param(playerId).param(exceptPickNo)
+                .query((rs, i) -> rs.getInt(1))
+                .optional();
+    }
+
     /** Completed picks for a draft, ordered. Used both for profiles and for resume-from-state. */
     public List<PickRow> picks(long draftId) {
         return db.sql("""

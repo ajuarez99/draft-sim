@@ -70,6 +70,23 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
   // this fetch because its ManagerSummary already carries `.stated`.
   const [stated, setStated] = useState<ManualTendencies | null>(null)
 
+  // Notes are private to their author (V25), so the seat payload -- which is the
+  // same for everyone -- carries none. Read the caller's own once on open, so a
+  // note you wrote shows in read mode without pressing Edit. Failing quietly is
+  // right: it only decides whether a line of your own text is shown.
+  useEffect(() => {
+    let cancelled = false
+    getManagers(sport)
+      .then((managers) => {
+        const mine = managers.find((m) => m.managerId === s.managerId)
+        if (!cancelled && mine) setStated(mine.stated)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [sport, s.managerId])
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -95,7 +112,7 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
     }
   }
 
-  const canClear = s.provenance === 'STATED' || s.provenance === 'BLENDED'
+  const canClear = stated?.note != null
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -122,7 +139,7 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
               <button
                 className="seat-edit"
                 onClick={() => (editing ? setEditing(false) : startEdit())}
-                title={editing ? 'Stop editing without saving' : "Edit this manager's stated tendencies"}
+                title={editing ? 'Stop editing without saving' : 'Edit your private note about this manager'}
               >
                 {editing ? 'Cancel' : 'Edit'}
               </button>
@@ -159,7 +176,11 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
                 <p className="small">{behaviour(s)}</p>
               )}
 
-              {s.note && <p className="note small">“{s.note}”</p>}
+              {stated?.note && (
+                <p className="note small" title="Only you can see this note">
+                  “{stated.note}”
+                </p>
+              )}
               {footnote(s) && <p className="muted tiny">{footnote(s)}</p>}
             </>
           )}

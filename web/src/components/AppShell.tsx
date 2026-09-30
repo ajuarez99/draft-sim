@@ -207,6 +207,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             collapsed={collapsed}
             onMockIt={(leagueId, sport) => openMockModal({ leagueId, sport })}
             allLeagues={allLeagues}
+            onOpenJumpTo={openJumpTo}
           />
         )}
       </Rail>
