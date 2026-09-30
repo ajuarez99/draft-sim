@@ -50,13 +50,7 @@ public final class MostAddedPlayers {
      *                         (a football team defense) is never counted, even at the top
      */
     public static List<Ranked> rank(List<CompletedAdd> adds, int throughWeek, Predicate<String> eligiblePlayerId) {
-        Map<String, List<CompletedAdd>> byPlayer = new LinkedHashMap<>();
-        for (CompletedAdd a : adds) {
-            if (!"WAIVER".equals(a.type()) && !"FREE_AGENT".equals(a.type())) continue;
-            if (a.week() < 1 || a.week() > throughWeek) continue;
-            if (!eligiblePlayerId.test(a.playerId())) continue;
-            byPlayer.computeIfAbsent(a.playerId(), k -> new ArrayList<>()).add(a);
-        }
+        Map<String, List<CompletedAdd>> byPlayer = countedByPlayer(adds, throughWeek, eligiblePlayerId);
         if (byPlayer.isEmpty()) return List.of();
 
         int max = byPlayer.values().stream().mapToInt(List::size).max().orElseThrow();
@@ -68,15 +62,58 @@ public final class MostAddedPlayers {
                 .toList();
 
         List<Ranked> out = new ArrayList<>();
-        for (String playerId : topIds) {
-            List<CompletedAdd> counted = new ArrayList<>(byPlayer.get(playerId));
-            // Same ordering as WaiverPickupAttribution.isMoreRecent: week, then
-            // createdAt, with a null createdAt sorting first.
-            counted.sort(Comparator.<CompletedAdd>comparingInt(CompletedAdd::week)
-                    .thenComparing(CompletedAdd::createdAt, Comparator.nullsFirst(Comparator.naturalOrder())));
-            int distinctTeams = (int) counted.stream().map(CompletedAdd::rosterId).distinct().count();
-            out.add(new Ranked(playerId, max, distinctTeams, counted));
-        }
+        for (String playerId : topIds) out.add(ranked(playerId, byPlayer.get(playerId)));
         return out;
+    }
+
+    /**
+     * Spec 010: the players behind the award's winner, for its full standings -- most adds first, then
+     * playerId. Uses exactly the same definition of "which adds count" as {@link #rank} (both go through
+     * {@link #countedByPlayer}), and applies {@link #MIN_ADDS_TO_NAME} itself: a player with a single
+     * add is a roster move, not a standing (the same floor the card uses to name a winner).
+     *
+     * <p>The cut at {@code limit} keeps every player tied with the last one kept, so the list can run
+     * past {@code limit} rather than silently cutting a tie. Its top tier is exactly {@code rank}'s
+     * result whenever {@code rank}'s top clears the floor.
+     */
+    public static List<Ranked> top(List<CompletedAdd> adds, int throughWeek, Predicate<String> eligiblePlayerId,
+                                   int limit) {
+        if (limit <= 0) return List.of();
+        List<Ranked> all = new ArrayList<>();
+        countedByPlayer(adds, throughWeek, eligiblePlayerId).forEach((playerId, counted) -> {
+            if (counted.size() >= MIN_ADDS_TO_NAME) all.add(ranked(playerId, counted));
+        });
+        all.sort(Comparator.comparingInt(Ranked::adds).reversed().thenComparing(Ranked::playerId));
+        if (all.size() <= limit) return all;
+        int cutoffAdds = all.get(limit - 1).adds();
+        int end = limit;
+        while (end < all.size() && all.get(end).adds() == cutoffAdds) end++;
+        return new ArrayList<>(all.subList(0, end));
+    }
+
+    /**
+     * The single definition of which adds count (research R16 decisions 1-3): WAIVER/FREE_AGENT only,
+     * inside the week window, for an eligible player. Both {@link #rank} and {@link #top} read this.
+     */
+    private static Map<String, List<CompletedAdd>> countedByPlayer(List<CompletedAdd> adds, int throughWeek,
+                                                                   Predicate<String> eligiblePlayerId) {
+        Map<String, List<CompletedAdd>> byPlayer = new LinkedHashMap<>();
+        for (CompletedAdd a : adds) {
+            if (!"WAIVER".equals(a.type()) && !"FREE_AGENT".equals(a.type())) continue;
+            if (a.week() < 1 || a.week() > throughWeek) continue;
+            if (!eligiblePlayerId.test(a.playerId())) continue;
+            byPlayer.computeIfAbsent(a.playerId(), k -> new ArrayList<>()).add(a);
+        }
+        return byPlayer;
+    }
+
+    private static Ranked ranked(String playerId, List<CompletedAdd> adds) {
+        List<CompletedAdd> counted = new ArrayList<>(adds);
+        // Same ordering as WaiverPickupAttribution.isMoreRecent: week, then
+        // createdAt, with a null createdAt sorting first.
+        counted.sort(Comparator.<CompletedAdd>comparingInt(CompletedAdd::week)
+                .thenComparing(CompletedAdd::createdAt, Comparator.nullsFirst(Comparator.naturalOrder())));
+        int distinctTeams = (int) counted.stream().map(CompletedAdd::rosterId).distinct().count();
+        return new Ranked(playerId, counted.size(), distinctTeams, counted);
     }
 }

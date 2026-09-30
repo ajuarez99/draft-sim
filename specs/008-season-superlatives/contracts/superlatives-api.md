@@ -177,3 +177,41 @@ entry id can't be used to reach across leagues.
 `POST` with a JSON body and `DELETE` both trigger a CORS preflight from a real browser. The
 multi-user onboarding work caught a real CORS header bug this way. The quickstart drives both from
 the page, not from curl.
+
+## Amended 2026-09-29 (spec 010): `standings` and `playerStandings`
+
+`specs/010-superlatives-full-standings` adds two fields to every `superlatives[]` entry. It changes
+no existing field. Its `plan.md` amendments are the full reasoning.
+
+```jsonc
+"standings": [            // [] unless the kind is available, has holders, and is team-headed
+  { "rank": 1,            // competition rank (1, 1, 3); null exactly when hasValue is false
+    "team": { /* same shape as holders[] */ },
+    "value": 187.42,      // rounded the same way as the kind's own `value`; null when hasValue is false
+    "note": "week 7",     // one line of context, or null
+    "hasValue": true,
+    "missingReason": null // non-null exactly when hasValue is false, e.g. "no wins yet"
+  }
+],
+"playerStandings": [      // JABARI_SMITH_JR only; [] for every other kind
+  { "rank": 1, "playerId": "4984", "playerName": "…", "position": "RB", "team": "SF",
+    "adds": 3, "distinctTeams": 2 }
+]
+```
+
+- **Universe.** `standings` holds every `roster_season` row of the league-season exactly once,
+  **including an orphaned roster**, which is named `"Roster N"`.
+- **Order.** The list is already sorted in the kind's own direction, and clients must not re-sort
+  it.
+  - Low to high: LOWEST_WEEK, CLOSEST_GAME, UNLUCKIEST.
+  - High to low: every other kind.
+  - Rows with no value come last.
+- **Rank 1 = `holders`**, with one exception, CLOSEST_GAME. It ranks each team's closest game won
+  **or lost**, while `holders` is that game's winner only, so `holders ⊆ rank-1 rows`.
+- **`playerStandings`** holds the top 10 players by adds with at least `MIN_ADDS_TO_NAME` (2),
+  **including everyone tied with the 10th**. Adds are counted by the same rule as `playerHolders`,
+  and its rank-1 players equal `playerHolders`.
+- **Behaviour change (plan amendment 9).** WAIVER_WIRE_WARRIOR and JOEL_EMBIID now return the empty
+  state when the best value in their per-roster map is ≤ 0. The empty reasons are `"no started
+  pickup has scored yet"` and `"no absence has cost anyone points yet"`. Before this, a team with,
+  for example, −2 pickup points could "win" while level with, or behind, teams that did nothing.

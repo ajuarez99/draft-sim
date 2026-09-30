@@ -4697,3 +4697,54 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+
+/* --- Superlatives full standings (specs/010-superlatives-full-standings) --
+   "See all" opens every roster's place for one award. The card body is also a
+   mouse target, so it gets a hover cue; the lift is a shadow, NOT a transform --
+   a transformed ancestor becomes the containing block for `position: fixed`,
+   and the modal renders inside the card, so a transform would pin the backdrop
+   to the card instead of the viewport. */
+.sl-card-openable { cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+.sl-card-openable:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  border-color: color-mix(in oklab, var(--line) 60%, oklch(60% 0.12 var(--sl-hue, 250)));
+}
+.sl-card-openable .sl-detail { cursor: auto; }
+.sl-see-all {
+  margin-left: auto; background: transparent; border: 0; padding: 2px 6px; border-radius: 999px;
+  font: inherit; font-size: 12px; color: oklch(75% 0.11 var(--sl-hue, 250)); cursor: pointer;
+}
+.sl-see-all:hover { background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250))); }
+
+.sl-standings-modal { cursor: auto; text-align: left; }
+.sl-standings-title { margin: 0 32px 6px 0; font-size: 18px; }
+.sl-standings-sub { margin: 0 0 6px; }
+.sl-standings {
+  list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+/* rank | who (+ note beneath) | figure. The figure is right-aligned and
+   tabular so a column of values scans as a column. */
+.sl-standing {
+  display: grid; grid-template-columns: 2.2ch minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: 8px; border: 1px solid transparent;
+  font-variant-numeric: tabular-nums;
+}
+.sl-standing-top {
+  border-color: color-mix(in oklab, var(--line) 50%, oklch(60% 0.12 var(--sl-hue, 250)));
+  background: color-mix(in oklab, var(--panel) 88%, oklch(60% 0.12 var(--sl-hue, 250)) 12%);
+}
+.sl-standing-rank { color: var(--muted); text-align: right; }
+.sl-standing-top .sl-standing-rank { color: var(--text); font-weight: 700; }
+.sl-standing-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sl-standing-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.sl-standing-note { padding-left: 28px; }
+.sl-standing-figure { text-align: right; white-space: nowrap; }
+.sl-standing-missing .sl-standing-figure { white-space: normal; max-width: 22ch; }
+@media (max-width: 700px) {
+  .modal-backdrop:has(.sl-standings-modal) { padding: 0; align-items: stretch; }
+  .sl-standings-modal { max-width: none; max-height: none; height: 100%; border-radius: 0; }
+  .sl-standing { grid-template-columns: 2.2ch minmax(0, 1fr); }
+  .sl-standing-figure { grid-column: 2; text-align: left; }
+  .sl-standing-missing .sl-standing-figure { max-width: none; }
+}

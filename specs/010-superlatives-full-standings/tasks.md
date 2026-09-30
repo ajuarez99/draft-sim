@@ -333,12 +333,12 @@ Postgres.
     `SuperlativesStandingsIT` must show as run in the XML.
   - `cd web && npx tsc -b && npm run build && npx vitest run`.
   - Record the numbers in `verification.md`.
-- [ ] T028 [P] Add an "Amended 2026-09-29 (spec 010)" section to
+- [X] T028 [P] Add an "Amended 2026-09-29 (spec 010)" section to
   `specs/008-season-superlatives/contracts/superlatives-api.md`. It covers:
   - the `standings` and `playerStandings` shapes and invariants;
   - the CLOSEST_GAME exception;
   - the R4 empty-state change to WAIVER_WIRE_WARRIOR and JOEL_EMBIID.
-- [ ] T029 [P] Add a visible "Amended after review" section to
+- [X] T029 [P] Add a visible "Amended after review" section to
   `claude/superlatives-full-standings.md`. It points at plan amendments 1–13 and says plainly
   that:
   - amendment 1's first version was an unrun claim;

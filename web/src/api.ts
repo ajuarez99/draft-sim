@@ -1959,6 +1959,33 @@ export type SuperlativePlayerHolder = {
   distinctTeams: number
 }
 
+/**
+ * One row of a superlative's full standings (specs/010-superlatives-full-standings).
+ * Mirrors SeasonSuperlativesService.Standing. Payload order is the ranking order; never
+ * re-sort. `rank` is null exactly when `hasValue` is false, and `missingReason` is
+ * non-null exactly when `hasValue` is false. Ties share a rank (1, 1, 3).
+ */
+export type SuperlativeStanding = {
+  rank: number | null
+  team: SuperlativeHolder
+  value: number | null
+  /** Per-row context line ("week 7", "vs X · week 3"); may be null. */
+  note: string | null
+  hasValue: boolean
+  missingReason: string | null
+}
+
+/** JABARI_SMITH_JR only (spec 010): the top players by adds, `[]` for every other kind. Mirrors SeasonSuperlativesService.PlayerStanding. `position` and `team` are nullable. */
+export type SuperlativePlayerStanding = {
+  rank: number
+  playerId: string
+  playerName: string
+  position: string | null
+  team: string | null
+  adds: number
+  distinctTeams: number
+}
+
 /** Present only when fewer than the season's scored weeks were usable for a pairing-based kind. */
 export type SuperlativeCoverage = {
   weeksCovered: number
@@ -2069,6 +2096,10 @@ export type Superlative = {
   coverage: SuperlativeCoverage | null
   /** JABARI_SMITH_JR only (added 2026-09-28); `[]` for every other kind. `holders` and `playerHolders` are both `[]` iff `emptyReason` is non-null or `available` is false. */
   playerHolders: SuperlativePlayerHolder[]
+  /** Spec 010: every roster ranked, in payload order (never re-sort). `[]` when unavailable/empty and for JABARI_SMITH_JR. */
+  standings: SuperlativeStanding[]
+  /** Spec 010: JABARI_SMITH_JR only; `[]` for every other kind. */
+  playerStandings: SuperlativePlayerStanding[]
 }
 
 export type SuperlativesResponse = {

@@ -6,6 +6,27 @@ card should open a modal showing where **every** team ranked, not just the winne
 File:line references were checked against `main` at `04c2043`. Nothing
 here has been executed.
 
+> **Amended after review (2026-09-29).** This became spec
+> `specs/010-superlatives-full-standings/`. Its `plan.md` records 13 amendments that
+> override this doc, and the doc below is left as written. What this doc got wrong:
+>
+> - **It missed the controller.** `SuperlativesController.superlativeRow` builds each
+>   award's JSON by hand, so new record fields would never have reached the page (R1).
+> - **It missed orphaned rosters.** "Every team" has to mean every `roster_season` row.
+>   The name map this doc implied skips a roster with no manager (R2).
+> - **"Absent means 0" for Waiver Wire Warrior and Joel Embiid** could rank non-winners
+>   level with, or above, the card's winner. Both kinds now show their empty state when
+>   the best value is ≤ 0 (amendment 9). Embiid's unclassified weeks are noted on every
+>   row, not just the winner's (amendment 4).
+> - **"Formatted the way the card formats it"** only holds for a few kinds. There is now one
+>   per-kind formatter (amendment 10).
+> - **The "your row" highlight was dropped.** It compared two different Sleeper name fields
+>   (amendment 11).
+>
+> And one correction of a correction. The spec's first plan claimed the four record kinds
+> needed a separate, unfiltered query, or rank 1 could disagree with the card. **That claim
+> was never run, and it was false.** This doc's "rows already loaded" was right (amendment 1).
+
 ## What's there now
 
 - **There's no modal.** Each card (`SuperlativeCard`,
