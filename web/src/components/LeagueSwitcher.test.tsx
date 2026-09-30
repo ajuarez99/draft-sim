@@ -57,8 +57,11 @@ describe('switchTarget', () => {
     expect(switchTarget('board', ctxOf(NFL_B))).toBe('/drafts/DB/board')
   })
 
-  it('falls back to History from a page that is not a league page at all', () => {
-    expect(switchTarget(null, ctxOf(NFL_B))).toBe('/leagues/LB/history')
+  // Was History; a page with no league destination of its own (a mock room, a
+  // manager's history) now lands on the target's board, so a flyout's year links
+  // differ per year instead of all pointing at one History URL (spec 011).
+  it('falls back to the board from a page that is not a league page at all', () => {
+    expect(switchTarget(null, ctxOf(NFL_B))).toBe('/drafts/DB/board')
   })
 })
 

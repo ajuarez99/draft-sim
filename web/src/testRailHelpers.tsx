@@ -125,8 +125,13 @@ export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}
     avatar: null,
   })
 
+  // A `?query` in `pathname` is split off: MemoryRouter would otherwise treat
+  // it as part of the path and match no route.
+  const [pathOnly, ...queryParts] = pathname.split('?')
+  const search = queryParts.length ? `?${queryParts.join('?')}` : ''
+
   const result = render(
-    <MemoryRouter initialEntries={[{ pathname, state: options.state ?? null }]}>
+    <MemoryRouter initialEntries={[{ pathname: pathOnly, search, state: options.state ?? null }]}>
       <AppShell>
         {options.page ?? <p>page</p>}
       </AppShell>

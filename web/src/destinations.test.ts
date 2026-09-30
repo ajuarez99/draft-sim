@@ -136,19 +136,52 @@ describe('destinationsFor', () => {
     expect(labelOf(board, draft({ status: null }))).toBe('Mock draft')
   })
 
-  it('points league pages at the current season and the board at the viewed one', () => {
+  // specs/011: History is chain-wide and lives on the newest season; the board
+  // and every one-season page follow the season being viewed.
+  it('points History at the chain and season-scoped rows at the viewed season', () => {
     const older = draft({ sleeperDraftId: 'D_OLD', sleeperLeagueId: 'L_OLD', season: 2025 })
     const current = draft({ sleeperDraftId: 'D_NEW', sleeperLeagueId: 'L_NEW', season: 2026 })
     const viewingOlder: LeagueContext = {
       lineage: { current, seasons: [current, older] },
       season: older,
     }
-    const history = LEAGUE_DESTINATIONS.find((d) => d.key === 'history')!
-    const board = LEAGUE_DESTINATIONS.find((d) => d.key === 'board')!
+    const hrefOf = (key: string) => LEAGUE_DESTINATIONS.find((d) => d.key === key)!.href(viewingOlder)
     // History walks the whole chain itself, so it lives on the league.
-    expect(history.href(viewingOlder)).toBe('/leagues/L_NEW/history')
+    expect(hrefOf('history')).toBe('/leagues/L_NEW/history')
     // The board is the one thing each season genuinely has its own of.
-    expect(board.href(viewingOlder)).toBe('/drafts/D_OLD/board')
+    expect(hrefOf('board')).toBe('/drafts/D_OLD/board')
+    const oneSeason: Array<[string, string]> = [
+      ['analysis', 'analysis'],
+      ['rosterManagement', 'roster-management'],
+      ['expectedWins', 'expected-wins'],
+      ['forecast', 'forecast'],
+      ['weeklyReport', 'weekly-report'],
+      ['superlatives', 'superlatives'],
+    ]
+    for (const [key, path] of oneSeason) {
+      expect(hrefOf(key), key).toBe(`/leagues/L_OLD/${path}`)
+    }
+  })
+
+  // The rule as an iteration rather than a list, so a new league page added to
+  // the table defaults to "one season" and has to opt out by name.
+  it('every /leagues/ row except the chain-wide ones uses the viewed season', () => {
+    const older = draft({ sleeperDraftId: 'D_OLD', sleeperLeagueId: 'L_OLD', season: 2025 })
+    const current = draft({ sleeperDraftId: 'D_NEW', sleeperLeagueId: 'L_NEW', season: 2026 })
+    const ctxOlder: LeagueContext = { lineage: { current, seasons: [current, older] }, season: older }
+    // `power` is chain-wide for now; whether it should follow the season is
+    // pending decision T019 (specs/011). Remove it from this set if that lands.
+    const chainWide = new Set(['history', 'power'])
+    let checked = 0
+    for (const d of LEAGUE_DESTINATIONS) {
+      if (d.isAction) continue
+      const href = d.href(ctxOlder)
+      if (!href.startsWith('/leagues/')) continue
+      checked++
+      const expected = chainWide.has(d.key) ? 'L_NEW' : ctxOlder.season.sleeperLeagueId
+      expect(href.split('/')[2], d.key).toBe(expected)
+    }
+    expect(checked).toBeGreaterThan(6)
   })
 })
 

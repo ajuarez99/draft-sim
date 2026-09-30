@@ -60,7 +60,7 @@ export default function ExpectedWins() {
   return (
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="Expected wins"
         sub="What each team's scoring would have earned against a random opponent every week, against what the schedule actually gave them. The gap is luck, not skill."
       />

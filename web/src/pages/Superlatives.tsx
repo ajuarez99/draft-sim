@@ -100,7 +100,7 @@ export default function Superlatives() {
   return (
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="Superlatives"
         sub="Season-long awards, one card each: the highs and lows, the closest games, luck, the bench and the waiver wire. If an award can't be worked out yet, its card says why."
       />
