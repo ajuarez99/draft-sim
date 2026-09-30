@@ -4,6 +4,8 @@ import { PROVENANCE_LABEL } from '../provenance'
 import { behaviourText, reachGapText } from '../managerBehaviour'
 import TendenciesForm from './TendenciesForm'
 import Avatar from './Avatar'
+import { OnBrandLine } from './OnBrandPanel'
+import type { OnBrandRead } from '../onBrand'
 
 /**
  * Formerly SeatList's per-seat card, now the popover a board column header
@@ -58,9 +60,11 @@ type Props = {
   onChanged: () => void
   onClose: () => void
   onMakeMine: () => void
+  /** Live room only: this seat's on-brand read so far. Absent everywhere else. */
+  onBrand?: OnBrandRead
 }
 
-export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, onMakeMine }: Props) {
+export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, onMakeMine, onBrand }: Props) {
   const [editing, setEditing] = useState(false)
   const [loadingStated, setLoadingStated] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -183,6 +187,11 @@ export default function SeatPopover({ seat: s, sport, isMe, onChanged, onClose, 
                 </p>
               )}
               {footnote(s) && <p className="muted tiny">{footnote(s)}</p>}
+              {onBrand && (
+                <p className="seat-onbrand small">
+                  <OnBrandLine read={onBrand} />
+                </p>
+              )}
             </>
           )}
         </div>

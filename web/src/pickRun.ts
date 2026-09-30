@@ -19,7 +19,7 @@ import type { Sport } from './api'
  * excluded there. Mirrors positions.ts's POSITIONS_BY_SPORT minus that
  * football carve-out, not a separate list that could drift from it.
  */
-const RUNNABLE_BY_SPORT: Record<Sport, ReadonlySet<string>> = {
+export const RUNNABLE_BY_SPORT: Record<Sport, ReadonlySet<string>> = {
   nfl: new Set(['QB', 'RB', 'WR', 'TE']),
   nba: new Set(['PG', 'SG', 'SF', 'PF', 'C']),
 }

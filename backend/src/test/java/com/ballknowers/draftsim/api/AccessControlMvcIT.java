@@ -152,6 +152,10 @@ class AccessControlMvcIT {
     void draftRoutesAre404WithNoIdentity() throws Exception {
         mvc.perform(get("/api/drafts/it-acl-draft/seats")).andExpect(status().isNotFound());
         mvc.perform(get("/api/drafts/it-acl-draft/board")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/drafts/it-acl-draft/pool")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/drafts/it-acl-draft/pool").header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/drafts/it-acl-draft/pool").header("X-Sleeper-User", MEMBER)).andExpect(status().isOk());
         mvc.perform(get("/api/drafts/it-acl-draft/live-stream")).andExpect(status().isNotFound());
         mvc.perform(get("/api/drafts/it-acl-draft/live-stream").param("user", ""))
                 .andExpect(status().isNotFound());

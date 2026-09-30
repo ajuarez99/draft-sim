@@ -563,3 +563,27 @@ during a 5,000-iteration sim took 0.23 s, and replacement cancels the old run li
 - Heavy compute goes on a bounded platform pool.
 - A test of cancellation or fairness has to put the heavy work and a request handler on the same
   scheduler, or it can't see this.
+
+## 24. A lookup that silently drops its misses turns bad input into a plausible wrong answer
+
+**2026-09-30, spec 012 (T023).**
+
+**What happened.**
+- Measuring the per-pick re-projection, the first runs sent a `startState` of 24 real picks exported with `psql` on Windows.
+- Every sleeper id carried a trailing `\r`.
+- `SimulationService.resolveStartState` looks each id up in `idsBySleeperId` and **skips any that miss**, so all 24 were dropped with no error and no log line.
+- The engine then simulated the whole draft as if nothing had been picked.
+- The response was a normal, well-formed 200: 500 iterations, 180 cells, sensible-looking timings.
+
+**How it was caught.** Only by reading a number that should have been certain: pick 1, a locked
+real pick, read **0.094** instead of **1.0**. The timings were off by that mistake too, since an
+unlocked run simulates more picks.
+
+**Why it matters beyond the script.** The app's own live tab builds `startState` from
+`RealPick.player.sleeperId`, so it is not exposed today. Any future caller that passes ids from
+anywhere else gets the same silent unlock. The DB-replay fallback has the same shape: it skips a
+`draft_pick` row whose `player_id` is null.
+
+**The rule:**
+- When input maps through a lookup, a miss is either an error or a counted, logged event. It is never a silent `continue`, least of all when the missing entries change what the output means (locked vs. simulated).
+- Before trusting a measurement, check one value whose answer you already know. Here, a locked pick must read 1.0.

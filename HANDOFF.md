@@ -1,5 +1,50 @@
 # Ball Knowers — handoff
 
+**2026-09-30, branch `012-draft-pick-insight` (worktree
+`.claude/worktrees/012-draft-pick-insight`, off local `main` `de1e1dd`): built and verified
+locally against a harness, not committed, not deployed.** `specs/012-draft-pick-insight/` is the
+brief. `plan-review.md`, `code-review.md` and `verification.md` record every correction and
+measurement.
+
+**What it is.** The live draft room, and only the live room, now has three new pieces:
+- **A passive pick card for every pick.** It shows:
+  - the slot it fills and what that roster still needs, with a summary;
+  - the pick against ADP;
+  - "model had this at N%";
+  - an on-brand read against the manager's history;
+  - their likely next pick, with its share and runners-up.
+- **A position scarcity meter.** The starter pool is the board's top teams × starters. It shows how many are left now, and "~N at your pick" once that figure can be exact.
+- **A per-manager "Room read"** panel.
+
+**What changed underneath.**
+- **Per-pick background re-projection is back.** It partially reverses `41b9426`: facts still never wait on it. Each run is pinned to an explicit `startState`, so every projected number knows which side of a pick it is on.
+- **A new `GET /api/drafts/{id}/pool`** endpoint.
+- **No migration.**
+
+**Measured.**
+- A 500-iteration run takes 150–270 ms locally.
+- 12 concurrent callers got results within 2.2 s with 0 × 429, even at 2 permits.
+- The old "~5 s" figure was about 20× too high.
+- In the browser: 274–456 ms per pick.
+- Railway is **unmeasured**.
+
+**Verified live** through the real poller, SSE and UI, with a local fake Sleeper replaying the real 2026 "(Foot) Ball Knowers" picks into a synthetic draft (since deleted):
+- **SC-003**: the card's model share and likely-next figures match the recorded pre- and post-pick projections exactly.
+- Burst → one card; on the clock → no card; hidden tab → no card; the preference survives a reload.
+- 375 px; basketball meters; the mock room and simulator are untouched.
+
+**Live verification found three bugs the tests had missed.** All are fixed:
+- the board was blank before the first projection;
+- an on-brand verdict called a +0.7 drafter "on brand" against a +10 profile;
+- the card was below the fold on phones.
+
+**Tests.** Web vitest 806/806, `tsc` and the build are clean. Backend: 945 tests, 0 skipped, 1 failure, `RefreshControllerIT`, which is intermittent: it failed at baseline and passed in between.
+
+**Not done.**
+- A real Sleeper draft end to end.
+- Railway numbers.
+- The NBA meter shows "SG 0 / 0". That is board data, not a bug, but a candidate follow-up.
+
 **2026-09-30, branch `011-season-scoped-rail-links` (worktree
 `.claude/worktrees/011-season-scoped-rail-links`, off `origin/main` `587fbc3`): built and
 verified locally, not deployed.** The brief is `claude/season-scoped-rail-links.md`, and

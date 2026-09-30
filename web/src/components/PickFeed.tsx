@@ -29,6 +29,12 @@ type Props = {
   // room is football-only regardless) don't need to pass anything. Drives
   // both the run detector's runnable-position list and the DEF name guard.
   sport?: Sport
+  /**
+   * Makes every row a button that reports its pick number. Optional and
+   * additive: the mock room and the simulator pass nothing and get the plain
+   * rows they always had. Only the live room uses it, to open a pick's card.
+   */
+  onPickClick?: (pickNo: number) => void
 }
 
 /**
@@ -52,7 +58,7 @@ type Props = {
  * `revealedThrough === pausedAt`, so the board's predicted player at your own
  * still-open pick would otherwise show up here as though it had happened.
  */
-export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl' }: Props) {
+export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl', onPickClick }: Props) {
   if (picks.length === 0) return null
 
   const run = positionRun(picks.map((p) => p.player), 6, 4, sport)
@@ -73,16 +79,8 @@ export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl' }: Pro
         const clause = showRun && run ? `${run.count} of the last ${run.window} were ${run.position}` : null
         const runClass = showRun && run ? ` run pos-run-${run.position}` : ''
         const fit = isLead && !clause ? p.fit : null
-        return (
-          <li
-            key={p.pickNo}
-            className={`pick-feed-row${isLead ? ' lead' : ''}${runClass}`}
-            // The position's own color as a left edge on the announcement row.
-            // Set from the position code rather than through eleven CSS rules
-            // because --qb/--rb/--pg/... are already named after it in
-            // styles.css, so this covers both sports for free.
-            style={isLead ? ({ '--lead-hue': `var(--${p.player.position.toLowerCase()})` } as CSSProperties) : undefined}
-          >
+        const body = (
+          <>
             <span className="pick-feed-no mono">{roundPickLabel(p.pickNo, teams)}</span>
             <span className={`pos ${p.player.position}`}>{posRank(p.player)}</span>
             {/* The announcement says the whole name. Everywhere else the
@@ -105,6 +103,30 @@ export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl' }: Pro
             {(isLead || !clause) && <span className="pick-feed-by mono">{p.manager}</span>}
             {clause && <span className="pick-feed-run cond">{clause}</span>}
             {fit && <span className="pick-feed-fit cond">{fit}</span>}
+          </>
+        )
+        return (
+          <li
+            key={p.pickNo}
+            className={`pick-feed-row${isLead ? ' lead' : ''}${runClass}${onPickClick ? ' clickable' : ''}`}
+            // The position's own color as a left edge on the announcement row.
+            // Set from the position code rather than through eleven CSS rules
+            // because --qb/--rb/--pg/... are already named after it in
+            // styles.css, so this covers both sports for free.
+            style={isLead ? ({ '--lead-hue': `var(--${p.player.position.toLowerCase()})` } as CSSProperties) : undefined}
+          >
+            {onPickClick ? (
+              <button
+                type="button"
+                className="pick-feed-btn"
+                aria-label={`Pick ${roundPickLabel(p.pickNo, teams)}, ${p.player.name} to ${p.manager}. Show pick card`}
+                onClick={() => onPickClick(p.pickNo)}
+              >
+                {body}
+              </button>
+            ) : (
+              body
+            )}
           </li>
         )
       })}
