@@ -115,6 +115,18 @@ class SeasonSuperlativesStandingsRecordsTest {
     // ---------------------------------------------------------------- margins
 
     @Test
+    void aTiedGameIsNobodysBlowoutWinButStillCountsForClosestGame() {
+        // B5: the tie must not hand roster 1 (side A) a 0.00 "win".
+        List<LeagueMatchupRepository.PairedGame> games = List.of(game(1, 1, "100.00", 2, "100.00"));
+        List<Standing> blowout = margins(games, false);
+        assertTrue(blowout.stream().noneMatch(Standing::hasValue));
+        assertEquals("no wins yet", of(blowout, 1).missingReason());
+        List<Standing> closest = margins(games, true);
+        assertEquals(0.0, of(closest, 1).value());
+        assertEquals(0.0, of(closest, 2).value());
+    }
+
+    @Test
     void biggestBlowoutUsesLargestWinningMarginHighToLow() {
         List<Standing> s = margins(List.of(
                 game(1, 1, "150.00", 2, "100.00"),   // 1 beats 2 by 50

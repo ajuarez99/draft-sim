@@ -203,7 +203,15 @@ function SuperlativeCard({
     <article
       className={`sl-card${openable ? ' sl-card-openable' : ''}`}
       style={{ ['--sl-hue' as string]: hue }}
-      onClick={openable ? () => setOpen(true) : undefined}
+      onClick={
+        openable
+          ? () => {
+              // B3: a drag-select across card text ends in a click on the article; don't open over it.
+              if (window.getSelection()?.toString()) return
+              setOpen(true)
+            }
+          : undefined
+      }
     >
       <header className="sl-card-head">
         <h4>{meta.title}</h4>
@@ -512,6 +520,10 @@ export function standingFigure(kind: Superlative['kind'], unit: Superlative['uni
   if (kind === 'LUCKIEST' || kind === 'UNLUCKIEST') {
     return `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)} wins vs expected`
   }
+  // B1: UNETHICAL's total counts player-weeks (a player flagged for a week), not games.
+  if (kind === 'UNETHICAL') return `${value} ${value === 1 ? 'player-week' : 'player-weeks'}`
+  // B4: every Embiid figure is an estimate, same wording as the card.
+  if (kind === 'JOEL_EMBIID') return `${value.toFixed(2)} estimated points lost`
   return formatValue(value, unit)
 }
 

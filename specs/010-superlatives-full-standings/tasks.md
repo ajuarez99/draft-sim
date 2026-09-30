@@ -50,7 +50,7 @@ Path prefixes:
 
 ## Phase 2: Foundational
 
-- [ ] T002 Add the new records and fields in `BE/engine/SeasonSuperlativesService.java`.
+- [X] T002 Add the new records and fields in `BE/engine/SeasonSuperlativesService.java`.
   - Next to `Holder`:
     - `public record Standing(Integer rank, Holder team, Double value, String note, boolean hasValue, String missingReason) {}`
     - `public record PlayerStanding(int rank, String playerId, String playerName, String position, String team, int adds, int distinctTeams) {}`
@@ -58,10 +58,10 @@ Path prefixes:
     Keep the existing shorter constructors, defaulting both lists to `List.of()`.
   - Document the invariants on the record: `rank == null` iff `!hasValue`; `missingReason != null`
     iff `!hasValue`.
-- [ ] T003 Update `withUsernames` in `BE/engine/SeasonSuperlativesService.java`.
+- [X] T003 Update `withUsernames` in `BE/engine/SeasonSuperlativesService.java`.
   - Fill `username` on each `standings` row's `team`, exactly as for `holders`.
   - Carry `standings` and `playerStandings` through to the rebuilt `Superlative`.
-- [ ] T004 Serialize the new fields in `BE/api/SuperlativesController.java` (R1).
+- [X] T004 Serialize the new fields in `BE/api/SuperlativesController.java` (R1).
   - In `superlativeRow` (`:206`), add `m.put("standings", …)` and `m.put("playerStandings", …)`.
   - Add `standingRow(Standing)`, built as a `LinkedHashMap` because nullable fields make `Map.of`
     throw. It reuses `holderRow(s.team())` for `team`.
@@ -69,7 +69,7 @@ Path prefixes:
     are nullable.
   - JSON field names: `rank`, `team`, `value`, `note`, `hasValue`, `missingReason`; and `rank`,
     `playerId`, `playerName`, `position`, `team`, `adds`, `distinctTeams`.
-- [ ] T005 [P] Create `BE/engine/SuperlativeStandings.java`: a final class with static methods only
+- [X] T005 [P] Create `BE/engine/SuperlativeStandings.java`: a final class with static methods only
   and no Spring.
   - `record Entry(Holder team, Double value, String note, String missingReason)`
   - `static List<Standing> rank(List<Entry> entries, boolean ascending)`
@@ -79,12 +79,12 @@ Path prefixes:
       ascending.
     - Ranks are competition ranks (1, 1, 3), comparing with `Double.compare`. Callers pass values
       already rounded exactly as the winner's value is.
-- [ ] T006 [P] Write `BT/engine/SuperlativeStandingsTest.java` for T005. It asserts:
+- [X] T006 [P] Write `BT/engine/SuperlativeStandingsTest.java` for T005. It asserts:
   - descending and ascending order;
   - ties 1, 1, 3 and 1, 1, 1, 4;
   - null-value rows last, with `rank == null` and `hasValue == false`;
   - a null value without a reason throws.
-- [ ] T007 [P] Mirror the types in `web/api.ts`, next to `SuperlativePlayerHolder`.
+- [X] T007 [P] Mirror the types in `web/api.ts`, next to `SuperlativePlayerHolder`.
   - Add `SuperlativeStanding = { rank: number | null; team: SuperlativeHolder; value: number | null; note: string | null; hasValue: boolean; missingReason: string | null }`.
   - Add `SuperlativePlayerStanding = { rank: number; playerId: string; playerName: string; position: string | null; team: string | null; adds: number; distinctTeams: number }`.
   - Add `standings: SuperlativeStanding[]` and `playerStandings: SuperlativePlayerStanding[]` to
@@ -105,7 +105,7 @@ Every function below is a package-private static in `SeasonSuperlativesService` 
 signature given, where `…maps` means the three maps. Tests call them directly, without
 Postgres.
 
-- [ ] T008 [P] [US1] Write the week-score and margin tests in
+- [X] T008 [P] [US1] Write the week-score and margin tests in
   `BT/engine/SeasonSuperlativesStandingsRecordsTest.java`.
   - Build `RosterWeekPointsRepository.WeekBreakdown` rows by hand, with null JSON fields, and
     `LeagueMatchupRepository.PairedGame` rows by hand.
@@ -123,7 +123,7 @@ Postgres.
     exactly.
   - The opponent name comes from `nameByRoster`, with the `"Roster N"` fallback.
   - An orphaned roster, absent from `nameByRoster` but in `rosterIds`, appears as `"Roster N"`.
-- [ ] T009 [P] [US1] Write the tests for the remaining kinds in
+- [X] T009 [P] [US1] Write the tests for the remaining kinds in
   `BT/engine/SeasonSuperlativesStandingsTotalsTest.java`.
   - `closeGameStandings`:
     - A roster that is in a paired game but absent from the map is a real 0.
@@ -142,7 +142,7 @@ Postgres.
       `"N weeks couldn't be classified as a bye or a missed game"` (`"1 week …"` for 1).
     - A roster with none has a null note.
   - Every function returns each id in `rosterIds` exactly once.
-- [ ] T010 [P] [US1] Write the empty-state tests (R4 / FR-011) in
+- [X] T010 [P] [US1] Write the empty-state tests (R4 / FR-011) in
   `BT/engine/SeasonSuperlativesStandingsTotalsTest.java`, or in the existing
   `SeasonSuperlativesWaiverTest` and `SeasonSuperlativesAbsenceCoverageTest` if their fixtures
   fit better.
@@ -155,7 +155,7 @@ Postgres.
 
 ### Backend: implementation, in sequence (one file: `BE/engine/SeasonSuperlativesService.java`)
 
-- [ ] T011 [US1] Add the roster universe and the week and margin standings.
+- [X] T011 [US1] Add the roster universe and the week and margin standings.
   - In `forLeague`, after `teamMaps`, add `Set<Integer> rosterIds = Set.copyOf(managerByRoster.keySet())`.
   - `static List<Standing> weekScoreStandings(List<RosterWeekPointsRepository.WeekBreakdown> rows, Set<Integer> rosterIds, boolean highest, …maps)`:
     - built from the loaded `leagueBreakdowns` (amendment 1);
@@ -171,33 +171,33 @@ Postgres.
         `"tied with {opp} · week N"`.
   - Pass each result into `weekScoreSuperlative` and `marginSuperlative`, adding a parameter, and
     from there into the `Superlative` constructor.
-- [ ] T012 [US1] Add the close-game and luck standings.
+- [X] T012 [US1] Add the close-game and luck standings.
   - `static List<Standing> closeGameStandings(Map<Integer, List<GameDetail>> byRoster, Set<Integer> rostersWithGames, Set<Integer> rosterIds, …maps)`:
     - `rostersWithGames` is every roster id appearing in `games`;
     - wire it into `closeGameSuperlative`.
   - `static List<Standing> luckStandings(List<ExpectedWinsService.TeamRow> teams, Set<Integer> rosterIds, boolean ascending, …maps)`:
     - pass the maps and `rosterIds` into `addLuckSuperlatives`, adding parameters (R14);
     - round the value exactly as the winner's `extreme` is.
-- [ ] T013 [US1] Add the bench, waiver, absence and conduct standings.
+- [X] T013 [US1] Add the bench, waiver, absence and conduct standings.
   - `benchStandings(Map<Integer, BenchAgg> byRoster, Set<Integer> rosterIds, …maps)`
   - `waiverStandings(Map<Integer, WaiverPickupAttribution.RosterTotal> byRoster, Set<Integer> rosterIds, …maps)`
   - `absenceStandings(Map<Integer, AbsenceCost.RosterCost> byRoster, Map<Integer, Set<Integer>> unclassifiedWeeksByRoster, Set<Integer> rosterIds, …maps)`
   - `conductStandings(Map<Integer, Integer> totalByRoster, Set<Integer> rosterIds, …maps)`
   - Round values with `round2`, as each winner's value is. Wire each into its builder, adding
     `rosterIds` parameters.
-- [ ] T014 [US1] Add the R4 empty state (FR-011) in `waiverSuperlative` and `absenceSuperlative`.
+- [X] T014 [US1] Add the R4 empty state (FR-011) in `waiverSuperlative` and `absenceSuperlative`.
   - After computing `max`, if `max <= 0`, return the kind's existing empty-state shape (as when
     `byRoster.isEmpty()`) with the new `emptyReason` from T010.
   - Add a comment citing plan amendment 9.
 
 ### Backend: the controller-level guard
 
-- [ ] T015 [US1] Keep the default construction honest, and run T008–T010 green.
+- [X] T015 [US1] Keep the default construction honest, and run T008–T010 green.
   - Grep every `new Superlative(` in `SeasonSuperlativesService`.
   - Every **available** return that has holders must pass `standings`, or `playerStandings` for
     Jabari.
   - Every empty or unavailable return uses the shorter constructor.
-- [ ] T016 [US1] Create `BT/api/SuperlativesStandingsIT.java` (R3), modelled on
+- [X] T016 [US1] Create `BT/api/SuperlativesStandingsIT.java` (R3), modelled on
   `SuperlativesControllerIT`: the same `requiresLocalPostgres` guard, the same setup and teardown
   style, and unique `sleeper_id`s so it can't collide with real rows.
   - Read the schema before writing inserts. Look in `backend/src/main/resources/db/migration`
@@ -223,13 +223,13 @@ Postgres.
 
 ### Frontend
 
-- [ ] T017 [P] [US1] Add `export function standingFigure(kind: SuperlativeKind, unit: Superlative['unit'], value: number): string`
+- [X] T017 [P] [US1] Add `export function standingFigure(kind: SuperlativeKind, unit: Superlative['unit'], value: number): string`
   to `web/pages/Superlatives.tsx` (amendment 10). It returns:
   - `formatCloseGameCount(kind, value)` for CLOSE_WINS / CLOSE_LOSSES;
   - `${value >= 0 ? '+' : '−'}${Math.abs(value).toFixed(2)} wins vs expected` for LUCKIEST /
     UNLUCKIEST;
   - `formatValue(value, unit)` otherwise.
-- [ ] T018 [P] [US1] Create `web/components/SuperlativeStandingsModal.tsx`.
+- [X] T018 [P] [US1] Create `web/components/SuperlativeStandingsModal.tsx`.
   - Props: `{ s: Superlative; title: string; hue: number; figure: (v: number) => string; onClose: () => void }`.
   - Follow `web/components/StartMockModal.tsx`:
     - a `modal-backdrop` with `onClick={onClose}`;
@@ -254,14 +254,14 @@ Postgres.
     - `figure(value)` when `hasValue`, otherwise the `missingReason` in muted text;
     - the `note` in muted text.
   - Rank-1 rows get the class `sl-standing-top` and the card's `--sl-hue`.
-- [ ] T019 [P] [US1] Add the styles to `web/styles.css`, beside the `.sl-card` rules.
+- [X] T019 [P] [US1] Add the styles to `web/styles.css`, beside the `.sl-card` rules.
   - `.sl-see-all`: a small text button in the card header.
   - `.sl-card-openable`: a cursor pointer and a hover lift consistent with the other card hovers.
   - `.sl-standings`: rows as a grid of `rank | avatar | name+note | figure`, with `tabular-nums`
     and the figure right-aligned.
   - At `@media (max-width: 700px)`, `.sl-standings-modal` is full height with no side margin,
     the list scrolls inside it, and there's no horizontal overflow.
-- [ ] T020 [US1] Wire up the cards in `web/pages/Superlatives.tsx`, in `SuperlativeCard`.
+- [X] T020 [US1] Wire up the cards in `web/pages/Superlatives.tsx`, in `SuperlativeCard`.
   - `const openable = s.available && !isEmpty && (s.standings.length > 0 || s.playerStandings.length > 0)`.
   - `const [open, setOpen] = useState(false)`.
   - When `openable`:
@@ -275,7 +275,7 @@ Postgres.
     inside the card component. Clicks inside the modal don't bubble to the article, because the
     modal stops propagation. It still renders inside `<article>`, so check the backdrop's
     `position: fixed` covers the page.
-- [ ] T021 [US1] Add tests to `web/pages/Superlatives.test.tsx`:
+- [X] T021 [US1] Add tests to `web/pages/Superlatives.test.tsx`:
   - A HIGHEST_WEEK card with 3 standings has a "See all" button. Clicking it opens a `dialog` with
     3 `listitem`s in payload order.
   - Escape closes the dialog.
@@ -294,7 +294,7 @@ Postgres.
 
 ## Phase 4: User Story 2, Jabari Smith Jr. (P2)
 
-- [ ] T022 [P] [US2] Write `BT/engine/MostAddedPlayersTopTest.java`.
+- [X] T022 [P] [US2] Write `BT/engine/MostAddedPlayersTopTest.java`.
   - `top()` uses the same filters as `rank()`: WAIVER/FREE_AGENT only, the week window, and the
     eligibility predicate. Write one test per filter.
   - `top()` itself excludes players below `MIN_ADDS_TO_NAME`.
@@ -302,33 +302,33 @@ Postgres.
   - The cut at `limit` includes everyone tied with the last player kept, e.g. 12 when 9th–12th
     tie.
   - The players tied for most adds in `top()` equal `rank()`'s players.
-- [ ] T023 [US2] Add `public static List<Ranked> top(List<CompletedAdd> adds, int throughWeek, Predicate<String> eligiblePlayerId, int limit)`
+- [X] T023 [US2] Add `public static List<Ranked> top(List<CompletedAdd> adds, int throughWeek, Predicate<String> eligiblePlayerId, int limit)`
   to `BE/engine/MostAddedPlayers.java`.
   - First extract `rank`'s filter loop into one private method that both call. There must be a
     single definition of "which adds count".
   - `Ranked.counted` is sorted the same way in both methods.
-- [ ] T024 [US2] Build `playerStandings` in `mostAddedSuperlative` (`BE/engine/SeasonSuperlativesService.java`).
+- [X] T024 [US2] Build `playerStandings` in `mostAddedSuperlative` (`BE/engine/SeasonSuperlativesService.java`).
   - Call `MostAddedPlayers.top(..., 10)` and assign competition ranks by `adds`.
   - Map each to `PlayerStanding` using the same `Player` lookup and "Unknown player" fallback as
     the holders loop.
   - Pass it into the final constructor. Leave `standings` as `List.of()`.
   - Extend T016's IT: seed 3 WAIVER adds of one player (by two rosters) and 2 of another. Assert
     Jabari's `playerStandings` ranks are `[1, 2]`, and that rank 1 equals `playerHolders`.
-- [ ] T025 [US2] Add the player branch to `web/components/SuperlativeStandingsModal.tsx`.
+- [X] T025 [US2] Add the player branch to `web/components/SuperlativeStandingsModal.tsx`.
   - When `s.kind === 'JABARI_SMITH_JR'`, render `s.playerStandings`. Each row shows:
     - the rank;
     - the name and `(position)`;
     - the team, if any;
     - `"{adds} add(s) by {distinctTeams} team(s)"`, with the card's singular and plural wording.
   - Subtitle: `"This award ranks players, not teams."`
-- [ ] T026 [US2] Add a test to `web/pages/Superlatives.test.tsx`: the Jabari card's "See all"
+- [X] T026 [US2] Add a test to `web/pages/Superlatives.test.tsx`: the Jabari card's "See all"
   opens a dialog with the `playerStandings` in order and the players subtitle.
 
 ---
 
 ## Phase 5: Polish & verification
 
-- [ ] T027 Run the full checks.
+- [X] T027 Run the full checks.
   - `cd backend && ./gradlew test`: compare with the baseline of 880, 0 failed, 0 skipped.
     `SuperlativesStandingsIT` must show as run in the XML.
   - `cd web && npx tsc -b && npm run build && npx vitest run`.

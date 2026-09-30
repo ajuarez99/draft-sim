@@ -127,6 +127,9 @@ class SuperlativesStandingsIT {
     private void cleanUp() {
         jdbc.update("delete from league where sleeper_id = ?", LEAGUE_SLEEPER_ID);
         for (String u : MANAGER_USERS) jdbc.update("delete from manager where sleeper_user_id = ?", u);
+        // player_game / player_absence are keyed by sport + sleeper id, not the league, so they don't cascade.
+        jdbc.update("delete from player_game where sport = 'nfl' and sleeper_player_id in (?, ?)", PLAYER_X, PLAYER_Y);
+        jdbc.update("delete from player_absence where sport = 'nfl' and sleeper_player_id in (?, ?)", PLAYER_X, PLAYER_Y);
         jdbc.update("delete from player where sport = 'nfl' and sleeper_id in (?, ?)", PLAYER_X, PLAYER_Y);
     }
 
@@ -161,18 +164,67 @@ class SuperlativesStandingsIT {
         return standings.stream().map(s -> (Integer) s.get("rank")).toList();
     }
 
+    /**
+     * B2: gives the four kinds the base seed can't reach a winner, all on roster 3. Roster 3 holds X (RB) and Y (WR):
+     * <ul>
+     *   <li>MOST_BENCH_POINTS: roster 3's weeks carry players_points (the other rosters' are '{}', so unusable and
+     *       excluded), and the best lineup outscores the recorded starters_points.</li>
+     *   <li>WAIVER_WIRE_WARRIOR: a completed WAIVER add of X in week 1, and X started weeks 1-2.</li>
+     *   <li>UNETHICAL: a commissioner conduct entry for X from week 1 (3 rostered weeks).</li>
+     *   <li>JOEL_EMBIID: X played weeks 1-2 (rec_yd 100 at 0.1 = 10 ppg), missed week 3 -> 10 estimated points lost.</li>
+     * </ul>
+     */
+    private void seedRichKinds() {
+        jdbc.update("insert into player (sport, sleeper_id, name, positions) values ('nfl', ?, 'IT Player X', '{RB}')", PLAYER_X);
+        jdbc.update("insert into player (sport, sleeper_id, name, positions) values ('nfl', ?, 'IT Player Y', '{WR}')", PLAYER_Y);
+        jdbc.update("update league set scoring_json = '{\"rec_yd\": 0.1}'::jsonb where id = ?", leagueId);
+
+        double[] yPoints = {80, 70, 60};
+        String[] starters = {"[\"" + PLAYER_X + "\"]", "[\"" + PLAYER_X + "\"]", "[]"};
+        for (int w = 1; w <= 3; w++) {
+            jdbc.update("""
+                    update roster_week_points
+                       set players_points = jsonb_build_object(?::text, 100, ?::text, ?::numeric),
+                           starters = ?::jsonb
+                     where league_id = ? and week = ? and roster_id = 3
+                    """, PLAYER_X, PLAYER_Y, yPoints[w - 1], starters[w - 1], leagueId, w);
+        }
+        jdbc.update("""
+                insert into league_transaction (league_id, season, week, sleeper_transaction_id, type, status, roster_id, adds)
+                values (?, 2026, 1, 'it-tx-standings-010-rich', 'WAIVER', 'complete', 3, jsonb_build_object(?::text, 3))
+                """, leagueId, PLAYER_X);
+        jdbc.update("insert into league_conduct_entry (league_id, sleeper_player_id, reason, applies_from_week) values (?, ?, 'IT conduct', 1)",
+                leagueId, PLAYER_X);
+        for (int w = 1; w <= 2; w++) {
+            jdbc.update("""
+                    insert into player_game (sport, season, week, sleeper_player_id, game_id, game_date, stats)
+                    values ('nfl', 2026, ?, ?, ?, date '2026-09-10', '{"rec_yd": 100}'::jsonb)
+                    """, w, PLAYER_X, "it-game-standings-010-" + w);
+        }
+        jdbc.update("""
+                insert into player_absence (sport, season, week, sleeper_player_id, basis)
+                values ('nfl', 2026, 3, ?, 'TEAM_PLAYED_NO_ENTRY')
+                """, PLAYER_X);
+    }
+
+    /** B2: the exact kinds the loop below must reach -- a kind dropping out fails this, not a loose count. */
+    private static final Set<String> EXPECTED_CHECKED = Set.of(
+            "HIGHEST_WEEK", "LOWEST_WEEK", "BIGGEST_BLOWOUT", "CLOSEST_GAME", "CLOSE_WINS", "CLOSE_LOSSES",
+            "LUCKIEST", "UNLUCKIEST", "MOST_BENCH_POINTS", "WAIVER_WIRE_WARRIOR", "JOEL_EMBIID", "UNETHICAL");
+
     @Test
     void everyAvailableKindWithHoldersCarriesAllFourRostersAndRankOneMatchesTheCard() {
+        seedRichKinds();
         Map<String, Object> body = body();
         assertEquals(Boolean.TRUE, body.get("available"), "the seeded season must resolve and be scored");
 
-        int checked = 0;
+        Set<String> checked = new HashSet<>();
         for (Map<String, Object> s : list(body, "superlatives")) {
             String kind = (String) s.get("kind");
             boolean hasHolders = !list(s, "holders").isEmpty();
             if (!Boolean.TRUE.equals(s.get("available")) || !hasHolders) continue;
             if ("JABARI_SMITH_JR".equals(kind)) continue; // player-headed; covered by its own test
-            checked++;
+            checked.add(kind);
 
             List<Map<String, Object>> standings = list(s, "standings");
             assertEquals(4, standings.size(), kind + ": one row per roster_season row");
@@ -204,7 +256,7 @@ class SuperlativesStandingsIT {
                 assertEquals(holders, rankOne, kind + ": rank-1 rosters must equal the card's holders");
             }
         }
-        assertTrue(checked >= 6, "at least the six record and close-game kinds should have been checked, was " + checked);
+        assertEquals(EXPECTED_CHECKED, checked, "the exact set of kinds that had holders and were checked");
     }
 
     @Test

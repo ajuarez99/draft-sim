@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Superlatives, { standingFigure } from './Superlatives'
@@ -1227,6 +1227,39 @@ describe('Superlatives', () => {
 
       await userEvent.click(await screen.findByText('Highest week'))
       expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('does not open from a card click while text is selected (B3)', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      const title = await screen.findByText('Highest week')
+      const spy = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'Team A' } as unknown as Selection)
+      try {
+        await userEvent.click(title)
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      } finally {
+        spy.mockRestore()
+      }
+    })
+
+    it('stays open when a press starts inside the card and is released on the backdrop (B3)', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
+      render(<Superlatives />)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const backdrop = dialog.parentElement as HTMLElement
+      fireEvent.mouseDown(dialog)
+      fireEvent.mouseUp(backdrop)
+      fireEvent.click(backdrop)
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    it('labels UNETHICAL as player-weeks and JOEL_EMBIID as estimated (B1, B4)', () => {
+      expect(standingFigure('UNETHICAL', 'GAMES', 1)).toBe('1 player-week')
+      expect(standingFigure('UNETHICAL', 'GAMES', 3)).toBe('3 player-weeks')
+      expect(standingFigure('JOEL_EMBIID', 'POINTS', 12.4)).toBe('12.40 estimated points lost')
     })
 
     it('has no See all on unavailable or empty cards', async () => {

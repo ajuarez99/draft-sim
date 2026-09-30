@@ -50,6 +50,10 @@ export default function SuperlativeStandingsModal({ s, title, hue, figure, onClo
     return () => document.body.classList.remove('bk-modal-fullscreen')
   }, [])
 
+  // B3: a drag that starts inside the card and ends on the backdrop fires a click on the
+  // backdrop; only close when the press also began there.
+  const downOnBackdrop = useRef(false)
+
   const isPlayers = s.kind === 'JABARI_SMITH_JR'
 
   return (
@@ -58,9 +62,13 @@ export default function SuperlativeStandingsModal({ s, title, hue, figure, onClo
     // backdrop click would close it and then bubble up and reopen it.
     <div
       className="modal-backdrop"
+      onMouseDown={(e) => {
+        downOnBackdrop.current = e.target === e.currentTarget
+      }}
       onClick={(e) => {
         e.stopPropagation()
-        onClose()
+        if (downOnBackdrop.current) onClose()
+        downOnBackdrop.current = false
       }}
     >
       <div

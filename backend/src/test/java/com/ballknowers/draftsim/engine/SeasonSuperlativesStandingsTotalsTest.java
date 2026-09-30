@@ -243,6 +243,24 @@ class SeasonSuperlativesStandingsTotalsTest {
     }
 
     @Test
+    void embiidEmptyStatesNameRostersWithUnclassifiedWeeks() {
+        // B6: both empty paths (no rows at all, and max <= 0) must not read as a flat zero.
+        Map<Integer, Set<Integer>> unclassified = Map.of(1, Set.of(3, 4), 2, Set.of(5), 3, Set.of());
+        Superlative noRows = SeasonSuperlativesService.absenceWinners(Map.of(), unclassified, List.of(), 8, false,
+                rosterIds, Map.of(), names, avatars, managers);
+        assertNotNull(noRows.coverage());
+        assertEquals(List.of("2 rosters had weeks that couldn't be classified as a bye or a missed game"),
+                noRows.coverage().reasons());
+
+        Superlative zero = SeasonSuperlativesService.absenceWinners(Map.of(1, cost(1, 0.0)), Map.of(1, Set.of(3)),
+                List.of("3 rostered players have no game-by-game records yet."), 8, false, rosterIds, Map.of(),
+                names, avatars, managers);
+        assertEquals(List.of("3 rostered players have no game-by-game records yet.",
+                "1 roster had weeks that couldn't be classified as a bye or a missed game"),
+                zero.coverage().reasons());
+    }
+
+    @Test
     void embiidWithAPositiveCostCrownsTheTopRosterAsRankOne() {
         Map<Integer, AbsenceCost.RosterCost> byRoster = Map.of(1, cost(1, 60.0), 2, cost(2, 10.0));
         Superlative s = SeasonSuperlativesService.absenceWinners(byRoster, Map.of(), List.of(), 8, false, rosterIds,

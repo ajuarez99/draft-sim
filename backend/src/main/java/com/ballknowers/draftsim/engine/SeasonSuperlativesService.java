@@ -986,8 +986,14 @@ public class SeasonSuperlativesService {
                                       Set<Integer> rosterIds, Map<String, Player> playersBySleeperId,
                                       Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
                                       Map<Integer, Long> managerByRoster) {
-        Coverage emptyCoverage = leagueLevelReasons.isEmpty() ? null
-                : new Coverage(weeksScored, 0, leagueLevelReasons);
+        // B6: an empty card must not read as a flat zero when some rosters' weeks are unknown, not zero.
+        long unclassifiedRosters = unclassifiedWeeksByRoster.values().stream().filter(w -> !w.isEmpty()).count();
+        List<String> emptyReasons = new ArrayList<>(leagueLevelReasons);
+        if (unclassifiedRosters > 0) {
+            emptyReasons.add(unclassifiedRosters + (unclassifiedRosters == 1 ? " roster had" : " rosters had")
+                    + " weeks that couldn't be classified as a bye or a missed game");
+        }
+        Coverage emptyCoverage = emptyReasons.isEmpty() ? null : new Coverage(weeksScored, 0, emptyReasons);
         if (byRoster.isEmpty()) {
             return new Superlative(Kind.JOEL_EMBIID, true, null, early, null, "POINTS", List.of(),
                     "nobody's been bitten yet", List.of(), emptyCoverage);
@@ -1318,6 +1324,9 @@ public class SeasonSuperlativesService {
         Map<Integer, MarginPick> best = new HashMap<>();
         for (LeagueMatchupRepository.PairedGame g : games) {
             int cmp = g.aPoints().compareTo(g.bPoints());
+            // B5: a tie is nobody's blowout win. Degenerate case accepted: a season where every game is
+            // tied -- the card would still name a 0-margin holder while standings say "no wins yet".
+            if (!closest && cmp == 0) continue;
             boolean aWon = cmp >= 0;
             double margin = (aWon ? g.aPoints().subtract(g.bPoints()) : g.bPoints().subtract(g.aPoints())).doubleValue();
             if (closest) {
