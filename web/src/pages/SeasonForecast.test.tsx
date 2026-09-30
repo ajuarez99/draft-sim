@@ -5,6 +5,7 @@ import type { SeasonForecast as Data, ForecastTeam } from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
+  Link: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a>,
 }))
 
 const getSeasonForecast = vi.fn()
@@ -43,6 +44,7 @@ function data(over: Partial<Data> = {}): Data {
     latestScoredWeek: 1,
     latestFinalWeek: 1,
     canCommission: false,
+    seasonComplete: false,
     ...over,
   }
 }
@@ -63,6 +65,47 @@ describe('Season forecast', () => {
     expect(within(row).getByText('8–12')).toBeInTheDocument()
     expect(within(row).getByText('#2.5')).toBeInTheDocument()
     expect(within(row).getByText('41.0%')).toBeInTheDocument()
+  })
+
+  it('a finished season whose forecast was never computed offers no recompute', async () => {
+    getSeasonForecast.mockResolvedValue(
+      data({
+        available: false,
+        reason: 'NOT_COMPUTED',
+        season: 2025,
+        teams: [],
+        latestScoredWeek: 17,
+        latestFinalWeek: 17,
+        seasonComplete: true,
+        canCommission: true,
+      }),
+    )
+    render(<SeasonForecast />)
+
+    expect(await screen.findByText(/The 2025 season is over, so there is nothing left to forecast/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /History/ })).toHaveAttribute('href', '/leagues/L1/history')
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('a finished season says it is over and links to History instead of showing odds', async () => {
+    getSeasonForecast.mockResolvedValue(
+      data({ season: 2025, week: 17, latestScoredWeek: 17, latestFinalWeek: 17, seasonComplete: true, canCommission: true }),
+    )
+    render(<SeasonForecast />)
+
+    expect(await screen.findByText(/The 2025 season is over, so there is nothing left to forecast/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /History/ })).toHaveAttribute('href', '/leagues/L1/history')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(screen.queryByText(/simulated seasons/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('a live season still renders the odds table', async () => {
+    getSeasonForecast.mockResolvedValue(data({ seasonComplete: false }))
+    render(<SeasonForecast />)
+
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    expect(screen.queryByText(/season is over/)).not.toBeInTheDocument()
   })
 
   it('says the numbers come from a stored snapshot, not a fresh run', async () => {
@@ -230,5 +273,26 @@ describe('Season forecast', () => {
       await screen.findByText(/1 week scored since this forecast/)
       expect(screen.queryByRole('button', { name: /Recompute/ })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('Season forecast eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    getSeasonForecast.mockResolvedValue(data({ season: 2025 }))
+    render(<SeasonForecast />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    getSeasonForecast.mockResolvedValue(data({ season: 2025, requestedSeason: 2026 }))
+    render(<SeasonForecast />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    getSeasonForecast.mockReturnValue(new Promise(() => {}))
+    render(<SeasonForecast />)
+    expect(screen.getByText('League')).toBeInTheDocument()
   })
 })

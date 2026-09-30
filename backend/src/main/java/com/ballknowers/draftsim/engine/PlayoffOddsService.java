@@ -283,18 +283,17 @@ public class PlayoffOddsService {
 
     public record Forecast(boolean available, Unavailable reason, int season, Integer requestedSeason,
                            int week, int iterations, String model, String snapshotAt,
-                           List<ForecastTeam> teams, int latestScoredWeek, int latestFinalWeek) {
-
-        static Forecast no(Unavailable reason, int season) {
-            return no(reason, season, null, 0, 0);
-        }
+                           List<ForecastTeam> teams, int latestScoredWeek, int latestFinalWeek,
+                           boolean seasonComplete) {
 
         /** A refusal announces the season fallback too: the reader still needs
-         *  to know the answer is about a different year than the one clicked. */
+         *  to know the answer is about a different year than the one clicked.
+         *  {@code seasonComplete} is the resolved league row's own status (V21), stated on every
+         *  shape so the page can tell a finished season from a live one instead of inferring it. */
         static Forecast no(Unavailable reason, int season, Integer requestedSeason, int latestScoredWeek,
-                           int latestFinalWeek) {
+                           int latestFinalWeek, boolean seasonComplete) {
             return new Forecast(false, reason, season, requestedSeason, 0, 0, null, null, List.of(),
-                    latestScoredWeek, latestFinalWeek);
+                    latestScoredWeek, latestFinalWeek, seasonComplete);
         }
     }
 
@@ -318,7 +317,7 @@ public class PlayoffOddsService {
         Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
         if (format.isEmpty() || !format.get().modelable()) {
             return Optional.of(Forecast.no(Unavailable.UNMODELLED_SEEDING, season,
-                    found.get().requestedSeason(), scored.latestStored(), scored.latestFinal()));
+                    found.get().requestedSeason(), scored.latestStored(), scored.latestFinal(), league.complete()));
         }
 
         // Only snapshots for weeks up to the latest final one count; a higher-week row is ignored.
@@ -328,7 +327,7 @@ public class PlayoffOddsService {
             boolean played = scored.latestStored() > 0;
             return Optional.of(Forecast.no(
                     played ? Unavailable.NOT_COMPUTED : Unavailable.NO_SCORED_WEEKS, season,
-                    found.get().requestedSeason(), scored.latestStored(), scored.latestFinal()));
+                    found.get().requestedSeason(), scored.latestStored(), scored.latestFinal(), league.complete()));
         }
         PlayoffOddsRepository.Snapshot s = snap.get();
 
@@ -369,7 +368,8 @@ public class PlayoffOddsService {
         }
 
         return Optional.of(new Forecast(true, null, s.season(), found.get().requestedSeason(),
-                s.week(), s.iterations(), s.model(), null, teams, scored.latestStored(), scored.latestFinal()));
+                s.week(), s.iterations(), s.model(), null, teams, scored.latestStored(), scored.latestFinal(),
+                league.complete()));
     }
 
     /** {@code "3": 412} -> {3: 412}. Null (a pre-V17 snapshot) is an empty map. */

@@ -89,11 +89,15 @@ const ALL_SPORTS: Sport[] = ['nfl', 'nba']
 /**
  * The declaration. Order is rail render order.
  *
- * League-scoped pages key off `lineage.current.sleeperLeagueId` rather than the
- * season being viewed: history, power rankings and analysis each walk the whole
- * season chain themselves, so they live on the league, not on one of its years.
- * The board is the exception and takes the viewed season, because every season
- * genuinely has its own board.
+ * Two rules, and each row states which one it follows:
+ *
+ * - Whole chain: History (and, pending a decision, Power rankings) walk the
+ *   season chain themselves, so they live on the league and use
+ *   `lineage.current`. Every season's link lands on the same page.
+ * - One season: the board, and every other league page (Analysis, Roster
+ *   management, Expected wins, Season forecast, Weekly report, Superlatives),
+ *   is a view of one season and uses the season being viewed, `ctx.season`.
+ *   That is what lets the rail's year links keep you on the page you are on.
  */
 export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
   {
@@ -125,6 +129,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     glyph: '◷',
     sports: ALL_SPORTS,
     label: 'History',
+    // whole chain: History walks every season itself
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/history`,
     match: /^\/leagues\/([^/]+)\/history\/?$/,
     idKind: 'league',
@@ -136,6 +141,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     glyph: '▲',
     sports: ALL_SPORTS,
     label: 'Power rankings',
+    // whole chain, for now: pending a decision on whether Power rankings should follow the season
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/power`,
     // `/verify` is the dev-only self-check harness (power-rankings-reskin.md
     // §7). It is not a destination of its own, but it is inside the league and
@@ -155,7 +161,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // working block and two explaining themselves. See claude/league-analysis.md.
     sports: ['nfl'],
     label: 'Analysis',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/analysis`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/analysis`,
     match: /^\/leagues\/([^/]+)\/analysis\/?$/,
     idKind: 'league',
     requiresStatus: null,
@@ -171,7 +178,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // for football. See specs/004-ffwrapped-feature-parity research R2/R4.
     sports: ['nfl', 'nba'],
     label: 'Roster management',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/roster-management`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/roster-management`,
     match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
     idKind: 'league',
     requiresStatus: null,
@@ -185,7 +193,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // thing in basketball.
     sports: ['nfl', 'nba'],
     label: 'Expected wins',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/expected-wins`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/expected-wins`,
     match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
     idKind: 'league',
     requiresStatus: null,
@@ -199,7 +208,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // seeding, and that is a league property rather than a sport one.
     sports: ['nfl', 'nba'],
     label: 'Season forecast',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/forecast`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/forecast`,
     match: /^\/leagues\/([^/]+)\/forecast\/?$/,
     idKind: 'league',
     requiresStatus: null,
@@ -212,7 +222,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // points already scored; none of it is a projection.
     sports: ['nfl', 'nba'],
     label: 'Weekly report',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/weekly-report`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/weekly-report`,
     match: /^\/leagues\/([^/]+)\/weekly-report\/?$/,
     idKind: 'league',
     requiresStatus: null,
@@ -225,7 +236,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // already stored -- none of it is a projection, so basketball gets it too.
     sports: ['nfl', 'nba'],
     label: 'Superlatives',
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/superlatives`,
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/superlatives`,
     match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
     idKind: 'league',
     requiresStatus: null,

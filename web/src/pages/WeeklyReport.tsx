@@ -83,7 +83,7 @@ export default function WeeklyReport() {
   return (
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="Weekly report"
         sub="Every matchup, the week's best performances, and the awards nobody wants — read back from what actually happened."
         actions={

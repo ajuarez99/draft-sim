@@ -264,3 +264,24 @@ describe('Roster management', () => {
     expect(screen.queryByRole('heading', { name: /league transactions/i })).not.toBeInTheDocument()
   })
 })
+
+describe('Roster management eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    getRosterManagement.mockResolvedValue(data({ season: 2025 }))
+    render(<RosterManagement />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    getRosterManagement.mockResolvedValue(data({ season: 2025, requestedSeason: 2026 }))
+    render(<RosterManagement />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    getRosterManagement.mockReturnValue(new Promise(() => {}))
+    render(<RosterManagement />)
+    expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})

@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { acceptsLeagueHint, leagueRefFromPath } from './railLeague'
+import { MemoryRouter } from 'react-router-dom'
+import { createElement, type ReactNode } from 'react'
+import { renderHook, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as api from './api'
+import type { DraftSummary } from './api'
+import { acceptsLeagueHint, invalidateRailLeagues, leagueRefFromPath, useRailLeague } from './railLeague'
 
 /**
  * The rail lives outside `<Routes>`, so it can't use `useParams` and matches
@@ -77,5 +82,51 @@ describe('acceptsLeagueHint', () => {
     ['/drafts/abc123/board'],
   ])('refuses a hint on %s', (path) => {
     expect(acceptsLeagueHint(path)).toBe(false)
+  })
+})
+
+/**
+ * specs/011 T004. A league page for an older season resolves `season` to that
+ * season's lineage entry, not to `lineage.current` -- the rail's year links and
+ * "on" marker depend on it. Pins existing behaviour (railLeague.ts, the
+ * `kind === 'league'` branch of resolve()).
+ */
+describe('useRailLeague on an older season league page', () => {
+  afterEach(() => {
+    invalidateRailLeagues()
+    vi.restoreAllMocks()
+  })
+
+  function draft(over: Partial<DraftSummary>): DraftSummary {
+    return {
+      id: 1,
+      sleeperDraftId: 'D1',
+      leagueId: 1,
+      leagueName: 'Test League',
+      season: 2026,
+      teams: 12,
+      rounds: 15,
+      status: 'complete',
+      startTime: null,
+      sleeperLeagueId: 'L1',
+      previousLeagueId: null,
+      sport: 'nfl',
+      ...over,
+    }
+  }
+
+  it('resolves season to the older lineage entry for /leagues/<older id>/superlatives', async () => {
+    invalidateRailLeagues()
+    vi.spyOn(api, 'getDrafts').mockResolvedValue([
+      draft({ id: 2, sleeperDraftId: 'D_NEW', sleeperLeagueId: 'L_NEW', season: 2026, previousLeagueId: 'L_OLD' }),
+      draft({ id: 1, sleeperDraftId: 'D_OLD', sleeperLeagueId: 'L_OLD', season: 2025 }),
+    ])
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(MemoryRouter, null, children)
+
+    const { result } = renderHook(() => useRailLeague('/leagues/L_OLD/superlatives'), { wrapper })
+
+    await waitFor(() => expect(result.current).not.toBeNull())
+    expect(result.current!.season.sleeperLeagueId).toBe('L_OLD')
+    expect(result.current!.lineage.current.sleeperLeagueId).toBe('L_NEW')
   })
 })

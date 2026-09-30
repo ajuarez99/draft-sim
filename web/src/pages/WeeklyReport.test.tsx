@@ -434,3 +434,24 @@ describe('the weekly report page decides by rule, not by sport name', () => {
     expect(pageSource).toContain('playersPlayMultiplePerPeriod')
   })
 })
+
+describe('Weekly report eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    getWeeklyReport.mockResolvedValue(data({ season: 2025 }))
+    renderPage()
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    getWeeklyReport.mockResolvedValue(data({ season: 2025, requestedSeason: 2026 }))
+    renderPage()
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    getWeeklyReport.mockReturnValue(new Promise(() => {}))
+    renderPage()
+    expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})

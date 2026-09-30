@@ -87,7 +87,7 @@ export default function RosterManagement() {
   return (
     <div className="content">
       <PageHeader
-        eyebrow="League"
+        eyebrow={data ? `League · ${data.season}` : 'League'}
         title="Roster management"
         sub="What each team scored, against the most it could have scored if every weekly lineup had been perfect. Efficiency is the first divided by the second — it measures lineup decisions, not the roster."
       />

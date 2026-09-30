@@ -4,6 +4,7 @@ import { crestLetter, hueForName } from '../hue'
 import {
   destinationFromPath,
   destinationsFor,
+  LEAGUE_DESTINATIONS,
   labelOf,
   type DestinationKey,
   type LeagueContext,
@@ -128,30 +129,33 @@ export function refreshLine(status: RefreshStatus | null, now: Date = new Date()
   }
 }
 
-/** The same rule the board destination uses: a finished season has picks to
- *  show, anything else opens the room. */
-function seasonHref(s: DraftSummary): string {
-  return (s.status ?? 'unknown') === 'complete'
-    ? `/drafts/${s.sleeperDraftId}/board`
-    : `/drafts/${s.sleeperDraftId}`
-}
-
 /**
  * Where switching to `target` should land you, given where you are now.
  *
- * Keeps the page you were on when the other league has it, and falls back to
- * that league's History when it does not -- switching from an NFL league's
- * Analysis to a basketball league has to go somewhere, and Analysis is
- * football-only. The availability rule is read from `destinationsFor`, never
- * restated here: a second copy of "which sports have Analysis" is how the rail
- * and the palette would eventually disagree.
+ * Keeps the page you were on when the target has it -- another year of the same
+ * league, or another league. When it does not (Analysis is football-only; Follow
+ * live exists only while a draft is running), the fallback depends on what kind
+ * of page you were on: a league page lands on its History, and anything else on
+ * '/'. A draft page lands on the target's board, and so does no page at all
+ * (`current === null`): a hinted room (a mock, a manager's history) is inside a
+ * league without being on one of its pages, and falling back to History there
+ * pointed every year in the flyout at the same URL. The board is the page that
+ * differs per year. The Leagues flyout group calls this with the same `current`,
+ * so from a mock room it now lands on the other league's board rather than its
+ * History -- intended, for the same reason. The
+ * availability rule is read from `destinationsFor`, never restated here: a
+ * second copy of "which sports have Analysis" is how the rail and the palette
+ * would eventually disagree.
  */
 export function switchTarget(current: DestinationKey | null, target: LeagueContext): string {
   const offered = destinationsFor(target).filter((d) => !d.isAction)
   const same = current ? offered.find((d) => d.key === current) : undefined
   if (same) return same.href(target)
-  const history = offered.find((d) => d.key === 'history')
-  return history ? history.href(target) : '/'
+  const wasDraftPage = current
+    ? LEAGUE_DESTINATIONS.find((d) => d.key === current)?.idKind === 'draft'
+    : true
+  const fallback = offered.find((d) => d.key === (wasDraftPage ? 'board' : 'history'))
+  return fallback ? fallback.href(target) : '/'
 }
 
 /**
@@ -384,10 +388,11 @@ export default function LeagueRailSection({
         </span>
       )}
 
-      {/* Every season is its own Sleeper league with its own board, so the
-          older ones are links rather than a label -- the home card's own
-          treatment, and the reason the rail marks the season you are actually
-          looking at instead of always the newest.
+      {/* Every season is its own Sleeper league, so the years are links rather
+          than a label, and the rail marks the season you are actually looking
+          at instead of always the newest. A year link keeps the page you are
+          on (switchTarget): pick 2025 on Superlatives and you get 2025's
+          Superlatives; on the board, 2025's board; on History, History.
           Hidden while collapsed, where the flyout below carries them instead:
           a 56px rail has no room for a row of years, and draft rooms (which
           collapse by default) are exactly where comparing seasons is wanted. */}
@@ -396,7 +401,7 @@ export default function LeagueRailSection({
           {lineage.seasons.map((s) => (
             <Link
               key={s.sleeperLeagueId}
-              to={seasonHref(s)}
+              to={switchTarget(currentKey, { lineage, season: s })}
               className={`league-season-link${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
               title={`${s.season} · ${s.teams} managers`}
             >
@@ -437,7 +442,7 @@ export default function LeagueRailSection({
                   {lineage.seasons.map((s) => (
                     <Link
                       key={s.sleeperLeagueId}
-                      to={seasonHref(s)}
+                      to={switchTarget(currentKey, { lineage, season: s })}
                       role="menuitem"
                       className={`rail-switcher-item${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
                     >

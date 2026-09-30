@@ -647,3 +647,24 @@ describe('LeagueAnalysis', () => {
     expect(within(row).queryByText('Josh Allen')).not.toBeInTheDocument()
   })
 })
+
+describe('League analysis eyebrow names the season shown', () => {
+  it('reads League · <season> from the payload', async () => {
+    getLeagueAnalysis.mockResolvedValue(data({ season: 2025 }))
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+  })
+
+  it('uses the resolved season, not the requested one, when the server fell back', async () => {
+    getLeagueAnalysis.mockResolvedValue(data({ season: 2025, requestedSeason: 2026 } as Partial<LeagueAnalysisData>))
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText('League · 2025')).toBeInTheDocument()
+    expect(screen.queryByText('League · 2026')).not.toBeInTheDocument()
+  })
+
+  it('is plain League while there is no payload yet', () => {
+    getLeagueAnalysis.mockReturnValue(new Promise(() => {}))
+    render(<LeagueAnalysis />)
+    expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})

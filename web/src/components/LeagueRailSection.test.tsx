@@ -10,7 +10,9 @@ import {
   renderAtPath,
   resetRail,
 } from '../testRailHelpers'
-import { REFRESH_POLL_MS } from './LeagueRailSection'
+import { REFRESH_POLL_MS, switchTarget } from './LeagueRailSection'
+import type { LeagueContext } from '../destinations'
+import type { LeagueLineage } from '../leagueLineage'
 
 /*
  * The question this whole feature is about: standing on this URL, does the rail
@@ -39,6 +41,29 @@ const NBA = draftSummary({
   sleeperLeagueId: 'L_NBA',
   leagueName: 'Hoops League',
   sport: 'nba',
+  status: 'complete',
+})
+
+const NFL25 = draftSummary({
+  id: 11,
+  leagueId: 11,
+  sleeperDraftId: 'D_NFL25',
+  sleeperLeagueId: 'L_NFL25',
+  leagueName: 'Football League',
+  season: 2025,
+  sport: 'nfl',
+  status: 'complete',
+})
+
+const NFL26 = draftSummary({
+  id: 12,
+  leagueId: 12,
+  sleeperDraftId: 'D_NFL26',
+  sleeperLeagueId: 'L_NFL26',
+  previousLeagueId: 'L_NFL25',
+  leagueName: 'Football League',
+  season: 2026,
+  sport: 'nfl',
   status: 'complete',
 })
 
@@ -253,6 +278,52 @@ describe('refresh on visit', () => {
     expect(pending).toHaveLength(0)
   })
 
+  // specs/011 T005: a page for an older season is keyed by that season's own
+  // league id, so the rail must bump every season of the lineage. Pins the loop
+  // in LeagueRailSection.tsx (`for (const id of seasonIdsRef.current) bump(id)`).
+  it('bumps the data version of every season in the lineage when a refresh finishes', async () => {
+    const running = refreshStatus({ state: 'RUNNING', leagueSleeperId: 'L_NFL26' })
+    const fresh = refreshStatus({
+      state: 'FRESH',
+      leagueSleeperId: 'L_NFL26',
+      lastSuccessAt: new Date().toISOString(),
+    })
+    const pending: Array<() => void> = []
+    const realSetTimeout = globalThis.setTimeout
+    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => {
+      if (ms === REFRESH_POLL_MS) {
+        pending.push(fn)
+        return 0 as unknown as ReturnType<typeof setTimeout>
+      }
+      return realSetTimeout(fn, ms, ...rest)
+    }) as unknown as typeof setTimeout)
+
+    function TwoVersions() {
+      return (
+        <>
+          <p data-testid="v-new">{useLeagueDataVersion('L_NFL26')}</p>
+          <p data-testid="v-old">{useLeagueDataVersion('L_NFL25')}</p>
+        </>
+      )
+    }
+
+    const { leagueSection } = renderAtPath('/leagues/L_NFL26/history', {
+      drafts: [NFL26, NFL25],
+      refresh: running,
+      polls: [fresh],
+      page: <TwoVersions />,
+    })
+    await waitFor(() => expect(leagueSection()?.textContent).toContain('Updating…'))
+    expect(screen.getByTestId('v-old')).toHaveTextContent('0')
+
+    await act(async () => {
+      pending.shift()!()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(screen.getByTestId('v-new')).toHaveTextContent('1'))
+    expect(screen.getByTestId('v-old')).toHaveTextContent('1')
+  })
+
   it('does not bump the data version when a refresh was never running', async () => {
     const { leagueSection } = renderAtPath('/leagues/L_NFL/history', {
       drafts: [NFL],
@@ -294,5 +365,119 @@ describe('refresh on visit', () => {
     expect(leagueSection()?.querySelector('.rail-league-refresh')).toBeNull()
     expect(getLeagueRefreshSpy).not.toHaveBeenCalled()
     expect(refreshLeagueSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+/*
+ * specs/011 US1: a year link keeps the page you are on. Two-season NFL lineage,
+ * 2025 complete. (b), (c), (d) pin behaviour that already held; (a), (g), (e)
+ * and (f1) are the bug.
+ */
+describe('year links keep the page', () => {
+  // Draft routes open with the rail collapsed, which hides the year row; the
+  // saved override ('bk-rail') expands it so the board and live cases can see it.
+  const expandRail = () => localStorage.setItem('bk-rail', 'expanded')
+  afterEach(() => localStorage.removeItem('bk-rail'))
+
+  const yearLink = (leagueSection: () => HTMLElement | null, year: string) =>
+    [...leagueSection()!.querySelectorAll<HTMLAnchorElement>('a.league-season-link')].find(
+      (a) => a.textContent?.trim() === year,
+    )!
+
+  it('(a) keeps a one-season page: superlatives 2026 -> 2025', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL26/superlatives', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').getAttribute('href')).toBe('/leagues/L_NFL25/superlatives')
+  })
+
+  it("(b) on the board, the other year is that year's board", async () => {
+    expandRail()
+    const { leagueSection } = renderAtPath('/drafts/D_NFL26/board', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').getAttribute('href')).toBe('/drafts/D_NFL25/board')
+  })
+
+  it('(c) on History, both year links are the same History link', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL26/history', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').getAttribute('href')).toBe('/leagues/L_NFL26/history')
+    expect(yearLink(leagueSection, '2026').getAttribute('href')).toBe('/leagues/L_NFL26/history')
+  })
+
+  it('(d) marks the year being viewed on a one-season page', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL25/weekly-report', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').classList.contains('on')).toBe(true)
+    expect(yearLink(leagueSection, '2026').classList.contains('on')).toBe(false)
+  })
+
+  it('(g) does not carry the query string across a year switch', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL26/weekly-report?week=5', {
+      drafts: [NFL26, NFL25],
+    })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').getAttribute('href')).toBe('/leagues/L_NFL25/weekly-report')
+  })
+
+  it('(e) the Switch flyout Seasons items follow the same rule', async () => {
+    const user = userEvent.setup()
+    const a = renderAtPath('/leagues/L_NFL26/superlatives', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(a.leagueSection()).not.toBeNull())
+    await user.click(await screen.findByRole('button', { name: /switch/i }))
+    const item = (await screen.findAllByRole('menuitem')).find((m) => m.textContent?.startsWith('2025'))!
+    expect(item.getAttribute('href')).toBe('/leagues/L_NFL25/superlatives')
+    a.unmount()
+    resetRail()
+
+    const b = renderAtPath('/drafts/D_NFL26/board', { drafts: [NFL26, NFL25] })
+    await waitFor(() => expect(b.leagueSection()).not.toBeNull())
+    await user.click(await screen.findByRole('button', { name: /switch/i }))
+    const item2 = (await screen.findAllByRole('menuitem')).find((m) => m.textContent?.startsWith('2025'))!
+    expect(item2.getAttribute('href')).toBe('/drafts/D_NFL25/board')
+  })
+
+  it('(f1) from Follow live on a pre_draft season, a complete year goes to its board, not History', async () => {
+    const pre26 = { ...NFL26, status: 'pre_draft' }
+    expandRail()
+    const { leagueSection } = renderAtPath('/drafts/D_NFL26/live', { drafts: [pre26, NFL25] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(yearLink(leagueSection, '2025').getAttribute('href')).toBe('/drafts/D_NFL25/board')
+  })
+
+  // A hinted page (a mock room, a manager's history) has no league destination
+  // of its own, so currentKey is null. Falling back to History there sent every
+  // year link in the flyout to the same URL; the board is the per-year page.
+  it('(h) with no current page, a year goes to its own board', () => {
+    const ctx: LeagueContext = { lineage: { current: NFL26, seasons: [NFL26, NFL25] }, season: NFL25 }
+    expect(switchTarget(null, ctx)).toBe('/drafts/D_NFL25/board')
+  })
+
+  it('(h) on a hinted mock route, the Switch flyout year goes to its board, not History', async () => {
+    const user = userEvent.setup()
+    const { leagueSection } = renderAtPath('/mock/4', {
+      drafts: [NFL26, NFL25],
+      state: { railLeagueId: 'L_NFL26' },
+    })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    await user.click(await screen.findByRole('button', { name: /switch/i }))
+    const item = (await screen.findAllByRole('menuitem')).find((m) => m.textContent?.startsWith('2025'))!
+    expect(item.getAttribute('href')).toBe('/drafts/D_NFL25/board')
+  })
+
+  // (f2) Leagues-flyout coverage: year links cannot cross sports (a lineage is
+  // one sport), so the "current page not offered by the target" fallback is only
+  // reachable from the Leagues group of the flyout. Analysis is football-only.
+  it('(f2) falls back to History when the target sport lacks the page', () => {
+    const nba25 = draftSummary({ sleeperDraftId: 'D_NBA25', sleeperLeagueId: 'L_NBA25', sport: 'nba', season: 2025 })
+    const nba26 = draftSummary({
+      sleeperDraftId: 'D_NBA26',
+      sleeperLeagueId: 'L_NBA26',
+      previousLeagueId: 'L_NBA25',
+      sport: 'nba',
+      season: 2026,
+    })
+    const nbaLineage: LeagueLineage = { current: nba26, seasons: [nba26, nba25] }
+    const nbaCtx: LeagueContext = { lineage: nbaLineage, season: nba26 }
+    expect(switchTarget('analysis', nbaCtx)).toBe('/leagues/L_NBA26/history')
   })
 })

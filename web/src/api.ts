@@ -1821,6 +1821,8 @@ export type SeasonForecast = {
   latestFinalWeek: number
   /** Display only: whether to offer the recompute button. The route re-checks. */
   canCommission: boolean
+  /** The resolved season's league is finished (league.status): nothing left to forecast. Present on every shape. */
+  seasonComplete: boolean
 }
 
 export const getSeasonForecast = (sleeperLeagueId: string) =>
