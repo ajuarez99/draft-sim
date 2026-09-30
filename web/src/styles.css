@@ -4719,8 +4719,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .sl-standings-modal { cursor: auto; text-align: left; }
 .sl-standings-title { margin: 0 32px 6px 0; font-size: 18px; }
 .sl-standings-sub { margin: 0 0 6px; }
+.sl-standings-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; }
 .sl-standings {
-  list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; min-height: 0;
+  list-style: none; margin: 0; padding: 0;
   display: flex; flex-direction: column; gap: 4px;
 }
 /* rank | who (+ note beneath) | figure. The figure is right-aligned and
@@ -4739,11 +4740,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .sl-standing-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .sl-standing-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
 .sl-standing-note { padding-left: 28px; }
+/* Player rows have no avatar, so their team line sits under the name, not indented past an avatar (T031). */
+.sl-player-standing .sl-standing-note { padding-left: 0; }
 .sl-standing-figure { text-align: right; white-space: nowrap; }
 .sl-standing-missing .sl-standing-figure { white-space: normal; max-width: 22ch; }
 @media (max-width: 700px) {
   .modal-backdrop:has(.sl-standings-modal) { padding: 0; align-items: stretch; }
-  .sl-standings-modal { max-width: none; max-height: none; height: 100%; border-radius: 0; }
+  /* Three classes, to beat the shared .modal-card.wide max-height: 80vh (T031: the sheet stopped at 650px of 812). */
+  .modal-card.wide.sl-standings-modal { max-width: none; max-height: none; height: 100%; border-radius: 0; }
   .sl-standing { grid-template-columns: 2.2ch minmax(0, 1fr); }
   .sl-standing-figure { grid-column: 2; text-align: left; }
   .sl-standing-missing .sl-standing-figure { max-width: none; }

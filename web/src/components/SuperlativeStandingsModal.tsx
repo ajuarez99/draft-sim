@@ -1,7 +1,26 @@
 import { useEffect, useId, useRef } from 'react'
 import Avatar from './Avatar'
 import PersonName from './PersonName'
-import type { Superlative } from '../api'
+import type { Superlative, SuperlativePlayerStanding } from '../api'
+
+const MAX_PLAYER_ROWS = 10
+
+/** Whole rank groups while the cumulative count stays <= 10; the first group that would overflow, and all after it, are collapsed. */
+function splitPlayerGroups(rows: SuperlativePlayerStanding[]) {
+  const groups: SuperlativePlayerStanding[][] = []
+  for (const p of rows) {
+    const last = groups[groups.length - 1]
+    if (last && last[0].rank === p.rank) last.push(p)
+    else groups.push([p])
+  }
+  const shown: SuperlativePlayerStanding[] = []
+  let i = 0
+  for (; i < groups.length; i++) {
+    if (shown.length + groups[i].length > MAX_PLAYER_ROWS) break
+    shown.push(...groups[i])
+  }
+  return { shownPlayers: shown, collapsedGroups: groups.slice(i) }
+}
 
 type Props = {
   s: Superlative
@@ -56,6 +75,37 @@ export default function SuperlativeStandingsModal({ s, title, hue, figure, onClo
 
   const isPlayers = s.kind === 'JABARI_SMITH_JR'
 
+  // T031 live finding: 41-way tie on NFL 2025. The backend sends everyone tied with the
+  // 10th (correct), but 41 identical rows are noise. Group by rank in payload order (never
+  // re-sorted), show whole groups while the running count stays <= 10, and fold the rest
+  // (and every later group) behind a "Show all". The clicks stay inside the modal card,
+  // which already stops propagation, so the <details> can't close the modal or open the card.
+  const { shownPlayers, collapsedGroups } = splitPlayerGroups(isPlayers ? s.playerStandings : [])
+  const firstGroupCollapsed = shownPlayers.length === 0 && collapsedGroups.length > 0
+  const collapsedCount = collapsedGroups.reduce((n, g) => n + g.length, 0)
+  const collapsedAdds = collapsedGroups[0]?.[0]?.adds ?? 0
+  const collapsedSummary = firstGroupCollapsed
+    ? `${collapsedCount} ${collapsedCount === 1 ? 'player' : 'players'} tied with ${collapsedAdds} ${collapsedAdds === 1 ? 'add' : 'adds'} each`
+    : `${collapsedCount} more ${collapsedCount === 1 ? 'player' : 'players'} with ${collapsedAdds} ${collapsedAdds === 1 ? 'add' : 'adds'} each`
+
+  function playerRow(p: SuperlativePlayerStanding) {
+    return (
+      <li className={`sl-standing sl-player-standing${p.rank === 1 ? ' sl-standing-top' : ''}`} key={p.playerId}>
+        <span className="sl-standing-rank">{p.rank}</span>
+        <span className="sl-standing-who">
+          <span className="sl-standing-name">
+            {p.playerName}
+            {p.position ? ` (${p.position})` : ''}
+          </span>
+          {p.team && <span className="muted small sl-standing-note">{p.team}</span>}
+        </span>
+        <span className="sl-standing-figure">
+          {p.adds} {p.adds === 1 ? 'add' : 'adds'} by {p.distinctTeams} {p.distinctTeams === 1 ? 'team' : 'teams'}
+        </span>
+      </li>
+    )
+  }
+
   return (
     // stopPropagation on the backdrop too (amendment 12): this modal renders
     // inside the card's <article>, whose own onClick opens it. Without this a
@@ -93,24 +143,12 @@ export default function SuperlativeStandingsModal({ s, title, hue, figure, onClo
           </p>
         )}
 
+        {/* One scroll area for the ranked list and any collapsed tie group (T031: as two
+            flex children, expanding "Show all" squeezed the leaders' list to 0px). */}
+        <div className="sl-standings-scroll">
         <ol className="sl-standings">
           {isPlayers
-            ? s.playerStandings.map((p) => (
-                <li className={`sl-standing${p.rank === 1 ? ' sl-standing-top' : ''}`} key={p.playerId}>
-                  <span className="sl-standing-rank">{p.rank}</span>
-                  <span className="sl-standing-who">
-                    <span className="sl-standing-name">
-                      {p.playerName}
-                      {p.position ? ` (${p.position})` : ''}
-                    </span>
-                    {p.team && <span className="muted small sl-standing-note">{p.team}</span>}
-                  </span>
-                  <span className="sl-standing-figure">
-                    {p.adds} {p.adds === 1 ? 'add' : 'adds'} by {p.distinctTeams}{' '}
-                    {p.distinctTeams === 1 ? 'team' : 'teams'}
-                  </span>
-                </li>
-              ))
+            ? shownPlayers.map(playerRow)
             : s.standings.map((r) => (
                 <li
                   className={`sl-standing${r.rank === 1 ? ' sl-standing-top' : ''}${r.hasValue ? '' : ' sl-standing-missing'}`}
@@ -138,6 +176,18 @@ export default function SuperlativeStandingsModal({ s, title, hue, figure, onClo
                 </li>
               ))}
         </ol>
+        {isPlayers && collapsedGroups.length > 0 && (
+          <details className="sl-standings-more">
+            <summary className="muted small">
+              {/* Spelled out: a bare "7" beside "41 more" read as 741 (T031). */}
+              Rank {collapsedGroups[0][0].rank} ·{' '}
+              {collapsedSummary}
+              <span className="sl-standings-more-hint"> — Show all</span>
+            </summary>
+            <ol className="sl-standings">{collapsedGroups.flat().map(playerRow)}</ol>
+          </details>
+        )}
+        </div>
       </div>
     </div>
   )

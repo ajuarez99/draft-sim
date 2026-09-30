@@ -1371,5 +1371,48 @@ describe('Superlatives', () => {
       expect(items[1]).toHaveTextContent('Some Guy')
       expect(items[1]).toHaveTextContent('1 add by 1 team')
     })
+
+    // T031 live finding: 41-way tie on NFL 2025.
+    function jabariWith(playerStandings: Superlative['playerStandings']): Superlative {
+      return {
+        kind: 'JABARI_SMITH_JR', available: true, reason: null, early: false, value: 3, unit: 'ADDS',
+        holders: [], emptyReason: null, detail: [], coverage: null, playerHolders: playerStandings.filter((p) => p.rank === 1).slice(0, 1), standings: [],
+        playerStandings,
+      }
+    }
+    function players(n: number, rank: number, adds: number, prefix: string) {
+      return Array.from({ length: n }, (_, i) => ({
+        rank, playerId: `${prefix}${i}`, playerName: `${prefix} ${i}`, position: 'WR', team: 'KC', adds, distinctTeams: adds,
+      }))
+    }
+
+    it('collapses a large tied tail behind a summary and expands to all rows', async () => {
+      fetchSuperlatives.mockResolvedValue(
+        withKind(baseline(), jabariWith([...players(6, 1, 3, 'Top'), ...players(41, 7, 2, 'Tail')])),
+      )
+      render(<Superlatives />)
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const lists = within(dialog).getAllByRole('list')
+      expect(within(lists[0]).getAllByRole('listitem')).toHaveLength(6)
+      const summary = within(dialog).getByText(/41 more players with 2 adds each/)
+      expect(summary).toBeInTheDocument()
+      const details = summary.closest('details') as HTMLDetailsElement
+      expect(details.open).toBe(false)
+      await userEvent.click(summary)
+      expect(details.open).toBe(true)
+      expect(screen.getByRole('dialog')).toBeInTheDocument() // did not close the modal
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(47)
+    })
+
+    it('collapses a first group over 10 as tied for the lead, with one click to see them', async () => {
+      fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabariWith(players(12, 1, 3, 'Tie'))))
+      render(<Superlatives />)
+      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
+      const dialog = screen.getByRole('dialog')
+      const summary = within(dialog).getByText(/12 players tied with 3 adds each/)
+      await userEvent.click(summary)
+      expect(within(dialog).getAllByRole('listitem')).toHaveLength(12)
+    })
   })
 })

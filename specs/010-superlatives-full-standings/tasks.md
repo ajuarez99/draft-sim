@@ -343,9 +343,9 @@ Postgres.
   that:
   - amendment 1's first version was an unrun claim;
   - the design missed the controller (R1) and the orphan roster (R2).
-- [ ] T030 Do the bug-hunting code review of the full diff. This is a separate pass from the
+- [X] T030 Do the bug-hunting code review of the full diff. This is a separate pass from the
   builder, per AGENTS.md. Fix what it confirms, then re-run T027.
-- [ ] T031 Verify it live on this worktree's own servers.
+- [X] T031 Verify it live on this worktree's own servers.
   - Use the ports free at the time; don't disturb another session's 8080 or 5173.
   - On the 2025 season of "(Foot) Ball Knowers" and of "Ball Knowers" (NBA):
     - open Highest week, Lowest week, Closest game, Unluckiest and Jabari Smith Jr.;
