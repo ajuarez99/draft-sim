@@ -25,8 +25,8 @@ import java.util.function.IntConsumer;
 public class MonteCarloRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MonteCarloRunner.class);
-    private static final int SNAPSHOT_DEPTH = 75;   // how deep the availability curve goes
-    private static final int ALTERNATIVES = 3;
+    static final int SNAPSHOT_DEPTH = 75;   // how deep the availability curve goes
+    static final int ALTERNATIVES = 3;
 
     public SimulationResult run(DraftContext ctx,
                                 int mySlot,

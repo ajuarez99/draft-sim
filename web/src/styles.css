@@ -52,7 +52,9 @@
  *
  * STACKING (over `.board-stage`)
  *   0 cells · 1 sticky headers (2 for the corner) · 3 a focused cell ·
- *   4 `.avail-sheet` · 5 `.start-overlay`. Add a layer here, not inline.
+ *   4 `.avail-sheet` · 5 `.start-overlay` · 7 `.pick-card` (the live room's
+ *   pick card; above the 6 below, which only exists pre-start when no card can).
+ *   Add a layer here, not inline.
  *
  * STACKING (page-level `position: fixed` layers, not scoped to `.board-stage`)
  *   100  `.modal-backdrop`. The top of the app.
@@ -66,6 +68,9 @@
  *    45  `.jumpto-fab`, the phone-only return control. Below the overlay it
  *         opens, and below a drag in progress. It was 50 first, which tied the
  *         ghost and left DOM order to decide; a tie is not a decision.
+ *    44  `.pick-card` at phone width only (≤700px), where it leaves the
+ *         board stage and pins to the viewport bottom. Just below the
+ *         jump-to FAB so that control is never covered.
  *   Add the next page-level fixed layer here, not inline.
  *
  * DENSITY
@@ -1393,6 +1398,78 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   color: color-mix(in oklch, var(--lead-hue, var(--text)) 70%, var(--text));
 }
 
+/* Live feed rows become buttons only when the room passes onPickClick (the
+   mock room and simulator never do). The button carries the row's padding so
+   the whole strip is the hit target, and reads as the same row, not a control. */
+.pick-feed-row.clickable { padding: 0; }
+.pick-feed-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0;
+  padding: 6px 11px; background: none; border: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.pick-feed-row.lead .pick-feed-btn { padding-top: 8px; padding-bottom: 8px; }
+.pick-feed-btn:hover { background: color-mix(in oklch, var(--lead-hue, var(--teal)) 10%, transparent); }
+.pick-feed-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+/*
+ * The live room's pick card (PickInsightCard). Floats over the top of
+ * `.board-stage` -- layer 7 in the stacking list at the top of this file -- and
+ * is the one thing on this page that genuinely floats, so it carries the
+ * shadow; `--lead-hue` (set inline from the position code, like the feed's
+ * announcement row) gives it a tinted edge so it reads as that player's card
+ * and not a fifth kind of alert. At phone width it spans the stage.
+ */
+.pick-card {
+  position: absolute; top: 8px; left: 8px; z-index: 7;
+  width: min(440px, calc(100% - 16px)); box-sizing: border-box; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: color-mix(in oklch, var(--lead-hue, var(--teal)) 9%, var(--panel));
+  border-radius: 14px; box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 8px 24px rgb(0 0 0 / 0.45);
+  outline: none; transition: box-shadow 0.15s, transform 0.15s;
+}
+.pick-card:hover, .pick-card:focus-within {
+  box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 12px 32px rgb(0 0 0 / 0.6);
+  transform: translateY(-1px);
+}
+.pick-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pick-card-head .avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; overflow: hidden; }
+.pick-card-head .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pick-card-mgr { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pick-card-no { font-size: 11px; margin-left: auto; }
+.pick-card-close {
+  background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1;
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+}
+.pick-card-close:hover { color: var(--text); background: color-mix(in oklch, var(--text) 10%, transparent); }
+.pick-card-player { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.pick-card-player .pos { margin-right: 0; }
+.pick-card-name { font-size: 16px; overflow-wrap: anywhere; }
+.pick-card-fit { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pick-card-fills {
+  font-size: 11px; letter-spacing: 0.06em; padding: 2px 9px; border-radius: 999px;
+  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+}
+.pick-card-summary { margin: 0; color: color-mix(in oklch, var(--text) 80%, transparent); }
+.pick-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-card-tag {
+  font-size: 11px; padding: 2px 9px; border-radius: 999px;
+  color: var(--text); background: color-mix(in oklch, var(--lead-hue, var(--teal)) 18%, transparent);
+}
+/*
+ * Phone: the board collapses (`.board-stage` measured 0px tall at 375px), so a
+ * card hung off the stage's top landed below the fold -- and wherever the page
+ * happened to be scrolled, a pick arriving meant a card nobody could see (found
+ * in live verification, T042). Pinned to the viewport instead: a page-level
+ * fixed layer (44, see the STACKING list), capped in height and scrolling
+ * inside itself rather than pushing past the screen.
+ */
+@media (max-width: 700px) {
+  .pick-card {
+    position: fixed; top: auto; bottom: 12px; left: 12px; right: 12px;
+    width: auto; max-height: 60vh; overflow-y: auto; z-index: 44;
+  }
+}
+
 /* "Simulate again", moved out of the board header into the settings modal. */
 .modal-actions {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1513,7 +1590,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .live-fresh.ok { color: var(--teal); background: color-mix(in oklch, var(--teal) 15%, var(--panel)); }
 .live-fresh.stale { color: var(--crimson); background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); }
 
-.live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .live-resim-progress { margin-bottom: 10px; }
 /* Once a projection exists, the pre-draft waiting copy shrinks to this line
    instead of covering the board it is worth looking at. */
@@ -4752,3 +4829,44 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .sl-standing-figure { grid-column: 2; text-align: left; }
   .sl-standing-missing .sl-standing-figure { max-width: none; }
 }
+
+/* ---- Spec 012 US4/US5: scarcity meter + room read (T035/T037) ---- */
+.scarcity-meter { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.scarcity-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.scarcity-chip {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px;
+  border: 1px solid color-mix(in oklch, var(--scar-hue, var(--line)) 45%, var(--line));
+  background: color-mix(in oklch, var(--scar-hue, var(--line)) 14%, var(--panel));
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.scarcity-chip:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+.scarcity-chip.running { border-color: var(--scar-hue, var(--line)); background: color-mix(in oklch, var(--scar-hue, var(--line)) 26%, var(--panel)); }
+.scarcity-pos { font-weight: 700; color: var(--scar-hue, var(--text)); }
+.scarcity-next { color: var(--muted); }
+.scarcity-run { font-size: 10px; letter-spacing: 0.06em; color: var(--scar-hue, var(--text)); }
+.scarcity-note { margin: 0; font-size: 11px; }
+
+.onbrand-panel { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.onbrand-summary { cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.onbrand-summary:hover { color: var(--text); }
+.onbrand-rows { list-style: none; margin: 0; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 4px; }
+.onbrand-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  padding: 6px 8px; border-radius: 8px; font-size: 12px;
+  transition: background 0.12s ease;
+}
+.onbrand-row:hover { background: color-mix(in oklch, var(--text) 6%, var(--panel)); }
+.onbrand-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.onbrand-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.onbrand-verdict { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; letter-spacing: 0.04em; cursor: help; }
+.onbrand-verdict.on { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
+.onbrand-verdict.off { background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); color: var(--text); }
+.onbrand-verdict.none { color: var(--muted); border: 1px dashed var(--line); }
+
+/* T034/T035: the meters' place in the live room. Chips already wrap (flex-wrap),
+   and min-width: 0 keeps long names/lines from forcing horizontal scroll at 375px. */
+.live-meters { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 100%; }
+.live-meters .scarcity-meter, .live-meters .onbrand-panel { margin-top: 0; min-width: 0; }
+.pick-card-scarcity { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.seat-onbrand { margin: 6px 0 0; min-width: 0; }

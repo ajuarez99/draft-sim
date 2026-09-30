@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import PickFeed, { type FeedPick } from './PickFeed'
 import type { PlayerRef } from '../api'
 
@@ -82,6 +83,32 @@ describe('the announcement row', () => {
     expect(screen.getByText('4 of the last 6 were WR')).toBeTruthy()
     expect(screen.queryByText('Fills WR2')).toBeNull()
     expect(screen.getByText('Allan')).toBeTruthy()
+  })
+
+  it('is inert without onPickClick: no buttons at all', () => {
+    const { container } = render(
+      <PickFeed teams={TEAMS} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]} />,
+    )
+    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(container.querySelector('.clickable')).toBeNull()
+  })
+
+  it('with onPickClick, each row is a named button that reports its pick number', async () => {
+    const onPickClick = vi.fn()
+    render(
+      <PickFeed
+        teams={TEAMS}
+        onPickClick={onPickClick}
+        picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]}
+      />,
+    )
+    const buttons = screen.getAllByRole('button')
+    expect(buttons).toHaveLength(2)
+    // Newest first: the first button is pick 2.
+    await userEvent.click(buttons[0])
+    expect(onPickClick).toHaveBeenLastCalledWith(2)
+    await userEvent.click(screen.getByRole('button', { name: /Bijan Robinson/ }))
+    expect(onPickClick).toHaveBeenLastCalledWith(1)
   })
 
   it('renders nothing at all before the first pick', () => {

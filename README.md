@@ -25,6 +25,12 @@ Built so far:
   hardcoded page.
 - **Live draft tracking.** Poll a real, in-progress Sleeper draft in the
   background and stream its state to the UI over SSE as picks land.
+- **Live pick insight** (specs/012-draft-pick-insight). In the live room only, each pick
+  raises a passive card: the slot it fills and what that roster still needs, the pick
+  against ADP, how likely the model thought it was, whether it fits the manager's history,
+  and their likely next pick, re-projected in the background after every pick. A position
+  scarcity meter (starter pool = the board's top teams × starters) and a per-manager
+  "Room read" sit beside it.
 - **League analysis, in both sports** (specs/004-ffwrapped-feature-parity). Four
   pages built on weekly results Sleeper has always reported and this app has
   always stored: **Roster management** (points scored against the most a perfect

@@ -285,6 +285,10 @@ export type RealDraftBoard = {
 export const getRealDraftBoard = (draftId: string) =>
   apiFetch(`/api/drafts/${draftId}/board`).then(json<RealDraftBoard>)
 
+// Mirrors LeagueController.pool: the head of the board in board order, with ids.
+export const getDraftPool = (draftId: string, limit: number) =>
+  apiFetch(`/api/drafts/${draftId}/pool?limit=${limit}`).then(json<PlayerRef[]>)
+
 // Mirrors DraftRepository.DraftSummary (store/DraftRepository.java). Backs the picker screen.
 export type DraftSummary = {
   id: number

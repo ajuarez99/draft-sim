@@ -95,6 +95,30 @@ public class LeagueController {
         return drafts.allWithLeagueFor(sleeperUserId);
     }
 
+    static final int POOL_DEFAULT_LIMIT = 200;
+    static final int POOL_MAX_LIMIT = 400;   // hand-set: 14 teams x 15 starters with room to spare
+
+    /**
+     * The head of the board the engine simulates against, in board order, with
+     * player ids. The live room's scarcity meter needs exactly that to define its
+     * starter pool; /api/board has neither ids nor draft scoping. Drafted players
+     * are not filtered out -- the client subtracts landed picks, so the pool's
+     * definition does not shift as the draft moves. limit is clamped to [1, 400]
+     * rather than rejected; an empty board is [], not an error.
+     */
+    @GetMapping("/drafts/{sleeperDraftId}/pool")
+    public ResponseEntity<?> pool(@PathVariable String sleeperDraftId,
+                                  @RequestParam(defaultValue = "" + POOL_DEFAULT_LIMIT) int limit,
+                                  @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<DraftRepository.DraftRow> draft = membership.visibleDraft(sleeperUserId, sleeperDraftId);
+        if (draft.isEmpty()) return ResponseEntity.notFound().build();
+        Sport sport = leagues.byId(draft.get().leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
+        int clamped = Math.max(1, Math.min(POOL_MAX_LIMIT, limit));
+        // Records straight to JSON: a null team (free agent) must not go through Map.of.
+        return ResponseEntity.ok(boards.currentBoard(sport).stream().limit(clamped)
+                .map(SimulationResult.PlayerRef::from).toList());
+    }
+
     /** Seats with their profiles. draftsObserved is here so the UI can be honest. */
     @GetMapping("/drafts/{sleeperDraftId}/seats")
     public ResponseEntity<?> seats(@PathVariable String sleeperDraftId,
