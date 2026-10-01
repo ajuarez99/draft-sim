@@ -159,4 +159,12 @@ public interface SportRules {
      * sport rather than a share of score -- see research R5 for the numbers.
      */
     double closeGameMargin();
+
+    /**
+     * Whether {@code player} may appear in the league home's Rookie watch
+     * (specs/014-home-player-spotlight, amended after design review). Football excludes kickers
+     * and team defenses (a rookie kicker's points are not what a reader wants highlighted);
+     * basketball excludes no position. A fact about a sport's positions, so no default.
+     */
+    boolean rookieWatchEligible(Player player);
 }

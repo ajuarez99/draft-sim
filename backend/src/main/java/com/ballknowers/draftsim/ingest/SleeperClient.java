@@ -104,4 +104,17 @@ public class SleeperClient {
     public Map<String, Object> state(String sport) {
         return http.get().uri("/state/{sport}", sport).retrieve().body(Map.class);
     }
+
+    /**
+     * Sleeper's trending-adds list for a sport: {@code [{player_id, count}]}, most-added first.
+     * {@code Content-Type: application/json}, verified with {@code curl -D -} on 2026-10-01;
+     * CDN-cached about 10 minutes ({@code s-maxage=600}). The counts are adds across <b>all</b>
+     * Sleeper leagues over the lookback window, not this app's leagues, and Sleeper asks for
+     * attribution when they are shown. sport is Sleeper's own path segment ("nfl"/"nba").
+     */
+    public List<Map<String, Object>> trendingAdds(String sport, int lookbackHours, int limit) {
+        return http.get()
+                .uri("/players/{sport}/trending/add?lookback_hours={h}&limit={n}", sport, lookbackHours, limit)
+                .retrieve().body(List.class);
+    }
 }

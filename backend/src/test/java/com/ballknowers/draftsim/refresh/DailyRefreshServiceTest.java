@@ -35,6 +35,7 @@ class DailyRefreshServiceTest {
     @Mock private PlayerIngestService players;
     @Mock private BoardRefresh boardRefresh;
     @Mock private DailyCaptureRepository captures;
+    @Mock private TrendingRefresh trending;
 
     private DailyRefreshService service;
 
@@ -57,7 +58,8 @@ class DailyRefreshServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DailyRefreshService(players, boardRefresh, captures);
+        service = new DailyRefreshService(players, boardRefresh, captures, trending);
+        when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.DONE);
         when(players.ingest(any())).thenReturn(new PlayerIngestService.Result(2091, 300, true, 0));
         when(boardRefresh.run(any())).thenReturn(board(ffcOk()));
     }
@@ -166,5 +168,26 @@ class DailyRefreshServiceTest {
         verify(players).ingest(Sport.NBA);
         verifyNoInteractions(boardRefresh);
         verify(captures).record(eq(Sport.NBA), any(), eq("PLAYERS"), any(), anyString());
+    }
+
+    @Test
+    void aTrendingFailureIsBestEffortAndDoesNotFailTheRun() {
+        when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.FAILED);
+
+        DailyResult r = service.runAll();
+
+        assertEquals(Outcome.DONE_TRENDING_FAILED_BEST_EFFORT, step(r, Sport.NFL, "TRENDING").outcome());
+        assertFalse(r.failed(), "spec 014: trending is decoration and must not fail the run");
+        verify(captures, never()).record(any(), any(), eq("TRENDING"), any(), any());
+    }
+
+    @Test
+    void trendingReportsDoneWhenFetchedAndSkippedWhenFresh() {
+        when(trending.refreshIfStale(eq(Sport.NBA), any())).thenReturn(TrendingRefresh.Outcome.SKIPPED_FRESH);
+
+        DailyResult r = service.runAll();
+
+        assertEquals(Outcome.DONE, step(r, Sport.NFL, "TRENDING").outcome());
+        assertEquals(Outcome.SKIPPED_ALREADY_TODAY, step(r, Sport.NBA, "TRENDING").outcome());
     }
 }

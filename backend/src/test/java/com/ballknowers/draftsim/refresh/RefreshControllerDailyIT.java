@@ -64,6 +64,8 @@ class RefreshControllerDailyIT {
 
     @MockitoBean private PlayerIngestService players;
     @MockitoBean private BoardRefresh boardRefresh;
+    /** Mocked so this IT neither calls Sleeper nor writes the shared local sport_trending rows. */
+    @MockitoBean private TrendingRefresh trending;
     @Autowired private RefreshController controller;
     @Autowired private ApiSecurityProperties security;
     @Autowired private JdbcTemplate jdbc;
@@ -72,6 +74,7 @@ class RefreshControllerDailyIT {
     void setUp() {
         // Today's rows would make PLAYERS skip; the shared local DB may already hold some.
         clear();
+        when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.DONE);
         when(players.ingest(any())).thenReturn(new PlayerIngestService.Result(7, 3, true, 0));
         when(boardRefresh.run(any())).thenReturn(new BoardRefresh.Result(
                 new FfcAdpService.Result(true, 1, 1, 0, 1, false, null, List.of()),
@@ -103,7 +106,7 @@ class RefreshControllerDailyIT {
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         assertEquals(LocalDate.now(ZoneOffset.UTC).toString(), body.get("date"));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
-        assertEquals(Sport.values().length * 2, steps.size());
+        assertEquals(Sport.values().length * 3, steps.size());
         assertEquals(Sport.values()[0].code(), steps.get(0).get("sport"));
         assertEquals("PLAYERS", steps.get(0).get("kind"));
         assertEquals("DONE", steps.get(0).get("outcome"));
@@ -129,6 +132,19 @@ class RefreshControllerDailyIT {
         assertNotNull(body);
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
         assertTrue(steps.stream().anyMatch(s -> "FAILED".equals(s.get("outcome"))));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aTrendingFailureIsReportedButStillAnswers200() {
+        when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.FAILED);
+
+        ResponseEntity<?> response = controller.daily("it-009-secret");
+
+        assertEquals(200, response.getStatusCode().value());
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) ((Map<String, Object>) response.getBody()).get("steps");
+        assertTrue(steps.stream().anyMatch(s -> "TRENDING".equals(s.get("kind"))
+                && "DONE_TRENDING_FAILED_BEST_EFFORT".equals(s.get("outcome"))));
     }
 
     @Test

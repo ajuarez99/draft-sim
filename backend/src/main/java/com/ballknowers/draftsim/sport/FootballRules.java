@@ -376,6 +376,12 @@ public class FootballRules implements SportRules {
         return injuryStatus != null && "Sus".equalsIgnoreCase(injuryStatus.trim());
     }
 
+    @Override
+    public boolean rookieWatchEligible(Player player) {
+        Position primary = player.primary();
+        return primary != Position.K && primary != Position.DEF;
+    }
+
     /**
      * Hand-set, arbitrary: each sport's 2025 regular-season 25th-percentile
      * margin, measured 2026-09-22 (research R5). Football's p25 was 9.8,

@@ -26,6 +26,8 @@ import java.util.List;
  * failure inside {@code BOARD} is {@link Outcome#DONE_ADP_FAILED_BEST_EFFORT}: the
  * board was still rebuilt, so it does not count as a failure (spec amendment 8).
  *
+ * <p>{@code TRENDING} (spec 014) is best-effort: see {@link #trending}.
+ *
  * <p>{@code BOARD} is not skipped by a same-day row: the contract skips only
  * {@code PLAYERS} ("skipped if today's row exists"), and the board must reflect a
  * re-run after a failed ADP fetch. It still records its row for the day-gap
@@ -38,8 +40,14 @@ public class DailyRefreshService {
 
     static final String KIND_PLAYERS = "PLAYERS";
     static final String KIND_BOARD = "BOARD";
+    static final String KIND_TRENDING = "TRENDING";
 
-    public enum Outcome { DONE, DONE_ADP_FAILED_BEST_EFFORT, SKIPPED_ALREADY_TODAY, FAILED }
+    public enum Outcome {
+        DONE, DONE_ADP_FAILED_BEST_EFFORT,
+        /** Trending is decoration (spec 014): its failure is reported but never fails the run. */
+        DONE_TRENDING_FAILED_BEST_EFFORT,
+        SKIPPED_ALREADY_TODAY, FAILED
+    }
 
     /** {@code detail} is nullable. */
     public record StepResult(Sport sport, String kind, Outcome outcome, String detail) {}
@@ -54,9 +62,11 @@ public class DailyRefreshService {
     private final PlayerIngestService playerIngest;
     private final BoardRefresh boardRefresh;
     private final DailyCaptureRepository captures;
+    private final TrendingRefresh trendingRefresh;
 
     public DailyRefreshService(PlayerIngestService playerIngest, BoardRefresh boardRefresh,
-                               DailyCaptureRepository captures) {
+                               DailyCaptureRepository captures, TrendingRefresh trendingRefresh) {
+        this.trendingRefresh = trendingRefresh;
         this.playerIngest = playerIngest;
         this.boardRefresh = boardRefresh;
         this.captures = captures;
@@ -68,6 +78,7 @@ public class DailyRefreshService {
         for (Sport sport : Sport.values()) {
             steps.add(players(sport));
             steps.add(board(sport));
+            steps.add(trending(sport));
         }
         return new DailyResult(today, steps);
     }
@@ -102,6 +113,22 @@ public class DailyRefreshService {
         } catch (Exception e) {
             return failed(sport, KIND_BOARD, e);
         }
+    }
+
+    /**
+     * Best-effort (specs/014-home-player-spotlight): {@code DONE} on a fetch, {@code
+     * SKIPPED_ALREADY_TODAY} when the stored list is still fresh, and a failure is
+     * {@link Outcome#DONE_TRENDING_FAILED_BEST_EFFORT}, never {@code FAILED}. Records no
+     * {@code daily_capture} row: its freshness gate is the stored {@code fetched_at}.
+     */
+    StepResult trending(Sport sport) {
+        TrendingRefresh.Outcome r = trendingRefresh.refreshIfStale(sport, Instant.now());
+        return switch (r) {
+            case DONE -> new StepResult(sport, KIND_TRENDING, Outcome.DONE, null);
+            case SKIPPED_FRESH -> new StepResult(sport, KIND_TRENDING, Outcome.SKIPPED_ALREADY_TODAY, null);
+            case FAILED -> new StepResult(sport, KIND_TRENDING, Outcome.DONE_TRENDING_FAILED_BEST_EFFORT,
+                    "trending fetch failed; the stored list, if any, is unchanged");
+        };
     }
 
     private static StepResult failed(Sport sport, String kind, Exception e) {

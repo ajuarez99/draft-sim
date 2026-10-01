@@ -46,7 +46,7 @@ function data(over: Partial<Data> = {}): Data {
       },
     ],
     topPerformers: [
-      { playerId: '1', playerName: 'Caleb Williams', position: 'QB', teamName: 'Prayer Circle', points: 37.26 },
+      { playerId: '1', playerName: 'Caleb Williams', position: 'QB', teamName: 'Prayer Circle', points: 37.26, team: 'CHI', opponent: null, isAway: null, avatarId: null },
     ],
     awards: [
       {

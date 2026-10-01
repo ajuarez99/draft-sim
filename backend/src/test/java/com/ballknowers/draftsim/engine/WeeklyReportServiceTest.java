@@ -140,4 +140,17 @@ class WeeklyReportServiceTest {
         assertTrue(WeeklyReportService.rankNights(java.util.List.of(), 5).isEmpty());
         assertTrue(WeeklyReportService.rankWeeks(java.util.List.of(), 5).isEmpty());
     }
+
+    // ---- specs/014-home-player-spotlight T003: the extracted default-week rule ----
+
+    /** An explicit request wins over everything; otherwise latest final; otherwise latest stored. */
+    @Test
+    void defaultWeekPrefersRequestedThenLatestFinalThenLatestStored() {
+        ScoredWeeks.Snapshot mixed = new ScoredWeeks.Snapshot(3, 2, Set.of(1, 2));
+        assertEquals(5, WeeklyReportService.defaultWeek(mixed, 5));
+        assertEquals(2, WeeklyReportService.defaultWeek(mixed, 0));
+        ScoredWeeks.Snapshot noneFinal = new ScoredWeeks.Snapshot(1, 0, Set.of());
+        assertEquals(1, WeeklyReportService.defaultWeek(noneFinal, 0));
+        assertEquals(0, WeeklyReportService.defaultWeek(new ScoredWeeks.Snapshot(0, 0, Set.of()), 0));
+    }
 }
