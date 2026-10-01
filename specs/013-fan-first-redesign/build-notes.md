@@ -532,3 +532,24 @@ Scope: T084–T093 (web only; T094 live check is the parent's). No commit made.
 - **Manager profile, mock setup:** render; no horizontal scroll at 1440. **Sign-in** (identity removed, then
   restored): centered pitch "Your league's real managers, simulated. See who's likely gone before you pick.",
   Continue in `--volt` (oklch(0.88 0.19 125)), no-password line kept.
+
+## Polish: final verification (measured, local, 2026-10-01)
+
+**T095, full matrix (amended harness):** 25 routes × {1440×900, 768×1024, 375×812} = **75 loads, 0 failures**.
+Routes: /, /managers, /managers/13/history, /managers/13/versus/1, /mock/new, /mock/653, NBA sim, NBA live,
+NFL completed board, NFL league home + history/power/analysis/roster-management/expected-wins/forecast/
+weekly-report/superlatives, NBA league home + history/power/weekly-report/superlatives/roster-management/expected-wins.
+- max `depth` **2**, max `gridDepth` **2** (SC-001; baseline was 3 on home, history, analysis)
+- horizontal page scroll: **0** (SC-010)
+- broken images (complete, naturalWidth 0): **0** (SC-008)
+- U+FFFD replacement characters in rendered text: **0** (added after the encoding incident)
+- Contrast (SC-011): every token pair ≥ 4.5:1, computed from OKLCH (Phase 2 notes); the position-tint cell min
+  11.76:1. **Not browser-measured** with a contrast tool. That's stated, not implied.
+
+**T096, caveats:** `caveats-after.md` maps **488/488** ids from `caveats-before.md`, 0 missing, 0 empty locations.
+442 unchanged, 22 in How this works, 3 beside the number, 20 reworded. All 20 rewordings were read by the parent;
+each keeps its qualification visible or in How this works.
+
+**T097, suites:** web `tsc -b` clean, **913/913** tests (75 files; baseline 806/66), build OK (main chunk
+472.77 kB / 142.14 kB gzip; baseline 442.02 / 132.91). Backend **964** tests, 0 failures, **0 skipped**
+(baseline 945/0).

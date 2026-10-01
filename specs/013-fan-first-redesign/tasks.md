@@ -299,11 +299,11 @@ Every page task does the same five things:
 
 ## Phase 12: Polish & cross-cutting
 
-- [ ] T095 Full quickstart §4 matrix on every route (3 sizes × 2 sports): depth, gridDepth, scroll, contrast (§4g, including `--crimson-text` and `--down`), addresses. Record the numbers.
-- [ ] T096 Final caveat diff: `caveats-after.md` has zero unmapped rows.
-- [ ] T097 [P] Full suites (web tsc/test/build, backend test); compare with T001's pass/skip counts and explain the differences.
+- [X] T095 Full quickstart §4 matrix on every route (3 sizes × 2 sports): depth, gridDepth, scroll, contrast (§4g, including `--crimson-text` and `--down`), addresses. Record the numbers.
+- [X] T096 Final caveat diff: `caveats-after.md` has zero unmapped rows.
+- [X] T097 [P] Full suites (web tsc/test/build, backend test); compare with T001's pass/skip counts and explain the differences.
 - [ ] T098 [P] `HANDOFF.md`, `README.md` and `claude/lessons.md`: what changed, verified vs assumed, open items (week 3 not final, co-commissioners, reversal-round gating, deploy order backend → frontend).
-- [ ] T099 Proof screenshots (quickstart §5).
+- [X] T099 Proof screenshots (quickstart §5).
 - [ ] T100 Bug-hunting review of the full diff (session model, not a style pass), plus a fix pass on confirmed findings.
 
 ---
