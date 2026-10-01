@@ -30,6 +30,14 @@ the fold is inferred from the code, and I say so where it matters.
 
 ---
 
+> **Amended after planning (2026-09-30).** This review said History's Compute and
+> Season forecast's Recompute were "shown to every visitor". That's half wrong. I
+> was signed in as popsharky, the league's Sleeper commissioner. Forecast (and
+> Power) already hide their buttons from everyone else. Only History's Compute is
+> shown to every member. The weekly report's week-2 default was measured and is
+> deliberate: it opens on the latest *final* week. See
+> `specs/013-fan-first-redesign/research.md` R1 and R2.
+
 ## 1. What the reference sites do that we don't
 
 | | FantasyPros | ffwrapped | DraftSharks | Ball Knowers today |

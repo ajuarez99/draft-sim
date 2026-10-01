@@ -28,12 +28,35 @@ answer came from the user.
 - Q: Does the redesign apply to NBA leagues too? → A: Yes. Both sports get every change and are checked separately. Player photos and team logos were measured as available for both sports on 2026-09-30.
 - Q: How are letter grades decided? → A: By a team's rank within its own league, not by fixed score thresholds. The cutoffs are hand-set and labelled arbitrary. The grade carries the existing "early — this is mostly noise" badge until the season's existing early threshold (4 scored weeks) is reached, and the number is always shown beside it.
 
+## Amended after planning (2026-09-30)
+
+Planning checked the spec against the code and production. It found four things
+the spec had wrong or didn't know. The spec below has been changed in place to
+match, and each change is listed here (details in [research.md](research.md)):
+
+1. **Commissioner controls were mostly hidden already.** Power rankings and
+   Playoff odds already show their recompute buttons only to the commissioner.
+   The design review saw them because it was run signed in *as* the commissioner.
+   The real gap is History's **Compute** button, which every member sees.
+   "Commissioner" also includes the app's configured owner, which is what the
+   server already does. (US2, FR-009)
+2. **Mock drafts can't show next-pick availability.** They run no simulation, so
+   there's no availability figure to show. The "Your pick" panel ships in mocks
+   with tiers and photos, and says why the bar is missing. (US6, FR-020, SC-006)
+3. **The weekly report opening on week 2 is deliberate.** Measured: it opens on the
+   latest *final* week, and week 3 is scored but not final. The requirement is the
+   label, which was already FR-019. Why week 3 isn't final yet is out of scope.
+4. **The existing "you" color fails contrast.** White on the crimson fill measures
+   4.07:1, under FR-036's 4.5:1. FR-036 already covered it; it's named here so it
+   isn't missed.
+
 ## Who this is for
 
 - **Fan**: a signed-in league member. They want the answer ("am I good, am I lucky,
   who do I take") before the method.
-- **Commissioner**: a fan whom Sleeper marks as that league's commissioner. Sees the
-  maintenance controls (compute, recompute) that nobody else should see.
+- **Commissioner**: a fan whom Sleeper marks as that league's commissioner, or the
+  app's configured owner (amended after planning). Sees the maintenance controls
+  (compute, recompute) that nobody else should see.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -65,11 +88,11 @@ caveats against the pre-change inventory: none may be missing.
 ### User Story 2 - Only commissioners see commissioner controls (Priority: P1)
 
 A regular fan never sees a "Compute" or "Recompute" button. The league's
-commissioner, as Sleeper records it, does see them. Running one still asks for the
-commissioner key exactly as it does today.
+commissioner, as Sleeper records it (or the app's configured owner), does see them.
+Where running one asks for the commissioner key today, it still does.
 
-**Why this priority**: These buttons are visible to every visitor on the standings
-history and playoff odds pages today. They confuse fans and invite key prompts that
+**Why this priority**: History's Compute button is visible to every member today
+(amended after planning: Power's and Playoff odds' buttons were already hidden). They confuse fans and invite key prompts that
 lead nowhere.
 
 **Independent Test**: As a signed-in user who is not the commissioner of a league,
@@ -174,7 +197,7 @@ three screen sizes.
 
 **Acceptance Scenarios**:
 
-1. **Given** the fan is on the clock and their seat is known, **When** the draft room is shown, **Then** the best available players, their tiers and their next-pick availability are visible without opening a modal (on a phone: one tap on a persistent control, with the board still visible behind it).
+1. **Given** the fan is on the clock and their seat is known, **When** the draft room is shown, **Then** the best available players, their tiers and their next-pick availability are visible without opening a modal (on a phone: one tap on a persistent control, with the board still visible behind it). *Amended after planning:* in a mock draft, which runs no simulation, the panel shows tiers and photos and says why availability is missing.
 2. **Given** the fan's seat is not known yet, **When** the panel is shown, **Then** it lists best available players and says availability appears once their seat is known, instead of showing empty bars.
 3. **Given** the simulator page is opened, **When** simulations are still running, **Then** a loading state with a progress message appears within 1 second, and the panel is never blank.
 4. **Given** the fan's last pick of the draft, **When** there is no next pick, **Then** the availability bar is omitted rather than shown as 0%.
@@ -277,8 +300,8 @@ at all three sizes and in both sports.
 - **FR-008**: Section titles MUST be plain headings. The display face is reserved for page titles and hero numbers.
 
 **Commissioner controls (US2)**
-- **FR-009**: The site MUST show commissioner-only controls (compute, recompute, and any other control that writes league-level data on the commissioner's behalf) only to a signed-in user whom Sleeper marks as commissioner of that specific league.
-- **FR-010**: Running a commissioner control MUST still require the existing commissioner key. Showing the control grants nothing by itself.
+- **FR-009**: The site MUST show commissioner-only controls (compute, recompute, and any other control that writes league-level data on the commissioner's behalf) only to a signed-in user whom Sleeper marks as commissioner of that specific league, or to the app's configured owner. The server already decides this, and the page must use its answer rather than work it out again.
+- **FR-010**: Server-side gating is unchanged. Controls that require the commissioner key today still do, and History's Compute keeps its current server rule (amended after planning, research R1). Showing a control grants nothing by itself.
 - **FR-011**: Empty states that today offer a commissioner control (such as playoff odds not computed yet) MUST give non-commissioners a plain-language message saying when the content will appear.
 
 **Navigation (US3)**
@@ -296,7 +319,7 @@ at all three sizes and in both sports.
 - **FR-019**: The weekly report MUST offer previous/next week navigation and MUST label the shown week and why it was chosen.
 
 **Draft room (US6)**
-- **FR-020**: In the simulator, live draft room and mock drafts, when the fan is on the clock or next up, the best available players, grouped into tiers, with next-pick availability, MUST be visible without opening a modal (on a phone: one tap on a persistent control).
+- **FR-020**: In the simulator, live draft room and mock drafts, when the fan is on the clock or next up, the best available players, grouped into tiers, MUST be visible without opening a modal (on a phone: one tap on a persistent control). Next-pick availability MUST be shown wherever the room has an availability figure (simulator, live room). A mock draft has none, and MUST say so instead (amended after planning).
 - **FR-021**: The simulator MUST show a loading state with a progress message within 1 second of opening while simulations run.
 - **FR-022**: Recent position runs already detected by the draft room MUST be shown as a callout next to the pick panel.
 
@@ -339,7 +362,7 @@ at all three sizes and in both sports.
 - **SC-003**: A non-commissioner sees 0 commissioner controls across every page of a league. The commissioner of that league sees all of them. Measured on "(Foot) Ball Knowers", whose commissioner was confirmed on 2026-09-30.
 - **SC-004**: From any league page, any other league page is reachable in at most 2 clicks or taps, at all three screen sizes.
 - **SC-005**: On the league home, a member's record, rank and this week's opponent are visible without scrolling at all three screen sizes.
-- **SC-006**: In a mock draft, when the fan is on the clock, next-pick availability for the top available players is readable with 0 extra clicks on desktop and tablet and at most 1 tap on phone.
+- **SC-006**: When the fan is on the clock, the tiered best-available list is readable with 0 extra clicks on desktop and tablet and at most 1 tap on phone, in all three rooms. Next-pick availability is readable the same way in the simulator and live room (amended after planning: mocks have none).
 - **SC-007**: The simulator shows a loading message within 1 second of opening, and there are 0 seconds of blank panel.
 - **SC-008**: On a full NFL draft board and a full NBA mock board, 100% of player cells show a photo, logo or initials, and 0 broken images appear.
 - **SC-009**: Letter grades follow the league ranking with 0 ordering violations, and the early badge is present at 3 scored weeks and absent at 4.
