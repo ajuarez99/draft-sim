@@ -31,7 +31,10 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import HowThisWorks from '../components/HowThisWorks'
+import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { extremes } from '../extremes'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -136,15 +139,71 @@ function ManagerLink({
  */
 function FormulaNote({ formula }: { formula: string }) {
   return (
-    <div className="muted small analysis-formula">
+    <div className="analysis-formula">
       <p>
         Score = average week × 6, plus (best week + worst week) × 2, plus win % × 400, all ÷ 10.
       </p>
       <details>
         <summary>ffwrapped&apos;s formula, as published</summary>
-        <code className="mono">{formula}</code>
+        <code className="code">{formula}</code>
       </details>
     </div>
+  )
+}
+
+/**
+ * The ranking score's methodology, folded away under the table: what the
+ * number is, the raw figures it was scaled from (they used to sit under each
+ * score; the scaling is ours, not ffwrapped's, so they are still shown), the
+ * formula, and when the ranking appears at all.
+ */
+function RankingScoreHow({ block }: { block: AnalysisRankingScores }) {
+  return (
+    <HowThisWorks>
+      <p>
+        A composite of scoring and record over the {block.weeksScored} week
+        {block.weeksScored === 1 ? '' : 's'} played, scaled 1–100 with the league average at 50. It
+        is built from games already played, so it describes the season so far, not who is best from
+        here; the ladders, the vote and the bump chart are on Power rankings.
+      </p>
+      <p>
+        Rankings appear after {block.weeksRequired} scored weeks. Before that, high and low are
+        the same number or close to it, and the score would mean nothing.
+      </p>
+      <p>
+        The letter beside each score is that team&apos;s rank in the league, from cutoffs set by
+        hand rather than fitted to anything. {gradesEarlySentence(block.earlyThresholdWeeks)} The
+        ranking itself appears once {block.weeksRequired} weeks are scored.
+      </p>
+      {block.available && (
+        <p>
+          Raw formula output, before it is scaled to 1–100:{' '}
+          {block.entries.map((e, i) => (
+            <span key={e.rosterId}>
+              {i > 0 ? ' · ' : ''}
+              {e.manager ?? `roster ${e.rosterId}`} {e.raw.toFixed(1)}
+            </span>
+          ))}
+          .
+        </p>
+      )}
+      <FormulaNote formula={block.formula} />
+    </HowThisWorks>
+  )
+}
+
+/** Every row tied at the column's best (or worst) value is marked; nothing when there is no spread. */
+function heatKind(value: number, ex: ReturnType<typeof extremes>): 'best' | 'worst' | null {
+  if (ex == null) return null
+  return value === ex.best ? 'best' : value === ex.worst ? 'worst' : null
+}
+
+function HeatCell({ value, kind }: { value: number; kind: 'best' | 'worst' | null }) {
+  if (kind == null) return <>{pts(value)}</>
+  return (
+    <span className={`analysis-heat ${kind}`} title={kind === 'best' ? 'Highest in the league' : 'Lowest in the league'}>
+      {kind === 'best' ? '▲' : '▼'} {pts(value)}
+    </span>
   )
 }
 
@@ -153,10 +212,12 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
     return (
       <>
         <NotYet reason={block.reason} />
-        <FormulaNote formula={block.formula} />
+        <RankingScoreHow block={block} />
       </>
     )
   }
+  const highs = extremes(block.entries.map((e) => e.high), true)
+  const lows = extremes(block.entries.map((e) => e.low), true)
   return (
     <>
       <div className="table-wrap">
@@ -165,7 +226,9 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
             <tr>
               <th className="mono">#</th>
               <th>Manager</th>
-              <th className="mono">Score</th>
+              <th className="mono">
+                Score <GradesEarlyBadge early={block.gradesEarly} />
+              </th>
               <th className="mono">Record</th>
               <th className="mono">Avg</th>
               <th className="mono">High</th>
@@ -184,26 +247,31 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
                     avatarId={e.avatarId}
                   />
                 </td>
-                {/* The 1-100 number and the formula's own raw output, side by
-                    side. The scaling is ours, not ffwrapped's, so the page
-                    shows what it scaled FROM rather than asking to be trusted. */}
+                {/* The 1-100 number. The formula's own raw output, which it was
+                    scaled FROM, is listed under "How this works" below the
+                    table rather than under every score. */}
                 <td className="mono">
-                  <span className="analysis-score-pill">{e.score.toFixed(1)}</span>
-                  <span className="muted small analysis-raw">{e.raw.toFixed(1)} raw</span>
+                  <GradeChip grade={e.grade}>
+                    <span className="analysis-score-pill">{e.score.toFixed(1)}</span>
+                  </GradeChip>
                 </td>
                 <td className="mono">
                   {e.wins}-{e.losses}
                   {e.ties > 0 ? `-${e.ties}` : ''}
                 </td>
                 <td className="mono">{pts(e.avgWeekly)}</td>
-                <td className="mono">{pts(e.high)}</td>
-                <td className="mono">{pts(e.low)}</td>
+                <td className="mono">
+                  <HeatCell value={e.high} kind={heatKind(e.high, highs)} />
+                </td>
+                <td className="mono">
+                  <HeatCell value={e.low} kind={heatKind(e.low, lows)} />
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <FormulaNote formula={block.formula} />
+      <RankingScoreHow block={block} />
     </>
   )
 }
@@ -1108,8 +1176,8 @@ export default function LeagueAnalysis() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="League analysis"
-        sub="What each roster is made of: a composite ranking score from games already played, the rest of the regular season projected onto the lineup each manager would actually start, and next week's games read off those lineups. Who is best — the ladders, the vote, the bump chart — is Power rankings."
+        title="Team strength"
+        sub="How strong each roster is so far, and who is projected ahead in next week's games."
       />
 
       {error && (
@@ -1126,73 +1194,78 @@ export default function LeagueAnalysis() {
 
       {data && (
         <>
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Ranking score</h2>
+              <h2 className="section-title">Ranking score</h2>
               {sleeperLeagueId && (
                 <Link className="chip" to={`/leagues/${sleeperLeagueId}/power`}>
                   Power rankings →
                 </Link>
               )}
             </div>
-            <p className="muted small">
-              A composite of scoring and record over the {data.rankingScores.weeksScored} week
-              {data.rankingScores.weeksScored === 1 ? '' : 's'} played, scaled 1–100 with the league
-              average at 50.
-            </p>
             <RankingScoresBlock block={data.rankingScores} />
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Roster projections</h2>
+              <h2 className="section-title">Roster projections</h2>
               <span className="muted small">
                 {window && window.weeks > 0
                   ? `weeks ${window.fromWeek}–${window.toWeek} · ${SCORING_LABEL[data.scoringKey] ?? data.scoringKey}`
                   : SCORING_LABEL[data.scoringKey] ?? data.scoringKey}
               </span>
             </div>
-            <p className="muted small">
-              Rest-of-season points for the starting lineup each roster would field, split by the
-              position the starter actually plays — a running back filling a flex slot counts under
-              RB. Open a lineup to see the players the number is made of.
-            </p>
             <ProjectionsBlock block={data.projections} />
+            <HowThisWorks>
+              <p>
+                The rest of the regular season is projected onto the lineup each manager would
+                actually start. These are rest-of-season points for that starting lineup, split by
+                the position the starter actually plays — a running back filling a flex slot counts
+                under RB. Open a lineup to see the players the number is made of.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Projected week by week</h2>
+              <h2 className="section-title">Projected week by week</h2>
               <span className="muted small">
                 {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
               </span>
             </div>
             <p className="muted small">
-              Where each roster is projected to rank in each remaining week — the bye weeks are the
-              drops. Click a line to follow it. This is the projection; what was actually scored is
-              further down.
+              This is the projection; what was actually scored is further down.
             </p>
             <ProjectedBumpBlock block={data.projections} />
+            <HowThisWorks>
+              <p>
+                Where each roster is projected to rank in each remaining week — the bye weeks are
+                the drops. Click a line to follow it. This is the projection; what was actually
+                scored is further down.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Position group rankings</h2>
+              <h2 className="section-title">Position group rankings</h2>
             </div>
-            <p className="muted small">
-              The same projections read down the columns: where each roster stands at each position.
-              Big number is the rank, small number is the projected points behind it.
-            </p>
             <PositionGroupsBlock block={data.projections} />
+            <HowThisWorks>
+              <p>
+                The same projections read down the columns: where each roster stands at each
+                position. Big number is the rank, small number is the projected points behind it.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
               {/* The week is named only when there IS one. A finished season
                   refuses this block because its regular season ended at week
                   14, and heading that refusal "Week 18 matchups" would assert
                   a week the reason underneath denies. */}
-              <h2>
+              <h2 className="section-title">
                 {data.matchups.available ? `Week ${data.matchups.week} matchups` : 'Upcoming matchups'}
               </h2>
               {window && window.toWeek >= window.fromWeek && (
@@ -1219,44 +1292,51 @@ export default function LeagueAnalysis() {
               )}
             </div>
             <p className="muted small">
-              The league's real pairings, each side's lineup rebuilt for the chosen week rather than
-              sliced out of the rest-of-season total — a bye or a one-week injury moves who starts.
               The margin is two projections subtracted, not a win probability.
             </p>
             <div aria-busy={weekLoading}>
               <MatchupsBlock block={data.matchups} />
             </div>
+            <HowThisWorks>
+              <p>
+                The league's real pairings, each side's lineup rebuilt for the chosen week rather
+                than sliced out of the rest-of-season total — a bye or a one-week injury moves who
+                starts. The margin is two projections subtracted, not a win probability.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Week by week</h2>
+              <h2 className="section-title">Week by week</h2>
               <span className="muted small">
                 {data.scores.weeks.length} week{data.scores.weeks.length === 1 ? '' : 's'} scored
               </span>
             </div>
-            <p className="muted small">
-              What every roster actually scored, week by week — played games, not projections, so
-              nothing here moves once a week is in the books.
-            </p>
             <ScoresBlock block={data.scores} />
+            <HowThisWorks>
+              <p>
+                What every roster actually scored, week by week — played games, not projections, so
+                nothing here moves once a week is in the books.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
+          <section className="section analysis-section">
             <div className="panel-head">
-              <h2>Head to head</h2>
+              <h2 className="section-title">Head to head</h2>
               <span className="muted small">
                 {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
               </span>
             </div>
-            <p className="muted small">
-              Any two rosters, slot against slot, over the same rest-of-season window.
-            </p>
             {data.projections.available ? (
               <HeadToHead block={data.projections} />
             ) : (
               <NotYet reason={data.projections.reason} />
             )}
+            <HowThisWorks>
+              <p>Any two rosters, slot against slot, over the same rest-of-season window.</p>
+            </HowThisWorks>
           </section>
         </>
       )}

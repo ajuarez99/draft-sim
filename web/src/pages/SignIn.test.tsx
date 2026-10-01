@@ -92,3 +92,30 @@ describe('SignIn', () => {
     expect(getSleeperUser).toHaveBeenCalledWith('popsharky')
   })
 })
+
+// spec 013 US9 (T093): a centered welcome.
+describe('SignIn welcome', () => {
+  it('leads with the product name and the exact pitch, and keeps the no-password line', () => {
+    render(<SignIn />)
+
+    expect(screen.getByText('Ball Knowers')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: "Your league's real managers, simulated. See who's likely gone before you pick.",
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/No password -- this app never asks Sleeper for anything private/)).toBeInTheDocument()
+  })
+
+  it('has one text field and one primary Continue button, and Enter submits', async () => {
+    getSleeperUser.mockResolvedValue(sampleUser)
+    const user = userEvent.setup()
+    const { container } = render(<SignIn />)
+
+    expect(container.querySelectorAll('input')).toHaveLength(1)
+    expect(container.querySelectorAll('button.signin-continue')).toHaveLength(1)
+    await user.type(screen.getByLabelText(/your sleeper username/i), 'popsharky{Enter}')
+    expect(getSleeperUser).toHaveBeenCalledWith('popsharky')
+  })
+})

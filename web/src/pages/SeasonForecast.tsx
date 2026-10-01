@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import { computePowerRankings, getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
 import CommissionerKeyNote from '../components/CommissionerKeyNote'
@@ -78,8 +79,8 @@ export default function SeasonForecast() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Season forecast"
-        sub="The rest of the schedule, simulated from every team's scoring so far. These are the odds as of the last recompute — the page reads a stored simulation rather than running a new one."
+        title="Playoff odds"
+        sub="Every team's playoff chances and projected wins, simulated from how everyone has scored so far."
       />
 
       {error && (
@@ -113,16 +114,16 @@ export default function SeasonForecast() {
       )}
 
       {data && data.available && data.seasonComplete && (
-        <section className="panel">
-          <h3 className="cond">Nothing left to forecast</h3>
+        <section className="section">
+          <h3 className="section-title">Nothing left to forecast</h3>
           <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
           <SeasonOver season={data.season} sleeperLeagueId={sleeperLeagueId} />
         </section>
       )}
 
       {data && data.available && !data.seasonComplete && (
-        <section className="panel">
-          <h3 className="cond">
+        <section className="section">
+          <h3 className="section-title">
             Through week {data.week} · {(data.iterations ?? 0).toLocaleString()} simulated seasons
           </h3>
           <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
@@ -147,10 +148,21 @@ export default function SeasonForecast() {
           </table>
 
           <p className="muted small sf-note">
-            Odds come from the snapshot taken at the last commissioner recompute, so they match the
-            playoff odds shown on the power rankings exactly. A range is the middle 80% of simulated
-            outcomes — a wide one means the schedule still decides this team's season.
+            A range is the middle 80% of simulated outcomes — a wide one means the schedule still
+            decides this team's season.
           </p>
+
+          <HowThisWorks>
+            <p>
+              The rest of the schedule is simulated from every team's scoring so far. These are the
+              odds as of the last update: the page reads a stored simulation rather than running a new
+              one.
+            </p>
+            <p>
+              Odds come from the snapshot taken at the last commissioner recompute, so they match the
+              playoff odds shown on the power rankings exactly.
+            </p>
+          </HowThisWorks>
         </section>
       )}
     </div>
@@ -186,14 +198,23 @@ function Refusal({
     reason === 'UNMODELLED_SEEDING'
       ? "This league seeds its playoffs in a way this app doesn't model — divisions, or a non-default seeding rule. Rather than show odds computed under the wrong bracket, it shows none."
       : reason === 'NOT_COMPUTED'
-        ? 'This season has been played, but no odds have been computed for it yet. A commissioner recompute produces them — the page reads a stored simulation rather than running one on load.'
+        ? 'Odds appear when the commissioner updates them.'
         : 'No week has been scored yet, so there is nothing to project from. Odds appear once the first week is final.'
   return (
-    <section className="panel">
-      <h3 className="cond">No forecast for this league</h3>
+    <section className="section">
+      <h3 className="section-title">No forecast for this league</h3>
       <SeasonFallbackNote season={season} requestedSeason={requestedSeason} />
       <p className="muted small">{body}</p>
       {notice}
+      {reason === 'NOT_COMPUTED' && (
+        <HowThisWorks>
+          <p>
+            This season has been played, but no odds have been computed for it yet. A commissioner
+            recompute produces them — the page reads a stored simulation rather than running one on
+            load.
+          </p>
+        </HowThisWorks>
+      )}
     </section>
   )
 }

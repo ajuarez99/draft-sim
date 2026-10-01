@@ -42,13 +42,16 @@ public class WeeklyReportService {
     private final PlayerGameRepository playerGames;
     private final GameScoringService gameScoring;
     private final ScoredWeeks scoredWeeks;
+    private final ManagerRepository managers;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members, PlayerRepository players,
                                SportRulesRegistry rulesRegistry, RealizedLineupService realized,
                                LeagueSeasonResolver seasons, PlayerGameRepository playerGames,
-                               GameScoringService gameScoring, ScoredWeeks scoredWeeks) {
+                               GameScoringService gameScoring, ScoredWeeks scoredWeeks,
+                               ManagerRepository managers) {
+        this.managers = managers;
         this.scoredWeeks = scoredWeeks;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
@@ -63,7 +66,13 @@ public class WeeklyReportService {
         this.gameScoring = gameScoring;
     }
 
-    public record Side(int rosterId, String teamName, String username, String avatarId, String record, double points) {}
+    /**
+     * @param isMe spec 013 T043: this roster's manager is the caller's manager (X-Sleeper-User ->
+     *             manager id, the same owner rule as LeagueAnalysisService). Never a username match;
+     *             false for a signed-out caller or a roster with no manager.
+     */
+    public record Side(int rosterId, String teamName, String username, String avatarId, String record, double points,
+                       boolean isMe) {}
 
     public record Matchup(Side home, Side away) {}
 
@@ -153,6 +162,10 @@ public class WeeklyReportService {
      * With nothing scored the answer is the unavailable shape at week 0.
      */
     public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek) {
+        return forWeek(sleeperLeagueId, requestedWeek, null);
+    }
+
+    public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek, String sleeperUserId) {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
@@ -178,6 +191,9 @@ public class WeeklyReportService {
         Map<Integer, String> usernameByRoster = new HashMap<>();
         Map<Integer, String> avatarByRoster = new HashMap<>();
         Map<Integer, String> recordByRoster = new HashMap<>();
+        Set<Integer> myRosters = new HashSet<>();
+        Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
+                : managers.idsBySleeperUserId().get(sleeperUserId);
         Map<Long, String> teamNameByManager = new HashMap<>();
         for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
             if (m.teamName() != null && !m.teamName().isBlank()) {
@@ -189,6 +205,7 @@ public class WeeklyReportService {
             if (name == null) name = s.managerName();
             nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
             usernameByRoster.put(s.rosterId(), s.managerName());
+            if (callerManagerId != null && callerManagerId.equals(s.managerId())) myRosters.add(s.rosterId());
             avatarByRoster.put(s.rosterId(), s.avatarId());
             recordByRoster.put(s.rosterId(), recordAfter(all, league.season(), week, s.rosterId(),
                     matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)));
@@ -207,11 +224,13 @@ public class WeeklyReportService {
                     new Side(p.aRosterId(), nameByRoster.getOrDefault(p.aRosterId(), "Roster " + p.aRosterId()),
                             usernameByRoster.get(p.aRosterId()),
                             avatarByRoster.get(p.aRosterId()), recordByRoster.get(p.aRosterId()),
-                            p.aPoints() == null ? 0 : p.aPoints().doubleValue()),
+                            p.aPoints() == null ? 0 : p.aPoints().doubleValue(),
+                            myRosters.contains(p.aRosterId())),
                     new Side(p.bRosterId(), nameByRoster.getOrDefault(p.bRosterId(), "Roster " + p.bRosterId()),
                             usernameByRoster.get(p.bRosterId()),
                             avatarByRoster.get(p.bRosterId()), recordByRoster.get(p.bRosterId()),
-                            p.bPoints() == null ? 0 : p.bPoints().doubleValue())));
+                            p.bPoints() == null ? 0 : p.bPoints().doubleValue(),
+                            myRosters.contains(p.bRosterId()))));
         }
 
         // ---- top performers (US5.2), ranked by points actually scored

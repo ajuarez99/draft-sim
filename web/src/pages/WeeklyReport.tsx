@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
+import PlayerFace from '../components/PlayerFace'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   getWeeklyReport,
   type WeeklyReport as Data,
   type WeeklyMatchup,
   type WeeklySide,
+  type WeeklyPerformer,
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
@@ -71,12 +74,21 @@ export default function WeeklyReport() {
     }
   }, [requestedWeek, latest, searchParams, setSearchParams])
 
-  function pickWeek(raw: string) {
-    const n = Math.min(latest, Math.max(1, Math.trunc(Number(raw)) || 1))
+  // The week on screen: what the server resolved, else the URL's, else the latest.
+  const shown = data?.week || requestedWeek || latest
+
+  function goToWeek(n: number) {
+    const clamped = Math.min(latest, Math.max(1, n))
     const next = new URLSearchParams(searchParams)
-    next.set('week', String(n))
+    next.set('week', String(clamped))
     setSearchParams(next)
   }
+
+  // The first matchup with a side that is the signed-in reader's own. Absent (signed out,
+  // not in the league, or a bye week) means the page keeps its original order.
+  const mineIdx = data?.available ? data.matchups.findIndex((m) => m.home.isMe || m.away.isMe) : -1
+  const mine = mineIdx >= 0 && data ? data.matchups[mineIdx] : null
+  const others = data ? data.matchups.filter((_, i) => i !== mineIdx) : []
 
   if (notFound) return <NotFound what="league" />
 
@@ -84,21 +96,21 @@ export default function WeeklyReport() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Weekly report"
-        sub="Every matchup, the week's best performances, and the awards nobody wants — read back from what actually happened."
+        title="Matchups & awards"
+        sub="Who won each matchup this week, and the awards nobody wants — read back from what actually happened."
         actions={
-          // Nothing scored means no week to pick, so no input rather than a week 0.
+          // Nothing scored means no week to pick, so no stepper rather than a week 0.
           latest > 0 ? (
-            <div className="wr-weekpick">
-              <label htmlFor="wr-week">Week</label>
-              <input
-                id="wr-week"
-                type="number"
-                min={1}
-                max={latest}
-                value={requestedWeek ?? data?.week ?? latest}
-                onChange={(e) => pickWeek(e.target.value)}
-              />
+            <div className="wr-stepper" role="group" aria-label="Choose week">
+              <button type="button" aria-label="Previous week" disabled={shown <= 1} onClick={() => goToWeek(shown - 1)}>
+                ‹
+              </button>
+              <span className="wr-stepper-label" aria-live="polite">
+                Week {shown}
+              </span>
+              <button type="button" aria-label="Next week" disabled={shown >= latest} onClick={() => goToWeek(shown + 1)}>
+                ›
+              </button>
             </div>
           ) : undefined
         }
@@ -113,8 +125,8 @@ export default function WeeklyReport() {
       {loading && !data && <p className="muted small">Loading…</p>}
 
       {data && !data.available && (
-        <section className="panel">
-          <h3 className="cond">
+        <section className="section">
+          <h3 className="section-title">
             {data.week === 0 ? 'No week has been scored yet' : `Week ${data.week} has not been scored`}
           </h3>
           <p className="muted small">
@@ -130,65 +142,187 @@ export default function WeeklyReport() {
               <strong>In progress</strong> — scores can still change until the week closes.
             </p>
           )}
-          <section className="panel">
-            <h3 className="cond">Week {data.week} matchups</h3>
+          {/* Which week this is when the reader did not choose one: the server picked the newest
+              FINAL week, and a later one may be under way. */}
+          {requestedWeek == null && data.weekFinal && data.week === data.latestFinalWeek && (
+            <p className="wr-weeknote small">
+              <span>Week {data.week} · latest final week</span>
+              {data.latestScoredWeek > data.week && (
+                <Link className="lh-link" to={`?week=${data.latestScoredWeek}`}>
+                  Week {data.latestScoredWeek} in progress →
+                </Link>
+              )}
+            </p>
+          )}
+          <section className="section">
+            <h3 className="section-title">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
-            <div className="wr-games">
-              {data.matchups.map((m, i) => (
-                <Game key={i} game={m} />
-              ))}
-            </div>
-          </section>
-
-          <section className="panel">
-            <h3 className="cond">Weekly awards</h3>
-            {data.awards.length === 0 ? (
-              <p className="muted small">Nobody qualified for an award this week.</p>
+            {mine ? (
+              <>
+                <Scoreboard game={mine} />
+                {others.length > 0 && (
+                  <div className="wr-games wr-strip">
+                    {others.map((m, i) => (
+                      <Game key={i} game={m} />
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="wr-awards">
-                {data.awards.map((a) => (
-                  <article key={a.kind} className="wr-award">
-                    <h4>{titleOf(a.kind)}</h4>
-                    <p className="wr-award-team">{a.teamName}</p>
-                    <p className="muted small">{a.detail}</p>
-                  </article>
+              <div className="wr-games">
+                {data.matchups.map((m, i) => (
+                  <Game key={i} game={m} />
                 ))}
               </div>
             )}
-
-            {data.awardsOmitted.length > 0 && (
-              <ul className="muted small wr-omitted">
-                {data.awardsOmitted.map((o) => (
-                  <li key={o.kind}>
-                    <strong>{titleOf(o.kind)}</strong> could not be worked out for this week:{' '}
-                    {o.reason === 'STARTERS_NOT_STORED'
-                      ? 'this week was stored before the app recorded which players were actually started, so naming the swap would be a guess.'
-                      : o.reason}
-                  </li>
-                ))}
-              </ul>
-            )}
           </section>
 
-          {data.playersPlayMultiplePerPeriod ? (
-            <Rankings data={data} />
+          {mine ? (
+            <WeekInReview data={data} />
           ) : (
-            <section className="panel">
-              <h3 className="cond">Top performers</h3>
-              <ol className="wr-performers">
-                {(data.topPerformers ?? []).map((p) => (
-                  <li key={p.playerId}>
-                    <span className="wr-pname">{p.playerName}</span>
-                    <span className="wr-ppos">{p.position}</span>
-                    <span className="wr-pteam muted">{p.teamName}</span>
-                    <span className="wr-ppts">{p.points.toFixed(2)}</span>
-                  </li>
-                ))}
-              </ol>
-            </section>
+            <>
+              <section className="section">
+                <h3 className="section-title">Weekly awards</h3>
+                {data.awards.length === 0 ? (
+                  <p className="muted small">Nobody qualified for an award this week.</p>
+                ) : (
+                  <div className="wr-awards row-list">
+                    {data.awards.map((a) => (
+                      <article key={a.kind} className="wr-award">
+                        <h4>{titleOf(a.kind)}</h4>
+                        <p className="wr-award-team">{a.teamName}</p>
+                        <p className="muted small">{a.detail}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                <Omitted data={data} />
+              </section>
+
+              {!data.playersPlayMultiplePerPeriod && (
+                <section className="section">
+                  <h3 className="section-title">Top performers</h3>
+                  <ol className="wr-performers">
+                    {(data.topPerformers ?? []).map((p) => (
+                      <li key={p.playerId}>
+                        <PerformerLine p={p} sport={data.sport} />
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              )}
+            </>
           )}
+
+          {data.playersPlayMultiplePerPeriod && <Rankings data={data} />}
         </>
       )}
+    </div>
+  )
+}
+
+/** Awards that could not be computed are rendered, with the reason, not dropped. */
+function Omitted({ data }: { data: Data }) {
+  if (data.awardsOmitted.length === 0) return null
+  return (
+    <ul className="muted small wr-omitted">
+      {data.awardsOmitted.map((o) => (
+        <li key={o.kind}>
+          <strong>{titleOf(o.kind)}</strong> could not be worked out for this week:{' '}
+          {o.reason === 'STARTERS_NOT_STORED'
+            ? 'this week was stored before the app recorded which players were actually started, so naming the swap would be a guess.'
+            : o.reason}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/**
+ * Awards and (football) top performers as one list of one-line records, used when the
+ * reader's own matchup leads the page. The same facts as the two sections it replaces.
+ */
+function WeekInReview({ data }: { data: Data }) {
+  const performers = data.playersPlayMultiplePerPeriod ? [] : (data.topPerformers ?? [])
+  return (
+    <section className="section">
+      <h3 className="section-title">Week in review</h3>
+      {data.awards.length === 0 && performers.length === 0 ? (
+        <p className="muted small">Nobody qualified for an award this week.</p>
+      ) : (
+        <ul className="wr-review row-list">
+          {data.awards.map((a) => (
+            <li key={a.kind} className="wr-award">
+              <span className="wr-review-kind">{titleOf(a.kind)}</span>
+              <span className="wr-award-team">{a.teamName}</span>
+              <span className="muted small">{a.detail}</span>
+            </li>
+          ))}
+          {performers.map((p) => (
+            <li key={`p-${p.playerId}`} className="wr-perf-row">
+              <span className="wr-review-kind">Top performer</span>
+              <PerformerLine p={p} sport={data.sport} />
+            </li>
+          ))}
+        </ul>
+      )}
+      <Omitted data={data} />
+    </section>
+  )
+}
+
+/**
+ * playerId here is a Sleeper player id (WeeklyReportService keys every performer through
+ * playersBySleeperId), so the face can use it. The row carries the FANTASY team name, not
+ * the player's pro team, so there is no logo step: photo, then initials.
+ */
+function PerformerLine({ p, sport }: { p: WeeklyPerformer; sport: Data['sport'] }) {
+  return (
+    <>
+      <PlayerFace sport={sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
+      <span className="wr-pname">{p.playerName}</span>
+      <span className="wr-ppos">{p.position}</span>
+      <span className="wr-pteam muted">{p.teamName}</span>
+      <span className="wr-ppts">{p.points.toFixed(2)}</span>
+    </>
+  )
+}
+
+/** The reader's own matchup, full width: both sides, big scores, and the result in words. */
+function Scoreboard({ game }: { game: WeeklyMatchup }) {
+  const me = game.home.isMe ? game.home : game.away
+  const them = game.home.isMe ? game.away : game.home
+  const result = me.points > them.points ? 'Won' : me.points < them.points ? 'Lost' : 'Tied'
+  const margin = Math.abs(me.points - them.points)
+  return (
+    <article className="wr-score" aria-label="Your matchup">
+      <ScoreSide side={me} isMe />
+      <ScoreSide side={them} right />
+      <p className="wr-score-result small">
+        <span className={`wr-result ${result.toLowerCase()}`}>{result}</span>
+        {result !== 'Tied' && <span className="muted"> by {margin.toFixed(2)}</span>}
+      </p>
+    </article>
+  )
+}
+
+function ScoreSide({ side, isMe, right }: { side: WeeklySide; isMe?: boolean; right?: boolean }) {
+  return (
+    <div className={right ? 'wr-score-side right' : 'wr-score-side'}>
+      <Avatar
+        avatarId={side.avatarId}
+        seed={String(side.rosterId)}
+        label={side.teamName}
+        isMe={isMe}
+        className="wr-score-avatar"
+      />
+      <div className="wr-score-id">
+        <span className="wr-score-name" title={side.teamName}>
+          <PersonName teamName={side.teamName} username={side.username} />
+        </span>
+        <span className="wr-record muted">({side.record})</span>
+      </div>
+      <span className="wr-score-pts">{side.points.toFixed(2)}</span>
     </div>
   )
 }
@@ -209,15 +343,15 @@ function Rankings({ data }: { data: Data }) {
 
   return (
     <div className="wr-rankings">
-      <section className="panel">
-        <h3 className="cond">Best nights</h3>
-        <p className="muted small">The biggest single games anyone rostered this week.</p>
+      <section className="section">
+        <h3 className="section-title">Best nights</h3>
         {missing('BEST_NIGHTS') ? (
           <Unavailable reason={missing('BEST_NIGHTS')!.reason} />
         ) : (
           <ol className="wr-performers">
             {nights.map((p) => (
               <li key={`${p.playerId}-${p.date}`}>
+                <PlayerFace sport={data.sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
                 <span className="wr-pname">{p.playerName}</span>
                 <span className="wr-ppos">{p.position}</span>
                 <span className="wr-pteam muted">{p.teamName}</span>
@@ -227,10 +361,13 @@ function Rankings({ data }: { data: Data }) {
             ))}
           </ol>
         )}
+        <HowThisWorks>
+          <p>The biggest single games anyone rostered this week.</p>
+        </HowThisWorks>
       </section>
 
-      <section className="panel">
-        <h3 className="cond">Best week</h3>
+      <section className="section">
+        <h3 className="section-title">Best week</h3>
         {/*
           FR-005: this total counts every game the player played, including
           games the league's scoring never counted. Driven by `basis` rather
@@ -248,6 +385,7 @@ function Rankings({ data }: { data: Data }) {
           <ol className="wr-performers">
             {weeks.map((p) => (
               <li key={p.playerId}>
+                <PlayerFace sport={data.sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
                 <span className="wr-pname">{p.playerName}</span>
                 <span className="wr-ppos">{p.position}</span>
                 <span className="wr-pteam muted">{p.teamName}</span>

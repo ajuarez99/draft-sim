@@ -1,15 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { AvailabilityRow, Sport } from '../api'
+import type { AvailabilityRow, PlayerRef, Sport } from '../api'
 import { filterPositions } from '../positions'
+import { positionRun } from '../pickRun'
+import { tierPlayers } from '../tiers'
+import PlayerFace from './PlayerFace'
 import { needLabel } from '../teamNeeds'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 
 type Props = {
-  availability: AvailabilityRow[]
+  /**
+   * The simulation's per-player survival curves. Optional: a mock draft runs no
+   * simulation, so it has none, and passes `players` + `noAvailabilityReason`
+   * instead and still gets the tiered list.
+   */
+  availability?: AvailabilityRow[]
+  /** The undrafted pool, for rooms with no `availability`. Ignored when `availability` is given. */
+  players?: PlayerRef[]
+  /**
+   * Why there are no survival numbers here, shown in their place. When set, the
+   * survival strip and verdict are hidden even if `availability` is present
+   * (the live room before the seat is known: a curve computed for an assumed
+   * seat would answer a question the reader didn't ask).
+   */
+  noAvailabilityReason?: string
+  /** Recent picks, newest last, for the position-run callout. Omit to show none. */
+  recentPicks?: { position: string }[]
   myPicks: number[]
   teams: number
-  pickedPlayerIds: Set<number>
+  pickedPlayerIds?: Set<number>
   // Whether there is a draft to have options in yet. Drives both the empty
   // copy and whether the sheet opens itself -- see the collapse note below.
   started: boolean
@@ -33,6 +52,15 @@ type Props = {
 // run) rather than undefined -- every consumer below (the row filter, the
 // sort key, the strip, the verdict) needs the same fallback, so it lives in
 // one place instead of five `?? 0`s that could drift.
+// "ADP 12" or "ADP 12–15", from the tier's own members.
+function adpSpan(adps: number[]): string {
+  const lo = Math.round(Math.min(...adps))
+  const hi = Math.round(Math.max(...adps))
+  return lo === hi ? `ADP ${lo}` : `ADP ${lo}–${hi}`
+}
+
+const NO_PICKED: Set<number> = new Set()
+
 function survivalAt(row: AvailabilityRow, pick: number): number {
   return row.survivalByPick[String(pick)] ?? 0
 }
@@ -69,9 +97,12 @@ function verdict(survivalAtNextPick: number): { label: string; cls: 'risk' | 'ev
  */
 export default function AvailabilityPanel({
   availability,
+  players,
+  noAvailabilityReason,
+  recentPicks,
   myPicks,
   teams,
-  pickedPlayerIds,
+  pickedPlayerIds = NO_PICKED,
   started,
   sport,
   openSlots,
@@ -148,25 +179,40 @@ export default function AvailabilityPanel({
   // value was never observable -- but that is a coincidence of the call site,
   // not a property of this component.
   const picks = useMemo(() => myPicks.slice(0, shownDepth), [myPicks, shownDepth])
+  // Survival numbers exist only when there are curves AND nothing says to hold
+  // them back. Everything survival-shaped below keys off this one flag.
+  const showSurvival = availability != null && !noAvailabilityReason
   const rows = useMemo(() => {
-    const candidates = availability
+    const source: { player: PlayerRef; row: AvailabilityRow | null }[] = availability
+      ? availability.map((row) => ({ player: row.player, row }))
+      : (players ?? []).map((player) => ({ player, row: null }))
+    const candidates = source
       .filter((r) => filter === 'ALL' || r.player.position === filter)
       .filter((r) => !pickedPlayerIds.has(r.player.id))
-      .filter((r) => picks.some((p) => survivalAt(r, p) > 0.01))
+      .filter((r) => !showSurvival || picks.some((p) => survivalAt(r.row!, p) > 0.01))
       // Board rank still caps *which* players are worth showing at all --
-      // top 60 by consensus is a reasonable "in range" pool -- but it is no
-      // longer how they're ordered. The sheet's one job is "who won't be
-      // there when you pick", and board rank answers "who is good", a
-      // different question that happens to correlate. Re-sorting by
-      // survival at the very next pick (ascending -- lowest survives least,
-      // i.e. what you're most at risk of losing) puts that answer first
-      // without the reader scanning down a 60-row alphabet-by-ADP list for
-      // it. ADP itself stays visible in its own column for context.
+      // top 60 by consensus is a reasonable "in range" pool.
       .slice(0, 60)
-    if (picks.length === 0) return candidates
+    return candidates
+  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival])
+
+  // Tiers group by consensus ADP (tiers.ts). Inside a tier the sheet's old
+  // job survives: when there are survival numbers, the player you are most at
+  // risk of losing at your very next pick comes first.
+  const tiers = useMemo(() => {
+    const t = tierPlayers(rows, (r) => r.player.adp)
+    if (!showSurvival || picks.length === 0) return t
     const nextPick = picks[0]
-    return [...candidates].sort((a, b) => survivalAt(a, nextPick) - survivalAt(b, nextPick))
-  }, [availability, filter, picks, pickedPlayerIds])
+    return t.map((tier) => ({
+      ...tier,
+      players: [...tier.players].sort((a, b) => survivalAt(a.row!, nextPick) - survivalAt(b.row!, nextPick)),
+    }))
+  }, [rows, showSurvival, picks])
+
+  const run = useMemo(
+    () => (recentPicks ? positionRun(recentPicks, 6, 4, sport) : null),
+    [recentPicks, sport],
+  )
 
   // Early in a draft, a column for your third or fourth pick out is ~0% for
   // nearly every row shown -- everyone still in range of the board is
@@ -179,11 +225,11 @@ export default function AvailabilityPanel({
   // `rows`, not `availability`, so switching the position filter to a
   // thinner position can un-trim a column that a fuller list had dropped.
   const visiblePicks = useMemo(() => {
-    if (rows.length === 0) return picks
+    if (rows.length === 0 || !showSurvival) return picks
     let end = picks.length
-    while (end > 1 && rows.every((r) => survivalAt(r, picks[end - 1]) < 0.005)) end--
+    while (end > 1 && rows.every((r) => survivalAt(r.row!, picks[end - 1]) < 0.005)) end--
     return picks.slice(0, end)
-  }, [picks, rows])
+  }, [picks, rows, showSurvival])
 
   return (
     <section ref={sheetRef} className={`panel avail-sheet${collapsed ? ' collapsed' : ''}`}>
@@ -193,7 +239,7 @@ export default function AvailabilityPanel({
             covered a whole round, which is not "giving the board back". The
             filters and the depth slider have nothing to act on while the list
             is hidden, so they go with it. */}
-        {!collapsed && <h2>Who's still there when you pick</h2>}
+        {!collapsed && <h2>{showSurvival ? "Who's still there when you pick" : 'Best available'}</h2>}
         <div className="controls-inline">
           {!collapsed &&
             POSITIONS.map((p) => (
@@ -214,7 +260,7 @@ export default function AvailabilityPanel({
               -- `input[type=range]` has no style here -- and it paired a
               tuning knob with a loose integer where the question is just "how
               many of my picks ahead". Same values, same clamping. */}
-          {!collapsed && (
+          {!collapsed && showSurvival && (
             <span className="depth">
               {myPicks.length === 0 ? (
                 <span className="muted">No picks left</span>
@@ -253,6 +299,12 @@ export default function AvailabilityPanel({
 
       {!collapsed && (
         <div className="avail-scroll panel-body">
+          {run && (
+            <p className="avail-run" role="note">
+              <strong>{run.position} run:</strong> {run.count} of the last {run.window} picks
+            </p>
+          )}
+          {noAvailabilityReason && <p className="muted small avail-reason">{noAvailabilityReason}</p>}
           <table className="avail">
             <thead>
               <tr>
@@ -264,70 +316,92 @@ export default function AvailabilityPanel({
                     `title` instead. The header's own title lists them all, for
                     anyone who wants the full run without hovering cell by
                     cell. */}
-                <th
-                  className="strip-col"
-                  title={visiblePicks.map((p) => roundPickLabel(p, teams)).join(' · ')}
-                >
-                  Next picks
-                </th>
-                <th>Verdict</th>
+                {showSurvival && (
+                  <th
+                    className="strip-col"
+                    title={visiblePicks.map((p) => roundPickLabel(p, teams)).join(' · ')}
+                  >
+                    Next picks
+                  </th>
+                )}
+                {showSurvival && <th>Verdict</th>}
               </tr>
             </thead>
-            <tbody>
-              {rows.map((r) => {
-                // "Next" always means the user's very next pick (picks[0]),
-                // never the last *visible* column -- trimming trailing zero
-                // columns changes what's drawn, not what "next" means, and a
-                // verdict that silently repointed itself when a column
-                // dropped would be a worse bug than the dead width it fixes.
-                const v = verdict(picks.length > 0 ? survivalAt(r, picks[0]) : 0)
-                return (
-                  <tr key={r.player.id}>
-                    <td className="player-col">
-                      <span className={`pos ${r.player.position}`}>{posRank(r.player)}</span>
-                      {r.player.name}
-                      <span className="team">{r.player.team}</span>
-                      {need(r.player.position) && <span className="need-tag">{need(r.player.position)}</span>}
-                    </td>
-                    <td className="num">{Math.round(r.player.adp)}</td>
-                    <td className="strip-cell">
-                      <div className="survival-strip">
-                        {visiblePicks.map((p) => {
-                          const pv = survivalAt(r, p)
-                          const pct = Math.round(pv * 100)
-                          return (
-                            <span
-                              key={p}
-                              className="survival-block"
-                              // Teal mixed into the panel color by survival --
-                              // full teal at 100%, fading to plain --panel as
-                              // a player's odds of still being there drop to
-                              // zero. Reusing --teal (generic interaction, per
-                              // the house style) rather than inventing a risk
-                              // hue: this is a decay reading, not an identity
-                              // one, and --crimson is reserved for "you"
-                              // alone. A near-zero cell still reads as a tile
-                              // rather than a gap because `.survival-block`
-                              // carries its own hairline border -- the fill is
-                              // the only thing that goes to nothing.
-                              style={{ background: `color-mix(in oklch, var(--teal) ${Math.round(pv * 92)}%, var(--panel))` }}
-                              title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
-                            />
-                          )
-                        })}
-                      </div>
-                    </td>
-                    <td className={`verdict verdict-${v.cls}`}>{v.label}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
+            {tiers.map((tier) => (
+              <tbody key={tier.label}>
+                <tr className="tier-head">
+                  <th colSpan={showSurvival ? 4 : 2} scope="colgroup">
+                    {tier.label}
+                    {tier.tier != null && <span className="tier-range"> {adpSpan(tier.players.map((r) => r.player.adp))}</span>}
+                  </th>
+                </tr>
+                {tier.players.map((r) => {
+                  // "Next" always means the user's very next pick (picks[0]),
+                  // never the last *visible* column -- trimming trailing zero
+                  // columns changes what's drawn, not what "next" means, and a
+                  // verdict that silently repointed itself when a column
+                  // dropped would be a worse bug than the dead width it fixes.
+                  const v = showSurvival ? verdict(picks.length > 0 ? survivalAt(r.row!, picks[0]) : 0) : null
+                  return (
+                    <tr key={r.player.id}>
+                      <td className="player-col">
+                        <span className={`pos ${r.player.position}`}>{posRank(r.player)}</span>
+                        <PlayerFace
+                          sport={sport}
+                          sleeperId={r.player.sleeperId}
+                          team={r.player.team}
+                          position={r.player.position}
+                          name={r.player.name}
+                          size={20}
+                        />
+                        {r.player.name}
+                        <span className="team">{r.player.team}</span>
+                        {need(r.player.position) && <span className="need-tag">{need(r.player.position)}</span>}
+                      </td>
+                      <td className="num">{Math.round(r.player.adp)}</td>
+                      {showSurvival && (
+                        <td className="strip-cell">
+                          <div className="survival-strip">
+                            {visiblePicks.map((p) => {
+                              const pv = survivalAt(r.row!, p)
+                              const pct = Math.round(pv * 100)
+                              return (
+                                <span
+                                  key={p}
+                                  className="survival-block"
+                                  // Teal mixed into the panel color by survival --
+                                  // full teal at 100%, fading to plain --panel as
+                                  // a player's odds of still being there drop to
+                                  // zero. Reusing --teal (generic interaction, per
+                                  // the house style) rather than inventing a risk
+                                  // hue: this is a decay reading, not an identity
+                                  // one, and --crimson is reserved for "you"
+                                  // alone. A near-zero cell still reads as a tile
+                                  // rather than a gap because `.survival-block`
+                                  // carries its own hairline border -- the fill is
+                                  // the only thing that goes to nothing.
+                                  style={{ background: `color-mix(in oklch, var(--teal) ${Math.round(pv * 92)}%, var(--panel))` }}
+                                  title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
+                                />
+                              )
+                            })}
+                          </div>
+                        </td>
+                      )}
+                      {v && <td className={`verdict verdict-${v.cls}`}>{v.label}</td>}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            ))}
           </table>
           {rows.length === 0 && (
             <p className="muted">
               {!started
                 ? 'Your realistic options show up here once the draft starts.'
-                : 'No players survive to these picks in any run.'}
+                : showSurvival
+                  ? 'No players survive to these picks in any run.'
+                  : 'No players to list.'}
             </p>
           )}
         </div>

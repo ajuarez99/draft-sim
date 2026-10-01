@@ -31,6 +31,59 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ExpectedWinsServiceTest {
 
+    /** Week 1: six teams (60/50/40/30/20/10). Week 2: rosters 5 and 6 are on a bye, four play. */
+    private static List<Game> withByeAndOddWeek() {
+        return List.of(
+                new Game(1, 1, 60, 2, 50), new Game(1, 3, 40, 4, 30), new Game(1, 5, 20, 6, 10),
+                // week 2: rosters 5 and 6 are on a bye; 3 and 4 tie at 70
+                new Game(2, 1, 100, 2, 90), new Game(2, 3, 70, 4, 70));
+    }
+
+    /** Spec 013 T083: per team, total = sum over weeks played of (n_w - 1); league wins = losses. */
+    @Test
+    void allPlayTotalsFollowWeeksPlayedAndLeagueWinsEqualLosses() {
+        List<Game> games = withByeAndOddWeek();
+        Map<Integer, ExpectedWinsService.WinLossTie> ap = ExpectedWinsService.allPlay(games);
+        // week 1 has 6 rosters (5 comparisons); week 2 has 4 rosters (3 comparisons)
+        for (int r = 1; r <= 4; r++) {
+            ExpectedWinsService.WinLossTie t = ap.get(r);
+            assertEquals(5 + 3, t.wins() + t.losses() + t.ties(), "roster " + r);
+        }
+        for (int r = 5; r <= 6; r++) {
+            ExpectedWinsService.WinLossTie t = ap.get(r);
+            assertEquals(5, t.wins() + t.losses() + t.ties(), "roster " + r + " has a bye in week 2");
+        }
+        int wins = ap.values().stream().mapToInt(ExpectedWinsService.WinLossTie::wins).sum();
+        int losses = ap.values().stream().mapToInt(ExpectedWinsService.WinLossTie::losses).sum();
+        assertEquals(wins, losses);
+        // the 70/70 tie in week 2 shows up as one tie each, and nothing else ties
+        assertEquals(1, ap.get(3).ties());
+        assertEquals(1, ap.get(4).ties());
+        assertEquals(0, ap.get(1).ties());
+        // roster 1: beat all 5 in week 1 and all 3 in week 2
+        assertEquals(new ExpectedWinsService.WinLossTie(8, 0, 0), ap.get(1));
+    }
+
+    /** Spec 013 T083: with an odd number of rosters the median roster ties every week by construction. */
+    @Test
+    void medianRosterTiesInAnOddWeek() {
+        List<Game> five = List.of(new Game(1, 1, 50, 2, 40), new Game(1, 3, 30, 4, 20), new Game(1, 5, 10, 6, 1));
+        // six rosters -> even: median = (30+20)/2 = 25, nobody ties
+        Map<Integer, ExpectedWinsService.WinLossTie> even = ExpectedWinsService.median(five);
+        assertEquals(0, even.values().stream().mapToInt(ExpectedWinsService.WinLossTie::ties).sum());
+        assertEquals(3, even.values().stream().mapToInt(ExpectedWinsService.WinLossTie::wins).sum());
+
+        // odd: rosters 1..5 only (a pair plus a pair plus a bye is not a pairing, but the walk only
+        // reads who scored), so the middle score IS the median and ties
+        List<Game> odd = List.of(new Game(1, 1, 50, 2, 40), new Game(1, 3, 30, 4, 20), new Game(1, 5, 10, 5, 10));
+        Map<Integer, ExpectedWinsService.WinLossTie> m = ExpectedWinsService.median(odd);
+        assertEquals(5, m.size());
+        assertEquals(new ExpectedWinsService.WinLossTie(0, 0, 1), m.get(3), "the median roster ties");
+        assertEquals(1, m.values().stream().mapToInt(ExpectedWinsService.WinLossTie::ties).sum());
+        assertEquals(2, m.values().stream().mapToInt(ExpectedWinsService.WinLossTie::wins).sum());
+        assertEquals(2, m.values().stream().mapToInt(ExpectedWinsService.WinLossTie::losses).sum());
+    }
+
     /** Six teams, one week, scores 60/50/40/30/20/10. */
     private static List<Game> oneWeekOfSix() {
         return List.of(
@@ -289,6 +342,35 @@ class ExpectedWinsServiceBoundTest {
         double expSum = result.teams().stream().mapToDouble(ExpectedWinsService.TeamRow::expectedWins).sum();
         double actSum = result.teams().stream().mapToDouble(ExpectedWinsService.TeamRow::actualWins).sum();
         assertEquals(actSum, expSum, 1e-6, "expected wins must still conserve against real wins on the bounded subset");
+    }
+
+    /**
+     * A stored-but-not-final week is excluded from every number: weeksScored, actualWins,
+     * allPlay and median. Weeks 1-15 are final, week 16 is stored but still in progress.
+     */
+    @Test
+    void aStoredButNotFinalWeekIsExcludedFromEveryNumber() {
+        for (int week = 1; week <= 16; week++) {
+            jdbc.update("""
+                    insert into league_week_fetch (league_id, kind, week, fetched_at, final)
+                    values (?, 'POINTS', ?, now(), ?)
+                    """, leagueId, week, week <= 15);
+        }
+        ExpectedWinsService.Result result =
+                expectedWins.forLeague(LEAGUE_SLEEPER_ID, WeekBound.ALL_WEEKS).orElseThrow();
+        assertEquals(15, result.weeksScored(), "the in-progress week 16 is not scored");
+        for (ExpectedWinsService.TeamRow t : result.teams()) {
+            // 4 rosters: 3 all-play comparisons and 1 median comparison per final week
+            ExpectedWinsService.WinLossTie ap = t.allPlay();
+            assertEquals(15 * 3, ap.wins() + ap.losses() + ap.ties(), "all-play covers final weeks only");
+            ExpectedWinsService.WinLossTie md = t.median();
+            assertEquals(15, md.wins() + md.losses() + md.ties(), "median covers final weeks only");
+        }
+        double act = result.teams().stream().mapToDouble(ExpectedWinsService.TeamRow::actualWins).sum();
+        assertEquals(15 * 2, act, 1e-9, "two games a week, final weeks only");
+        for (ExpectedWinsService.TeamRow t : result.teams()) {
+            for (ExpectedWinsService.SwingWeek sw : t.swingWeeks()) assertTrue(sw.week() <= 15);
+        }
     }
 
     /** The unbounded case still sees all 16 weeks, so the bound genuinely does something. */

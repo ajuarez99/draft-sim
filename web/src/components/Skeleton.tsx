@@ -66,3 +66,31 @@ export function LoadingScreen({ label }: WaitProps) {
     </div>
   )
 }
+
+type BoardProps = {
+  /** Column and row counts are only a hint at the real grid's shape (height, not precision). */
+  columns?: number
+  rows?: number
+}
+
+/**
+ * A placeholder for the draft board while its seats load. Quiet on purpose:
+ * it says nothing about "running" or "simulating", because nothing is running
+ * until the reader presses Start (the simulator does not auto-run). It is the
+ * board's own shape, a grid of tiles, not the list rows `SkeletonRows` draws.
+ */
+export function SkeletonBoard({ columns = 12, rows = 8 }: BoardProps) {
+  return (
+    <div
+      className="board-skeleton"
+      role="status"
+      aria-label="Loading the draft board"
+      aria-busy="true"
+      style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
+    >
+      {Array.from({ length: columns * rows }, (_, i) => (
+        <span key={i} className="board-skeleton-tile" />
+      ))}
+    </div>
+  )
+}

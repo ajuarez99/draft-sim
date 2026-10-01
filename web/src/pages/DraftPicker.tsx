@@ -10,6 +10,7 @@ import SportFilterRail from '../components/SportFilterRail'
 import { useSportFilter, type SportFilter } from '../sportFilter'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
 import {
@@ -21,12 +22,10 @@ import {
   ingestLeague,
   refreshLeague,
   refreshPlayers,
-  trackDraft,
   type DraftSummary,
   type MockSessionSummary,
   type Sport,
   type SleeperLeague,
-  type TrackResponse,
 } from '../api'
 
 // claude/user-identity-and-onboarding.md §5d: driven from the frontend rather
@@ -49,15 +48,6 @@ function setupStages(l: SleeperLeague) {
 }
 
 type SetupState = { stageIndex: number; failedLabel: string | null }
-
-// A complete draft has real picks to show (CompletedDraftBoard); anything
-// else -- pre_draft, drafting, or a null/unrecognized status -- has none yet,
-// so it goes to DraftView's simulator instead, same as it always has.
-function draftRoute(d: { sleeperDraftId: string; status: string | null }): string {
-  return (d.status ?? 'unknown') === 'complete'
-    ? `/drafts/${d.sleeperDraftId}/board`
-    : `/drafts/${d.sleeperDraftId}`
-}
 
 function sportTitle(f: SportFilter): string {
   if (f === 'all') return 'All sports'
@@ -94,8 +84,6 @@ export default function DraftPicker() {
   const [addError, setAddError] = useState<string | null>(null)
   const [leagueId, setLeagueId] = useState('')
   const [adding, setAdding] = useState(false)
-  const [tracking, setTracking] = useState<string | null>(null)
-  const [tracked, setTracked] = useState<Record<string, TrackResponse | { failed: string }>>({})
 
   // "From Sleeper": leagues this user belongs to on Sleeper that have no
   // `league` row in this app's DB yet (§5c/§5d). null while loading, distinct
@@ -183,27 +171,6 @@ export default function DraftPicker() {
     // leagues" -- both lists have to refresh for that card to actually move.
     refetch()
     refetchSleeperLeagues()
-  }
-
-  // /track now runs one poll tick synchronously before it answers, so this is
-  // also the status refresh -- one button doing both jobs. The number that
-  // matters on draft night is seatsMapped: 0 means every seat in the room is a
-  // league-average bot, and it is better to find that out here than at 8:15.
-  async function track(sleeperDraftId: string) {
-    setTracking(sleeperDraftId)
-    setFetchError(null)
-    try {
-      const r = await trackDraft(sleeperDraftId)
-      setTracked((prev) => ({ ...prev, [sleeperDraftId]: r }))
-      refetch()
-    } catch (e) {
-      setTracked((prev) => ({
-        ...prev,
-        [sleeperDraftId]: { failed: e instanceof Error ? e.message : String(e) },
-      }))
-    } finally {
-      setTracking(null)
-    }
   }
 
   // The field says "link or ID" now, so a pasted Sleeper URL has to work --
@@ -313,21 +280,23 @@ export default function DraftPicker() {
 
       <div className="content home-content">
         <PageHeader
-          eyebrow="Viewing"
-          title={sportTitle(sportFilter)}
+          // The hero greets the user (specs/013 US4); the sport filter in
+          // effect moves to the eyebrow so it is still said out loud.
+          eyebrow={sportTitle(sportFilter)}
+          title={user ? `Welcome back, ${user.displayName || user.username}` : 'Welcome back'}
           sub={
             drafts == null ? (
-              'Bots fill every seat but yours, and you take your own picks on your turn.'
+              'Practice your draft against the real managers in your leagues, or against bots.'
             ) : recentLeague ? (
               <>
                 <strong>{recentLeague.leagueName}</strong> is a {recentLeague.teams}-team,{' '}
-                {recentLeague.rounds}-round league — get more reps before its next draft, in a
-                room only you control.
+                {recentLeague.rounds}-round league — practice before its next draft, in a room
+                only you control.
               </>
             ) : drafts.length > 0 && sportFilter === 'all' ? (
-              'Bots fill every seat but yours, or seat the real managers from any of your leagues below.'
+              'Practice your draft with bots, or seat the real managers from any of your leagues below.'
             ) : (
-              'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
+              'Practice your draft with bots, or add a league below to seat its real managers instead.'
             )
           }
           actions={
@@ -337,9 +306,9 @@ export default function DraftPicker() {
           }
         />
 
-        <section className="panel">
+        <section className="section picker-section">
           <div className="panel-head">
-            <h2>Your leagues</h2>
+            <h2 className="section-title">Your leagues</h2>
           </div>
 
           {fetchError && <div className="error">{fetchError}</div>}
@@ -364,163 +333,68 @@ export default function DraftPicker() {
           )}
 
           {drafts && visibleLineages.length > 0 && (
-            // Cards, not `.draft-list` rows. A row was right while a league was
-            // one line of content -- name, season, size, status. It now carries
-            // an identity, a draft, a history and a power ranking, and the row
-            // answered that by growing a column of three identical chips 1400px
-            // from the league's own name. See styles.css DENSITY: re-judge the
-            // shape when the content changes rather than defending the old call.
-            <div className="league-grid">
-              {visibleLineages.map(({ current: d, seasons }) => {
+            // Rows, not cards (specs/013 US4, FR-017 amended). A league here is
+            // one line of content again -- identity, sport, season, draft
+            // status -- and the page it leads to (League home) is where its
+            // record, standings and matchup live. No record or rank on this
+            // row: that would be one request per league just to draw a front
+            // door. Season pills and the per-draft Refresh left with the
+            // card; seasons are on the league's own rail, and the seat check
+            // is in the live room.
+            <ul className="row-list league-rows">
+              {visibleLineages.map(({ current: d }) => {
                 // draft.status is nullable in the DB. Reading .replace() off it
                 // threw a TypeError during render, and with no error boundary
                 // above this component that took out the entire picker screen --
                 // one unstarted draft row was enough to make the app unusable.
                 const status = d.status ?? 'unknown'
-                const t = tracked[d.sleeperDraftId]
                 const live = status === 'pre_draft' || status === 'drafting'
-                const complete = status === 'complete'
                 // Hashed on the NAME, not the id: every season of a league is a
                 // separate Sleeper league id, so hashing the id gave the two
                 // "(Foot) Ball Knowers" cards different colors -- the exact
                 // opposite of what the crest is for.
                 const hue = hueForName(d.leagueName)
                 const crest = crestLetter(d.leagueName)
+                const home = `/leagues/${d.sleeperLeagueId}`
                 return (
-                  <article key={d.sleeperLeagueId} className={`league-card${live ? ' live' : ''}`}>
-                    <header className="league-card-head">
-                      {/* Same hue-derived crest the board's column headers and
-                          the manager cards use, so two seasons of one league
-                          read as one league instead of two identical strings. */}
-                      <span
-                        className="avatar league-crest"
-                        style={{ background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` }}
-                        aria-hidden="true"
-                      >
-                        {crest}
+                  <li key={d.sleeperLeagueId} className={`league-row${live ? ' live' : ''}`}>
+                    <span
+                      className="avatar league-crest"
+                      style={{ background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` }}
+                      aria-hidden="true"
+                    >
+                      {crest}
+                    </span>
+                    <span className="league-card-title">
+                      <Link to={home} className="league-card-name" title={d.leagueName}>
+                        {d.leagueName}
+                      </Link>
+                      <span className="league-card-sub">
+                        {/* The sport pill -- load-bearing now that the sidebar
+                            filter mixes both sports in "All sports". */}
+                        <span className={`sport-pill ${d.sport}`}>{d.sport.toUpperCase()}</span>
+                        {d.season} &middot; {d.teams} managers
                       </span>
-                      <span className="league-card-title">
-                        <Link to={draftRoute(d)} className="league-card-name">
-                          {d.leagueName}
-                        </Link>
-                        <span className="league-card-sub">
-                          {/* The sport pill -- load-bearing now that the sidebar
-                              filter mixes both sports in "All sports". */}
-                          <span className={`sport-pill ${d.sport}`}>{d.sport.toUpperCase()}</span>
-                          {d.teams} managers &middot; {d.rounds} rounds
-                        </span>
-                      </span>
-                      <span className="league-card-season cond">{d.season}</span>
-                    </header>
+                    </span>
 
-                    {/* Every season of a Sleeper league is its own league object,
-                        so this list used to render one card per season -- two
-                        "West Coast Fantasy Football" cards side by side, each
-                        carrying an identical History and Power rankings link to
-                        the same two pages. Those are league-scoped and walk the
-                        whole chain themselves; only the draft board is per
-                        season. So one card per league, and the older seasons
-                        become links to their own boards. */}
-                    {seasons.length > 1 && (
-                      <div className="league-seasons">
-                        <span className="league-seasons-label">Seasons</span>
-                        {seasons.map((s) => (
-                          <Link
-                            key={s.sleeperLeagueId}
-                            to={draftRoute(s)}
-                            className={`league-season-link${s.sleeperLeagueId === d.sleeperLeagueId ? ' on' : ''}`}
-                            title={`${s.season} ${s.status === 'complete' ? 'draft board' : 'mock draft'} · ${s.teams} managers`}
-                          >
-                            {s.season}
-                          </Link>
-                        ))}
-                      </div>
+                    {/* A finished draft is the resting state and says so
+                        quietly; one that is live or about to be is the only
+                        thing on this row worth an accent. */}
+                    {live ? (
+                      <Link className="league-card-live" to={`/drafts/${d.sleeperDraftId}/live`}>
+                        <span className="league-live-dot" />
+                        {status === 'drafting' ? 'Drafting now — follow live' : 'Draft not started — follow live'}
+                      </Link>
+                    ) : (
+                      <span className="league-card-status">
+                        {status === 'complete' ? 'Draft complete' : 'Draft status unknown'}
+                      </span>
                     )}
 
-                    <div className="league-card-links">
-                      {/* One primary destination, then two peers -- not three
-                          identical chips. The draft is what this app is for.
-                          A complete draft has real picks to show; anything else
-                          -- live or not yet drafted -- has none yet, so it opens
-                          the simulator (mock the room from its own tendencies)
-                          instead of an empty "come back later" screen. */}
-                      <Link className="league-link primary" to={draftRoute(d)}>
-                        {live ? 'Draft room' : complete ? 'Draft board' : 'Mock draft'}
+                    <span className="league-row-actions">
+                      <Link className="league-link primary" to={home}>
+                        Open league
                       </Link>
-                      {/* Both sports since claude/nba-power-rankings.md. These
-                          used to be football-only because power rankings'
-                          wire format was football-shaped down to the NFL
-                          week/season fields it returned; it no longer is, and
-                          /history never was. */}
-                      <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/history`}>
-                        History
-                      </Link>
-                      <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/power`}>
-                        Power rankings
-                      </Link>
-                      {/* claude/league-analysis.md, and football-only unlike its
-                          two neighbours: this page's roster projections read
-                          Sleeper's pts_ppr, which has no basketball equivalent.
-                          A third peer rather than a fourth chip competing with
-                          the primary -- Analysis is the other half of Power
-                          rankings and belongs beside it. */}
-                      {d.sport === 'nfl' && (
-                        <Link className="league-link" to={`/leagues/${d.sleeperLeagueId}/analysis`}>
-                          Analysis
-                        </Link>
-                      )}
-                    </div>
-
-                    <footer className="league-card-foot">
-                      {/* A finished draft is the resting state and says so
-                          quietly; one that is live or about to be is the only
-                          thing on this card worth an accent. */}
-                      {live ? (
-                        <Link className="league-card-live" to={`/drafts/${d.sleeperDraftId}/live`}>
-                          <span className="league-live-dot" />
-                          {status === 'drafting' ? 'Drafting now — follow live' : 'Draft not started — follow live'}
-                        </Link>
-                      ) : (
-                        <span className="league-card-status">Draft complete</span>
-                      )}
-
-                      <span className="league-card-foot-spacer" />
-
-                      {t &&
-                        ('failed' in t ? (
-                          <span className="tiny track-note failed">{t.failed}</span>
-                        ) : typeof t.seatsMapped !== 'number' ? (
-                          // A backend older than the seatsMapped field answers
-                          // 200 with it simply absent. Say what came back rather
-                          // than rendering "undefined/undefined seats mapped" --
-                          // verified live 2026-09-02 against a pre-restart 8080.
-                          <span className="tiny track-note">{t.status ?? 'unknown'} · no seat count from this backend</span>
-                        ) : (
-                          // "12/14 seats mapped" described a data structure. What
-                          // the reader needs on draft night is whether any seat is
-                          // still an unmodelled league-average bot -- so the full
-                          // house says so quietly and anything short of it is the
-                          // thing that stands out.
-                          <span className={`tiny track-note${t.seatsMapped < t.teams ? ' failed' : ''}`}>
-                            {t.seatsMapped === t.teams
-                              ? `All ${t.teams} managers identified`
-                              : `Only ${t.seatsMapped} of ${t.teams} managers identified`}
-                            {/* observed: false means Sleeper was unreachable and
-                                `status` is the stale DB value -- label it rather
-                                than showing it as fact. */}
-                            {t.observed === false ? ' · stale' : ''}
-                          </span>
-                        ))}
-
-                      <button
-                        className="league-card-refresh"
-                        onClick={() => track(d.sleeperDraftId)}
-                        disabled={tracking === d.sleeperDraftId}
-                        title="Check Sleeper now and refresh this draft's status and seat mapping"
-                      >
-                        {tracking === d.sleeperDraftId ? 'Checking…' : 'Refresh'}
-                      </button>
-
                       {/* Every league's own fast path into the modal, preset to
                           its sport and itself -- design_handoff_multisport_
                           mock_drafts's "fastest correct path" for starting a
@@ -532,11 +406,11 @@ export default function DraftPicker() {
                       >
                         Mock it
                       </button>
-                    </footer>
-                  </article>
+                    </span>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           )}
         </section>
 
@@ -544,9 +418,9 @@ export default function DraftPicker() {
             below simply doesn't render, so a broken lookup and "you have nothing
             to set up" look identical. */}
         {sleeperError && (
-          <section className="panel">
+          <section className="section picker-section">
             <div className="panel-head">
-              <h2>From Sleeper</h2>
+              <h2 className="section-title">From Sleeper</h2>
             </div>
             <div className="error">
               Couldn’t load your Sleeper leagues ({sleeperError}).{' '}
@@ -565,9 +439,9 @@ export default function DraftPicker() {
             Hidden for the NBA filter per design_handoff_multisport_mock_drafts
             ("shown for All sports and NFL only"). */}
         {visibleSleeperLeagues && visibleSleeperLeagues.some((l) => !l.ingested) && (
-          <section className="panel">
+          <section className="section picker-section">
             <div className="panel-head">
-              <h2>From Sleeper</h2>
+              <h2 className="section-title">From Sleeper</h2>
             </div>
             <div className="league-grid">
               {visibleSleeperLeagues
@@ -628,9 +502,9 @@ export default function DraftPicker() {
           </section>
         )}
 
-        <section className="panel">
+        <section className="section picker-section">
           <div className="panel-head">
-            <h2>Mock drafts</h2>
+            <h2 className="section-title">Mock drafts</h2>
             <button type="button" className="chip on" onClick={() => openMockModal()}>
               New mock
             </button>
@@ -688,6 +562,10 @@ export default function DraftPicker() {
               })}
             </div>
           )}
+
+          <HowThisWorks>
+            <p>Bots fill every seat but yours, and you take your own picks on your turn.</p>
+          </HowThisWorks>
         </section>
 
         {/* B1: "Add a league" was its own panel, a third of the front door

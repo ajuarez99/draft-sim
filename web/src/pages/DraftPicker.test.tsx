@@ -171,3 +171,70 @@ describe('DraftPicker hero subtitle', () => {
     await waitFor(() => expect(document.querySelector('.page-head strong')?.textContent).toBe('Hoops League'))
   })
 })
+
+// specs/013 US4 (FR-017 amended): one row per league, leading to League home.
+describe('DraftPicker league rows', () => {
+  const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
+    id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
+    teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
+    previousLeagueId: null, sport: 'nfl', ...over,
+  })
+
+  beforeEach(() => {
+    getSleeperUserLeagues.mockResolvedValue([])
+    localStorage.clear()
+  })
+
+  it('greets the user in the hero', async () => {
+    getDrafts.mockResolvedValue([draftRow({})])
+    render(<DraftPicker />)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome back, Tester' })).toBeInTheDocument()
+  })
+
+  it('gives each league one row: name, sport, season, status, and one action to League home', async () => {
+    getDrafts.mockResolvedValue([
+      draftRow({}),
+      draftRow({ id: 2, sleeperDraftId: 'd2', leagueId: 2, leagueName: 'Hoops League', sleeperLeagueId: 'L2', sport: 'nba', status: 'pre_draft' }),
+    ])
+    render(<DraftPicker />)
+
+    const rows = await waitFor(() => {
+      const found = document.querySelectorAll('.league-row')
+      expect(found).toHaveLength(2)
+      return [...found] as HTMLElement[]
+    })
+    expect(rows[0].textContent).toContain('Football League')
+    expect(rows[0].textContent).toContain('NFL')
+    expect(rows[0].textContent).toContain('2026')
+    expect(rows[0].textContent).toContain('Draft complete')
+    expect(rows[0].querySelector('a.primary')?.getAttribute('href')).toBe('/leagues/L1')
+    expect(rows[0].querySelector('a.league-card-name')?.getAttribute('href')).toBe('/leagues/L1')
+    expect(rows[1].textContent).toContain('NBA')
+    expect(rows[1].textContent).toContain('Draft not started')
+    expect(rows[1].querySelector('a.primary')?.getAttribute('href')).toBe('/leagues/L2')
+  })
+
+  it('shows no record or rank on the row, and no season pills or Refresh', async () => {
+    getDrafts.mockResolvedValue([
+      draftRow({}),
+      draftRow({ id: 3, sleeperDraftId: 'd0', leagueId: 3, sleeperLeagueId: 'L0', season: 2025, previousLeagueId: null }),
+    ])
+    render(<DraftPicker />)
+    await waitFor(() => expect(document.querySelectorAll('.league-row').length).toBeGreaterThan(0))
+    expect(document.querySelector('.league-seasons')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull()
+    expect(document.querySelector('.league-row')?.textContent).not.toMatch(/\d+-\d+|\d(st|nd|rd|th)/)
+  })
+
+  it('keeps Mock it on the row, and following a live draft one tap away', async () => {
+    getDrafts.mockResolvedValue([draftRow({ status: 'drafting' })])
+    const user = userEvent.setup()
+    render(<DraftPicker />)
+
+    const mockIt = await screen.findByRole('button', { name: 'Mock it' })
+    expect(screen.getByRole('link', { name: /follow live/ })).toHaveAttribute('href', '/drafts/d1/live')
+    await user.click(mockIt)
+    // StartMockModal opens seeded with this league
+    expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+})

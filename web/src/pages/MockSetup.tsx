@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import { createMockSession, getManagers, type ManagerSummary, type Sport } from '../api'
 import { hueForIndex } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
+import { archetype } from '../managerBehaviour'
+import Avatar from '../components/Avatar'
 
 // Same domain as LeagueShape.SUPPORTED_TEAM_COUNTS (engine/LeagueShape.java) --
 // one team-size dropdown across the whole app, per claude/next-features-roadmap.md §3.1.
@@ -153,29 +156,30 @@ export default function MockSetup() {
         eyebrow={`New ${sport.toUpperCase()} mock`}
         title="Mock draft setup"
         sub={
-          <>
-            {handoff?.sourceLeagueName ? (
-              <>
-                Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams
-                {handoff.rounds ? `, ${handoff.rounds} rounds` : ''}. Bots fill every seat but
-                yours and auto-pick down the draft order.
-              </>
-            ) : (
-              'Bots fill every seat but yours and auto-pick down the draft order. You take your own picks on your turn.'
-            )}{' '}
-            {anyFitted ? (
-              'Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
-            ) : (
-              <>
-                No {sport.toUpperCase()} manager has enough drafted history to model yet, so every
-                seat drafts league-average either way.
-              </>
-            )}
-          </>
+          handoff?.sourceLeagueName ? (
+            <>
+              Practice <strong>{handoff.sourceLeagueName}</strong>'s draft — {teams} teams
+              {handoff.rounds ? `, ${handoff.rounds} rounds` : ''}, with you in the seat you pick.
+            </>
+          ) : (
+            'Pick your seat, seat the managers you want to face, and start the practice draft.'
+          )
         }
       />
 
-      <section className="panel add-draft">
+      <section className="section add-draft">
+        {/* The caveat that used to ride in the subtitle: it qualifies every
+            seat below, so it stays on the page rather than behind a click. */}
+        <p className="muted small">
+          {anyFitted ? (
+            'Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
+          ) : (
+            <>
+              No {sport.toUpperCase()} manager has enough drafted history to model yet, so every
+              seat drafts league-average either way.
+            </>
+          )}
+        </p>
 
         {error && <div className="error">{error}</div>}
 
@@ -239,14 +243,30 @@ export default function MockSetup() {
                 <button
                   type="button"
                   className="mock-seat-face"
-                  style={assignedManager ? { background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` } : undefined}
                   onClick={() => handleUserSlotChange(slot)}
                   aria-pressed={isMine}
                   aria-label={isMine ? `Your seat, pick ${pickLabel}` : `Take pick ${pickLabel} as your seat`}
                   disabled={creating}
                 >
                   <span className="mock-seat-pick">{pickLabel}</span>
+                  {/* A real manager shows who they are (photo) and how they draft
+                      (archetype, built on the same reach read as /managers); a
+                      bot shows neither, because there is nothing to say. */}
+                  {assignedManager && !isMine && (
+                    <Avatar
+                      avatarId={assignedManager.avatarId}
+                      seed={String(assignedManager.managerId)}
+                      label={assignedManager.manager}
+                      hue={hue}
+                      className="mock-seat-avatar"
+                    />
+                  )}
                   <span className="mock-seat-who">{isMine ? 'You' : (assignedManager?.manager ?? 'Bot')}</span>
+                  {assignedManager && !isMine && (
+                    <span className="mock-seat-arch" title={archetype(assignedManager).basis}>
+                      {archetype(assignedManager).label}
+                    </span>
+                  )}
                 </button>
 
                 {/* Compact inline select, not a full-width row -- this
@@ -286,6 +306,13 @@ export default function MockSetup() {
             {creating ? 'Starting…' : 'Start the draft'}
           </button>
         </div>
+
+        <HowThisWorks>
+          <p>
+            Bots fill every seat but yours and auto-pick down the draft order. You take your own
+            picks on your turn.
+          </p>
+        </HowThisWorks>
       </section>
     </div>
   )

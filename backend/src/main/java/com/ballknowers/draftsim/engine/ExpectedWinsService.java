@@ -28,6 +28,12 @@ import java.util.*;
  * hold, both sides must cover the SAME games -- which is why the scores below
  * are filtered down to the rosters that actually played in each week, instead
  * of every roster the scores table happens to hold.
+ *
+ * <p><b>Final weeks only.</b> Games are kept only for weeks {@link ScoredWeeks} calls final
+ * (the rule {@code WeeklyReportService} uses). A stored but in-progress week is partial: counting
+ * it would credit a "win" for a game still being played and skew all-play, median, actual and
+ * expected wins and {@code weeksScored} alike. Every number this service returns therefore covers
+ * final weeks only (changed in spec 013's fix pass; earlier it covered every stored week).
  */
 @Service
 public class ExpectedWinsService {
@@ -37,17 +43,20 @@ public class ExpectedWinsService {
     private final RosterSeasonRepository rosterSeasons;
     private final LeagueMemberRepository members;
     private final LeagueSeasonResolver seasons;
+    private final ScoredWeeks scoredWeeks;
 
     public ExpectedWinsService(LeagueRepository leagues,
                                LeagueMatchupRepository matchups,
                                RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members,
-                               LeagueSeasonResolver seasons) {
+                               LeagueSeasonResolver seasons,
+                               ScoredWeeks scoredWeeks) {
         this.leagues = leagues;
         this.matchups = matchups;
         this.rosterSeasons = rosterSeasons;
         this.members = members;
         this.seasons = seasons;
+        this.scoredWeeks = scoredWeeks;
     }
 
     /** One played, scored game. The pure core's only input. */
@@ -62,9 +71,20 @@ public class ExpectedWinsService {
 
     public record SwingWeek(int week, boolean won, double points, int weeklyRank, String opponent) {}
 
+    /** A whole-number record: wins, losses and ties are each a count of comparisons, never halves. */
+    public record WinLossTie(int wins, int losses, int ties) {}
+
+    /**
+     * @param allPlay spec 013 T082: against every OTHER roster scored that week, regular season.
+     *                Total per team = sum over the weeks it played of (rosters scored that week - 1).
+     * @param median  spec 013 T082: against that week's median score, regular season. With an odd
+     *                roster count the median roster IS the median, so it ties every week by
+     *                construction; this is documented on the page, not hidden.
+     */
     public record TeamRow(int rosterId, Long managerId, String teamName, String username, String avatarId,
                           double expectedWins, double actualWins, double winsAboveExpected,
-                          double strengthOfSchedule, LuckSource luckSource, List<SwingWeek> swingWeeks) {}
+                          double strengthOfSchedule, LuckSource luckSource, List<SwingWeek> swingWeeks,
+                          WinLossTie allPlay, WinLossTie median) {}
 
     public record Result(boolean available, String reason, int season, Integer requestedSeason,
                          Sport sport, int weeksScored, double leagueAveragePpg, List<TeamRow> teams) {
@@ -100,6 +120,51 @@ public class ExpectedWinsService {
                 out.merge(me.getKey(), beat / (n - 1), Double::sum);
             }
         }
+        return out;
+    }
+
+    /**
+     * The all-play record as whole counts: per week, every other roster scored that week is one
+     * comparison. Same walk and same {@code scoresByWeek} filter as {@link #expectedWins}, so a
+     * roster on a bye (absent from {@code games} that week) neither plays nor is played.
+     */
+    static Map<Integer, WinLossTie> allPlay(List<Game> games) {
+        Map<Integer, int[]> acc = new HashMap<>();
+        for (Map<Integer, Double> week : scoresByWeek(games).values()) {
+            for (Map.Entry<Integer, Double> me : week.entrySet()) {
+                int[] a = acc.computeIfAbsent(me.getKey(), k -> new int[3]);
+                for (Map.Entry<Integer, Double> other : week.entrySet()) {
+                    if (other.getKey().equals(me.getKey())) continue;
+                    int cmp = Double.compare(me.getValue(), other.getValue());
+                    a[cmp > 0 ? 0 : cmp < 0 ? 1 : 2]++;
+                }
+            }
+        }
+        return toRecords(acc);
+    }
+
+    /**
+     * Each week, a win for scoring above that week's median score, a loss below, a tie at it.
+     * The median is of the rosters scored that week (the mean of the middle two when even).
+     */
+    static Map<Integer, WinLossTie> median(List<Game> games) {
+        Map<Integer, int[]> acc = new HashMap<>();
+        for (Map<Integer, Double> week : scoresByWeek(games).values()) {
+            double[] sorted = week.values().stream().mapToDouble(Double::doubleValue).sorted().toArray();
+            int n = sorted.length;
+            double med = n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+            for (Map.Entry<Integer, Double> me : week.entrySet()) {
+                int[] a = acc.computeIfAbsent(me.getKey(), k -> new int[3]);
+                int cmp = Double.compare(me.getValue(), med);
+                a[cmp > 0 ? 0 : cmp < 0 ? 1 : 2]++;
+            }
+        }
+        return toRecords(acc);
+    }
+
+    private static Map<Integer, WinLossTie> toRecords(Map<Integer, int[]> acc) {
+        Map<Integer, WinLossTie> out = new HashMap<>();
+        acc.forEach((r, a) -> out.put(r, new WinLossTie(a[0], a[1], a[2])));
         return out;
     }
 
@@ -243,9 +308,11 @@ public class ExpectedWinsService {
         LeagueRepository.LeagueRow league = found.league();
 
         List<Game> games = new ArrayList<>();
+        ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
         for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), bound)) {
             if (p.season() != league.season()) continue;
             if (p.aPoints() == null || p.bPoints() == null) continue;
+            if (!scored.isFinal(p.week())) continue; // stored-but-in-progress weeks are partial
             games.add(new Game(p.week(), p.aRosterId(), p.aPoints().doubleValue(),
                     p.bRosterId(), p.bPoints().doubleValue()));
         }
@@ -275,6 +342,8 @@ public class ExpectedWinsService {
         Map<Integer, Double> expected = expectedWins(games);
         Map<Integer, Double> actual = actualWins(games);
         Map<Integer, Double> sos = strengthOfSchedule(games);
+        Map<Integer, WinLossTie> allPlay = allPlay(games);
+        Map<Integer, WinLossTie> median = median(games);
 
         List<TeamRow> teams = new ArrayList<>();
         for (Integer rosterId : expected.keySet()) {
@@ -290,7 +359,9 @@ public class ExpectedWinsService {
                     round2(exp), act, round2(act - exp),
                     round2(sos.getOrDefault(rosterId, 0.0)),
                     swings.isEmpty() ? LuckSource.CONSISTENT_OPPONENT_SCORING : LuckSource.SWING_WEEKS,
-                    swings));
+                    swings,
+                    allPlay.getOrDefault(rosterId, new WinLossTie(0, 0, 0)),
+                    median.getOrDefault(rosterId, new WinLossTie(0, 0, 0))));
         }
         teams.sort(Comparator.comparingDouble(TeamRow::winsAboveExpected).reversed()
                 .thenComparingInt(TeamRow::rosterId));

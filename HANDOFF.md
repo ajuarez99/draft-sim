@@ -1,5 +1,52 @@
 # Ball Knowers — handoff
 
+**2026-10-01, branch `013-fan-first-redesign` (worktree `.claude/worktrees/013-fan-first-redesign`,
+off `origin/main` `f684189`): built and verified locally, committed on the branch, not pushed, not
+deployed.** `specs/013-fan-first-redesign/` is the brief. `build-notes.md` there records every measured
+number and every correction; `claude/design-review-fan-first.md` is the design source.
+
+**What it is.** A fan-first redesign of every page, for both sports, at 1440 / 768 / 375:
+- **Look:** two surfaces instead of nested boxes; one-sentence takeaway subtitles with the method under
+  "How this works"; one meaning per color (crimson = you, lime `--volt` = the page's one primary action,
+  `--up`/`--down` = better/worse, always with a sign or word); tabular sans numbers instead of monospace.
+- **Navigation:** grouped This week / The season / Draft / History, with fan names (Luck, Bench points,
+  Team strength, Playoff odds, Awards, Standings). Old names still work in jump-to, and **no URL changed**.
+- **New League home** (`/leagues/:id`): your record, standings position and latest matchup first.
+- **Weekly report:** your matchup leads as a scoreboard, with a week stepper.
+- **Player photos and logos** everywhere players appear, plus a tiered best-available panel in all three draft rooms.
+- **Grades and verdicts:** rank-based letter grades with an "early" caveat; a steals & reaches board built on
+  **draft-time** ADP; archetypes on the scouting report.
+- **Records:** record vs all and vs the weekly median (final weeks only).
+
+**Backend:** additive fields only (canCommission + isMe on history, isMe on weekly sides, adpAtDraft on real
+picks, allPlay/median/early on expected wins, grade/gradesEarly/earlyThresholdWeeks, health gradesLoaded),
+a `draftsim.grades` block in `weights.yml` (labelled arbitrary; missing → null grades, never a failed
+startup), and one `SeasonWindow.EARLY_THRESHOLD_WEEKS`. There's no migration and no new endpoint.
+**Deploy the backend before the frontend.** Otherwise a new frontend hides History's Compute even from the commissioner.
+
+**Behaviour change to know:** expected wins (Luck page, standings columns) now counts **final weeks only**.
+Before, a live week's partial score counted as a real win. Sleeper's W-L can include a week this app hasn't
+marked final yet, so the standings headers name their span ("2 final wks").
+
+**Verified (measured, local):** 25 routes × 3 sizes = 75 loads, with nesting depth ≤ 2, no sideways
+scroll, no broken images and no garbled text. All 488 inventoried caveats are mapped (none dropped). Web 923/923,
+backend 965 tests with 0 skipped. Simulator skeleton at 242 ms. Grades, all-play, isMe and draft-time ADP were
+checked against real league data, and all-play records match ffwrapped's exactly.
+
+**Not verified:** production/Railway (not deployed); contrast with a browser tool (computed from OKLCH only);
+History's Compute as seen by a commissioner live (no local league needed it; covered by a unit test).
+
+**Open follow-ups (deliberately out of scope):**
+- The reversal-round setting can be changed by any league member.
+- History's backfill is hidden in the UI but not gated on the server.
+- Week 3 is still not marked final after Sleeper moved to week 4 (finality lag, spec 009 territory).
+- Bench-point grades are tight mid-table (0.934 → A-, 0.918 → B-). That's Allan's call once a full season is in.
+- Whether Sleeper flags co-commissioners is unverified.
+- Each history request reads the managers table a few extra times (small table).
+
+---
+
+
 **2026-09-30, branch `012-draft-pick-insight` (worktree
 `.claude/worktrees/012-draft-pick-insight`, off local `main` `de1e1dd`): built and verified
 locally against a harness, not committed, not deployed.** `specs/012-draft-pick-insight/` is the

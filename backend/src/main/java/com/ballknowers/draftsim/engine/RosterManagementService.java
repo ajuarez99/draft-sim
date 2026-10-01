@@ -42,6 +42,7 @@ public class RosterManagementService {
     private final SportRulesRegistry rulesRegistry;
     private final RealizedLineupService realized;
     private final LeagueSeasonResolver seasons;
+    private final LetterGrades letterGrades;
 
     public RosterManagementService(LeagueRepository leagues,
                                    RosterWeekPointsRepository weekPoints,
@@ -50,7 +51,8 @@ public class RosterManagementService {
                                    LeagueMemberRepository members,
                                    SportRulesRegistry rulesRegistry,
                                    RealizedLineupService realized,
-                                   LeagueSeasonResolver seasons) {
+                                   LeagueSeasonResolver seasons, LetterGrades letterGrades) {
+        this.letterGrades = letterGrades;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
         this.rosterSeasons = rosterSeasons;
@@ -75,7 +77,9 @@ public class RosterManagementService {
      */
     public record TeamRow(int rosterId, Long managerId, String teamName, String username, String avatarId,
                           double totalPoints, double potentialPoints, Double efficiency,
-                          int weeksCounted, List<Integer> weeksExcluded) {}
+                          int weeksCounted, List<Integer> weeksExcluded,
+                          /** Spec 013 T074: letter for the efficiency rank; null with no efficiency or no cutoffs. */
+                          String grade) {}
 
     /**
      * @param available false when the league has no scored weeks at all. The
@@ -214,8 +218,18 @@ public class RosterManagementService {
                     avatarByRoster.get(rosterId),
                     round2(total), round2(potential), efficiency,
                     countedByRoster.getOrDefault(rosterId, 0),
-                    excludedByRoster.getOrDefault(rosterId, List.of())));
+                    excludedByRoster.getOrDefault(rosterId, List.of()),
+                    null));
         }
+        // Spec 013 T074: rank by efficiency descending; a null efficiency is not ranked, so no grade.
+        Map<TeamRow, Integer> efficiencyRank = LetterGrades.ranksDescending(
+                teams, t -> t.efficiency(), t -> t.efficiency() != null);
+        int graded = efficiencyRank.size();
+        teams.replaceAll(t -> efficiencyRank.containsKey(t)
+                ? new TeamRow(t.rosterId(), t.managerId(), t.teamName(), t.username(), t.avatarId(),
+                        t.totalPoints(), t.potentialPoints(), t.efficiency(), t.weeksCounted(), t.weeksExcluded(),
+                        letterGrades.grade(efficiencyRank.get(t), graded))
+                : t);
         teams.sort(Comparator.comparingDouble(TeamRow::totalPoints).reversed()
                 .thenComparingInt(TeamRow::rosterId));
 

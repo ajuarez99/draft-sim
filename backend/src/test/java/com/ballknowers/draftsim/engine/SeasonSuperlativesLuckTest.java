@@ -24,7 +24,8 @@ class SeasonSuperlativesLuckTest {
     private static ExpectedWinsService.TeamRow team(int rosterId, double winsAboveExpected) {
         return new ExpectedWinsService.TeamRow(rosterId, (long) rosterId, "Team " + rosterId, null, null,
                 1.0, 1.0 + winsAboveExpected, winsAboveExpected, 0.0,
-                ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING, List.of());
+                ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING, List.of(),
+                new ExpectedWinsService.WinLossTie(0, 0, 0), new ExpectedWinsService.WinLossTie(0, 0, 0));
     }
 
     // ------------------------------------------------------------- (a)

@@ -43,9 +43,9 @@ function manager(over: Partial<ManagerSummary> = {}): ManagerSummary {
 describe('league destinations', () => {
   it('offers a football league its pages, Analysis included', () => {
     const labels = leagueDestinations([draft()]).map((d) => d.label)
-    expect(labels).toContain('History')
+    expect(labels).toContain('Standings')
     expect(labels).toContain('Power rankings')
-    expect(labels).toContain('Analysis')
+    expect(labels).toContain('Team strength')
   })
 
   // The sport gate is read from the destination table, not restated here --
@@ -53,7 +53,7 @@ describe('league destinations', () => {
   // one of them is reading a second copy of the rule.
   it('never offers Analysis for a basketball league', () => {
     const rows = leagueDestinations([draft({ sport: 'nba', leagueName: 'Hoops' })])
-    expect(rows.map((d) => d.label)).not.toContain('Analysis')
+    expect(rows.map((d) => d.label)).not.toContain('Team strength')
     expect(rows.map((d) => d.label)).toContain('Power rankings')
   })
 
@@ -61,12 +61,12 @@ describe('league destinations', () => {
     expect(leagueDestinations([draft()]).map((d) => d.label)).not.toContain('Mock it')
   })
 
-  it('names the league on every row, so two leagues’ History are distinguishable', () => {
+  it('names the league on every row, so two leagues’ Standings are distinguishable', () => {
     const rows = leagueDestinations([
       draft({ sleeperLeagueId: 'L1', sleeperDraftId: 'D1', leagueName: 'Ball Knowers' }),
       draft({ id: 2, leagueId: 2, sleeperLeagueId: 'L2', sleeperDraftId: 'D2', leagueName: 'West Coast' }),
     ])
-    const histories = rows.filter((r) => r.label === 'History')
+    const histories = rows.filter((r) => r.label === 'Standings')
     expect(histories).toHaveLength(2)
     expect(histories.map((h) => h.context).sort()).toEqual(['Ball Knowers', 'West Coast'])
     for (const r of rows) expect(r.context).not.toBe('')
@@ -93,7 +93,7 @@ describe('league destinations', () => {
     const leagueRows = rows.filter((r) => r.href.startsWith('/leagues/'))
     expect(leagueRows.length).toBeGreaterThan(5)
     for (const r of leagueRows) {
-      expect(r.href, r.label).toMatch(/^\/leagues\/L26\//)
+      expect(r.href, r.label).toMatch(/^\/leagues\/L26(\/|$)/)
     }
   })
 
@@ -182,8 +182,23 @@ describe('searching', () => {
 
   it('matches a league and a page together', () => {
     const hits = searchDestinations(index, 'west coast history')
-    expect(hits[0].label).toBe('History')
+    expect(hits[0].label).toBe('Standings')
     expect(hits[0].context).toBe('West Coast Fantasy')
+  })
+
+  // specs/013 US3: pages were renamed for fans; the old names still find them.
+  it('finds a renamed page by its former name', () => {
+    const lookup = (q: string) => searchDestinations(index, q).map((h) => h.label)
+    expect(lookup('expected wins')).toContain('Luck')
+    expect(lookup('season forecast')).toContain('Playoff odds')
+    expect(lookup('roster management')).toContain('Bench points')
+    expect(lookup('weekly report')).toContain('Matchups & awards')
+    expect(lookup('superlatives')).toContain('Awards')
+    expect(lookup('analysis')).toContain('Team strength')
+  })
+
+  it('finds a page by its new name', () => {
+    expect(searchDestinations(index, 'luck').map((h) => h.label)).toContain('Luck')
   })
 
   it('finds nothing for a query that matches nothing', () => {

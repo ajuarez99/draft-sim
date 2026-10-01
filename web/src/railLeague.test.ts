@@ -23,6 +23,7 @@ describe('leagueRefFromPath', () => {
   })
 
   it.each([
+    ['/leagues/999', '999'],
     ['/leagues/999/history', '999'],
     ['/leagues/999/power', '999'],
     // The dev-only self-check harness hangs off /power; it is still that
@@ -45,10 +46,6 @@ describe('leagueRefFromPath', () => {
     ['/mock/new'],
     ['/mock/4'],
     ['/nonsense'],
-    // Not a route the app has -- and matching it would put a league's menu on
-    // the "Nothing here" fallback, which is the one screen that should only
-    // offer the way out.
-    ['/leagues/999'],
     ['/drafts'],
   ])('has no league context on %s', (path) => {
     expect(leagueRefFromPath(path)).toBeNull()

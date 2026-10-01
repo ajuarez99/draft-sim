@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { crestLetter, hueForName } from '../hue'
 import {
+  DESTINATION_GROUPS,
   destinationFromPath,
   destinationsFor,
+  destinationsInGroup,
+  type DestinationGroup,
   LEAGUE_DESTINATIONS,
   labelOf,
   type DestinationKey,
@@ -15,6 +18,7 @@ import type { RailLeague } from '../railLeague'
 import { getLeagueRefresh, refreshLeague, type DraftSummary, type RefreshStatus } from '../api'
 import { useBumpLeagueDataVersion } from '../leagueDataVersion'
 import { relativeTime } from '../relativeTime'
+import { useNarrow } from '../useNarrow'
 import { laneOverflow, type LaneOverflow } from '../railLane'
 
 type Props = {
@@ -129,14 +133,37 @@ export function refreshLine(status: RefreshStatus | null, now: Date = new Date()
   }
 }
 
+const GROUP_STATE_KEY = 'bk.rail.groups.v1'
+type GroupState = Partial<Record<DestinationGroup, boolean>>
+
+/** Per-viewer open/closed state of the rail groups. Missing or unreadable
+ *  storage means "everything expanded", which is the default anyway. */
+function readGroupState(): GroupState {
+  try {
+    const raw = window.localStorage.getItem(GROUP_STATE_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    return parsed && typeof parsed === 'object' ? (parsed as GroupState) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeGroupState(state: GroupState) {
+  try {
+    window.localStorage.setItem(GROUP_STATE_KEY, JSON.stringify(state))
+  } catch {
+    // private window or blocked storage: the toggle still works for this visit
+  }
+}
+
 /**
  * Where switching to `target` should land you, given where you are now.
  *
  * Keeps the page you were on when the target has it -- another year of the same
  * league, or another league. When it does not (Analysis is football-only; Follow
  * live exists only while a draft is running), the fallback depends on what kind
- * of page you were on: a league page lands on its History, and anything else on
- * '/'. A draft page lands on the target's board, and so does no page at all
+ * of page you were on: a league page lands on League home (specs/013), and
+ * anything else on '/'. A draft page lands on the target's board, and so does no page at all
  * (`current === null`): a hinted room (a mock, a manager's history) is inside a
  * league without being on one of its pages, and falling back to History there
  * pointed every year in the flyout at the same URL. The board is the page that
@@ -154,7 +181,7 @@ export function switchTarget(current: DestinationKey | null, target: LeagueConte
   const wasDraftPage = current
     ? LEAGUE_DESTINATIONS.find((d) => d.key === current)?.idKind === 'draft'
     : true
-  const fallback = offered.find((d) => d.key === (wasDraftPage ? 'board' : 'history'))
+  const fallback = offered.find((d) => d.key === (wasDraftPage ? 'board' : 'home'))
   return fallback ? fallback.href(target) : '/'
 }
 
@@ -307,6 +334,30 @@ export default function LeagueRailSection({
   const crest = crestLetter(d.leagueName)
 
   const destinations = destinationsFor(league)
+  const phone = useNarrow() // the phone lane: every group expanded (spec 013)
+  const [groupState, setGroupState] = useState<GroupState>(readGroupState)
+  const currentGroup = destinations.find((x) => x.key === currentKey)?.group ?? null
+
+  // Landing on a page opens the group it lives in, so the current row is never
+  // hidden behind a heading the viewer collapsed earlier.
+  useEffect(() => {
+    if (!currentGroup) return
+    setGroupState((prev) => {
+      if (prev[currentGroup] !== false) return prev
+      const next = { ...prev, [currentGroup]: true }
+      writeGroupState(next)
+      return next
+    })
+  }, [currentGroup, pathname])
+
+  function toggleGroup(g: DestinationGroup) {
+    setGroupState((prev) => {
+      const next = { ...prev, [g]: prev[g] === false }
+      writeGroupState(next)
+      return next
+    })
+  }
+
   const boardHref = destinations.find((x) => x.key === 'board')?.href(league) ?? '/'
 
   function rowFor(dest: LeagueDestination) {
@@ -488,7 +539,38 @@ export default function LeagueRailSection({
           data-overflow-start={overflow.start ? 'true' : undefined}
           data-overflow-end={overflow.end ? 'true' : undefined}
         >
-          {destinations.map(rowFor)}
+          {DESTINATION_GROUPS.map((g) => {
+            const rows = destinationsInGroup(destinations, g.key)
+            if (rows.length === 0) return null
+            // League home is one row and needs no heading.
+            if (g.heading === null) return <Fragment key={g.key}>{rows.map(rowFor)}</Fragment>
+            // A phone has no room for a second tap, and a collapsed desktop rail
+            // has no room for a heading: both show every row.
+            const alwaysOpen = phone || collapsed
+            const open = alwaysOpen || groupState[g.key] !== false
+            return (
+              <div key={g.key} className="app-rail-group" role="group" aria-label={g.heading} data-open={open}>
+                {alwaysOpen ? (
+                  <span className="app-rail-group-head static" aria-hidden="true">
+                    {g.heading}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="app-rail-group-head"
+                    aria-expanded={open}
+                    onClick={() => toggleGroup(g.key)}
+                  >
+                    <span>{g.heading}</span>
+                    <span className="app-rail-group-caret" aria-hidden="true">
+                      {open ? '▾' : '▸'}
+                    </span>
+                  </button>
+                )}
+                {open && rows.map(rowFor)}
+              </div>
+            )
+          })}
         </div>
         {/* Phone only (CSS). The lane hides pages off its right edge; this is
             the chip that is always on screen and lists all of them. */}

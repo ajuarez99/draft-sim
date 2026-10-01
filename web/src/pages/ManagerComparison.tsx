@@ -41,7 +41,7 @@ export default function ManagerComparison() {
   if (error) {
     return (
       <div className="content">
-        <section className="panel">
+        <section className="section">
           <div className="error">{error}</div>
         </section>
       </div>
@@ -51,7 +51,7 @@ export default function ManagerComparison() {
   if (!data) {
     return (
       <div className="content">
-        <section className="panel">
+        <section className="section">
           <p className="muted small">Loading comparison…</p>
         </section>
       </div>
@@ -82,7 +82,7 @@ export default function ManagerComparison() {
       {/* US4.3: never a bare 0-0. Two managers who have never shared a league
           get an explicit reason instead of an empty panel that looks broken. */}
       {data.sharedNothing ? (
-        <section className="panel">
+        <section className="section">
           <p className="muted">
             {aName} and {bName} have never shared a league season in either sport -- there is nothing to compare.
           </p>
@@ -99,7 +99,7 @@ export default function ManagerComparison() {
 function SportComparison({ sport, aName, bName }: { sport: VersusSport; aName: string; bName: string }) {
   const games = sport.aWins + sport.bWins + sport.ties
   return (
-    <section className="panel">
+    <section className="section">
       <div className="panel-head">
         <span className={`sport-pill ${sport.sport}`}>{sport.sport.toUpperCase()}</span>
         <span className="versus-record mono">

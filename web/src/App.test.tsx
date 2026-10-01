@@ -74,7 +74,7 @@ describe('App sign-out gating', () => {
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
-    expect(screen.getByRole('heading', { name: /who are you\?/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/your sleeper username/i)).toBeInTheDocument()
     // Regex, not the string '/' -- toHaveTextContent does a substring match,
     // so the plain string would also pass against '/leagues/1/power' and this
@@ -89,7 +89,7 @@ describe('App sign-out gating', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: /who are you\?/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
   })
 
   it('a junk path while signed out shows the username screen, not the "Nothing here" fallback', () => {
@@ -99,7 +99,7 @@ describe('App sign-out gating', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: /who are you\?/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
     expect(screen.queryByText(/nothing here/i)).not.toBeInTheDocument()
   })
 

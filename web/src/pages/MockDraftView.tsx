@@ -15,6 +15,7 @@ import DraftBoard from '../components/DraftBoard'
 import TurnIndicator from '../components/TurnIndicator'
 import OnTheClockPickInput from '../components/OnTheClockPickInput'
 import PickFeed from '../components/PickFeed'
+import AvailabilityPanel from '../components/AvailabilityPanel'
 import { LoadingScreen } from '../components/Skeleton'
 import { useRailLeagueHint } from '../appSlots'
 
@@ -153,7 +154,7 @@ export default function MockDraftView() {
           {state.isUsersTurn && !complete && (
             <div className="controls-inline">
               <button className="start-button" onClick={() => setPickerOpen(true)} disabled={submitting}>
-                {submitting ? 'Submitting…' : 'Make your pick'}
+                {submitting ? 'Submitting…' : 'Pick from full list'}
               </button>
             </div>
           )}
@@ -171,6 +172,21 @@ export default function MockDraftView() {
               reversalRound={state.reversalRound}
               hideProvenanceDots
             />
+            {/* On the clock: who is best available, by tier. Mock drafts run no
+                simulation, so there are no survival numbers, and the panel says
+                so instead of leaving a gap. The picker stays reachable as the
+                full list. */}
+            {state.isUsersTurn && !complete && (
+              <AvailabilityPanel
+                players={state.available}
+                noAvailabilityReason="Availability needs a simulation, which mock drafts don't run."
+                recentPicks={board.map((p) => p.player)}
+                myPicks={state.myPicks.filter((p) => p >= state.currentPickNo)}
+                teams={state.teams}
+                started
+                sport={state.sport}
+              />
+            )}
           </div>
         </section>
       </div>

@@ -21,10 +21,12 @@ vi.mock('react-router-dom', () => ({
 const getLeagueHistory = vi.fn()
 const ingestLeagueHistory = vi.fn()
 const backfillFinalRanks = vi.fn()
+const getExpectedWins = vi.fn()
 vi.mock('../api', () => ({
   getLeagueHistory: (...args: unknown[]) => getLeagueHistory(...args),
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
   backfillFinalRanks: (...args: unknown[]) => backfillFinalRanks(...args),
+  getExpectedWins: (...args: unknown[]) => getExpectedWins(...args),
 }))
 
 function score(season: number, week: number, rosterId: number, points: number,
@@ -97,8 +99,9 @@ function standing(rosterId: number, rankStatus: RankStatus, finalRank: number | 
   }
 }
 
-function withStandings(rows: StandingRow[], season = 2025): LeagueHistoryData {
+function withStandings(rows: StandingRow[], season = 2025, canCommission?: boolean): LeagueHistoryData {
   const h = history()
+  if (canCommission !== undefined) h.canCommission = canCommission
   h.seasons = [{ season, leagueId: 5, sleeperLeagueId: 'L1', name: 'BK', standings: rows }]
   return h
 }
@@ -107,6 +110,8 @@ beforeEach(() => {
   getLeagueHistory.mockReset()
   ingestLeagueHistory.mockReset()
   backfillFinalRanks.mockReset()
+  getExpectedWins.mockReset()
+  getExpectedWins.mockRejectedValue(new Error('no expected wins in this test'))
 })
 
 describe('record book', () => {
@@ -333,12 +338,36 @@ describe('season final rank', () => {
   })
 
   /** FR-006: a finished, computable season gets the reason AND the control. */
-  it('offers a compute button for a finished season that was never computed', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024))
+  it('offers a compute button to a commissioner for a finished season that was never computed', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
     render(<LeagueHistory />)
 
     expect(await screen.findByText(/not computed yet/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /compute/i })).toBeTruthy()
+  })
+
+  /**
+   * spec 013 US2 (FR-011): the control is the commissioner's. False and a missing
+   * field (an older backend) both hide it; the page says what the cells wait on.
+   */
+  it.each([
+    ['false', false],
+    ['missing', undefined],
+  ])('hides Compute when canCommission is %s and says who computes ranks', async (_label, flag) => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, flag))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText(/not computed yet/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /compute/i })).toBeNull()
+    expect(screen.getByText('Final ranks appear once the commissioner computes them.')).toBeTruthy()
+  })
+
+  it('shows Compute, and not the non-commissioner message, when canCommission is true', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByRole('button', { name: /compute/i })).toBeTruthy()
+    expect(screen.queryByText(/appear once the commissioner computes them/i)).toBeNull()
   })
 
   /** Nothing to compute from -- the button would lie, so there isn't one. */
@@ -350,7 +379,11 @@ describe('season final rank', () => {
     expect(screen.queryByRole('button', { name: /compute/i })).toBeNull()
   })
 
-  /** SC-004 / FR-005: no rank cell is ever a bare dash with no explanation. */
+  /**
+   * SC-004 / FR-005: no rank cell is ever a bare dash with no explanation. An
+   * in-progress season's dash is explained once, in the section title (spec 013),
+   * and carries a title of its own; the other two states still say why in words.
+   */
   it('never renders an unexplained dash', async () => {
     getLeagueHistory.mockResolvedValue(
       withStandings([standing(1, 'IN_PROGRESS'), standing(2, 'NOT_COMPUTED'), standing(3, 'UNAVAILABLE')]),
@@ -360,11 +393,13 @@ describe('season final rank', () => {
     await screen.findByText(/season in progress/i)
     const cells = document.querySelectorAll('.rank-cell')
     expect(cells.length).toBe(3)
-    cells.forEach((c) => expect(c.textContent?.trim()).not.toBe('—'))
+    cells.forEach((c) => {
+      if (c.textContent?.trim() === '—') expect(c.getAttribute('title')).toMatch(/season in progress/i)
+    })
   })
 
   it('fires the backfill from the button and reloads, rather than printing an endpoint', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024))
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
     backfillFinalRanks.mockResolvedValue({ backfilled: [{ season: 2024, week: 24, entries: 12 }], skipped: [] })
     render(<LeagueHistory />)
 
@@ -374,5 +409,93 @@ describe('season final rank', () => {
 
     await waitFor(() => expect(backfillFinalRanks).toHaveBeenCalledWith('L1'))
     expect(document.body.textContent).not.toMatch(/POST \/api/)
+  })
+})
+
+// --- spec 013 US9: season label once, best/worst marks, expected-wins columns ---
+
+function ewTeam(rosterId: number, allPlay: [number, number, number], median: [number, number, number]) {
+  return {
+    rosterId, managerId: rosterId, teamName: `T${rosterId}`, username: `mgr${rosterId}`, avatarId: null,
+    expectedWins: 1, actualWins: 1, winsAboveExpected: 0, strengthOfSchedule: 0,
+    luckSource: 'CONSISTENT_OPPONENT_SCORING' as const, swingWeeks: [],
+    allPlay: { wins: allPlay[0], losses: allPlay[1], ties: allPlay[2] },
+    median: { wins: median[0], losses: median[1], ties: median[2] },
+  }
+}
+
+function ew(season: number) {
+  return {
+    available: true, season, sport: 'NFL', weeksScored: 3, early: true, leagueAveragePpg: 100,
+    teams: [ewTeam(1, [28, 5, 0], [3, 0, 0]), ewTeam(2, [8, 25, 0], [0, 3, 0])],
+  }
+}
+
+describe('standings: season in progress, marks and expected-wins columns', () => {
+  it('says "season in progress" exactly once for a 12-row season, in the section title', async () => {
+    const rows = Array.from({ length: 12 }, (_, i) => standing(i + 1, 'IN_PROGRESS'))
+    getLeagueHistory.mockResolvedValue(withStandings(rows, 2026))
+    render(<LeagueHistory />)
+
+    await screen.findByText(/season in progress/i)
+    expect(screen.getAllByText(/season in progress/i)).toHaveLength(1)
+    const heading = screen.getByRole('heading', { name: /2026/ })
+    expect(heading.textContent).toMatch(/season in progress/i)
+  })
+
+  it('renders the new columns, and fills them only where the expected-wins season matches', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2026))
+    getExpectedWins.mockReset()
+    getExpectedWins.mockResolvedValue(ew(2026))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText('28-5')).toBeTruthy()
+    expect(screen.getByText('8-25')).toBeTruthy()
+    // Median games only: 3-0, not added to the real 9-5 record.
+    expect(screen.getByText('3-0')).toBeTruthy()
+    // The span is named from the payload's final-week count (code-review fix pass).
+    expect(screen.getByRole("columnheader", { name: /^Record vs all \(\d+ final wks?\)$/ })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: /^Vs weekly median \(\d+ final wks?\)$/ })).toBeTruthy()
+  })
+
+  it('shows dashes when the expected-wins season differs from the row season', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025))
+    getExpectedWins.mockReset()
+    getExpectedWins.mockResolvedValue(ew(2026))
+    render(<LeagueHistory />)
+
+    await screen.findByText('Final ranks appear once the commissioner computes them.').catch(() => null)
+    await waitFor(() => expect(getExpectedWins).toHaveBeenCalled())
+    expect(screen.queryByText('28-5')).toBeNull()
+    expect(screen.queryByText('3-0')).toBeNull()
+    const cells = Array.from(document.querySelectorAll('tbody tr')).map((tr) => tr.querySelectorAll('td'))
+    expect(cells.length).toBe(2)
+    cells.forEach((tds) => {
+      expect(tds[tds.length - 1].textContent?.trim()).toBe('—')
+      expect(tds[tds.length - 2].textContent?.trim()).toBe('—')
+    })
+  })
+
+  it('marks best and worst with a glyph and a label, not colour alone, and none when level', async () => {
+    const a = standing(1, 'RANKED', 1, 17)
+    const b = standing(2, 'RANKED', 2, 17)
+    b.wins = 3; b.losses = 11
+    getLeagueHistory.mockResolvedValue(withStandings([a, b], 2025))
+    render(<LeagueHistory />)
+
+    await screen.findAllByRole('img', { name: 'Best in the league' })
+    // W: 9 best / 3 worst. L: 5 best / 11 worst. PF and PA are level in this fixture: no marks there.
+    expect(screen.getAllByRole('img', { name: 'Best in the league' })).toHaveLength(2)
+    expect(screen.getAllByRole('img', { name: 'Worst in the league' })).toHaveLength(2)
+    expect(screen.getAllByRole('img', { name: 'Best in the league' })[0].textContent).toBe('▲')
+  })
+
+  it('explains both expected-wins columns, including how ffwrapped differs', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17)], 2025))
+    render(<LeagueHistory />)
+
+    await screen.findByText('How this works')
+    expect(document.body.textContent).toMatch(/not.*added to the real W-L record/)
+    expect(document.body.textContent).toMatch(/ffwrapped's "Median record" does add them/)
   })
 })

@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import {
   backfillFinalRanks,
+  getExpectedWins,
   getLeagueHistory,
+  type ExpectedWins,
+  type ExpectedWinsTeam,
   ingestLeagueHistory,
   type LeagueHistory as LeagueHistoryData,
   type LeagueRecords,
@@ -18,6 +22,7 @@ import PersonName from '../components/PersonName'
 import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { extremes, type Extremes } from '../extremes'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -50,8 +55,8 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
 function RecordBook({ records }: { records: LeagueRecords }) {
   const hasScores = records.highestWeeks.length > 0 || records.lowestWeeks.length > 0
   return (
-    <section className="panel">
-      <h3 className="cond">Record book</h3>
+    <section className="section">
+      <h3 className="section-title">Record book</h3>
       {!hasScores ? (
         <p className="muted small">
           No weekly scores have been loaded for this league's seasons yet, so there are no records to show.
@@ -109,8 +114,8 @@ function RecordWho({ row }: { row: { rosterId: number; managerId: number | null;
 function MatchupMargins({ records }: { records: LeagueRecords }) {
   const has = records.closestMatchups.length > 0 || records.biggestBlowouts.length > 0
   return (
-    <section className="panel">
-      <h3 className="cond">Matchup margins</h3>
+    <section className="section">
+      <h3 className="section-title">Matchup margins</h3>
       {!has ? (
         <p className="muted small">
           {records.marginsUnavailableReason ??
@@ -172,8 +177,8 @@ function MarginGroup({ title, rows }: { title: string; rows: MarginRecord[] }) {
 function PointsLeaders({ records }: { records: LeagueRecords }) {
   const rows = records.pointsLeaders
   return (
-    <section className="panel">
-      <h3 className="cond">All-time points leaders</h3>
+    <section className="section">
+      <h3 className="section-title">All-time points leaders</h3>
       {rows.length === 0 ? (
         // Deliberately reworded rather than the RecordBook panel's identical
         // sentence: both panels are empty for the same underlying reason (no
@@ -224,8 +229,8 @@ function PointsLeaders({ records }: { records: LeagueRecords }) {
 function Streaks({ records }: { records: LeagueRecords }) {
   const rows = [...records.winStreaks, ...records.lossStreaks]
   return (
-    <section className="panel">
-      <h3 className="cond">Streaks</h3>
+    <section className="section">
+      <h3 className="section-title">Streaks</h3>
       {rows.length === 0 ? (
         <p className="muted small">
           {records.marginsUnavailableReason ??
@@ -297,10 +302,12 @@ function RankCell({
   row,
   onCompute,
   computing,
+  canCommission,
 }: {
   row: StandingRow
   onCompute: () => void
   computing: boolean
+  canCommission: boolean
 }) {
   if (row.rankStatus === 'RANKED' && row.finalRank != null) {
     return (
@@ -312,6 +319,11 @@ function RankCell({
   // An older server that does not send rankStatus at all -- the field is
   // optional on the wire because getManagerHistory reuses this row type.
   if (row.rankStatus == null) return <td className="mono rank-cell">—</td>
+  // spec 013: "season in progress" is said once, in the season's section title,
+  // not repeated in every row. The dash here is explained by that title.
+  if (row.rankStatus === 'IN_PROGRESS') {
+    return <td className="mono rank-cell" title="Season in progress">—</td>
+  }
   // RANKED with no rank means this roster is missing from an otherwise-present
   // snapshot, which is the same thing as having nothing to show for it.
   const status = row.rankStatus === 'RANKED' ? 'UNAVAILABLE' : row.rankStatus
@@ -321,7 +333,7 @@ function RankCell({
       {/* A button, never the endpoint printed for the reader to run -- the
           "Load past seasons" control below was written for exactly this
           reason and the pattern came straight back in new code once already. */}
-      {status === 'NOT_COMPUTED' && (
+      {status === 'NOT_COMPUTED' && canCommission && (
         <button className="action-button" onClick={onCompute} disabled={computing}>
           {computing ? 'Computing…' : 'Compute'}
         </button>
@@ -330,16 +342,76 @@ function RankCell({
   )
 }
 
+type Rec = { wins: number; losses: number; ties: number }
+
+function recText(r: Rec): string {
+  return r.ties > 0 ? `${r.wins}-${r.losses}-${r.ties}` : `${r.wins}-${r.losses}`
+}
+
+/** Win share with a tie as half a win; null with no games. */
+function recShare(r: Rec): number | null {
+  const g = r.wins + r.losses + r.ties
+  return g === 0 ? null : (r.wins + 0.5 * r.ties) / g
+}
+
+/**
+ * Best/worst marker: a tint (--up/--down) AND a glyph with a text label, so the
+ * colour is never the only signal (contracts/ui-rules.md, Color).
+ */
+function Mark({ value, ex }: { value: number | null | undefined; ex: Extremes }) {
+  if (ex == null || value == null) return null
+  if (value === ex.best) {
+    return <span role="img" aria-label="Best in the league" title="Best in the league" className="stand-mark best">▲</span>
+  }
+  if (value === ex.worst) {
+    return <span role="img" aria-label="Worst in the league" title="Worst in the league" className="stand-mark worst">▼</span>
+  }
+  return null
+}
+
 function StandingsTable({
   rows,
+  season,
+  expected,
   onCompute,
   computing,
+  canCommission,
 }: {
   rows: StandingRow[]
+  season: number
+  /** Expected-wins response, or null when unavailable. Used only where its own `season` equals this table's. */
+  expected: ExpectedWins | null
   onCompute: () => void
   computing: boolean
+  canCommission: boolean
 }) {
   const linkState = useLeagueLinkState()
+  // The expected-wins endpoint answers for ONE season (it may fall back from the
+  // one asked for). Its figures belong to that season only, so another season's
+  // table shows a dash rather than this season's numbers.
+  const teams = new Map<number, ExpectedWinsTeam>()
+  if (expected?.available && expected.season === season) {
+    for (const t of expected.teams) teams.set(t.rosterId, t)
+  }
+  // These two columns count FINAL weeks only (ExpectedWinsService); W-L is Sleeper's own
+  // and can already include a week this app hasn't marked final. Name the span so the
+  // two can't be read as covering the same games (spec 013 code-review fix pass).
+  const finalWeeks = teams.size > 0 ? expected?.weeksScored ?? null : null
+  const span = finalWeeks == null ? 'reg. season' : `${finalWeeks} final wk${finalWeeks === 1 ? '' : 's'}`
+  const exW = extremes(rows.map((r) => r.wins), true)
+  const exL = extremes(rows.map((r) => r.losses), false)
+  const exPF = extremes(rows.map((r) => r.pointsFor), true)
+  const exPA = extremes(rows.map((r) => r.pointsAgainst), false)
+  const allShare = (r: StandingRow) => {
+    const t = teams.get(r.rosterId)
+    return t?.allPlay ? recShare(t.allPlay) : null
+  }
+  const medShare = (r: StandingRow) => {
+    const t = teams.get(r.rosterId)
+    return t?.median ? recShare(t.median) : null
+  }
+  const exAll = extremes(rows.map(allShare), true)
+  const exMed = extremes(rows.map(medShare), true)
   return (
     <div className="table-wrap">
       <table className="standings">
@@ -353,10 +425,17 @@ function StandingsTable({
             <th className="mono">T</th>
             <th className="mono">PF</th>
             <th className="mono">PA</th>
+            <th className="mono" title="Regular season: each week's score against every other team's score that week">
+              Record vs all ({span})
+            </th>
+            <th className="mono" title="Regular season: each week's score against that week's median. Median games only, not added to the real record">
+              Vs weekly median ({span})
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => {
+            const t = teams.get(r.rosterId)
             return (
               <tr key={r.rosterId}>
                 <td>{r.champion && <span title="Champion">🏆</span>}</td>
@@ -374,12 +453,20 @@ function StandingsTable({
                     <span className="muted">roster {r.rosterId} (unowned)</span>
                   )}
                 </td>
-                <RankCell row={r} onCompute={onCompute} computing={computing} />
-                <td className="mono">{r.wins ?? '—'}</td>
-                <td className="mono">{r.losses ?? '—'}</td>
+                <RankCell row={r} onCompute={onCompute} computing={computing} canCommission={canCommission} />
+                <td className="mono">{r.wins ?? '—'}<Mark value={r.wins} ex={exW} /></td>
+                <td className="mono">{r.losses ?? '—'}<Mark value={r.losses} ex={exL} /></td>
                 <td className="mono">{r.ties ?? '—'}</td>
-                <td className="mono">{r.pointsFor?.toFixed(2) ?? '—'}</td>
-                <td className="mono">{r.pointsAgainst?.toFixed(2) ?? '—'}</td>
+                <td className="mono">{r.pointsFor?.toFixed(2) ?? '—'}<Mark value={r.pointsFor} ex={exPF} /></td>
+                <td className="mono">{r.pointsAgainst?.toFixed(2) ?? '—'}<Mark value={r.pointsAgainst} ex={exPA} /></td>
+                <td className="mono">
+                  {t?.allPlay ? recText(t.allPlay) : '—'}
+                  <Mark value={allShare(r)} ex={exAll} />
+                </td>
+                <td className="mono">
+                  {t?.median ? recText(t.median) : '—'}
+                  <Mark value={medShare(r)} ex={exMed} />
+                </td>
               </tr>
             )
           })}
@@ -395,10 +482,13 @@ export default function LeagueHistory() {
   const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   const [computing, setComputing] = useState(false)
+  const [expected, setExpected] = useState<ExpectedWins | null>(null)
   // Bumped by the rail when this league's background refresh finishes
   // (specs/009-auto-data-refresh): refetch, but keep what is on screen.
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
   const loadedFor = useRef<string | null>(null)
+  // Sleeper's own commissioner flag for THIS league, from the payload. Never inferred client-side.
+  const canCommission = history?.canCommission === true
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -410,6 +500,20 @@ export default function LeagueHistory() {
     getLeagueHistory(sleeperLeagueId)
       .then(setHistory)
       .catch((e) => fail(e))
+    // Optional extra columns: a failure here leaves them as dashes and never
+    // blocks the standings themselves.
+    let cancelled = false
+    ;(async () => {
+      try {
+        const ew = await getExpectedWins(sleeperLeagueId)
+        if (!cancelled) setExpected(ew)
+      } catch {
+        if (!cancelled) setExpected(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [sleeperLeagueId, dataVersion])
 
   // Backs the error state's own button. Same call the page used to print as a
@@ -454,12 +558,12 @@ export default function LeagueHistory() {
           `Power rankings →` chip beside it -- the chip moved to the rail
           (Phase 3) and the title out of the box (Phase 4). */}
       <PageHeader
-        eyebrow="League"
+        eyebrow="Standings"
         title={history?.seasons[0]?.name ?? 'League history'}
         sub="Standings as Sleeper reports them — wins, losses, points, the champion. What this app thinks about a draft (reach, value) lives on a manager's own history page, kept visually separate from what actually happened."
       />
 
-      <section className="panel">
+      <section className="section">
 
         {/* This used to print `POST /api/ingest/league-history/{id}` for the
             reader to run themselves. Step 3 of the design review removed
@@ -494,7 +598,13 @@ export default function LeagueHistory() {
         {history &&
           history.seasons.map((s) => (
             <div key={s.leagueId} className="history-season">
-              <h3 className="cond">{s.season}</h3>
+              <h3 className="section-title">
+                {s.season}
+                {/* Said once per season, here, rather than in every row's rank cell. */}
+                {s.standings.some((r) => r.rankStatus === 'IN_PROGRESS') && (
+                  <span className="muted stand-inprogress"> · season in progress</span>
+                )}
+              </h3>
               {/* A season with no standings rendered its headers over nothing
                   -- verified on the 2026 season, which is ingested but hasn't
                   been played. `seasons.length === 0` was guarded; this wasn't. */}
@@ -503,10 +613,57 @@ export default function LeagueHistory() {
                   No standings for {s.season} yet — Sleeper reports them once the season is under way.
                 </p>
               ) : (
-                <StandingsTable rows={s.standings} onCompute={computeFinalRanks} computing={computing} />
+                <>
+                  {/* Not a commissioner: the Compute button is hidden (the server
+                      would refuse it anyway), so say once per season what the
+                      "not computed yet" cells are waiting on. A missing
+                      canCommission (older backend) counts as false. */}
+                  {!canCommission && s.standings.some((r) => r.rankStatus === 'NOT_COMPUTED') && (
+                    <p className="muted small">Final ranks appear once the commissioner computes them.</p>
+                  )}
+                  <StandingsTable
+                    rows={s.standings}
+                    season={s.season}
+                    expected={expected}
+                    onCompute={computeFinalRanks}
+                    computing={computing}
+                    canCommission={canCommission}
+                  />
+                </>
               )}
             </div>
           ))}
+
+        {history && history.seasons.length > 0 && (
+          <HowThisWorks>
+            <p>
+              Standings as Sleeper reports them — wins, losses, points, the champion. What this app
+              thinks about a draft (reach, value) lives on a manager's own history page, kept
+              visually separate from what actually happened.
+            </p>
+            <p>
+              <strong>Record vs all (reg. season)</strong> plays each week's score against every other
+              team's score that week, regular season only. In a 12-team league that is 11 games a week.
+              It matches ffwrapped's "Record vs all".
+            </p>
+            <p>
+              <strong>Vs weekly median (reg. season)</strong> counts one game a week: above that week's
+              median score is a win, below it a loss (with an odd number of teams, the median team ties).
+              Those games are kept apart and are <em>not</em> added to the real W-L record. ffwrapped's
+              "Median record" does add them, so the same team can read 3-0 here and 6-0 there (3 real
+              wins plus 3 median wins). Neither is wrong; they count different things.
+            </p>
+            <p>
+              Both columns count only weeks this app has marked final, so the header names how many.
+              Sleeper's W-L can already include a week that is over on Sleeper but not yet marked final
+              here, which is why the two can cover a different number of games for a day or two.
+              Both columns come from the Luck page's calculation, which covers one season at a time.
+              Any season it did not compute shows a dash. In each number column, ▲ marks the best value
+              and ▼ the worst (fewest losses and points against count as best); nothing is marked when
+              every team is level.
+            </p>
+          </HowThisWorks>
+        )}
       </section>
 
       {history && <RecordBook records={history.records} />}

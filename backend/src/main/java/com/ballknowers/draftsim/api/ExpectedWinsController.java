@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.ExpectedWinsService;
+import com.ballknowers.draftsim.engine.SeasonWindow;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,6 +52,8 @@ public class ExpectedWinsController {
         out.put("requestedSeason", r.requestedSeason());
         out.put("sport", r.sport().code());
         out.put("weeksScored", r.weeksScored());
+        // Spec 013: the page reads "early" from here rather than keeping its own copy of the threshold.
+        out.put("early", r.weeksScored() < SeasonWindow.EARLY_THRESHOLD_WEEKS);
         out.put("leagueAveragePpg", r.leagueAveragePpg());
         if (!r.available()) {
             out.put("reason", r.reason());
@@ -84,9 +87,20 @@ public class ExpectedWinsController {
                 swings.add(sw);
             }
             row.put("swingWeeks", swings);
+            // Spec 013 T082: regular-season whole-number records, always present for an available team.
+            row.put("allPlay", wlt(t.allPlay()));
+            row.put("median", wlt(t.median()));
             teams.add(row);
         }
         out.put("teams", teams);
         return out;
+    }
+
+    private static Map<String, Object> wlt(ExpectedWinsService.WinLossTie r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("wins", r.wins());
+        m.put("losses", r.losses());
+        m.put("ties", r.ties());
+        return m;
     }
 }

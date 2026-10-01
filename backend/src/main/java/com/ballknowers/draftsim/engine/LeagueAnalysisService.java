@@ -59,13 +59,15 @@ public class LeagueAnalysisService {
     private final SleeperClient sleeper;
     private final SportRulesRegistry rulesRegistry;
     private final LeagueMemberRepository members;
+    private final LetterGrades letterGrades;
 
     public LeagueAnalysisService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                  RosterWeekPointsRepository weekPoints, PlayerProjectionRepository projections,
                                  PlayerRepository players, ManagerRepository managers,
                                  LeagueMatchupRepository matchupRepo,
                                  SleeperClient sleeper, SportRulesRegistry rulesRegistry,
-                                 LeagueMemberRepository members) {
+                                 LeagueMemberRepository members, LetterGrades letterGrades) {
+        this.letterGrades = letterGrades;
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.weekPoints = weekPoints;
@@ -101,11 +103,17 @@ public class LeagueAnalysisService {
      * broken feature, not as "too early to say".
      */
     public record RankingScores(boolean available, String reason, String formula,
-                                int weeksScored, int weeksRequired, List<ScoreEntry> entries) {}
+                                int weeksScored, int weeksRequired, List<ScoreEntry> entries,
+                                /** Spec 013: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. Grades are badged early while true. */
+                                boolean gradesEarly,
+                                /** Spec 013: SeasonWindow.EARLY_THRESHOLD_WEEKS, so the page can state the rule without a copy. */
+                                int earlyThresholdWeeks) {}
 
     public record ScoreEntry(int rank, int rosterId, Long managerId, String manager, String avatarId,
                              double score, double raw, double avgWeekly, double high, double low,
-                             double winPct, int wins, int losses, int ties) {}
+                             double winPct, int wins, int losses, int ties,
+                             /** Spec 013: letter for this rank, null when no cutoffs are configured. */
+                             String grade) {}
 
     public record Projections(boolean available, String reason, List<String> positionGroups,
                               List<RosterProjection> rosters) {}
@@ -322,7 +330,8 @@ public class LeagueAnalysisService {
 
     // ---- piece 1 ----
 
-    private RankingScores rankingScores(LeagueRepository.LeagueRow league, int weeksScored, int lastScored) {
+    /* package-private so LeagueAnalysisServiceTest can pin the grade fields without a database. */
+    RankingScores rankingScores(LeagueRepository.LeagueRow league, int weeksScored, int lastScored) {
         String formula = "((avgWeeklyScore * 6) + ((highScore + lowScore) * 2) + (winPct * 400)) / 10";
         if (weeksScored < MIN_SCORED_WEEKS) {
             String reason = weeksScored == 0
@@ -331,7 +340,8 @@ public class LeagueAnalysisService {
                             + " scored. The formula weighs a team's best and worst week against its average,"
                             + " which cannot mean anything until those are three different numbers;"
                             + " " + MIN_SCORED_WEEKS + " weeks are needed.";
-            return new RankingScores(false, reason, formula, weeksScored, MIN_SCORED_WEEKS, List.of());
+            return new RankingScores(false, reason, formula, weeksScored, MIN_SCORED_WEEKS, List.of(),
+                    SeasonWindow.isEarly(weeksScored), SeasonWindow.EARLY_THRESHOLD_WEEKS);
         }
 
         Map<Integer, List<Double>> weeklyByRoster = new HashMap<>();
@@ -362,10 +372,11 @@ public class LeagueAnalysisService {
             double winPct = games == 0 ? 0 : (rec[0] + rec[2] / 2.0) / games;
             raw.add(new ScoreEntry(0, e.getKey(), managerIds.get(e.getKey()), managerNames.get(e.getKey()),
                     avatars.get(e.getKey()), 0, rawScore(avg, high, low, winPct), avg, high, low, winPct,
-                    rec[0], rec[1], rec[2]));
+                    rec[0], rec[1], rec[2], null));
         }
 
-        return new RankingScores(true, null, formula, weeksScored, MIN_SCORED_WEEKS, normalise(raw));
+        return new RankingScores(true, null, formula, weeksScored, MIN_SCORED_WEEKS, normalise(raw),
+                SeasonWindow.isEarly(weeksScored), SeasonWindow.EARLY_THRESHOLD_WEEKS);
     }
 
     /**
@@ -381,7 +392,7 @@ public class LeagueAnalysisService {
      * league whose teams are all identical has no spread to scale by and gets
      * a flat 50 rather than a division by zero.
      */
-    private static List<ScoreEntry> normalise(List<ScoreEntry> raw) {
+    List<ScoreEntry> normalise(List<ScoreEntry> raw) {
         if (raw.isEmpty()) return List.of();
         double mean = raw.stream().mapToDouble(ScoreEntry::raw).average().orElse(0);
         double maxDev = raw.stream().mapToDouble(e -> Math.abs(e.raw() - mean)).max().orElse(0);
@@ -392,7 +403,7 @@ public class LeagueAnalysisService {
             score = Math.max(1, Math.min(100, score));
             scored.add(new ScoreEntry(0, e.rosterId(), e.managerId(), e.manager(), e.avatarId(),
                     round(score, 1), round(e.raw(), 2), round(e.avgWeekly(), 2), round(e.high(), 2),
-                    round(e.low(), 2), round(e.winPct(), 4), e.wins(), e.losses(), e.ties()));
+                    round(e.low(), 2), round(e.winPct(), 4), e.wins(), e.losses(), e.ties(), null));
         }
         List<ScoreEntry> ranked = new ArrayList<>();
         for (Ranker.Ranked<ScoreEntry> r : Ranker.rank(scored,
@@ -400,7 +411,9 @@ public class LeagueAnalysisService {
             ScoreEntry e = r.item();
             ranked.add(new ScoreEntry(r.rank(), e.rosterId(), e.managerId(), e.manager(), e.avatarId(),
                     e.score(), e.raw(), e.avgWeekly(), e.high(), e.low(), e.winPct(),
-                    e.wins(), e.losses(), e.ties()));
+                    e.wins(), e.losses(), e.ties(),
+                    // Spec 013 T075: rank by composite score, tied ranks share a grade.
+                    letterGrades.grade(r.rank(), scored.size())));
         }
         return ranked;
     }

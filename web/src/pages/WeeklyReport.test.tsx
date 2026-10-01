@@ -70,7 +70,7 @@ describe('Weekly report', () => {
 
     // Scoped to the matchups panel: a team that also won an award appears
     // twice on this page, which is realistic rather than a bug.
-    const heading = await screen.findByRole('heading', { name: /matchups/i })
+    const heading = await screen.findByRole('heading', { name: /week [0-9]+ matchups/i })
     const panel = heading.closest('section') as HTMLElement
 
     expect(within(panel).getByText('Dart has hit anotha Bower')).toBeInTheDocument()
@@ -158,6 +158,7 @@ describe('Weekly report', () => {
 /*
  * claude/audit-2026-09-28/10: the page opens on the latest scored week, keeps
  * the pick in the URL, and cannot be pushed past what has been scored.
+ * 013 US5: the numeric input became a ‹ Week N › stepper.
  */
 describe('Weekly report week selection', () => {
   beforeEach(() => {
@@ -165,13 +166,15 @@ describe('Weekly report week selection', () => {
     lastSearch = ''
   })
 
-  const weekInput = () => screen.findByLabelText('Week') as Promise<HTMLInputElement>
+  const weekLabel = async () => (await screen.findByText(/^Week \d+$/, { selector: '.wr-stepper-label' })).textContent
+  const prev = () => screen.findByRole('button', { name: 'Previous week' }) as Promise<HTMLButtonElement>
+  const next = () => screen.findByRole('button', { name: 'Next week' }) as Promise<HTMLButtonElement>
 
   it('opens on the latest scored week when the URL names none', async () => {
     getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2 }))
     renderPage()
 
-    expect((await weekInput()).value).toBe('2')
+    expect(await weekLabel()).toBe('Week 2')
     // 0 is the "latest" request; the page never asks for week 1 by default.
     expect(getWeeklyReport).toHaveBeenCalledWith('L1', 0)
     expect(await screen.findByText('Week 2 matchups')).toBeInTheDocument()
@@ -181,39 +184,40 @@ describe('Weekly report week selection', () => {
     getWeeklyReport.mockResolvedValue(data({ week: 1, latestScoredWeek: 3 }))
     renderPage('/leagues/L1/weekly-report?week=1')
 
-    expect((await weekInput()).value).toBe('1')
+    expect(await weekLabel()).toBe('Week 1')
     expect(getWeeklyReport).toHaveBeenCalledWith('L1', 1)
   })
 
-  it('writes the chosen week back to ?week=', async () => {
+  it('writes the chosen week back to ?week= when stepping', async () => {
     getWeeklyReport.mockResolvedValue(data({ week: 3, latestScoredWeek: 3 }))
     renderPage()
 
-    fireEvent.change(await weekInput(), { target: { value: '2' } })
+    fireEvent.click(await prev())
 
     await waitFor(() => expect(lastSearch).toBe('?week=2'))
     await waitFor(() => expect(getWeeklyReport).toHaveBeenLastCalledWith('L1', 2))
   })
 
-  it('caps the input at the latest scored week, with no hardcoded 18', async () => {
+  it('disables the stepper at week 1 and at the latest scored week, with no hardcoded 18', async () => {
     getWeeklyReport.mockResolvedValue(data({ week: 3, latestScoredWeek: 3 }))
     renderPage()
-
-    const input = await weekInput()
-    expect(input.max).toBe('3')
-    expect(input.min).toBe('1')
+    expect((await next()).disabled).toBe(true)
+    expect((await prev()).disabled).toBe(false)
   })
 
-  it('clamps a typed week into [1, latest]', async () => {
-    getWeeklyReport.mockResolvedValue(data({ week: 3, latestScoredWeek: 3 }))
+  it('disables Previous at week 1', async () => {
+    getWeeklyReport.mockResolvedValue(data({ week: 1, latestScoredWeek: 3 }))
+    renderPage('/leagues/L1/weekly-report?week=1')
+    expect((await prev()).disabled).toBe(true)
+    expect((await next()).disabled).toBe(false)
+  })
+
+  it('steps forward to the next week, which can be the in-progress one', async () => {
+    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 3, latestFinalWeek: 2 }))
     renderPage()
-    const input = await weekInput()
 
-    fireEvent.change(input, { target: { value: '40' } })
+    fireEvent.click(await next())
     await waitFor(() => expect(lastSearch).toBe('?week=3'))
-
-    fireEvent.change(input, { target: { value: '-5' } })
-    await waitFor(() => expect(lastSearch).toBe('?week=1'))
   })
 
   it('pulls a link past the last scored week back to it', async () => {
@@ -228,18 +232,29 @@ describe('Weekly report week selection', () => {
     getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 2, latestFinalWeek: 2 }))
     renderPage('/leagues/L1/weekly-report?week=abc')
 
-    expect((await weekInput()).value).toBe('2')
+    expect(await weekLabel()).toBe('Week 2')
     expect(getWeeklyReport).toHaveBeenCalledWith('L1', 0)
   })
 
-  it('defaults to the latest FINAL week, with no in-progress label, while a later week is in progress', async () => {
+  /** T052: the default is the newest FINAL week, and a later scored week is offered, not hidden. */
+  it('labels the default week "latest final week" and links to the in-progress one', async () => {
     getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 3, latestFinalWeek: 2, weekFinal: true }))
     renderPage()
 
-    const input = await weekInput()
-    expect(input.value).toBe('2')
-    expect(input.max).toBe('3') // the in-progress week can still be opened on purpose
+    expect(await screen.findByText('Week 2 · latest final week')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /Week 3 in progress/ })
+    expect(link.getAttribute('href')).toMatch(/[?]week=3$/)
+    // The week shown is final, so the in-progress caveat is not on it.
     expect(screen.queryByText(/scores can still change/)).not.toBeInTheDocument()
+    expect((await next()).disabled).toBe(false)
+  })
+
+  it('does not call a chosen week the "latest final week"', async () => {
+    getWeeklyReport.mockResolvedValue(data({ week: 2, latestScoredWeek: 3, latestFinalWeek: 2, weekFinal: true }))
+    renderPage('/leagues/L1/weekly-report?week=2')
+
+    await weekLabel()
+    expect(screen.queryByText(/latest final week/)).not.toBeInTheDocument()
   })
 
   it('labels an in-progress week, whether chosen on purpose or the fallback when nothing is final', async () => {
@@ -248,10 +263,11 @@ describe('Weekly report week selection', () => {
 
     expect(await screen.findByText(/scores can still change/)).toBeInTheDocument()
     expect(screen.getByText('Week 1 matchups')).toBeInTheDocument()
-    expect((await weekInput()).max).toBe('1')
+    expect(screen.queryByText(/latest final week/)).not.toBeInTheDocument()
+    expect((await next()).disabled).toBe(true)
   })
 
-  it('shows a plain "nothing scored" panel, and no week picker, before any week is scored', async () => {
+  it('shows a plain "nothing scored" panel, and no stepper, before any week is scored', async () => {
     getWeeklyReport.mockResolvedValue(
       data({
         available: false,
@@ -269,7 +285,91 @@ describe('Weekly report week selection', () => {
 
     expect(await screen.findByText('No week has been scored yet')).toBeInTheDocument()
     expect(screen.queryByText(/Week 0/)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Week')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next week' })).not.toBeInTheDocument()
+  })
+})
+
+/*
+ * 013 US5 (T050): the reader's own matchup leads, full width, with the result
+ * in words. Without an isMe side the page keeps its original order.
+ */
+describe('Weekly report: your matchup first', () => {
+  beforeEach(() => getWeeklyReport.mockReset())
+
+  const side = (rosterId: number, teamName: string, points: number, isMe?: boolean) => ({
+    rosterId,
+    teamName,
+    username: null,
+    avatarId: null,
+    record: '1-0',
+    points,
+    ...(isMe === undefined ? {} : { isMe }),
+  })
+  const twoGames = (meIsAway: boolean, mePoints = 147.9, themPoints = 157.4) => [
+    { home: side(3, 'Other Home', 100), away: side(4, 'Other Away', 90) },
+    meIsAway
+      ? { home: side(1, 'Rival', themPoints), away: side(2, 'My Team', mePoints, true) }
+      : { home: side(2, 'My Team', mePoints, true), away: side(1, 'Rival', themPoints) },
+  ]
+
+  it('puts your matchup first as a scoreboard, with the word Lost', async () => {
+    getWeeklyReport.mockResolvedValue(data({ matchups: twoGames(true) }))
+    renderPage()
+
+    const board = await screen.findByLabelText('Your matchup')
+    expect(within(board).getByText('My Team')).toBeInTheDocument()
+    expect(within(board).getByText('Rival')).toBeInTheDocument()
+    expect(within(board).getByText('147.90')).toBeInTheDocument()
+    expect(within(board).getByText('157.40')).toBeInTheDocument()
+    const result = within(board).getByText('Lost')
+    expect(result).toHaveClass('lost')
+    // The scoreboard comes before the other matchup in document order.
+    const other = screen.getByText('Other Home')
+    expect(board.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('says Won in words when you outscored them, even when you are the home side', async () => {
+    getWeeklyReport.mockResolvedValue(data({ matchups: twoGames(false, 160, 150) }))
+    renderPage()
+
+    const board = await screen.findByLabelText('Your matchup')
+    expect(within(board).getByText('Won')).toHaveClass('won')
+    expect(within(board).getByText(/by 10\.00/)).toBeInTheDocument()
+  })
+
+  it('says Tied, with no margin, on equal scores', async () => {
+    getWeeklyReport.mockResolvedValue(data({ matchups: twoGames(false, 150, 150) }))
+    renderPage()
+
+    const board = await screen.findByLabelText('Your matchup')
+    expect(within(board).getByText('Tied')).toBeInTheDocument()
+    expect(within(board).queryByText(/ by /)).not.toBeInTheDocument()
+  })
+
+  it('merges awards and top performers into one "Week in review" list', async () => {
+    getWeeklyReport.mockResolvedValue(data({ matchups: twoGames(true) }))
+    renderPage()
+
+    const heading = await screen.findByRole('heading', { name: 'Week in review' })
+    const section = heading.closest('section') as HTMLElement
+    expect(within(section).getByText('Self-inflicted wound')).toBeInTheDocument()
+    expect(within(section).getByText('Caleb Williams')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Weekly awards' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Top performers' })).not.toBeInTheDocument()
+  })
+
+  it('keeps today\'s order and sections when no side is yours', async () => {
+    getWeeklyReport.mockResolvedValue(data())
+    renderPage()
+
+    const matchups = await screen.findByRole('heading', { name: /week 1 matchups/i })
+    const awards = screen.getByRole('heading', { name: 'Weekly awards' })
+    const performers = screen.getByRole('heading', { name: 'Top performers' })
+    expect(screen.queryByLabelText('Your matchup')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Week in review' })).not.toBeInTheDocument()
+    const follows = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(matchups, awards)).toBe(true)
+    expect(follows(awards, performers)).toBe(true)
   })
 })
 

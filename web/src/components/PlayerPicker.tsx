@@ -5,6 +5,7 @@ import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
 import TeamStrip from './TeamStrip'
+import PlayerFace from './PlayerFace'
 
 type Props = {
   pausedAt: number
@@ -92,7 +93,7 @@ export default function PlayerPicker({
           on what you take — may take a few seconds.
         </p>
 
-        <TeamStrip needs={needs} />
+        <TeamStrip needs={needs} sport={sport} />
 
         <div className="controls-inline picker-filters">
           {POSITIONS.map((p) => (
@@ -129,6 +130,7 @@ export default function PlayerPicker({
                   >
                     <td className="player-col">
                       <span className={`pos ${r.player.position}`}>{r.player.position}</span>
+                      <PlayerFace sport={sport} sleeperId={r.player.sleeperId} team={r.player.team} position={r.player.position} name={r.player.name} size={20} />
                       {r.player.name}
                       <span className="team">{r.player.team}</span>
                     </td>

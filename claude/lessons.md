@@ -587,3 +587,54 @@ anywhere else gets the same silent unlock. The DB-replay fallback has the same s
 **The rule:**
 - When input maps through a lookup, a miss is either an error or a counted, logged event. It is never a silent `continue`, least of all when the missing entries change what the output means (locked vs. simulated).
 - Before trusting a measurement, check one value whose answer you already know. Here, a locked pick must read 1.0.
+
+## 25. Build agents re-derive the rule they were told already exists (spec 013, four times in one build)
+
+Spec 013 was built by Sonnet coding agents, each given the tasks plus AGENTS.md's
+"two implementations of one rule" warning. Four separate agents still wrote a
+second copy of something:
+- the 4-week "early" threshold, as a frontend constant on the Luck page, and again
+  in `GradeChip` for a sentence;
+- the Power page's hero-week rule, re-derived for League home, and already choosing
+  the season differently (MEMBER entries vs all entries);
+- the 860px phone breakpoint, a third JS copy beside AppShell's.
+
+Each one passed its own tests. They were caught only because the parent session read every
+diff with this one question in mind.
+
+**The class:** an agent asked to *show* a number reaches for the nearest literal.
+The fix is mechanical every time: the server sends the value (`early`,
+`earlyThresholdWeeks`), or one exported function/hook is shared (`leagueVoteHero`,
+`useNarrow`), plus a test that pins the single source (`SeasonWindowSingleSourceTest`,
+`useNarrow.test.ts`). **When reviewing agent output, grep its diff for new numeric
+literals and new `const X = <number>` declarations before reading anything else.**
+
+## 26. A file written on Windows came back in two encodings at once
+
+A build agent's edit left `AvailabilityPanel.tsx` with three lines saved as
+Windows-1252 bytes inside an otherwise UTF-8 file. Type-check, all 885 tests and the
+production build passed. The page showed "ADP 1�60" instead of "ADP 1–60", and a
+broken tooltip separator. A whole-file `iconv -f cp1252` would have double-encoded the
+lines that were already correct (the ▾/▴ arrows became "â–¾"); the repair had to be
+per-line (decode UTF-8, fall back to cp1252 only for lines that fail).
+
+**The class:** nothing in the toolchain checks source encoding. `web/src/sourceEncoding.test.ts`
+now does (strict `TextDecoder('utf-8', { fatal: true })` over `src/**/*.{ts,tsx,css}`),
+proven to fail on an injected 0x96 byte.
+
+## 27. A guard test that reads `styles.css?raw` under Vitest passes against nothing
+
+Vitest stubs CSS, so `import css from './styles.css?raw'` yields `""` in tests. The
+first breakpoint-guard test asserted on that empty string. It *failed* (luckily the
+assertion was `toContain`); written as `not.toContain` it would have passed forever.
+Read the file from disk (`node:fs`, cwd = `web/`), and assert the content is non-trivial
+(`css.length > 1000`) before asserting anything about it.
+
+## 28. Rank-based display can manufacture certainty from nothing
+
+League home said "You're 1st of 12 at 0-0" for an NBA league whose season hadn't
+started: an `isMe` row exists, so its index was shown as a position. Same build:
+an award block showed 2025's winner on the 2026 home with no year, because the
+endpoint falls back a season. Unit tests passed for both. Both were found by reading the
+rendered page for a league in an unusual state (pre-season, fallback season).
+**Live checks need at least one league in each odd state**, not just the populated one.

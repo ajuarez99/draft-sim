@@ -220,7 +220,7 @@ export default function PowerRankingsVerify() {
         <div className="verify-checklist">
           {checklist.map((row) => (
             <div className="verify-check-row" key={row.id}>
-              <span className="mono tiny muted">{row.id}</span>
+              <span className="code tiny muted">{row.id}</span>
               <span className="small">{row.text}</span>
               <select value={row.status} onChange={(e) => setStatus(row.id, e.target.value as Status)}>
                 <option value="pass">pass</option>
@@ -250,20 +250,20 @@ export default function PowerRankingsVerify() {
         <div className="verify-states">
           {(['loading', 'signed-out', 'not-member', 'voting-closed', 'load-error', 'ok'] as const).map((s) => (
             <div className="verify-state-card panel" key={s}>
-              <h3 className="cond" style={{ margin: '0 0 6px', fontSize: 13 }}>
+              <h3 className="section-title" style={{ margin: '0 0 6px', fontSize: 13 }}>
                 {s}
               </h3>
               <p className="tiny muted">{ballotBlockState(true, ballot, s === 'load-error') === s || s === 'ok' ? 'Reachable with current data.' : 'Synthetic -- see PowerRankings.tsx\'s own branch for this state.'}</p>
             </div>
           ))}
           <div className="verify-state-card panel">
-            <h3 className="cond" style={{ margin: '0 0 6px', fontSize: 13 }}>
+            <h3 className="section-title" style={{ margin: '0 0 6px', fontSize: 13 }}>
               one week of data (no chart)
             </h3>
             <p className="tiny muted">{weeks.length < 2 ? 'This league is currently in this state.' : `This league has ${weeks.length} weeks; Trend disclosure draws normally.`}</p>
           </div>
           <div className="verify-state-card panel">
-            <h3 className="cond" style={{ margin: '0 0 6px', fontSize: 13 }}>
+            <h3 className="section-title" style={{ margin: '0 0 6px', fontSize: 13 }}>
               no snapshots for a mode
             </h3>
             <p className="tiny muted">

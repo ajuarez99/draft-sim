@@ -164,4 +164,34 @@ class LeagueControllerRealBoardTest {
         List<Map<String, Object>> picks = (List<Map<String, Object>>) body.get("picks");
         assertTrue(picks.isEmpty());
     }
+
+    /** Spec 013 T077: adpAtDraft is the stored draft-time value, not today's board's adp. */
+    @Test
+    void adpAtDraftComesFromTheStoredPickNotTheCurrentBoard() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
+        when(drafts.picks(1L)).thenReturn(List.of(
+                new DraftRepository.PickRow(1L, 1, 1, 1, 101L, 55L, 23.4)));
+        Player bijan = player(55L, "4046", "Bijan Robinson", Position.RB);
+        // today's board says 1.4; the draft-time value stored on the pick says 23.4
+        when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(bijan, 1.4, 1)));
+        when(players.findAll(Sport.NFL)).thenReturn(List.of(bijan));
+        when(managers.names()).thenReturn(Map.of(101L, "Allan"));
+
+        assertEquals(23.4, onlyPick(controller().realBoard("d1", null)).get("adpAtDraft"));
+    }
+
+    @Test
+    void adpAtDraftIsAPresentNullWhenNeverCaptured() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
+        when(drafts.picks(1L)).thenReturn(List.of(
+                new DraftRepository.PickRow(1L, 1, 1, 1, 101L, 55L, null)));
+        Player bijan = player(55L, "4046", "Bijan Robinson", Position.RB);
+        when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(bijan, 1.4, 1)));
+        when(players.findAll(Sport.NFL)).thenReturn(List.of(bijan));
+        when(managers.names()).thenReturn(Map.of(101L, "Allan"));
+
+        Map<String, Object> pick = onlyPick(controller().realBoard("d1", null));
+        assertTrue(pick.containsKey("adpAtDraft"));
+        assertNull(pick.get("adpAtDraft"));
+    }
 }

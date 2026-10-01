@@ -2,46 +2,86 @@
 
 /*
  * ============================================================================
- * House style. Read this before adding a component; these are the rules the
- * existing screens already follow, not aspirations.
- * (Design note: claude/pill-board-and-player-list-on-top.md)
+ * House style. Read this before adding a component. These are the rules every
+ * screen is checked against (specs/013-fan-first-redesign/contracts/ui-rules.md).
  * ============================================================================
  *
+ * SURFACES
+ *   At most TWO nested surfaces: the page (--bg) and one raised surface
+ *   (--panel). `.panel .panel` is flattened on purpose. A list or table inside
+ *   a panel uses a 1px divider BETWEEN rows (`.row-list`), never a box per row.
+ *   A card is for card-shaped content only (a matchup, a player, a seat); a
+ *   one-line record is a row. Section titles are headings on the surface
+ *   (`.section-title`), not the header strip of a box. Unboxed regions use
+ *   `.section`. Modals use `.modal-card`, not `.panel`. Elevation is a claim
+ *   about layering: only `.panel` and `.avail-sheet` float and carry a shadow;
+ *   grid tiles are on the plane. Radii by role: 999px badges and chips, 10px
+ *   tiles and controls, 12px floating sheets, 14px panels.
+ *
+ * TYPE
+ *   Oswald uppercase (`.cond`): the page H1 and hero numbers only. Section
+ *   titles: Plus Jakarta 600, sentence case. Numbers: Plus Jakarta with
+ *   tabular-nums (`.mono` is now exactly that). The monospace stack is `.code`
+ *   and is for things that really are code: ids, URLs, hashes.
+ *
+ * COLOR: ONE MEANING EACH
+ *   --crimson        YOU: rings, bars and other non-text marks. Never anything
+ *                    that is not the viewer's own.
+ *   --crimson-fill   YOU behind text. --text on it is >= 4.5:1.
+ *   --crimson-text   YOU as text. >= 4.5:1 on both --bg and --panel.
+ *   --teal           interaction (hover, focus, active chip). Never identity,
+ *                    never data.
+ *   --volt           the page's single primary action (max one per page), with
+ *                    --bg text. Never links, navigation or secondary actions.
+ *   --up / --down    better / worse. --down sits at hue 350, not crimson's 25,
+ *                    so "worse" is never read as "you". Never identity.
+ *   --fitted         earned / awards / provenance. Never a position.
+ *   position tokens  position only (see below).
+ *   Every text/background pair is >= 4.5:1; measure it, don't eyeball it.
+ *   Error colors (.error, .track-note.failed, .live-fresh.stale, the offline
+ *   banner) still use --crimson. That is a known, noted exception.
+ *
  * POSITION COLOR IS A SYSTEM, NOT A DECORATION
- *   Six tokens -- --qb --rb --wr --te --k --def -- and a player's position is
- *   always said in the same color wherever he appears. Three usages, all of
- *   them already defined, so reach for the class rather than a new color:
+ *   Six football tokens (--qb --rb --wr --te --k --def) and five basketball
+ *   ones, always the same color for the same position. Three usages:
  *     .pos.RB              solid badge, `--bg` text. Carries the positional
- *                          rank too ("RB4" via posRank.ts), never a bare
- *                          position when a rank exists.
- *     .cell.pos-RB         22% of the position color over `--panel`. This is
- *                          the ceiling: the text on top is `--text` at
- *                          oklch(95%), and past ~25% the name starts losing.
- *                          Measure, don't eyeball -- 22% clears 12:1.
- *     .chip.pos-chip.RB    filter control; 45% mix on the border, solid when
- *                          `.on`.
- *   Never encode position with color alone -- every one of the above carries
- *   the position as text as well, because six hues are not memorizable and not
- *   everyone can separate them.
+ *                          rank too ("RB4" via posRank.ts).
+ *     .cell.pos-RB         22% of the position color over `--panel`, with
+ *                          `--text` on top. Measured (OKLCH math, not a
+ *                          browser) >= 11.7:1 for every position token
+ *                          against the 2026-09-30 --panel. Past ~25% the name
+ *                          starts losing; the old "12:1" claim was for the old
+ *                          --panel.
+ *     .chip.pos-chip.RB    filter control; 45% mix on the border, solid `.on`.
+ *   Never encode position with color alone: each also carries it as text.
  *
- * CRIMSON MEANS "YOU", AND IT YIELDS THE FILL
- *   --crimson is reserved for the user's own seat, own pick, own column. Where
- *   nothing else owns the background it can fill (`.col-head.mine`); where
- *   something else does -- a position-colored cell -- it becomes a ring
- *   (`.cell.mine`), never a competing fill. --teal is the opposite: generic
- *   interaction (hover, focus, active chip), never identity.
+ * WORDS
+ *   A page subtitle is one sentence, the takeaway. It never says "computation",
+ *   "computed", "stored", "snapshot", "simulation run", "standard error",
+ *   "endpoint" or "payload" (PageHeader warns in dev). Methodology goes in a
+ *   `<HowThisWorks>` disclosure at the end of its section and keeps its
+ *   original text. A caveat that qualifies one number stays beside that
+ *   number as a badge, visible on touch. Caveats are never deleted.
  *
- * SHAPE
- *   border-radius by role, not by taste: 999px for badges and chips, 10px for
- *   board tiles and controls, 12px for floating sheets, 14px for panels.
- *   Nothing in this app has square corners.
+ * NAVIGATION
+ *   Groups: League home, This week, The season, Draft, History. The group that
+ *   holds the current page is expanded. The league + season switcher is at the
+ *   top of the league block. The collapsed rail keeps `title` and `aria-label`
+ *   from the destination's label; never an unlabeled mark. Addresses never
+ *   change; jump-to matches both the fan name and the former name.
  *
- * ELEVATION IS A CLAIM ABOUT LAYERING
- *   A shadow means "this is above the plane." Grid tiles are on the plane and
- *   get none -- a dense board of shadowed cards is the failure mode this
- *   design keeps walking away from. `.panel` and `.avail-sheet` genuinely
- *   float and are the only things that carry one. What keeps flat elements
- *   from reading as uniform boxes is tint and hover, not elevation.
+ * PLAYER FACES
+ *   photo, then team logo, then initials. Fixed size, lazy loading, no layout
+ *   shift, never a broken-image icon. Same for NFL and NBA.
+ *
+ * SIZES
+ *   Check every changed page at 1440x900, 768x1024 and 375x812: no horizontal
+ *   page scroll (the draft board scrolls inside its own frame), nothing
+ *   clipped, long team names truncate with the full name in `title`.
+ *
+ * COMMISSIONER CONTROLS
+ *   Shown only when the page's payload says `canCommission`. Never inferred on
+ *   the client.
  *
  * LAYOUT
  *   The app is one screen: `.app` claims 100vh and every band scrolls
@@ -73,14 +113,6 @@
  *         jump-to FAB so that control is never covered.
  *   Add the next page-level fixed layer here, not inline.
  *
- * DENSITY
- *   Match the layout to the shape of the content: rows for lists
- *   (`.draft-list`), a grid for the board, cards only for things that are
- *   actually card-shaped. Padding a one-line record out into a card is how
- *   this stops looking hand-built. The shape of the content can change --
- *   `.league-card` was a `.draft-row` until a league grew a history, a power
- *   ranking and a champion; re-judge rather than defend the old call.
- *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
  *   A strip of controls must say what kind of thing each one is. Mixing them
  *   is how /leagues/:id/power ended up with six identical teal buttons doing
@@ -101,12 +133,18 @@
  */
 
 :root {
-  --bg: oklch(13% 0.02 250);
-  --panel: oklch(18% 0.025 250);
+  --bg: oklch(14% 0.025 255);       /* the page */
+  --panel: oklch(19% 0.03 255);     /* the one raised surface */
   --line: oklch(28% 0.02 250);
   --text: oklch(95% 0.005 250);
   --muted: oklch(63% 0.02 250);
-  --crimson: oklch(58% 0.19 25);
+  --crimson: oklch(58% 0.19 25);    /* YOU: rings, bars, non-text marks only */
+  --crimson-fill: oklch(54% 0.19 25);  /* YOU behind text; --text on it >= 4.5:1 */
+  --crimson-text: oklch(64% 0.19 25);  /* YOU as text; >= 4.5:1 on --bg and --panel */
+  --volt: oklch(88% 0.19 125);      /* the page's single primary action (--bg text) */
+  --up: oklch(74% 0.16 150);        /* better / gained */
+  --down: oklch(68% 0.18 350);      /* worse / lost; hue 350 keeps it off crimson ("you") */
+  --row-hover: oklch(22% 0.03 255); /* hover on a .row-list row */
   --teal: oklch(72% 0.14 175);
   /* provenance.ts's FITTED/BLENDED dot and border, split out from `--rb` --
      .col-head-dot.fitted/.seat.fitted/.prov-dot.fitted all borrowed the RB
@@ -162,7 +200,9 @@ body {
 }
 
 .cond { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; }
-.mono { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+.mono { font-family: inherit; font-variant-numeric: tabular-nums; } /* numbers: the body face, aligned digits */
+.code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; } /* real code only: ids, URLs, hashes */
+.section-title { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 /* Crimson ring, not fill, once a real photo replaces the initial -- the
@@ -266,7 +306,24 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
   background: var(--panel); border-radius: 14px; padding: 18px 20px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
 }
-.panel h2 { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
+.panel h2 { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
+/* Nested panels flatten: at most two surfaces (page + one panel). Modals use
+   .modal-card, not .panel, so they are unaffected. */
+.panel .panel { border: 0; background: transparent; box-shadow: none; padding: 0; border-radius: 0; }
+/* An unboxed region: a heading plus spacing, no border or fill. */
+.section { display: flex; flex-direction: column; gap: 10px; margin: 0 0 24px; }
+.section > .section-title { margin: 0; }
+/* A list on the surface: a divider between rows, hover tint, no per-row box. */
+.row-list { list-style: none; margin: 0; padding: 0; }
+.row-list > * { border-bottom: 1px solid var(--line); }
+.row-list > *:last-child { border-bottom: 0; }
+.row-list > *:hover { background: var(--row-hover); }
+/* "How this works": methodology kept, folded away. Muted, small, no box. */
+.how { font-size: 12px; color: var(--muted); margin-top: 12px; }
+.how > summary { cursor: pointer; font-weight: 600; color: var(--muted); width: fit-content; }
+.how > summary:hover { color: var(--text); }
+.how[open] > summary { margin-bottom: 8px; }
+.how p { margin: 0 0 8px; line-height: 1.5; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 .muted { color: var(--muted); }
@@ -372,7 +429,7 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .power-tab {
   appearance: none; -webkit-appearance: none; background: none; border: 0;
   border-bottom: 2px solid transparent; margin: 0; cursor: pointer;
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  text-transform: none;
   font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
   padding: 10px 15px; color: var(--muted);
   transition: color 120ms ease, border-color 120ms ease;
@@ -430,14 +487,14 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   box-shadow: inset 2px 0 0 var(--teal);
 }
 .rank-grid-header {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  text-transform: uppercase;
   font-size: 10.5px; letter-spacing: 0.09em; color: var(--muted);
   cursor: default;
 }
 .rank-grid-header:hover { background: none; }
 .rank-grid-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
 .rank-grid-rank.top { color: var(--text); }
-.rank-grid-rank.mine { color: var(--crimson); }
+.rank-grid-rank.mine { color: var(--crimson-text); }
 /* min-width: 0 on both -- the team column is a fixed 260px now, not `1fr`,
    and a fixed track does not by itself shrink a grid item's content below its
    min-content size (that needs an explicit 0 min-width); without it a long
@@ -450,8 +507,8 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .rank-grid-bar .spread-bar { width: 100%; }
 
 .rank-move { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.rank-move.up { color: oklch(72% 0.14 150); }
-.rank-move.down { color: var(--crimson); }
+.rank-move.up { color: var(--up); }
+.rank-move.down { color: var(--down); }
 
 @media (max-width: 700px) {
   /* The full six-column budget (30+58+88+140+84 fixed, plus five gaps) does
@@ -490,8 +547,8 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .homers-track { position: relative; height: 6px; border-radius: 999px; background: var(--line); }
 .homers-hairline { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
 .homers-fill { position: absolute; top: 0; height: 100%; border-radius: 999px; }
-.homers-fill.neg { right: 50%; background: var(--crimson); }
-.homers-fill.pos { left: 50%; background: oklch(72% 0.14 150); }
+.homers-fill.neg { right: 50%; background: var(--down); }
+.homers-fill.pos { left: 50%; background: var(--up); }
 
 /* Per-team placement panel -- one row per mode, a dot on a shared 1..N axis,
    rather than the transposed bump chart trying to say something with one
@@ -828,8 +885,8 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
 /* Same crimson identity as `.cell.mine` -- your own seat should read as the
    same "you" everywhere on the board, not a second visual language. */
-.board .col-head.mine { background: color-mix(in oklch, var(--crimson) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
-.board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson) 22%, var(--panel)); }
+.board .col-head.mine { background: color-mix(in oklch, var(--crimson-fill) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
+.board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson-fill) 22%, var(--panel)); }
 /* 9px mono was small enough to read as texture rather than names -- nothing
    was truncated at that size, but nothing was legible either. 11px in the body
    face (not `.mono`, which is wider per character) trades an occasional
@@ -848,7 +905,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .col-head-dot.neutral { background: var(--muted); opacity: 0.5; }
 .board .col-head-dot.stated { background: var(--teal); }
 .board .col-head-dot.fitted { background: var(--fitted); }
-.board .col-head-you { font-size: 8px; color: var(--crimson); letter-spacing: 0.04em; }
+.board .col-head-you { font-size: 8px; color: var(--crimson-text); letter-spacing: 0.04em; }
 .board .rnd {
   background: var(--panel); display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
@@ -946,7 +1003,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    names truncate at 1440x900, down from 23. The cell's own 7px of padding is
    the gutter. */
 .board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.board .meta { display: flex; align-items: baseline; margin-top: 3px; gap: 6px; }
+.board .meta { display: flex; align-items: center; margin-top: 3px; gap: 6px; }
 /* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
 .board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
 /* An undrafted cell is its pick number and nothing else -- in flow, not the
@@ -1111,7 +1168,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .seat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
 .seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seat .who.mine-name { color: var(--crimson); }
+.seat .who.mine-name { color: var(--crimson-text); }
 /* Was a filled uppercase badge. 23 of the 24 cards on /managers are FITTED,
    so a bright "FROM HISTORY" chip on nearly all of them marked nothing while
    outweighing the manager's own name -- the same "eleven identical league
@@ -1274,7 +1331,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   box-shadow: inset 0 0 0 1.5px var(--crimson);
   border-radius: 8px; padding: 8px 12px; font-size: 12px;
 }
-.pause-banner .chip.on { background: var(--crimson); border-color: var(--crimson); color: var(--bg); }
+.pause-banner .chip.on { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
 
 /* PickPrompt: the same crimson pause-banner, now carrying two actions and an
    honesty line instead of one bare "Continue" -- wraps rather than truncating
@@ -1314,7 +1371,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .on-clock-kicker {
   font-size: 10px; letter-spacing: 0.1em; color: var(--muted);
 }
-.on-clock.mine .on-clock-kicker { color: var(--crimson); }
+.on-clock.mine .on-clock-kicker { color: var(--crimson-text); }
 .on-clock-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .on-clock-spacer { flex: 1; min-width: 0; }
 /* The right-hand readout is one number with its own label under it, not a row
@@ -1653,7 +1710,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .bump-hit { pointer-events: stroke; }
 
 .bump-end-label { fill: var(--muted); font-size: 10px; cursor: pointer; }
-.bump-end-label-me { fill: var(--crimson); font-weight: 600; }
+.bump-end-label-me { fill: var(--crimson-text); font-weight: 600; }
 .bump-end-label-focus-1,
 .bump-end-label-focus-2,
 .bump-end-label-focus-3 { fill: var(--text); font-weight: 600; }
@@ -1717,7 +1774,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    why it gets its own class instead of reusing `.chip` at a larger size. */
 .home-hero-cta {
   flex-shrink: 0; display: inline-flex; align-items: center;
-  background: var(--teal); color: var(--bg); text-decoration: none;
+  background: var(--volt); color: var(--bg); text-decoration: none;
   font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 999px;
   transition: filter 120ms ease, transform 120ms ease;
 }
@@ -2227,8 +2284,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .league-data[open] .league-data-summary::before { transform: rotate(90deg); }
 .league-data-summary span:first-child {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
-  font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted);
+  text-transform: none;
+  font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--text);
 }
 /* The body only exists in flow while open, so it only needs a gap from the
    summary then -- closed, there is nothing below to space away from. */
@@ -2270,7 +2327,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* Crimson fills here because nothing else owns this seat's background --
    the same move `.segment.on` makes with teal, substituting the identity
    color because this is specifically "you," not generic interaction. */
-.mock-seat.mine .mock-seat-face { background: var(--crimson); color: var(--bg); }
+.mock-seat.mine .mock-seat-face { background: var(--crimson-fill); color: var(--text); }
 .mock-seat.mine .mock-seat-who { font-weight: 700; }
 .mock-seat.assigned .mock-seat-who { font-weight: 600; }
 
@@ -2675,7 +2732,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: color-mix(in oklch, var(--crimson) 12%, var(--panel));
   box-shadow: inset 2px 0 0 var(--crimson);
 }
-.pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--crimson); }
+.pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--crimson-text); }
 .pr-your-team-name { font-size: 16px; font-weight: 600; }
 .pr-your-team-detail { font-size: 13px; color: var(--muted); }
 .pr-your-team-vote { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -2718,7 +2775,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .pr-row-head {
   padding: 0 6px 8px; border-bottom: 1px solid var(--line);
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  text-transform: uppercase;
   font-size: 11px; font-weight: 600; letter-spacing: 0.07em; color: var(--muted);
 }
 .pr-move-head { text-align: center; }
@@ -2742,7 +2799,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 .pr-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
 .pr-rank.top { color: var(--text); }
-.pr-rank.mine { color: var(--crimson); }
+.pr-rank.mine { color: var(--crimson-text); }
 
 .pr-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pr-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
@@ -2753,7 +2810,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    used to truncate the tag away entirely on the viewer's own row). */
 .pr-team-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; }
 .pr-team-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson); }
+.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson-text); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Record over odds: two lines in the width one line used to take, so adding
@@ -2772,8 +2829,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-odds.out { background: color-mix(in oklch, oklch(75% 0.13 50) 14%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
-.pr-move.up { color: oklch(72% 0.14 150); }
-.pr-move.down { color: var(--crimson); }
+.pr-move.up { color: var(--up); }
+.pr-move.down { color: var(--down); }
 .pr-move.flat { color: oklch(52% 0.02 250); }
 
 .pr-playoff-cell { display: flex; align-items: center; gap: 8px; }
@@ -2835,7 +2892,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    than the plain-text +/- the movement column uses elsewhere. */
 .pr-your-ballot .pr-move { padding: 2px 6px; border-radius: 999px; font-size: 11px; }
 .pr-your-ballot .pr-move.up { background: color-mix(in oklch, var(--teal) 16%, transparent); }
-.pr-your-ballot .pr-move.down { background: color-mix(in oklch, var(--crimson) 16%, transparent); }
+.pr-your-ballot .pr-move.down { background: color-mix(in oklch, var(--down) 16%, transparent); }
 .pr-your-ballot .pr-move.flat { background: color-mix(in oklch, var(--muted) 16%, transparent); }
 /* One flat track, one constant fill. The old row stacked four encodings on
    this bar -- a hue-shifting range gradient, a four-hue median dot, and a
@@ -2913,7 +2970,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .pr-focus-row.head {
   padding: 0 4px 7px;
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  text-transform: uppercase;
   font-size: 10.5px; letter-spacing: 0.09em; color: var(--muted);
 }
 .pr-focus-mode { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; min-width: 0; }
@@ -2936,8 +2993,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-homer-track { position: relative; height: 6px; background: var(--line); border-radius: 999px; }
 .pr-homer-mid { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: oklch(34% 0.02 250); }
 .pr-homer-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
-.pr-homer-fill.down { background: var(--crimson); }
-.pr-homer-fill.up { background: oklch(72% 0.14 150); }
+.pr-homer-fill.down { background: var(--down); }
+.pr-homer-fill.up { background: var(--up); }
 .pr-homer-value { font-size: 12px; text-align: right; color: var(--muted); }
 
 /* --- sidebar (from 2c) --- */
@@ -4870,3 +4927,417 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .live-meters .scarcity-meter, .live-meters .onbrand-panel { margin-top: 0; min-width: 0; }
 .pick-card-scarcity { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .seat-onbrand { margin: 6px 0 0; min-width: 0; }
+
+
+/* --- 013 US1: DraftPicker (site home) ---------------------------------------
+   The three list sections are unboxed (.section) with a heading on the page.
+   "Start a mock draft" (.home-hero-cta, --volt above) is the page's one primary
+   action. The league cards stay cards until T047 turns them into rows. */
+.picker-section .panel-head { margin: 0; }
+.picker-section .panel-head .section-title { margin: 0; }
+
+
+/* --- 013 US1: PowerRankings ------------------------------------------------
+   The hero (headline, #1 card, Riser/Free fall) sits on the page, unboxed. The
+   ladder is a .section whose rows are a .row-list: the divider between rows and
+   the hover come from the shared utility, not from a box per row. */
+.pr-number-one { padding: 4px 0 4px 20px; border-left: 1px solid var(--line); }
+.pr-stories { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.pr-story { padding: 0; }
+.pr-story-name { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.pr-story .pr-move { display: inline-flex; font-size: 13px; }
+.pr-section .pr-ladder-head { margin-bottom: 4px; }
+.pr-list .row-list > .pr-row { border-bottom: 1px solid var(--line); border-radius: 0; }
+.pr-list .row-list > .pr-row:last-child { border-bottom: 0; }
+.pr-list .row-list > .pr-row:hover { background: var(--row-hover); }
+.pr-list .row-list > .pr-row.on { background: color-mix(in oklch, var(--teal) 12%, transparent); }
+.pr-list .row-list > .pr-row.mine { background: color-mix(in oklch, var(--crimson) 12%, transparent); }
+
+
+/* --- 013 US1: LeagueAnalysis (Team strength) -------------------------------
+   Sections sit on the page (.section) instead of in a box each. Best/worst
+   High and Low carry a tint AND an arrow, so colour is never the only signal. */
+.analysis-section { margin-bottom: 28px; }
+.analysis-section .panel-head { margin: 0; }
+.analysis-section .panel-head .section-title { margin: 0; }
+.analysis-heat { display: inline-block; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.analysis-heat.best { background: color-mix(in oklch, var(--up) 16%, transparent); color: var(--up); }
+.analysis-heat.worst { background: color-mix(in oklch, var(--down) 16%, transparent); color: var(--down); }
+.analysis-formula { font-size: 12px; }
+
+
+/* --- 013 US1: RosterManagement (Bench points) ------------------------------
+   One bar colour: the rainbow by rank encoded rank a second time, and rank is
+   already the order of the rows. The three largest bench gaps read in --down;
+   the words "left on the bench" travel with it, so colour never stands alone. */
+.rm-track { --hue: 250; }
+.rm-left-big { color: var(--down); font-weight: 600; }
+
+
+/* --- 013 US1: ExpectedWins (Luck) ------------------------------------------
+   Sections sit on the page. The early badge reuses .sl-early (the Superlatives
+   one), so "early, mostly noise" looks the same everywhere it appears. */
+.ew-table + .how { margin-top: 14px; }
+
+
+/* --- 013 US1: SeasonForecast (Playoff odds) --------------------------------
+   Sections sit on the page. The commissioner recompute stays an .action-button
+   (teal, an interaction); --volt is reserved for a page's one primary action
+   and this page's only action is commissioner-only. */
+.sf-table + .sf-note { margin-top: 10px; }
+
+
+/* --- 013 US1: WeeklyReport (Matchups & awards) -----------------------------
+   Matchups stay cards: a matchup is a pair facing each other. The weekly
+   awards are one-line records, so they are a .row-list, not a card each. */
+.wr-awards.row-list { display: block; }
+.wr-awards.row-list .wr-award { border: 0; border-radius: 0; background: transparent; padding: 10px 4px; }
+
+
+/* --- 013 US1: Superlatives (Awards) ----------------------------------------
+   One raised surface per award card, no per-card coloured top/left border (the
+   hue encoded nothing; position in the grid is already the order). The cards
+   keep their grid until the trophy-list rework (T086). */
+.sl-card { border-left: 1px solid var(--line); background: var(--panel); }
+.sl-card-openable:hover { border-color: var(--line); background: var(--row-hover); box-shadow: none; }
+.sl-conduct { margin-top: 28px; }
+
+
+/* --- 013 US1: LeagueHistory (Standings) ------------------------------------
+   Seasons and the record book sit on the page (.section), tables on the
+   surface with row separators. Matchup margin cards stay cards: a margin is
+   two sides facing each other. */
+.history-season { margin-top: 6px; margin-bottom: 18px; }
+.history-season h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; letter-spacing: 0; }
+
+
+/* --- 013 US1: ManagerTendencies (Scouting report) --------------------------
+   The list sits on the page; the (±n) beside each reach caption stays visible
+   (it qualifies that one number), the method moved to How this works. */
+.mgr-list { margin-top: 4px; }
+
+
+/* --- 013 US1: ManagerHistory (Manager profile) -----------------------------
+   Career figures are one unboxed row (.career-stats), not a card each; ranks
+   are separated by row dividers instead of a border per row. Meetings and
+   matchup margins elsewhere keep .margin-card, because those are card-shaped. */
+.career-stats { display: flex; flex-wrap: wrap; gap: 14px 36px; margin-top: 6px; }
+.career-stats .margin-card { border: 0; border-radius: 0; padding: 0; background: transparent; min-width: 120px; max-width: 260px; }
+.career-ranks { gap: 0; }
+.career-rank-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 4px; }
+.career-rank-row:last-child { border-bottom: 0; }
+.career-rank-row:hover { background: var(--row-hover); }
+
+
+/* --- 013 US1: ManagerComparison --------------------------------------------
+   Shared rules only (sections on the page); no page-specific styling. */
+
+
+/* --- 013 US1: DraftBoard (.board / .cell) ----------------------------------
+   The cell's position tint is its only surface. The solid position badge
+   (`.pos`, "RB4") stays: it is a leaf, not a container, so it adds no nesting,
+   and it is the position-color system's primary mark (parent review reverted
+   a build-agent change that had flattened it to plain text, along with the
+   loss of the "second choice" dotted underline, which carries meaning).
+   Empty future cells are softened so the filled rounds read as the front line. */
+.board .cell:not([class*="pos-"]) { background: color-mix(in oklch, var(--panel) 45%, var(--bg)); }
+.board .cell:not([class*="pos-"]) .pickno-open { color: var(--muted); }
+
+
+/* --- 013 US1: MockSetup ----------------------------------------------------
+   Seats are chips on the page; "Start the draft" is the page's one --volt. */
+.controls.mock-seat-cta button:not(.chip):not(.segment) { background: var(--volt); color: var(--bg); border-color: transparent; font-weight: 700; }
+
+/* --- 013 US1: phone width (T030) ---------------------------------------------
+   Flattening .panel into .section removed the scroll container the stat tables
+   relied on (.panel-body { overflow: auto }), so at 375px they pushed the page
+   sideways. A section now lets its own wide table scroll instead of the page;
+   the weekly performer rows and the live status bar wrap. Measured with the
+   spec 013 harness: 7 routes had page-level horizontal scroll at 375 before this. */
+.section { min-width: 0; }
+.section > table, .section .table-scroll { display: block; max-width: 100%; overflow-x: auto; }
+.wr-performers li { flex-wrap: wrap; min-width: 0; }
+.wr-performers li > * { min-width: 0; overflow-wrap: anywhere; }
+.live-bar { flex-wrap: wrap; }
+.live-right { flex-wrap: wrap; min-width: 0; }
+/* Waiver adds (Bench points): rows wrap on a phone instead of pushing the page. */
+.tx-adds li { flex-wrap: wrap; min-width: 0; }
+
+/* --- 013 US3: rail groups (This week / The season / Draft / History) ---
+   Desktop: a heading button per group; closed groups are not rendered at all.
+   Phone lane (<= 860px, matched in LeagueRailSection's PHONE_LANE_QUERY): every
+   group is open, headings are small separators inside the swipe lane, and the
+   group wrappers dissolve so the lane stays one row. Collapsed rail: headings
+   shrink to a hairline between groups. */
+.app-rail-group { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.app-rail-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 4px 10px; background: none; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.app-rail-group-head:hover { color: var(--text); }
+.app-rail-group-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 6px; }
+.app-rail-group-head.static { cursor: default; }
+.app-rail-group-caret { font-size: 9px; }
+.app-rail.collapsed .app-rail-group { margin-top: 4px; }
+.app-rail.collapsed .app-rail-group-head.static {
+  font-size: 0; height: 1px; padding: 0; margin: 4px 10px; background: var(--line);
+}
+@media (max-width: 860px) {
+  .app-rail-group { display: contents; }
+  .app-rail-group-head.static {
+    flex: 0 0 auto; align-self: center; padding: 0 2px 0 8px; font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .app-rail.collapsed .app-rail-group-head.static { height: auto; margin: 0; background: none; font-size: 10px; }
+}
+
+/* --- 013 US4: League home ---------------------------------------------------
+   Sections sit on the page (.section); standings are a .row-list. The only
+   --volt is "Open the draft room" (.home-hero-cta), and only before the draft.
+   Win/loss colours always travel with the words Won / Lost / Tied. */
+.lh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
+.lh-grid > .section { min-width: 0; }
+.lh-draft { margin-bottom: 20px; }
+.lh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.lh-link { font-size: 13px; color: var(--teal); text-decoration: none; align-self: flex-start; }
+.lh-link:hover { text-decoration: underline; }
+.lh-hero-nums { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.lh-hero-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.lh-hero-num { font-size: 40px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.lh-hero-label { font-size: 12px; color: var(--muted); }
+.lh-rows { list-style: none; margin: 0; padding: 0; }
+.lh-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
+.lh-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-pos { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-rec, .lh-pts { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-matchup { display: flex; flex-direction: column; gap: 6px; }
+.lh-side { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lh-pts { font-weight: 600; }
+.lh-result.won { color: var(--up); font-weight: 600; }
+.lh-result.lost { color: var(--down); font-weight: 600; }
+.lh-result.tied { font-weight: 600; }
+.lh-headline { font-weight: 600; margin: 0; }
+.lh-award-title { font-weight: 600; margin: 0; }
+
+/* --- 013 US4: site home league rows -----------------------------------------
+   One row per league: crest, name + sport + season, draft status, one action.
+   Separators come from .row-list; the live tint is the only accent. "Start a
+   mock draft" (.home-hero-cta) stays the page's one --volt. */
+.league-rows { display: block; }
+.league-row { display: flex; align-items: center; gap: 12px 14px; padding: 12px 8px; min-width: 0; flex-wrap: wrap; }
+.league-row.live { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.league-row .league-card-title { flex: 1 1 200px; min-width: 0; }
+.league-row .league-card-status, .league-row .league-card-live { flex: 0 1 auto; font-size: 12px; }
+.league-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+/* --- 013 US7: PlayerFace -------------------------------------------------
+   photo -> team logo -> initials, one fixed box in every state. Inline-block
+   with negative vertical margins so a face beside a line of text never makes
+   that line taller (the draft board's cell height must not change). The img is
+   a leaf, not a surface: no border, no panel fill. */
+.pface { display: inline-block; vertical-align: middle; border-radius: 50%; overflow: hidden; flex-shrink: 0; margin: -4px 5px -4px 0; line-height: 1; }
+.pface img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pface-logo img { object-fit: contain; }
+.pface-initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+
+/* --- 013 US5: WeeklyReport scoreboard + stepper ----------------------------
+   Your matchup is the one card-shaped thing here: two sides facing each other,
+   full width. Won/Lost always carries the word; --up/--down only reinforce it. */
+.wr-stepper { display: flex; align-items: center; gap: 8px; }
+.wr-stepper button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.wr-stepper button:disabled { opacity: 0.4; cursor: default; }
+.wr-stepper-label { font-variant-numeric: tabular-nums; min-width: 8ch; text-align: center; font-weight: 600; }
+.wr-weeknote { margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.wr-score { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 12px 20px; padding: 16px 18px; background: var(--panel); border-radius: 12px; }
+.wr-score-side { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wr-score-side.right { flex-direction: row-reverse; text-align: right; }
+.wr-score-id { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.wr-score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.wr-score-avatar { width: 40px; height: 40px; flex: 0 0 40px; font-size: 16px; }
+.wr-score-pts { font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; font-weight: 700; }
+.wr-result { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.wr-result.won { color: var(--up); }
+.wr-result.lost { color: var(--down); }
+.wr-score-result { grid-column: 1 / -1; margin: 0; text-align: center; }
+.wr-strip { margin-top: 12px; }
+@media (max-width: 640px) {
+  .wr-score { grid-template-columns: 1fr; gap: 10px; }
+  .wr-score-side.right { flex-direction: row; text-align: left; }
+}
+.wr-review.row-list { display: block; }
+.wr-review > li { padding: 10px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.wr-review-kind { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; flex: 0 0 100%; }
+
+/* --- 013 US6: tiers, faces and the run callout inside the availability sheet ---
+   Stays inside `.avail-sheet` (layer 4); nothing here adds a layer or a surface.
+   Tier headings are rows on the sheet's own surface, not boxes. */
+.avail tbody + tbody .tier-head th { border-top: 1px solid var(--line); }
+.avail .tier-head th {
+  position: static; background: transparent; text-align: left;
+  font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 6px 3px;
+}
+.avail .tier-head .tier-range { font-weight: 400; font-variant-numeric: tabular-nums; }
+.avail .player-col .pface { vertical-align: middle; margin: -4px 6px -4px 6px; }
+.avail-run { margin: 0 0 6px; font-size: 12px; color: var(--text); }
+.avail-reason { margin: 0 0 6px; }
+
+/* The simulator's placeholder board while seats load (SkeletonBoard). Tiles on
+   the page plane, no surface of their own; the pulse reuses the keyframes
+   defined with the other loading placeholders. */
+.board-skeleton { display: grid; gap: 4px; flex: 1; min-height: 0; padding: 4px 0; }
+.board-skeleton-tile {
+  min-height: 34px; border-radius: 6px;
+  background: color-mix(in oklch, var(--line) 45%, var(--bg));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board-skeleton-tile { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+}
+
+/* --- 013 US8: grade chip beside its number --------------------------------
+   Neutral on purpose: a letter is a rank, not a position or an identity, so it
+   borrows no position token. --up/--down are not used either (a grade is not a
+   signed change). The early badge is the shared .sl-early. */
+.grade-wrap { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.grade-chip {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px; color: var(--text);
+  border: 1px solid var(--line);
+}
+.grade-early { white-space: nowrap; }
+
+/* --- 013 US8: steals & reaches on a finished board -------------------------
+   Tint = pickNo minus ADP at draft time. A gradient over the cell's position
+   fill (background-image, so the position color underneath is kept). --up is
+   always printed with a "+" and --down with a minus, never color alone. */
+.board.value-view .cell.value-steal {
+  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent));
+}
+.board.value-view .cell.value-reach {
+  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
+}
+.value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.value-delta.steal { color: var(--up); }
+.value-delta.reach { color: var(--down); }
+.value-delta.even, .value-delta.none { color: var(--muted); font-weight: 500; }
+.value-legend { margin: 0 0 6px; }
+/* The grade column's early caveat keeps its own case inside an uppercase table header. */
+th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }
+
+/* --- 013 US9: LeagueHistory (Standings) ------------------------------------
+   Best/worst per numeric column: a tint (--up/--down) AND a glyph with an
+   accessible label, never colour alone. "season in progress" is said once, in
+   the season's title. */
+.stand-inprogress { font-weight: 500; font-size: 13px; }
+.stand-mark { margin-left: 5px; font-size: 10px; font-weight: 700; }
+.stand-mark.best { color: var(--up); }
+.stand-mark.worst { color: var(--down); }
+.standings th.mono { line-height: 1.25; }
+
+/* --- 013 US9: Superlatives (Awards, trophy list) ---------------------------
+   One row per award on the page: trophy (--fitted, "earned"), name, the holder
+   with their detail lines, and the headline figure in big tabular numbers.
+   Rows are separated by a line, not boxed. "See all" expands the full standings
+   in place under the row. */
+.sl-list { display: flex; flex-direction: column; }
+.sl-card.sl-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 4px 18px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: transparent;
+  padding: 14px 6px;
+}
+.sl-card.sl-row:last-child { border-bottom: 0; }
+.sl-row .sl-card-head { margin-bottom: 0; flex-wrap: wrap; align-items: center; }
+.sl-row .sl-card-head h4 { font-size: 15px; font-weight: 600; }
+.sl-trophy { color: var(--fitted); flex-shrink: 0; }
+.sl-row-body { min-width: 0; }
+.sl-row-stat { text-align: right; align-self: center; min-width: 0; }
+.sl-row-action { align-self: center; }
+.sl-row .sl-value, .sl-row .sl-stat {
+  margin: 0; font-size: 24px; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.sl-row .sl-value .muted { font-size: 12px; font-weight: 400; display: block; white-space: normal; }
+.sl-row .sl-see-all { margin-left: 0; border: 1px solid var(--line); padding: 4px 10px; }
+.sl-standings-panel {
+  grid-column: 1 / -1; margin-top: 10px; padding: 8px 4px 0 4px;
+  border-top: 1px dashed var(--line); cursor: auto; text-align: left;
+}
+.sl-standings-panel .sl-standings-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+@media (max-width: 700px) {
+  .sl-card.sl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sl-row .sl-card-head { grid-column: 1 / -1; }
+  .sl-row-body { grid-column: 1; }
+  .sl-row-stat { grid-column: 2; align-self: start; }
+  .sl-row-action { grid-column: 1 / -1; }
+}
+
+/* --- 013 US9: ManagerHistory (Manager profile, player card) ----------------
+   Big avatar and name, then one line per sport: record, trophies and four
+   headline figures, with no boxes. */
+.mgr-card-avatar { width: 56px; height: 56px; font-size: 22px; }
+.mgr-card-title { gap: 14px; }
+.mgr-card { display: flex; flex-direction: column; gap: 14px; margin: 4px 0 18px; }
+.mgr-card-row { display: flex; flex-direction: column; gap: 8px; }
+.mgr-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.mgr-card-record { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-trophies { display: inline-flex; align-items: center; gap: 3px; color: var(--fitted); }
+.mgr-trophy-count { margin-left: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.mgr-card-stats { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; }
+.mgr-card-stat { min-width: 0; }
+.mgr-card-stat dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mgr-card-stat dd { margin: 0; }
+.mgr-card-figure { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-archetype { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 4px; }
+.mgr-archetype-label { font-size: 16px; font-weight: 700; }
+.career-rank-row { font-size: 14px; }
+.career-rank-pop { margin-left: 6px; }
+.career-rank-position { font-weight: 700; }
+
+/* --- 013 US9: ManagerTendencies (Scouting report) --------------------------
+   An archetype label under each manager's name; the selected league's managers
+   are grouped first under their own sub-heading. */
+.mgr-archetype-chip { font-size: 12px; font-weight: 600; color: var(--teal); width: fit-content; }
+.mgr-group { margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mgr-group:first-of-type { margin-top: 6px; }
+
+/* --- 013 US9: MockSetup ----------------------------------------------------
+   One row of seat chips (it scrolls inside its own frame when the room is wider
+   than the page). "You" is --crimson-fill; a real manager shows avatar and
+   archetype; "Start the draft" is the page's one --volt (see US1 block above). */
+.mock-seat-strip {
+  grid-template-columns: none; grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, 1fr); overflow-x: auto; padding-bottom: 4px;
+}
+.mock-seat.assigned .mock-seat-face { background: var(--panel); color: var(--text); }
+.mock-seat-avatar { width: 28px; height: 28px; font-size: 11px; }
+.mock-seat-arch { font-size: 10px; color: var(--teal); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-seat-who { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 013 US9: SignIn (welcome) ---------------------------------------------
+   Centered, no box: product name (Oswald), the pitch, a large field and the
+   page's one --volt action. */
+.signin-welcome {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 14px; min-height: 70vh; max-width: 720px; margin: 0 auto;
+}
+.signin-kicker { margin: 0; font-size: 18px; letter-spacing: 0.12em; color: var(--muted); }
+.signin-pitch { margin: 0; font-size: clamp(26px, 4.4vw, 42px); line-height: 1.15; font-weight: 700; }
+.signin-form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; margin-top: 10px; }
+.signin-label { display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; font-size: 12px; color: var(--muted); }
+.signin-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 14px 16px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+}
+.signin-input:focus { outline: 2px solid var(--teal); outline-offset: 2px; }
+.signin-continue {
+  font: inherit; font-size: 17px; font-weight: 700; padding: 13px 18px; border: 0; border-radius: 10px;
+  background: var(--volt); color: var(--bg); cursor: pointer;
+}
+.signin-continue:disabled { opacity: 0.55; cursor: default; }
+.signin-note { max-width: 520px; margin: 0; }
+.signin-welcome .error { max-width: 520px; margin: 0; }

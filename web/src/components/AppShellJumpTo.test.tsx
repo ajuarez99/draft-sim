@@ -100,7 +100,7 @@ describe('what the palette offers', () => {
 
     await waitFor(() => expect(screen.getAllByRole('option').length).toBeGreaterThan(0))
     const labels = screen.getAllByRole('option').map((o) => o.textContent ?? '')
-    expect(labels.some((l) => l.includes('History'))).toBe(true)
+    expect(labels.some((l) => l.includes('Standings'))).toBe(true)
     expect(labels.some((l) => l.includes('Power rankings'))).toBe(true)
   })
 
@@ -114,7 +114,7 @@ describe('what the palette offers', () => {
 
     await waitFor(() => expect(screen.getAllByRole('option').length).toBeGreaterThan(0))
     const labels = screen.getAllByRole('option').map((o) => o.textContent ?? '')
-    expect(labels.some((l) => l.includes('Analysis'))).toBe(false)
+    expect(labels.some((l) => l.includes('Team strength'))).toBe(false)
   })
 })
 

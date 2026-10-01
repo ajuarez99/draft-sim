@@ -489,3 +489,64 @@ describe('the header and the career panel agree (FR-007)', () => {
   // would be testing a reconstruction of the very second source the removal
   // was meant to delete.
 })
+
+// spec 013 US9 (T088): the player card, ranks as sentences, tendencies under the card.
+describe('player card header', () => {
+  it('shows one row per sport with the record, a title count and the headline figures, each with its seasons', async () => {
+    getManagerHistory.mockResolvedValue(twoSportHistory())
+    render(<ManagerHistory />)
+    await screen.findByText('popsharky')
+
+    const card = document.querySelector('.mgr-card') as HTMLElement
+    expect(card).toBeTruthy()
+    const rows = card.querySelectorAll('.mgr-card-row')
+    expect(rows).toHaveLength(2)
+    // NFL has one title, NBA none: the trophy count is per sport, never summed.
+    expect(within(rows[0] as HTMLElement).getByText('1 title')).toBeTruthy()
+    expect(within(rows[1] as HTMLElement).queryByText(/title/)).toBeNull()
+    expect(within(rows[0] as HTMLElement).getByText('Win rate')).toBeTruthy()
+    expect(within(rows[0] as HTMLElement).getAllByText('over 3 seasons')).toHaveLength(4)
+  })
+
+  it('reads a rank as a sentence that keeps its population and league', async () => {
+    getManagerHistory.mockResolvedValue(historyWithCareer())
+    render(<ManagerHistory />)
+    await screen.findByText('popsharky')
+
+    const row = (await screen.findByText('2nd of 12')).closest('li') as HTMLElement
+    expect(row.textContent).toBe('2nd of 12 for win ratein (Foot) Ball Knowers')
+  })
+
+  it('puts the draft tendencies with the archetype directly under the card, before the season tables', async () => {
+    const h = twoSportHistory()
+    h.draftHistory = [{
+      sport: 'nfl', reachBias: 8, relativeReachBias: 8, relativeReachStdErr: 3, positionalTilt: { QB: 1.4 },
+      draftsObserved: 2, picksScored: 30, provenance: 'FITTED',
+    }]
+    getManagerHistory.mockResolvedValue(h)
+    render(<ManagerHistory />)
+    await screen.findByText('popsharky')
+
+    expect(await screen.findByText('Reacher')).toBeTruthy()
+    const card = document.querySelector('.mgr-card') as HTMLElement
+    const tend = screen.getByText('What this app thinks about their drafting').closest('section') as HTMLElement
+    const seasons = document.querySelector('.manager-seasons') as HTMLElement
+    expect(card.compareDocumentPosition(tend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(tend.compareDocumentPosition(seasons) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('never labels an NBA-style manager (no scoreable picks) with a reach archetype', async () => {
+    const h = twoSportHistory()
+    h.draftHistory = [{
+      sport: 'nba', reachBias: 0, relativeReachBias: null, relativeReachStdErr: null, positionalTilt: { C: 1.5 },
+      draftsObserved: 2, picksScored: 0, provenance: 'NEUTRAL',
+    }]
+    getManagerHistory.mockResolvedValue(h)
+    render(<ManagerHistory />)
+    await screen.findByText('popsharky')
+
+    expect(await screen.findByText('C early')).toBeTruthy()
+    expect(screen.queryByText('Reacher')).toBeNull()
+    expect(screen.queryByText('Waits')).toBeNull()
+  })
+})

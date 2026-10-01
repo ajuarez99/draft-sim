@@ -31,8 +31,7 @@ import com.ballknowers.draftsim.domain.LeagueSettings;
 @Service
 public class SeasonSuperlativesService {
 
-    /** research R6, hand-set, arbitrary: fewer than this many scored weeks and every rate-based read is mostly noise. */
-    static final int EARLY_THRESHOLD_WEEKS = 4;
+    // The early-season threshold lives in SeasonWindow (spec 013 T069): one declaration, shared with the grades.
 
     private final LeagueRepository leagues;
     private final LeagueSeasonResolver seasons;
@@ -252,14 +251,14 @@ public class SeasonSuperlativesService {
             // observed yet (fix below applies the same rule once throughWeek exists).
             return Optional.of(new Result(false, "no week of this season has been scored yet",
                     league.season(), requestedSeason, league.sport(), null, 0, regularSeasonEnd, false,
-                    EARLY_THRESHOLD_WEEKS, closeMargin, List.of(), commissionerListAvailable, List.of(),
+                    SeasonWindow.EARLY_THRESHOLD_WEEKS, closeMargin, List.of(), commissionerListAvailable, List.of(),
                     league.sleeperId()));
         }
 
         int throughWeek = Collections.max(scoredWeeks);
         List<Integer> suspensionWeeksObserved = suspensionWeeksObserved(league, throughWeek);
         int weeksScored = scoredWeeks.size();
-        boolean early = weeksScored < EARLY_THRESHOLD_WEEKS;
+        boolean early = weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS;
         WeekBound bound = WeekBound.through(throughWeek);
         final Set<Integer> scoredWeeksFinal = scoredWeeks;
 
@@ -359,7 +358,7 @@ public class SeasonSuperlativesService {
         }
 
         return Optional.of(new Result(true, null, league.season(), requestedSeason, league.sport(),
-                throughWeek, weeksScored, regularSeasonEnd, early, EARLY_THRESHOLD_WEEKS, closeMargin,
+                throughWeek, weeksScored, regularSeasonEnd, early, SeasonWindow.EARLY_THRESHOLD_WEEKS, closeMargin,
                 suspensionWeeksObserved, commissionerListAvailable, superlatives, league.sleeperId()));
     }
 

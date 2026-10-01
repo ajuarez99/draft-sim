@@ -38,7 +38,7 @@ public class WeeklyReportController {
         // this league, is the same 404 as a league that does not exist. This route had no
         // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
         if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
-        return weeklyReport.forWeek(sleeperId, week)
+        return weeklyReport.forWeek(sleeperId, week, sleeperUserId)
                 .map(r -> ResponseEntity.ok(body(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -180,6 +180,7 @@ public class WeeklyReportController {
         out.put("avatarId", s.avatarId());
         out.put("record", s.record());
         out.put("points", s.points());
+        out.put("isMe", s.isMe());
         return out;
     }
 }

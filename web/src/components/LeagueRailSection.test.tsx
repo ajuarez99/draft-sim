@@ -69,9 +69,10 @@ const NFL26 = draftSummary({
 
 describe('league context per route', () => {
   it.each([
-    ['/leagues/L_NFL/history', 'History'],
+    ['/leagues/L_NFL', 'League home'],
+    ['/leagues/L_NFL/history', 'Standings'],
     ['/leagues/L_NFL/power', 'Power rankings'],
-    ['/leagues/L_NFL/analysis', 'Analysis'],
+    ['/leagues/L_NFL/analysis', 'Team strength'],
     ['/drafts/D_NFL/board', 'Draft board'],
   ])('shows the league on %s and marks %s current', async (path, current) => {
     const { leagueSection, currentRowLabels } = renderAtPath(path, { drafts: [NFL] })
@@ -87,7 +88,7 @@ describe('league context per route', () => {
     })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(rowLabels()).toContain('History')
+    expect(rowLabels()).toContain('Standings')
   })
 
   it('marks nothing current on a manager history page', async () => {
@@ -125,7 +126,7 @@ describe('league context per route', () => {
     })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(rowLabels()).toContain('History')
+    expect(rowLabels()).toContain('Standings')
   })
 })
 
@@ -134,17 +135,20 @@ describe('what a league is offered', () => {
     const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
+    // Grouped by what a fan is doing (specs/013 US3): home, this week, the
+    // season, draft, history.
     expect(rowLabels()).toEqual([
-      'Draft board',
-      'History',
+      'League home',
+      'Matchups & awards',
       'Power rankings',
-      'Analysis',
-      'Roster management',
-      'Expected wins',
-      'Season forecast',
-      'Weekly report',
-      'Superlatives',
+      'Team strength',
+      'Luck',
+      'Bench points',
+      'Playoff odds',
+      'Awards',
+      'Draft board',
       'Mock it',
+      'Standings',
     ])
   })
 
@@ -155,17 +159,17 @@ describe('what a league is offered', () => {
     const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NBA/history', { drafts: [NBA] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(rowLabels()).not.toContain('Analysis')
+    expect(rowLabels()).not.toContain('Team strength')
     expect(rowLabels()).toContain('Power rankings')
     // Roster management IS offered to basketball, and the contrast with
     // Analysis one line up is the whole point: Analysis is gated because two
     // of its blocks are projections and there is no basketball projection
     // source, while nothing on Roster management is a projection -- it reads
     // points already scored, which Sleeper reports for both sports.
-    expect(rowLabels()).toContain('Roster management')
-    expect(rowLabels()).toContain('Expected wins')
-    expect(rowLabels()).toContain('Season forecast')
-    expect(rowLabels()).toContain('Weekly report')
+    expect(rowLabels()).toContain('Bench points')
+    expect(rowLabels()).toContain('Luck')
+    expect(rowLabels()).toContain('Playoff odds')
+    expect(rowLabels()).toContain('Matchups & awards')
   })
 
   it('offers Follow live only while a draft is running', async () => {
@@ -467,7 +471,7 @@ describe('year links keep the page', () => {
   // (f2) Leagues-flyout coverage: year links cannot cross sports (a lineage is
   // one sport), so the "current page not offered by the target" fallback is only
   // reachable from the Leagues group of the flyout. Analysis is football-only.
-  it('(f2) falls back to History when the target sport lacks the page', () => {
+  it('(f2) falls back to League home when the target sport lacks the page', () => {
     const nba25 = draftSummary({ sleeperDraftId: 'D_NBA25', sleeperLeagueId: 'L_NBA25', sport: 'nba', season: 2025 })
     const nba26 = draftSummary({
       sleeperDraftId: 'D_NBA26',
@@ -478,6 +482,90 @@ describe('year links keep the page', () => {
     })
     const nbaLineage: LeagueLineage = { current: nba26, seasons: [nba26, nba25] }
     const nbaCtx: LeagueContext = { lineage: nbaLineage, season: nba26 }
-    expect(switchTarget('analysis', nbaCtx)).toBe('/leagues/L_NBA26/history')
+    expect(switchTarget('analysis', nbaCtx)).toBe('/leagues/L_NBA26')
+  })
+})
+
+describe('rail groups (specs/013 US3)', () => {
+  const headings = (root: HTMLElement | null) =>
+    root ? [...root.querySelectorAll('.app-rail-group-head')].map((e) => (e.textContent ?? '').trim()) : []
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    try {
+      window.localStorage.clear()
+    } catch {
+      /* none */
+    }
+  })
+
+  it('renders the four headed groups in order', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(headings(leagueSection()).map((h) => h.replace(/[▾▸]/g, '').trim())).toEqual([
+      'This week',
+      'The season',
+      'Draft',
+      'History',
+    ])
+  })
+
+  it('collapses a group on click, remembers it, and keeps the current group open', async () => {
+    const user = userEvent.setup()
+    const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+
+    const season = [...leagueSection()!.querySelectorAll<HTMLButtonElement>('button.app-rail-group-head')].find(
+      (b) => (b.textContent ?? '').includes('The season'),
+    )!
+    expect(season.getAttribute('aria-expanded')).toBe('true')
+    await user.click(season)
+    expect(rowLabels()).not.toContain('Luck')
+    expect(season.getAttribute('aria-expanded')).toBe('false')
+    expect(JSON.parse(window.localStorage.getItem('bk.rail.groups.v1') ?? '{}')).toEqual({ season: false })
+  })
+
+  it('reopens a remembered-closed group when you land on one of its pages', async () => {
+    window.localStorage.setItem('bk.rail.groups.v1', JSON.stringify({ season: false }))
+    const { leagueSection, rowLabels, currentRowLabels } = renderAtPath('/leagues/L_NFL/expected-wins', {
+      drafts: [NFL],
+    })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    await waitFor(() => expect(currentRowLabels()).toEqual(['Luck']))
+    expect(rowLabels()).toContain('Team strength')
+  })
+
+  it('starts with a remembered-closed group closed elsewhere', async () => {
+    window.localStorage.setItem('bk.rail.groups.v1', JSON.stringify({ season: false }))
+    const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(rowLabels()).not.toContain('Luck')
+    expect(rowLabels()).toContain('Standings')
+  })
+
+  it('shows every group expanded in the phone lane, ignoring remembered state', async () => {
+    window.localStorage.setItem('bk.rail.groups.v1', JSON.stringify({ season: false, draft: false }))
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('860px'),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+    const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(rowLabels()).toContain('Luck')
+    expect(rowLabels()).toContain('Draft board')
+    // headings are separators on a phone, not buttons: no extra tap to find a page
+    expect(leagueSection()!.querySelectorAll('button.app-rail-group-head')).toHaveLength(0)
+    expect(headings(leagueSection())).toHaveLength(4)
+  })
+
+  it('titles every row with its fan label, so a collapsed rail is never an unlabeled mark', async () => {
+    const { leagueSection } = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    const luck = [...leagueSection()!.querySelectorAll<HTMLElement>('.app-rail-row')].find(
+      (e) => e.getAttribute('aria-label') === 'Luck',
+    )
+    expect(luck?.getAttribute('title')).toBe('Luck')
   })
 })

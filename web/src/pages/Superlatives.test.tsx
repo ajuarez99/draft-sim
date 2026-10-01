@@ -736,7 +736,8 @@ describe('Superlatives', () => {
     render(<Superlatives />)
 
     expect(await screen.findByText('Games missed, cause unknown')).toBeInTheDocument()
-    expect(screen.getByText('62.40 estimated points lost')).toBeInTheDocument()
+    // The total is the row's headline figure (stat column) and still says "estimated".
+    expect(screen.getByText('62.40 estimated points lost')).toHaveClass('sl-stat')
     expect(
       screen.getByText('The Process (C) — 6 games missed (5 weeks), ~10.40 per game (estimated)'),
     ).toBeInTheDocument()
@@ -1147,8 +1148,10 @@ describe('Superlatives', () => {
     expect(fetchSuperlatives).toHaveBeenLastCalledWith('L1')
   })
 
-  // specs/010-superlatives-full-standings T021/T026: the "See all" standings modal.
-  describe('full standings modal', () => {
+  // specs/010-superlatives-full-standings T021/T026: the "See all" standings. Since
+  // spec 013 US9 they expand in place under the award's row (a labelled region).
+  describe('full standings (in place)', () => {
+    const panel = () => screen.getByRole('region', { name: /full standings/ })
     const holder = (id: number, name: string) => ({
       rosterId: id, managerId: id * 10, teamName: name, username: null, avatarId: null,
     })
@@ -1185,7 +1188,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const dialog = screen.getByRole('dialog')
+      const dialog = panel()
       const items = within(dialog).getAllByRole('listitem')
       expect(items).toHaveLength(3)
       expect(items[0]).toHaveTextContent('Team A')
@@ -1195,22 +1198,25 @@ describe('Superlatives', () => {
       expect(items[0]).toHaveTextContent('week 3')
     })
 
-    it('closes on Escape and on the backdrop, but not on a click inside the dialog', async () => {
+    it('expands in place, with no dialog, and Hide collapses it again', async () => {
       fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
       render(<Superlatives />)
 
-      await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      await userEvent.click(screen.getByRole('dialog'))
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
-
-      await userEvent.keyboard('{Escape}')
+      const button = await screen.findByRole('button', { name: 'See all' })
+      expect(button).toHaveAttribute('aria-expanded', 'false')
+      await userEvent.click(button)
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      // The standings sit inside the same row (article) as the award they belong to.
+      expect(panel().closest('article')).toContainElement(button)
+      expect(screen.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-expanded', 'true')
 
-      // The backdrop click must close it and not bubble up to the card, which
-      // would reopen it.
-      await userEvent.click(screen.getByRole('button', { name: 'See all' }))
-      await userEvent.click(screen.getByRole('dialog').parentElement as HTMLElement)
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      // A click inside the panel neither collapses nor re-opens anything.
+      await userEvent.click(panel())
+      expect(panel()).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Hide' }))
+      expect(screen.queryByRole('region', { name: /full standings/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'See all' })).toHaveAttribute('aria-expanded', 'false')
     })
 
     it('does not open from the Games summary', async () => {
@@ -1218,7 +1224,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByText('Games'))
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: /full standings/ })).not.toBeInTheDocument()
     })
 
     it('opens from a click on the card body (mouse path)', async () => {
@@ -1226,7 +1232,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByText('Highest week'))
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(panel()).toBeInTheDocument()
     })
 
     it('does not open from a card click while text is selected (B3)', async () => {
@@ -1237,23 +1243,23 @@ describe('Superlatives', () => {
       const spy = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'Team A' } as unknown as Selection)
       try {
         await userEvent.click(title)
-        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+        expect(screen.queryByRole('region', { name: /full standings/ })).not.toBeInTheDocument()
       } finally {
         spy.mockRestore()
       }
     })
 
-    it('stays open when a press starts inside the card and is released on the backdrop (B3)', async () => {
+    it('stays open when a press starts inside the panel and is released elsewhere (B3)', async () => {
       fetchSuperlatives.mockResolvedValue(withKind(baseline(), highestWeek()))
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const dialog = screen.getByRole('dialog')
+      const dialog = panel()
       const backdrop = dialog.parentElement as HTMLElement
       fireEvent.mouseDown(dialog)
       fireEvent.mouseUp(backdrop)
       fireEvent.click(backdrop)
-      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(panel()).toBeInTheDocument()
     })
 
     it('labels UNETHICAL as player-weeks and JOEL_EMBIID as estimated (B1, B4)', () => {
@@ -1283,7 +1289,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      const items = within(panel()).getAllByRole('listitem')
       expect(items[1]).toHaveTextContent('—')
       expect(items[1]).toHaveTextContent('Roster 4')
       expect(items[1]).toHaveTextContent('no scored weeks')
@@ -1298,7 +1304,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      const items = within(panel()).getAllByRole('listitem')
       expect(items.map((li) => li.textContent)).toEqual([
         expect.stringContaining('Team C'),
         expect.stringContaining('Team B'),
@@ -1316,7 +1322,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      const items = within(panel()).getAllByRole('listitem')
       expect(items[0]).toHaveTextContent('−1.30 wins vs expected')
       expect(items[1]).toHaveTextContent('+0.50 wins vs expected')
     })
@@ -1331,7 +1337,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const items = within(screen.getByRole('dialog')).getAllByRole('listitem')
+      const items = within(panel()).getAllByRole('listitem')
       expect(items[0]).toHaveTextContent('2 wins')
       expect(items[1]).toHaveTextContent('1 win')
       expect(standingFigure('CLOSE_LOSSES', 'GAMES', 1)).toBe('1 loss')
@@ -1362,7 +1368,7 @@ describe('Superlatives', () => {
       render(<Superlatives />)
 
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const dialog = screen.getByRole('dialog')
+      const dialog = panel()
       expect(within(dialog).getByText('This award ranks players, not teams.')).toBeInTheDocument()
       const items = within(dialog).getAllByRole('listitem')
       expect(items).toHaveLength(2)
@@ -1392,7 +1398,7 @@ describe('Superlatives', () => {
       )
       render(<Superlatives />)
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const dialog = screen.getByRole('dialog')
+      const dialog = panel()
       const lists = within(dialog).getAllByRole('list')
       expect(within(lists[0]).getAllByRole('listitem')).toHaveLength(6)
       const summary = within(dialog).getByText(/41 more players with 2 adds each/)
@@ -1401,7 +1407,7 @@ describe('Superlatives', () => {
       expect(details.open).toBe(false)
       await userEvent.click(summary)
       expect(details.open).toBe(true)
-      expect(screen.getByRole('dialog')).toBeInTheDocument() // did not close the modal
+      expect(panel()).toBeInTheDocument() // did not collapse the row
       expect(within(dialog).getAllByRole('listitem')).toHaveLength(47)
     })
 
@@ -1409,7 +1415,7 @@ describe('Superlatives', () => {
       fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabariWith(players(12, 1, 3, 'Tie'))))
       render(<Superlatives />)
       await userEvent.click(await screen.findByRole('button', { name: 'See all' }))
-      const dialog = screen.getByRole('dialog')
+      const dialog = panel()
       const summary = within(dialog).getByText(/12 players tied with 3 adds each/)
       await userEvent.click(summary)
       expect(within(dialog).getAllByRole('listitem')).toHaveLength(12)
@@ -1435,5 +1441,29 @@ describe('Superlatives eyebrow names the season shown', () => {
     fetchSuperlatives.mockReturnValue(new Promise(() => {}))
     render(<Superlatives />)
     expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})
+
+// spec 013 US9 (T086/T087): the trophy list. One row per award, in payload order,
+// each with a trophy mark; the headline figure sits in its own column in tabular numbers.
+describe('Superlatives trophy list', () => {
+  it('renders one row per award, each with a trophy, and keeps the early badge and empty-award message', async () => {
+    const early: Superlative = {
+      kind: 'HIGHEST_WEEK', available: true, reason: null, early: true, value: 180.5, unit: 'POINTS',
+      holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
+      emptyReason: null, detail: [{ type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 }],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+    }
+    const empty: Superlative = { ...notBuiltYet('LOWEST_WEEK'), available: true, reason: null, emptyReason: 'nobody yet' }
+    fetchSuperlatives.mockResolvedValue(withKind(withKind(baseline(), early), empty))
+    const { container } = render(<Superlatives />)
+
+    await screen.findByText('Team A')
+    expect(container.querySelectorAll('article.sl-row')).toHaveLength(KINDS.length)
+    expect(container.querySelectorAll('article.sl-row .sl-trophy')).toHaveLength(KINDS.length)
+    expect(screen.getByText('early — this is mostly noise')).toBeInTheDocument()
+    expect(screen.getByText('nobody yet')).toBeInTheDocument()
+    // The headline figure is its own element.
+    expect(container.querySelector('.sl-row-stat .sl-stat')?.textContent).toBe('180.50 points')
   })
 })

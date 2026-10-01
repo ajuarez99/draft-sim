@@ -45,8 +45,8 @@ describe('switchTarget', () => {
   // The case that makes the fallback necessary. Analysis is football-only, and
   // the rule for that lives in the destination table -- this reads it rather
   // than restating it, which is why the two can't drift apart.
-  it('falls back to History when the target league has no such page', () => {
-    expect(switchTarget('analysis', ctxOf(NBA_C))).toBe('/leagues/LC/history')
+  it('falls back to League home when the target league has no such page', () => {
+    expect(switchTarget('analysis', ctxOf(NBA_C))).toBe('/leagues/LC')
   })
 
   it('keeps Analysis between two football leagues', () => {
@@ -99,7 +99,7 @@ describe('the switcher in the rail', () => {
     expect(beta?.getAttribute('href')).toBe('/leagues/LB/power')
   })
 
-  it('offers an NBA league History when you are on an NFL league’s Analysis', async () => {
+  it('offers an NBA league its League home when you are on an NFL league’s Analysis', async () => {
     const user = userEvent.setup()
     const { leagueSection } = renderAtPath('/leagues/LA/analysis', { drafts: [NFL_A, NBA_C] })
 
@@ -108,7 +108,7 @@ describe('the switcher in the rail', () => {
     await user.click(screen.getByTitle('Switch league or season'))
 
     const hoops = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('Hoops'))
-    expect(hoops?.getAttribute('href')).toBe('/leagues/LC/history')
+    expect(hoops?.getAttribute('href')).toBe('/leagues/LC')
   })
 })
 
