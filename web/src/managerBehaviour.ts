@@ -110,3 +110,63 @@ export function reachGapText(m: { draftsObserved: number; picksScored: number })
     + 'no board snapshot exists from close enough to those drafts. The position leanings are '
     + 'real; there is no reach number, and the engine uses the league average in its place.'
 }
+
+/**
+ * The smallest distance from neutral (1.0) at which a positional tilt becomes
+ * the manager's label ("QB early", "TE late"). ARBITRARY: a hand-set number,
+ * not fitted and not backtested. It is deliberately well above the 0.05 that
+ * `behaviourText` uses to list a lean at all, because a label is a headline and
+ * a weak lean is not one. If a manager has no tilt this far from neutral the
+ * label says so ("Not enough history") rather than naming a weak lean.
+ */
+export const ARCHETYPE_TILT_CUTOFF = 0.25
+
+export type Archetype = {
+  /** The short fan-facing label: "Reacher", "Waits", "Drafts like the room", "QB early", "Not enough history". */
+  label: string
+  /** Why this label, in a sentence that names its evidence. Safe to show beside or under the label. */
+  basis: string
+}
+
+/**
+ * One label per manager, built on the SAME reach read the seat popover,
+ * /managers and the manager page use (`relativeReachRead`), so an archetype can
+ * never disagree with the reach caption beside it, and the "room" band is not
+ * re-derived here.
+ *
+ * Order of evidence:
+ *   1. Reach, but only with scoreable picks behind it (`picksScored > 0`) and a
+ *      read that is not `thin`: early -> "Reacher", late -> "Waits", room ->
+ *      "Drafts like the room". With no scoreable picks the reach number is the
+ *      league mean wearing this manager's name (every NBA manager, always), so
+ *      it never produces a reach label.
+ *   2. Otherwise the strongest positional tilt, if it is at least
+ *      ARCHETYPE_TILT_CUTOFF from neutral.
+ *   3. Otherwise "Not enough history".
+ */
+export function archetype(m: BehaviourInputs): Archetype {
+  if (m.picksScored > 0) {
+    const read = relativeReachRead(m.relativeReachBias, m.relativeReachStdErr)
+    if (read && read.kind !== 'thin') {
+      const label = read.kind === 'early' ? 'Reacher' : read.kind === 'late' ? 'Waits' : 'Drafts like the room'
+      return { label, basis: read.text }
+    }
+  }
+
+  const strongest = Object.entries(m.positionalTilt)
+    .sort((a, b) => Math.abs(b[1] - 1) - Math.abs(a[1] - 1))[0]
+  if (strongest && Math.abs(strongest[1] - 1) >= ARCHETYPE_TILT_CUTOFF) {
+    const [pos, v] = strongest
+    return {
+      label: `${pos} ${v > 1 ? 'early' : 'late'}`,
+      basis: `${v > 1 ? 'Leans' : 'Fades'} ${pos} (${v.toFixed(2)}x neutral); no usable reach read to label them on.`,
+    }
+  }
+
+  return {
+    label: 'Not enough history',
+    basis: m.picksScored > 0
+      ? 'Too few scoreable picks to compare with their room, and no strong positional lean.'
+      : 'No pick of theirs can be scored for reach, and no strong positional lean.',
+  }
+}

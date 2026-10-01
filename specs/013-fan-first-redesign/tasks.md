@@ -275,25 +275,25 @@ Every page task does the same five things:
   - league Σ wins = Σ losses;
   - a bye week;
   - an odd-n fixture where the median roster ties.
-- [ ] T084 [US9] Standings `WEB/pages/LeagueHistory.tsx`:
+- [X] T084 [US9] Standings `WEB/pages/LeagueHistory.tsx`:
   - "season in progress" once, in the section title;
   - best/worst per numeric column;
   - "Record vs all (reg. season)" and "Vs weekly median (reg. season)" (median games only, NOT added to the real record; ffwrapped's "Median record" adds them, so say so in How this works) filled only where expected-wins `season` equals the row's season, otherwise "—";
   - `<HowThisWorks>` explains both.
-- [ ] T085 [P] [US9] `WEB/pages/LeagueHistory.test.tsx`: in-progress text appears once; "—" when the season differs; columns render.
-- [ ] T086 [US9] Awards trophy list `WEB/pages/Superlatives.tsx`: one row per award (`--fitted` trophy, name, winner avatar + name, the stat in big tabular numbers, "See all" expanding in place). Early badges stay.
-- [ ] T087 [P] [US9] `WEB/pages/Superlatives.test.tsx`: update layout assertions; keep every early-badge and empty-award assertion.
-- [ ] T088 [US9] Manager profile header `WEB/pages/ManagerHistory.tsx`: a player-card row (avatar, name, career record, trophies, 3–4 headline stats); ranks as sentences; tendencies beneath.
-- [ ] T089 [US9] `WEB/managerBehaviour.ts`: `archetype(inputs)` built on `relativeReachRead(...).kind` (`early` → "Reacher", `late` → "Waits", `room` → "Drafts like the room", `thin`/null → fall through to tilt). Tilt above a labelled cutoff gives e.g. "QB early"; otherwise "Not enough history". Returns `{ label, basis }`.
-- [ ] T090 [P] [US9] `WEB/managerBehaviour.test.ts`:
+- [X] T085 [P] [US9] `WEB/pages/LeagueHistory.test.tsx`: in-progress text appears once; "—" when the season differs; columns render.
+- [X] T086 [US9] Awards trophy list `WEB/pages/Superlatives.tsx`: one row per award (`--fitted` trophy, name, winner avatar + name, the stat in big tabular numbers, "See all" expanding in place). Early badges stay.
+- [X] T087 [P] [US9] `WEB/pages/Superlatives.test.tsx`: update layout assertions; keep every early-badge and empty-award assertion.
+- [X] T088 [US9] Manager profile header `WEB/pages/ManagerHistory.tsx`: a player-card row (avatar, name, career record, trophies, 3–4 headline stats); ranks as sentences; tendencies beneath.
+- [X] T089 [US9] `WEB/managerBehaviour.ts`: `archetype(inputs)` built on `relativeReachRead(...).kind` (`early` → "Reacher", `late` → "Waits", `room` → "Drafts like the room", `thin`/null → fall through to tilt). Tilt above a labelled cutoff gives e.g. "QB early"; otherwise "Not enough history". Returns `{ label, basis }`.
+- [X] T090 [P] [US9] `WEB/managerBehaviour.test.ts`:
   - `picksScored = 0` / `thin` never gives a reach label (the NBA case);
   - `early` → "Reacher" (sign not inverted);
   - tilt fallback;
   - none.
-- [ ] T091 [US9] `WEB/pages/ManagerTendencies.tsx`: archetype label per manager; managers in the rail's **currently selected league** first.
-- [ ] T092 [US9] `WEB/pages/MockSetup.tsx` plus test: a single row of seat chips; a real manager shows avatar plus archetype; "You" uses `--crimson-fill`; "Start the draft" is `--volt`.
-- [ ] T093 [US9] `WEB/pages/SignIn.tsx` plus test: a centered welcome, pitch "Your league's real managers, simulated. See who's likely gone before you pick.", a big field, a `--volt` Continue, and the "no password" line kept.
-- [ ] T094 [US9] Live check of each US9 page at 3 sizes × 2 sports.
+- [X] T091 [US9] `WEB/pages/ManagerTendencies.tsx`: archetype label per manager; managers in the rail's **currently selected league** first.
+- [X] T092 [US9] `WEB/pages/MockSetup.tsx` plus test: a single row of seat chips; a real manager shows avatar plus archetype; "You" uses `--crimson-fill`; "Start the draft" is `--volt`.
+- [X] T093 [US9] `WEB/pages/SignIn.tsx` plus test: a centered welcome, pitch "Your league's real managers, simulated. See who's likely gone before you pick.", a big field, a `--volt` Continue, and the "no password" line kept.
+- [X] T094 [US9] Live check of each US9 page at 3 sizes × 2 sports.
 
 ---
 

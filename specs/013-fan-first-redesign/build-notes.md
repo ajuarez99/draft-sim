@@ -489,3 +489,46 @@ Props added, all optional: `availability`, `players`, `noAvailabilityReason`, `r
   checks out: B. Robinson, pick 4 at draft-time ADP 2, shows **+2** (steal). Tinted cell bg oklch(29.8% .054 232) with
   `--text` oklch(95%) on top: high contrast, not separately ratio-measured.
 - Grades: one header badge per table at 3 scored weeks; Team strength states "fewer than 4 weeks", read from the payload.
+
+## US9 — build agent
+
+Scope: T084–T093 (web only; T094 live check is the parent's). No commit made.
+
+**Archetype rules (`web/src/managerBehaviour.ts`, `archetype()` returns `{ label, basis }`):**
+1. Reach, only with `picksScored > 0` AND a read from `relativeReachRead(...)` that is not `thin`: `early` → "Reacher", `late` → "Waits", `room` → "Drafts like the room". `basis` is the read's own text, so label and caption can't disagree.
+2. Otherwise the single strongest positional tilt (largest |v − 1|), if |v − 1| ≥ `ARCHETYPE_TILT_CUTOFF` = **0.25** → "QB early" (v > 1) or "TE late" (v < 1).
+3. Otherwise "Not enough history".
+- **0.25 is ARBITRARY** (hand-set, not fitted, not backtested; labelled so in the code). Reason: `behaviourText` already lists any lean over 0.05, but a label is a headline, so it needs a clearly non-neutral tilt. Not measured against the real distribution of tilts; revisit with data, and don't retune it to make a particular manager read a particular way.
+- NBA case: every NBA manager has `picksScored = 0`, so they can never get a reach label; they get a tilt label or "Not enough history" (tested, including with a reach number present).
+
+**How standings decide the season match:** `LeagueHistory` fetches `getExpectedWins(league)` once (failure leaves the columns as dashes). Each season table gets `season={s.season}` (the `SeasonHistory.season`, since per-league `StandingRow.season` is null). A team's figures are used only if `expected.available && expected.season === s.season`, matched by `rosterId`; otherwise "—". The median column is "Vs weekly median (reg. season)" and shows median games only; How this works says ffwrapped's "Median record" adds them to the real record (3-0 here vs 6-0 there).
+
+**Other decisions:**
+- "season in progress" appears once, in the `<h3>`; an in-progress rank cell is "—" with `title="Season in progress"`. The old test that said "never an unexplained dash" now accepts a dash only with that title.
+- Best/worst marks (W, L, PF, PA, vs-all, vs-median): `▲`/`▼` with `role="img"` + aria-label, tinted `--up`/`--down`. None when the column has no spread. Rank and T are not marked.
+- Superlatives: modal replaced by an in-place `region` (`SuperlativeStandingsModal.tsx` git-mv'd to `SuperlativeStandings.tsx`). "See all" toggles to "Hide" (`aria-expanded`). The modal's repeated early badge and coverage line are not repeated in the panel (the row above already shows both). The Embiid total line moved from the holder line to the headline figure (otherwise printed twice); it still says "estimated".
+- Archetype on the Scouting report: managers of the rail's league first. **Deviation/finding:** on `/managers` the rail has no selected league (the rail derives its league from the path or a route-state hint, and `/managers` accepts neither). So `Rail.tsx` now puts `{ railLeagueId }` in the Managers link's route state (`AppShell` passes `railLeague.season.sleeperLeagueId`) and `ManagerTendencies` reads that same key, the one `AppShell` already reads for manager history. Members come from `getLeagueHistory` standings, sport and name from `cachedDrafts()` (the rail's own draft list). A direct visit to `/managers` has no league and no grouping (never a guess). Not covered by a Rail unit test; the parent should click through it.
+- Manager profile: player card (big avatar + name, one row per sport: record, trophy icons + "N title(s)", four headline figures, each with "over N seasons"); ranks are sentences ("2nd of 12 for win rate in <league>"); the drafting section (with archetype) moved directly under the card.
+- MockSetup: seat strip is one scrolling row; a seated real manager shows avatar + archetype; the per-seat hue tint on the face was dropped (neutral raised surface) so colour keeps one meaning.
+- SignIn: centered; kicker "Ball Knowers", H1 pitch exactly as specified, large field, `--volt` Continue, no-password sentence kept verbatim (under the field). `App.test.tsx` heading assertions changed from "Who are you?" to the new pitch.
+- Line endings: several files are CRLF in the working tree (index is LF, `core.autocrlf=true`); files I rewrote via script are LF. Git normalises on commit.
+
+**Files changed:** `web/src/managerBehaviour.ts`(+test), `web/src/pages/{LeagueHistory,Superlatives,ManagerHistory,ManagerTendencies,MockSetup,SignIn}.tsx` (+ their tests), `web/src/components/SuperlativeStandings.tsx` (renamed from SuperlativeStandingsModal), `web/src/components/{Rail,AppShell}.tsx`, `web/src/App.test.tsx`, `web/src/styles.css` (five `/* --- 013 US9: ... */` blocks at the end), `specs/013-fan-first-redesign/caveats-after.md` (rows C016–C018, C065, C157, C359 + US9 section; still 488 distinct ids).
+
+**Verified:** `npx tsc -b` clean; `npx vitest run` 75 files / 913 tests passed (includes `sourceEncoding.test.ts`); `npm run build` ok. **Not verified:** nothing was viewed in a browser (parent does T094).
+
+## US9: parent review and live check (measured, local, 2026-10-01)
+
+- Diff grep for new numeric constants (lessons #25): only `ARCHETYPE_TILT_CUTOFF = 0.25` (new, labelled ARBITRARY)
+  and `MAX_PLAYER_ROWS = 10` (predates the branch; moved with the SuperlativeStandings rename). No duplicated rules.
+- **Standings (NFL):** "season in progress" appears once; 2026 shows "Record vs all (reg. season)" and "Vs weekly
+  median (reg. season)", e.g. Master Bates 28-5 / 3-0. 2025 rows show "—" (expected-wins season ≠ row season).
+  The ▲ for best all-play sits on Play with the Klittle (29-4 > 28-5), **matching ffwrapped's own table.**
+- **Scouting report via the rail's Managers link:** "In (Foot) Ball Knowers" is grouped first. 18 rows were checked
+  label-vs-caption: every Reacher has "picks earlier", every Waits has "picks later", and every "Drafts like the room"
+  has a reach within its ± band. No sign inversion. Direct visits to /managers (no rail state) show no league group,
+  by design.
+- **Awards:** one row per award (28 list rows with expansions), 6 early badges kept, "See all" expands in place.
+- **Manager profile, mock setup:** render; no horizontal scroll at 1440. **Sign-in** (identity removed, then
+  restored): centered pitch "Your league's real managers, simulated. See who's likely gone before you pick.",
+  Continue in `--volt` (oklch(0.88 0.19 125)), no-password line kept.

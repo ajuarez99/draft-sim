@@ -5,6 +5,8 @@ import HowThisWorks from '../components/HowThisWorks'
 import { createMockSession, getManagers, type ManagerSummary, type Sport } from '../api'
 import { hueForIndex } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
+import { archetype } from '../managerBehaviour'
+import Avatar from '../components/Avatar'
 
 // Same domain as LeagueShape.SUPPORTED_TEAM_COUNTS (engine/LeagueShape.java) --
 // one team-size dropdown across the whole app, per claude/next-features-roadmap.md §3.1.
@@ -241,14 +243,30 @@ export default function MockSetup() {
                 <button
                   type="button"
                   className="mock-seat-face"
-                  style={assignedManager ? { background: `oklch(30% 0.05 ${hue})`, color: `oklch(84% 0.12 ${hue})` } : undefined}
                   onClick={() => handleUserSlotChange(slot)}
                   aria-pressed={isMine}
                   aria-label={isMine ? `Your seat, pick ${pickLabel}` : `Take pick ${pickLabel} as your seat`}
                   disabled={creating}
                 >
                   <span className="mock-seat-pick">{pickLabel}</span>
+                  {/* A real manager shows who they are (photo) and how they draft
+                      (archetype, built on the same reach read as /managers); a
+                      bot shows neither, because there is nothing to say. */}
+                  {assignedManager && !isMine && (
+                    <Avatar
+                      avatarId={assignedManager.avatarId}
+                      seed={String(assignedManager.managerId)}
+                      label={assignedManager.manager}
+                      hue={hue}
+                      className="mock-seat-avatar"
+                    />
+                  )}
                   <span className="mock-seat-who">{isMine ? 'You' : (assignedManager?.manager ?? 'Bot')}</span>
+                  {assignedManager && !isMine && (
+                    <span className="mock-seat-arch" title={archetype(assignedManager).basis}>
+                      {archetype(assignedManager).label}
+                    </span>
+                  )}
                 </button>
 
                 {/* Compact inline select, not a full-width row -- this

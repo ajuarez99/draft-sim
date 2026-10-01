@@ -50,47 +50,53 @@ export default function SignIn() {
   }
 
   return (
-    <div className="content signin-content">
-      <section className="panel home-hero signin-hero">
-        <div className="home-hero-body">
-          <p className="home-hero-kicker cond">Welcome to Ball Knowers</p>
-          <h2 className="home-hero-title">Who are you?</h2>
-          <p className="home-hero-sub">
-            Enter your Sleeper username (or paste your Sleeper profile link) to see your own
-            leagues and get your seat highlighted at the table. No password -- this app never
-            asks Sleeper for anything private.
-          </p>
+    // spec 013 US9 (T093): a centered welcome, no box. The product name, one line
+    // of pitch, a large field and the page's one primary action (--volt).
+    <div className="content signin-content signin-welcome">
+      <p className="signin-kicker cond">Ball Knowers</p>
+      <h1 className="signin-pitch">
+        Your league&apos;s real managers, simulated. See who&apos;s likely gone before you pick.
+      </h1>
 
-          <div className="controls signin-controls">
-            <label>
-              Your Sleeper username
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && submit()}
-                placeholder="Username or profile link"
-                autoFocus
-                size={24}
-              />
-            </label>
-            <button onClick={submit} disabled={status === 'resolving' || !input.trim()}>
-              {status === 'resolving' ? 'Checking…' : 'Continue'}
-            </button>
-          </div>
+      <form
+        className="signin-form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+      >
+        <label className="signin-label">
+          Your Sleeper username
+          <input
+            className="signin-input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Username or profile link"
+            autoFocus
+          />
+        </label>
+        <button className="signin-continue" type="submit" disabled={status === 'resolving' || !input.trim()}>
+          {status === 'resolving' ? 'Checking…' : 'Continue'}
+        </button>
+      </form>
 
-          {status === 'not-found' && (
-            <div className="error">
-              No Sleeper user called “{lastTried}”. Check the spelling and try again.
-            </div>
-          )}
-          {status === 'unreachable' && (
-            <div className="error">
-              Couldn’t reach Sleeper just now -- that’s not on you.{' '}
-              <button className="link-button" onClick={submit}>Try again</button>
-            </div>
-          )}
+      <p className="signin-note muted small">
+        Enter your Sleeper username (or paste your Sleeper profile link) to see your own leagues and
+        get your seat highlighted at the table. No password -- this app never asks Sleeper for
+        anything private.
+      </p>
+
+      {status === 'not-found' && (
+        <div className="error">
+          No Sleeper user called “{lastTried}”. Check the spelling and try again.
         </div>
-      </section>
+      )}
+      {status === 'unreachable' && (
+        <div className="error">
+          Couldn’t reach Sleeper just now -- that’s not on you.{' '}
+          <button className="link-button" onClick={submit}>Try again</button>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
-import SuperlativeStandingsModal from '../components/SuperlativeStandingsModal'
+import SuperlativeStandings from '../components/SuperlativeStandings'
 import PlayerFace from '../components/PlayerFace'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
@@ -135,7 +135,7 @@ export default function Superlatives() {
             </p>
           </section>
 
-          <div className="sl-cards">
+          <div className="sl-list">
             {data.superlatives.map((s, i) => (
               <SuperlativeCard
                 key={s.kind}
@@ -150,7 +150,7 @@ export default function Superlatives() {
           </div>
 
           <HowThisWorks>
-            <p>One card each. If an award can&apos;t be worked out yet, its card says why.</p>
+            <p>One row each. If an award can&apos;t be worked out yet, its row says why.</p>
           </HowThisWorks>
 
           {data.leagueSleeperId && (
@@ -209,14 +209,29 @@ function SuperlativeCard({
   const openable = s.available && !isEmpty && (s.standings.length > 0 || s.playerStandings.length > 0)
   const [open, setOpen] = useState(false)
 
+  // The headline figure, in big tabular numbers. Player-headed awards lead with
+  // the winner's add count; every other kind reuses `standingFigure`, the same
+  // formatter the full standings use, so the row and its standings can't
+  // disagree on a number (amendment 10). Absent when the payload has no value.
+  const showSharedValue = !isSingleEventKind && !isReadingKind
+  let stat: string | null = null
+  if (s.available && !isEmpty) {
+    if (isPlayerHeadedKind) {
+      const ph = s.playerHolders[0]
+      stat = ph ? `${ph.adds} ${ph.adds === 1 ? 'add' : 'adds'}` : null
+    } else if (!showSharedValue && s.value != null) {
+      stat = standingFigure(s.kind, s.unit, s.value)
+    }
+  }
+
   return (
     <article
-      className={`sl-card${openable ? ' sl-card-openable' : ''}`}
+      className={`sl-card sl-row${openable ? ' sl-card-openable' : ''}`}
       style={{ ['--sl-hue' as string]: hue }}
       onClick={
         openable
           ? () => {
-              // B3: a drag-select across card text ends in a click on the article; don't open over it.
+              // B3: a drag-select across row text ends in a click on the article; don't open over it.
               if (window.getSelection()?.toString()) return
               setOpen(true)
             }
@@ -224,23 +239,13 @@ function SuperlativeCard({
       }
     >
       <header className="sl-card-head">
+        <TrophyIcon />
         <h4>{meta.title}</h4>
         {meta.subtitle && <span className="sl-subtitle muted small">{meta.subtitle}</span>}
         {s.early && <span className="sl-early small">early — this is mostly noise</span>}
-        {openable && (
-          <button
-            type="button"
-            className="sl-see-all"
-            onClick={(e) => {
-              e.stopPropagation()
-              setOpen(true)
-            }}
-          >
-            See all
-          </button>
-        )}
       </header>
 
+      <div className="sl-row-body">
       {/* Unconditional lines, independent of available/holders state -- EXCEPT
           the empty-tracking fallback below, which is deliberately suppressed
           in one case (see its own comment). */}
@@ -349,21 +354,6 @@ function SuperlativeCard({
             })}
           </div>
 
-          {/* Single-event and reading kinds put their figure on each holder's
-              own line above (ties can point at different weeks/opponents, or
-              already carry the full reading), so the shared line here would
-              just repeat the first holder's figure. */}
-          {!isSingleEventKind && !isReadingKind && (
-            <p className="sl-value">
-              {isCloseGameKind
-                ? s.value != null && formatCloseGameCount(s.kind, s.value)
-                : s.value != null && formatValue(s.value, s.unit)}
-              {isCloseGameKind && (
-                <span className="muted small"> by under {closeGameMargin} points</span>
-              )}
-            </p>
-          )}
-
           {s.coverage && (
             <p className="muted small sl-coverage">
               {s.coverage.weeksCovered} of {s.coverage.weeksCovered + s.coverage.weeksExcluded} weeks
@@ -374,17 +364,61 @@ function SuperlativeCard({
           {expandableRows(s).length > 0 && <DetailList s={s} />}
         </>
       )}
+      </div>
+
+      {/* The headline figure sits in its own column. Single-event and reading
+          kinds put their full figure on each holder's own line as well (ties
+          can point at different weeks/opponents), so this is the headline,
+          not a replacement for those lines. */}
+      <div className="sl-row-stat">
+        {s.available && !isEmpty && !isPlayerHeadedKind && showSharedValue && s.value != null && (
+          <p className="sl-value">
+            {isCloseGameKind ? formatCloseGameCount(s.kind, s.value) : formatValue(s.value, s.unit)}
+            {isCloseGameKind && (
+              <span className="muted small"> by under {closeGameMargin} points</span>
+            )}
+          </p>
+        )}
+        {stat && <p className="sl-stat">{stat}</p>}
+      </div>
+
+      <div className="sl-row-action">
+        {openable && (
+          <button
+            type="button"
+            className="sl-see-all"
+            aria-expanded={open}
+            onClick={(e) => {
+              e.stopPropagation()
+              setOpen((o) => !o)
+            }}
+          >
+            {open ? 'Hide' : 'See all'}
+          </button>
+        )}
+      </div>
 
       {open && (
-        <SuperlativeStandingsModal
+        <SuperlativeStandings
           s={s}
           title={meta.title}
           hue={hue}
           figure={(v) => standingFigure(s.kind, s.unit, v)}
-          onClose={() => setOpen(false)}
         />
       )}
     </article>
+  )
+}
+
+/** The trophy beside each award's name; --fitted ("earned"), a leaf mark with no text of its own. */
+function TrophyIcon() {
+  return (
+    <svg className="sl-trophy" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M7 3h10v2h3a1 1 0 0 1 1 1v1.5A4.5 4.5 0 0 1 16.6 12 5 5 0 0 1 13 14.9V17h3a1 1 0 0 1 1 1v3H7v-3a1 1 0 0 1 1-1h3v-2.1A5 5 0 0 1 7.4 12 4.5 4.5 0 0 1 3 7.5V6a1 1 0 0 1 1-1h3V3Zm0 4H5v.5A2.5 2.5 0 0 0 7.3 10 5 5 0 0 1 7 8.2V7Zm10 0v1.2a5 5 0 0 1-.3 1.8A2.5 2.5 0 0 0 19 7.5V7h-2Z"
+      />
+    </svg>
   )
 }
 
@@ -461,14 +495,14 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
       (d): d is Extract<SuperlativeDetail, { type: 'ABSENCE' }> => d.type === 'ABSENCE',
     )
     if (absences.length === 0) return []
-    const total: string[] =
-      s.value != null ? [`${s.value.toFixed(2)} estimated points lost`] : []
+    // The total ("62.40 estimated points lost") is the row's headline figure now
+    // (the stat column, via standingFigure), so it is not printed a second time here.
     const absenceLines = absences.map(
       (d) =>
         `${d.playerName} (${d.position}) — ${d.gamesMissed} games missed (${d.weeksAffected} weeks), ` +
         `~${d.pointsPerGame.toFixed(2)} per game (estimated)`,
     )
-    return [...total, ...absenceLines]
+    return absenceLines
   }
   // US6 (T060): one line per player named -- a team can be on the list for
   // more than one player, each with its own source and reason. Plain text

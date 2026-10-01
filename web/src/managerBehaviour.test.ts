@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { behaviourText, reachGapText, relativeReachRead } from './managerBehaviour'
+import { ARCHETYPE_TILT_CUTOFF, archetype, behaviourText, reachGapText, relativeReachRead } from './managerBehaviour'
 
 // The distinction under test is the one thing basketball made urgent: reach and
 // positional tilt are fitted from different evidence, and a manager can have
@@ -99,5 +99,60 @@ describe('reachGapText', () => {
 
   it('is silent for a seat with no history at all -- that is a different sentence', () => {
     expect(reachGapText({ draftsObserved: 0, picksScored: 0 })).toBeNull()
+  })
+})
+
+// spec 013 US9: archetype() is built on relativeReachRead, so its sign cannot drift from the reach caption.
+describe('archetype', () => {
+  const base = { relativeReachBias: null, relativeReachStdErr: null, unpredictability: 1, positionalTilt: {}, picksScored: 0 }
+
+  it('early (picks earlier than the room) is a Reacher, not Waits: the sign is not inverted', () => {
+    expect(archetype({ ...base, relativeReachBias: 8, relativeReachStdErr: 3, picksScored: 30 }).label).toBe('Reacher')
+    expect(archetype({ ...base, relativeReachBias: -8, relativeReachStdErr: 3, picksScored: 30 }).label).toBe('Waits')
+  })
+
+  it('agrees with relativeReachRead for the same inputs', () => {
+    for (const [rel, se] of [[8, 3], [-8, 3], [1, 3]] as const) {
+      const kind = relativeReachRead(rel, se)?.kind
+      const label = archetype({ ...base, relativeReachBias: rel, relativeReachStdErr: se, picksScored: 30 }).label
+      expect(label).toBe(kind === 'early' ? 'Reacher' : kind === 'late' ? 'Waits' : 'Drafts like the room')
+    }
+  })
+
+  it('inside one standard error reads "Drafts like the room"', () => {
+    expect(archetype({ ...base, relativeReachBias: 1.5, relativeReachStdErr: 4, picksScored: 30 })).toEqual({
+      label: 'Drafts like the room',
+      basis: 'drafts like the room',
+    })
+  })
+
+  it('picksScored = 0 never gives a reach label, even with a reach number present (the NBA case)', () => {
+    const a = archetype({ ...base, relativeReachBias: 12, relativeReachStdErr: 1, picksScored: 0, positionalTilt: { C: 1.4 } })
+    expect(['Reacher', 'Waits', 'Drafts like the room']).not.toContain(a.label)
+    expect(a.label).toBe('C early')
+  })
+
+  it('a thin read (no standard error) never gives a reach label and falls through to tilt', () => {
+    const a = archetype({ ...base, relativeReachBias: 9, relativeReachStdErr: null, picksScored: 1, positionalTilt: { TE: 0.2 } })
+    expect(a.label).toBe('TE late')
+    const none = archetype({ ...base, relativeReachBias: 9, relativeReachStdErr: null, picksScored: 1 })
+    expect(none.label).toBe('Not enough history')
+  })
+
+  it('names the strongest tilt, early for above neutral and late for below', () => {
+    expect(archetype({ ...base, positionalTilt: { QB: 1.6, RB: 0.7 } }).label).toBe('QB early')
+    expect(archetype({ ...base, positionalTilt: { QB: 1.3, TE: 0.2 } }).label).toBe('TE late')
+  })
+
+  it('does not label a tilt below the cutoff', () => {
+    expect(archetype({ ...base, positionalTilt: { QB: 1 + ARCHETYPE_TILT_CUTOFF - 0.01 } }).label).toBe('Not enough history')
+    expect(archetype({ ...base, positionalTilt: { QB: 1 + ARCHETYPE_TILT_CUTOFF } }).label).toBe('QB early')
+  })
+
+  it('says Not enough history with nothing to go on', () => {
+    expect(archetype(base)).toEqual({
+      label: 'Not enough history',
+      basis: 'No pick of theirs can be scored for reach, and no strong positional lean.',
+    })
   })
 })

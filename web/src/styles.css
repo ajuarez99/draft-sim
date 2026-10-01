@@ -5224,3 +5224,120 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .value-legend { margin: 0 0 6px; }
 /* The grade column's early caveat keeps its own case inside an uppercase table header. */
 th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }
+
+/* --- 013 US9: LeagueHistory (Standings) ------------------------------------
+   Best/worst per numeric column: a tint (--up/--down) AND a glyph with an
+   accessible label, never colour alone. "season in progress" is said once, in
+   the season's title. */
+.stand-inprogress { font-weight: 500; font-size: 13px; }
+.stand-mark { margin-left: 5px; font-size: 10px; font-weight: 700; }
+.stand-mark.best { color: var(--up); }
+.stand-mark.worst { color: var(--down); }
+.standings th.mono { line-height: 1.25; }
+
+/* --- 013 US9: Superlatives (Awards, trophy list) ---------------------------
+   One row per award on the page: trophy (--fitted, "earned"), name, the holder
+   with their detail lines, and the headline figure in big tabular numbers.
+   Rows are separated by a line, not boxed. "See all" expands the full standings
+   in place under the row. */
+.sl-list { display: flex; flex-direction: column; }
+.sl-card.sl-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 4px 18px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: transparent;
+  padding: 14px 6px;
+}
+.sl-card.sl-row:last-child { border-bottom: 0; }
+.sl-row .sl-card-head { margin-bottom: 0; flex-wrap: wrap; align-items: center; }
+.sl-row .sl-card-head h4 { font-size: 15px; font-weight: 600; }
+.sl-trophy { color: var(--fitted); flex-shrink: 0; }
+.sl-row-body { min-width: 0; }
+.sl-row-stat { text-align: right; align-self: center; min-width: 0; }
+.sl-row-action { align-self: center; }
+.sl-row .sl-value, .sl-row .sl-stat {
+  margin: 0; font-size: 24px; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.sl-row .sl-value .muted { font-size: 12px; font-weight: 400; display: block; white-space: normal; }
+.sl-row .sl-see-all { margin-left: 0; border: 1px solid var(--line); padding: 4px 10px; }
+.sl-standings-panel {
+  grid-column: 1 / -1; margin-top: 10px; padding: 8px 4px 0 4px;
+  border-top: 1px dashed var(--line); cursor: auto; text-align: left;
+}
+.sl-standings-panel .sl-standings-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+@media (max-width: 700px) {
+  .sl-card.sl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sl-row .sl-card-head { grid-column: 1 / -1; }
+  .sl-row-body { grid-column: 1; }
+  .sl-row-stat { grid-column: 2; align-self: start; }
+  .sl-row-action { grid-column: 1 / -1; }
+}
+
+/* --- 013 US9: ManagerHistory (Manager profile, player card) ----------------
+   Big avatar and name, then one line per sport: record, trophies and four
+   headline figures, with no boxes. */
+.mgr-card-avatar { width: 56px; height: 56px; font-size: 22px; }
+.mgr-card-title { gap: 14px; }
+.mgr-card { display: flex; flex-direction: column; gap: 14px; margin: 4px 0 18px; }
+.mgr-card-row { display: flex; flex-direction: column; gap: 8px; }
+.mgr-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.mgr-card-record { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-trophies { display: inline-flex; align-items: center; gap: 3px; color: var(--fitted); }
+.mgr-trophy-count { margin-left: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.mgr-card-stats { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; }
+.mgr-card-stat { min-width: 0; }
+.mgr-card-stat dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mgr-card-stat dd { margin: 0; }
+.mgr-card-figure { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-archetype { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 4px; }
+.mgr-archetype-label { font-size: 16px; font-weight: 700; }
+.career-rank-row { font-size: 14px; }
+.career-rank-pop { margin-left: 6px; }
+.career-rank-position { font-weight: 700; }
+
+/* --- 013 US9: ManagerTendencies (Scouting report) --------------------------
+   An archetype label under each manager's name; the selected league's managers
+   are grouped first under their own sub-heading. */
+.mgr-archetype-chip { font-size: 12px; font-weight: 600; color: var(--teal); width: fit-content; }
+.mgr-group { margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mgr-group:first-of-type { margin-top: 6px; }
+
+/* --- 013 US9: MockSetup ----------------------------------------------------
+   One row of seat chips (it scrolls inside its own frame when the room is wider
+   than the page). "You" is --crimson-fill; a real manager shows avatar and
+   archetype; "Start the draft" is the page's one --volt (see US1 block above). */
+.mock-seat-strip {
+  grid-template-columns: none; grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, 1fr); overflow-x: auto; padding-bottom: 4px;
+}
+.mock-seat.assigned .mock-seat-face { background: var(--panel); color: var(--text); }
+.mock-seat-avatar { width: 28px; height: 28px; font-size: 11px; }
+.mock-seat-arch { font-size: 10px; color: var(--teal); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-seat-who { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 013 US9: SignIn (welcome) ---------------------------------------------
+   Centered, no box: product name (Oswald), the pitch, a large field and the
+   page's one --volt action. */
+.signin-welcome {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 14px; min-height: 70vh; max-width: 720px; margin: 0 auto;
+}
+.signin-kicker { margin: 0; font-size: 18px; letter-spacing: 0.12em; color: var(--muted); }
+.signin-pitch { margin: 0; font-size: clamp(26px, 4.4vw, 42px); line-height: 1.15; font-weight: 700; }
+.signin-form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; margin-top: 10px; }
+.signin-label { display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; font-size: 12px; color: var(--muted); }
+.signin-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 14px 16px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+}
+.signin-input:focus { outline: 2px solid var(--teal); outline-offset: 2px; }
+.signin-continue {
+  font: inherit; font-size: 17px; font-weight: 700; padding: 13px 18px; border: 0; border-radius: 10px;
+  background: var(--volt); color: var(--bg); cursor: pointer;
+}
+.signin-continue:disabled { opacity: 0.55; cursor: default; }
+.signin-note { max-width: 520px; margin: 0; }
+.signin-welcome .error { max-width: 520px; margin: 0; }

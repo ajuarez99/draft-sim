@@ -11,7 +11,7 @@ import {
   type Unavailable,
   type WaiverTendency,
 } from '../api'
-import { reachGapText, relativeReachRead } from '../managerBehaviour'
+import { archetype, reachGapText, relativeReachRead } from '../managerBehaviour'
 import { ordinal } from '../rankOrder'
 import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
@@ -144,60 +144,23 @@ export default function ManagerHistory() {
       <PageHeader
         eyebrow="Manager"
         title={
-          <span className="page-title-avatar">
-            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} /> {name}
+          <span className="page-title-avatar mgr-card-title">
+            <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} className="mgr-card-avatar" /> {name}
           </span>
         }
-        sub={
-          // Rethought for FR-002: the old sub was one combined record
-          // ("29-25 across 6 seasons") that added basketball wins to
-          // football wins. There is no honest single number to replace it
-          // with -- a manager who plays two sports has two records, not one
-          // blended one -- so this renders one clause per sport instead,
-          // each with its own record/season-count/titles, never combined.
-          // A one-sport manager gets one clause, which reads exactly like
-          // the old single-sport case did.
-          //
-          // Read off `careers`, NOT recomputed from `seasons`. Live
-          // verification on 2026-09-21 caught exactly that bug: this header
-          // said "NBA 17-21 across 3 seasons" while the career panel below
-          // said "17-21-1 over 2 seasons" -- two season counts for one
-          // manager on one page, because the header counted every listed
-          // row and the panel counted only seasons with a scored week
-          // (NBA 2026 is ingested and unplayed). It also dropped the tie.
-          // The fix is the rule the repo already learned the hard way from a
-          // ballot tally printed under a lagging week label: a number and
-          // its label come from ONE source. `seasonsCounted` is that source
-          // (FR-007), and `careers` is where it lives.
-          <>
-            {careersBySport.map(({ sport, career }, i) => {
-              // Read straight off the career, with no row-summing fallback:
-              // since T076 the rows on this page ARE the career's rows, so a
-              // fallback could only ever produce a SECOND answer to a question
-              // this object already answers -- the shape of defect this whole
-              // feature existed to remove.
-              const wins = career.wins
-              const losses = career.losses
-              const ties = career.ties
-              // Counted seasons, matching the panel. A season with no scored
-              // week (NBA 2026) is listed in the table above and counts
-              // towards nothing, which is the same rule everywhere on this
-              // page.
-              const seasons = career.seasonsCounted
-              const titles = career.titles
-              return (
-                <span key={sport}>
-                  {i > 0 && ' · '}
-                  <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>{' '}
-                  {wins}-{losses}
-                  {ties > 0 && `-${ties}`} across {seasons} season{seasons === 1 ? '' : 's'}
-                  {titles > 0 && ` · ${titles} title${titles === 1 ? '' : 's'}`}
-                </span>
-              )
-            })}
-          </>
-        }
       />
+
+      {/* spec 013 US9 (T088): the player card. One row per sport, never summed
+          across sports (FR-002) -- a manager who plays two sports has two
+          records. Every figure is read off `careers`, the one source (FR-007),
+          and states the seasons it covers beside it (SC-008). */}
+      <section className="mgr-card" aria-label="Career at a glance">
+        {careersBySport.map(({ sport, career }) => (
+          <PlayerCardRow key={sport} sport={sport} career={career} />
+        ))}
+      </section>
+
+      <TendenciesSection data={data} />
 
       {/* `manager-seasons` names this section so a test (or a future style)
           can scope to the standings tables alone: `.manager-sport-block` with
@@ -266,58 +229,82 @@ export default function ManagerHistory() {
           would reintroduce it one level up. */}
       <CareerPanel careers={data.careers} />
 
-      <section className="section">
-        <h3 className="section-title">What this app thinks about their drafting</h3>
-        {data.draftHistory.length === 0 ? (
-          <p className="muted">No drafts observed yet -- drafts like the room, no history to fit from.</p>
-        ) : (
-          // One block per sport. The same person can appear twice here, which
-          // is the honest answer rather than a chosen one -- these are two
-          // separate fits off two separate sets of picks.
-          data.draftHistory.map((h) => (
-            <div key={h.sport} className="manager-sport-block">
-              <p className="small">
-                <span className={`sport-pill ${h.sport}`}>{h.sport.toUpperCase()}</span>
-                {h.picksScored > 0 ? (
-                  <>
-                    Reach vs. their draft room:{' '}
-                    <span className="mono">
-                      {relativeReachRead(h.relativeReachBias, h.relativeReachStdErr)?.text ?? '—'}
-                    </span>{' '}
-                    over {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} ({h.provenance.toLowerCase()})
-                  </>
-                ) : (
-                  // No reach number rather than a reach number of zero -- with
-                  // no scoreable picks, `reachBias` is the league mean wearing
-                  // this manager's name. Printing "0.00" there would read as a
-                  // finding. Same rule as SeatPopover and /managers.
-                  <>
-                    {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} observed, no reach number
-                  </>
-                )}
-              </p>
-              {h.picksScored === 0 && (
-                <p className="muted tiny">{reachGapText(h)}</p>
-              )}
-              {h.positionalTilt && Object.keys(h.positionalTilt).length > 0 && (
-                <p className="small mono">
-                  {Object.entries(h.positionalTilt)
-                    .map(([pos, tilt]) => `${pos} ${tilt.toFixed(2)}×`)
-                    .join(' · ')}
-                </p>
-              )}
-            </div>
-          ))
-        )}
-        <HowThisWorks>
-          <p>
-            Fitted from their own draft history, the same numbers the simulator uses -- not the
-            record above, which is what actually happened on the scoreboard.
-          </p>
-        </HowThisWorks>
-      </section>
       </div>
     </>
+  )
+}
+
+/**
+ * spec 013 US9 (T088): the draft tendencies sit directly under the player card,
+ * with the archetype label (`archetype()`, built on the same reach read as the
+ * line beneath it) leading each sport's block. Same content as before; it moved
+ * up from the bottom of the page.
+ */
+function TendenciesSection({ data }: { data: ManagerHistoryData }) {
+  return (
+    <section className="section">
+      <h3 className="section-title">What this app thinks about their drafting</h3>
+      {data.draftHistory.length === 0 ? (
+        <p className="muted">No drafts observed yet -- drafts like the room, no history to fit from.</p>
+      ) : (
+        // One block per sport. The same person can appear twice here, which
+        // is the honest answer rather than a chosen one -- these are two
+        // separate fits off two separate sets of picks.
+        data.draftHistory.map((h) => {
+          const arch = archetype({
+            relativeReachBias: h.relativeReachBias,
+            relativeReachStdErr: h.relativeReachStdErr,
+            unpredictability: 1, // not used by archetype(); draftHistory does not carry it
+            positionalTilt: h.positionalTilt ?? {},
+            picksScored: h.picksScored,
+          })
+          return (
+          <div key={h.sport} className="manager-sport-block">
+            <p className="mgr-archetype">
+              <span className={`sport-pill ${h.sport}`}>{h.sport.toUpperCase()}</span>
+              <span className="mgr-archetype-label">{arch.label}</span>
+              <span className="muted small"> {arch.basis}</span>
+            </p>
+            <p className="small">
+              {h.picksScored > 0 ? (
+                <>
+                  Reach vs. their draft room:{' '}
+                  <span className="mono">
+                    {relativeReachRead(h.relativeReachBias, h.relativeReachStdErr)?.text ?? '—'}
+                  </span>{' '}
+                  over {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} ({h.provenance.toLowerCase()})
+                </>
+              ) : (
+                // No reach number rather than a reach number of zero -- with
+                // no scoreable picks, `reachBias` is the league mean wearing
+                // this manager's name. Printing "0.00" there would read as a
+                // finding. Same rule as SeatPopover and /managers.
+                <>
+                  {h.draftsObserved} draft{h.draftsObserved === 1 ? '' : 's'} observed, no reach number
+                </>
+              )}
+            </p>
+            {h.picksScored === 0 && (
+              <p className="muted tiny">{reachGapText(h)}</p>
+            )}
+            {h.positionalTilt && Object.keys(h.positionalTilt).length > 0 && (
+              <p className="small mono">
+                {Object.entries(h.positionalTilt)
+                  .map(([pos, tilt]) => `${pos} ${tilt.toFixed(2)}×`)
+                  .join(' · ')}
+              </p>
+            )}
+          </div>
+          )
+        })
+      )}
+      <HowThisWorks>
+        <p>
+          Fitted from their own draft history, the same numbers the simulator uses -- not the
+          record on this page, which is what actually happened on the scoreboard.
+        </p>
+      </HowThisWorks>
+    </section>
   )
 }
 
@@ -330,6 +317,74 @@ const RANK_FIGURE_LABEL: Record<Rank['figure'], string> = {
 const UNAVAILABLE_FIGURE_LABEL: Record<Unavailable['figure'], string> = {
   playoffAppearances: 'Playoff appearances',
   tradesPerSeason: 'Trades per season',
+}
+
+/** A trophy mark per title, up to FIVE; past that the count alone says it (the text beside it always does). */
+function Trophies({ count }: { count: number }) {
+  if (count <= 0) return null
+  const shown = Math.min(count, 5)
+  return (
+    <span className="mgr-trophies" title={`${count} title${count === 1 ? '' : 's'}`}>
+      {Array.from({ length: shown }, (_, i) => (
+        <svg key={i} className="mgr-trophy" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <path
+            fill="currentColor"
+            d="M7 3h10v2h3a1 1 0 0 1 1 1v1.5A4.5 4.5 0 0 1 16.6 12 5 5 0 0 1 13 14.9V17h3a1 1 0 0 1 1 1v3H7v-3a1 1 0 0 1 1-1h3v-2.1A5 5 0 0 1 7.4 12 4.5 4.5 0 0 1 3 7.5V6a1 1 0 0 1 1-1h3V3Z"
+          />
+        </svg>
+      ))}
+      <span className="mgr-trophy-count">
+        {count} title{count === 1 ? '' : 's'}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * One sport's line of the player card: record and titles, then the headline
+ * figures. No boxes -- one row, figures separated by space. Each figure carries
+ * "over N seasons" (SC-008); a null figure is a dash, never a zero.
+ */
+function PlayerCardRow({ sport, career }: { sport: Sport; career: CareerProfile }) {
+  const wins = career.wins
+  const losses = career.losses
+  const ties = career.ties
+  const seasons = career.seasonsCounted
+  const over = `over ${seasons} season${seasons === 1 ? '' : 's'}`
+  const stats: { label: string; value: string }[] = [
+    { label: 'Win rate', value: career.winRate == null ? '—' : `${(career.winRate * 100).toFixed(1)}%` },
+    { label: 'Points per season', value: career.pointsPerSeason == null ? '—' : career.pointsPerSeason.toFixed(2) },
+    { label: 'Average efficiency', value: career.averageEfficiency == null ? '—' : `${(career.averageEfficiency * 100).toFixed(1)}%` },
+    {
+      label: 'Wins above expected',
+      value: career.winsAboveExpected == null
+        ? '—'
+        : `${career.winsAboveExpected > 0 ? '+' : ''}${career.winsAboveExpected.toFixed(2)}`,
+    },
+  ]
+  return (
+    <div className="mgr-card-row">
+      <div className="mgr-card-head">
+        {/* Same text the page's one-clause-per-sport header always had: record,
+            counted seasons (never every listed row). */}
+        <span className="mgr-card-record">
+          <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>{' '}
+          {wins}-{losses}
+          {ties > 0 && `-${ties}`} across {seasons} season{seasons === 1 ? '' : 's'}
+        </span>
+        <Trophies count={career.titles} />
+      </div>
+      <dl className="mgr-card-stats">
+        {stats.map((st) => (
+          <div className="mgr-card-stat" key={st.label}>
+            <dt>{st.label}</dt>
+            <dd className="mgr-card-figure">{st.value}</dd>
+            <dd className="muted tiny">{over}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
 }
 
 /**
@@ -549,10 +604,13 @@ function RankList({ ranks }: { ranks: Rank[] }) {
     <ul className="career-ranks">
       {ranks.map((r) => (
         <li className="career-rank-row" key={`${r.figure}-${r.sleeperLeagueId}`}>
-          <span className="career-rank-figure">{RANK_FIGURE_LABEL[r.figure]}</span>
+          {/* A sentence: "2nd of 12 for win rate in (Foot) Ball Knowers". The
+              population and the league stay in it (FR-008), only the table
+              layout is gone. */}
           <span className="career-rank-position mono">
             {ordinal(r.position)} of {r.population}
           </span>
+          <span className="career-rank-figure"> for {RANK_FIGURE_LABEL[r.figure].toLowerCase()}</span>
           <span className="career-rank-pop muted">in {r.leagueName}</span>
         </li>
       ))}

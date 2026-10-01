@@ -5,8 +5,12 @@ import ManagerTendencies from './ManagerTendencies'
 import type { ManagerSummary } from '../api'
 
 const getManagers = vi.fn()
+const getLeagueHistory = vi.fn()
+const getDrafts = vi.fn()
 vi.mock('../api', () => ({
   getManagers: (...args: unknown[]) => getManagers(...args),
+  getLeagueHistory: (...args: unknown[]) => getLeagueHistory(...args),
+  getDrafts: (...args: unknown[]) => getDrafts(...args),
 }))
 
 function m(over: Partial<ManagerSummary>): ManagerSummary {
@@ -34,6 +38,8 @@ function m(over: Partial<ManagerSummary>): ManagerSummary {
 beforeEach(() => {
   localStorage.clear()
   getManagers.mockReset()
+  getLeagueHistory.mockReset()
+  getDrafts.mockReset()
 })
 
 describe('ManagerTendencies reach display (audit 11)', () => {
@@ -68,5 +74,63 @@ describe('ManagerTendencies reach display (audit 11)', () => {
     const order = screen.getAllByRole('link').map((a) => a.textContent)
     expect(order.indexOf('Early Eddie')).toBeLessThan(order.indexOf('Late Larry'))
     expect(order.indexOf('Late Larry')).toBeLessThan(order.indexOf('Middle Mike'))
+  })
+})
+
+// spec 013 US9 (T091): an archetype per manager, and the rail's selected league first.
+describe('ManagerTendencies archetypes and league-first order', () => {
+  const nfl = [
+    m({ managerId: 1, manager: 'Early Eddie', relativeReachBias: 12, relativeReachStdErr: 4 }),
+    m({ managerId: 2, manager: 'Late Larry', relativeReachBias: -9.5, relativeReachStdErr: 3 }),
+    m({ managerId: 3, manager: 'Middle Mike', relativeReachBias: 2, relativeReachStdErr: 5 }),
+    m({ managerId: 4, manager: 'Tilt Tom', picksScored: 0, relativeReachBias: null, positionalTilt: { QB: 1.5 } }),
+    m({ managerId: 5, manager: 'No Info', picksScored: 0, relativeReachBias: null }),
+  ]
+  function withManagers() {
+    getManagers.mockImplementation((sport: string) => Promise.resolve(sport === 'nfl' ? nfl : []))
+  }
+
+  it('labels each manager Reacher, Waits, Drafts like the room, a tilt, or Not enough history', async () => {
+    withManagers()
+    render(<MemoryRouter><ManagerTendencies /></MemoryRouter>)
+    await screen.findByText('Early Eddie')
+    expect(screen.getByText('Reacher')).toBeInTheDocument()
+    expect(screen.getByText('Waits')).toBeInTheDocument()
+    expect(screen.getByText('Drafts like the room')).toBeInTheDocument()
+    expect(screen.getByText('QB early')).toBeInTheDocument()
+    expect(screen.getByText('Not enough history')).toBeInTheDocument()
+  })
+
+  it('lists the managers of the rail league first when the rail passes its league along', async () => {
+    withManagers()
+    getDrafts.mockResolvedValue([
+      { id: 1, sleeperDraftId: 'D1', leagueId: 1, leagueName: 'Our League', season: 2026, teams: 12, rounds: 15,
+        status: 'complete', startTime: null, sleeperLeagueId: 'L1', previousLeagueId: null, sport: 'nfl' },
+    ])
+    // Only Mike and Tom are in Our League; the default order would put Eddie and Larry ahead of them.
+    getLeagueHistory.mockResolvedValue({
+      sleeperLeagueId: 'L1',
+      seasons: [{ season: 2026, leagueId: 1, sleeperLeagueId: 'L1', name: 'Our League',
+        standings: [{ managerId: 3 }, { managerId: 4 }] }],
+      records: {},
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/managers', state: { railLeagueId: 'L1' } }]}>
+        <ManagerTendencies />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('In Our League')).toBeInTheDocument()
+    expect(screen.getByText('Everyone else')).toBeInTheDocument()
+    const names = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(names.indexOf('Middle Mike')).toBeLessThan(names.indexOf('Early Eddie'))
+    expect(names.indexOf('Tilt Tom')).toBeLessThan(names.indexOf('Early Eddie'))
+  })
+
+  it('does not group at all when no league is selected', async () => {
+    withManagers()
+    render(<MemoryRouter><ManagerTendencies /></MemoryRouter>)
+    await screen.findByText('Early Eddie')
+    expect(screen.queryByText('Everyone else')).not.toBeInTheDocument()
+    expect(getLeagueHistory).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-# Caveats inventory, AFTER the 013 fan-first redesign
+| C359 | web/src/pages/Superlatives.tsx:153 | reworded + HowThisWorks | Subtitle is one sentence; "If an award can't be worked out yet, its row says why" ("card" became "row" in the trophy list) is a How this works under the list. || C065 | web/src/pages/ManagerHistory.tsx:303 | HowThisWorks | Same sentence, in the draft-tendencies section's How this works. That section moved up directly under the player card, so "the record above" now reads "the record on this page" (clarity only, no claim changed). || C157 | web/src/pages/LeagueHistory.tsx:615 | moved | "season in progress" now appears once, in the season's section title, instead of in every rank cell; an in-progress rank cell is a dash with title="Season in progress". The RANK_REASON entry (line 295) is kept for the other statuses. || C018 | web/src/pages/SignIn.tsx:96 | unchanged |  || C017 | web/src/pages/SignIn.tsx:91 | unchanged |  || C016 | web/src/pages/SignIn.tsx:85 | moved (visible) | Same sentence, now a muted note under the field on the centered welcome (was the hero sub-paragraph). Still visible, not behind a click. |# Caveats inventory, AFTER the 013 fan-first redesign
 
 Maps each `caveats-before.md` row to where it lives now. Line numbers are searched from the current source by the row text, so a number is the first line carrying that text; "unchanged" means the text and condition are as before (the surrounding section moved from `.panel` to `.section`).
 
@@ -494,3 +494,11 @@ Covered: T014-T021 (part A: DraftPicker, PowerRankings, LeagueAnalysis, RosterMa
 | C486 | web/src/components/BumpChart.tsx:260 | unchanged |  |
 | C487 | web/src/components/RankBoard.tsx:747 | unchanged |  |
 | C488 | web/src/components/PageHeader.tsx:~42 | unchanged | (line approximated; text built from parts or a tooltip, code untouched) |
+
+## US9 additions (T084-T093)
+
+No caveat row was removed. New text added in US9, each beside its number or in How this works:
+- LeagueHistory How this works: explains "Record vs all (reg. season)" (matches ffwrapped) and "Vs weekly median (reg. season)" (median games only, NOT added to the real record; ffwrapped's "Median record" adds them), that both come from the Luck calculation for one season (other seasons show a dash), and that best/worst marks need a spread. Column headers carry "(reg. season)" and a title.
+- Superlatives: every early badge, empty-award message, estimated-points line and "tracking" note is kept on the row. The Embiid total ("N estimated points lost", still says estimated) moved from a holder line to the row's headline figure; it is printed once, not twice. The full standings expand in place (no modal); content unchanged except the modal's repeated early badge and coverage line, which the row above already shows.
+- ManagerHistory: the player card states "over N seasons" under every figure (FR-007/SC-008); each rank is a sentence that still names its population and league (FR-008).
+- ManagerTendencies / MockSetup: the archetype label's basis is in its title and, for tilt-based labels, the existing "no reach number" reason stays on the row (reach-gap line) or in the seat's hint.

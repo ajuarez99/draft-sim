@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { getManagers, type ManagerSummary, type Sport } from '../api'
+import { getLeagueHistory, getManagers, type ManagerSummary, type Sport } from '../api'
 import { PROVENANCE_LABEL } from '../provenance'
-import { reachGapText, relativeReachRead } from '../managerBehaviour'
+import { archetype, reachGapText, relativeReachRead } from '../managerBehaviour'
+import { cachedDrafts } from '../railLeague'
 import TendenciesForm from '../components/TendenciesForm'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
@@ -132,6 +133,8 @@ function ManagerRow({ m, onChanged }: RowProps) {
   // is the single most misleading thing this page could say.
   const hasReachNumber = m.relativeReachBias != null
   const gap = reachGapText(m)
+  // spec 013 US9: one label per manager, built on the same reach read as the axis beside it.
+  const arch = archetype(m)
 
   return (
     <div className={`mgr-row ${label.className}${m.provenance === 'NEUTRAL' ? ' neutral-row' : ''}`}>
@@ -146,6 +149,9 @@ function ManagerRow({ m, onChanged }: RowProps) {
             <Link to={`/managers/${m.managerId}/history`} className="who mgr-who-link">
               {m.manager}
             </Link>
+            <span className="mgr-archetype-chip" title={arch.basis}>
+              {arch.label}
+            </span>
             {/* Note and comparison ride under the name rather than taking
                 columns of their own: both are optional and only a handful of
                 managers have either, so a column for them would be mostly
@@ -295,6 +301,35 @@ export default function ManagerTendencies() {
   const [sportFilter, setSportFilter] = useSportFilter()
   const rail = useRailContextSlot()
 
+  // The rail's currently selected league, as the rail itself passes it along
+  // (Rail.tsx puts it in route state on the Managers link; AppShell reads the
+  // same key for manager history). No league there -> no grouping, never a guess.
+  const location = useLocation()
+  const railLeagueId = (location.state as { railLeagueId?: string } | null)?.railLeagueId ?? null
+  const [league, setLeague] = useState<{ name: string; sport: Sport; managerIds: Set<number> } | null>(null)
+  useEffect(() => {
+    if (!railLeagueId) {
+      setLeague(null)
+      return
+    }
+    let live = true
+    async function load() {
+      // Sport and name from the rail's own draft list; members from the league's standings.
+      const [drafts, history] = await Promise.all([cachedDrafts(), getLeagueHistory(railLeagueId as string)])
+      const d = drafts.find((x) => x.sleeperLeagueId === railLeagueId)
+      if (!live || !d) return
+      const ids = new Set<number>()
+      for (const s of history.seasons) for (const r of s.standings) if (r.managerId != null) ids.add(r.managerId)
+      setLeague({ name: d.leagueName, sport: d.sport, managerIds: ids })
+    }
+    load().catch(() => {
+      if (live) setLeague(null)
+    })
+    return () => {
+      live = false
+    }
+  }, [railLeagueId])
+
   function refetch() {
     Promise.all(
       SPORTS.map((sport) => getManagers(sport).then((ms) => ms.map((m) => ({ ...m, sport })))),
@@ -347,6 +382,13 @@ export default function ManagerTendencies() {
       })
     : null
 
+  // The selected league's managers first (same sport, in that league's standings),
+  // each group keeping the page's own order.
+  const isInLeague = (m: SportManager) =>
+    league != null && m.sport === league.sport && league.managerIds.has(m.managerId)
+  const inLeague = sorted ? sorted.filter(isInLeague) : []
+  const rest = sorted ? sorted.filter((m) => !isInLeague(m)) : []
+
   return (
     <div className="content">
       {rail.node &&
@@ -394,11 +436,26 @@ export default function ManagerTendencies() {
         )}
 
         {sorted && sorted.length > 0 && (
-          <div className="mgr-list">
-            {sorted.map((m) => (
-              <ManagerRow key={`${m.sport}-${m.managerId}`} m={m} onChanged={refetch} />
-            ))}
-          </div>
+          <>
+            {inLeague.length > 0 && (
+              <>
+                <h4 className="mgr-group">In {league?.name}</h4>
+                <div className="mgr-list">
+                  {inLeague.map((m) => (
+                    <ManagerRow key={`${m.sport}-${m.managerId}`} m={m} onChanged={refetch} />
+                  ))}
+                </div>
+              </>
+            )}
+            {inLeague.length > 0 && rest.length > 0 && <h4 className="mgr-group">Everyone else</h4>}
+            {rest.length > 0 && (
+              <div className="mgr-list">
+                {rest.map((m) => (
+                  <ManagerRow key={`${m.sport}-${m.managerId}`} m={m} onChanged={refetch} />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         <HowThisWorks>

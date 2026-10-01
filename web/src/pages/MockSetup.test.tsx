@@ -182,6 +182,31 @@ describe('MockSetup', () => {
       expect(face).toHaveTextContent('Dave')
     })
 
+    // spec 013 US9 (T092): a real manager's seat shows their archetype, a bot's shows none.
+    it('shows the assigned manager archetype on the seat face, and none on a bot or on you', async () => {
+      getManagers.mockResolvedValue([{ ...dave, relativeReachBias: 9, relativeReachStdErr: 2 }])
+      const user = userEvent.setup()
+      render(<MockSetup />)
+
+      await user.selectOptions(await screen.findByLabelText('seat 2'), '42')
+      const face = screen.getByRole('button', { name: 'Take pick 1.02 as your seat' })
+      expect(face).toHaveTextContent('Dave')
+      expect(face).toHaveTextContent('Reacher')
+      expect(screen.getAllByText('Reacher')).toHaveLength(1)
+      expect(screen.getByRole('button', { name: 'Take pick 1.03 as your seat' })).not.toHaveTextContent('Reacher')
+      expect(screen.getByRole('button', { name: 'Your seat, pick 1.01' })).not.toHaveTextContent('Reacher')
+    })
+
+    it('marks your seat and the one Start button with their own classes', async () => {
+      render(<MockSetup />)
+      await screen.findByLabelText('seat 2')
+      // "You" is the .mine seat (--crimson-fill in CSS); Start is the only button in the volt CTA bar.
+      expect(document.querySelectorAll('.mock-seat.mine')).toHaveLength(1)
+      const bar = document.querySelector('.mock-seat-cta') as HTMLElement
+      expect(bar.querySelectorAll('button')).toHaveLength(1)
+      expect(bar.querySelector('button')).toHaveTextContent('Start the draft')
+    })
+
     it('does not offer a manager seat at the user\'s own slot', async () => {
       render(<MockSetup />)
 

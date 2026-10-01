@@ -170,6 +170,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         onOpenMockModal={openMockModal}
         onOpenJumpTo={openJumpTo}
         contextSlotRef={setRailContextSlot}
+        managersLeagueId={railLeague?.season.sleeperLeagueId ?? null}
       >
         {railLeague && (
           <LeagueRailSection

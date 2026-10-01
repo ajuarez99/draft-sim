@@ -37,6 +37,8 @@ type Props = {
   /** Filled by AppShell with the ref callback for the page-context region.
    *  See appSlots.tsx: the current page portals into it. */
   contextSlotRef: (el: HTMLDivElement | null) => void
+  /** The league the rail is showing right now (railLeague.ts), if any. Carried to /managers in route state so the Scouting report can list that league's managers first -- the same channel manager history already uses to learn its league. Null when the rail shows no league. */
+  managersLeagueId?: string | null
   /** Context AppShell can render itself because it is derivable from the URL
    *  -- league context today (railLeague.ts). A sibling of the portal target
    *  rather than its content: React owns the portal node's children, so
@@ -75,6 +77,7 @@ export default function Rail({
   onOpenMockModal,
   onOpenJumpTo,
   contextSlotRef,
+  managersLeagueId = null,
   children,
 }: Props) {
   const location = useLocation()
@@ -169,6 +172,7 @@ export default function Rail({
         </Link>
         <Link
           to="/managers"
+          state={managersLeagueId ? { railLeagueId: managersLeagueId } : undefined}
           className={`app-rail-row${onManagers ? ' on' : ''}`}
           title="Managers"
           aria-label="Managers"
