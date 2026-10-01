@@ -45,7 +45,7 @@ description: "Task list for spec 013: fan-first redesign"
 
 - [X] T001 Run `cd web && npx tsc -b && npm test && npm run build` and `cd backend && ./gradlew test`. Record pass, fail and **skipped** counts in `SPEC/build-notes.md`; if ITs were skipped, start Postgres (5433) and re-run before recording.
 - [X] T002 Re-ingest `POST /api/ingest/all/1346366555759341568` (NFL) and `POST /api/ingest/all/1339351318115946496` (NBA) on the local backend; note the result in `SPEC/build-notes.md`.
-- [ ] T003 [P] Build the caveat inventory **from source** (conditional caveats included): every caveat sentence, badge and methodology paragraph as `C### | kind | file:line | condition | exact text` in `SPEC/caveats-before.md`.
+- [X] T003 [P] Build the caveat inventory **from source** (conditional caveats included): every caveat sentence, badge and methodology paragraph as `C### | kind | file:line | condition | exact text` in `SPEC/caveats-before.md`.
 - [X] T004 [P] Measure baselines at 1440×900 for every route (NFL league): nested-surface depth (quickstart §4a script), horizontal scroll (§4b). Append a table to `SPEC/build-notes.md`, labelled measured.
 
 ---
