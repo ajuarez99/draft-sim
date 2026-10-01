@@ -344,6 +344,35 @@ class ExpectedWinsServiceBoundTest {
         assertEquals(actSum, expSum, 1e-6, "expected wins must still conserve against real wins on the bounded subset");
     }
 
+    /**
+     * A stored-but-not-final week is excluded from every number: weeksScored, actualWins,
+     * allPlay and median. Weeks 1-15 are final, week 16 is stored but still in progress.
+     */
+    @Test
+    void aStoredButNotFinalWeekIsExcludedFromEveryNumber() {
+        for (int week = 1; week <= 16; week++) {
+            jdbc.update("""
+                    insert into league_week_fetch (league_id, kind, week, fetched_at, final)
+                    values (?, 'POINTS', ?, now(), ?)
+                    """, leagueId, week, week <= 15);
+        }
+        ExpectedWinsService.Result result =
+                expectedWins.forLeague(LEAGUE_SLEEPER_ID, WeekBound.ALL_WEEKS).orElseThrow();
+        assertEquals(15, result.weeksScored(), "the in-progress week 16 is not scored");
+        for (ExpectedWinsService.TeamRow t : result.teams()) {
+            // 4 rosters: 3 all-play comparisons and 1 median comparison per final week
+            ExpectedWinsService.WinLossTie ap = t.allPlay();
+            assertEquals(15 * 3, ap.wins() + ap.losses() + ap.ties(), "all-play covers final weeks only");
+            ExpectedWinsService.WinLossTie md = t.median();
+            assertEquals(15, md.wins() + md.losses() + md.ties(), "median covers final weeks only");
+        }
+        double act = result.teams().stream().mapToDouble(ExpectedWinsService.TeamRow::actualWins).sum();
+        assertEquals(15 * 2, act, 1e-9, "two games a week, final weeks only");
+        for (ExpectedWinsService.TeamRow t : result.teams()) {
+            for (ExpectedWinsService.SwingWeek sw : t.swingWeeks()) assertTrue(sw.week() <= 15);
+        }
+    }
+
     /** The unbounded case still sees all 16 weeks, so the bound genuinely does something. */
     @Test
     void allWeeksBoundSeesAllSixteen() {

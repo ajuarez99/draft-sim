@@ -28,6 +28,12 @@ import java.util.*;
  * hold, both sides must cover the SAME games -- which is why the scores below
  * are filtered down to the rosters that actually played in each week, instead
  * of every roster the scores table happens to hold.
+ *
+ * <p><b>Final weeks only.</b> Games are kept only for weeks {@link ScoredWeeks} calls final
+ * (the rule {@code WeeklyReportService} uses). A stored but in-progress week is partial: counting
+ * it would credit a "win" for a game still being played and skew all-play, median, actual and
+ * expected wins and {@code weeksScored} alike. Every number this service returns therefore covers
+ * final weeks only (changed in spec 013's fix pass; earlier it covered every stored week).
  */
 @Service
 public class ExpectedWinsService {
@@ -37,17 +43,20 @@ public class ExpectedWinsService {
     private final RosterSeasonRepository rosterSeasons;
     private final LeagueMemberRepository members;
     private final LeagueSeasonResolver seasons;
+    private final ScoredWeeks scoredWeeks;
 
     public ExpectedWinsService(LeagueRepository leagues,
                                LeagueMatchupRepository matchups,
                                RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members,
-                               LeagueSeasonResolver seasons) {
+                               LeagueSeasonResolver seasons,
+                               ScoredWeeks scoredWeeks) {
         this.leagues = leagues;
         this.matchups = matchups;
         this.rosterSeasons = rosterSeasons;
         this.members = members;
         this.seasons = seasons;
+        this.scoredWeeks = scoredWeeks;
     }
 
     /** One played, scored game. The pure core's only input. */
@@ -299,9 +308,11 @@ public class ExpectedWinsService {
         LeagueRepository.LeagueRow league = found.league();
 
         List<Game> games = new ArrayList<>();
+        ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
         for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), bound)) {
             if (p.season() != league.season()) continue;
             if (p.aPoints() == null || p.bPoints() == null) continue;
+            if (!scored.isFinal(p.week())) continue; // stored-but-in-progress weeks are partial
             games.add(new Game(p.week(), p.aRosterId(), p.aPoints().doubleValue(),
                     p.bRosterId(), p.bPoints().doubleValue()));
         }

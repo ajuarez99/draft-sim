@@ -553,3 +553,32 @@ each keeps its qualification visible or in How this works.
 **T097, suites:** web `tsc -b` clean, **913/913** tests (75 files; baseline 806/66), build OK (main chunk
 472.77 kB / 142.14 kB gzip; baseline 442.02 / 132.91). Backend **964** tests, 0 failures, **0 skipped**
 (baseline 945/0).
+
+## Code-review fix pass — build agent
+
+Verified by execution: `npx tsc -b` clean; `npx vitest run` 76 files / 923 tests pass; `npm run build` ok; `./gradlew test` 965 tests, 0 failures, 0 errors, 0 skipped (Postgres on 5433).
+
+1. LeagueHome latest matchup / power from another season. `web/src/pages/LeagueHome.tsx`: MatchupBlock takes `seasonYear`; if the payload's `season` differs or `requestedSeason` is set it says "No week of {seasonYear} has been scored yet."; PowerBlock says "The {seasonYear} league vote hasn't started yet." when `leagueVoteHero(...).season` differs. Tests in `LeagueHome.test.tsx` (both).
+2. ExpectedWinsService counts final weeks only. `ExpectedWinsService.java`: injects `ScoredWeeks`, keeps games with `scored.isFinal(week)`; javadoc states that every number (actualWins, expectedWins, allPlay, median, weeksScored) is now final-weeks-only, a behaviour change on the Luck page. Test `aStoredButNotFinalWeekIsExcludedFromEveryNumber` in `ExpectedWinsServiceBoundTest` (real Postgres; week 16 stored, not final). No test constructed the service with `new`, so no other test needed a constructor change.
+3. Live game wording. LeagueHome uses Leading/Trailing/Level and "in week N · in progress" when `!weekFinal`. Tests for Leading and Trailing.
+4. One best/worst rule. New `web/src/extremes.ts` (+ `extremes.test.ts`, incl. ties); `LeagueHistory.tsx` imports it; `LeagueAnalysis.tsx` now marks every tied row (value-based `heatKind`) instead of the first index.
+5. `LUCK_NOTABLE_WINS = 0.25` exported from `ExpectedWins.tsx` with an ARBITRARY, hand-set comment; used in both places.
+6. `LetterGrades.grade` returns null when `teamCount < 2`. `LetterGradesTest` previously pinned `grade(1, 1) == "A+"`; changed to `assertNull` with a comment.
+7. `ManagerTendencies.tsx`: "In {league}" set is built from the season whose `sleeperLeagueId` equals the rail league (fallback `seasons[0]`); `setLeague(null)` when the draft/league cannot be resolved. Tests for both.
+8. `ManagerTendencies.tsx` renders `arch.basis` as visible small muted text beside the label (title kept). Side effect: the basis duplicates the reach sentence already in the row, so the existing audit-11 test now uses `findAllByText`/`getAllByText` for those two sentences. MockSetup chip left title-only, as instructed.
+9. `MockDraftView.tsx`: button relabelled "Pick from full list".
+10. LeagueHome position title now "Standings order: final placement when the season is over, otherwise wins, then points for", with a comment citing `RosterSeasonRepository.forLeague` (ORDER BY `(final_placement is null), final_placement, wins desc nulls last, points_for desc nulls last`, line ~91).
+
+## Code-review fix pass: parent review and live check (2026-10-01)
+
+- Refined item 8: showing every archetype's evidence repeated the reach caption already on each row. `archetype()`
+  now returns `source: 'reach' | 'tilt' | 'none'`. The scouting report shows the evidence visibly only for tilt/none
+  labels, the ones the row doesn't already explain.
+- Item 2 exposed a real span mismatch. Expected wins now counts final weeks only (2 locally), while Sleeper's W-L
+  includes week 3, which is over on Sleeper but not yet marked final here (the R2 finality lag). Neither number is
+  wrong, so the standings headers now name their span ("Record vs all (2 final wks)") and How this works says why.
+- Live (local): Luck covers 2 weeks with the early badge; Σ all-play wins = losses = 132; NFL league home's latest
+  matchup is week 2 (final) with "Lost"; the NBA home shows no matchup pre-season and "The league vote hasn't started yet."
+- Not fixed, recorded: review #11 (`managers.idsBySleeperUserId()` full-table reads, 2–3 per history/weekly
+  request). The table is small; it's a follow-up, not a defect.
+- Suites: web 923/923 (76 files); backend 965, 0 failures, 0 skipped.

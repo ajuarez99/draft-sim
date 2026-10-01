@@ -61,8 +61,9 @@ describe('ManagerTendencies reach display (audit 11)', () => {
         <ManagerTendencies />
       </MemoryRouter>,
     )
-    expect(await screen.findByText(/12\.0 picks earlier than their draft room/)).toBeInTheDocument()
-    expect(screen.getByText(/9\.5 picks later than their draft room/)).toBeInTheDocument()
+    // Said in the row and, since the archetype basis is visible text, once more beside the label.
+    expect((await screen.findAllByText(/12\.0 picks earlier than their draft room/)).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/9\.5 picks later than their draft room/).length).toBeGreaterThanOrEqual(1)
     // Inside one standard error: no number claimed.
     expect(screen.getAllByText(/drafts like the room/).length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText(/(^|\D)2\.0 picks/)).not.toBeInTheDocument()
@@ -124,6 +125,56 @@ describe('ManagerTendencies archetypes and league-first order', () => {
     const names = screen.getAllByRole('link').map((a) => a.textContent)
     expect(names.indexOf('Middle Mike')).toBeLessThan(names.indexOf('Early Eddie'))
     expect(names.indexOf('Tilt Tom')).toBeLessThan(names.indexOf('Early Eddie'))
+  })
+
+  it("groups by the rail league's own season only, not every season in its chain", async () => {
+    withManagers()
+    getDrafts.mockResolvedValue([
+      { id: 1, sleeperDraftId: 'D1', leagueId: 1, leagueName: 'Our League', season: 2026, teams: 12, rounds: 15,
+        status: 'complete', startTime: null, sleeperLeagueId: 'L1', previousLeagueId: 'L0', sport: 'nfl' },
+    ])
+    // Eddie played in an earlier season of the chain only; he must not count as "in" the league.
+    getLeagueHistory.mockResolvedValue({
+      sleeperLeagueId: 'L1',
+      seasons: [
+        { season: 2026, leagueId: 1, sleeperLeagueId: 'L1', name: 'Our League', standings: [{ managerId: 3 }] },
+        { season: 2025, leagueId: 0, sleeperLeagueId: 'L0', name: 'Our League', standings: [{ managerId: 1 }] },
+      ],
+      records: {},
+    })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/managers', state: { railLeagueId: 'L1' } }]}>
+        <ManagerTendencies />
+      </MemoryRouter>,
+    )
+    await screen.findByText('In Our League')
+    const names = screen.getAllByRole('link').map((a) => a.textContent)
+    expect(names.indexOf('Middle Mike')).toBeLessThan(names.indexOf('Early Eddie'))
+    // Eddie only appears in the older season, so he is with everyone else.
+    expect(screen.getByText('Everyone else')).toBeInTheDocument()
+  })
+
+  it('drops the grouping when the rail league cannot be resolved', async () => {
+    withManagers()
+    getDrafts.mockResolvedValue([])
+    getLeagueHistory.mockResolvedValue({ sleeperLeagueId: 'L1', seasons: [], records: {} })
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/managers', state: { railLeagueId: 'L1' } }]}>
+        <ManagerTendencies />
+      </MemoryRouter>,
+    )
+    await screen.findByText('Early Eddie')
+    expect(screen.queryByText('Everyone else')).not.toBeInTheDocument()
+  })
+
+  it('shows the archetype evidence as visible text, not only a tooltip', async () => {
+    withManagers()
+    render(<MemoryRouter><ManagerTendencies /></MemoryRouter>)
+    await screen.findByText('Early Eddie')
+    const chip = screen.getByText('Reacher')
+    const basis = chip.getAttribute('title')
+    expect(basis).toBeTruthy()
+    expect(screen.getAllByText(basis as string).length).toBeGreaterThanOrEqual(1)
   })
 
   it('does not group at all when no league is selected', async () => {

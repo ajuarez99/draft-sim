@@ -31,14 +31,20 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
  */
 const isEarly = (data: Data) => data.early ?? true
 
+/**
+ * ARBITRARY, hand-set: under a quarter of a win above/below expected is not worth
+ * calling lucky or unlucky. Not fitted to anything; the one copy of this cutoff.
+ */
+export const LUCK_NOTABLE_WINS = 0.25
+
 /** The one-sentence takeaway. Names the luckiest team only once enough weeks
  *  are scored for the name to mean something; before that it stays neutral. */
 function luckSubtitle(data: Data | null): string {
   const neutral = "Who the schedule has helped, and who it has hurt."
   if (!data || !data.available || isEarly(data)) return neutral
   const top = [...data.teams].sort((a, b) => b.winsAboveExpected - a.winsAboveExpected)[0]
-  // Under a quarter-win above expected nobody is meaningfully lucky.
-  if (!top || top.winsAboveExpected < 0.25) return neutral
+  // Under LUCK_NOTABLE_WINS above expected nobody is meaningfully lucky.
+  if (!top || top.winsAboveExpected < LUCK_NOTABLE_WINS) return neutral
   return `${top.teamName} has been the luckiest, ${top.winsAboveExpected.toFixed(2)} wins above what their scoring earned.`
 }
 
@@ -154,7 +160,7 @@ export default function ExpectedWins() {
             <h3 className="section-title">Where the luck came from</h3>
             <div className="ew-luck">
               {data.teams
-                .filter((t) => Math.abs(t.winsAboveExpected) >= 0.25)
+                .filter((t) => Math.abs(t.winsAboveExpected) >= LUCK_NOTABLE_WINS)
                 .map((t) => (
                   <LuckCard key={t.rosterId} team={t} />
                 ))}

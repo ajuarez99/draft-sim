@@ -11,6 +11,9 @@ a Sleeper league, rather than generic ADP bots.
 
 ## Status
 
+**2026-10-01:** spec 013 (fan-first redesign) is built and verified locally on branch
+`013-fan-first-redesign`, but not deployed. See `HANDOFF.md`'s top section.
+
 Vertical slice, end to end: ingest -> board -> profiles -> Monte Carlo -> SSE -> UI.
 Nothing has been backtested. See "What not to trust" below.
 

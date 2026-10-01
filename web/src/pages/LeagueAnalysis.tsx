@@ -34,6 +34,7 @@ import NotFound from '../components/NotFound'
 import HowThisWorks from '../components/HowThisWorks'
 import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { extremes } from '../extremes'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -191,14 +192,10 @@ function RankingScoreHow({ block }: { block: AnalysisRankingScores }) {
   )
 }
 
-/** Best and worst of a column, as indices into the entries, for the heat tint.
- *  Nothing is tinted when there is no spread (everyone level, or one roster). */
-function extremes(values: number[]): { best: number | null; worst: number | null } {
-  if (values.length < 2) return { best: null, worst: null }
-  const max = Math.max(...values)
-  const min = Math.min(...values)
-  if (max === min) return { best: null, worst: null }
-  return { best: values.indexOf(max), worst: values.indexOf(min) }
+/** Every row tied at the column's best (or worst) value is marked; nothing when there is no spread. */
+function heatKind(value: number, ex: ReturnType<typeof extremes>): 'best' | 'worst' | null {
+  if (ex == null) return null
+  return value === ex.best ? 'best' : value === ex.worst ? 'worst' : null
 }
 
 function HeatCell({ value, kind }: { value: number; kind: 'best' | 'worst' | null }) {
@@ -219,8 +216,8 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
       </>
     )
   }
-  const highs = extremes(block.entries.map((e) => e.high))
-  const lows = extremes(block.entries.map((e) => e.low))
+  const highs = extremes(block.entries.map((e) => e.high), true)
+  const lows = extremes(block.entries.map((e) => e.low), true)
   return (
     <>
       <div className="table-wrap">
@@ -239,7 +236,7 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
             </tr>
           </thead>
           <tbody>
-            {block.entries.map((e, i) => (
+            {block.entries.map((e) => (
               <tr key={e.rosterId}>
                 <td className="mono analysis-rank">{e.rank}</td>
                 <td>
@@ -264,10 +261,10 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
                 </td>
                 <td className="mono">{pts(e.avgWeekly)}</td>
                 <td className="mono">
-                  <HeatCell value={e.high} kind={i === highs.best ? 'best' : i === highs.worst ? 'worst' : null} />
+                  <HeatCell value={e.high} kind={heatKind(e.high, highs)} />
                 </td>
                 <td className="mono">
-                  <HeatCell value={e.low} kind={i === lows.best ? 'best' : i === lows.worst ? 'worst' : null} />
+                  <HeatCell value={e.low} kind={heatKind(e.low, lows)} />
                 </td>
               </tr>
             ))}

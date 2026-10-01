@@ -326,6 +326,48 @@ describe('League home', () => {
     expect(screen.queryByText(/1st of 4/)).not.toBeInTheDocument()
   })
 
+  /** The weekly report falls back to the newest PLAYED season; that week is not this season's. */
+  it("does not show another season's matchup as the latest", async () => {
+    arrange({ weekly: () => Promise.resolve(weekly({ season: 2025, requestedSeason: 2026 })) })
+    renderHome()
+    const latest = await waitFor(() => section('Latest matchup'))
+    await waitFor(() => expect(within(latest).getByText('No week of 2026 has been scored yet.')).toBeInTheDocument())
+    expect(within(latest).queryByText('Team 2')).toBeNull()
+  })
+
+  it("does not headline another season's power vote", async () => {
+    const p = power()
+    arrange({
+      power: () =>
+        Promise.resolve({
+          ...p,
+          entries: (p.entries as unknown as { season: number }[]).map((e) => ({ ...e, season: 2025 })),
+        } as unknown as PowerRankings),
+    })
+    renderHome()
+    const block = await waitFor(() => section('Power rankings'))
+    await waitFor(() => expect(within(block).getByText("The 2026 league vote hasn't started yet.")).toBeInTheDocument())
+    expect(within(block).queryByText(/No\. 1/)).toBeNull()
+  })
+
+  it('calls a live game Leading, not Won', async () => {
+    arrange({ weekly: () => Promise.resolve(weekly({ weekFinal: false })) })
+    renderHome()
+    const latest = await waitFor(() => section('Latest matchup'))
+    await waitFor(() => expect(within(latest).getByText('Leading')).toBeInTheDocument())
+    expect(within(latest).queryByText('Won')).toBeNull()
+    expect(within(latest).getByText(/in progress/)).toBeInTheDocument()
+  })
+
+  it('calls a live game Trailing when behind', async () => {
+    const w = weekly({ weekFinal: false })
+    w.matchups[0].home.points = 50
+    arrange({ weekly: () => Promise.resolve(w) })
+    renderHome()
+    const latest = await waitFor(() => section('Latest matchup'))
+    await waitFor(() => expect(within(latest).getByText('Trailing')).toBeInTheDocument())
+  })
+
   /** The awards endpoint can fall back a season; the home says so. */
   it('labels an award that comes from an earlier season', async () => {
     arrange({ awards: () => Promise.resolve({ ...awards(), season: 2025 }) })

@@ -453,8 +453,9 @@ describe('standings: season in progress, marks and expected-wins columns', () =>
     expect(screen.getByText('8-25')).toBeTruthy()
     // Median games only: 3-0, not added to the real 9-5 record.
     expect(screen.getByText('3-0')).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "Record vs all (reg. season)" })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: "Vs weekly median (reg. season)" })).toBeTruthy()
+    // The span is named from the payload's final-week count (code-review fix pass).
+    expect(screen.getByRole("columnheader", { name: /^Record vs all \(\d+ final wks?\)$/ })).toBeTruthy()
+    expect(screen.getByRole("columnheader", { name: /^Vs weekly median \(\d+ final wks?\)$/ })).toBeTruthy()
   })
 
   it('shows dashes when the expected-wins season differs from the row season', async () => {

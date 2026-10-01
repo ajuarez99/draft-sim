@@ -22,6 +22,7 @@ import PersonName from '../components/PersonName'
 import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { extremes, type Extremes } from '../extremes'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -353,22 +354,6 @@ function recShare(r: Rec): number | null {
   return g === 0 ? null : (r.wins + 0.5 * r.ties) / g
 }
 
-type Extremes = { best: number; worst: number } | null
-
-/**
- * Best and worst value in one column. Null when there is no spread (every row
- * equal, or fewer than two rows with a value): marking a best and a worst among
- * identical numbers would state a difference that is not there.
- */
-function extremes(values: (number | null | undefined)[], higherIsBetter: boolean): Extremes {
-  const v = values.filter((x): x is number => x != null)
-  if (v.length < 2) return null
-  const hi = Math.max(...v)
-  const lo = Math.min(...v)
-  if (hi === lo) return null
-  return higherIsBetter ? { best: hi, worst: lo } : { best: lo, worst: hi }
-}
-
 /**
  * Best/worst marker: a tint (--up/--down) AND a glyph with a text label, so the
  * colour is never the only signal (contracts/ui-rules.md, Color).
@@ -408,6 +393,11 @@ function StandingsTable({
   if (expected?.available && expected.season === season) {
     for (const t of expected.teams) teams.set(t.rosterId, t)
   }
+  // These two columns count FINAL weeks only (ExpectedWinsService); W-L is Sleeper's own
+  // and can already include a week this app hasn't marked final. Name the span so the
+  // two can't be read as covering the same games (spec 013 code-review fix pass).
+  const finalWeeks = teams.size > 0 ? expected?.weeksScored ?? null : null
+  const span = finalWeeks == null ? 'reg. season' : `${finalWeeks} final wk${finalWeeks === 1 ? '' : 's'}`
   const exW = extremes(rows.map((r) => r.wins), true)
   const exL = extremes(rows.map((r) => r.losses), false)
   const exPF = extremes(rows.map((r) => r.pointsFor), true)
@@ -436,10 +426,10 @@ function StandingsTable({
             <th className="mono">PF</th>
             <th className="mono">PA</th>
             <th className="mono" title="Regular season: each week's score against every other team's score that week">
-              Record vs all (reg. season)
+              Record vs all ({span})
             </th>
             <th className="mono" title="Regular season: each week's score against that week's median. Median games only, not added to the real record">
-              Vs weekly median (reg. season)
+              Vs weekly median ({span})
             </th>
           </tr>
         </thead>
@@ -664,6 +654,9 @@ export default function LeagueHistory() {
               wins plus 3 median wins). Neither is wrong; they count different things.
             </p>
             <p>
+              Both columns count only weeks this app has marked final, so the header names how many.
+              Sleeper's W-L can already include a week that is over on Sleeper but not yet marked final
+              here, which is why the two can cover a different number of games for a day or two.
               Both columns come from the Luck page's calculation, which covers one season at a time.
               Any season it did not compute shows a dash. In each number column, ▲ marks the best value
               and ▼ the worst (fewest losses and points against count as best); nothing is marked when

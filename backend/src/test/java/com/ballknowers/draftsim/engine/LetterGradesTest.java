@@ -53,7 +53,9 @@ class LetterGradesTest {
             assertEquals("A+", g.grade(1, n));
             assertEquals("F", g.grade(n, n));
         }
-        assertEquals("A+", g.grade(1, 1), "a one-team league is its own best");
+        // Changed in the fix pass: a ranking of one says nothing, so it earns no letter
+        // (it used to be "A+", a grade for beating nobody).
+        assertNull(g.grade(1, 1), "a one-team league has no ranking to grade");
     }
 
     @Test

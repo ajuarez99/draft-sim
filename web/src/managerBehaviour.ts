@@ -126,6 +126,9 @@ export type Archetype = {
   label: string
   /** Why this label, in a sentence that names its evidence. Safe to show beside or under the label. */
   basis: string
+  /** Which evidence produced the label. A 'reach' basis is the same sentence as the
+   *  reach caption pages already print beside the label, so they needn't repeat it. */
+  source: 'reach' | 'tilt' | 'none'
 }
 
 /**
@@ -149,7 +152,7 @@ export function archetype(m: BehaviourInputs): Archetype {
     const read = relativeReachRead(m.relativeReachBias, m.relativeReachStdErr)
     if (read && read.kind !== 'thin') {
       const label = read.kind === 'early' ? 'Reacher' : read.kind === 'late' ? 'Waits' : 'Drafts like the room'
-      return { label, basis: read.text }
+      return { label, basis: read.text, source: 'reach' }
     }
   }
 
@@ -160,6 +163,7 @@ export function archetype(m: BehaviourInputs): Archetype {
     return {
       label: `${pos} ${v > 1 ? 'early' : 'late'}`,
       basis: `${v > 1 ? 'Leans' : 'Fades'} ${pos} (${v.toFixed(2)}x neutral); no usable reach read to label them on.`,
+      source: 'tilt',
     }
   }
 
@@ -168,5 +172,6 @@ export function archetype(m: BehaviourInputs): Archetype {
     basis: m.picksScored > 0
       ? 'Too few scoreable picks to compare with their room, and no strong positional lean.'
       : 'No pick of theirs can be scored for reach, and no strong positional lean.',
+    source: 'none',
   }
 }

@@ -123,6 +123,7 @@ describe('archetype', () => {
     expect(archetype({ ...base, relativeReachBias: 1.5, relativeReachStdErr: 4, picksScored: 30 })).toEqual({
       label: 'Drafts like the room',
       basis: 'drafts like the room',
+      source: 'reach',
     })
   })
 
@@ -153,6 +154,7 @@ describe('archetype', () => {
     expect(archetype(base)).toEqual({
       label: 'Not enough history',
       basis: 'No pick of theirs can be scored for reach, and no strong positional lean.',
+      source: 'none',
     })
   })
 })

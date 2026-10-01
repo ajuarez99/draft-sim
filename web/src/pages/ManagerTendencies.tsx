@@ -152,6 +152,9 @@ function ManagerRow({ m, onChanged }: RowProps) {
             <span className="mgr-archetype-chip" title={arch.basis}>
               {arch.label}
             </span>
+            {/* The evidence is visible, not tooltip-only (touch has no hover). A reach-based
+                label's evidence IS the reach caption this row already prints, so it isn't repeated. */}
+            {arch.source !== 'reach' && <span className="muted small mgr-archetype-basis">{arch.basis}</span>}
             {/* Note and comparison ride under the name rather than taking
                 columns of their own: both are optional and only a handful of
                 managers have either, so a column for them would be mostly
@@ -317,9 +320,15 @@ export default function ManagerTendencies() {
       // Sport and name from the rail's own draft list; members from the league's standings.
       const [drafts, history] = await Promise.all([cachedDrafts(), getLeagueHistory(railLeagueId as string)])
       const d = drafts.find((x) => x.sleeperLeagueId === railLeagueId)
-      if (!live || !d) return
+      if (!live) return
+      if (!d) {
+        setLeague(null)
+        return
+      }
+      // Members of the rail league's OWN season, not every season in its chain.
+      const own = history.seasons.find((s) => s.sleeperLeagueId === railLeagueId) ?? history.seasons[0]
       const ids = new Set<number>()
-      for (const s of history.seasons) for (const r of s.standings) if (r.managerId != null) ids.add(r.managerId)
+      for (const r of own?.standings ?? []) if (r.managerId != null) ids.add(r.managerId)
       setLeague({ name: d.leagueName, sport: d.sport, managerIds: ids })
     }
     load().catch(() => {

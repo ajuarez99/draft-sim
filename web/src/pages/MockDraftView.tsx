@@ -154,7 +154,7 @@ export default function MockDraftView() {
           {state.isUsersTurn && !complete && (
             <div className="controls-inline">
               <button className="start-button" onClick={() => setPickerOpen(true)} disabled={submitting}>
-                {submitting ? 'Submitting…' : 'Full list'}
+                {submitting ? 'Submitting…' : 'Pick from full list'}
               </button>
             </div>
           )}

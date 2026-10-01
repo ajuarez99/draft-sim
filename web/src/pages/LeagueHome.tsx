@@ -179,13 +179,13 @@ export default function LeagueHome() {
             three fit the first screen on a phone (SC-005); the league after. */}
         {me && anyGames && <YourSeason me={me} position={meIndex + 1} of={standings.length} />}
 
-        {!preSeason && <MatchupBlock block={weekly} isMember={me != null} leagueId={id} />}
+        {!preSeason && <MatchupBlock block={weekly} isMember={me != null} leagueId={id} seasonYear={seasonYear} />}
 
         {analysis.status !== 'idle' && <NextOpponentBlock block={analysis} leagueId={id} />}
 
         <StandingsBlock block={history} season={anyGames ? season : null} meIndex={meIndex} leagueId={id} />
 
-        <PowerBlock block={power} leagueId={id} />
+        <PowerBlock block={power} leagueId={id} seasonYear={seasonYear} />
 
         <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
       </div>
@@ -236,7 +236,11 @@ function YourSeason({ me, position, of }: { me: StandingRow; position: number; o
           <span className="lh-hero-label">Record</span>
         </div>
         <div>
-          <span className="lh-hero-num cond" title="By wins, then points for">
+          {/* RosterSeasonRepository.forLeague's ORDER BY: final_placement first (nulls last), then wins desc, then points_for desc. */}
+          <span
+            className="lh-hero-num cond"
+            title="Standings order: final placement when the season is over, otherwise wins, then points for"
+          >
             {ordinal(position)}
           </span>
           <span className="lh-hero-label">of {of} in the standings</span>
@@ -300,13 +304,26 @@ function StandingLine({ row, position }: { row: StandingRow; position: number })
   )
 }
 
-function MatchupBlock({ block, isMember, leagueId }: { block: Block<WeeklyReport>; isMember: boolean; leagueId: string }) {
+function MatchupBlock({
+  block,
+  isMember,
+  leagueId,
+  seasonYear,
+}: {
+  block: Block<WeeklyReport>
+  isMember: boolean
+  leagueId: string
+  seasonYear: number | null
+}) {
   if (block.status === 'idle') return null
   let body
   if (block.status === 'loading') body = <p className="muted small">Loading…</p>
   else if (block.status === 'error') body = <p className="muted small">Couldn't load the latest matchup.</p>
   else if (!block.data.available || block.data.week === 0) {
     body = <p className="muted small">No week has been scored yet.</p>
+  } else if (seasonYear != null && (block.data.season !== seasonYear || block.data.requestedSeason != null)) {
+    // The resolver falls back to the newest PLAYED season; that week is not this season's.
+    body = <p className="muted small">No week of {seasonYear} has been scored yet.</p>
   } else {
     const m = block.data.matchups.find((x) => x.home.isMe || x.away.isMe)
     if (!m) {
@@ -316,7 +333,19 @@ function MatchupBlock({ block, isMember, leagueId }: { block: Block<WeeklyReport
     } else {
       const mine = m.home.isMe ? m.home : m.away
       const theirs = m.home.isMe ? m.away : m.home
-      const result = mine.points > theirs.points ? 'Won' : mine.points < theirs.points ? 'Lost' : 'Tied'
+      const final = block.data.weekFinal
+      // A live game is not a result: Leading/Trailing/Level until the week is final.
+      const result = final
+        ? mine.points > theirs.points
+          ? 'Won'
+          : mine.points < theirs.points
+            ? 'Lost'
+            : 'Tied'
+        : mine.points > theirs.points
+          ? 'Leading'
+          : mine.points < theirs.points
+            ? 'Trailing'
+            : 'Level'
       body = (
         <>
           <div className="lh-matchup">
@@ -337,7 +366,7 @@ function MatchupBlock({ block, isMember, leagueId }: { block: Block<WeeklyReport
           </div>
           <p className="small">
             <span className={`lh-result ${result.toLowerCase()}`}>{result}</span> in week {block.data.week}
-            {block.data.weekFinal ? '' : ' · still in progress'}
+            {final ? '' : ' · in progress'}
           </p>
         </>
       )
@@ -404,8 +433,11 @@ function NextOpponentBlock({ block, leagueId }: { block: Block<LeagueAnalysis>; 
   )
 }
 
-function PowerBlock({ block, leagueId }: { block: Block<PowerRankings>; leagueId: string }) {
-  const headline = block.status === 'ok' ? powerHeadline(block.data) : null
+function PowerBlock({ block, leagueId, seasonYear }: { block: Block<PowerRankings>; leagueId: string; seasonYear: number | null }) {
+  // The hero is the newest season that has a vote; if that is not the season shown, this season has none.
+  const heroSeason = block.status === 'ok' ? leagueVoteHero(block.data.entries)?.season : undefined
+  const otherSeason = heroSeason != null && seasonYear != null && heroSeason !== seasonYear
+  const headline = block.status === 'ok' && !otherSeason ? powerHeadline(block.data) : null
   return (
     <section className="section lh-power" aria-labelledby="lh-power-h">
       <h2 className="section-title" id="lh-power-h">
@@ -414,7 +446,7 @@ function PowerBlock({ block, leagueId }: { block: Block<PowerRankings>; leagueId
       {block.status === 'loading' && <p className="muted small">Loading…</p>}
       {block.status === 'error' && <p className="muted small">Couldn't load the power rankings.</p>}
       {block.status === 'ok' &&
-        (headline ? <p className="lh-headline">{headline}</p> : <p className="muted small">The league vote hasn't started yet.</p>)}
+        (headline ? <p className="lh-headline">{headline}</p> : <p className="muted small">{otherSeason ? `The ${seasonYear} league vote hasn't started yet.` : "The league vote hasn't started yet."}</p>)}
       <Link className="lh-link" to={`/leagues/${leagueId}/power`}>
         All power rankings
       </Link>

@@ -24,10 +24,11 @@ public class LetterGrades {
     /**
      * @param rank      1 = best. Tied teams must be passed the same rank, so they share a grade.
      * @param teamCount how many teams were ranked
-     * @return the grade, or null when no cutoffs are configured or the input is not a real rank
+     * @return the grade, or null when no cutoffs are configured, the input is not a real rank, or fewer
+     *         than two teams were ranked (a ranking of one says nothing: it is not "the best")
      */
     public String grade(int rank, int teamCount) {
-        if (!props.loaded() || teamCount < 1 || rank < 1 || rank > teamCount) return null;
+        if (!props.loaded() || teamCount < 2 || rank < 1 || rank > teamCount) return null;
         double percentile = (rank - 1) / (double) Math.max(1, teamCount - 1) * 100.0;
         for (GradeProperties.Cutoff c : props.cutoffs()) {
             if (percentile <= c.maxPercentile()) return c.grade();
