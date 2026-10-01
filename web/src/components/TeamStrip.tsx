@@ -1,8 +1,12 @@
 import type { SlotStatus } from '../teamNeeds'
+import type { Sport } from '../api'
+import PlayerFace from './PlayerFace'
 
 type Props = {
   /** Straight from computeTeamNeeds -- template order, one entry per starting slot. */
   needs: SlotStatus[]
+  /** Required: picks the player-photo CDN folder. */
+  sport: Sport
 }
 
 /**
@@ -19,7 +23,7 @@ type Props = {
  * synced has `rosterPositions: []` (see SeatsResponse), and an empty strip
  * would read as "you have no starters" rather than "we don't know the shape".
  */
-export default function TeamStrip({ needs }: Props) {
+export default function TeamStrip({ needs, sport }: Props) {
   if (needs.length === 0) return null
   return (
     <div className="team-strip">
@@ -28,6 +32,7 @@ export default function TeamStrip({ needs }: Props) {
           {n.player ? (
             <>
               <span className={`pos ${n.player.position}`}>{n.player.position}</span>
+              <PlayerFace sport={sport} sleeperId={n.player.sleeperId} team={n.player.team} position={n.player.position} name={n.player.name} size={16} />
               <span className="team-slot-name">{n.player.name}</span>
             </>
           ) : (

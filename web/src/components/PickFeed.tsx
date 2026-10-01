@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react'
 import type { PlayerRef, Sport } from '../api'
+import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { positionRun } from '../pickRun'
@@ -25,10 +26,9 @@ type Props = {
   picks: FeedPick[]
   teams: number
   limit?: number
-  // Defaults to 'nfl' -- pre-multi-sport callers (and MockDraftView, whose
-  // room is football-only regardless) don't need to pass anything. Drives
-  // both the run detector's runnable-position list and the DEF name guard.
-  sport?: Sport
+  // Required, never defaulted. Drives the run detector's runnable-position list,
+  // the DEF name guard and the player-photo CDN folder.
+  sport: Sport
   /**
    * Makes every row a button that reports its pick number. Optional and
    * additive: the mock room and the simulator pass nothing and get the plain
@@ -58,7 +58,7 @@ type Props = {
  * `revealedThrough === pausedAt`, so the board's predicted player at your own
  * still-open pick would otherwise show up here as though it had happened.
  */
-export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl', onPickClick }: Props) {
+export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }: Props) {
   if (picks.length === 0) return null
 
   const run = positionRun(picks.map((p) => p.player), 6, 4, sport)
@@ -88,6 +88,7 @@ export default function PickFeed({ picks, teams, limit = 3, sport = 'nfl', onPic
                 out the numbers around them -- but the pick that just landed is
                 the one being announced, and announcing an initial is odd. */}
             <span className="pick-feed-name">
+              <PlayerFace sport={sport} sleeperId={p.player.sleeperId} team={p.player.team} position={p.player.position} name={p.player.name} size={18} />
               {isLead ? (
                 p.player.name
               ) : (

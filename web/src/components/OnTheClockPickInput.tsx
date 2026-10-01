@@ -3,6 +3,7 @@ import type { PlayerRef, Sport } from '../api'
 import { filterPositions } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
+import PlayerFace from './PlayerFace'
 
 type Props = {
   pickNo: number
@@ -80,6 +81,7 @@ export default function OnTheClockPickInput({
                 {n.player ? (
                   <>
                     <span className={`pos ${n.player.position}`}>{n.player.position}</span>
+                    <PlayerFace sport={sport} sleeperId={n.player.sleeperId} team={n.player.team} position={n.player.position} name={n.player.name} size={16} />
                     <span className="team-slot-name">{n.player.name}</span>
                   </>
                 ) : (
@@ -125,6 +127,7 @@ export default function OnTheClockPickInput({
                   >
                     <td className="player-col">
                       <span className={`pos ${p.position}`}>{p.position}</span>
+                      <PlayerFace sport={sport} sleeperId={p.sleeperId} team={p.team} position={p.position} name={p.name} size={20} />
                       {p.name}
                       <span className="team">{p.team}</span>
                     </td>

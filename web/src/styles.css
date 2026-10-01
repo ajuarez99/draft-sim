@@ -1003,7 +1003,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    names truncate at 1440x900, down from 23. The cell's own 7px of padding is
    the gutter. */
 .board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.board .meta { display: flex; align-items: baseline; margin-top: 3px; gap: 6px; }
+.board .meta { display: flex; align-items: center; margin-top: 3px; gap: 6px; }
 /* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
 .board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
 /* An undrafted cell is its pick number and nothing else -- in flow, not the
@@ -5131,3 +5131,41 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .league-row .league-card-title { flex: 1 1 200px; min-width: 0; }
 .league-row .league-card-status, .league-row .league-card-live { flex: 0 1 auto; font-size: 12px; }
 .league-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+/* --- 013 US7: PlayerFace -------------------------------------------------
+   photo -> team logo -> initials, one fixed box in every state. Inline-block
+   with negative vertical margins so a face beside a line of text never makes
+   that line taller (the draft board's cell height must not change). The img is
+   a leaf, not a surface: no border, no panel fill. */
+.pface { display: inline-block; vertical-align: middle; border-radius: 50%; overflow: hidden; flex-shrink: 0; margin: -4px 5px -4px 0; line-height: 1; }
+.pface img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pface-logo img { object-fit: contain; }
+.pface-initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+
+/* --- 013 US5: WeeklyReport scoreboard + stepper ----------------------------
+   Your matchup is the one card-shaped thing here: two sides facing each other,
+   full width. Won/Lost always carries the word; --up/--down only reinforce it. */
+.wr-stepper { display: flex; align-items: center; gap: 8px; }
+.wr-stepper button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.wr-stepper button:disabled { opacity: 0.4; cursor: default; }
+.wr-stepper-label { font-variant-numeric: tabular-nums; min-width: 8ch; text-align: center; font-weight: 600; }
+.wr-weeknote { margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.wr-score { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 12px 20px; padding: 16px 18px; background: var(--panel); border-radius: 12px; }
+.wr-score-side { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wr-score-side.right { flex-direction: row-reverse; text-align: right; }
+.wr-score-id { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.wr-score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.wr-score-avatar { width: 40px; height: 40px; flex: 0 0 40px; font-size: 16px; }
+.wr-score-pts { font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; font-weight: 700; }
+.wr-result { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.wr-result.won { color: var(--up); }
+.wr-result.lost { color: var(--down); }
+.wr-score-result { grid-column: 1 / -1; margin: 0; text-align: center; }
+.wr-strip { margin-top: 12px; }
+@media (max-width: 640px) {
+  .wr-score { grid-template-columns: 1fr; gap: 10px; }
+  .wr-score-side.right { flex-direction: row; text-align: left; }
+}
+.wr-review.row-list { display: block; }
+.wr-review > li { padding: 10px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.wr-review-kind { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; flex: 0 0 100%; }

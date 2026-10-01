@@ -36,6 +36,7 @@ describe('the announcement row', () => {
   it('names the newest pick in full, with who took him and how he fits', () => {
     render(
       <PickFeed
+        sport="nfl"
         teams={TEAMS}
         picks={[
           pick(1, 'RB', 'Bijan Robinson', 'Sam'),
@@ -52,6 +53,7 @@ describe('the announcement row', () => {
   it('abbreviates the older rows and leaves their fit unsaid', () => {
     render(
       <PickFeed
+        sport="nfl"
         teams={TEAMS}
         // Both carry a fit; only the newest may render one.
         picks={[
@@ -78,7 +80,7 @@ describe('the announcement row', () => {
       pick(5, 'TE', 'Player Five', 'Jo'),
       pick(6, 'WR', 'Player Six', 'Allan', 'Fills WR2'),
     ]
-    render(<PickFeed teams={TEAMS} picks={picks} />)
+    render(<PickFeed sport="nfl" teams={TEAMS} picks={picks} />)
 
     expect(screen.getByText('4 of the last 6 were WR')).toBeTruthy()
     expect(screen.queryByText('Fills WR2')).toBeNull()
@@ -87,7 +89,7 @@ describe('the announcement row', () => {
 
   it('is inert without onPickClick: no buttons at all', () => {
     const { container } = render(
-      <PickFeed teams={TEAMS} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]} />,
+      <PickFeed sport="nfl" teams={TEAMS} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]} />,
     )
     expect(screen.queryAllByRole('button')).toHaveLength(0)
     expect(container.querySelector('.clickable')).toBeNull()
@@ -97,6 +99,7 @@ describe('the announcement row', () => {
     const onPickClick = vi.fn()
     render(
       <PickFeed
+        sport="nfl"
         teams={TEAMS}
         onPickClick={onPickClick}
         picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]}
@@ -112,7 +115,7 @@ describe('the announcement row', () => {
   })
 
   it('renders nothing at all before the first pick', () => {
-    const { container } = render(<PickFeed teams={TEAMS} picks={[]} />)
+    const { container } = render(<PickFeed sport="nfl" teams={TEAMS} picks={[]} />)
     expect(container.firstChild).toBeNull()
   })
 })

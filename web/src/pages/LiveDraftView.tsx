@@ -776,7 +776,7 @@ export default function LiveDraftView() {
             <span className="muted tiny">
               {startersSet} of {myNeeds.length} starters
             </span>
-            <TeamStrip needs={myNeeds} />
+            <TeamStrip needs={myNeeds} sport={sport} />
           </div>
         )}
 

@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import SuperlativeStandingsModal from '../components/SuperlativeStandingsModal'
+import PlayerFace from '../components/PlayerFace'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   fetchSuperlatives,
@@ -12,6 +13,7 @@ import {
   deleteConductEntry,
   type SuperlativesResponse,
   type Superlative,
+  type Sport,
   type SuperlativeDetail,
   type ConductList,
 } from '../api'
@@ -139,6 +141,7 @@ export default function Superlatives() {
                 key={s.kind}
                 s={s}
                 hue={hueForIndex(i, data.superlatives.length)}
+                sport={data.sport}
                 closeGameMargin={data.closeGameMargin}
                 throughWeek={data.throughWeek}
                 suspensionWeeksObserved={data.suspensionWeeksObserved}
@@ -176,12 +179,14 @@ const READING_KINDS = new Set([
 function SuperlativeCard({
   s,
   hue,
+  sport,
   closeGameMargin,
   throughWeek,
   suspensionWeeksObserved,
 }: {
   s: Superlative
   hue: number
+  sport: Sport
   closeGameMargin: number
   throughWeek: number | null
   suspensionWeeksObserved: number[]
@@ -279,6 +284,7 @@ function SuperlativeCard({
                 <div className="sl-holder sl-player-holder" key={ph.playerId}>
                   <span className="sl-holder-top">
                     <span className="sl-holder-name">
+                      <PlayerFace sport={sport} sleeperId={ph.playerId} team={ph.team} position={ph.position ?? ''} name={ph.playerName} size={20} />
                       {ph.playerName}
                       {ph.position ? ` (${ph.position})` : ''}
                     </span>

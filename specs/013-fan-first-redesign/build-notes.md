@@ -402,3 +402,31 @@ at 375 where it starts on screen and runs ~65px past). No horizontal scroll on a
 (League home, Matchups & awards, Power rankings, Team strength, Luck, Bench points, Playoff odds, Awards,
 Draft board, Standings). Group headings show on desktop; the phone lane shows every row.
 Old addresses still load (all US1 harness routes use them).
+
+## US5 + US7 — build agent
+
+Verified: `npx tsc -b` clean, `npx vitest run` 70 files / 858 tests passed, `npm run build` ok. Not browser-checked (T053, T059 left to the parent).
+
+**US5 (WeeklyReport.tsx, styles.css section "013 US5")**
+- T050: when a matchup has an `isMe` side it renders first as a full-width `Scoreboard` (both avatars, 34px tabular scores, "Won"/"Lost"/"Tied" as a word with `--up`/`--down` and "by N.NN"); the other matchups follow in the existing `.wr-games` grid as a strip. Awards and football top performers become one "Week in review" `.row-list` (`WeekInReview`). Basketball's Best nights / Best week sections are unchanged (they keep their HowThisWorks and caveats). No `isMe` leaves the original sections and order.
+- T051: numeric input replaced by a `‹ Week N ›` group (`aria-label` "Previous week"/"Next week", disabled at 1 and at `latestScoredWeek`). URL `?week=` and the clamp-to-latest effect are untouched. Label "Week N · latest final week" shows only when there is no `?week=`, the week is final, and it equals `latestFinalWeek`; if `latestScoredWeek > N` a link "Week M in progress →" follows. The existing "In progress — scores can still change" caveat is kept for `!weekFinal`. The payload does carry `weekFinal`/`latestFinalWeek`.
+- T052: tests rewritten for the stepper (the old input tests no longer apply) plus new ones: scoreboard first (Lost / Won / Tied), merged review list, no-isMe order, stepper bounds, default-week label with week 2 shown and week 3 scored.
+
+**US7**
+- T054/T055: `components/PlayerFace.tsx` (+ test). Sport required. Stage only advances on `onError`; DEF starts at logo; null team skips logo; fixed box in all states (inline-block, negative vertical margin so it never grows a text line); `loading="lazy"`, `alt={name}`; initials styled like Avatar. 6 tests.
+- T056: `DraftBoard` cell: 16px face inside `.name`, before the name. Cell height: face margin box is 8px (16px minus 2x4px negative margin), below the name line height, so it adds no height; not measured live. It costs about 21px of name width in a 96px column, so check truncation at 1440 with 14 teams.
+- T057: faces added in `PlayerPicker` rows (20px) and filled `TeamStrip` slots (16px), `OnTheClockPickInput` rows and its inline team strip, `PickFeed` rows (18px). Sport threading: `DraftBoard.sport` and `PickFeed.sport` were optional with a silent `'nfl'` default; both are now required (all real callers already passed it; `PickFeed.test.tsx` now passes `sport="nfl"`). `TeamStrip` gained a required `sport` prop, passed from `PlayerPicker` and `LiveDraftView` (its `sport` variable).
+- T058 finding: YES, both are Sleeper player ids. `WeeklyPerformer.playerId` is the key of `playersBySleeperId` (backend/src/main/java/com/ballknowers/draftsim/engine/WeeklyReportService.java:237-253; same for NightPerformance/PlayerWeek). Superlative player ids come from `playersBySleeperId.get(r.playerId())` (SeasonSuperlativesService.java:822-823, 843-844, and 765 for pickups). So PlayerFace is used in WeeklyReport (top performers, best nights, best week) and in Superlatives' JABARI_SMITH_JR `playerHolders` (these carry the pro `team`, so they get the logo step). Weekly performers carry only the FANTASY team name, so they pass `team={null}`: photo then initials. Not done: the SuperlativeStandingsModal player rows and per-detail rows (PICKUP/ABSENCE/CONDUCT) in Superlatives, left as is to keep scope small.
+
+## US5 + US7: parent live check (measured, local, 2026-10-01)
+
+- **Faces:** 0 broken images on the NFL completed board (180 cells, 1440 and 375), the NBA mock (/mock/653) and the
+  NFL weekly report. No horizontal scroll on any.
+- **Fixed in review:** the agent put the 16px face on the board's *name* line. Measured: it truncated
+  **16 of 180** names at 1440 vs **1** without faces. Moved it to the meta line beside the team code.
+  Re-measured: 1 of 180 truncated at 1440 and 768; cell height unchanged at 63px.
+- **Weekly report:** the NBA league (2026 not started) shows "League · 2025", a fallback note, the stepper at
+  week 21 and "Week 21 · latest final week", with popsharky's matchup leading as a scoreboard ("WON by 9.00").
+  It's honest about which season it is.
+- The agent also removed silent `sport = 'nfl'` defaults from DraftBoard and PickFeed (every caller already
+  passed it). This is the "optional params that encode rules" class, closed rather than worked around.

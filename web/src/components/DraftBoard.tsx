@@ -1,6 +1,7 @@
 import { Fragment } from 'react'
 import type { PlayerRef, PredictedPick, Seat, Sport } from '../api'
 import Avatar from './Avatar'
+import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
@@ -17,11 +18,10 @@ type Props = {
   // Undefined while the slot isn't known yet -- see DraftView's `slotKnown`.
   // Distinct from "no seats at all" (seats itself being undefined).
   mySlot?: number
-  // Defaults to 'nfl' so every existing caller keeps its pre-multi-sport
-  // behaviour; only guards playerName.ts's DEF-abbreviation special case
-  // today (multi-sport-and-rebrand.md Phase 6). Real callers should pass the
-  // draft's actual sport once they have one (e.g. SeatsResponse.sport).
-  sport?: Sport
+  // Required, never defaulted: it picks the player-photo CDN folder as well as
+  // playerName.ts's DEF-abbreviation guard, and a silent 'nfl' would show a
+  // football face on a basketball player. Callers pass the draft's own sport.
+  sport: Sport
   onCellClick?: (pick: PredictedPick) => void
   onSeatClick?: (slot: number) => void
   // The mock draft room (claude/next-features-roadmap.md §4, Phase 3) has no
@@ -61,7 +61,7 @@ export default function DraftBoard({
   revealedThrough,
   seats,
   mySlot,
-  sport = 'nfl',
+  sport,
   onCellClick,
   onSeatClick,
   hideProvenanceDots,
@@ -180,7 +180,11 @@ export default function DraftBoard({
                       <span className="name-lead">{label.lead}</span>
                       {label.rest}
                     </span>
+                    {/* The face sits on the meta line, not the name line: on the name
+                        line it truncated 16 of 180 names at 1440 vs 1 without
+                        (measured, spec 013 parent review). */}
                     <div className="meta">
+                      <PlayerFace sport={sport} sleeperId={shown.sleeperId} team={shown.team} position={shown.position} name={shown.name} size={16} />
                       <span className="team-code mono">{shown.team ?? '—'}</span>
                     </div>
                   </>

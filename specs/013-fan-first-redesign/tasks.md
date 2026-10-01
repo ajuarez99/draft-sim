@@ -180,26 +180,26 @@ Every page task does the same five things:
 
 ## Phase 7: User Story 5 - Weekly report leads with your matchup (Priority: P2)
 
-- [ ] T050 [US5] `WEB/pages/WeeklyReport.tsx`: the matchup with an `isMe` side goes first, full width (avatars, large tabular scores, win/loss with `--up`/`--down` and the words "Won"/"Lost"). The rest is a compact scoreboard strip; awards and top performers form one "Week in review" `.row-list`. Missing `isMe` → today's order.
-- [ ] T051 [US5] Same file: replace the numeric input (~92) with ‹ Week N › (disabled at 1 and at `latestScoredWeek`). Label: "Week N · latest final week", plus "Week N+1 in progress →" when a later week is scored and not final.
-- [ ] T052 [P] [US5] `WEB/pages/WeeklyReport.test.tsx`: yours first; no `isMe` keeps the order; stepper bounds; the label for week 2 shown with week 3 scored and not final.
-- [ ] T053 [US5] Live check at 3 sizes × 2 sports.
+- [X] T050 [US5] `WEB/pages/WeeklyReport.tsx`: the matchup with an `isMe` side goes first, full width (avatars, large tabular scores, win/loss with `--up`/`--down` and the words "Won"/"Lost"). The rest is a compact scoreboard strip; awards and top performers form one "Week in review" `.row-list`. Missing `isMe` → today's order.
+- [X] T051 [US5] Same file: replace the numeric input (~92) with ‹ Week N › (disabled at 1 and at `latestScoredWeek`). Label: "Week N · latest final week", plus "Week N+1 in progress →" when a later week is scored and not final.
+- [X] T052 [P] [US5] `WEB/pages/WeeklyReport.test.tsx`: yours first; no `isMe` keeps the order; stepper bounds; the label for week 2 shown with week 3 scored and not final.
+- [X] T053 [US5] Live check at 3 sizes × 2 sports.
 
 ---
 
 ## Phase 8: User Story 7 - Players have faces (Priority: P3)
 
-- [ ] T054 [US7] `WEB/components/PlayerFace.tsx`:
+- [X] T054 [US7] `WEB/components/PlayerFace.tsx`:
   - props `{ sport, sleeperId, team, position, name, size }` (sport required);
   - states only ever go `photo → logo → initials`, advancing on `onError`;
   - photo `https://sleepercdn.com/content/{sport}/players/thumb/{sleeperId}.jpg`; logo `https://sleepercdn.com/images/team_logos/{sport}/{team.toLowerCase()}.png`;
   - `DEF` starts at logo; null team skips logo;
   - fixed size, `loading="lazy"`, `alt={name}`.
-- [ ] T055 [P] [US7] `WEB/components/PlayerFace.test.tsx`: photo→logo→initials; DEF starts at logo; null team → initials; NBA URL.
-- [ ] T056 [US7] Wire into `WEB/components/DraftBoard.tsx` cells (small, no layout shift, still `gridDepth ≤ 2`, since the face is an image leaf, not a surface).
-- [ ] T057 [US7] Wire into `WEB/components/PlayerPicker.tsx`, `WEB/components/OnTheClockPickInput.tsx`, `WEB/components/PickFeed.tsx` and `WEB/components/TeamStrip.tsx`.
-- [ ] T058 [US7] Weekly top performers (`WEB/pages/WeeklyReport.tsx`) and player rows in `WEB/pages/Superlatives.tsx`: first verify whether `WeeklyPerformer.playerId` and the superlative player ids are Sleeper ids (record the answer). Use `PlayerFace` only if they are; otherwise logo/initials.
-- [ ] T059 [US7] Live check (§4f), NFL board plus NBA mock: count broken images and empty cells.
+- [X] T055 [P] [US7] `WEB/components/PlayerFace.test.tsx`: photo→logo→initials; DEF starts at logo; null team → initials; NBA URL.
+- [X] T056 [US7] Wire into `WEB/components/DraftBoard.tsx` cells (small, no layout shift, still `gridDepth ≤ 2`, since the face is an image leaf, not a surface).
+- [X] T057 [US7] Wire into `WEB/components/PlayerPicker.tsx`, `WEB/components/OnTheClockPickInput.tsx`, `WEB/components/PickFeed.tsx` and `WEB/components/TeamStrip.tsx`.
+- [X] T058 [US7] Weekly top performers (`WEB/pages/WeeklyReport.tsx`) and player rows in `WEB/pages/Superlatives.tsx`: first verify whether `WeeklyPerformer.playerId` and the superlative player ids are Sleeper ids (record the answer). Use `PlayerFace` only if they are; otherwise logo/initials.
+- [X] T059 [US7] Live check (§4f), NFL board plus NBA mock: count broken images and empty cells.
 
 ---
 
