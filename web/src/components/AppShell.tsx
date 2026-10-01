@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import Rail from './Rail'
 import JumpTo from './JumpTo'
 import LeagueRailSection from './LeagueRailSection'
+import { useNarrow } from '../useNarrow'
 import { PageActionSlotContext, RailContextSlotContext, RailLeagueHintContext } from '../appSlots'
 import { useAllLeagues, useRailLeague } from '../railLeague'
 import { useSearchIndex } from '../searchIndex'
@@ -25,36 +26,6 @@ const RAIL_KEY = 'bk-rail'
 export function railDefaultCollapsed(pathname: string): boolean {
   if (pathname.startsWith('/drafts/')) return true
   return /^\/mock\/[^/]+$/.test(pathname) && pathname !== '/mock/new'
-}
-
-const NARROW = '(max-width: 860px)'
-
-/**
- * Below 860px the rail is not a rail -- it's the horizontal bar across the
- * top (styles.css's own media query), where there is no column to save and
- * "collapsed" means nothing. Tracked in JS rather than left to CSS because
- * the collapsed state also decides *content*, not just layout: the rail
- * renders a "BK" mark instead of the wordmark. Left to CSS alone, a phone
- * visiting a draft room got the abbreviation in a bar with room for the
- * whole name.
- *
- * `matchMedia` is guarded: jsdom doesn't implement it, and the component
- * mounts in every App test.
- */
-function useNarrow(): boolean {
-  const supported = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-  const [narrow, setNarrow] = useState(() => (supported ? window.matchMedia(NARROW).matches : false))
-
-  useEffect(() => {
-    if (!supported) return
-    const mq = window.matchMedia(NARROW)
-    const sync = () => setNarrow(mq.matches)
-    sync()
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [supported])
-
-  return narrow
 }
 
 function readOverride(): 'expanded' | 'collapsed' | null {

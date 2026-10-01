@@ -321,3 +321,84 @@ Findings from the audit (not fixed here):
 - Commissioner path: Power rankings shows "Recompute week 4 (commissioner)" for popsharky ("(Foot) Ball
   Knowers", `is_owner`). **History's Compute for a commissioner wasn't seen live:** no local league popsharky
   commissions has uncomputed ranks. It's covered by `LeagueHistory.test.tsx` (canCommission true → button).
+
+## US3 + US4 — build agent
+
+Tasks T037-T041 and T044-T048 built. T042 and T049 (live checks) are the parent's.
+
+### Navigation: final groups and labels (destinations.ts is still the one table)
+
+| Group (heading) | Row (new label) | Former label (searchable) | Sports |
+|---|---|---|---|
+| home (none) | League home | none | nfl, nba |
+| thisWeek ("This week") | Matchups & awards | Weekly report | nfl, nba |
+| thisWeek | Power rankings | none | nfl, nba |
+| season ("The season") | Team strength | Analysis | nfl only |
+| season | Luck | Expected wins | nfl, nba |
+| season | Bench points | Roster management | nfl, nba |
+| season | Playoff odds | Season forecast | nfl, nba |
+| season | Awards | Superlatives | nfl, nba |
+| draft ("Draft") | Draft room / Draft board / Mock draft (unchanged), Follow live, Mock it | none | nfl, nba |
+| history ("History") | Standings (the all-seasons history page) | History | nfl, nba |
+
+- League home: route `/leagues/:sleeperLeagueId`, whole-chain href (`lineage.current`), like History. `switchTarget`'s non-draft fallback is now `home` (was `history`).
+- Desktop: a heading button per group; closed groups are not rendered. State is per viewer in `localStorage` key `bk.rail.groups.v1` (try/catch, default expanded). Landing on a page re-opens its group.
+- Phone lane (<= 860px) and collapsed rail: every group is rendered open. The phone decision is made in JS (`matchMedia('(max-width: 860px)')`, `PHONE_LANE_QUERY`), mirroring the CSS lane breakpoint; headings become non-interactive separators. If the CSS breakpoint moves, move the constant (comment says so).
+- Jump-to matches `label` and `formerLabel` (searchIndex terms).
+
+### Standings position
+`getLeagueHistory` walks the chain from the requested league, so `seasons[0]` is the URL's league; League home looks the season up by `sleeperLeagueId` first, then falls back to `seasons[0]`. Position = (index of the `isMe` row in that season's `standings`) + 1. The server orders standings with `RosterSeasonRepository.forLeague`: `final_placement` (nulls last), then wins desc, then points_for desc. So mid-season the position is "by wins, then points for" (no ties/losses tiebreak); the number carries a `title` saying so. Not verified against Sleeper's own displayed standings.
+
+### Power headline
+`getPowerRankings` entries, MEMBER kind, latest season, latest MEMBER week vs the week before, fed to PowerRankings.tsx's exported `computeWeeklyStory` and `buildHeadline` (the same functions the Power page's `<h1>` uses). The week selection (about 8 lines) is re-written in `LeagueHome.powerHeadline`, not shared: the page does it inline in its component. One difference: the page takes `season` as the max over all entries, League home as the max over MEMBER entries. No MEMBER entries => "The league vote hasn't started yet."
+
+### Other League home sources
+- Latest matchup: `getWeeklyReport(id, 0)`, side with `isMe`. Won/Lost/Tied by points. Non-member (no `isMe` side and no `isMe` standings row): block omitted. Member without a game that week: "You had no game in week N."
+- Next opponent: `getLeagueAnalysis(id)` matchups side with `isMe`; only fetched when `LEAGUE_DESTINATIONS` says `analysis` offers the league's sport (sport from the draft list, falling back to the weekly report's sport). Labelled as a projection.
+- Top award: first superlative in payload order with `available` and non-empty `holders` (so the player-headed Jabari award is never the pick); titles reuse `TITLES` from Superlatives.tsx (now exported). `early` shows a caveat beside it.
+- Pre-season (draft for this league not `complete`): draft status + "Open the draft room" (the page's one `--volt`, via `.home-hero-cta`) and "Follow live" when pre_draft/drafting; the latest-matchup block is not rendered.
+- 404 from the history endpoint renders the shared NotFound; any other failure stays in its own block.
+
+### Site home (T047)
+One `.row-list` row per league: crest, name (link to League home), sport pill, season, managers, draft status (live rows link to follow live), "Open league" (-> `/leagues/:id`), and "Mock it" (kept, opens the seeded modal). Removed from rows: season pills, Refresh/`track` state (the same `trackDraft` call still lives in LiveStatusBar in the live room), the per-league History/Power/Analysis chips, record/rank (none shown, per S17). Hero: title "Welcome back, <display name>", eyebrow carries the sport filter ("All sports" / "NFL leagues"). "From Sleeper" set-up cards are unchanged.
+
+### Files
+destinations.ts (+test), searchIndex.ts (+test), railLeague.test.ts, components/LeagueRailSection.tsx (+test), LeagueSwitcher.test.tsx, AppShellJumpTo.test.tsx, App.tsx, pages/LeagueHome.tsx (new) + LeagueHome.test.tsx (new), pages/DraftPicker.tsx (+test), pages/Superlatives.tsx (one word: `export` on TITLES), styles.css (blocks "013 US3: rail groups" and "013 US4: League home" / "site home league rows"). No backend or api.ts edits.
+
+### Tests (measured)
+`npx tsc -b` clean; `npx vitest run`: 842 passed, 0 failed (68 files; baseline before this work was 813 across 67 files, +29 incl. 10 LeagueHome, 4 DraftPicker rows, 6 rail groups, 6 destinations groups, 2 searchIndex); `npm run build` green. Existing tests changed only for the renames (labels, History -> League home fallback, `/leagues/:id` now a league route); no behavioural assertion deleted.
+Not verified: any browser rendering, the three screen sizes, contrast of new CSS.
+
+## US3 + US4: parent review and live check (2026-09-30)
+
+**Rejected and fixed in review (two-implementations class):**
+- League home re-derived the Power page's hero week rule, and already disagreed with it: the season came from
+  MEMBER entries vs all entries. Extracted `leagueVoteHero()` in PowerRankings.tsx; both pages call it.
+- The rail added a third JS copy of the 860px phone breakpoint (AppShell had one). Moved to one
+  `web/src/useNarrow.ts` used by both. `useNarrow.test.ts` reads styles.css from disk and fails if the CSS stops
+  using that query. (Vitest stubs CSS, so `?raw` returned "" and the first version of that test passed vacuously
+  against nothing. Caught because it failed when expected to pass.)
+
+**Found live, fixed (not caught by the agent's tests):**
+- NBA pre-season said "You're 1st of 12 at 0-0." That's a position claimed from zero games. Now: no position and
+  no record block until any roster has played. The subtitle reads "Your season hasn't started yet."
+- The NBA award block showed 2025's "Highest week" unlabelled on the 2026 home. It now says "From the 2025 season;
+  2026 has no games yet." The early caveat uses the site's standard "early — this is mostly noise".
+- Order: your record → latest matchup → next opponent → standings, so "you" fits the first screen.
+Tests added for both honesty fixes (845 pass).
+
+**Measured (local, NFL "(Foot) Ball Knowers", block positions in px vs screen height):**
+
+| Size | you | latest matchup | next opponent | screen |
+|---|---|---|---|---|
+| 375×812 | 383–476 | 508–674 | 706–877 | 812 |
+| 768×1024 | 355–448 | 355–521 | 553–724 | 1024 |
+| 1440×900 | 120–213 | 120–286 | 120–291 | 900 |
+
+SC-005 passes at all three sizes (record, position and latest matchup on the first screen; the next opponent too, except
+at 375 where it starts on screen and runs ~65px past). No horizontal scroll on any size, either sport.
+
+**Nav (SC-004):** at 1440, 768 and 375, every league destination is a visible one-click link in the rail
+(League home, Matchups & awards, Power rankings, Team strength, Luck, Bench points, Playoff odds, Awards,
+Draft board, Standings). Group headings show on desktop; the phone lane shows every row.
+Old addresses still load (all US1 harness routes use them).

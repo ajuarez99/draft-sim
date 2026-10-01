@@ -105,7 +105,8 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
         href: dest.href(ctx),
         sports: [current.sport],
         mark,
-        terms: lower(label, current.leagueName, current.sport, dest.key),
+        // formerLabel: the pre-fan-first name still finds the page (specs/013 US3)
+        terms: lower(label, dest.formerLabel, current.leagueName, current.sport, dest.key),
       })
     }
 

@@ -8,6 +8,7 @@ import LiveDraftView from './pages/LiveDraftView'
 import MockSetup from './pages/MockSetup'
 import MockDraftView from './pages/MockDraftView'
 import ManagerTendencies from './pages/ManagerTendencies'
+import LeagueHome from './pages/LeagueHome'
 import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
 import LeagueAnalysis from './pages/LeagueAnalysis'
@@ -114,6 +115,7 @@ export default function App() {
                   for pages reached from inside one league -- see that file's
                   own header comment). */}
               <Route path="/managers/:aId/versus/:bId" element={<ManagerComparison />} />
+              <Route path="/leagues/:sleeperLeagueId" element={<KeyedByLeague page={LeagueHome} />} />
               <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
               <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} />} />

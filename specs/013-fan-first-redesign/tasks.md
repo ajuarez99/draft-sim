@@ -144,25 +144,25 @@ Every page task does the same five things:
 
 ## Phase 5: User Story 3 - Navigation grouped by what a fan is doing (Priority: P2)
 
-- [ ] T037 [US3] `WEB/destinations.ts`:
+- [X] T037 [US3] `WEB/destinations.ts`:
   - add a required `group: 'home' | 'thisWeek' | 'season' | 'draft' | 'history'` and an optional `formerLabel`;
   - groups and labels: thisWeek = weeklyReport "Matchups & awards", power "Power rankings"; season = analysis "Team strength", expectedWins "Luck", rosterManagement "Bench points", forecast "Playoff odds", superlatives "Awards"; draft = board/live/mock (labels unchanged); history = history "Standings";
   - each old label → `formerLabel`.
-- [ ] T038 [P] [US3] `WEB/destinations.test.ts`: every row has a group; every non-home group is non-empty for an NFL league; `formerLabel` ≠ `label`.
-- [ ] T039 [US3] `WEB/components/LeagueRailSection.tsx`:
+- [X] T038 [P] [US3] `WEB/destinations.test.ts`: every row has a group; every non-home group is non-empty for an NFL league; `formerLabel` ≠ `label`.
+- [X] T039 [US3] `WEB/components/LeagueRailSection.tsx`:
   - render the four groups in order with headings; the current group is expanded, and other groups' state is kept per viewer in `localStorage` (try/catch, default expanded);
   - **phone lane (~470-490): all groups expanded**, headings as small separators;
   - collapsed desktop rail: keep the existing `title`/`aria-label` (~322-342), now fed by the fan labels.
-- [ ] T040 [P] [US3] `WEB/searchIndex.ts`: match `label` or `formerLabel`. Tests: `WEB/searchIndex.test.ts` ("expected wins" → Luck), `WEB/components/JumpTo.test.tsx`, `WEB/components/AppShellJumpTo.test.tsx`.
-- [ ] T041 [P] [US3] Update `WEB/components/LeagueRailSection.test.tsx` for groups and fan labels; add a test that groups are all expanded in the phone lane.
-- [ ] T042 [US3] Live check at 3 sizes × 2 sports: ≤ 2 clicks/taps between any league pages (SC-004), and every old address works (§4h).
+- [X] T040 [P] [US3] `WEB/searchIndex.ts`: match `label` or `formerLabel`. Tests: `WEB/searchIndex.test.ts` ("expected wins" → Luck), `WEB/components/JumpTo.test.tsx`, `WEB/components/AppShellJumpTo.test.tsx`.
+- [X] T041 [P] [US3] Update `WEB/components/LeagueRailSection.test.tsx` for groups and fan labels; add a test that groups are all expanded in the phone lane.
+- [X] T042 [US3] Live check at 3 sizes × 2 sports: ≤ 2 clicks/taps between any league pages (SC-004), and every old address works (§4h).
 
 ---
 
 ## Phase 6: User Story 4 - A league home that starts with you (Priority: P2)
 
 - [X] T043 [US4] Backend: add `isMe` to `WeeklySide` in the weekly-report response (owner rule as in `LeagueAnalysisService.java:687`), in `BE/` (weekly report service/controller). Same commit: `isMe?: boolean` on `WeeklySide` in `WEB/api.ts`. Extend `BT/api/WeeklyReportShapeTest.java`: exactly one side is `isMe` for the caller's matchup, none for a non-member.
-- [ ] T044 [US4] Create `WEB/pages/LeagueHome.tsx`, composed from:
+- [X] T044 [US4] Create `WEB/pages/LeagueHome.tsx`, composed from:
   - (a) `getLeagueHistory`: your record and **standings position** from the current season's `isMe` row, plus a top-5 snippet;
   - (b) `getWeeklyReport(id, 0)`: your latest matchup via `WeeklySide.isMe`;
   - (c) NFL only: next opponent from `getLeagueAnalysis` matchups `isMe`;
@@ -170,11 +170,11 @@ Every page task does the same five things:
   - (e) the top award from `fetchSuperlatives`.
 
   Each block loads and fails on its own. No "you" blocks for a non-member. Pre-season: draft status plus a draft-room link.
-- [ ] T045 [US4] Route `/leagues/:sleeperLeagueId` in `WEB/App.tsx`. `home` row in `WEB/destinations.ts` (group `home`, "League home", sports `['nfl','nba']` listed explicitly). `switchTarget`'s fallback (`LeagueRailSection.tsx:150`) → `home`.
-- [ ] T046 [P] [US4] `WEB/pages/LeagueHome.test.tsx`: member sees record/position/latest matchup; NFL adds the next opponent and NBA doesn't; non-member sees no "you" blocks; one failing endpoint leaves the others; pre-season shows draft status.
-- [ ] T047 [US4] Site home rows `WEB/pages/DraftPicker.tsx`: one row per league (initial/avatar, name, sport pill, season, draft status, one action → league home). Season pills and Refresh leave the row. The hero greets the user. **No record/rank** (FR-017 amended).
-- [ ] T048 [P] [US4] Update `WEB/pages/DraftPicker.test.tsx`, keeping behavioural assertions.
-- [ ] T049 [US4] Live check (§4d) at 3 sizes × 2 sports.
+- [X] T045 [US4] Route `/leagues/:sleeperLeagueId` in `WEB/App.tsx`. `home` row in `WEB/destinations.ts` (group `home`, "League home", sports `['nfl','nba']` listed explicitly). `switchTarget`'s fallback (`LeagueRailSection.tsx:150`) → `home`.
+- [X] T046 [P] [US4] `WEB/pages/LeagueHome.test.tsx`: member sees record/position/latest matchup; NFL adds the next opponent and NBA doesn't; non-member sees no "you" blocks; one failing endpoint leaves the others; pre-season shows draft status.
+- [X] T047 [US4] Site home rows `WEB/pages/DraftPicker.tsx`: one row per league (initial/avatar, name, sport pill, season, draft status, one action → league home). Season pills and Refresh leave the row. The hero greets the user. **No record/rank** (FR-017 amended).
+- [X] T048 [P] [US4] Update `WEB/pages/DraftPicker.test.tsx`, keeping behavioural assertions.
+- [X] T049 [US4] Live check (§4d) at 3 sizes × 2 sports.
 
 ---
 

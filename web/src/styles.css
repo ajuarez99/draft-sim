@@ -5062,3 +5062,72 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .live-right { flex-wrap: wrap; min-width: 0; }
 /* Waiver adds (Bench points): rows wrap on a phone instead of pushing the page. */
 .tx-adds li { flex-wrap: wrap; min-width: 0; }
+
+/* --- 013 US3: rail groups (This week / The season / Draft / History) ---
+   Desktop: a heading button per group; closed groups are not rendered at all.
+   Phone lane (<= 860px, matched in LeagueRailSection's PHONE_LANE_QUERY): every
+   group is open, headings are small separators inside the swipe lane, and the
+   group wrappers dissolve so the lane stays one row. Collapsed rail: headings
+   shrink to a hairline between groups. */
+.app-rail-group { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.app-rail-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 4px 10px; background: none; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.app-rail-group-head:hover { color: var(--text); }
+.app-rail-group-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 6px; }
+.app-rail-group-head.static { cursor: default; }
+.app-rail-group-caret { font-size: 9px; }
+.app-rail.collapsed .app-rail-group { margin-top: 4px; }
+.app-rail.collapsed .app-rail-group-head.static {
+  font-size: 0; height: 1px; padding: 0; margin: 4px 10px; background: var(--line);
+}
+@media (max-width: 860px) {
+  .app-rail-group { display: contents; }
+  .app-rail-group-head.static {
+    flex: 0 0 auto; align-self: center; padding: 0 2px 0 8px; font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .app-rail.collapsed .app-rail-group-head.static { height: auto; margin: 0; background: none; font-size: 10px; }
+}
+
+/* --- 013 US4: League home ---------------------------------------------------
+   Sections sit on the page (.section); standings are a .row-list. The only
+   --volt is "Open the draft room" (.home-hero-cta), and only before the draft.
+   Win/loss colours always travel with the words Won / Lost / Tied. */
+.lh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
+.lh-grid > .section { min-width: 0; }
+.lh-draft { margin-bottom: 20px; }
+.lh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.lh-link { font-size: 13px; color: var(--teal); text-decoration: none; align-self: flex-start; }
+.lh-link:hover { text-decoration: underline; }
+.lh-hero-nums { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.lh-hero-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.lh-hero-num { font-size: 40px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.lh-hero-label { font-size: 12px; color: var(--muted); }
+.lh-rows { list-style: none; margin: 0; padding: 0; }
+.lh-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
+.lh-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-pos { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-rec, .lh-pts { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-matchup { display: flex; flex-direction: column; gap: 6px; }
+.lh-side { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lh-pts { font-weight: 600; }
+.lh-result.won { color: var(--up); font-weight: 600; }
+.lh-result.lost { color: var(--down); font-weight: 600; }
+.lh-result.tied { font-weight: 600; }
+.lh-headline { font-weight: 600; margin: 0; }
+.lh-award-title { font-weight: 600; margin: 0; }
+
+/* --- 013 US4: site home league rows -----------------------------------------
+   One row per league: crest, name + sport + season, draft status, one action.
+   Separators come from .row-list; the live tint is the only accent. "Start a
+   mock draft" (.home-hero-cta) stays the page's one --volt. */
+.league-rows { display: block; }
+.league-row { display: flex; align-items: center; gap: 12px 14px; padding: 12px 8px; min-width: 0; flex-wrap: wrap; }
+.league-row.live { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.league-row .league-card-title { flex: 1 1 200px; min-width: 0; }
+.league-row .league-card-status, .league-row .league-card-live { flex: 0 1 auto; font-size: 12px; }
+.league-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }

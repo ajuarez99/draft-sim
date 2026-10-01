@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 // suite needs no @types/node and stays in the same module world as the app.
 import appSource from './App.tsx?raw'
 import {
+  DESTINATION_GROUPS,
   LEAGUE_DESTINATIONS,
   destinationFromPath,
   destinationsFor,
@@ -171,7 +172,7 @@ describe('destinationsFor', () => {
     const ctxOlder: LeagueContext = { lineage: { current, seasons: [current, older] }, season: older }
     // `power` is chain-wide for now; whether it should follow the season is
     // pending decision T019 (specs/011). Remove it from this set if that lands.
-    const chainWide = new Set(['history', 'power'])
+    const chainWide = new Set(['home', 'history', 'power'])
     let checked = 0
     for (const d of LEAGUE_DESTINATIONS) {
       if (d.isAction) continue
@@ -242,5 +243,45 @@ describe('sports', () => {
   it('offers Superlatives to both sports', () => {
     expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).toContain('superlatives')
     expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('superlatives')
+  })
+})
+
+describe('groups (specs/013 US3)', () => {
+  it('puts every row in a known group', () => {
+    const known = new Set(DESTINATION_GROUPS.map((g) => g.key))
+    for (const d of LEAGUE_DESTINATIONS) expect(known.has(d.group), d.key).toBe(true)
+  })
+
+  it('keeps every group non-empty for a football league', () => {
+    const rows = destinationsFor(ctx({ sport: 'nfl' }))
+    for (const g of DESTINATION_GROUPS) {
+      expect(rows.filter((d) => d.group === g.key).length, g.key).toBeGreaterThan(0)
+    }
+  })
+
+  it('keeps every group non-empty for a basketball league', () => {
+    const rows = destinationsFor(ctx({ sport: 'nba' }))
+    for (const g of DESTINATION_GROUPS) {
+      expect(rows.filter((d) => d.group === g.key).length, g.key).toBeGreaterThan(0)
+    }
+  })
+
+  it('only gives a heading to groups with more than the home row', () => {
+    expect(DESTINATION_GROUPS.filter((g) => g.heading === null).map((g) => g.key)).toEqual(['home'])
+  })
+
+  it('never lets a former label equal the label', () => {
+    for (const d of LEAGUE_DESTINATIONS) {
+      if (d.formerLabel === undefined) continue
+      expect(d.formerLabel, d.key).not.toBe(labelOf(d, draft()))
+    }
+  })
+
+  it('offers League home to both sports', () => {
+    for (const sport of ['nfl', 'nba'] as Sport[]) {
+      expect(destinationsFor(ctx({ sport })).map((d) => d.key)).toContain('home')
+    }
+    expect(destinationFromPath('/leagues/L7')).toBe('home')
+    expect(leagueIdFromPath('/leagues/L7')).toEqual({ idKind: 'league', id: 'L7' })
   })
 })

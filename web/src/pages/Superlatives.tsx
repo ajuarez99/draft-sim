@@ -30,7 +30,7 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
  * indistinguishable from a broken fetch, and a card with nothing to say still
  * says why (FR-002/FR-008).
  */
-const TITLES: Record<string, { title: string; subtitle?: string; note?: string }> = {
+export const TITLES: Record<string, { title: string; subtitle?: string; note?: string }> = {
   HIGHEST_WEEK: { title: 'Highest week' },
   LOWEST_WEEK: { title: 'Lowest week' },
   BIGGEST_BLOWOUT: { title: 'Biggest blowout' },

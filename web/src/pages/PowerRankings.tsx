@@ -318,6 +318,27 @@ const nameOf = (e: PowerRankingEntry) => e.teamName?.trim() || e.manager || `ros
 const userOf = (e: PowerRankingEntry) => (e.manager && e.manager.toLowerCase() !== nameOf(e).toLowerCase() ? e.manager : '')
 const weekTitle = (week: number) => (week === 0 ? 'Preseason' : `Week ${week}`)
 
+/**
+ * Spec 013: the hero's "which weeks" rule, stated once and shared with League home.
+ * The latest League-vote (MEMBER) week of the newest season any entry has,
+ * compared with the MEMBER week before it. Null when that season has no
+ * League-vote week yet. The season is the max over ALL entries, the same as
+ * this page's own `season`, so the two pages can't pick different years.
+ */
+export function leagueVoteHero(
+  entries: PowerRankingEntry[],
+): { season: number; week: number; rows: PowerRankingEntry[]; prevWeek: number | null; prevRows: PowerRankingEntry[] | null } | null {
+  if (entries.length === 0) return null
+  const season = Math.max(...entries.map((e) => e.season))
+  const member = entries.filter((e) => e.kind === 'MEMBER' && e.season === season)
+  if (member.length === 0) return null
+  const weeks = [...new Set(member.map((e) => e.week))].sort((a, b) => a - b)
+  const week = weeks[weeks.length - 1]
+  const rowsOf = (w: number) => member.filter((e) => e.week === w).sort((a, b) => a.rank - b.rank)
+  const prevWeek = [...weeks].reverse().find((w) => w < week) ?? null
+  return { season, week, rows: rowsOf(week), prevWeek, prevRows: prevWeek == null ? null : rowsOf(prevWeek) }
+}
+
 export function buildHeadline(story: WeeklyStory, week: number): string {
   if (!story.top) return `${weekTitle(week)} power rankings`
   if (story.newTop) return `${nameOf(story.top)} is your new No. 1`
@@ -670,11 +691,12 @@ export default function PowerRankings() {
   // League vote, independent of which ladder tab is selected -- it is "state
   // of the league", not "state of the current tab" (2a/2c both keep the
   // headline fixed while only the ladder switches). ----
-  const memberWeeks = weeksOf('MEMBER')
-  const heroWeek = memberWeeks.length > 0 ? memberWeeks[memberWeeks.length - 1] : currentWeek
-  const heroRows = entriesFor('MEMBER', heroWeek)
-  const heroPrevWeek = [...memberWeeks].reverse().find((w) => w < heroWeek) ?? null
-  const heroPrevRows = heroPrevWeek == null ? null : entriesFor('MEMBER', heroPrevWeek)
+  // The weeks rule lives in leagueVoteHero() (shared with League home). With no
+  // League-vote week yet the hero falls back to the current week, empty.
+  const hero = leagueVoteHero(data.entries)
+  const heroWeek = hero?.week ?? currentWeek
+  const heroRows = hero?.rows ?? entriesFor('MEMBER', heroWeek)
+  const heroPrevRows = hero?.prevRows ?? null
   const story = computeWeeklyStory(heroRows, heroPrevRows)
   const headline = buildHeadline(story, heroWeek)
   const memberCount = ballot?.memberCount ?? teamCount
