@@ -108,6 +108,62 @@ public class PlayerGameRepository {
     }
 
     /**
+     * Every game on one calendar date (specs/014-home-player-spotlight, T017): the NIGHT period's
+     * rows. Keyed by {@code game_date}, the one column that names a night, not by week.
+     */
+    public List<Row> forDate(Sport sport, int season, LocalDate date) {
+        return db.sql("""
+                select sport, season, week, sleeper_player_id, game_id, game_date, opponent,
+                       is_away, stats::text as stats
+                from player_game
+                where sport = ? and season = ? and game_date = ?
+                """)
+                .params(sport.code(), season, java.sql.Date.valueOf(date))
+                .query((rs, n) -> new Row(
+                        Sport.fromCode(rs.getString("sport")),
+                        rs.getInt("season"),
+                        rs.getInt("week"),
+                        rs.getString("sleeper_player_id"),
+                        rs.getString("game_id"),
+                        rs.getDate("game_date").toLocalDate(),
+                        rs.getString("opponent"),
+                        (Boolean) rs.getObject("is_away"),
+                        rs.getString("stats")))
+                .list();
+    }
+
+    /**
+     * One game date of a sport-season: which fantasy week it falls in and how many
+     * distinct games were played that day.
+     *
+     * @param gamesCount {@code count(distinct game_id)} -- a game has one id however many
+     *                   players have a row in it
+     */
+    public record DateRow(LocalDate gameDate, int week, int gamesCount) {}
+
+    /**
+     * Every distinct {@code game_date} stored for a sport-season, with its week and game
+     * count, oldest first (specs/014-home-player-spotlight, research R6).
+     *
+     * <p>Grouped by (date, week) rather than by date alone, so a date whose rows disagree
+     * about their week surfaces as two rows instead of one silently chosen week. Night
+     * completeness is judged per week, so the disagreement has to be visible to it.
+     */
+    public List<DateRow> datesForSeason(Sport sport, int season) {
+        return db.sql("""
+                select game_date, week, count(distinct game_id) as games
+                from player_game
+                where sport = ? and season = ?
+                group by game_date, week
+                order by game_date, week
+                """)
+                .params(sport.code(), season)
+                .query((rs, n) -> new DateRow(rs.getDate("game_date").toLocalDate(),
+                        rs.getInt("week"), rs.getInt("games")))
+                .list();
+    }
+
+    /**
      * Every game played by a specific set of players in one sport and season
      * (specs/008-season-superlatives, research R10): the input to a player's
      * mean points per game played, over however many weeks are stored.

@@ -638,3 +638,15 @@ an award block showed 2025's winner on the 2026 home with no year, because the
 endpoint falls back a season. Unit tests passed for both. Both were found by reading the
 rendered page for a league in an unusual state (pre-season, fallback season).
 **Live checks need at least one league in each odd state**, not just the populated one.
+
+## 29. "It falls out of the same rule for the other sport" is a claim, not a proof
+
+Spec 014's plan inferred a football bye from "no game row, and his team is nobody's opponent this week",
+and research R3 said basketball "has no byes, and that falls out of the same rule without a sport check."
+Both halves were wrong. A basketball NIGHT is one date, and on most NBA nights only 12–20 of 30 teams play,
+so every off-night would have read "Bye". In an unfinished football week, a team that simply hasn't
+kicked off yet is also nobody's opponent, so week 1 would have said "Bye in Week 1". The unit tests passed,
+because they encoded the same assumption. A cold bug-hunting review caught it with one SQL query
+(distinct opponents per `game_date`).
+**When a rule is called sport-agnostic, count the cases that make it true in each sport, against real
+data, before writing it down.** And never infer an absence ("bye", "no game") from a period that isn't settled.

@@ -65,6 +65,8 @@ class RefreshControllerIT {
 
     @MockitoBean private LeagueHistoryIngestService history;
     @MockitoBean private PlayerGameIngestService playerGames;
+    // LeagueRefreshService now runs TrendingRefresh; without this the IT would reach the real Sleeper API.
+    @MockitoBean private TrendingRefresh trendingRefresh;
     @Autowired private RefreshController controller;
     @Autowired private LeagueMemberRepository leagueMembers;
     @Autowired private LeagueRefreshRepository refreshes;

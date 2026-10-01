@@ -446,6 +446,11 @@ public class BasketballRules implements SportRules {
         return status != null && "SUS".equalsIgnoreCase(status.trim());
     }
 
+    @Override
+    public boolean rookieWatchEligible(Player player) {
+        return true;
+    }
+
     /**
      * Hand-set, arbitrary: each sport's 2025 regular-season 25th-percentile
      * margin, measured 2026-09-22 (research R5). Basketball's p25 was 14.0,

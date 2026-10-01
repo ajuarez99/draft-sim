@@ -3,17 +3,21 @@ import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import NotFound from '../components/NotFound'
+import PlayerSpotlight from '../components/PlayerSpotlight'
 import PersonName from '../components/PersonName'
+import { SkeletonRows } from '../components/Skeleton'
 import {
   fetchSuperlatives,
   getLeagueAnalysis,
   getLeagueHistory,
+  getPlayerSpotlight,
   getPowerRankings,
   getWeeklyReport,
   type AnalysisMatchups,
   type DraftSummary,
   type LeagueAnalysis,
   type LeagueHistory,
+  type PlayerSpotlight as PlayerSpotlightData,
   type PowerRankings,
   type SeasonHistory,
   type Sport,
@@ -41,13 +45,16 @@ import { TITLES } from './Superlatives'
  *   power headline                      <- getPowerRankings, via PowerRankings' own
  *                                          computeWeeklyStory + buildHeadline
  *   top award                           <- fetchSuperlatives
+ *   player spotlight                    <- getPlayerSpotlight (specs/014); football's top-of-week
+ *                                          list is read from the `weekly` block, but nothing
+ *                                          else depends on the spotlight block
  *
  * "You" is only ever a server-side fact (`isMe` on a standings row, a weekly
  * side, an analysis side), never a client-side name match. A reader who is not
  * in the league gets no "you" blocks and no error.
  */
 
-type Block<T> = { status: 'idle' } | { status: 'loading' } | { status: 'error'; notFound: boolean } | { status: 'ok'; data: T }
+export type Block<T> = { status: 'idle' } | { status: 'loading' } | { status: 'error'; notFound: boolean } | { status: 'ok'; data: T }
 
 /** One endpoint, one block. `load` null means "this block does not apply"
  *  (idle): rendered as nothing, never as an empty state. */
@@ -132,6 +139,7 @@ export default function LeagueHome() {
   const weekly = useBlock(id ? () => getWeeklyReport(id, 0) : null, [id, version])
   const power = useBlock(id ? () => getPowerRankings(id) : null, [id, version])
   const awards = useBlock(id ? () => fetchSuperlatives(id) : null, [id, version])
+  const spotlight = useBlock(id ? () => getPlayerSpotlight(id) : null, [id, version])
 
   const draft: DraftSummary | null =
     drafts.status === 'ok' ? (drafts.data.find((d) => d.sleeperLeagueId === id) ?? null) : null
@@ -189,11 +197,35 @@ export default function LeagueHome() {
 
         <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
       </div>
+
+      <SpotlightArea block={spotlight} weekly={weekly} />
     </div>
   )
 }
 
 // --- blocks ------------------------------------------------------------------
+
+/** The spotlight's own error/loading handling: a failure or a 404 here never touches another block. */
+function SpotlightArea({ block, weekly }: { block: Block<PlayerSpotlightData>; weekly: Block<WeeklyReport> }) {
+  if (block.status === 'idle') return null
+  if (block.status === 'loading') {
+    return (
+      <section className="section lh-spotlight" aria-label="Player spotlight">
+        <SkeletonRows count={3} label="Loading player spotlight" />
+      </section>
+    )
+  }
+  if (block.status === 'error') {
+    if (block.notFound) return null
+    return (
+      <section className="section lh-spotlight">
+        <p className="muted small">Couldn't load the player spotlight.</p>
+      </section>
+    )
+  }
+  if (!block.data.applies) return null
+  return <PlayerSpotlight spotlight={block.data} weekly={weekly} />
+}
 
 function DraftBlock({ draft }: { draft: DraftSummary }) {
   const status = draft.status ?? 'unknown'

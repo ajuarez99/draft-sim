@@ -5121,6 +5121,38 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lh-headline { font-weight: 600; margin: 0; }
 .lh-award-title { font-weight: 600; margin: 0; }
 
+/* --- 014: player spotlight -------------------------------------------------
+   Rows reuse .lh-row; "Yours" and "Free agent" are tinted pills with the word, never
+   colour alone. Three columns on the dashboard's own grid; a segmented control on phones. */
+.lh-spotlight { margin-top: 16px; }
+.lh-spotlight-tag { font-weight: 600; color: var(--teal); }
+.lh-spot-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
+.lh-spot-section { margin-top: 14px; min-width: 0; }
+.lh-spot-cols > .lh-spot-section { margin-top: 0; }
+.lh-spot-h { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+.lh-spot-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lh-spot-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; min-width: 0; }
+.lh-spot-line .lh-name { flex: 0 1 auto; }
+.lh-spot-extra { flex: 0 1 auto; }
+.lh-spot-sub2 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lh-spot-sub { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-spot-owner { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 5px; }
+.lh-spot-owner-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar.lh-spot-avatar { width: 16px; height: 16px; font-size: 8px; }
+.lh-spot-toggle { background: none; border: 0; padding: 6px 0 2px; cursor: pointer; font-family: inherit; }
+.lh-spot-credit { margin-top: 6px; }
+.lh-yours, .lh-fa { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.lh-yours { margin-left: 3px; color: var(--crimson-text); background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 18%, transparent); }
+.lh-fa { color: var(--teal); background: color-mix(in oklch, var(--teal) 16%, transparent); }
+.lh-spot-tabs { display: none; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); }
+.lh-spot-tab { flex: 1 1 0; border: 0; border-radius: 999px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--muted); background: none; cursor: pointer; }
+.lh-spot-tab[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
+@media (max-width: 639px) {
+  .lh-spot-tabs { display: flex; }
+  .lh-spot-cols { display: block; }
+  .lh-spot-section[data-active="false"] { display: none; }
+}
+
 /* --- 013 US4: site home league rows -----------------------------------------
    One row per league: crest, name + sport + season, draft status, one action.
    Separators come from .row-list; the live tint is the only accent. "Start a

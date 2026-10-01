@@ -1,5 +1,54 @@
 # Ball Knowers — handoff
 
+**2026-10-01, branch `014-home-player-spotlight` (worktree `.claude/worktrees/014-home-player-spotlight`, off
+`origin/main` `2dd47f2`): built and verified locally. Not committed, not pushed, not deployed.**
+`specs/014-home-player-spotlight/` is the brief; tasks.md has the Baseline and Verification sections.
+
+**What it is.** The league home gains a Player spotlight:
+- **Basketball:** top players of the night.
+- **Football:** top players of the week, read from the Weekly Report's own list.
+- **Both sports:** Trending (Sleeper's most-added, with what each player actually scored) and Rookie watch,
+  scored under the viewing league's own settings.
+
+It adds one endpoint (`GET /api/leagues/{id}/player-spotlight`), one migration (**V26** `sport_trending`), and a
+best-effort trending step in both the league refresh and the daily refresh. **Deploy the backend before the
+frontend.** An old backend 404s the new route, and the home then renders nothing for that block, so this order
+is safe but not useful the other way round.
+
+**Verified (measured, local, 2026-10-01):**
+- **Backend suite:** 1,052 tests, 0 skipped. The only failure is the flaky
+  `RefreshControllerIT.aChainRunShowsRunningAtTheTopEvenWhenTheShownSeasonIsLoadedComplete`. It also failed on the
+  untouched base, and passed 3 out of 3 when run alone.
+- **Web:** 950 of 950 tests pass, `tsc` is clean, and the build succeeds.
+- **Live, against this worktree's backend on 8081:**
+  - A missing or foreign identity gets a 404.
+  - The NFL spotlight names the same week as `weekly-report/0`.
+  - Trending order is identical to Sleeper's live list, and the stored points match Sleeper's to the decimal.
+  - A non-game never carries points.
+  - NBA 2026 shows its pre-season state, with tip-off 2026-10-20 read from stored data.
+  - NBA 2025 returns `PAST_SEASON`.
+  - A back-dated list is flagged stale with its true age.
+- **Browser:** the NFL league home at desktop width and at 375 px, with no sideways scroll.
+
+**Not verified / owed:**
+- **Quickstart V6, the first real NBA night (after 2026-10-21).** The night-complete cutoff
+  (`NIGHT_COMPLETE_HOUR_UTC = 10`) is an **assumption**. On the first morning after games, check that the spotlight
+  names the previous night only after a refresh past 10:00 UTC, and that its points equal the Weekly Report's Best
+  Nights. Record the result in research.md R6.
+- **The "Yours" pill, live:** the browser profile's identity is not a member of the league checked. It is covered
+  by ITs and component tests only.
+- **A trending fetch failure, live:** covered by `TrendingRefreshIsolationIT`, not by a real dead upstream.
+- **Light theme:** not applicable; the app is dark-only.
+- **Production / Railway:** not deployed.
+
+**Design-review pass (same day):** the block is now three columns under the dashboard on desktop (408 px, was 2,534) and a Top / Trending / Rookies tablist on phones. Trending and Rookie watch use the newest **complete** week, so they can differ from the matchup block's week, and each section names its own. Rookie watch drops K and DEF. Weekly top performers gained team, opponent and owner avatar. Before the regular season, NBA reads "No regular-season games yet … preseason games aren't counted here". Preseason nights are not ingested (research R7).
+
+**Corrected during the build (shown, not hidden):** research R3 was wrong about byes. See its "amended after
+review" section and claude/lessons.md #29. The contract gained `NO_ROSTERED_PLAYED`, and `BYE` became `NO_GAME`.
+
+---
+
+
 **2026-10-01, branch `013-fan-first-redesign` (worktree `.claude/worktrees/013-fan-first-redesign`,
 off `origin/main` `f684189`): built and verified locally, committed on the branch, not pushed, not
 deployed.** `specs/013-fan-first-redesign/` is the brief. `build-notes.md` there records every measured

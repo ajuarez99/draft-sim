@@ -31,6 +31,28 @@ class SuperlativeSportRulesTest {
                 status, injuryStatus, null, null);
     }
 
+    // --- rookieWatchEligible (specs/014) ----------------------------------
+
+    @Test
+    void footballExcludesKickersAndDefensesFromRookieWatchOnly() {
+        for (Position p : List.of(Position.QB, Position.RB, Position.WR, Position.TE)) {
+            assertTrue(football.rookieWatchEligible(new Player(1, Sport.NFL, "s", "N", List.of(p),
+                    "FA", "Active", null, 22, 0)), p + " is eligible");
+        }
+        for (Position p : List.of(Position.K, Position.DEF)) {
+            assertFalse(football.rookieWatchEligible(new Player(1, Sport.NFL, "s", "N", List.of(p),
+                    "FA", "Active", null, 22, 0)), p + " is excluded");
+        }
+    }
+
+    @Test
+    void basketballExcludesNoPositionFromRookieWatch() {
+        for (Position p : Position.forSport(Sport.NBA)) {
+            assertTrue(basketball.rookieWatchEligible(new Player(1, Sport.NBA, "s", "N", List.of(p),
+                    "FA", "Active", null, 20, 0)));
+        }
+    }
+
     // --- playedIn -----------------------------------------------------
 
     @Test

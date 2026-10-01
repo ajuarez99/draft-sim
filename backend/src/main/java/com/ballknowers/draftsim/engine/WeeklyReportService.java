@@ -76,8 +76,14 @@ public class WeeklyReportService {
 
     public record Matchup(Side home, Side away) {}
 
+    /**
+     * {@code team} (the player's current pro team), {@code opponent}/{@code isAway} (that week's
+     * game, if a row is stored) and {@code avatarId} (the owning manager's) are all nullable:
+     * unknown is unknown, never guessed, and every serialization of this must tolerate null.
+     */
     public record Performer(String playerId, String playerName, String position,
-                            String teamName, double points) {}
+                            String teamName, double points,
+                            String team, String opponent, Boolean isAway, String avatarId) {}
 
     public record Award(String kind, String teamName, String detail) {}
 
@@ -156,6 +162,19 @@ public class WeeklyReportService {
     static final String STARTERS_NOT_STORED = "STARTERS_NOT_STORED";
 
     /**
+     * Which week a request resolves to: the one asked for, else the latest FINAL week, else the
+     * latest stored one while nothing is final yet.
+     *
+     * <p>Extracted so the league home's player spotlight names the same week the Weekly Report
+     * does, from one rule rather than two copies that can drift
+     * (specs/014-home-player-spotlight, research R9). Returns 0 when nothing is stored.
+     */
+    public static int defaultWeek(ScoredWeeks.Snapshot scored, int requestedWeek) {
+        return requestedWeek > 0 ? requestedWeek
+                : scored.latestFinal() > 0 ? scored.latestFinal() : scored.latestStored();
+    }
+
+    /**
      * {@code week <= 0} means "the latest FINAL week", falling back to the latest stored one
      * while nothing is final yet (an in-progress week 1), so a caller with no week in hand (the page,
      * opened fresh) gets the most recent report and learns {@code latestScoredWeek} in one call.
@@ -176,8 +195,7 @@ public class WeeklyReportService {
                 weekPoints.breakdownsFor(league.id(), league.season());
         ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
         int latestScoredWeek = scored.latestStored();
-        final int week = requestedWeek > 0 ? requestedWeek
-                : scored.latestFinal() > 0 ? scored.latestFinal() : latestScoredWeek;
+        final int week = defaultWeek(scored, requestedWeek);
         List<RosterWeekPointsRepository.WeekBreakdown> thisWeek = all.stream()
                 .filter(w -> w.week() == week).toList();
         if (thisWeek.isEmpty()) {
@@ -238,6 +256,14 @@ public class WeeklyReportService {
         for (Player pl : players.findAll(settings.sport())) {
             if (pl.sleeperId() != null) playersBySleeperId.put(pl.sleeperId(), pl);
         }
+        // Loaded once: the top performers' opponent and the basketball best-nights below both read it.
+        List<PlayerGameRepository.Row> weekGameRows =
+                playerGames.forWeek(settings.sport(), league.season(), week);
+        Map<String, PlayerGameRepository.Row> gameByPlayer = new HashMap<>();
+        for (PlayerGameRepository.Row r : weekGameRows) {
+            gameByPlayer.merge(r.sleeperPlayerId(), r,
+                    (a, b) -> a.gameId().compareTo(b.gameId()) <= 0 ? a : b);
+        }
         List<Performer> performers = new ArrayList<>();
         for (RosterWeekPointsRepository.WeekBreakdown w : thisWeek) {
             Map<String, Object> pts = w.playersPointsJson() == null || w.playersPointsJson().isBlank()
@@ -250,8 +276,11 @@ public class WeeklyReportService {
                 if (!started.isEmpty() && !started.contains(e.getKey())) continue;
                 Player pl = playersBySleeperId.get(e.getKey());
                 if (pl == null) continue;
+                PlayerGameRepository.Row game = gameByPlayer.get(e.getKey());
                 performers.add(new Performer(e.getKey(), pl.name(), pl.primary().name(),
-                        nameByRoster.getOrDefault(w.rosterId(), "Roster " + w.rosterId()), n.doubleValue()));
+                        nameByRoster.getOrDefault(w.rosterId(), "Roster " + w.rosterId()), n.doubleValue(),
+                        pl.team(), game == null ? null : game.opponent(), game == null ? null : game.isAway(),
+                        avatarByRoster.get(w.rosterId())));
             }
         }
         performers.sort(Comparator.comparingDouble(Performer::points).reversed()
@@ -310,8 +339,7 @@ public class WeeklyReportService {
             }
 
             Map<String, Double> scoring = leagues.scoringOf(league.id());
-            List<PlayerGameRepository.Row> rows =
-                    playerGames.forWeek(settings.sport(), league.season(), week);
+            List<PlayerGameRepository.Row> rows = weekGameRows;
 
             // Rows exist for every player in the sport, not just this league's.
             // Restricting to the rostered set is what keeps this a league page.

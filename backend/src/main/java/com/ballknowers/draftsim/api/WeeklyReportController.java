@@ -94,6 +94,11 @@ public class WeeklyReportController {
                 row.put("position", p.position());
                 row.put("teamName", p.teamName());
                 row.put("points", p.points());
+                // Nullable, and a LinkedHashMap on purpose (Map.of throws on null): unknown is unknown.
+                row.put("team", p.team());
+                row.put("opponent", p.opponent());
+                row.put("isAway", p.isAway());
+                row.put("avatarId", p.avatarId());
                 performers.add(row);
             }
             out.put("topPerformers", performers);

@@ -62,6 +62,7 @@ public class LeagueRefreshService {
     private final PlayerGameIngestService playerGames;
     private final RefreshProperties properties;
     private final SportWeekStatsRepository sportWeeks;
+    private final TrendingRefresh trendingRefresh;
 
     /** Keyed {@code chain:<newest league sleeper id>}. Separate from the per-sport-season flight it waits on. */
     private final SingleFlight chainFlight = new SingleFlight();
@@ -69,7 +70,8 @@ public class LeagueRefreshService {
     public LeagueRefreshService(LeagueRepository leagues, LeagueRefreshRepository refreshes,
                                 LeagueSeasonResolver resolver, LeagueHistoryIngestService history,
                                 PlayerGameIngestService playerGames, RefreshProperties properties,
-                                SportWeekStatsRepository sportWeeks) {
+                                SportWeekStatsRepository sportWeeks, TrendingRefresh trendingRefresh) {
+        this.trendingRefresh = trendingRefresh;
         this.leagues = leagues;
         this.refreshes = refreshes;
         this.resolver = resolver;
@@ -201,6 +203,10 @@ public class LeagueRefreshService {
             for (LeagueRepository.LeagueRow season : targets) {
                 weeksFailed += playerGames.refreshSportSeason(sport, season.season(), startedAt).weeksFailed();
             }
+            // Sport-wide and best-effort (spec 014): never throws, and its outcome is
+            // deliberately not read, so it can change neither weeksFailed nor success.
+            // Before the throw below so it runs even when per-game fetching failed.
+            trendingRefresh.refreshIfStale(sport, startedAt);
             // A per-game week that failed to fetch left its data behind; that is a
             // failed refresh, not a complete one, or loaded_complete could freeze a gap.
             if (weeksFailed > 0) {

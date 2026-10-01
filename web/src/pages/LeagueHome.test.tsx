@@ -173,6 +173,10 @@ function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
     analysis: vi.spyOn(api, 'getLeagueAnalysis').mockImplementation((over.analysis ?? ok(analysis())) as never),
     power: vi.spyOn(api, 'getPowerRankings').mockImplementation((over.power ?? ok(power())) as never),
     awards: vi.spyOn(api, 'fetchSuperlatives').mockImplementation((over.awards ?? ok(awards())) as never),
+    // Spec 014: the spotlight is its own block; by default it does not apply, so no existing test sees it.
+    spotlight: vi
+      .spyOn(api, 'getPlayerSpotlight')
+      .mockImplementation(() => Promise.resolve({ applies: false, reason: 'PAST_SEASON', season: 2025, sport: 'nfl' }) as never),
   }
 }
 

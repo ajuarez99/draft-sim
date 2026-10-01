@@ -34,7 +34,8 @@ class WeeklyReportShapeTest {
         return new WeeklyReportService.Result(
                 true, null, 2026, null, 1, Sport.NFL, false,
                 List.of(),
-                List.of(new WeeklyReportService.Performer("4034", "Caleb Williams", "QB", "Team", 37.26)),
+                List.of(new WeeklyReportService.Performer("4034", "Caleb Williams", "QB", "Team", 37.26,
+                        "CHI", "GB", true, "av9")),
                 null, null, null, null,
                 List.of(), List.of());
     }
@@ -63,6 +64,28 @@ class WeeklyReportShapeTest {
         assertFalse(body.containsKey("bestWeek"), "bestWeek must be ABSENT for football, not empty");
         assertFalse(body.containsKey("basis"));
         assertEquals(false, body.get("playersPlayMultiplePerPeriod"));
+    }
+
+    /** Spec 014 amendment: each performer carries nullable team/opponent/isAway/avatarId; nulls serialize. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void topPerformersCarryTeamOpponentIsAwayAndAvatarIdAndNullsDoNotThrow() {
+        Map<String, Object> body = WeeklyReportController.body(football());
+        Map<String, Object> row = ((List<Map<String, Object>>) body.get("topPerformers")).getFirst();
+        assertEquals("CHI", row.get("team"));
+        assertEquals("GB", row.get("opponent"));
+        assertEquals(true, row.get("isAway"));
+        assertEquals("av9", row.get("avatarId"));
+
+        WeeklyReportService.Result nulls = new WeeklyReportService.Result(
+                true, null, 2026, null, 1, Sport.NFL, false, List.of(),
+                List.of(new WeeklyReportService.Performer("1", "N", "WR", "Team", 5.0, null, null, null, null)),
+                null, null, null, null, List.of(), List.of());
+        Map<String, Object> nullBody = assertDoesNotThrow(() -> WeeklyReportController.body(nulls));
+        Map<String, Object> nullRow = ((List<Map<String, Object>>) nullBody.get("topPerformers")).getFirst();
+        for (String k : List.of("team", "opponent", "isAway", "avatarId")) {
+            assertTrue(nullRow.containsKey(k) && nullRow.get(k) == null, k + " must be present and null");
+        }
     }
 
     /** Contract assertion 2: basketball gets the pair and loses the single list. */
