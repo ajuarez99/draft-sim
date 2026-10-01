@@ -103,18 +103,18 @@ Every page task does the same five things:
 
 **Run these tasks one at a time, in order** (all of them touch `styles.css`).
 
-- [ ] T014 [US1] Site home `WEB/pages/DraftPicker.tsx`: unbox the "Your leagues", "From Sleeper" and "Mock drafts" sections; "Start a mock draft" is the one `--volt`.
-- [ ] T015 [US1] Power rankings `WEB/pages/PowerRankings.tsx`: hero headline unboxed; Riser/Free fall as inline callouts with `--up`/`--down` arrows plus signed numbers; ladder as `.row-list`.
-- [ ] T016 [US1] Team strength `WEB/pages/LeagueAnalysis.tsx` (title "Team strength"): one-sentence subtitle. "Raw" sub-figures and composite method go into `<HowThisWorks>`, which also states that rankings appear after 3 scored weeks. Heat-tint best/worst High/Low.
-- [ ] T017 [US1] Bench points `WEB/pages/RosterManagement.tsx` (title "Bench points"): single bar color; "left N on the bench" in `--down` for the three largest gaps; method into `<HowThisWorks>`.
-- [ ] T018 [US1] Luck `WEB/pages/ExpectedWins.tsx` (title "Luck"): the subtitle names the luckiest team **only when `weeksScored` ≥ 4**; otherwise a neutral sentence plus the early badge. The schedule footnote goes into `<HowThisWorks>`.
-- [ ] T019 [US1] Playoff odds `WEB/pages/SeasonForecast.tsx` (title "Playoff odds"):
+- [X] T014 [US1] Site home `WEB/pages/DraftPicker.tsx`: unbox the "Your leagues", "From Sleeper" and "Mock drafts" sections; "Start a mock draft" is the one `--volt`.
+- [X] T015 [US1] Power rankings `WEB/pages/PowerRankings.tsx`: hero headline unboxed; Riser/Free fall as inline callouts with `--up`/`--down` arrows plus signed numbers; ladder as `.row-list`.
+- [X] T016 [US1] Team strength `WEB/pages/LeagueAnalysis.tsx` (title "Team strength"): one-sentence subtitle. "Raw" sub-figures and composite method go into `<HowThisWorks>`, which also states that rankings appear after 3 scored weeks. Heat-tint best/worst High/Low.
+- [X] T017 [US1] Bench points `WEB/pages/RosterManagement.tsx` (title "Bench points"): single bar color; "left N on the bench" in `--down` for the three largest gaps; method into `<HowThisWorks>`.
+- [X] T018 [US1] Luck `WEB/pages/ExpectedWins.tsx` (title "Luck"): the subtitle names the luckiest team **only when `weeksScored` ≥ 4**; otherwise a neutral sentence plus the early badge. The schedule footnote goes into `<HowThisWorks>`.
+- [X] T019 [US1] Playoff odds `WEB/pages/SeasonForecast.tsx` (title "Playoff odds"):
   - subtitle;
   - refusal copy per reason: `NOT_COMPUTED` → "Odds appear when the commissioner updates them."; keep the existing text for no-scored-week and `UNMODELLED_SEEDING`;
   - keep StaleNotice;
   - the "stored simulation" explanation goes into `<HowThisWorks>`.
-- [ ] T020 [US1] Weekly report `WEB/pages/WeeklyReport.tsx` (title "Matchups & awards"): copy and surfaces only; awards cards → `.row-list`.
-- [ ] T021 [US1] Awards `WEB/pages/Superlatives.tsx` (title "Awards"): copy and surfaces only; remove per-card colored top borders and panel-in-panel.
+- [X] T020 [US1] Weekly report `WEB/pages/WeeklyReport.tsx` (title "Matchups & awards"): copy and surfaces only; awards cards → `.row-list`.
+- [X] T021 [US1] Awards `WEB/pages/Superlatives.tsx` (title "Awards"): copy and surfaces only; remove per-card colored top borders and panel-in-panel.
 - [ ] T022 [US1] Standings `WEB/pages/LeagueHistory.tsx` (title stays the league name, eyebrow "Standings"): subtitle; the draft-opinion paragraph goes into `<HowThisWorks>`; tables on the surface.
 - [ ] T023 [US1] Scouting report `WEB/pages/ManagerTendencies.tsx` (title "Scouting report"): the standard-error lede goes into `<HowThisWorks>`; **`(±n)` stays visible** beside the reach text.
 - [ ] T024 [US1] Manager profile `WEB/pages/ManagerHistory.tsx`: method paragraph → `<HowThisWorks>`; stat boxes → one unboxed row.

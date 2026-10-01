@@ -70,7 +70,7 @@ describe('Weekly report', () => {
 
     // Scoped to the matchups panel: a team that also won an award appears
     // twice on this page, which is realistic rather than a bug.
-    const heading = await screen.findByRole('heading', { name: /matchups/i })
+    const heading = await screen.findByRole('heading', { name: /week [0-9]+ matchups/i })
     const panel = heading.closest('section') as HTMLElement
 
     expect(within(panel).getByText('Dart has hit anotha Bower')).toBeInTheDocument()

@@ -679,7 +679,7 @@ export default function DraftView() {
             <button className="modal-close" onClick={() => setSettingsOpen(false)} aria-label="Close">
               ✕
             </button>
-            <h3 className="cond tiny muted">Simulation settings</h3>
+            <h3 className="section-title tiny muted">Simulation settings</h3>
             <div className="controls">
               <label>
                 runs

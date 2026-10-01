@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import SuperlativeStandingsModal from '../components/SuperlativeStandingsModal'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
@@ -101,8 +102,8 @@ export default function Superlatives() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Superlatives"
-        sub="Season-long awards, one card each: the highs and lows, the closest games, luck, the bench and the waiver wire. If an award can't be worked out yet, its card says why."
+        title="Awards"
+        sub="Season-long awards for the highs and lows, the closest games, luck, the bench and the waiver wire."
       />
 
       {error && (
@@ -114,16 +115,16 @@ export default function Superlatives() {
       {loading && !data && <p className="muted small">Loading…</p>}
 
       {data && !data.available && (
-        <section className="panel">
-          <h3 className="cond">No scored weeks yet</h3>
+        <section className="section">
+          <h3 className="section-title">No scored weeks yet</h3>
           <p className="muted small">{data.reason ?? 'No week of this season has been scored yet.'}</p>
         </section>
       )}
 
       {data && data.available && (
         <>
-          <section className="panel">
-            <h3 className="cond">Season so far · through week {data.throughWeek}</h3>
+          <section className="section">
+            <h3 className="section-title">Season so far · through week {data.throughWeek}</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
             <p className="muted small">
               {data.regularSeasonEnd == null
@@ -144,6 +145,10 @@ export default function Superlatives() {
               />
             ))}
           </div>
+
+          <HowThisWorks>
+            <p>One card each. If an award can&apos;t be worked out yet, its card says why.</p>
+          </HowThisWorks>
 
           {data.leagueSleeperId && (
             <ConductListSection
@@ -725,8 +730,8 @@ function ConductListSection({
   const canEdit = commissionerListAvailable && Boolean(list?.canEdit)
 
   return (
-    <section className="panel sl-conduct">
-      <h3 className="cond">Commissioner&apos;s list</h3>
+    <section className="section sl-conduct">
+      <h3 className="section-title">Commissioner&apos;s list</h3>
       <p className="muted small">
         This list is for this season only — a new season starts with an empty one.
       </p>

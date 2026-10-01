@@ -4,7 +4,10 @@ type Props = {
   /** Small uppercase line above the title: where you are, or what this is. */
   eyebrow?: ReactNode
   title: ReactNode
-  /** One line of explanation. This is where a page's "what this screen is"
+  /** One sentence, the takeaway (not the method -- that goes in
+   *  `<HowThisWorks>`). In dev, a string `sub` containing a word from
+   *  FORBIDDEN_SUB_WORDS logs a warning (contracts/ui-rules.md, "Words").
+   *  This is where a page's "what this screen is"
    *  paragraph belongs -- several pages had theirs buried inside their first
    *  panel, under a panel heading, which is a caption for a box rather than a
    *  description of a page. */
@@ -15,6 +18,18 @@ type Props = {
    *  settings gear -- which no page owns a header slot for. */
   actions?: ReactNode
 }
+
+/** Words that make a subtitle read like a method note. Matched case-insensitively. */
+const FORBIDDEN_SUB_WORDS = [
+  'computation',
+  'computed',
+  'stored',
+  'snapshot',
+  'simulation run',
+  'standard error',
+  'endpoint',
+  'payload',
+]
 
 /**
  * The app's page header: eyebrow, title, one line of explanation.
@@ -34,6 +49,13 @@ type Props = {
  * distinction. One vocabulary, two scales -- not two vocabularies.
  */
 export default function PageHeader({ eyebrow, title, sub, actions }: Props) {
+  if (import.meta.env.DEV && typeof sub === 'string') {
+    const lower = sub.toLowerCase()
+    const hits = FORBIDDEN_SUB_WORDS.filter((w) => lower.includes(w))
+    if (hits.length > 0) {
+      console.warn(`PageHeader sub should be one takeaway sentence; contains ${hits.map((h) => `"${h}"`).join(', ')}. Move method text into <HowThisWorks>.`)
+    }
+  }
   return (
     <header className="page-head">
       <div className="page-head-text">

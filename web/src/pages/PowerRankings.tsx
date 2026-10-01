@@ -17,6 +17,7 @@ import {
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
 import CommissionerKeyNote from '../components/CommissionerKeyNote'
 import Avatar from '../components/Avatar'
+import HowThisWorks from '../components/HowThisWorks'
 import { managerHues } from '../managerColor'
 import BumpChart, { segmentsOf, type Series, type SeriesPoint } from '../components/BumpChart'
 
@@ -331,8 +332,10 @@ export function buildHeadline(story: WeeklyStory, week: number): string {
 }
 
 export function buildDeck(story: WeeklyStory, ballotCount: number, memberCount: number, week: number): string {
-  const parts: string[] = []
-  parts.push(`${ballotCount} of ${memberCount} ballot${memberCount === 1 ? '' : 's'} in for ${weekPhrase(week)}.`)
+  // One sentence: the takeaway first (when there is one), then the ballot tally
+  // that qualifies it. The tally is a caveat, so it stays in the sentence.
+  const tally = `${ballotCount} of ${memberCount} ballot${memberCount === 1 ? '' : 's'} in for ${weekPhrase(week)}.`
+  let lead: string | null = null
   const namedId = story.newTop
     ? story.top?.rosterId
     : story.riser && story.riser.delta >= 3
@@ -341,16 +344,14 @@ export function buildDeck(story: WeeklyStory, ballotCount: number, memberCount: 
         ? story.faller.entry.rosterId
         : story.divisive?.rosterId
   if (story.riser && story.riser.entry.rosterId !== namedId) {
-    parts.push(`${nameOf(story.riser.entry)} climbed ${story.riser.delta} spot${story.riser.delta === 1 ? '' : 's'}.`)
+    lead = `${nameOf(story.riser.entry)} climbed ${story.riser.delta} spot${story.riser.delta === 1 ? '' : 's'}`
   } else if (story.faller && story.faller.entry.rosterId !== namedId) {
     const n = Math.abs(story.faller.delta)
-    parts.push(`${nameOf(story.faller.entry)} dropped ${n} spot${n === 1 ? '' : 's'}.`)
+    lead = `${nameOf(story.faller.entry)} dropped ${n} spot${n === 1 ? '' : 's'}`
   } else if (story.divisive && story.divisive.rosterId !== namedId) {
-    parts.push(
-      `${nameOf(story.divisive)} splits the room, ${ordinal(story.divisive.bestRank ?? story.divisive.rank)} to ${ordinal(story.divisive.worstRank ?? story.divisive.rank)}.`,
-    )
+    lead = `${nameOf(story.divisive)} splits the room, ${ordinal(story.divisive.bestRank ?? story.divisive.rank)} to ${ordinal(story.divisive.worstRank ?? story.divisive.rank)}`
   }
-  return parts.join(' ')
+  return lead ? `${lead}; ${tally}` : tally
 }
 
 // --- "can this viewer rank" (§7 blocked states, 2d) -------------------------
@@ -397,7 +398,6 @@ export default function PowerRankings() {
   const [compareOpen, setCompareOpen] = useState(false)
   const [trendOpen, setTrendOpen] = useState(false)
   const [homersOpen, setHomersOpen] = useState(false)
-  const [howOpen, setHowOpen] = useState(false)
   const [ballotModalOpen, setBallotModalOpen] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -800,7 +800,7 @@ export default function PowerRankings() {
         </div>
 
         {story.top && (
-          <div className="pr-number-one panel">
+          <div className="pr-number-one">
             <div className="pr-number-one-label cond">Number one</div>
             <div className="pr-number-one-body">
               <div className="pr-number-one-rank cond mono">1</div>
@@ -866,19 +866,19 @@ export default function PowerRankings() {
       {(story.riser || story.faller || story.divisive) && (
         <div className="pr-stories">
           {story.riser && (
-            <div className="pr-story panel">
-              <h2 className="cond">Riser of the week</h2>
+            <div className="pr-story">
+              <h2 className="section-title">Riser of the week</h2>
               <div className="pr-story-name">
-                {nameOf(story.riser.entry)} <span className="mono pr-move up">▲{story.riser.delta}</span>
+                {nameOf(story.riser.entry)} <span className="mono pr-move up">▲ +{story.riser.delta}</span>
               </div>
               <div className="pr-story-note">Now {ordinal(story.riser.entry.rank)}, from {ordinal(story.riser.entry.rank + story.riser.delta)}.</div>
             </div>
           )}
           {story.faller && (
-            <div className="pr-story panel">
-              <h2 className="cond">Free fall</h2>
+            <div className="pr-story">
+              <h2 className="section-title">Free fall</h2>
               <div className="pr-story-name">
-                {nameOf(story.faller.entry)} <span className="mono pr-move down">▼{Math.abs(story.faller.delta)}</span>
+                {nameOf(story.faller.entry)} <span className="mono pr-move down">▼ −{Math.abs(story.faller.delta)}</span>
               </div>
               <div className="pr-story-note">
                 Now {ordinal(story.faller.entry.rank)}, from {ordinal(story.faller.entry.rank + story.faller.delta)}.
@@ -886,8 +886,8 @@ export default function PowerRankings() {
             </div>
           )}
           {story.divisive && (
-            <div className="pr-story panel">
-              <h2 className="cond">Nobody agrees</h2>
+            <div className="pr-story">
+              <h2 className="section-title">Nobody agrees</h2>
               <div className="pr-story-name">{nameOf(story.divisive)}</div>
               <div className="pr-story-note">
                 Ranked as high as {ordinal(story.divisive.bestRank ?? story.divisive.rank)} and as low as{' '}
@@ -901,9 +901,9 @@ export default function PowerRankings() {
       <div className="pr-grid">
         <div className="pr-main">
           {/* ---- the ladder ---- */}
-          <section className="panel">
+          <section className="section pr-section">
             <div className="pr-ladder-head panel-head">
-              <h2>The ladder</h2>
+              <h2 className="section-title">The ladder</h2>
               <span className="small muted">
                 {KIND_LABEL[ladderMode]} · {weekPhrase(tableWeek)}
                 {ladderMode === 'MEMBER' ? ` · ${ballotsCountedIn(data.entries, season, tableWeek)} ballots` : ''}
@@ -995,6 +995,7 @@ export default function PowerRankings() {
                   )}
                 </div>
 
+                <div className="row-list">
                 {rows.map((e) => {
                   const isMe = ballot?.members.some((m) => m.isMe && m.rosterId === e.rosterId) ?? false
                   const pinned = highlighted === e.rosterId
@@ -1096,6 +1097,7 @@ export default function PowerRankings() {
                     </button>
                   )
                 })}
+                </div>
 
                 {ladderMode === 'MEMBER' && (
                   <p className="pr-foot">
@@ -1119,27 +1121,21 @@ export default function PowerRankings() {
                     </span>
                   </div>
                 )}
-                <p className="pr-foot">
-                  Ranks are manager ballots, averaged. {oddsNote}{' '}
-                  <button type="button" className="link-button" onClick={() => setHowOpen((v) => !v)}>
-                    How this works →
-                  </button>
-                </p>
-                {howOpen && (
-                  <div className="pr-how">
-                    <p className="tiny muted">{KIND_CAVEAT[ladderMode]}</p>
-                    <p className="tiny muted">
-                      Movement compares this mode against {KIND_LABEL[referenceKind]} for the same week, when that mode has a
-                      snapshot for it -- otherwise the column is hidden rather than showing a fake zero. Playoff odds are a
-                      team-level simulation: each roster's weekly scoring, shrunk toward the league average by how few games
-                      it stands on, played out over the real remaining schedule. It knows nothing about injuries, byes or
-                      trades, and a league whose playoff seeding this app does not model (divisions, a custom seed type)
-                      shows "--" rather than a number that would be quietly wrong.
-                    </p>
-                  </div>
-                )}
               </div>
             )}
+
+            <HowThisWorks>
+              <p>Ranks are manager ballots, averaged. {oddsNote}</p>
+              <p>{KIND_CAVEAT[ladderMode]}</p>
+              <p>
+                Movement compares this mode against {KIND_LABEL[referenceKind]} for the same week, when that mode has a
+                snapshot for it -- otherwise the column is hidden rather than showing a fake zero. Playoff odds are a
+                team-level simulation: each roster's weekly scoring, shrunk toward the league average by how few games
+                it stands on, played out over the real remaining schedule. It knows nothing about injuries, byes or
+                trades, and a league whose playoff seeding this app does not model (divisions, a custom seed type)
+                shows "--" rather than a number that would be quietly wrong.
+              </p>
+            </HowThisWorks>
           </section>
 
           {/* ---- compare across modes (regression #9, no mockup slot) ---- */}
@@ -1439,12 +1435,6 @@ export default function PowerRankings() {
             )}
           </section>
 
-          <p className="pr-foot">
-            Ranks are manager ballots, averaged. {oddsNote}{' '}
-            <button type="button" className="link-button" onClick={() => setHowOpen((v) => !v)}>
-              How this works →
-            </button>
-          </p>
         </aside>
       </div>
 

@@ -1788,6 +1788,9 @@ export type ExpectedWins = {
   requestedSeason?: number | null
   sport: Sport
   weeksScored: number
+  /** Spec 013: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS, decided server-side
+   *  (ExpectedWinsController). Absent on an older backend: treat as early. */
+  early?: boolean
   leagueAveragePpg: number
   teams: ExpectedWinsTeam[]
 }

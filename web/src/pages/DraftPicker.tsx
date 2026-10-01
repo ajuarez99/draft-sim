@@ -10,6 +10,7 @@ import SportFilterRail from '../components/SportFilterRail'
 import { useSportFilter, type SportFilter } from '../sportFilter'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
 import {
@@ -317,17 +318,17 @@ export default function DraftPicker() {
           title={sportTitle(sportFilter)}
           sub={
             drafts == null ? (
-              'Bots fill every seat but yours, and you take your own picks on your turn.'
+              'Practice your draft against the real managers in your leagues, or against bots.'
             ) : recentLeague ? (
               <>
                 <strong>{recentLeague.leagueName}</strong> is a {recentLeague.teams}-team,{' '}
-                {recentLeague.rounds}-round league — get more reps before its next draft, in a
-                room only you control.
+                {recentLeague.rounds}-round league — practice before its next draft, in a room
+                only you control.
               </>
             ) : drafts.length > 0 && sportFilter === 'all' ? (
-              'Bots fill every seat but yours, or seat the real managers from any of your leagues below.'
+              'Practice your draft with bots, or seat the real managers from any of your leagues below.'
             ) : (
-              'Bots fill every seat but yours — add a league below to seat your real managers instead of them.'
+              'Practice your draft with bots, or add a league below to seat its real managers instead.'
             )
           }
           actions={
@@ -337,9 +338,9 @@ export default function DraftPicker() {
           }
         />
 
-        <section className="panel">
+        <section className="section picker-section">
           <div className="panel-head">
-            <h2>Your leagues</h2>
+            <h2 className="section-title">Your leagues</h2>
           </div>
 
           {fetchError && <div className="error">{fetchError}</div>}
@@ -544,9 +545,9 @@ export default function DraftPicker() {
             below simply doesn't render, so a broken lookup and "you have nothing
             to set up" look identical. */}
         {sleeperError && (
-          <section className="panel">
+          <section className="section picker-section">
             <div className="panel-head">
-              <h2>From Sleeper</h2>
+              <h2 className="section-title">From Sleeper</h2>
             </div>
             <div className="error">
               Couldn’t load your Sleeper leagues ({sleeperError}).{' '}
@@ -565,9 +566,9 @@ export default function DraftPicker() {
             Hidden for the NBA filter per design_handoff_multisport_mock_drafts
             ("shown for All sports and NFL only"). */}
         {visibleSleeperLeagues && visibleSleeperLeagues.some((l) => !l.ingested) && (
-          <section className="panel">
+          <section className="section picker-section">
             <div className="panel-head">
-              <h2>From Sleeper</h2>
+              <h2 className="section-title">From Sleeper</h2>
             </div>
             <div className="league-grid">
               {visibleSleeperLeagues
@@ -628,9 +629,9 @@ export default function DraftPicker() {
           </section>
         )}
 
-        <section className="panel">
+        <section className="section picker-section">
           <div className="panel-head">
-            <h2>Mock drafts</h2>
+            <h2 className="section-title">Mock drafts</h2>
             <button type="button" className="chip on" onClick={() => openMockModal()}>
               New mock
             </button>
@@ -688,6 +689,10 @@ export default function DraftPicker() {
               })}
             </div>
           )}
+
+          <HowThisWorks>
+            <p>Bots fill every seat but yours, and you take your own picks on your turn.</p>
+          </HowThisWorks>
         </section>
 
         {/* B1: "Add a league" was its own panel, a third of the front door

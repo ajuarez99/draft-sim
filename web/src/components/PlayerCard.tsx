@@ -32,7 +32,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
             overwrites the other. */}
         {yourPick && (
           <div className="modal-your-pick">
-            <h3 className="cond tiny muted">You picked</h3>
+            <h3 className="section-title tiny muted">You picked</h3>
             <div className="modal-head">
               <span className={`pos ${yourPick.position}`}>{posRank(yourPick)}</span>
               <h2 className="modal-name">{yourPick.name}</h2>
@@ -42,7 +42,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
         )}
 
         <div className={yourPick ? 'modal-model-pick' : undefined}>
-          {yourPick && <h3 className="cond tiny muted">Model's own pick here</h3>}
+          {yourPick && <h3 className="section-title tiny muted">Model's own pick here</h3>}
           <div className="modal-head">
             <span className={`pos ${pick.player.position}`}>{posRank(pick.player)}</span>
             <h2 className="modal-name">{pick.player.name}</h2>
@@ -57,7 +57,7 @@ export default function PlayerCard({ pick, teams, yourPick, onClose }: Props) {
 
         {pick.alternatives.length > 0 && (
           <div className="modal-alts">
-            <h3 className="cond">Alternatives</h3>
+            <h3 className="section-title">Alternatives</h3>
             {pick.alternatives.map((a) => (
               <div key={a.player.id} className="modal-alt-row">
                 <span className={`pos ${a.player.position}`}>{posRank(a.player)}</span>

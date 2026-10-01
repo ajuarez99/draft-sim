@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.ExpectedWinsService;
+import com.ballknowers.draftsim.engine.SeasonWindow;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -51,6 +52,8 @@ public class ExpectedWinsController {
         out.put("requestedSeason", r.requestedSeason());
         out.put("sport", r.sport().code());
         out.put("weeksScored", r.weeksScored());
+        // Spec 013: the page reads "early" from here rather than keeping its own copy of the threshold.
+        out.put("early", r.weeksScored() < SeasonWindow.EARLY_THRESHOLD_WEEKS);
         out.put("leagueAveragePpg", r.leagueAveragePpg());
         if (!r.available()) {
             out.put("reason", r.reason());

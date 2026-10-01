@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
 import { useFailure } from '../useFailure'
@@ -22,6 +23,25 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
  * Both sports, with no gate: nothing here reads a position, a lineup or a
  * projection.
  */
+/**
+ * Whether the numbers are still early. The threshold lives only on the server
+ * (SeasonWindow.EARLY_THRESHOLD_WEEKS, hand-set); a missing flag from an older
+ * backend counts as early, so the page never names a "luckiest" team on
+ * thin data by accident.
+ */
+const isEarly = (data: Data) => data.early ?? true
+
+/** The one-sentence takeaway. Names the luckiest team only once enough weeks
+ *  are scored for the name to mean something; before that it stays neutral. */
+function luckSubtitle(data: Data | null): string {
+  const neutral = "Who the schedule has helped, and who it has hurt."
+  if (!data || !data.available || isEarly(data)) return neutral
+  const top = [...data.teams].sort((a, b) => b.winsAboveExpected - a.winsAboveExpected)[0]
+  // Under a quarter-win above expected nobody is meaningfully lucky.
+  if (!top || top.winsAboveExpected < 0.25) return neutral
+  return `${top.teamName} has been the luckiest, ${top.winsAboveExpected.toFixed(2)} wins above what their scoring earned.`
+}
+
 export default function ExpectedWins() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const [data, setData] = useState<Data | null>(null)
@@ -61,8 +81,8 @@ export default function ExpectedWins() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Expected wins"
-        sub="What each team's scoring would have earned against a random opponent every week, against what the schedule actually gave them. The gap is luck, not skill."
+        title="Luck"
+        sub={luckSubtitle(data)}
       />
 
       {error && (
@@ -74,8 +94,8 @@ export default function ExpectedWins() {
       {loading && !data && <p className="muted small">Loading…</p>}
 
       {data && !data.available && (
-        <section className="panel">
-          <h3 className="cond">No games to measure yet</h3>
+        <section className="section">
+          <h3 className="section-title">No games to measure yet</h3>
           <p className="muted small">
             {data.reason ?? 'No completed games for this league yet.'} Expected wins compares a team
             against the rest of the league in the same week, so it needs at least one played week.
@@ -85,10 +105,16 @@ export default function ExpectedWins() {
 
       {data && data.available && (
         <>
-          <section className="panel">
-            <h3 className="cond">
+          <section className="section">
+            <h3 className="section-title">
               Season {data.season} · {data.weeksScored} week{data.weeksScored === 1 ? '' : 's'} ·
               league average {data.leagueAveragePpg.toFixed(2)} points per game
+              {isEarly(data) && (
+                <>
+                  {' '}
+                  <span className="sl-early small">early — this is mostly noise</span>
+                </>
+              )}
             </h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
 
@@ -111,15 +137,21 @@ export default function ExpectedWins() {
               </tbody>
             </table>
 
-            <p className="muted small ew-note">
-              Schedule is the average of a team's opponents' points per game minus the league-wide
-              average. <strong>Positive means a harder schedule</strong> — they faced better scoring
-              than everyone else did.
-            </p>
+            <HowThisWorks>
+              <p>
+                What each team's scoring would have earned against a random opponent every week,
+                against what the schedule actually gave them. The gap is luck, not skill.
+              </p>
+              <p>
+                Schedule is the average of a team's opponents' points per game minus the league-wide
+                average. <strong>Positive means a harder schedule</strong> — they faced better scoring
+                than everyone else did.
+              </p>
+            </HowThisWorks>
           </section>
 
-          <section className="panel">
-            <h3 className="cond">Where the luck came from</h3>
+          <section className="section">
+            <h3 className="section-title">Where the luck came from</h3>
             <div className="ew-luck">
               {data.teams
                 .filter((t) => Math.abs(t.winsAboveExpected) >= 0.25)

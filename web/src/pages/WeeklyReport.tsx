@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
@@ -84,8 +85,8 @@ export default function WeeklyReport() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Weekly report"
-        sub="Every matchup, the week's best performances, and the awards nobody wants — read back from what actually happened."
+        title="Matchups & awards"
+        sub="Who won each matchup this week, and the awards nobody wants — read back from what actually happened."
         actions={
           // Nothing scored means no week to pick, so no input rather than a week 0.
           latest > 0 ? (
@@ -113,8 +114,8 @@ export default function WeeklyReport() {
       {loading && !data && <p className="muted small">Loading…</p>}
 
       {data && !data.available && (
-        <section className="panel">
-          <h3 className="cond">
+        <section className="section">
+          <h3 className="section-title">
             {data.week === 0 ? 'No week has been scored yet' : `Week ${data.week} has not been scored`}
           </h3>
           <p className="muted small">
@@ -130,8 +131,8 @@ export default function WeeklyReport() {
               <strong>In progress</strong> — scores can still change until the week closes.
             </p>
           )}
-          <section className="panel">
-            <h3 className="cond">Week {data.week} matchups</h3>
+          <section className="section">
+            <h3 className="section-title">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
             <div className="wr-games">
               {data.matchups.map((m, i) => (
@@ -140,12 +141,12 @@ export default function WeeklyReport() {
             </div>
           </section>
 
-          <section className="panel">
-            <h3 className="cond">Weekly awards</h3>
+          <section className="section">
+            <h3 className="section-title">Weekly awards</h3>
             {data.awards.length === 0 ? (
               <p className="muted small">Nobody qualified for an award this week.</p>
             ) : (
-              <div className="wr-awards">
+              <div className="wr-awards row-list">
                 {data.awards.map((a) => (
                   <article key={a.kind} className="wr-award">
                     <h4>{titleOf(a.kind)}</h4>
@@ -173,8 +174,8 @@ export default function WeeklyReport() {
           {data.playersPlayMultiplePerPeriod ? (
             <Rankings data={data} />
           ) : (
-            <section className="panel">
-              <h3 className="cond">Top performers</h3>
+            <section className="section">
+              <h3 className="section-title">Top performers</h3>
               <ol className="wr-performers">
                 {(data.topPerformers ?? []).map((p) => (
                   <li key={p.playerId}>
@@ -209,9 +210,8 @@ function Rankings({ data }: { data: Data }) {
 
   return (
     <div className="wr-rankings">
-      <section className="panel">
-        <h3 className="cond">Best nights</h3>
-        <p className="muted small">The biggest single games anyone rostered this week.</p>
+      <section className="section">
+        <h3 className="section-title">Best nights</h3>
         {missing('BEST_NIGHTS') ? (
           <Unavailable reason={missing('BEST_NIGHTS')!.reason} />
         ) : (
@@ -227,10 +227,13 @@ function Rankings({ data }: { data: Data }) {
             ))}
           </ol>
         )}
+        <HowThisWorks>
+          <p>The biggest single games anyone rostered this week.</p>
+        </HowThisWorks>
       </section>
 
-      <section className="panel">
-        <h3 className="cond">Best week</h3>
+      <section className="section">
+        <h3 className="section-title">Best week</h3>
         {/*
           FR-005: this total counts every game the player played, including
           games the league's scoring never counted. Driven by `basis` rather

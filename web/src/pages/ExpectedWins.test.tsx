@@ -155,4 +155,21 @@ describe('Expected wins eyebrow names the season shown', () => {
     render(<ExpectedWins />)
     expect(screen.getByText('League')).toBeInTheDocument()
   })
+
+  /**
+   * Spec 013: the "early" decision belongs to the server (SeasonWindow). The page
+   * only names a luckiest team when the server says the numbers are not early,
+   * and treats a missing flag (older backend) as early.
+   */
+  it('names the luckiest team only when the server says the season is not early', async () => {
+    getExpectedWins.mockResolvedValue(data({ weeksScored: 6, early: false, teams: [team({ winsAboveExpected: 1.4 })] }))
+    render(<ExpectedWins />)
+    expect(await screen.findByText(/jpelwell/, { selector: '.page-head *' })).toBeInTheDocument()
+  })
+
+  it('keeps the neutral subtitle when the early flag is missing', async () => {
+    getExpectedWins.mockResolvedValue(data({ weeksScored: 6, teams: [team({ winsAboveExpected: 1.4 })] }))
+    render(<ExpectedWins />)
+    expect(await screen.findByText('Who the schedule has helped, and who it has hurt.')).toBeInTheDocument()
+  })
 })

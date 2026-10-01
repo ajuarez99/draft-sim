@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import {
   getRosterManagement,
@@ -81,6 +82,16 @@ export default function RosterManagement() {
   // The widest potential sets the scale, so every row's pair of bars is
   // comparable across the league rather than each row normalising to itself.
   const scale = Math.max(1, ...(data?.teams ?? []).map((t) => t.potentialPoints))
+  // The three largest bench gaps get the "worse" colour. A gap of zero is a
+  // perfect lineup, never a candidate, so fewer than three teams may qualify.
+  const gapOf = (t: RosterManagementTeam) => t.potentialPoints - t.totalPoints
+  const biggestGaps = new Set(
+    [...(data?.teams ?? [])]
+      .filter((t) => gapOf(t) > 0.005)
+      .sort((a, b) => gapOf(b) - gapOf(a))
+      .slice(0, 3)
+      .map((t) => t.rosterId),
+  )
 
   if (notFound) return <NotFound what="league" />
 
@@ -88,8 +99,8 @@ export default function RosterManagement() {
     <div className="content">
       <PageHeader
         eyebrow={data ? `League · ${data.season}` : 'League'}
-        title="Roster management"
-        sub="What each team scored, against the most it could have scored if every weekly lineup had been perfect. Efficiency is the first divided by the second — it measures lineup decisions, not the roster."
+        title="Bench points"
+        sub="Who left the most points on their bench, against a perfect lineup every week."
       />
 
       {error && (
@@ -101,8 +112,8 @@ export default function RosterManagement() {
       {loading && !data && <p className="muted small">Loading…</p>}
 
       {data && !data.available && (
-        <section className="panel">
-          <h3 className="cond">Nothing to measure yet</h3>
+        <section className="section">
+          <h3 className="section-title">Nothing to measure yet</h3>
           <p className="muted small">
             {data.reason ?? 'No scored weeks for this league yet.'} Efficiency needs at least one
             completed week — before that there is no lineup decision to grade.
@@ -111,8 +122,8 @@ export default function RosterManagement() {
       )}
 
       {data && data.available && (
-        <section className="panel">
-          <h3 className="cond">
+        <section className="section">
+          <h3 className="section-title">
             Season {data.season} · {data.weeksScored} week{data.weeksScored === 1 ? '' : 's'} scored
           </h3>
           <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
@@ -131,12 +142,26 @@ export default function RosterManagement() {
             </thead>
             <tbody>
               {data.teams.map((t, i) => (
-                <Row key={t.rosterId} team={t} hue={hueForIndex(i, data.teams.length)} scale={scale} />
+                <Row
+                  key={t.rosterId}
+                  team={t}
+                  hue={hueForIndex(i, data.teams.length)}
+                  scale={scale}
+                  bigGap={biggestGaps.has(t.rosterId)}
+                />
               ))}
             </tbody>
           </table>
 
           <ExcludedNote teams={data.teams} />
+
+          <HowThisWorks>
+            <p>
+              What each team scored, against the most it could have scored if every weekly lineup
+              had been perfect. Efficiency is the first divided by the second — it measures lineup
+              decisions, not the roster.
+            </p>
+          </HowThisWorks>
         </section>
       )}
 
@@ -155,8 +180,8 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
   const widest = Math.max(1, ...tx.byManager.map((m) => m.total))
   return (
     <>
-      <section className="panel">
-        <h3 className="cond">League transactions</h3>
+      <section className="section">
+        <h3 className="section-title">League transactions</h3>
         <ul className="tx-counts">
           {tx.byManager.map((m) => (
             <li key={m.teamName}>
@@ -187,8 +212,8 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
         </p>
       </section>
 
-      <section className="panel">
-        <h3 className="cond">League trades</h3>
+      <section className="section">
+        <h3 className="section-title">League trades</h3>
         {tx.trades.length === 0 ? (
           <p className="muted small">No trades have been made.</p>
         ) : (
@@ -208,8 +233,8 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
         )}
       </section>
 
-      <section className="panel">
-        <h3 className="cond">Waivers and free agent adds</h3>
+      <section className="section">
+        <h3 className="section-title">Waivers and free agent adds</h3>
         <ul className="tx-adds">
           {tx.adds.map((a, i) => (
             <li key={i}>
@@ -225,11 +250,13 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
             </li>
           ))}
         </ul>
-        <p className="muted small tx-legend">
-          Rank is the player's average finish among others at his position since the move —{' '}
-          <strong>lower is better</strong>, and the number of weeks it covers is shown beside it, so a
-          single week is not mistaken for a season.
-        </p>
+        <HowThisWorks>
+          <p>
+            Rank is the player's average finish among others at his position since the move —{' '}
+            <strong>lower is better</strong>, and the number of weeks it covers is shown beside it, so a
+            single week is not mistaken for a season.
+          </p>
+        </HowThisWorks>
       </section>
     </>
   )
@@ -255,7 +282,17 @@ function Rank({ player }: { player: MovedPlayer }) {
   )
 }
 
-function Row({ team, hue, scale }: { team: RosterManagementTeam; hue: number; scale: number }) {
+function Row({
+  team,
+  hue,
+  scale,
+  bigGap,
+}: {
+  team: RosterManagementTeam
+  hue: number
+  scale: number
+  bigGap: boolean
+}) {
   const actualPct = (team.totalPoints / scale) * 100
   const potentialPct = (team.potentialPoints / scale) * 100
   const left = team.potentialPoints - team.totalPoints
@@ -287,11 +324,11 @@ function Row({ team, hue, scale }: { team: RosterManagementTeam; hue: number; sc
         )}
       </td>
       <td className="rm-bars">
-        <div className="rm-track" style={{ ['--hue' as string]: hue }}>
+        <div className="rm-track">
           <div className="rm-bar rm-bar-potential" style={{ width: `${potentialPct}%` }} />
           <div className="rm-bar rm-bar-actual" style={{ width: `${actualPct}%` }} />
         </div>
-        <span className="rm-left">
+        <span className={`rm-left${bigGap ? ' rm-left-big' : ''}`}>
           {left <= 0.005 ? 'perfect' : `${left.toFixed(2)} left on the bench`}
         </span>
       </td>

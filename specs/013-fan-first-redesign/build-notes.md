@@ -235,3 +235,12 @@ Not run against a live server: no HTTP call to any of these endpoints, and no re
   label must say "vs weekly median" so a reader comparing the two sites isn't misled (T084).
 - Real board: `adpAtDraft` is present on 180/180 picks of the 2026 NFL draft and differs from today's ADP
   (pick 2: today 2.0, at draft 4.0). This confirms review B1 was a real bug in the plan.
+
+## US1 part A: parent review (2026-09-30)
+
+- **Rejected and fixed:** the Luck page shipped a frontend copy of the 4-week threshold (`EARLY_WEEKS`).
+  That's a second implementation of `SeasonWindow.EARLY_THRESHOLD_WEEKS`. The expected-wins response now
+  carries `early` (computed server-side). The page reads it, and a missing flag counts as early, so an old
+  backend never names a "luckiest" team. Two tests added (`ExpectedWins.test.tsx`).
+- Browser (1440, local): home shows the `--volt` CTA and sentence-case sections; Power rankings hero, callouts
+  and ladder unboxed; Luck shows the neutral subtitle plus the early badge at 3 weeks. Full matrix still owed (T030).

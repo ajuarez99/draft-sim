@@ -51,7 +51,7 @@ function RecordBook({ records }: { records: LeagueRecords }) {
   const hasScores = records.highestWeeks.length > 0 || records.lowestWeeks.length > 0
   return (
     <section className="panel">
-      <h3 className="cond">Record book</h3>
+      <h3 className="section-title">Record book</h3>
       {!hasScores ? (
         <p className="muted small">
           No weekly scores have been loaded for this league's seasons yet, so there are no records to show.
@@ -110,7 +110,7 @@ function MatchupMargins({ records }: { records: LeagueRecords }) {
   const has = records.closestMatchups.length > 0 || records.biggestBlowouts.length > 0
   return (
     <section className="panel">
-      <h3 className="cond">Matchup margins</h3>
+      <h3 className="section-title">Matchup margins</h3>
       {!has ? (
         <p className="muted small">
           {records.marginsUnavailableReason ??
@@ -173,7 +173,7 @@ function PointsLeaders({ records }: { records: LeagueRecords }) {
   const rows = records.pointsLeaders
   return (
     <section className="panel">
-      <h3 className="cond">All-time points leaders</h3>
+      <h3 className="section-title">All-time points leaders</h3>
       {rows.length === 0 ? (
         // Deliberately reworded rather than the RecordBook panel's identical
         // sentence: both panels are empty for the same underlying reason (no
@@ -225,7 +225,7 @@ function Streaks({ records }: { records: LeagueRecords }) {
   const rows = [...records.winStreaks, ...records.lossStreaks]
   return (
     <section className="panel">
-      <h3 className="cond">Streaks</h3>
+      <h3 className="section-title">Streaks</h3>
       {rows.length === 0 ? (
         <p className="muted small">
           {records.marginsUnavailableReason ??
@@ -494,7 +494,7 @@ export default function LeagueHistory() {
         {history &&
           history.seasons.map((s) => (
             <div key={s.leagueId} className="history-season">
-              <h3 className="cond">{s.season}</h3>
+              <h3 className="section-title">{s.season}</h3>
               {/* A season with no standings rendered its headers over nothing
                   -- verified on the 2026 season, which is ingested but hasn't
                   been played. `seasons.length === 0` was guarded; this wasn't. */}

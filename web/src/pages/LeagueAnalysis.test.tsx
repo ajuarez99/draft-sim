@@ -62,7 +62,8 @@ const GROUPS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
 
 /** The page draws two bump charts now, so every chart assertion names one. */
 function panelNamed(title: string): HTMLElement {
-  const panel = [...document.querySelectorAll('.panel')].find(
+  // 013: the page's blocks are unboxed `.section`s now, not `.panel`s.
+  const panel = [...document.querySelectorAll('.analysis-section')].find(
     (p) => p.querySelector('h2')?.textContent === title,
   )
   if (!panel) throw new Error(`no panel titled ${title}`)
