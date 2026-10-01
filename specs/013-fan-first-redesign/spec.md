@@ -28,6 +28,10 @@ answer came from the user.
 - Q: Does the redesign apply to NBA leagues too? → A: Yes. Both sports get every change and are checked separately. Player photos and team logos were measured as available for both sports on 2026-09-30.
 - Q: How are letter grades decided? → A: By a team's rank within its own league, not by fixed score thresholds. The cutoffs are hand-set and labelled arbitrary. The grade carries the existing "early — this is mostly noise" badge until the season's existing early threshold (4 scored weeks) is reached, and the number is always shown beside it.
 
+## Amended after adversarial review (2026-09-30)
+
+A cold-read review of the plan, before any code, changed FR-011, FR-012, FR-016, FR-017, FR-021, FR-025, FR-027, FR-030, FR-031, SC-001, SC-005, SC-007 and US2's scenarios. Each is edited in place and marked. The full decision table is in [plan.md](plan.md) "Amended after adversarial review".
+
 ## Amended after planning (2026-09-30)
 
 Planning checked the spec against the code and production. It found four things
@@ -102,9 +106,9 @@ that league's commissioner, the controls appear and still require the key.
 **Acceptance Scenarios**:
 
 1. **Given** a signed-in user whom Sleeper does not mark as commissioner of league X, **When** they view any page of league X, **Then** no compute or recompute control is shown.
-2. **Given** a signed-in user whom Sleeper marks as commissioner of league X, **When** they view league X's history or playoff odds page, **Then** the controls are shown, and using one without a saved commissioner key asks for the key as today.
+2. **Given** a signed-in user whom Sleeper marks as commissioner of league X, **When** they view league X's history or playoff odds page, **Then** the controls are shown. Where a control needed the commissioner key before, it still asks for it; History's Compute never did and still doesn't (amended after adversarial review).
 3. **Given** a user who is commissioner of league X but not league Y, **When** they view league Y, **Then** no commissioner control is shown.
-4. **Given** the playoff odds page has no odds yet, **When** a fan views it, **Then** it says when odds will appear in plain language, with no recompute control.
+4. **Given** the playoff odds page has no odds yet, **When** a fan views it, **Then** it says in plain language what makes odds appear ("Odds appear when the commissioner updates them."), with no recompute control. It never promises a date the app can't keep (amended after adversarial review).
 
 ---
 
@@ -302,17 +306,17 @@ at all three sizes and in both sports.
 **Commissioner controls (US2)**
 - **FR-009**: The site MUST show commissioner-only controls (compute, recompute, and any other control that writes league-level data on the commissioner's behalf) only to a signed-in user whom Sleeper marks as commissioner of that specific league, or to the app's configured owner. The server already decides this, and the page must use its answer rather than work it out again.
 - **FR-010**: Server-side gating is unchanged. Controls that require the commissioner key today still do, and History's Compute keeps its current server rule (amended after planning, research R1). Showing a control grants nothing by itself.
-- **FR-011**: Empty states that today offer a commissioner control (such as playoff odds not computed yet) MUST give non-commissioners a plain-language message saying when the content will appear.
+- **FR-011**: Empty states that today offer a commissioner control MUST give non-commissioners a plain-language message saying what makes the content appear. Example: "Odds appear when the commissioner updates them." / "Final ranks appear once the commissioner computes them." The message must never promise a time the app does not control (amended after adversarial review).
 
 **Navigation (US3)**
-- **FR-012**: League navigation MUST be grouped as This week / The season / Draft / History, using fan-facing page names (see Key Entities: Page names). The group holding the current page is expanded.
+- **FR-012**: League navigation MUST be grouped as This week / The season / Draft / History, using fan-facing page names (see Key Entities: Page names). History holds Standings (the all-seasons page). The group holding the current page is expanded, and on phone every group is expanded so nothing takes an extra tap. Page titles use the same fan names (amended after adversarial review).
 - **FR-013**: The league and season switcher MUST be visible at the top of every league page.
 - **FR-014**: Every navigation item MUST be identifiable by visible text, or by an icon plus a hover/long-press label, at every screen size, including in draft views.
 - **FR-015**: No existing page address may change or stop working.
 
 **League home and site home (US4)**
-- **FR-016**: The site MUST provide a league home that leads with the signed-in fan's record, rank and this week's matchup, followed by a standings snippet, the current power-rankings headline and the newest award.
-- **FR-017**: The site-wide home MUST list leagues as one row each (sport, the fan's record and rank when available, one primary action).
+- **FR-016**: The site MUST provide a league home that leads with the signed-in fan's record, standings position and latest matchup (both sports), plus their next opponent where the app knows it (NFL), followed by a standings snippet, the current power-rankings headline and the newest award (amended after adversarial review).
+- **FR-017**: The site-wide home MUST list leagues as one row each (sport, season, draft status, one primary action). *Amended after adversarial review:* no per-league record/rank, because no response carries it without one request per league.
 
 **Weekly report (US5)**
 - **FR-018**: The weekly report MUST show the signed-in fan's matchup first when they have one in the shown week.
@@ -320,7 +324,7 @@ at all three sizes and in both sports.
 
 **Draft room (US6)**
 - **FR-020**: In the simulator, live draft room and mock drafts, when the fan is on the clock or next up, the best available players, grouped into tiers, MUST be visible without opening a modal (on a phone: one tap on a persistent control). Next-pick availability MUST be shown wherever the room has an availability figure (simulator, live room). A mock draft has none, and MUST say so instead (amended after planning).
-- **FR-021**: The simulator MUST show a loading state with a progress message within 1 second of opening while simulations run.
+- **FR-021**: The simulator MUST show a skeleton board within 1 second of opening while its seats load, and keep its existing progress overlay while a simulation runs. It MUST NOT claim simulations are running before the fan presses Start (amended after adversarial review).
 - **FR-022**: Recent position runs already detected by the draft room MUST be shown as a callout next to the pick panel.
 
 **Player images (US7)**
@@ -328,17 +332,17 @@ at all three sizes and in both sports.
 - **FR-024**: Team defenses MUST show the team logo.
 
 **Grades and verdicts (US8)**
-- **FR-025**: Team strength and Bench points MUST show a letter grade (A+ to F) derived only from the team's rank within its league. The rank-to-grade cutoffs are a hand-set value, labelled arbitrary where the other hand-set values are kept.
+- **FR-025**: Team strength (NFL only, since the page is NFL-only) and Bench points (both sports) MUST show a letter grade (A+ to F) derived only from the team's rank within its league. The rank-to-grade cutoffs are a hand-set value, labelled arbitrary where the other hand-set values are kept. If the cutoffs are missing, no grade is shown and the app still starts (amended after adversarial review).
 - **FR-026**: A grade MUST always be shown beside its number and MUST carry the "early — this is mostly noise" badge while fewer scored weeks exist than the season's existing early threshold. The same threshold is reused, not duplicated.
-- **FR-027**: A finished draft board MUST offer a steals/reaches view that tints each pick by its distance from ADP, and MUST leave picks without an ADP untinted and labelled.
+- **FR-027**: A finished draft board MUST offer a steals/reaches view that tints each pick by its distance from **the ADP recorded at draft time**, never today's ADP. Picks without a draft-time ADP stay untinted and are labelled "no ADP at draft time" (amended after adversarial review).
 
 **Remaining pages (US9)**
 - **FR-028**: Superlatives MUST present one row per award with winner, stat and an in-place "see all".
 - **FR-029**: The manager profile MUST open with a single-row header (name, career record, titles, 3–4 headline stats), with league ranks written as sentences.
-- **FR-030**: The scouting report MUST show an archetype label per manager with draft history, derived from the existing reach/positional tendencies with hand-set, labelled cutoffs. Managers sharing a league with the fan come first.
-- **FR-031**: Standings MUST mark the best and worst value in each numeric column, show "season in progress" once, and add "record vs all" and "median record" columns.
+- **FR-030**: The scouting report MUST show an archetype label per manager with draft history, derived from the existing reach read and positional tendencies with hand-set, labelled cutoffs. Managers in the fan's currently selected league come first, and the existing `(±n)` uncertainty stays visible (amended after adversarial review).
+- **FR-031**: Standings MUST mark the best and worst value in each numeric column, show "season in progress" once, and add regular-season "record vs all" and "median record" columns, filled only for the season those figures were actually computed for (amended after adversarial review).
 - **FR-032**: Mock setup MUST present seats as a single row of chips, showing a real manager's avatar and archetype when one is seated.
-- **FR-033**: Sign-in MUST be a centered welcome with the product name, one line of pitch, the username field and one primary action. The "no password" reassurance is kept.
+- **FR-033**: Sign-in MUST be a centered welcome with the product name, one line of pitch ("…see who's likely gone before you pick"), the username field and one primary action. The "no password" reassurance is kept.
 
 **Everywhere**
 - **FR-034**: Every changed page MUST work at 1440×900, 768×1024 and 375×812 with no horizontal page scroll and no clipped content.
@@ -357,13 +361,13 @@ at all three sizes and in both sports.
 
 ### Measurable Outcomes
 
-- **SC-001**: On every page in the route inventory, 0 elements sit inside more than two nested bordered surfaces.
+- **SC-001**: On every page in the route inventory, outside data grids (the draft board, tables), 0 visible elements sit inside more than two nested surfaces, as measured by the amended harness (quickstart §4a). Inside a data grid, each cell is the only surface inside the grid frame (amended after adversarial review).
 - **SC-002**: 100% of page subtitles are a single sentence with no implementation vocabulary, and 100% of the caveats in the pre-change inventory are still present after the change (beside their number, or under "How this works").
 - **SC-003**: A non-commissioner sees 0 commissioner controls across every page of a league. The commissioner of that league sees all of them. Measured on "(Foot) Ball Knowers", whose commissioner was confirmed on 2026-09-30.
 - **SC-004**: From any league page, any other league page is reachable in at most 2 clicks or taps, at all three screen sizes.
-- **SC-005**: On the league home, a member's record, rank and this week's opponent are visible without scrolling at all three screen sizes.
+- **SC-005**: On the league home, a member's record, standings position and latest matchup are visible without scrolling at all three screen sizes in both sports; NFL also shows the next opponent (amended after adversarial review).
 - **SC-006**: When the fan is on the clock, the tiered best-available list is readable with 0 extra clicks on desktop and tablet and at most 1 tap on phone, in all three rooms. Next-pick availability is readable the same way in the simulator and live room (amended after planning: mocks have none).
-- **SC-007**: The simulator shows a loading message within 1 second of opening, and there are 0 seconds of blank panel.
+- **SC-007**: The simulator shows a skeleton board within 1 second of opening, with 0 seconds of blank panel, and never shows a "running" message before Start (amended after adversarial review).
 - **SC-008**: On a full NFL draft board and a full NBA mock board, 100% of player cells show a photo, logo or initials, and 0 broken images appear.
 - **SC-009**: Letter grades follow the league ranking with 0 ordering violations, and the early badge is present at 3 scored weeks and absent at 4.
 - **SC-010**: Every changed page passes a live check at 3 screen sizes × 2 sports with 0 horizontal page scroll.

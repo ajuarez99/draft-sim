@@ -53,36 +53,40 @@ The tests that must exist and pass:
 
 Sizes: `resize_window` 1440×900, 768×1024, 375×812. Reset to desktop afterwards.
 
-**4a. Nested surfaces (SC-001).** Run on each page:
-```js
-// Count bordered/filled ancestors for every leaf; report the worst.
-(() => { const box = el => { const s = getComputedStyle(el);
-  return parseFloat(s.borderTopWidth) > 0 || (s.backgroundColor !== 'rgba(0, 0, 0, 0)' && el !== document.body); };
-  let worst = 0, where = null;
-  for (const el of document.querySelectorAll('main *')) { if (el.children.length) continue;
-    let n = 0; for (let p = el; p && p.tagName !== 'MAIN'; p = p.parentElement) if (box(p)) n++;
-    if (n > worst) { worst = n; where = el.textContent.slice(0, 40); } }
-  return { worst, where }; })()
-```
-**Pass:** `worst ≤ 2`. Chips, badges and buttons are leaves themselves and are
-excluded by design. The script counts containers above a leaf, so a chip inside a
-row inside the panel scores 2.
+**4a. Nested surfaces (SC-001).** *Amended after adversarial review (B4): the
+first harness counted the leaf itself, read `border-top` only, counted hidden
+content, and made the board impossible to pass.* Use `specs/013-fan-first-redesign/measure.js`
+(`await bkMeasure(routes)`), whose definition is:
+- **surface** = a *visible* element (not `display:none`, not inside a closed `<details>`)
+  with padding > 0, at least one element child, and a background color, a border on
+  any side, or an inset box-shadow;
+- **leaf** = a visible element with non-empty own text, whose depth is the number of
+  surface *ancestors* (the leaf itself is not counted);
+- **exempt**: data grids (`.board` and `table`) and everything inside them are
+  reported separately as `gridDepth`, where a cell is the only allowed surface below
+  the grid frame.
+
+**Pass:** `depth ≤ 2` on every route, and `gridDepth ≤ 2` (frame plus cell).
 
 **4b. Horizontal scroll.** `document.documentElement.scrollWidth <= innerWidth` on
 every page at every size.
 
 **4c. Commissioner (SC-003).** As the fan, visit every "(Foot) Ball Knowers" page:
-no Compute/Recompute anywhere. As popsharky: the controls appear on History,
-Power and Forecast. Clicking one without a saved key prompts for the key as before.
+no Compute/Recompute anywhere, and History says "Final ranks appear once the
+commissioner computes them." As popsharky: the controls appear on History, Power
+and Forecast. Power and Forecast prompt for the key without a saved one. History's
+Compute never needed a key and still doesn't (amended after adversarial review, S1).
 
-**4d. League home (SC-005).** As popsharky, at each size, without scrolling:
-record, rank and this week's opponent are visible. As a signed-in non-member: no
+**4d. League home (SC-005).** As popsharky, at each size, both sports, without
+scrolling: record, standings position and latest matchup are visible; NFL also shows
+the next opponent. As a signed-in non-member: no
 "you" block and no error.
 
 **4e. Draft room (SC-006, SC-007).**
-- Simulator (`/drafts/1339351318128517120`): a loading message within 1s of load,
-  and never a blank panel. After it runs: tiers plus availability bars, visible
-  without clicking (desktop/tablet), one tap on phone.
+- Simulator (`/drafts/1339351318128517120`): a skeleton board within 1s of load,
+  never a blank panel, and no "running" text before Start. After a run, the
+  availability panel shows tiers plus survival, visible without clicking
+  (desktop/tablet), one tap on phone.
 - Mock (`/mock/new` → start): tiers and photos visible when on the clock. No
   availability bar, and the reason line is present (research R5).
 - Live room: tiers plus availability once the seat is known.

@@ -1,5 +1,7 @@
 # Research: Fan-first redesign
 
+> **Amended after adversarial review:** decisions B1–B6, S1–S18 and N1–N5 in [plan.md](plan.md) supersede R1, R3, R5, R8 and R9 wherever they disagree.
+
 Phase 0 of [plan.md](plan.md). Each item was checked against the code on
 `013-fan-first-redesign` (base `f684189`) or measured on production on
 2026-09-30. Where a finding contradicts the spec or the design review, the
@@ -198,7 +200,7 @@ real page.
 
 ## R11. How much of the styling is shared
 
-**Read.** `styles.css` is 4,583 lines with a documented house style (header
+**Read.** `styles.css` is 4,872 lines (amended after review; 4,583 was wrong) with a documented house style (header
 comment). There are ~125 uses of the `.mono` class across `.tsx` files, and ~182
 uses of `panel`. Section titles are `.panel h2` / `.cond` (Oswald, uppercase).
 

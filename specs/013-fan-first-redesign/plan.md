@@ -13,7 +13,7 @@ screen sizes: two surfaces instead of nested boxes, takeaway-first wording with
 methods behind "How this works", one meaning per color, grouped navigation with fan
 names, a league home, player photos, a "Your pick" panel, and rank-based grades.
 This is overwhelmingly a **frontend** change. The backend adds four fields to
-existing responses and one config block. There's no migration and no new endpoint.
+existing responses (amended: eight fields after review) and one config block. There's no migration and no new endpoint.
 
 Planning found four things the spec didn't know (spec amended, see its "Amended
 after planning" note; details in [research.md](research.md)):
@@ -28,6 +28,41 @@ after planning" note; details in [research.md](research.md)):
    The fix is the label. Week 3 still being non-final is out of scope.
 4. **One existing color fails contrast** (R10, computed): white on the crimson "You"
    fill is 4.07:1. It gets its own fill token.
+
+## Amended after adversarial review (2026-09-30)
+
+A cold-read review checked these docs against the code before any code was
+written. It found 6 blockers and 18 should-fixes. Every decision below
+supersedes the text it contradicts elsewhere in this folder. Spec, contracts,
+quickstart and tasks were updated to match.
+
+| # | Finding (evidence) | Decision |
+|---|---|---|
+| B1 | Steals/reaches would compare old picks to *today's* ADP (`RealPick` has no draft-time ADP; `LeagueController.java:313-341`) | Add `adpAtDraft: number \| null` to `RealPick` from `draft_pick.adp_at_time`. Tint **only** from it; null shows "no ADP at draft time" and stays untinted |
+| B2 | The league home can't get record, rank or matchup for NBA: `/analysis` is NFL-only (`LeagueAnalysisService.java:433`), and standings have no `isMe` | Add `isMe` to history `StandingRow` (server-side: caller → manager id). Record and **standings position** come from that, for both sports. "Latest matchup" comes from the weekly report (B3), for both sports. "Next opponent" only where `/analysis` has it (NFL). SC-005 amended |
+| B3 | `WeeklySide` identifies nobody (`api.ts:1837`) | Add `isMe` to `WeeklySide`, computed from the roster owner like `LeagueAnalysisService.java:687`. Never match on username |
+| B4 | The depth harness counts the leaf itself, `border-top` only, hidden content, and the board can't pass | New harness definition: a surface is a visible element with background, border (any side) or inset shadow, **padding > 0, and element children**. Data grids (`.board`, tables) and their cells are exempt and measured by their own rule (a cell is one surface inside the grid frame). SC-001 amended |
+| B5 | "Odds land after week N" is false: odds are written only by a commissioner recompute | One honest line per refusal reason: `NOT_COMPUTED` → "Odds appear when the commissioner updates them." Other reasons keep their existing text. StaleNotice is kept |
+| B6 | The simulator doesn't auto-run; a "Simulating…" message before Start would be false | T068 becomes: a skeleton board while seats load; the existing progress overlay while running. SC-007 amended |
+| S1 | History Compute needs no key | US2 AS2 and quickstart §4c corrected. A non-commissioner sees "Final ranks appear once the commissioner computes them." |
+| S2 | Other league-wide writes exist (`setReversalRound`; refresh/ingest/track) | Refresh, ingest and track re-read Sleeper and are idempotent, so they stay visible. `setReversalRound` is a real league-wide setting any member can change today. It is **out of scope** and recorded as a follow-up, not silently left |
+| S3 | The History nav group would be empty | Four groups: This week / The season / Draft / History, where History = Standings (the all-seasons page). The season group: Team strength, Luck, Bench points, Playoff odds, Awards |
+| S4 | Labels already exist on the collapsed rail (`LeagueRailSection.tsx:322-342`); the switcher is already on top | T041 dropped. T042 retargeted to fix the remaining gaps: the phone lane works with groups, and groups are expanded by default on phone so SC-004's two-tap limit holds |
+| S5 | Field is `rankingScores.entries`; Analysis uses records | Contract corrected. `ScoreEntry` gains a component |
+| S6 | Positional record constructors in tests will break; config class must be registered | Tasks name `LeagueAnalyticsContractTest`, `LeagueAnalysisServiceTest` and `DraftSimApplication.java` `@EnableConfigurationProperties` |
+| S7 | A strict `draftsim.grades` binding could stop startup (weights.yml is an optional import) | A missing block → `grade: null` everywhere, and `/api/health` reports `gradesLoaded`. Only a block that is *present* is validated |
+| S8 | The all-play invariant was wrong with byes or odd team counts | Per team: Σ over weeks played of (n_w − 1). With odd n, median ties are by construction; documented |
+| S9 | Expected-wins may fall back to another season, and covers the regular season only | Standings columns are filled only where `response.season` equals the row's season, and are labelled "regular season" |
+| S10 | A new YourPickPanel would duplicate `AvailabilityPanel` (survival + verdict) | **Extend `AvailabilityPanel`** (tiers, faces, an optional no-availability reason for mocks) instead of a second panel. Mock drafts render it without curves |
+| S11 | `positionRun` defaults sport to `'nfl'` | Callers in this spec must pass sport. The default is removed if its other callers allow (decided at build, recorded) |
+| S12 | Archetypes would re-derive the reach band; `/managers` is already filtered | Archetype is built on `relativeReachRead(...).kind` (`managerBehaviour.ts:60`), including `thin`. "Your league first" means the **rail's currently selected league** |
+| S13 | Moving `(±n)` into a tooltip hides a caveat on touch | `(±n)` stays visible |
+| S14 | ~70 section titles use `.cond` directly; line refs stale; styles.css is 4,872 lines | New `.section-title` class. Section headings switch from `.cond` to it, and `.cond` stays for page titles and heroes. Line refs corrected |
+| S15 | `--down` (hue 25) collides with `--crimson` (you); crimson *text* fails (3.92 on panel) | `--down` moves to hue 350 (measured at build); `.rank-move.down` remaps to `--down`. A new `--crimson-text` tuned to ≥ 4.5 for crimson used as text. Errors keep their current color (out of scope, noted) |
+| S16 | Parallel page tasks would collide in `styles.css` | US1 page tasks run **sequentially**, each confined to its page's own CSS section |
+| S17 | Site-home rows can't show record/rank without N requests | FR-017 amended: rows show sport, season, draft status and one action. No record/rank |
+| S18 | Team strength is NFL-only | Grades on Team strength are NFL-only. Bench points has grades for both sports. Both "too early" rules (rankings hidden under 3 weeks, grade badged early under 4) are documented in How this works |
+| N1–N5 | Names (`fetchSuperlatives`, `entries`), test lists, honesty wording, rollout order, CSS side effects | Fixed in tasks. Page H1s also take the fan names. The sign-in pitch says "likely gone". The Luck headline is suppressed while early. **Deploy the backend before the frontend.** The switcher fallback → League home. Re-measure position-tint contrast on the new `--panel` |
 
 ## Technical Context
 
@@ -52,7 +87,7 @@ after planning" note; details in [research.md](research.md)):
 - New frontend on an old backend degrades each new field to "absent" (contract table).
 - Hand-set values are labelled arbitrary.
 
-**Scale/Scope**: 18 existing routes plus one new (league home); 2 sports; 3 sizes; `styles.css` is 4,583 lines with ~125 `.mono` and ~182 `panel` usages
+**Scale/Scope**: 18 existing routes plus one new (league home); 2 sports; 3 sizes; `styles.css` is 4,872 lines with ~125 `.mono` and ~182 `panel` usages
 
 ## Constitution Check
 
