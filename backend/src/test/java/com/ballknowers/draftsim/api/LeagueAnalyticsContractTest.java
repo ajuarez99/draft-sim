@@ -70,7 +70,7 @@ class LeagueAnalyticsContractTest {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, 1, List.of(
                         new RosterManagementService.TeamRow(4, 17L, "Master Bates", "abc-user", "abc",
-                                164.96, 174.16, 0.947, 1, List.of(2))))));
+                                164.96, 174.16, 0.947, 1, List.of(2), "B+")))));
 
         Map<String, Object> body = bodyOf(
                 new RosterManagementController(rosterManagement, transactionAnalysis, membership)
@@ -91,6 +91,8 @@ class LeagueAnalyticsContractTest {
         assertEquals(164.96, team.get("totalPoints"));
         assertEquals(174.16, team.get("potentialPoints"));
         assertEquals(0.947, team.get("efficiency"));
+        assertEquals("B+", team.get("grade"));
+        assertEquals(true, body.get("gradesEarly"), "one week scored is early");
         assertEquals(1, team.get("weeksCounted"));
         assertEquals(List.of(2), team.get("weeksExcluded"));
     }
@@ -105,7 +107,7 @@ class LeagueAnalyticsContractTest {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, 1, List.of(
                         new RosterManagementService.TeamRow(4, null, "Roster 4", null, null,
-                                0, 0, null, 0, List.of())))));
+                                0, 0, null, 0, List.of(), null)))));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> team = ((List<Map<String, Object>>) bodyOf(
@@ -114,6 +116,21 @@ class LeagueAnalyticsContractTest {
 
         assertTrue(team.containsKey("efficiency"), "the key must exist even when the value is null");
         assertNull(team.get("efficiency"));
+        assertTrue(team.containsKey("grade"), "grade is present and null, not absent");
+        assertNull(team.get("grade"));
+    }
+
+    /** Spec 013 T076: gradesEarly flips at SeasonWindow.EARLY_THRESHOLD_WEEKS (3 weeks early, 4 not). */
+    @Test
+    void gradesEarlyIsTrueAtThreeWeeksAndFalseAtFour() {
+        for (int weeks : new int[] {3, 4}) {
+            when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
+                    new RosterManagementService.Result(true, null, 2026, null, Sport.NFL, weeks, List.of())));
+            Map<String, Object> body = bodyOf(
+                    new RosterManagementController(rosterManagement, transactionAnalysis, membership)
+                            .rosterManagement(LEAGUE, USER));
+            assertEquals(weeks < 4, body.get("gradesEarly"), weeks + " weeks");
+        }
     }
 
     /** T024: a league with no scored weeks answers with a reason, not zeros. */
@@ -143,7 +160,7 @@ class LeagueAnalyticsContractTest {
         when(rosterManagement.forLeague(LEAGUE)).thenReturn(Optional.of(
                 new RosterManagementService.Result(true, null, 2025, 2026, Sport.NBA, 21, List.of(
                         new RosterManagementService.TeamRow(1, 3L, "Fat Slovenian Revenge", "fatslovenian", null,
-                                5339.5, 5547.0, 0.963, 21, List.of())))));
+                                5339.5, 5547.0, 0.963, 21, List.of(), "A-")))));
 
         Map<String, Object> body = bodyOf(
                 new RosterManagementController(rosterManagement, transactionAnalysis, membership)
@@ -182,7 +199,8 @@ class LeagueAnalyticsContractTest {
                         new ExpectedWinsService.TeamRow(6, 9L, "jpelwell", "jpelwell", null,
                                 0.45, 1.0, 0.55, -12.4,
                                 ExpectedWinsService.LuckSource.SWING_WEEKS,
-                                List.of(new ExpectedWinsService.SwingWeek(1, true, 146.16, 7, "She Hocken")))))));
+                                List.of(new ExpectedWinsService.SwingWeek(1, true, 146.16, 7, "She Hocken")),
+                                new ExpectedWinsService.WinLossTie(5, 7, 0), new ExpectedWinsService.WinLossTie(0, 1, 0))))));
 
         Map<String, Object> body = bodyOf(new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER));
         assertEquals(130.1, body.get("leagueAveragePpg"));
@@ -194,6 +212,8 @@ class LeagueAnalyticsContractTest {
         assertEquals(0.55, team.get("winsAboveExpected"));
         assertEquals(-12.4, team.get("strengthOfSchedule"));
         assertEquals("SWING_WEEKS", team.get("luckSource"));
+        assertEquals(Map.of("wins", 5, "losses", 7, "ties", 0), team.get("allPlay"));
+        assertEquals(Map.of("wins", 0, "losses", 1, "ties", 0), team.get("median"));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> swing = ((List<Map<String, Object>>) team.get("swingWeeks")).getFirst();
@@ -214,7 +234,8 @@ class LeagueAnalyticsContractTest {
                         new ExpectedWinsService.TeamRow(2, 3L, "Hoop Dreams", "hoopuser", null,
                                 2.4, 2.0, -0.4, 5.1,
                                 ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING,
-                                List.of())))));
+                                List.of(),
+                                new ExpectedWinsService.WinLossTie(1, 2, 0), new ExpectedWinsService.WinLossTie(1, 1, 1))))));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> team = ((List<Map<String, Object>>) bodyOf(

@@ -272,6 +272,8 @@ export type RealPick = {
   manager: string
   avatarId: string | null
   player: PlayerRef
+  /** LeagueController.PickNaming.row: draft_pick.adp_at_time, the board when the pick was made. Null when never captured. */
+  adpAtDraft?: number | null
 }
 
 export type RealDraftBoard = {
@@ -775,6 +777,8 @@ export type StandingRow = {
   manager: string | null
   /** This season's team name (league history rows only; manager-history rows omit it). */
   teamName?: string | null
+  /** LeagueHistoryController.history(): this row's manager is the caller's manager (false when signed out). League history only. */
+  isMe?: boolean
   avatarId: string | null
   wins: number | null
   losses: number | null
@@ -927,6 +931,8 @@ export type LeagueRecords = {
 
 export type LeagueHistory = {
   sleeperLeagueId: string
+  /** LeagueHistoryController.history(): LeagueMembership.canCommission for the requested league. Absent (old backend) = treat as false. */
+  canCommission?: boolean
   seasons: SeasonHistory[]
   records: LeagueRecords
 }
@@ -1371,6 +1377,8 @@ export type AnalysisScoreEntry = {
   wins: number
   losses: number
   ties: number
+  /** LeagueAnalysisService.ScoreEntry.grade: letter for the composite-score rank; null when no grade cutoffs are configured. */
+  grade?: string | null
 }
 
 export type AnalysisRankingScores = {
@@ -1380,6 +1388,8 @@ export type AnalysisRankingScores = {
   weeksScored: number
   weeksRequired: number
   entries: AnalysisScoreEntry[]
+  /** LeagueAnalysisService.RankingScores.gradesEarly: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. */
+  gradesEarly?: boolean
 }
 
 export type AnalysisLineupPlayer = {
@@ -1713,6 +1723,8 @@ export type RosterManagementTeam = {
   efficiency: number | null
   weeksCounted: number
   weeksExcluded: number[]
+  /** RosterManagementService.TeamRow.grade: letter for the efficiency rank; null with no efficiency or no grade cutoffs. */
+  grade?: string | null
 }
 
 /** `available: false` carries a reason; it is not an empty table. */
@@ -1726,6 +1738,8 @@ export type RosterManagement = {
   requestedSeason?: number | null
   sport: Sport
   weeksScored: number
+  /** RosterManagementController.body: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. */
+  gradesEarly?: boolean
   teams: RosterManagementTeam[]
 }
 
@@ -1761,6 +1775,10 @@ export type ExpectedWinsTeam = {
   strengthOfSchedule: number
   luckSource: 'SWING_WEEKS' | 'CONSISTENT_OPPONENT_SCORING'
   swingWeeks: ExpectedWinsSwing[]
+  /** ExpectedWinsService.TeamRow.allPlay: regular-season record against every other roster scored each week. */
+  allPlay?: { wins: number; losses: number; ties: number }
+  /** ExpectedWinsService.TeamRow.median: regular-season record against each week's median score (odd rosters: the median roster ties). */
+  median?: { wins: number; losses: number; ties: number }
 }
 
 export type ExpectedWins = {
@@ -1842,6 +1860,8 @@ export type WeeklySide = {
   avatarId: string | null
   record: string
   points: number
+  /** WeeklyReportService.Side.isMe: this roster's manager is the caller's manager (false when signed out). */
+  isMe?: boolean
 }
 
 export type WeeklyMatchup = { home: WeeklySide; away: WeeklySide }

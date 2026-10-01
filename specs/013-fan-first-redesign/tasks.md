@@ -52,12 +52,12 @@ description: "Task list for spec 013: fan-first redesign"
 
 ## Phase 2: Foundational (blocks every story)
 
-- [ ] T005 Tokens in `:root` of `WEB/styles.css`:
+- [X] T005 Tokens in `:root` of `WEB/styles.css`:
   - add `--volt: oklch(88% 0.19 125)`, `--up: oklch(74% 0.16 150)`, `--row-hover: oklch(22% 0.03 255)`, and `--down` at **hue 350** (start `oklch(68% 0.18 350)`);
   - set `--bg: oklch(14% 0.025 255)` and `--panel: oklch(19% 0.03 255)`.
 
   Each token gets a one-line comment naming its single meaning.
-- [ ] T006 Contrast tokens in `WEB/styles.css`:
+- [X] T006 Contrast tokens in `WEB/styles.css`:
   - `--crimson-fill` (crimson darkened until `--text` on it is ≥ 4.5:1);
   - `--crimson-text` (crimson lightened until it is ≥ 4.5:1 on both `--bg` and `--panel`);
   - `--down` adjusted until ≥ 4.5:1 on `--panel`.
@@ -68,22 +68,22 @@ description: "Task list for spec 013: fan-first redesign"
   - `.rank-move.down` (~line 454) → `--down`.
 
   Leave error colors alone and note that in build-notes. Record every final value and its measured ratio.
-- [ ] T007 In `WEB/styles.css`, change `.mono` to `font-family: inherit; font-variant-numeric: tabular-nums;` and add `.code` (the old monospace stack). Switch only real ids/URLs in `WEB/` to `.code`. Then check the draft board header names still fit the `minmax(96px)` columns at 1440 (`.col-head-name` ellipsis); fix with ellipsis, not by widening.
-- [ ] T008 Section titles:
+- [X] T007 In `WEB/styles.css`, change `.mono` to `font-family: inherit; font-variant-numeric: tabular-nums;` and add `.code` (the old monospace stack). Switch only real ids/URLs in `WEB/` to `.code`. Then check the draft board header names still fit the `minmax(96px)` columns at 1440 (`.col-head-name` ellipsis); fix with ellipsis, not by widening.
+- [X] T008 Section titles:
   - add `.section-title` (Plus Jakarta 600, sentence case, ~15px, `--text`) to `WEB/styles.css`, and point `.panel h2` at the same declarations;
   - change section headings in `WEB/` that use `.cond` (`h2.cond`/`h3.cond`/`h4.cond` inside sections, ~70 sites) to `.section-title`;
   - keep `.cond` for page titles and hero numbers;
   - review the other Oswald rules at styles.css ~269, 358, 362, 375, 433, 1707, 1933, 2230, 2721, 2916, and keep each only if it styles a page title or hero.
-- [ ] T009 Add surface utilities to `WEB/styles.css`:
+- [X] T009 Add surface utilities to `WEB/styles.css`:
   - `.section` (unboxed: heading + spacing);
   - `.row-list` (1px `--line` divider *between* rows via `border-bottom` on all but the last, `--row-hover` on hover, no per-row box);
   - `.panel .panel { border: 0; background: transparent; box-shadow: none; padding: 0; }` with a comment that modals use `.modal-card`, not `.panel`.
 
   Check that `WEB/pages/PowerRankings.verify.tsx` (nested panels) still renders sensibly.
-- [ ] T010 Create `WEB/components/HowThisWorks.tsx` (`<details className="how">`, summary "How this works", children body, closed by default) and its `.how` styles in `WEB/styles.css` (muted, small, no box).
-- [ ] T011 [P] Test `WEB/components/HowThisWorks.test.tsx`: closed by default, opens on click, children present when open.
-- [ ] T012 [P] `WEB/components/PageHeader.tsx`: document `sub` as "one sentence, the takeaway", and `console.warn` in dev when a string `sub` contains a forbidden word from contracts/ui-rules.md.
-- [ ] T013 Replace the house-style header comment in `WEB/styles.css` with contracts/ui-rules.md's rules (surfaces, type, one meaning per color including `--crimson-fill`/`--crimson-text`/`--down` hue 350, words, nav, faces, sizes, commissioner). Keep the STACKING and LAYOUT sections. Re-measure the 22% position-tint cell against the new `--panel` and update the header's "12:1" claim with the measured value.
+- [X] T010 Create `WEB/components/HowThisWorks.tsx` (`<details className="how">`, summary "How this works", children body, closed by default) and its `.how` styles in `WEB/styles.css` (muted, small, no box).
+- [X] T011 [P] Test `WEB/components/HowThisWorks.test.tsx`: closed by default, opens on click, children present when open.
+- [X] T012 [P] `WEB/components/PageHeader.tsx`: document `sub` as "one sentence, the takeaway", and `console.warn` in dev when a string `sub` contains a forbidden word from contracts/ui-rules.md.
+- [X] T013 Replace the house-style header comment in `WEB/styles.css` with contracts/ui-rules.md's rules (surfaces, type, one meaning per color including `--crimson-fill`/`--crimson-text`/`--down` hue 350, words, nav, faces, sizes, commissioner). Keep the STACKING and LAYOUT sections. Re-measure the 22% position-tint cell against the new `--panel` and update the header's "12:1" claim with the measured value.
 
 **Checkpoint**: `npx tsc -b && npm test && npm run build` green, plus a visual spot check of home and board.
 
@@ -129,12 +129,12 @@ Every page task does the same five things:
 
 ## Phase 4: User Story 2 - Only commissioners see commissioner controls (Priority: P1)
 
-- [ ] T031 [US2] `BE/api/LeagueHistoryController.java` `history()` (line ~87):
+- [X] T031 [US2] `BE/api/LeagueHistoryController.java` `history()` (line ~87):
   - add `canCommission` = `membership.canCommission(<visibleLeague row>.id(), sleeperUserId)`, reading `X-Sleeper-User` like `ballot()` (~662);
   - add `isMe` to each standings row (row's manager id == caller's manager id via the managers repository's `idsBySleeperUserId`; false when signed out).
 
   Use mutable map puts. Same commit: `canCommission?: boolean` on the history type and `isMe?: boolean` on `StandingRow` in `WEB/api.ts`.
-- [ ] T032 [P] [US2] `BT/api/LeagueHistoryCanCommissionIT.java`: `canCommission` is true for the Sleeper commissioner and the configured owner, false for a member and with no header; `isMe` is true on exactly the caller's row.
+- [X] T032 [P] [US2] `BT/api/LeagueHistoryCanCommissionIT.java`: `canCommission` is true for the Sleeper commissioner and the configured owner, false for a member and with no header; `isMe` is true on exactly the caller's row.
 - [ ] T033 [US2] `WEB/pages/LeagueHistory.tsx` `RankCell` (~296): Compute only when `canCommission === true`. Otherwise the text is "Final ranks appear once the commissioner computes them." (FR-011). Missing field → hidden.
 - [ ] T034 [P] [US2] `WEB/pages/LeagueHistory.test.tsx`: Compute hidden when false/missing, shown when true; the non-commissioner message.
 - [ ] T035 [US2] Write the write-control audit in `SPEC/build-notes.md`, covering every non-GET call in `WEB/api.ts` that writes league-level data, with its UI gate and server gate (including `setReversalRound`, `refreshLeague`, `ingestLeague`, `trackDraft`). Record `setReversalRound` as an open follow-up (out of scope, review S2).
@@ -161,7 +161,7 @@ Every page task does the same five things:
 
 ## Phase 6: User Story 4 - A league home that starts with you (Priority: P2)
 
-- [ ] T043 [US4] Backend: add `isMe` to `WeeklySide` in the weekly-report response (owner rule as in `LeagueAnalysisService.java:687`), in `BE/` (weekly report service/controller). Same commit: `isMe?: boolean` on `WeeklySide` in `WEB/api.ts`. Extend `BT/api/WeeklyReportShapeTest.java`: exactly one side is `isMe` for the caller's matchup, none for a non-member.
+- [X] T043 [US4] Backend: add `isMe` to `WeeklySide` in the weekly-report response (owner rule as in `LeagueAnalysisService.java:687`), in `BE/` (weekly report service/controller). Same commit: `isMe?: boolean` on `WeeklySide` in `WEB/api.ts`. Extend `BT/api/WeeklyReportShapeTest.java`: exactly one side is `isMe` for the caller's matchup, none for a non-member.
 - [ ] T044 [US4] Create `WEB/pages/LeagueHome.tsx`, composed from:
   - (a) `getLeagueHistory`: your record and **standings position** from the current season's `isMe` row, plus a top-5 snippet;
   - (b) `getWeeklyReport(id, 0)`: your latest matchup via `WeeklySide.isMe`;
@@ -229,28 +229,28 @@ Every page task does the same five things:
 
 ## Phase 10: User Story 8 - Quick-read grades and verdicts (Priority: P3)
 
-- [ ] T069 [US8] `BE/engine/SeasonWindow.java` with `public static final int EARLY_THRESHOLD_WEEKS = 4` (comment: hand-set, arbitrary). `BE/engine/SeasonSuperlativesService.java` reads it, and its own constant (line 35) is **deleted**.
-- [ ] T070 [P] [US8] `BT/engine/SeasonWindowSingleSourceTest.java`: exactly one declaration of `EARLY_THRESHOLD_WEEKS` under `backend/src/main/java`.
-- [ ] T071 [US8] Grade config:
+- [X] T069 [US8] `BE/engine/SeasonWindow.java` with `public static final int EARLY_THRESHOLD_WEEKS = 4` (comment: hand-set, arbitrary). `BE/engine/SeasonSuperlativesService.java` reads it, and its own constant (line 35) is **deleted**.
+- [X] T070 [P] [US8] `BT/engine/SeasonWindowSingleSourceTest.java`: exactly one declaration of `EARLY_THRESHOLD_WEEKS` under `backend/src/main/java`.
+- [X] T071 [US8] Grade config:
   - `config/weights.yml`: a `draftsim.grades.cutoffs` block (an ordered list of `{maxPercentile, grade}`, A+ … F) with the comment "ARBITRARY: not fitted";
   - `BE/config/GradeProperties.java`, registered in `BE/DraftSimApplication.java`'s `@EnableConfigurationProperties`;
   - **a missing block binds to empty → all grades null and startup still succeeds**; a present block is validated (percentiles strictly increasing, last = 100);
   - add `gradesLoaded` to `/api/health`;
   - record the cutoffs in build-notes.
-- [ ] T072 [US8] `BE/engine/LetterGrades.java`: `grade(rank, teamCount)` with percentile = (rank − 1) / max(1, teamCount − 1) × 100; tied ranks share; empty config → null.
-- [ ] T073 [P] [US8] `BT/engine/LetterGradesTest.java`:
+- [X] T072 [US8] `BE/engine/LetterGrades.java`: `grade(rank, teamCount)` with percentile = (rank − 1) / max(1, teamCount − 1) × 100; tied ranks share; empty config → null.
+- [X] T073 [P] [US8] `BT/engine/LetterGradesTest.java`:
   - higher rank never gets a lower grade (10/12/14 teams);
   - ties share;
   - extremes get the first/last grade;
   - an invalid present block fails;
   - a missing block gives null.
-- [ ] T074 [US8] Bench points:
+- [X] T074 [US8] Bench points:
   - `BE/engine/RosterManagementService.java` and `BE/api/RosterManagementController.java`: per-team `grade` (rank by efficiency desc; null efficiency → null) and `gradesEarly`;
   - fix positional `TeamRow` constructions in `BT/api/LeagueAnalyticsContractTest.java`;
   - same commit: `WEB/api.ts`.
-- [ ] T075 [US8] Team strength (NFL only): `BE/engine/LeagueAnalysisService.java` adds a `grade` component to `ScoreEntry` (rank by composite score) and `gradesEarly` to the ranking-scores block. Fix every `ScoreEntry` construction (`BT/engine/LeagueAnalysisServiceTest.java`, `BT/api/LeagueAnalyticsContractTest.java`). Same commit: `WEB/api.ts` (`entries[].grade`, `gradesEarly`).
-- [ ] T076 [P] [US8] Backend tests: grade order follows rank; `gradesEarly` is true at 3 weeks and false at 4, for both services.
-- [ ] T077 [US8] Steals/reaches data:
+- [X] T075 [US8] Team strength (NFL only): `BE/engine/LeagueAnalysisService.java` adds a `grade` component to `ScoreEntry` (rank by composite score) and `gradesEarly` to the ranking-scores block. Fix every `ScoreEntry` construction (`BT/engine/LeagueAnalysisServiceTest.java`, `BT/api/LeagueAnalyticsContractTest.java`). Same commit: `WEB/api.ts` (`entries[].grade`, `gradesEarly`).
+- [X] T076 [P] [US8] Backend tests: grade order follows rank; `gradesEarly` is true at 3 weeks and false at 4, for both services.
+- [X] T077 [US8] Steals/reaches data:
   - add `adpAtDraft` (from `draft_pick.adp_at_time`, null-safe) to the real-board pick in `BE/api/LeagueController.java` (~313-341);
   - same commit: `RealPick.adpAtDraft?: number | null` in `WEB/api.ts`;
   - test in `BT/api/LeagueControllerRealBoardTest.java`: the value comes from `adp_at_time`, not the current board; null when absent.
@@ -269,8 +269,8 @@ Every page task does the same five things:
 
 ## Phase 11: User Story 9 - Fan-shaped versions of the remaining pages (Priority: P3)
 
-- [ ] T082 [US9] `BE/engine/ExpectedWinsService.java`: add `allPlay` and `median` (wins/losses/ties) to `TeamRow` from the same walk as `expectedWins(List<Game>)` (~86), using only rosters scored that week. Emit them in `BE/api/ExpectedWinsController.java` (~68). Fix the positional `ExpectedWinsService.TeamRow` in `BT/api/LeagueAnalyticsContractTest.java:182`. Same commit: `WEB/api.ts`.
-- [ ] T083 [P] [US9] `BT/engine/ExpectedWinsServiceTest.java`:
+- [X] T082 [US9] `BE/engine/ExpectedWinsService.java`: add `allPlay` and `median` (wins/losses/ties) to `TeamRow` from the same walk as `expectedWins(List<Game>)` (~86), using only rosters scored that week. Emit them in `BE/api/ExpectedWinsController.java` (~68). Fix the positional `ExpectedWinsService.TeamRow` in `BT/api/LeagueAnalyticsContractTest.java:182`. Same commit: `WEB/api.ts`.
+- [X] T083 [P] [US9] `BT/engine/ExpectedWinsServiceTest.java`:
   - per team, total = Σ over weeks played of (n_w − 1);
   - league Σ wins = Σ losses;
   - a bye week;
@@ -278,7 +278,7 @@ Every page task does the same five things:
 - [ ] T084 [US9] Standings `WEB/pages/LeagueHistory.tsx`:
   - "season in progress" once, in the section title;
   - best/worst per numeric column;
-  - "Record vs all (reg. season)" and "Median record (reg. season)" filled only where expected-wins `season` equals the row's season, otherwise "—";
+  - "Record vs all (reg. season)" and "Vs weekly median (reg. season)" (median games only, NOT added to the real record; ffwrapped's "Median record" adds them, so say so in How this works) filled only where expected-wins `season` equals the row's season, otherwise "—";
   - `<HowThisWorks>` explains both.
 - [ ] T085 [P] [US9] `WEB/pages/LeagueHistory.test.tsx`: in-progress text appears once; "—" when the season differs; columns render.
 - [ ] T086 [US9] Awards trophy list `WEB/pages/Superlatives.tsx`: one row per award (`--fitted` trophy, name, winner avatar + name, the stat in big tabular numbers, "See all" expanding in place). Early badges stay.

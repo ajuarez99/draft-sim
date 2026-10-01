@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.engine.RosterManagementService;
+import com.ballknowers.draftsim.engine.SeasonWindow;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
@@ -69,6 +70,8 @@ public class RosterManagementController {
         out.put("requestedSeason", r.requestedSeason());
         out.put("sport", r.sport().code());
         out.put("weeksScored", r.weeksScored());
+        // Spec 013: grades are badged early while fewer than SeasonWindow.EARLY_THRESHOLD_WEEKS are scored.
+        out.put("gradesEarly", SeasonWindow.isEarly(r.weeksScored()));
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("teams", List.of());
@@ -86,6 +89,8 @@ public class RosterManagementController {
             row.put("potentialPoints", t.potentialPoints());
             // null, not 1.0, when there is no potential to divide by.
             row.put("efficiency", t.efficiency());
+            // Spec 013: null with no efficiency or when no grade cutoffs are configured.
+            row.put("grade", t.grade());
             row.put("weeksCounted", t.weeksCounted());
             row.put("weeksExcluded", t.weeksExcluded());
             teams.add(row);

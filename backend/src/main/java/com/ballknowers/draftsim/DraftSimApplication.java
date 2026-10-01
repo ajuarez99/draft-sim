@@ -17,7 +17,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         CorsProperties.class,
         OwnerProperties.class,
         AdminProperties.class,
-        RefreshProperties.class
+        RefreshProperties.class,
+        GradeProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

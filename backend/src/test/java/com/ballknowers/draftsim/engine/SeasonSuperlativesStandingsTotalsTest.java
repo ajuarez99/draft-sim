@@ -86,7 +86,8 @@ class SeasonSuperlativesStandingsTotalsTest {
 
     private static ExpectedWinsService.TeamRow team(int id, double expected, double actual, double above) {
         return new ExpectedWinsService.TeamRow(id, null, "t" + id, null, null, expected, actual, above, 0.0,
-                ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING, List.of());
+                ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING, List.of(),
+                new ExpectedWinsService.WinLossTie(0, 0, 0), new ExpectedWinsService.WinLossTie(0, 0, 0));
     }
 
     @Test

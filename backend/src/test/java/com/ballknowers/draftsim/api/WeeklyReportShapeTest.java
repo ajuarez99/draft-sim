@@ -163,4 +163,29 @@ class WeeklyReportShapeTest {
         assertTrue(body.containsKey("reason"));
         assertTrue(body.containsKey("playersPlayMultiplePerPeriod"));
     }
+
+    private static WeeklyReportService.Result withMatchup(boolean homeMe, boolean awayMe) {
+        return new WeeklyReportService.Result(
+                true, null, 2026, null, 1, Sport.NFL, false,
+                List.of(new WeeklyReportService.Matchup(
+                        new WeeklyReportService.Side(1, "Home", "home", null, "1-0", 100.0, homeMe),
+                        new WeeklyReportService.Side(2, "Away", "away", null, "0-1", 90.0, awayMe))),
+                List.of(), null, null, null, null, List.of(), List.of());
+    }
+
+    /** Spec 013 T043: the caller's own matchup marks exactly one side; a non-member's marks none. */
+    @SuppressWarnings("unchecked")
+    @Test
+    void exactlyOneSideIsMeForTheCallersMatchupAndNoneForANonMember() {
+        for (boolean homeMe : new boolean[] {true, false}) {
+            var m = ((List<Map<String, Map<String, Object>>>) WeeklyReportController.body(withMatchup(homeMe, !homeMe))
+                    .get("matchups")).get(0);
+            assertEquals(homeMe, m.get("home").get("isMe"));
+            assertEquals(!homeMe, m.get("away").get("isMe"));
+        }
+        var none = ((List<Map<String, Map<String, Object>>>) WeeklyReportController.body(withMatchup(false, false))
+                .get("matchups")).get(0);
+        assertEquals(false, none.get("home").get("isMe"), "present and false, not absent");
+        assertEquals(false, none.get("away").get("isMe"));
+    }
 }

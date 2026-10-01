@@ -7,6 +7,12 @@ import com.ballknowers.draftsim.store.LeagueMatchupRepository.Fixture;
 import com.ballknowers.draftsim.store.PlayerProjectionRepository.ScoringKey;
 import org.junit.jupiter.api.Test;
 
+import com.ballknowers.draftsim.config.GradeProperties;
+import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.RosterSeasonRepository;
+import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import org.mockito.Mockito;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -312,5 +318,52 @@ class LeagueAnalysisServiceTest {
 
         assertEquals(1, games.getFirst().sides().size());
         assertEquals(1, games.getFirst().sides().getFirst().rosterId());
+    }
+
+    // ---- spec 013 T075/T076: letter grades on the ranking scores
+
+    private static final GradeProperties LADDER = new GradeProperties(List.of(
+            new GradeProperties.Cutoff(25, "A"), new GradeProperties.Cutoff(75, "C"),
+            new GradeProperties.Cutoff(100, "F")));
+
+    private static LeagueAnalysisService service(RosterSeasonRepository rs, RosterWeekPointsRepository wp,
+                                                 GradeProperties grades) {
+        return new LeagueAnalysisService(null, rs, wp, null, null, null, null, null, null, null,
+                new LetterGrades(grades));
+    }
+
+    private static LeagueAnalysisService.ScoreEntry raw(int rosterId, double rawScore) {
+        return new LeagueAnalysisService.ScoreEntry(0, rosterId, null, "m" + rosterId, null, 0, rawScore,
+                rawScore, rawScore, rawScore, 0.5, 1, 1, 0, null);
+    }
+
+    @Test
+    void gradeOrderFollowsRankAndTiesShareAGrade() {
+        var svc = service(null, null, LADDER);
+        var ranked = svc.normalise(List.of(raw(1, 100), raw(2, 90), raw(3, 90), raw(4, 50), raw(5, 10)));
+        assertEquals("A", ranked.get(0).grade());
+        assertEquals(ranked.get(1).rank(), ranked.get(2).rank());
+        assertEquals(ranked.get(1).grade(), ranked.get(2).grade(), "tied ranks share a grade");
+        assertEquals("F", ranked.get(4).grade());
+        List<String> order = List.of("A", "C", "F");
+        for (int i = 1; i < ranked.size(); i++) {
+            assertTrue(order.indexOf(ranked.get(i).grade()) >= order.indexOf(ranked.get(i - 1).grade()));
+        }
+    }
+
+    @Test
+    void noGradeConfigMeansNullGrades() {
+        var ranked = service(null, null, new GradeProperties(null)).normalise(List.of(raw(1, 100), raw(2, 10)));
+        assertNull(ranked.get(0).grade());
+        assertNull(ranked.get(1).grade());
+    }
+
+    @Test
+    void gradesAreEarlyAtThreeWeeksAndNotAtFour() {
+        var svc = service(Mockito.mock(RosterSeasonRepository.class), Mockito.mock(RosterWeekPointsRepository.class), LADDER);
+        var league = Mockito.mock(LeagueRepository.LeagueRow.class);
+        assertTrue(svc.rankingScores(league, 2, 2).gradesEarly(), "unavailable shape still states it");
+        assertTrue(svc.rankingScores(league, 3, 3).gradesEarly());
+        assertFalse(svc.rankingScores(league, 4, 4).gradesEarly());
     }
 }

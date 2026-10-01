@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.config.GradeProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,8 +14,11 @@ public class HealthController {
 
     private final ScoringProperties scoring;
 
-    public HealthController(ScoringProperties scoring) {
+    private final GradeProperties grades;
+
+    public HealthController(ScoringProperties scoring, GradeProperties grades) {
         this.scoring = scoring;
+        this.grades = grades;
     }
 
     /**
@@ -30,7 +34,9 @@ public class HealthController {
     public Map<String, Object> health() {
         return Map.of(
                 "status", "up",
-                "weightsLoaded", scoring.football() != null
+                "weightsLoaded", scoring.football() != null,
+                // Spec 013: false means every letter grade is null (the numbers still show).
+                "gradesLoaded", grades.loaded()
         );
     }
 }

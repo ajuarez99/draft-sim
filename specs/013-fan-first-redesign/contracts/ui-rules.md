@@ -29,6 +29,16 @@ read, so it's updated in the same change that implements it.
 | Position | position tokens | anything else |
 Every text/background pair is at least 4.5:1 (measured, research R10).
 
+*Amended during build (Phase 2):* hue alone can't keep these meanings apart. There
+are 18+ tokens in one dark palette: `--up` (150) is RB's hue exactly, `--down`
+(350) sits 9° from NBA's C (359), and `--volt` (125) is near the NFL sport tag
+(128). Context does the separating:
+- position colors appear only on position badges and tinted cells that always
+  carry the position as text;
+- `--up`/`--down` always come with a sign, an arrow or the words Won/Lost;
+- `--volt` only ever fills the page's one primary button.
+
+
 ## Words
 - Subtitle: one sentence, the takeaway. Forbidden in subtitles: "computation",
   "computed", "stored", "snapshot", "simulation run", "standard error",

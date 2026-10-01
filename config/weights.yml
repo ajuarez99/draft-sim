@@ -147,3 +147,23 @@ draftsim:
   # k is deliberately large. Lower it only when more seasons exist.
   shrinkage:
     k: 4.0
+
+  # Letter grades beside a rank (spec 013). ARBITRARY: not fitted to anything.
+  # A grade is a way of reading a rank, never a measurement: percentile =
+  # (rank - 1) / (teams - 1) * 100, 0 = best. A team gets the FIRST entry whose
+  # maxPercentile is >= its percentile. Percentiles must strictly increase and
+  # the last must be 100. Delete this whole block and every grade is simply
+  # absent (the number beside it still shows); /api/health reports gradesLoaded.
+  grades:
+    cutoffs:
+      - { maxPercentile: 8,   grade: "A+" }
+      - { maxPercentile: 17,  grade: "A" }
+      - { maxPercentile: 25,  grade: "A-" }
+      - { maxPercentile: 33,  grade: "B+" }
+      - { maxPercentile: 42,  grade: "B" }
+      - { maxPercentile: 50,  grade: "B-" }
+      - { maxPercentile: 58,  grade: "C+" }
+      - { maxPercentile: 67,  grade: "C" }
+      - { maxPercentile: 75,  grade: "C-" }
+      - { maxPercentile: 92,  grade: "D" }
+      - { maxPercentile: 100, grade: "F" }

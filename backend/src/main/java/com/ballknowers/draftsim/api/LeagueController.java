@@ -350,6 +350,10 @@ public class LeagueController {
                     : "Slot " + p.draftSlot());
             row.put("avatarId", p.managerId() != null ? managerAvatars.get(p.managerId()) : null);
             row.put("player", player);
+            // Spec 013 T077: the board as it stood when this pick was made (draft_pick.adp_at_time),
+            // NOT today's board. Null (key present) when it was never captured; the page then
+            // shows no steal/reach tint rather than comparing against the wrong board.
+            row.put("adpAtDraft", p.adpAtTime());
             return row;
         }
 

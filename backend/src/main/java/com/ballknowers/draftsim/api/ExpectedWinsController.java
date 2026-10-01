@@ -84,9 +84,20 @@ public class ExpectedWinsController {
                 swings.add(sw);
             }
             row.put("swingWeeks", swings);
+            // Spec 013 T082: regular-season whole-number records, always present for an available team.
+            row.put("allPlay", wlt(t.allPlay()));
+            row.put("median", wlt(t.median()));
             teams.add(row);
         }
         out.put("teams", teams);
         return out;
+    }
+
+    private static Map<String, Object> wlt(ExpectedWinsService.WinLossTie r) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("wins", r.wins());
+        m.put("losses", r.losses());
+        m.put("ties", r.ties());
+        return m;
     }
 }

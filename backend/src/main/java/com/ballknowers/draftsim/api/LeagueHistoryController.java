@@ -91,10 +91,16 @@ public class LeagueHistoryController {
         // expands to is by definition that league's own predecessor seasons, so
         // membership in the head is what governs -- and LeagueMembership's own
         // walk already treats predecessors as yours.
-        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        Optional<LeagueRepository.LeagueRow> visible = membership.visibleLeague(sleeperId, sleeperUserId);
+        if (visible.isEmpty()) return ResponseEntity.notFound().build();
 
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
+
+        // Spec 013 T031: caller -> manager id, never a username match. Null when
+        // signed out or the user has no manager row, so isMe is false for everyone.
+        boolean callerAnonymous = LeagueMembership.isAnonymous(sleeperUserId);
+        Long callerManagerId = callerAnonymous ? null : managers.idsBySleeperUserId().get(sleeperUserId);
 
         List<Map<String, Object>> seasons = new ArrayList<>();
         for (int i = 0; i < chain.size(); i++) {
@@ -128,6 +134,8 @@ public class LeagueHistoryController {
                         // Mutable map: teamName is legitimately null for an unowned roster.
                         row.put("teamName", r.managerId() == null ? null
                                 : teamNames.getOrDefault(r.managerId(), r.managerName()));
+                        // Spec 013 T031: this row's manager is the caller's manager.
+                        row.put("isMe", callerManagerId != null && callerManagerId.equals(r.managerId()));
                         return row;
                     })
                     .toList();
@@ -150,6 +158,8 @@ public class LeagueHistoryController {
         // reason the power compute endpoint below builds its response this way.
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("sleeperLeagueId", sleeperId);
+        // Spec 013 T031: gates the History page's Compute control. Same rule as ballot().
+        response.put("canCommission", membership.canCommission(visible.get().id(), sleeperUserId));
         response.put("records", recordBook(records.forChain(chainIds, WeekBound.ALL_WEEKS)));
         response.put("seasons", seasons);
         return ResponseEntity.ok(response);
