@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import {
   backfillFinalRanks,
   getLeagueHistory,
@@ -50,7 +51,7 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
 function RecordBook({ records }: { records: LeagueRecords }) {
   const hasScores = records.highestWeeks.length > 0 || records.lowestWeeks.length > 0
   return (
-    <section className="panel">
+    <section className="section">
       <h3 className="section-title">Record book</h3>
       {!hasScores ? (
         <p className="muted small">
@@ -109,7 +110,7 @@ function RecordWho({ row }: { row: { rosterId: number; managerId: number | null;
 function MatchupMargins({ records }: { records: LeagueRecords }) {
   const has = records.closestMatchups.length > 0 || records.biggestBlowouts.length > 0
   return (
-    <section className="panel">
+    <section className="section">
       <h3 className="section-title">Matchup margins</h3>
       {!has ? (
         <p className="muted small">
@@ -172,7 +173,7 @@ function MarginGroup({ title, rows }: { title: string; rows: MarginRecord[] }) {
 function PointsLeaders({ records }: { records: LeagueRecords }) {
   const rows = records.pointsLeaders
   return (
-    <section className="panel">
+    <section className="section">
       <h3 className="section-title">All-time points leaders</h3>
       {rows.length === 0 ? (
         // Deliberately reworded rather than the RecordBook panel's identical
@@ -224,7 +225,7 @@ function PointsLeaders({ records }: { records: LeagueRecords }) {
 function Streaks({ records }: { records: LeagueRecords }) {
   const rows = [...records.winStreaks, ...records.lossStreaks]
   return (
-    <section className="panel">
+    <section className="section">
       <h3 className="section-title">Streaks</h3>
       {rows.length === 0 ? (
         <p className="muted small">
@@ -297,10 +298,12 @@ function RankCell({
   row,
   onCompute,
   computing,
+  canCommission,
 }: {
   row: StandingRow
   onCompute: () => void
   computing: boolean
+  canCommission: boolean
 }) {
   if (row.rankStatus === 'RANKED' && row.finalRank != null) {
     return (
@@ -321,7 +324,7 @@ function RankCell({
       {/* A button, never the endpoint printed for the reader to run -- the
           "Load past seasons" control below was written for exactly this
           reason and the pattern came straight back in new code once already. */}
-      {status === 'NOT_COMPUTED' && (
+      {status === 'NOT_COMPUTED' && canCommission && (
         <button className="action-button" onClick={onCompute} disabled={computing}>
           {computing ? 'Computing…' : 'Compute'}
         </button>
@@ -334,10 +337,12 @@ function StandingsTable({
   rows,
   onCompute,
   computing,
+  canCommission,
 }: {
   rows: StandingRow[]
   onCompute: () => void
   computing: boolean
+  canCommission: boolean
 }) {
   const linkState = useLeagueLinkState()
   return (
@@ -374,7 +379,7 @@ function StandingsTable({
                     <span className="muted">roster {r.rosterId} (unowned)</span>
                   )}
                 </td>
-                <RankCell row={r} onCompute={onCompute} computing={computing} />
+                <RankCell row={r} onCompute={onCompute} computing={computing} canCommission={canCommission} />
                 <td className="mono">{r.wins ?? '—'}</td>
                 <td className="mono">{r.losses ?? '—'}</td>
                 <td className="mono">{r.ties ?? '—'}</td>
@@ -399,6 +404,8 @@ export default function LeagueHistory() {
   // (specs/009-auto-data-refresh): refetch, but keep what is on screen.
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
   const loadedFor = useRef<string | null>(null)
+  // Sleeper's own commissioner flag for THIS league, from the payload. Never inferred client-side.
+  const canCommission = history?.canCommission === true
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -454,12 +461,12 @@ export default function LeagueHistory() {
           `Power rankings →` chip beside it -- the chip moved to the rail
           (Phase 3) and the title out of the box (Phase 4). */}
       <PageHeader
-        eyebrow="League"
+        eyebrow="Standings"
         title={history?.seasons[0]?.name ?? 'League history'}
         sub="Standings as Sleeper reports them — wins, losses, points, the champion. What this app thinks about a draft (reach, value) lives on a manager's own history page, kept visually separate from what actually happened."
       />
 
-      <section className="panel">
+      <section className="section">
 
         {/* This used to print `POST /api/ingest/league-history/{id}` for the
             reader to run themselves. Step 3 of the design review removed
@@ -503,10 +510,34 @@ export default function LeagueHistory() {
                   No standings for {s.season} yet — Sleeper reports them once the season is under way.
                 </p>
               ) : (
-                <StandingsTable rows={s.standings} onCompute={computeFinalRanks} computing={computing} />
+                <>
+                  {/* Not a commissioner: the Compute button is hidden (the server
+                      would refuse it anyway), so say once per season what the
+                      "not computed yet" cells are waiting on. A missing
+                      canCommission (older backend) counts as false. */}
+                  {!canCommission && s.standings.some((r) => r.rankStatus === 'NOT_COMPUTED') && (
+                    <p className="muted small">Final ranks appear once the commissioner computes them.</p>
+                  )}
+                  <StandingsTable
+                    rows={s.standings}
+                    onCompute={computeFinalRanks}
+                    computing={computing}
+                    canCommission={canCommission}
+                  />
+                </>
               )}
             </div>
           ))}
+
+        {history && history.seasons.length > 0 && (
+          <HowThisWorks>
+            <p>
+              Standings as Sleeper reports them — wins, losses, points, the champion. What this app
+              thinks about a draft (reach, value) lives on a manager's own history page, kept
+              visually separate from what actually happened.
+            </p>
+          </HowThisWorks>
+        )}
       </section>
 
       {history && <RecordBook records={history.records} />}

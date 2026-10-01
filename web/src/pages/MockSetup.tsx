@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import { createMockSession, getManagers, type ManagerSummary, type Sport } from '../api'
 import { hueForIndex } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
@@ -153,29 +154,30 @@ export default function MockSetup() {
         eyebrow={`New ${sport.toUpperCase()} mock`}
         title="Mock draft setup"
         sub={
-          <>
-            {handoff?.sourceLeagueName ? (
-              <>
-                Using <strong>{handoff.sourceLeagueName}</strong>'s settings — {teams} teams
-                {handoff.rounds ? `, ${handoff.rounds} rounds` : ''}. Bots fill every seat but
-                yours and auto-pick down the draft order.
-              </>
-            ) : (
-              'Bots fill every seat but yours and auto-pick down the draft order. You take your own picks on your turn.'
-            )}{' '}
-            {anyFitted ? (
-              'Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
-            ) : (
-              <>
-                No {sport.toUpperCase()} manager has enough drafted history to model yet, so every
-                seat drafts league-average either way.
-              </>
-            )}
-          </>
+          handoff?.sourceLeagueName ? (
+            <>
+              Practice <strong>{handoff.sourceLeagueName}</strong>'s draft — {teams} teams
+              {handoff.rounds ? `, ${handoff.rounds} rounds` : ''}, with you in the seat you pick.
+            </>
+          ) : (
+            'Pick your seat, seat the managers you want to face, and start the practice draft.'
+          )
         }
       />
 
-      <section className="panel add-draft">
+      <section className="section add-draft">
+        {/* The caveat that used to ride in the subtitle: it qualifies every
+            seat below, so it stays on the page rather than behind a click. */}
+        <p className="muted small">
+          {anyFitted ? (
+            'Assign a real manager to a seat to see their tendencies play out instead of a league-average bot.'
+          ) : (
+            <>
+              No {sport.toUpperCase()} manager has enough drafted history to model yet, so every
+              seat drafts league-average either way.
+            </>
+          )}
+        </p>
 
         {error && <div className="error">{error}</div>}
 
@@ -286,6 +288,13 @@ export default function MockSetup() {
             {creating ? 'Starting…' : 'Start the draft'}
           </button>
         </div>
+
+        <HowThisWorks>
+          <p>
+            Bots fill every seat but yours and auto-pick down the draft order. You take your own
+            picks on your turn.
+          </p>
+        </HowThisWorks>
       </section>
     </div>
   )

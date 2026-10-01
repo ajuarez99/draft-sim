@@ -244,3 +244,80 @@ Not run against a live server: no HTTP call to any of these endpoints, and no re
   backend never names a "luckiest" team. Two tests added (`ExpectedWins.test.tsx`).
 - Browser (1440, local): home shows the `--volt` CTA and sentence-case sections; Power rankings hero, callouts
   and ladder unboxed; Luck shows the neutral subtitle plus the early badge at 3 weeks. Full matrix still owed (T030).
+
+## Write-control audit (T035, 2026-09-30)
+
+Every non-GET call in `web/src/api.ts`, with the control that fires it and what each side checks. Read from the
+source (controllers under `backend/src/main/java/com/ballknowers/draftsim/`), **not executed against a running
+server**: this table is "read", not "verified". "Sleeper commissioner" below is `LeagueMembership.canCommission`
+(the `is_owner` flag, or the configured app owner). Sign-in here is a typed username (`X-Sleeper-User`), not auth,
+so any gate that rests on that header alone is a visibility gate, not a security one.
+
+Shared/league-level writes:
+
+| api.ts call (line) | Fired from (UI file:line) | UI gate | Server gate (controller) | Gate kind |
+|---|---|---|---|---|
+| `computePowerRankings` (1534) | `PowerRankings.tsx:931` (Recompute); `SeasonForecast.tsx:278` (Recompute) | `ballot?.canCommission` (`PowerRankings.tsx:927`); `data.canCommission` (`SeasonForecast.tsx:271`) | `LeagueHistoryController.compute` (~869): league visible, **admin token** (`isAdminRequest`), then `canCommission` | admin token + commissioner |
+| `saveCommissionerRanking` (1554) | `PowerRankings.tsx:544` | `editingCommissioner` = `ballot?.canCommission` (`PowerRankings.tsx:729`) | `LeagueHistoryController.commissioner` (~960): league visible, **admin token**, `canCommission`, current week only | admin token + commissioner |
+| `saveConductEntry` (2246) | `Superlatives.tsx:705` | `canEdit` = `list?.canEdit` (`Superlatives.tsx:730`, form at 779) | `SuperlativesController.saveConductEntry` (83): league visible, **admin token**, `canCommission` | admin token + commissioner |
+| `deleteConductEntry` (2254) | `Superlatives.tsx:722` | `canEdit` (`Superlatives.tsx:730`, button at 765) | `SuperlativesController.deleteConductEntry` (118): league visible, **admin token**, `canCommission` | admin token + commissioner |
+| `backfillFinalRanks` (959) | `LeagueHistory.tsx:449` via the Compute button | `canCommission === true` (`LeagueHistory.tsx:327`, added by T033) | `LeagueHistoryController.backfillFinalRanks` (828): `membership.visibleLeague` only. **No admin token, no commissioner check.** | **visibility only** |
+| `setReversalRound` (559) | `DraftView.tsx:412` (settings popover select at 746) | none: shown to anyone who can open the draft room | `LeagueController.setReversalRound` (231): `membership.visibleDraft` only; 409 on a complete draft; value range-checked. **No admin token, no commissioner check.** | **visibility only** (open follow-up, out of scope, review S2) |
+| `trackDraft` (438) | `DraftPicker.tsx:197`; `LiveStatusBar.tsx:59` | none (any member's Track button) | `LeagueController.track` (394): `membership.visibleDraft`; starts or confirms the shared live poller | visibility only |
+| `ingestLeague` (449, `/api/setup/league`) | `DraftPicker.tsx:41` and `:226` (setup stages, Add a draft) | none beyond signed-in | `MemberSetupController.league` (78): `requireLeagueMember` (signed in AND in our DB, or on Sleeper's league-users list for that league) | membership |
+| `ingestLeagueHistory` (488, `/api/setup/league-history`) | `LeagueHistory.tsx:429` ("Load past seasons" on the error state) | none: shown on the error banner to any visitor | `MemberSetupController.leagueHistory` (88): `requireLeagueMember`; re-ingests the whole chain | membership |
+| `ingestAdp` (478, `/api/setup/adp`) | `DraftPicker.tsx:42` | none | `MemberSetupController.adp` (99): signed in and a member of at least one league (`requireKnownMember`); rebuilds shared ADP for a sport | any known member |
+| `ingestBoard` (481, `/api/setup/board`) | `DraftPicker.tsx:43` | none | `MemberSetupController.board` (108): same as `ingestAdp`; rebuilds the shared board | any known member |
+| `refreshPlayers` (475) | `DraftPicker.tsx:40` | none | `RefreshController.players` (81): signed in only (`X-Sleeper-User` present); bounded to once per sport per UTC day in steady state | any signed-in caller |
+| `refreshLeague` (2192) | `DraftPicker.tsx:48`; `LeagueRailSection.tsx:89` (refresh on visit) | none | `RefreshController.trigger` (104): `membership.visibleLeague`; starts a background refresh only if the league is stale | visibility only |
+
+Writes scoped to the caller's own data (listed for completeness, none writes league-level data):
+
+| api.ts call (line) | Server gate | Note |
+|---|---|---|
+| `submitBallot` (1697) | signed in, league member, current week only (`LeagueHistoryController.submitBallot` 758) | one ballot per member |
+| `setTendencies` / `clearTendencies` (542 / 548) | `canSeeManager`; the note is keyed to the caller's id (`ManagerController` 79, 111) | private note |
+| `createMockSession` / `createMockSessionFromDraft` / `submitMockPick` (717 / 737 / 747) | signed in to create; a session is its owner's, 404 for anyone else (`MockDraftController`) | own session |
+| `/api/sims/stream` POST (1566) | draft visible (`requireVisible`) plus per-user permits (`SimulationController`) | read-shaped compute, no stored league data |
+
+Findings from the audit (not fixed here):
+- `backfillFinalRanks` is the only call T033 hides in the UI whose server side does **not** require the commissioner: any
+  member who can see the league can POST it. After 013 a regular member no longer sees the button, but the route still
+  accepts them. It writes only the derived final-rank snapshot (idempotent, `power/backfill` makes no Sleeper call), so the
+  worst case is a member forcing a recompute, but the UI gate is not a server gate. Open follow-up; the tasks say the
+  backfill server gate is unchanged in this spec.
+- `setReversalRound`: **open follow-up (out of scope, review S2).** Any visitor to a draft room can change the snake
+  reversal round for every viewer of an unfinished draft. Unchanged by this spec.
+- `/api/ingest/**` (the operator routes) sit behind `AdminGateInterceptor` and are not reachable from the web client.
+
+## US1 part B: parent review (2026-09-30)
+
+- **Reverted:** the build agent flattened the board cell's solid position badge (`.pos`, "RB4") to plain text
+  and dropped the "second choice" dotted underline to pass the depth rule. Neither was needed: a badge has no
+  element children, so the amended harness never counts it as a surface, and both carry meaning (the
+  position-color system; uncertainty). Restored; only the softened empty cells remain.
+
+## T030: US1 live check (measured, amended harness, local, 23 routes × 3 sizes = 69 loads)
+
+- **Depth:** max `depth` 2 and max `gridDepth` 2 at 1440, 768 and 375. Every route passes SC-001
+  (baseline had depth 3 on home, NFL/NBA history and analysis).
+- **Horizontal scroll at 375: 7 routes failed on the first run.**
+  - Cause 1, a regression from this branch: the stat tables on Bench points, Luck and Playoff odds lost
+    their scroll container when `.panel` became `.section`.
+  - Cause 2, likely pre-existing (files untouched by this branch, not proven against base): the live
+    status bar, the weekly performer rows and the waiver-add rows didn't wrap.
+
+  Fixed in `styles.css` ("013 US1: phone width"). Re-measured: **0 of 7 scroll.** 768 and 1440 had none.
+- Routes: /, /managers, /managers/13/history, /managers/13/versus/1, /mock/new, /mock/653, NBA sim, NBA live,
+  NFL completed board, NFL history/power/analysis/roster-management/expected-wins/forecast/weekly-report/
+  superlatives, NBA history/power/weekly-report/superlatives/roster-management/expected-wins.
+
+## T036: US2 live check (measured, local)
+
+- Non-commissioner path, checked without impersonating anyone: popsharky is a member, not the commissioner,
+  of "West Coast Fantasy Football" (Sleeper `is_owner` → thebritkid). `/history` returns `canCommission: false`;
+  the page shows "Final ranks appear once the commissioner computes them." and 0 Compute buttons, with
+  12 "not computed yet" cells.
+- Commissioner path: Power rankings shows "Recompute week 4 (commissioner)" for popsharky ("(Foot) Ball
+  Knowers", `is_owner`). **History's Compute for a commissioner wasn't seen live:** no local league popsharky
+  commissions has uncomputed ranks. It's covered by `LeagueHistory.test.tsx` (canCommission true → button).

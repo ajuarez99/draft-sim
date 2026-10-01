@@ -7,6 +7,7 @@ import { reachGapText, relativeReachRead } from '../managerBehaviour'
 import TendenciesForm from '../components/TendenciesForm'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 import SportFilterRail from '../components/SportFilterRail'
 import { useRailContextSlot } from '../appSlots'
 import { useSportFilter } from '../sportFilter'
@@ -364,23 +365,14 @@ export default function ManagerTendencies() {
           claude/site-wide-shell-propagation.md Phase 4. */}
       <PageHeader
         eyebrow="Across your leagues"
-        title="Manager tendencies"
-        sub="What a manager's own draft history says, fitted by the engine — reach bias and unpredictability aren't something you type in, only something you can watch. A note is a reminder for yourself: only you can see it, and it never changes how a mock or live sim drafts."
+        title="Scouting report"
+        sub="Who in your leagues reaches, who waits on a position, and who drafts like the room, read from their own draft history."
       />
 
-      <section className="panel">
+      <section className="section">
         <p className="muted small">
           Football and basketball are fitted separately and listed together; the same person
           appears once per sport. Only managers who share a league with you are listed.
-
-
-        </p>
-
-        <p className="muted small reach-note">
-          Reach is measured against the other managers in the same draft, not the market board.
-          The board itself runs several picks off for every room, so an absolute figure would
-          mostly measure that. The shaded band is one standard error: with about 15 picks per
-          draft most managers sit inside it, and that reads as “drafts like the room”.
         </p>
 
         {error && <div className="error">{error}</div>}
@@ -408,6 +400,21 @@ export default function ManagerTendencies() {
             ))}
           </div>
         )}
+
+        <HowThisWorks>
+          <p>
+            What a manager's own draft history says, fitted by the engine — reach bias and
+            unpredictability aren't something you type in, only something you can watch. A note is a
+            reminder for yourself: only you can see it, and it never changes how a mock or live sim
+            drafts.
+          </p>
+          <p>
+            Reach is measured against the other managers in the same draft, not the market board.
+            The board itself runs several picks off for every room, so an absolute figure would
+            mostly measure that. The shaded band is one standard error: with about 15 picks per
+            draft most managers sit inside it, and that reads as “drafts like the room”.
+          </p>
+        </HowThisWorks>
       </section>
     </div>
   )

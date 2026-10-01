@@ -5001,3 +5001,64 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .sl-card { border-left: 1px solid var(--line); background: var(--panel); }
 .sl-card-openable:hover { border-color: var(--line); background: var(--row-hover); box-shadow: none; }
 .sl-conduct { margin-top: 28px; }
+
+
+/* --- 013 US1: LeagueHistory (Standings) ------------------------------------
+   Seasons and the record book sit on the page (.section), tables on the
+   surface with row separators. Matchup margin cards stay cards: a margin is
+   two sides facing each other. */
+.history-season { margin-top: 6px; margin-bottom: 18px; }
+.history-season h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; letter-spacing: 0; }
+
+
+/* --- 013 US1: ManagerTendencies (Scouting report) --------------------------
+   The list sits on the page; the (±n) beside each reach caption stays visible
+   (it qualifies that one number), the method moved to How this works. */
+.mgr-list { margin-top: 4px; }
+
+
+/* --- 013 US1: ManagerHistory (Manager profile) -----------------------------
+   Career figures are one unboxed row (.career-stats), not a card each; ranks
+   are separated by row dividers instead of a border per row. Meetings and
+   matchup margins elsewhere keep .margin-card, because those are card-shaped. */
+.career-stats { display: flex; flex-wrap: wrap; gap: 14px 36px; margin-top: 6px; }
+.career-stats .margin-card { border: 0; border-radius: 0; padding: 0; background: transparent; min-width: 120px; max-width: 260px; }
+.career-ranks { gap: 0; }
+.career-rank-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 4px; }
+.career-rank-row:last-child { border-bottom: 0; }
+.career-rank-row:hover { background: var(--row-hover); }
+
+
+/* --- 013 US1: ManagerComparison --------------------------------------------
+   Shared rules only (sections on the page); no page-specific styling. */
+
+
+/* --- 013 US1: DraftBoard (.board / .cell) ----------------------------------
+   The cell's position tint is its only surface. The solid position badge
+   (`.pos`, "RB4") stays: it is a leaf, not a container, so it adds no nesting,
+   and it is the position-color system's primary mark (parent review reverted
+   a build-agent change that had flattened it to plain text, along with the
+   loss of the "second choice" dotted underline, which carries meaning).
+   Empty future cells are softened so the filled rounds read as the front line. */
+.board .cell:not([class*="pos-"]) { background: color-mix(in oklch, var(--panel) 45%, var(--bg)); }
+.board .cell:not([class*="pos-"]) .pickno-open { color: var(--muted); }
+
+
+/* --- 013 US1: MockSetup ----------------------------------------------------
+   Seats are chips on the page; "Start the draft" is the page's one --volt. */
+.controls.mock-seat-cta button:not(.chip):not(.segment) { background: var(--volt); color: var(--bg); border-color: transparent; font-weight: 700; }
+
+/* --- 013 US1: phone width (T030) ---------------------------------------------
+   Flattening .panel into .section removed the scroll container the stat tables
+   relied on (.panel-body { overflow: auto }), so at 375px they pushed the page
+   sideways. A section now lets its own wide table scroll instead of the page;
+   the weekly performer rows and the live status bar wrap. Measured with the
+   spec 013 harness: 7 routes had page-level horizontal scroll at 375 before this. */
+.section { min-width: 0; }
+.section > table, .section .table-scroll { display: block; max-width: 100%; overflow-x: auto; }
+.wr-performers li { flex-wrap: wrap; min-width: 0; }
+.wr-performers li > * { min-width: 0; overflow-wrap: anywhere; }
+.live-bar { flex-wrap: wrap; }
+.live-right { flex-wrap: wrap; min-width: 0; }
+/* Waiver adds (Bench points): rows wrap on a phone instead of pushing the page. */
+.tx-adds li { flex-wrap: wrap; min-width: 0; }

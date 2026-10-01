@@ -97,8 +97,9 @@ function standing(rosterId: number, rankStatus: RankStatus, finalRank: number | 
   }
 }
 
-function withStandings(rows: StandingRow[], season = 2025): LeagueHistoryData {
+function withStandings(rows: StandingRow[], season = 2025, canCommission?: boolean): LeagueHistoryData {
   const h = history()
+  if (canCommission !== undefined) h.canCommission = canCommission
   h.seasons = [{ season, leagueId: 5, sleeperLeagueId: 'L1', name: 'BK', standings: rows }]
   return h
 }
@@ -333,12 +334,36 @@ describe('season final rank', () => {
   })
 
   /** FR-006: a finished, computable season gets the reason AND the control. */
-  it('offers a compute button for a finished season that was never computed', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024))
+  it('offers a compute button to a commissioner for a finished season that was never computed', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
     render(<LeagueHistory />)
 
     expect(await screen.findByText(/not computed yet/i)).toBeTruthy()
     expect(screen.getByRole('button', { name: /compute/i })).toBeTruthy()
+  })
+
+  /**
+   * spec 013 US2 (FR-011): the control is the commissioner's. False and a missing
+   * field (an older backend) both hide it; the page says what the cells wait on.
+   */
+  it.each([
+    ['false', false],
+    ['missing', undefined],
+  ])('hides Compute when canCommission is %s and says who computes ranks', async (_label, flag) => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, flag))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText(/not computed yet/i)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /compute/i })).toBeNull()
+    expect(screen.getByText('Final ranks appear once the commissioner computes them.')).toBeTruthy()
+  })
+
+  it('shows Compute, and not the non-commissioner message, when canCommission is true', async () => {
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByRole('button', { name: /compute/i })).toBeTruthy()
+    expect(screen.queryByText(/appear once the commissioner computes them/i)).toBeNull()
   })
 
   /** Nothing to compute from -- the button would lie, so there isn't one. */
@@ -364,7 +389,7 @@ describe('season final rank', () => {
   })
 
   it('fires the backfill from the button and reloads, rather than printing an endpoint', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024))
+    getLeagueHistory.mockResolvedValue(withStandings([standing(7, 'NOT_COMPUTED')], 2024, true))
     backfillFinalRanks.mockResolvedValue({ backfilled: [{ season: 2024, week: 24, entries: 12 }], skipped: [] })
     render(<LeagueHistory />)
 

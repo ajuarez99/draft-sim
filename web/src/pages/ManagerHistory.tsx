@@ -16,6 +16,7 @@ import { ordinal } from '../rankOrder'
 import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
+import HowThisWorks from '../components/HowThisWorks'
 
 // Same order draftHistory already renders in (Sport.values() server-side:
 // NFL, NBA) -- not exported from destinations.ts, so restated here rather
@@ -202,7 +203,7 @@ export default function ManagerHistory() {
           can scope to the standings tables alone: `.manager-sport-block` with
           a `.panel-head .sport-pill` inside it now occurs three times on this
           page -- here, in the career panel, and in draft history. */}
-      <section className="panel manager-seasons">
+      <section className="section manager-seasons">
         {/* The career line that used to open this panel is the page header's
             sub now -- it describes the manager, not the standings table.
             One block per sport (T017), following the same pattern
@@ -265,14 +266,8 @@ export default function ManagerHistory() {
           would reintroduce it one level up. */}
       <CareerPanel careers={data.careers} />
 
-      <section className="panel">
-        <div className="panel-head">
-          <h2>What this app thinks about their drafting</h2>
-        </div>
-        <p className="muted small">
-          Fitted from their own draft history, the same numbers the simulator uses -- not the
-          record above, which is what actually happened on the scoreboard.
-        </p>
+      <section className="section">
+        <h3 className="section-title">What this app thinks about their drafting</h3>
         {data.draftHistory.length === 0 ? (
           <p className="muted">No drafts observed yet -- drafts like the room, no history to fit from.</p>
         ) : (
@@ -314,6 +309,12 @@ export default function ManagerHistory() {
             </div>
           ))
         )}
+        <HowThisWorks>
+          <p>
+            Fitted from their own draft history, the same numbers the simulator uses -- not the
+            record above, which is what actually happened on the scoreboard.
+          </p>
+        </HowThisWorks>
       </section>
       </div>
     </>
@@ -342,20 +343,20 @@ const UNAVAILABLE_FIGURE_LABEL: Record<Unavailable['figure'], string> = {
 function CareerPanel({ careers }: { careers: CareerProfile[] }) {
   if (careers.length === 0) return null
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>Career profile</h2>
-      </div>
-      <p className="muted small">
-        Every figure below comes from the same per-week optimal-lineup computation the Roster
-        management page uses -- never Sleeper's own stored season potential, which reads more
-        flattering for the same manager-season. Each figure states the seasons it covers: with one
-        or two played seasons per manager in this database, an unlabeled average would read as a
-        career number that is really a single season's.
-      </p>
+    <section className="section">
+      <h3 className="section-title">Career profile</h3>
       {careers.map((c) => (
         <CareerBlock key={c.sport} career={c} />
       ))}
+      <HowThisWorks>
+        <p>
+          Every figure below comes from the same per-week optimal-lineup computation the Roster
+          management page uses -- never Sleeper's own stored season potential, which reads more
+          flattering for the same manager-season. Each figure states the seasons it covers: with one
+          or two played seasons per manager in this database, an unlabeled average would read as a
+          career number that is really a single season's.
+        </p>
+      </HowThisWorks>
     </section>
   )
 }
@@ -368,7 +369,7 @@ function CareerBlock({ career: c }: { career: CareerProfile }) {
         <span className={`sport-pill ${c.sport}`}>{c.sport.toUpperCase()}</span>
       </div>
 
-      <div className="margin-cards">
+      <div className="margin-cards career-stats">
         <CareerStat value={record} label="Record" seasonsCounted={c.seasonsCounted} />
         <CareerStat
           value={c.winRate == null ? '—' : `${(c.winRate * 100).toFixed(1)}%`}
@@ -446,7 +447,7 @@ function WaiverPanel({ waivers }: { waivers: WaiverTendency }) {
   return (
     <div className="career-waivers">
       <h3 className="career-waivers-head">Waiver activity</h3>
-      <div className="margin-cards">
+      <div className="margin-cards career-stats">
         <CareerStat
           value={waivers.movesPerSeason.toFixed(1)}
           label="Moves per season"

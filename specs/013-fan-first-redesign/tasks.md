@@ -115,15 +115,15 @@ Every page task does the same five things:
   - the "stored simulation" explanation goes into `<HowThisWorks>`.
 - [X] T020 [US1] Weekly report `WEB/pages/WeeklyReport.tsx` (title "Matchups & awards"): copy and surfaces only; awards cards → `.row-list`.
 - [X] T021 [US1] Awards `WEB/pages/Superlatives.tsx` (title "Awards"): copy and surfaces only; remove per-card colored top borders and panel-in-panel.
-- [ ] T022 [US1] Standings `WEB/pages/LeagueHistory.tsx` (title stays the league name, eyebrow "Standings"): subtitle; the draft-opinion paragraph goes into `<HowThisWorks>`; tables on the surface.
-- [ ] T023 [US1] Scouting report `WEB/pages/ManagerTendencies.tsx` (title "Scouting report"): the standard-error lede goes into `<HowThisWorks>`; **`(±n)` stays visible** beside the reach text.
-- [ ] T024 [US1] Manager profile `WEB/pages/ManagerHistory.tsx`: method paragraph → `<HowThisWorks>`; stat boxes → one unboxed row.
-- [ ] T025 [US1] Manager comparison `WEB/pages/ManagerComparison.tsx`: shared rules only.
-- [ ] T026 [US1] Draft board `WEB/components/DraftBoard.tsx` plus its `.board`/`.cell` CSS: the cell's position tint is its only surface (drop the inner border); soften empty future cells. Must reach `gridDepth ≤ 2`.
-- [ ] T027 [US1] `WEB/pages/MockSetup.tsx`, `WEB/pages/CompletedDraftBoard.tsx`, `WEB/pages/MockDraftView.tsx`, `WEB/pages/DraftView.tsx`, `WEB/pages/LiveDraftView.tsx`: subtitles/surfaces only (pick-panel work is US6).
-- [ ] T028 [US1] `cd web && npm test`: fix tests that asserted old copy by updating strings, **never deleting caveat assertions**.
-- [ ] T029 [US1] Write `SPEC/caveats-after.md`: every `caveats-before.md` row → its new location. Restore any unmapped row before continuing.
-- [ ] T030 [US1] Harness (quickstart §4a/§4b) on every route at 1440, 768 and 375, NFL and NBA; record in build-notes; fix failures.
+- [X] T022 [US1] Standings `WEB/pages/LeagueHistory.tsx` (title stays the league name, eyebrow "Standings"): subtitle; the draft-opinion paragraph goes into `<HowThisWorks>`; tables on the surface.
+- [X] T023 [US1] Scouting report `WEB/pages/ManagerTendencies.tsx` (title "Scouting report"): the standard-error lede goes into `<HowThisWorks>`; **`(±n)` stays visible** beside the reach text.
+- [X] T024 [US1] Manager profile `WEB/pages/ManagerHistory.tsx`: method paragraph → `<HowThisWorks>`; stat boxes → one unboxed row.
+- [X] T025 [US1] Manager comparison `WEB/pages/ManagerComparison.tsx`: shared rules only.
+- [X] T026 [US1] Draft board `WEB/components/DraftBoard.tsx` plus its `.board`/`.cell` CSS: the cell's position tint is its only surface (drop the inner border); soften empty future cells. Must reach `gridDepth ≤ 2`.
+- [X] T027 [US1] `WEB/pages/MockSetup.tsx`, `WEB/pages/CompletedDraftBoard.tsx`, `WEB/pages/MockDraftView.tsx`, `WEB/pages/DraftView.tsx`, `WEB/pages/LiveDraftView.tsx`: subtitles/surfaces only (pick-panel work is US6).
+- [X] T028 [US1] `cd web && npm test`: fix tests that asserted old copy by updating strings, **never deleting caveat assertions**.
+- [X] T029 [US1] Write `SPEC/caveats-after.md`: every `caveats-before.md` row → its new location. Restore any unmapped row before continuing.
+- [X] T030 [US1] Harness (quickstart §4a/§4b) on every route at 1440, 768 and 375, NFL and NBA; record in build-notes; fix failures.
 
 ---
 
@@ -135,10 +135,10 @@ Every page task does the same five things:
 
   Use mutable map puts. Same commit: `canCommission?: boolean` on the history type and `isMe?: boolean` on `StandingRow` in `WEB/api.ts`.
 - [X] T032 [P] [US2] `BT/api/LeagueHistoryCanCommissionIT.java`: `canCommission` is true for the Sleeper commissioner and the configured owner, false for a member and with no header; `isMe` is true on exactly the caller's row.
-- [ ] T033 [US2] `WEB/pages/LeagueHistory.tsx` `RankCell` (~296): Compute only when `canCommission === true`. Otherwise the text is "Final ranks appear once the commissioner computes them." (FR-011). Missing field → hidden.
-- [ ] T034 [P] [US2] `WEB/pages/LeagueHistory.test.tsx`: Compute hidden when false/missing, shown when true; the non-commissioner message.
-- [ ] T035 [US2] Write the write-control audit in `SPEC/build-notes.md`, covering every non-GET call in `WEB/api.ts` that writes league-level data, with its UI gate and server gate (including `setReversalRound`, `refreshLeague`, `ingestLeague`, `trackDraft`). Record `setReversalRound` as an open follow-up (out of scope, review S2).
-- [ ] T036 [US2] Live check (quickstart §4c) as popsharky and, **with Allan's OK**, as a non-commissioner member.
+- [X] T033 [US2] `WEB/pages/LeagueHistory.tsx` `RankCell` (~296): Compute only when `canCommission === true`. Otherwise the text is "Final ranks appear once the commissioner computes them." (FR-011). Missing field → hidden.
+- [X] T034 [P] [US2] `WEB/pages/LeagueHistory.test.tsx`: Compute hidden when false/missing, shown when true; the non-commissioner message.
+- [X] T035 [US2] Write the write-control audit in `SPEC/build-notes.md`, covering every non-GET call in `WEB/api.ts` that writes league-level data, with its UI gate and server gate (including `setReversalRound`, `refreshLeague`, `ingestLeague`, `trackDraft`). Record `setReversalRound` as an open follow-up (out of scope, review S2).
+- [X] T036 [US2] Live check (quickstart §4c) as popsharky and, **with Allan's OK**, as a non-commissioner member.
 
 ---
 
