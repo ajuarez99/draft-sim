@@ -897,6 +897,11 @@ export default function LiveDraftView() {
                   // Only when the seat is known -- "fills a need" against
                   // somebody else's roster is worse than no tag at all.
                   openSlots={slotKnown ? myOpenSlots : undefined}
+                  // The projection assumes a seat until the reader's is known,
+                  // so its survival numbers would answer for somebody else's
+                  // picks. Hold them back; the tiered list still shows.
+                  noAvailabilityReason={slotKnown ? undefined : 'Availability appears once your seat is known.'}
+                  recentPicks={landedPicks.map((p) => p.player)}
                 />
                 {waiting && !result && (
                   <div className="start-overlay">

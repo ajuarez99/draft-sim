@@ -72,6 +72,8 @@ public class RosterManagementController {
         out.put("weeksScored", r.weeksScored());
         // Spec 013: grades are badged early while fewer than SeasonWindow.EARLY_THRESHOLD_WEEKS are scored.
         out.put("gradesEarly", SeasonWindow.isEarly(r.weeksScored()));
+        // Spec 013: the threshold travels with the flag so the page can state the rule without its own copy.
+        out.put("earlyThresholdWeeks", SeasonWindow.EARLY_THRESHOLD_WEEKS);
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("teams", List.of());

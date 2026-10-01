@@ -205,25 +205,25 @@ Every page task does the same five things:
 
 ## Phase 9: User Story 6 - "Who should I take?" stays on screen (Priority: P3)
 
-- [ ] T060 [P] [US6] `WEB/tiers.ts`: `export const TIER_ADP_GAP` ("ARBITRARY, hand-set display grouping"; record the value) and `tierPlayers(players)` (sort by ADP; a new tier when the gap > the constant; 999 → "Unranked").
-- [ ] T061 [P] [US6] `WEB/tiers.test.ts`: a gap equal to the constant doesn't split; one greater does; 999 → Unranked; empty → empty.
-- [ ] T062 [US6] Remove the `sport` default from `positionRun` in `WEB/pickRun.ts` (all current callers already pass it: `PickFeed.tsx:64`, `scarcity.ts:78`). Fix the type errors and tests.
-- [ ] T063 [US6] Extend `WEB/components/AvailabilityPanel.tsx` (don't create a second panel):
+- [X] T060 [P] [US6] `WEB/tiers.ts`: `export const TIER_ADP_GAP` ("ARBITRARY, hand-set display grouping"; record the value) and `tierPlayers(players)` (sort by ADP; a new tier when the gap > the constant; 999 → "Unranked").
+- [X] T061 [P] [US6] `WEB/tiers.test.ts`: a gap equal to the constant doesn't split; one greater does; 999 → Unranked; empty → empty.
+- [X] T062 [US6] Remove the `sport` default from `positionRun` in `WEB/pickRun.ts` (all current callers already pass it: `PickFeed.tsx:64`, `scarcity.ts:78`). Fix the type errors and tests.
+- [X] T063 [US6] Extend `WEB/components/AvailabilityPanel.tsx` (don't create a second panel):
   - group its rows with `tierPlayers` under tier headings, and show `PlayerFace`;
   - keep its existing survival % and Act now/Coin flip/Safe verdict exactly;
   - accept `availability` as optional plus `noAvailabilityReason?: string` (shown instead of survival when absent), so a mock can list best-available players by tier without curves;
   - add the run callout via `positionRun(..., sport)`.
 
   Respect the stacking order in the `styles.css` header (`.avail-sheet` layer 4; phone `.pick-card` 44).
-- [ ] T064 [P] [US6] `WEB/components/AvailabilityPanel.test.tsx` (create if absent): tier headings; verdict unchanged for known survival values; reason shown without availability; run callout.
-- [ ] T065 [US6] Simulator `WEB/pages/DraftView.tsx`:
+- [X] T064 [P] [US6] `WEB/components/AvailabilityPanel.test.tsx` (create if absent): tier headings; verdict unchanged for known survival values; reason shown without availability; run callout.
+- [X] T065 [US6] Simulator `WEB/pages/DraftView.tsx`:
   - while `getSeats` is pending (the `seats && …` branch ~549), render a skeleton board via `WEB/components/Skeleton.tsx`, never a blank panel;
   - keep the existing running overlay (~589-594);
   - no "running" text before Start;
   - measure time-to-skeleton (SC-007) and record it.
-- [ ] T066 [US6] Mock `WEB/pages/MockDraftView.tsx`: when on the clock, show the extended `AvailabilityPanel` fed by `state.available` with `noAvailabilityReason="Availability needs a simulation, which mock drafts don't run."`. The existing picker stays as "Full list".
-- [ ] T067 [US6] Live room `WEB/pages/LiveDraftView.tsx`: confirm the extended panel (already mounted ~890) shows tiers and faces. Before the seat is known: "Availability appears once your seat is known."
-- [ ] T068 [US6] Live check (§4e), all three rooms × 3 sizes × 2 sports.
+- [X] T066 [US6] Mock `WEB/pages/MockDraftView.tsx`: when on the clock, show the extended `AvailabilityPanel` fed by `state.available` with `noAvailabilityReason="Availability needs a simulation, which mock drafts don't run."`. The existing picker stays as "Full list".
+- [X] T067 [US6] Live room `WEB/pages/LiveDraftView.tsx`: confirm the extended panel (already mounted ~890) shows tiers and faces. Before the seat is known: "Availability appears once your seat is known."
+- [X] T068 [US6] Live check (§4e), all three rooms × 3 sizes × 2 sports.
 
 ---
 
@@ -254,16 +254,16 @@ Every page task does the same five things:
   - add `adpAtDraft` (from `draft_pick.adp_at_time`, null-safe) to the real-board pick in `BE/api/LeagueController.java` (~313-341);
   - same commit: `RealPick.adpAtDraft?: number | null` in `WEB/api.ts`;
   - test in `BT/api/LeagueControllerRealBoardTest.java`: the value comes from `adp_at_time`, not the current board; null when absent.
-- [ ] T078 [P] [US8] `WEB/components/GradeChip.tsx`: a grade beside its number (never alone), with the existing early badge when `early`; null/missing → nothing.
-- [ ] T079 [US8] Wire `GradeChip` into `WEB/pages/LeagueAnalysis.tsx` and `WEB/pages/RosterManagement.tsx`. The How this works on Team strength states both thresholds (rankings after 3 weeks; grades early under 4). Tests in `WEB/pages/LeagueAnalysis.test.tsx` and `WEB/pages/RosterManagement.test.tsx`.
-- [ ] T080 [US8] Steals & reaches toggle in `WEB/pages/CompletedDraftBoard.tsx` and `WEB/components/DraftBoard.tsx`:
+- [X] T078 [P] [US8] `WEB/components/GradeChip.tsx`: a grade beside its number (never alone), with the existing early badge when `early`; null/missing → nothing.
+- [X] T079 [US8] Wire `GradeChip` into `WEB/pages/LeagueAnalysis.tsx` and `WEB/pages/RosterManagement.tsx`. The How this works on Team strength states both thresholds (rankings after 3 weeks; grades early under 4). Tests in `WEB/pages/LeagueAnalysis.test.tsx` and `WEB/pages/RosterManagement.test.tsx`.
+- [X] T080 [US8] Steals & reaches toggle in `WEB/pages/CompletedDraftBoard.tsx` and `WEB/components/DraftBoard.tsx`:
   - tint by `pickNo − adpAtDraft`: positive (taken after ADP) = steal → `--up`; negative = reach → `--down`;
   - the signed difference is shown as text;
   - null → untinted, "no ADP at draft time";
   - the toggle is hidden when no pick has `adpAtDraft`.
 
   **Ordering test:** a pick 20 after its draft-time ADP is never tinted as a reach.
-- [ ] T081 [US8] Live check: grades on Bench points (NFL + NBA) and Team strength (NFL); early state matches `weeksScored`; steals/reaches on the NFL board and the count of untinted picks.
+- [X] T081 [US8] Live check: grades on Bench points (NFL + NBA) and Team strength (NFL); early state matches `weeksScored`; steals/reaches on the NFL board and the count of untinted picks.
 
 ---
 

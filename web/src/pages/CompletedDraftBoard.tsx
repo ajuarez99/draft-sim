@@ -12,6 +12,7 @@ import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import PlayerCard from '../components/PlayerCard'
 import { LoadingScreen } from '../components/Skeleton'
+import { hasAnyAdpAtDraft } from '../stealsReaches'
 
 /**
  * The picks that actually happened in this draft -- never runs the engine,
@@ -26,6 +27,7 @@ export default function CompletedDraftBoard() {
   const [board, setBoard] = useState<RealDraftBoard | null>(null)
   const { error, notFound, setError, fail } = useFailure()
   const [openPick, setOpenPick] = useState<PredictedPick | null>(null)
+  const [valueView, setValueView] = useState(false)
 
   useEffect(() => {
     setSeats(null)
@@ -66,6 +68,11 @@ export default function CompletedDraftBoard() {
     alternatives: [],
   }))
 
+  // pickNo -> ADP when the pick was made. Only this, never player.adp (today's).
+  const adpAtDraft: Record<number, number | null | undefined> = {}
+  for (const p of board.picks) adpAtDraft[p.pickNo] = p.adpAtDraft
+  const canShowValue = hasAnyAdpAtDraft(board.picks.map((p) => p.adpAtDraft))
+
   const myPicks = seats.mySlot != null ? picks.filter((p) => p.slot === seats.mySlot).map((p) => p.pickNo) : []
 
   return (
@@ -83,7 +90,26 @@ export default function CompletedDraftBoard() {
           <div className="panel-head">
             <h2>Draft board</h2>
             <span className="muted small">What actually happened</span>
+            {/* Hidden outright when no pick carries a draft-time ADP: a toggle
+                that can only ever say "no ADP" on every cell is not a feature. */}
+            {canShowValue && (
+              <button
+                type="button"
+                className={`chip${valueView ? ' on' : ''}`}
+                aria-pressed={valueView}
+                onClick={() => setValueView((v) => !v)}
+              >
+                Steals &amp; reaches
+              </button>
+            )}
           </div>
+          {canShowValue && valueView && (
+            <p className="muted small value-legend">
+              Each pick against his ADP when it was made.{' '}
+              <span className="value-delta steal">+</span> means taken after his ADP (a steal),{' '}
+              <span className="value-delta reach">&minus;</span> means taken before it (a reach), counted in picks.
+            </p>
+          )}
           <div className="board-stage">
             <DraftBoard
               board={picks}
@@ -96,6 +122,8 @@ export default function CompletedDraftBoard() {
               sport={seats.sport}
               reversalRound={seats.reversalRound}
               onCellClick={setOpenPick}
+              valueView={canShowValue && valueView}
+              adpAtDraft={adpAtDraft}
             />
           </div>
         </section>

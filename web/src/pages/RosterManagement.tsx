@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
+import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
 import Avatar from '../components/Avatar'
 import {
   getRosterManagement,
@@ -134,7 +135,9 @@ export default function RosterManagement() {
                 <th scope="col">Team</th>
                 <th scope="col" className="rm-num">Points</th>
                 <th scope="col" className="rm-num">Potential</th>
-                <th scope="col" className="rm-num">Efficiency</th>
+                <th scope="col" className="rm-num">
+                  Efficiency <GradesEarlyBadge early={data.gradesEarly} />
+                </th>
                 <th scope="col" className="rm-barhead">
                   Scored against potential, points
                 </th>
@@ -160,6 +163,10 @@ export default function RosterManagement() {
               What each team scored, against the most it could have scored if every weekly lineup
               had been perfect. Efficiency is the first divided by the second — it measures lineup
               decisions, not the roster.
+            </p>
+            <p>
+              The letter beside efficiency is that team&apos;s rank in the league, from cutoffs
+              set by hand rather than fitted to anything. {gradesEarlySentence(data.earlyThresholdWeeks)}
             </p>
           </HowThisWorks>
         </section>
@@ -320,7 +327,9 @@ function Row({
             —
           </span>
         ) : (
-          `${(team.efficiency * 100).toFixed(1)}%`
+          <GradeChip grade={team.grade}>
+            {`${(team.efficiency * 100).toFixed(1)}%`}
+          </GradeChip>
         )}
       </td>
       <td className="rm-bars">

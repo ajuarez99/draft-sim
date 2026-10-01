@@ -430,3 +430,62 @@ Verified: `npx tsc -b` clean, `npx vitest run` 70 files / 858 tests passed, `npm
   It's honest about which season it is.
 - The agent also removed silent `sport = 'nfl'` defaults from DraftBoard and PickFeed (every caller already
   passed it). This is the "optional params that encode rules" class, closed rather than worked around.
+
+## US6 + US8 frontend — build agent
+
+**TIER_ADP_GAP = 4** (`web/src/tiers.ts`, labelled ARBITRARY there). A new tier starts when the next player's ADP is more than 4 picks past the previous one's (a gap of exactly 4 does not split). Reason: with a 12-team room, 4 breaks the dense top of a draft into a few tiers per round without making every player his own tier. It is a display grouping only: not fitted, not measured against anything. 999 ("no rank") goes in one trailing "Unranked" group and never takes part in gap arithmetic.
+
+### Files
+- New: `web/src/tiers.ts` (+ test), `web/src/stealsReaches.ts` (+ test), `web/src/components/GradeChip.tsx`, `web/src/components/AvailabilityPanel.test.tsx`, `web/src/pages/CompletedDraftBoard.test.tsx`.
+- Edited: `pickRun.ts` (+ test: `sport` is now required, no default; the only non-test callers `PickFeed.tsx` and `scarcity.ts` already passed it), `components/AvailabilityPanel.tsx`, `components/Skeleton.tsx` (`SkeletonBoard`), `components/DraftBoard.tsx`, `pages/DraftView.tsx`, `MockDraftView.tsx`, `LiveDraftView.tsx`, `CompletedDraftBoard.tsx`, `LeagueAnalysis.tsx`, `RosterManagement.tsx`, tests for both, `styles.css` (blocks `013 US6`, `013 US8` x2, plus a skeleton-board block under US6).
+
+### AvailabilityPanel (one panel, extended)
+Props added, all optional: `availability`, `players`, `noAvailabilityReason`, `recentPicks`. `pickedPlayerIds` is optional too. Survival numbers show only when `availability` exists AND no reason is given (`showSurvival`). Verdict thresholds and the survival strip are untouched. Rows are grouped by `tierPlayers`; inside a tier, with survival numbers, the old "most at risk first at your next pick" order is kept. Run callout is `positionRun(recentPicks, 6, 4, sport)`.
+- Simulator (DraftView): same as before plus tiers, faces and the run callout. Skeleton board (`SkeletonBoard`, no text) while `getSeats` is pending and there is no error. The existing "Simulating your draft..." overlay still only shows after Start; the running progress bar is unchanged.
+- Mock (MockDraftView): shown only when `isUsersTurn && !complete`; fed `players={state.available}`, reason "Availability needs a simulation, which mock drafts don't run.", title becomes "Best available", no depth chips/strip/verdict. The picker button is now labelled "Full list".
+- Live (LiveDraftView): tiers and faces always; when `!slotKnown` it passes the reason "Availability appears once your seat is known." and survival is held back even though a projection exists (it would answer for an assumed seat).
+
+### US8 frontend
+- `GradeChip` takes the number as `children`, so a grade cannot be drawn alone. null/empty grade renders the number untouched. Early badge text is exactly "early — this is mostly noise" with `sl-early`, driven by the payload's `gradesEarly`.
+- Wired into Team strength (the score pill) and Bench points (the efficiency %). Both pages' How this works gained a sentence on grades.
+- Steals & reaches: `pickNo - adpAtDraft`, positive = steal (`--up`, "+n"), negative = reach (`--down`, minus sign + n). Under half a pick is "even", untinted. null adpAtDraft: untinted, cell shows "no ADP" with title "no ADP at draft time". Toggle hidden when no pick has adpAtDraft. Never reads `player.adp`. Ordering tests in `stealsReaches.test.ts` and the page test.
+
+### Deviations and open items
+- The grade-early threshold (4) is NOT in the analysis or roster-management payloads (only `gradesEarly`), and I may not edit `api.ts` or the backend. `GRADES_EARLY_UNDER_WEEKS = 4` in `GradeChip.tsx` mirrors `SeasonWindow.EARLY_THRESHOLD_WEEKS` for the How-this-works sentence only; the badge itself never compares against it. The rankings threshold is read from `rankingScores.weeksRequired`.
+- The early badge repeats on every graded row while early (the caveat stays beside each number, per the contract). Parent should look at whether that is too noisy at 375px.
+- "no ADP" is the visible text; the full phrase "no ADP at draft time" is the `title` (the cell is ~96px wide).
+- Steal/reach tint is a gradient over the position fill. Its contrast against `--text` was NOT measured (max overlay 26%); the parent should measure.
+- No unit test for the DraftView skeleton (DraftView is too heavy to mount cheaply); needs a browser check, as does SC-007 time-to-skeleton. Mock/Live panel behavior is covered through AvailabilityPanel tests, not page tests.
+- Not browser-verified at 1440/768/375.
+
+### Measured
+`npx tsc -b` clean; `npx vitest run`: 74 files, 885 tests, all pass (was 71 files / 863 before this agent, plus 22 new... 6 AvailabilityPanel, 5 tiers, 8 stealsReaches, 3 CompletedDraftBoard, 3+3 grade page tests); `npm run build` ok.
+
+## US6 + US8 frontend: parent review and live check (measured, local, 2026-10-01)
+
+**Rejected and fixed in review:**
+- `GradeChip.tsx` kept a client copy of the early threshold (`GRADES_EARLY_UNDER_WEEKS = 4`) for its How-this-works
+  sentence. That's the third time this class appeared in this build. Roster-management and analysis responses now carry
+  `earlyThresholdWeeks` (from `SeasonWindow`); the sentence reads it, and without it says "for the first weeks of the
+  season" rather than inventing a number. api.ts is mirrored. Backend: 964 tests, 0 skipped.
+- The early badge repeated on every graded row (12× on one table). It now sits once, on the grade column's header,
+  beside every grade it qualifies. Tests assert exactly one.
+
+**Found live, fixed:**
+- **Encoding corruption.** `AvailabilityPanel.tsx` came back with mixed encodings: lines 55, 59 and 322 were saved
+  as Windows-1252 bytes inside a UTF-8 file. The tier label rendered "ADP 1�60" and the pick tooltip separator was
+  broken. Lines were re-decoded individually; a whole-file convert would have double-encoded the valid ▾/▴ arrows.
+  Added `sourceEncoding.test.ts`: every `src/**/*.{ts,tsx,css}` must decode as strict UTF-8. Proven to fail on an
+  injected 0x96 byte and pass on the clean tree.
+- **Tiers chained across 60 picks** in a dense mock list ("ADP 23–83"). Added `TIER_MAX_SPAN = 12` (ARBITRARY, one
+  12-team round): a tier also splits once it spans more than that from its first player. The same mock now reads
+  16–18, 23–35, 36–48, 49–61, 62–74, 75–83. Test added.
+
+**Measured:**
+- Simulator (NBA, local): skeleton at **242 ms**, board at **307 ms**; no "Simulating" text before Start (SC-007).
+- Mock (/mock/653): "Best available", tiers and faces, plus the reason "Availability needs a simulation, which mock drafts don't run."
+- Live (NBA): tiers, survival and verdicts (seat known).
+- Steals & reaches (NFL 2026 board): 69 steals, 94 reaches, 0 "no ADP" (all 180 picks have `adpAtDraft`). The sign
+  checks out: B. Robinson, pick 4 at draft-time ADP 2, shows **+2** (steal). Tinted cell bg oklch(29.8% .054 232) with
+  `--text` oklch(95%) on top: high contrast, not separately ratio-measured.
+- Grades: one header badge per table at 3 scored weeks; Team strength states "fewer than 4 weeks", read from the payload.

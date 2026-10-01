@@ -105,7 +105,9 @@ public class LeagueAnalysisService {
     public record RankingScores(boolean available, String reason, String formula,
                                 int weeksScored, int weeksRequired, List<ScoreEntry> entries,
                                 /** Spec 013: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. Grades are badged early while true. */
-                                boolean gradesEarly) {}
+                                boolean gradesEarly,
+                                /** Spec 013: SeasonWindow.EARLY_THRESHOLD_WEEKS, so the page can state the rule without a copy. */
+                                int earlyThresholdWeeks) {}
 
     public record ScoreEntry(int rank, int rosterId, Long managerId, String manager, String avatarId,
                              double score, double raw, double avgWeekly, double high, double low,
@@ -339,7 +341,7 @@ public class LeagueAnalysisService {
                             + " which cannot mean anything until those are three different numbers;"
                             + " " + MIN_SCORED_WEEKS + " weeks are needed.";
             return new RankingScores(false, reason, formula, weeksScored, MIN_SCORED_WEEKS, List.of(),
-                    SeasonWindow.isEarly(weeksScored));
+                    SeasonWindow.isEarly(weeksScored), SeasonWindow.EARLY_THRESHOLD_WEEKS);
         }
 
         Map<Integer, List<Double>> weeklyByRoster = new HashMap<>();
@@ -374,7 +376,7 @@ public class LeagueAnalysisService {
         }
 
         return new RankingScores(true, null, formula, weeksScored, MIN_SCORED_WEEKS, normalise(raw),
-                SeasonWindow.isEarly(weeksScored));
+                SeasonWindow.isEarly(weeksScored), SeasonWindow.EARLY_THRESHOLD_WEEKS);
     }
 
     /**

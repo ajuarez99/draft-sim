@@ -43,16 +43,15 @@ type Positioned = { position: string }
  *
  * `sport` picks which positions are runnable at all (RUNNABLE_BY_SPORT) --
  * the caller's own sport, never a union of both (a basketball feed calling
- * out a "K run" would be nonsense, and vice versa). Trailing, defaulted, and
- * after `window`/`threshold` so every existing (pre-multi-sport) positional
- * call -- including the window/threshold overrides in pickRun.test.ts --
- * keeps meaning exactly what it did before.
+ * out a "K run" would be nonsense, and vice versa). Required, not defaulted:
+ * a default would assert a rule ("football") instead of carrying a value
+ * (spec 013 T062).
  */
 export function positionRun(
   picks: Positioned[],
   window = 6,
   threshold = 4,
-  sport: Sport = 'nfl',
+  sport: Sport,
 ): PositionRun | null {
   if (threshold > window) return null
   const recent = picks.slice(-window)

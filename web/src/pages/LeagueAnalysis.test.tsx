@@ -669,3 +669,66 @@ describe('League analysis eyebrow names the season shown', () => {
     expect(screen.getByText('League')).toBeInTheDocument()
   })
 })
+
+describe('League analysis grades (spec 013 US8)', () => {
+  const entry = (rank: number, rosterId: number, manager: string, grade?: string | null) => ({
+    rank, rosterId, managerId: rosterId, manager, avatarId: null, score: 60 - rank, raw: 500,
+    avgWeekly: 120, high: 150, low: 100, winPct: 0.5, wins: 2, losses: 2, ties: 0, grade,
+  })
+  const scored = (entries: ReturnType<typeof entry>[], gradesEarly: boolean, weeksScored = 3) =>
+    data({
+      rankingScores: {
+        available: true, reason: null, formula: 'f', weeksScored, weeksRequired: 3, entries, gradesEarly,
+      },
+    })
+
+  it('shows the grade beside the score and marks it early while the payload says so', async () => {
+    getLeagueAnalysis.mockResolvedValue(scored([entry(1, 1, 'kieriskash', 'A'), entry(2, 2, 'jstrobe', null)], true))
+    render(<LeagueAnalysis />)
+    const row = (await screen.findByText('59.0')).closest('tr') as HTMLElement
+    expect(within(row).getByText('A')).toBeInTheDocument()
+    // Spec 013 parent review: the early caveat sits ONCE, on the Score column
+    // header beside every grade it qualifies, not repeated on each row.
+    expect(screen.getAllByText('early — this is mostly noise')).toHaveLength(1)
+    expect(screen.getByRole('columnheader', { name: /Score/ })).toHaveTextContent('early — this is mostly noise')
+    expect(within(row).queryByText(/early/)).toBeNull()
+    // A null grade adds nothing: no letter on that row.
+    const other = screen.getByText('58.0').closest('tr') as HTMLElement
+    expect(other.querySelector('.grade-chip')).toBeNull()
+  })
+
+  it('does not badge a grade early when the payload says it is not', async () => {
+    getLeagueAnalysis.mockResolvedValue(scored([entry(1, 1, 'kieriskash', 'B')], false, 5))
+    render(<LeagueAnalysis />)
+    const row = (await screen.findByText('59.0')).closest('tr') as HTMLElement
+    expect(within(row).getByText('B')).toBeInTheDocument()
+    expect(within(row).queryByText(/early/)).toBeNull()
+  })
+
+  it('states both thresholds in How this works, reading the ranking one from the payload', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        rankingScores: {
+          available: false, reason: 'not yet', formula: 'f', weeksScored: 1, weeksRequired: 3, entries: [],
+          earlyThresholdWeeks: 4,
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/Rankings appear after 3 scored weeks/)).toBeInTheDocument()
+    // The grades number comes from the payload (SeasonWindow), never a client copy.
+    expect(screen.getByText(/Grades are marked early while fewer than 4 weeks are scored/)).toBeInTheDocument()
+  })
+
+  it('states the grades rule without a number when the payload has no threshold', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      data({
+        rankingScores: {
+          available: false, reason: 'not yet', formula: 'f', weeksScored: 1, weeksRequired: 3, entries: [],
+        },
+      }),
+    )
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/Grades are marked early for the first weeks of the season/)).toBeInTheDocument()
+  })
+})

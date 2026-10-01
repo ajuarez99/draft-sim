@@ -284,4 +284,33 @@ describe('Roster management eyebrow names the season shown', () => {
     render(<RosterManagement />)
     expect(screen.getByText('League')).toBeInTheDocument()
   })
+
+  describe('grades (spec 013 US8)', () => {
+    it('shows the grade beside the efficiency, with the early badge when the payload says so', async () => {
+      getRosterManagement.mockResolvedValue(data({ gradesEarly: true, teams: [team({ grade: 'B+' })] }))
+      render(<RosterManagement />)
+      const row = await screen.findByRole('row', { name: /Master Bates/ })
+      expect(within(row).getByText('94.7%')).toBeInTheDocument()
+      expect(within(row).getByText('B+')).toBeInTheDocument()
+      // One early caveat on the Efficiency header, not one per row (spec 013 parent review).
+      expect(screen.getAllByText('early — this is mostly noise')).toHaveLength(1)
+      expect(screen.getByRole('columnheader', { name: /Efficiency/ })).toHaveTextContent('early — this is mostly noise')
+    })
+
+    it('shows no early badge once the payload says grades are settled', async () => {
+      getRosterManagement.mockResolvedValue(data({ gradesEarly: false, teams: [team({ grade: 'C' })] }))
+      render(<RosterManagement />)
+      const row = await screen.findByRole('row', { name: /Master Bates/ })
+      expect(within(row).getByText('C')).toBeInTheDocument()
+      expect(within(row).queryByText(/early/)).toBeNull()
+    })
+
+    it('adds nothing when there is no grade', async () => {
+      getRosterManagement.mockResolvedValue(data({ gradesEarly: true, teams: [team({ grade: null })] }))
+      render(<RosterManagement />)
+      const row = await screen.findByRole('row', { name: /Master Bates/ })
+      expect(within(row).getByText('94.7%')).toBeInTheDocument()
+      expect(within(row).queryByText(/early/)).toBeNull()
+    })
+  })
 })

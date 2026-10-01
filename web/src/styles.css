@@ -5169,3 +5169,58 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .wr-review.row-list { display: block; }
 .wr-review > li { padding: 10px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
 .wr-review-kind { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; flex: 0 0 100%; }
+
+/* --- 013 US6: tiers, faces and the run callout inside the availability sheet ---
+   Stays inside `.avail-sheet` (layer 4); nothing here adds a layer or a surface.
+   Tier headings are rows on the sheet's own surface, not boxes. */
+.avail tbody + tbody .tier-head th { border-top: 1px solid var(--line); }
+.avail .tier-head th {
+  position: static; background: transparent; text-align: left;
+  font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 6px 3px;
+}
+.avail .tier-head .tier-range { font-weight: 400; font-variant-numeric: tabular-nums; }
+.avail .player-col .pface { vertical-align: middle; margin: -4px 6px -4px 6px; }
+.avail-run { margin: 0 0 6px; font-size: 12px; color: var(--text); }
+.avail-reason { margin: 0 0 6px; }
+
+/* The simulator's placeholder board while seats load (SkeletonBoard). Tiles on
+   the page plane, no surface of their own; the pulse reuses the keyframes
+   defined with the other loading placeholders. */
+.board-skeleton { display: grid; gap: 4px; flex: 1; min-height: 0; padding: 4px 0; }
+.board-skeleton-tile {
+  min-height: 34px; border-radius: 6px;
+  background: color-mix(in oklch, var(--line) 45%, var(--bg));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board-skeleton-tile { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+}
+
+/* --- 013 US8: grade chip beside its number --------------------------------
+   Neutral on purpose: a letter is a rank, not a position or an identity, so it
+   borrows no position token. --up/--down are not used either (a grade is not a
+   signed change). The early badge is the shared .sl-early. */
+.grade-wrap { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.grade-chip {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px; color: var(--text);
+  border: 1px solid var(--line);
+}
+.grade-early { white-space: nowrap; }
+
+/* --- 013 US8: steals & reaches on a finished board -------------------------
+   Tint = pickNo minus ADP at draft time. A gradient over the cell's position
+   fill (background-image, so the position color underneath is kept). --up is
+   always printed with a "+" and --down with a minus, never color alone. */
+.board.value-view .cell.value-steal {
+  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent));
+}
+.board.value-view .cell.value-reach {
+  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
+}
+.value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.value-delta.steal { color: var(--up); }
+.value-delta.reach { color: var(--down); }
+.value-delta.even, .value-delta.none { color: var(--muted); font-weight: 500; }
+.value-legend { margin: 0 0 6px; }
+/* The grade column's early caveat keeps its own case inside an uppercase table header. */
+th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }

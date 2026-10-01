@@ -1390,6 +1390,8 @@ export type AnalysisRankingScores = {
   entries: AnalysisScoreEntry[]
   /** LeagueAnalysisService.RankingScores.gradesEarly: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. */
   gradesEarly?: boolean
+  /** LeagueAnalysisService.RankingScores.earlyThresholdWeeks (= SeasonWindow.EARLY_THRESHOLD_WEEKS). */
+  earlyThresholdWeeks?: number
 }
 
 export type AnalysisLineupPlayer = {
@@ -1740,6 +1742,8 @@ export type RosterManagement = {
   weeksScored: number
   /** RosterManagementController.body: weeksScored < SeasonWindow.EARLY_THRESHOLD_WEEKS. */
   gradesEarly?: boolean
+  /** RosterManagementController: SeasonWindow.EARLY_THRESHOLD_WEEKS. */
+  earlyThresholdWeeks?: number
   teams: RosterManagementTeam[]
 }
 

@@ -15,6 +15,7 @@ import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { SkeletonBoard } from '../components/Skeleton'
 import SeatPopover from '../components/SeatPopover'
 import OnTheClock from '../components/OnTheClock'
 import PickFeed from '../components/PickFeed'
@@ -546,6 +547,10 @@ export default function DraftView() {
               </>
             )}
 
+            {/* While getSeats is in flight the board's shape is unknown, so draw
+                a placeholder board rather than an empty panel. No words about
+                running or simulating: nothing runs until Start is pressed. */}
+            {!seats && !error && <SkeletonBoard />}
             {seats && (
               // teams/rounds come from `seats` (fetched independently of a
               // run) so the grid -- and its column headers -- exists before a
@@ -584,6 +589,7 @@ export default function DraftView() {
                   pickedPlayerIds={revealedPlayerIds}
                   started={started}
                   sport={sport}
+                  recentPicks={feedPicks.map((p) => p.player)}
                 />
                 {!started && (
                   <div className="start-overlay">

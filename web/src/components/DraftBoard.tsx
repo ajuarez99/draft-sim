@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, type CSSProperties } from 'react'
 import type { PlayerRef, PredictedPick, Seat, Sport } from '../api'
 import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
@@ -6,6 +6,7 @@ import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
 import { pickNoAt } from '../snake'
+import { pickValue, signedPicks, tintPercent } from '../stealsReaches'
 
 type Props = {
   board: PredictedPick[]
@@ -38,6 +39,14 @@ type Props = {
    * value -- Sleeper's, or the user's override of it.
    */
   reversalRound?: number
+  /**
+   * Steals-and-reaches view (a finished draft only). When `valueView` is on,
+   * each cell is tinted by pickNo minus the player's ADP *at draft time*, from
+   * this map (pickNo -> RealPick.adpAtDraft). Never today's ADP: see
+   * stealsReaches.ts. A pick with no entry, or a null one, is left untinted.
+   */
+  valueView?: boolean
+  adpAtDraft?: Record<number, number | null | undefined>
 }
 
 /**
@@ -66,6 +75,8 @@ export default function DraftBoard({
   onSeatClick,
   hideProvenanceDots,
   reversalRound = 0,
+  valueView = false,
+  adpAtDraft,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
@@ -73,7 +84,7 @@ export default function DraftBoard({
 
   return (
     <div className="board-scroll panel-body">
-      <div className="board" style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
+      <div className={`board${valueView ? ' value-view' : ''}`} style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
         <div className="corner" />
         {Array.from({ length: teams }, (_, i) => {
           const slot = i + 1
@@ -143,16 +154,28 @@ export default function DraftBoard({
                 // in it (section A) -- so "your seat" and "your pick" had to give
                 // the fill up and become rings instead (styles.css `.cell.mine`).
                 const shown = chosen ?? visible?.player
+                // Only a real, revealed pick can be a steal or a reach.
+                const value = valueView && visible ? pickValue(pickNo, adpAtDraft?.[pickNo]) : null
                 const cls =
                   'cell' +
                   (shown ? ` pos-${shown.position}` : '') +
+                  (value && (value.kind === 'steal' || value.kind === 'reach') ? ` value-${value.kind}` : '') +
                   (mine.has(pickNo) ? ' mine' : '') +
                   (chosen ? ' chosen' : visible && !visible.isModal ? ' uncertain' : '')
+                const valueTitle =
+                  value == null
+                    ? ''
+                    : value.kind === 'unknown'
+                      ? 'No ADP at draft time'
+                      : value.delta != null && value.kind !== 'even'
+                        ? `Taken ${Math.abs(Math.round(value.delta))} picks ${value.kind === 'steal' ? 'after' : 'before'} his ADP at draft time (${value.kind})`
+                        : 'Taken right at his ADP at draft time'
                 const titleAttr = chosen
                   ? `Your pick — ${chosen.name}`
                   : visible
                     ? // The cell shows an abbreviation now, so the hover is
                       // the only place the full name appears without a click.
+                      (valueTitle ? `${valueTitle}\n` : '') +
                       `${visible.player.name}\n${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
                       (visible.isModal
                         ? ''
@@ -186,6 +209,18 @@ export default function DraftBoard({
                     <div className="meta">
                       <PlayerFace sport={sport} sleeperId={shown.sleeperId} team={shown.team} position={shown.position} name={shown.name} size={16} />
                       <span className="team-code mono">{shown.team ?? '—'}</span>
+                      {value &&
+                        (value.kind === 'unknown' ? (
+                          <span className="value-delta none" title="no ADP at draft time">
+                            no ADP
+                          </span>
+                        ) : (
+                          value.delta != null && (
+                            <span className={`value-delta mono ${value.kind}`} title={valueTitle}>
+                              {signedPicks(value.delta)}
+                            </span>
+                          )
+                        ))}
                     </div>
                   </>
                 ) : (
@@ -208,6 +243,11 @@ export default function DraftBoard({
                     type="button"
                     className={cls}
                     title={titleAttr}
+                    style={
+                      value && value.delta != null && (value.kind === 'steal' || value.kind === 'reach')
+                        ? ({ '--vt': `${tintPercent(value.delta)}%` } as CSSProperties)
+                        : undefined
+                    }
                     onClick={() => onCellClick?.(visible)}
                   >
                     {inner}

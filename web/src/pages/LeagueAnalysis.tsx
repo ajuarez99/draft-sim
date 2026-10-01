@@ -32,6 +32,7 @@ import {
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import HowThisWorks from '../components/HowThisWorks'
+import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
@@ -168,6 +169,11 @@ function RankingScoreHow({ block }: { block: AnalysisRankingScores }) {
         Rankings appear after {block.weeksRequired} scored weeks. Before that, high and low are
         the same number or close to it, and the score would mean nothing.
       </p>
+      <p>
+        The letter beside each score is that team&apos;s rank in the league, from cutoffs set by
+        hand rather than fitted to anything. {gradesEarlySentence(block.earlyThresholdWeeks)} The
+        ranking itself appears once {block.weeksRequired} weeks are scored.
+      </p>
       {block.available && (
         <p>
           Raw formula output, before it is scaled to 1–100:{' '}
@@ -223,7 +229,9 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
             <tr>
               <th className="mono">#</th>
               <th>Manager</th>
-              <th className="mono">Score</th>
+              <th className="mono">
+                Score <GradesEarlyBadge early={block.gradesEarly} />
+              </th>
               <th className="mono">Record</th>
               <th className="mono">Avg</th>
               <th className="mono">High</th>
@@ -246,7 +254,9 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
                     scaled FROM, is listed under "How this works" below the
                     table rather than under every score. */}
                 <td className="mono">
-                  <span className="analysis-score-pill">{e.score.toFixed(1)}</span>
+                  <GradeChip grade={e.grade}>
+                    <span className="analysis-score-pill">{e.score.toFixed(1)}</span>
+                  </GradeChip>
                 </td>
                 <td className="mono">
                   {e.wins}-{e.losses}
