@@ -650,3 +650,18 @@ because they encoded the same assumption. A cold bug-hunting review caught it wi
 (distinct opponents per `game_date`).
 **When a rule is called sport-agnostic, count the cases that make it true in each sport, against real
 data, before writing it down.** And never infer an absence ("bye", "no game") from a period that isn't settled.
+
+## 30. A "flaky" test that was a false claim passing on storage rounding
+
+`RefreshControllerIT.aChainRunShowsRunningAtTheTopEvenWhenTheShownSeasonIsLoadedComplete` was
+written off as intermittent in four specs in a row (010–014): "fails on base too, passes on
+re-run". It was never flaky. It asserted that the 1998 page's `lastSuccessAt` moved after a
+1999 refresh, but `chainBySleeperId` walks backwards, so 1998's chain is [1998] and 1999's success
+can't reach it. It passed only when Postgres rounded `oldSuccess`'s sub-microsecond digits
+(Windows `Instant.now()` has 100 ns ticks) **up** on storage, which made the stored "old" success
+a few hundred ns later than the in-memory one. Truncating `oldSuccess` to `MICROS` made it fail 4 of 4.
+Fixed 2026-10-02 by testing the page the fix was about: the newest season's id, with the resolver
+showing an older played season. Mutation-checked: reverting either guarded behaviour fails it.
+**A test that fails "sometimes" with no concurrency in the asserted value is a deterministic bug
+plus a coin flip. Find the coin before re-running.** And compare timestamps that went through the
+DB at the column's precision (`truncatedTo(MICROS)` for `timestamptz`), or `isAfter` can pass on rounding.

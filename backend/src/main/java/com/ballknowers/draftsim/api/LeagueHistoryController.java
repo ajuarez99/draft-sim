@@ -829,7 +829,15 @@ public class LeagueHistoryController {
     public ResponseEntity<?> backfillFinalRanks(@PathVariable String sleeperId,
                                                 @RequestParam(required = false) Integer season,
                                                 @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
-        if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
+        Optional<LeagueRepository.LeagueRow> visible = membership.visibleLeague(sleeperId, sleeperUserId);
+        if (visible.isEmpty()) return ResponseEntity.notFound().build();
+        // History shows this button only when canCommission, but until 2026-10-02 the route
+        // checked membership alone (spec 013 open follow-up). Same two gates as power/compute.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        if (!membership.canCommission(visible.get().id(), sleeperUserId)) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "only this league's Sleeper commissioner may compute past seasons' final ranks"));
+        }
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperId);
         if (chain.isEmpty()) return ResponseEntity.notFound().build();
 

@@ -1,7 +1,35 @@
 # Ball Knowers — handoff
 
+**2026-10-02, branch `handoff-014-deployed` (worktree `.claude/worktrees/handoff-014-deployed`, off
+`origin/main` `af71a6c`): two fixes, verified locally, not committed.**
+
+- **`RefreshControllerIT` was never flaky; it is fixed.** Its `lastSuccessAt` assertion was false, and it
+  passed only when Postgres rounded the stored old timestamp up. Truncating that timestamp to µs made it
+  fail 4 of 4. It now tests the page the 2026-09-28 fix was about. It passed 5 of 5 in a row, and
+  reverting either guarded behaviour fails it. See claude/lessons.md #30. No production change.
+- **`POST /power/backfill` is now commissioner-gated** (spec 013's open follow-up): admin token + Sleeper
+  commissioner, the same two gates as `/power/compute`. History's Compute button now goes through
+  `commissionerFetch`, so it asks for the commissioner key once. `AccessControlMvcIT` covers refusal
+  (member, commissioner without a token), 403 (member with a token) and the allowed path.
+- **Measured:** backend 1,061 tests, **0 skipped, 0 failed**: the first fully green run since spec 010.
+  Web 957/957, `tsc` clean.
+- **Not verified:** the key prompt on History's Compute in a live browser. The same mechanism is live for
+  `/power/compute`.
+- **Still open:** the reversal-round override (`PUT /drafts/{id}/reversal-round`) is still any-member.
+  It has live UI in the draft view, so gating it is a product call, not done here.
+
+---
+
 **2026-10-01, branch `014-home-player-spotlight` (worktree `.claude/worktrees/014-home-player-spotlight`, off
-`origin/main` `2dd47f2`): built and verified locally. Not committed, not pushed, not deployed.**
+`origin/main` `2dd47f2`): built and verified locally, merged to `main` as PR #12 (`af71a6c`) and deployed.**
+
+*Amended 2026-10-02:* this header said "not committed, not pushed, not deployed"; that went stale when PR #12
+merged. Prod was checked on 2026-10-02 without signing in:
+- the live bundle (`index-Cmr3kiaM.js`) contains the `player-spotlight` call and the Trending and Rookie watch copy;
+- `api.ballknowers.co/api/leagues/x/player-spotlight` returns the controller's own empty-body 404, the same as
+  the known `weekly-report/0` route, where an unrouted path gets Spring's JSON "Not Found". So the route is live.
+
+The spotlight has **not** been viewed signed in on prod.
 `specs/014-home-player-spotlight/` is the brief; tasks.md has the Baseline and Verification sections.
 
 **What it is.** The league home gains a Player spotlight:
@@ -39,7 +67,7 @@ is safe but not useful the other way round.
   by ITs and component tests only.
 - **A trending fetch failure, live:** covered by `TrendingRefreshIsolationIT`, not by a real dead upstream.
 - **Light theme:** not applicable; the app is dark-only.
-- **Production / Railway:** not deployed.
+- **Production / Railway:** deployed (see the amendment above); route and bundle checked, not viewed signed in.
 
 **Design-review pass (same day):** the block is now three columns under the dashboard on desktop (408 px, was 2,534) and a Top / Trending / Rookies tablist on phones. Trending and Rookie watch use the newest **complete** week, so they can differ from the matchup block's week, and each section names its own. Rookie watch drops K and DEF. Weekly top performers gained team, opponent and owner avatar. Before the regular season, NBA reads "No regular-season games yet … preseason games aren't counted here". Preseason nights are not ingested (research R7).
 

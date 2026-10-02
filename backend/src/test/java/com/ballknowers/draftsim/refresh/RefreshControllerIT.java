@@ -236,9 +236,20 @@ class RefreshControllerIT {
     void aChainRunShowsRunningAtTheTopEvenWhenTheShownSeasonIsLoadedComplete() throws Exception {
         // Review fix 2026-09-28: stateOf returned COMPLETE before looking at chainRunning,
         // so the rail never saw RUNNING while a newer season refreshed behind a complete one.
+        //
+        // Rewritten 2026-10-02 (was "flaky", failing ~half of runs at the lastSuccessAt
+        // assertion). It polled the 1998 page, whose chain is [1998] only -- chainBySleeperId
+        // walks backwards -- so 1999's success could never reach lastSuccessAt. It passed
+        // only when Postgres rounded oldSuccess's sub-microsecond digits UP on storage;
+        // truncating oldSuccess to MICROS made it fail 4 of 4. The scenario the fix is about
+        // is the NBA offseason one: the page carries the NEWER season's id and the resolver
+        // shows the older, played season. That is modelled here: 1998 has stored weeks, so
+        // status(newer) shows 1998 while the chain includes 1999.
         String newer = LEAGUE + "-2";
         jdbc.update("update league set status = 'complete' where id = ?", leagueId);
-        Instant oldSuccess = Instant.now().minusSeconds(3600);
+        jdbc.update("insert into roster_week_points (league_id, season, week, roster_id) values (?, 1998, 1, 1)", leagueId);
+        // Truncated so the assertion below can't pass on a storage round-up of the old value.
+        Instant oldSuccess = Instant.now().minusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
         refreshes.recordSuccess(leagueId, oldSuccess, true);
         jdbc.update("insert into league (sport, season, sleeper_id, previous_league_id, name, total_rosters, status) "
                 + "values ('nba', 1999, ?, ?, 'IT refresh league 2', 12, 'in_season')", newer, LEAGUE);
@@ -253,8 +264,9 @@ class RefreshControllerIT {
             asOperator(() -> controller.trigger(newer, null));
             assertTrue(started.await(5, TimeUnit.SECONDS));
 
-            // The 1998 page shows 1998, which is loaded_complete -- yet the chain is running.
-            Map<String, Object> during = body(controller.status(LEAGUE, MEMBER));
+            // The newest season's page shows 1998, which is loaded_complete -- yet the chain is running.
+            Map<String, Object> during = body(asOperator(() -> controller.status(newer, null)));
+            assertEquals(1998, ((Number) during.get("season")).intValue(), "the resolver must show the played season");
             assertEquals("RUNNING", during.get("state"));
 
             release.countDown();
@@ -262,10 +274,10 @@ class RefreshControllerIT {
             Map<String, Object> after = during;
             while (System.nanoTime() < deadline && "RUNNING".equals(after.get("state"))) {
                 Thread.sleep(25);
-                after = body(controller.status(LEAGUE, MEMBER));
+                after = body(asOperator(() -> controller.status(newer, null)));
             }
             assertEquals("COMPLETE", after.get("state"));
-            // lastSuccessAt follows the newest success in the chain, not the shown season's.
+            // lastSuccessAt follows the newest success in the chain (1999's), not the shown season's.
             assertTrue(Instant.parse((String) after.get("lastSuccessAt")).isAfter(oldSuccess));
         } finally {
             release.countDown();

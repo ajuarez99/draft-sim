@@ -280,6 +280,11 @@ class AccessControlMvcIT {
                 .header("X-Sleeper-User", MEMBER)));
         expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
                 .header("X-Sleeper-User", COMMISSIONER).header("X-Admin-Token", "wrong")));
+        // power/backfill sat behind History's commissioner-only button but checked membership alone.
+        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+                .header("X-Sleeper-User", MEMBER)));
+        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+                .header("X-Sleeper-User", COMMISSIONER)));
     }
 
     @Test
@@ -288,6 +293,18 @@ class AccessControlMvcIT {
                         .header("X-Sleeper-User", MEMBER).header("X-Admin-Token", TestAdmin.TOKEN))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").doesNotExist());
+        mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+                        .header("X-Sleeper-User", MEMBER).header("X-Admin-Token", TestAdmin.TOKEN))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").doesNotExist());
+    }
+
+    @Test
+    void theCommissionerWithTheAdminTokenCanBackfill() throws Exception {
+        // The gate must not lock out the one caller History's button is shown to.
+        mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+                        .header("X-Sleeper-User", COMMISSIONER).header("X-Admin-Token", TestAdmin.TOKEN))
+                .andExpect(status().isOk());
     }
 
     // -------------------------------------------------------------- member-scoped setup routes

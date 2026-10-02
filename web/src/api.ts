@@ -954,7 +954,7 @@ export type BackfillResult = {
  * carries.
  */
 export const backfillFinalRanks = (sleeperLeagueId: string, season?: number) =>
-  apiFetch(
+  commissionerFetch(
     `/api/leagues/${sleeperLeagueId}/power/backfill${season == null ? '' : `?season=${season}`}`,
     { method: 'POST' },
   ).then(json<BackfillResult>)
