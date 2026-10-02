@@ -228,6 +228,7 @@ public class LeagueHistoryIngestService {
     private int ingestWeeklyPoints(long leagueId, int season, String sleeperLeagueId, Map<String, Object> league) {
         Map<String, Object> settings = asMap(league.get("settings"));
         int lastScoredLeg = LeagueMapper.asInt(settings.get("last_scored_leg"), 0);
+        int leg = LeagueMapper.asInt(settings.get("leg"), 0);
         if (lastScoredLeg < 1) return 0;
 
         // A week is skipped only if it is FINAL (fetched after the league moved on,
@@ -251,7 +252,7 @@ public class LeagueHistoryIngestService {
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
             boolean settled = stored.contains(week) && paired.contains(week) && withStarters.contains(week);
-            if (settled && finalWeeks.contains(week)) continue;
+            if (settled && WeekFinality.mayStopRefetching(finalWeeks.contains(week), week, lastScoredLeg)) continue;
             List<Map<String, Object>> matchups = sleeper.matchups(sleeperLeagueId, week);
             if (matchups == null) continue;
             for (Map<String, Object> m : matchups) {
@@ -281,7 +282,7 @@ public class LeagueHistoryIngestService {
                 count++;
             }
             weekFetches.record(leagueId, LeagueWeekFetchRepository.POINTS, week, java.time.Instant.now(),
-                    WeekFinality.isFinal(week, lastScoredLeg));
+                    WeekFinality.isFinal(week, lastScoredLeg, leg));
         }
         return count;
     }

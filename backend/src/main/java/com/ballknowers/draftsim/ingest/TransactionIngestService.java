@@ -67,6 +67,7 @@ public class TransactionIngestService {
         Map<String, Object> raw = sleeper.league(sleeperLeagueId);
         Map<String, Object> settings = asMap(raw == null ? null : raw.get("settings"));
         int lastScoredLeg = asInt(settings.get("last_scored_leg"), 0);
+        int leg = asInt(settings.get("leg"), 0);
         if (lastScoredLeg < 1) return 0;
 
         Map<Integer, Long> managerByRoster = new HashMap<>();
@@ -77,7 +78,7 @@ public class TransactionIngestService {
         Set<Integer> finalWeeks = weekFetches.finalWeeks(league.id(), LeagueWeekFetchRepository.TRANSACTIONS);
         int count = 0;
         for (int week = 1; week <= lastScoredLeg; week++) {
-            if (finalWeeks.contains(week)) continue;
+            if (WeekFinality.mayStopRefetching(finalWeeks.contains(week), week, lastScoredLeg)) continue;
             List<Map<String, Object>> payload = sleeper.transactions(sleeperLeagueId, week);
             if (payload == null) continue;
             for (Map<String, Object> t : payload) {
@@ -87,7 +88,7 @@ public class TransactionIngestService {
                 count++;
             }
             weekFetches.record(league.id(), LeagueWeekFetchRepository.TRANSACTIONS, week, Instant.now(),
-                    WeekFinality.isFinal(week, lastScoredLeg));
+                    WeekFinality.isFinal(week, lastScoredLeg, leg));
         }
         log.info("transactions: league {} season {} -- {} stored through week {}",
                 league.id(), league.season(), count, lastScoredLeg);

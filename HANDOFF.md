@@ -1,7 +1,7 @@
 # Ball Knowers — handoff
 
 **2026-10-02, branch `handoff-014-deployed` (worktree `.claude/worktrees/handoff-014-deployed`, off
-`origin/main` `af71a6c`): three fixes, verified locally, pushed to `main` (`49c28ba` and the commit after it).**
+`origin/main` `af71a6c`): four fixes, verified locally, pushed to `main`.**
 
 - **`RefreshControllerIT` was never flaky; it is fixed.** Its `lastSuccessAt` assertion was false, and it
   passed only when Postgres rounded the stored old timestamp up. Truncating that timestamp to µs made it
@@ -22,6 +22,16 @@
   Covered by unit tests plus `ManualPickGuardsIT` (admin token, no identity → 403, nothing written).
   Backend after this: 1,064 tests, 0 skipped, 0 failed. **Not browser-verified:** the disabled control
   and the key prompt.
+- **NFL weeks are marked final a week sooner.** This was spec 013's "week 3 not final after Sleeper moved
+  to week 4". In NFL, `last_scored_leg` is the last *completed* week (measured: `leg` 4,
+  `last_scored_leg` 3, with week 4 already scoring), so the old `last_scored_leg > week` rule waited for
+  week N+1 to finish. `WeekFinality` now separates the two questions:
+  - **counted:** `leg > week && last_scored_leg >= week`;
+  - **refetching stops:** only once `week < last_scored_leg`, so stat corrections still land.
+  See the R14 amendment in specs/009 research.md. Verified live against real Sleeper on a local backend:
+  week 3 went `f` → `t`, and expected wins reports `weeksScored: 3`. Backend: 1,068 tests, 0 skipped,
+  0 failed. **Owed:** measure NBA's `last_scored_leg` mid-week after 2026-10-21; the NBA half still
+  rests on R14's unmeasured reading.
 
 ---
 

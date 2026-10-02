@@ -242,6 +242,32 @@ class LeagueHistoryIngestServiceTest {
         verify(sleeper, times(1)).matchups("L3e", 4);
     }
 
+    /**
+     * 2026-10-02, WeekFinality amendment: NFL's last_scored_leg is the last COMPLETED
+     * week (measured: leg 4, last_scored_leg 3 with week 4 already scoring). Week 3 is
+     * recorded final -- it counts -- but is still refetched while it is the last scored
+     * week, so a stat correction during week 4 lands.
+     */
+    @Test
+    void anNflWeekCountsOnceTheLeagueMovesOnButIsRefetchedUntilItIsNoLongerTheLastScored() {
+        Map<String, Object> league = leagueObject("L3n", 2026, Map.of("last_scored_leg", 3, "leg", 4), Map.of());
+        when(sleeper.leagueChain("L3n")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L3n")).thenReturn(List.of());
+        when(sleeper.rosters("L3n")).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of(1, 2, 3));
+        when(fixtures.scheduledWeeks(55L, 2026)).thenReturn(Set.of(1, 2, 3));
+        when(weekPoints.weeksWithStarters(55L)).thenReturn(Set.of(1, 2, 3));
+        when(weekFetches.finalWeeks(55L, LeagueWeekFetchRepository.POINTS)).thenReturn(Set.of(1, 2, 3));
+        when(sleeper.matchups(eq("L3n"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L3n", Set.of());
+
+        verify(sleeper, never()).matchups("L3n", 2);
+        verify(sleeper, times(1)).matchups("L3n", 3);
+        verify(weekFetches).record(eq(55L), eq(LeagueWeekFetchRepository.POINTS), eq(3), any(), eq(true));
+        verify(sleeper, never()).matchups("L3n", 4);
+    }
+
     /** ...and the other half of "final AND settled": final but unsettled is still fetched. */
     @Test
     void reRunningRefetchesFinalWeeksThatAreNotSettled() {

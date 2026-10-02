@@ -21,13 +21,43 @@ package com.ballknowers.draftsim.refresh;
  * {@code loaded_complete}, which waits for every per-game week to be final
  * (>= 48 h after the last real game), so the last fantasy week keeps being
  * refetched through exactly that correction window.
+ *
+ * <p><b>Amended 2026-10-02: the two sports read {@code last_scored_leg} differently.</b>
+ * The rule above assumed {@code last_scored_leg} is the week being played (R14's
+ * reading of NBA, reasoned, not measured mid-week). Measured on (Foot) Ball Knowers
+ * 2026 on 2026-10-02: {@code leg} 4, {@code last_scored_leg} 3, with week 4 already
+ * scoring (5 of 12 rosters had points after Thursday night). In NFL it is the last
+ * <i>completed</i> week, so "{@code last_scored_leg > week}" held week 3 non-final
+ * until week 4 finished: a week late, while Sleeper's own W-L already counted it.
+ *
+ * <p>So finality has two answers now:
+ * <ul>
+ *   <li>{@link #isFinal}: <b>counted as decided</b>. Sleeper has scored the week
+ *       ({@code last_scored_leg >= week}) and moved on ({@code leg > week}), or the old
+ *       clause holds. Where {@code last_scored_leg} tracks {@code leg} (NBA per R14,
+ *       and every complete season: both read the last week) this is the old rule
+ *       unchanged.</li>
+ *   <li>{@link #mayStopRefetching}: <b>frozen</b>. A final week is still refetched while
+ *       it is the last scored week, so an NFL stat correction made during the following
+ *       week is still picked up, exactly as before this amendment.</li>
+ * </ul>
  */
 public final class WeekFinality {
 
     private WeekFinality() {}
 
-    public static boolean isFinal(int week, int lastScoredLegAtFetch) {
+    /**
+     * @param legAtFetch Sleeper's {@code settings.leg} at fetch time; 0 when absent,
+     *                   which falls back to the original rule
+     */
+    public static boolean isFinal(int week, int lastScoredLegAtFetch, int legAtFetch) {
         if (week < 1) return false;
-        return lastScoredLegAtFetch > week;
+        if (lastScoredLegAtFetch > week) return true;
+        return legAtFetch > week && lastScoredLegAtFetch >= week;
+    }
+
+    /** Whether a stored week may be skipped: final, and no longer the last scored week. */
+    public static boolean mayStopRefetching(boolean storedFinal, int week, int lastScoredLegNow) {
+        return storedFinal && week < lastScoredLegNow;
     }
 }

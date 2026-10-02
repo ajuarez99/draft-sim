@@ -650,6 +650,9 @@ because they encoded the same assumption. A cold bug-hunting review caught it wi
 (distinct opponents per `game_date`).
 **When a rule is called sport-agnostic, count the cases that make it true in each sport, against real
 data, before writing it down.** And never infer an absence ("bye", "no game") from a period that isn't settled.
+*Second instance, 2026-10-02:* spec 009's week-finality rule read `last_scored_leg` as "the week being
+played", which was reasoned from NBA. In NFL it's the last completed week, so every NFL week was marked
+final a full week late. One `curl` of the live league settings while a week was in progress showed it.
 
 ## 30. A "flaky" test that was a false claim passing on storage rounding
 

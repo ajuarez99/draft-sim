@@ -360,6 +360,21 @@ on, the week is no longer the last scored one, so it's skipped forever.
 
 **Decision (FR-016)**: one week-finality rule for all three walks: transactions, weekly points and
 per-game weeks.
+
+**Amended 2026-10-02: the line above about `last_scored_leg` holds for NBA only (and it was reasoned,
+not measured mid-week).** Measured on (Foot) Ball Knowers 2026 that day: `leg` 4,
+`last_scored_leg` **3**, while week 4 already had scores (5 of 12 rosters after Thursday night).
+In NFL, `last_scored_leg` is the last *completed* week. So `last_scored_leg > week` held NFL week 3
+non-final until week 4 finished: a week late, while Sleeper's own W-L already counted it. Complete
+seasons read `leg == last_scored_leg` (NFL 2025 17/17, NBA 2025 21/21).
+Fix (`WeekFinality`):
+- **final (counted):** `last_scored_leg > week`, or `leg > week && last_scored_leg >= week`;
+- **refetch stops:** only once `week < last_scored_leg`, so NFL stat corrections during the next
+  week still land. For NBA, if R14's reading is right, both are the old rule unchanged.
+- **Verified live (local, real Sleeper):** week 3 was stored non-final; after one refresh it is
+  final, and expected wins reports `weeksScored: 3`.
+- **Still unmeasured:** NBA's `last_scored_leg` mid-week. Check it on the first NBA week after
+  2026-10-21.
 - A week is **final** once it was fetched while `last_scored_leg > week`, or while the league's
   status is `complete`. *(Amended after code review, 2026-09-28: the `complete` clause is dropped. It
   froze the championship week at the first fetch after completion, before stat corrections. A season
