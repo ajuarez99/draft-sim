@@ -1,7 +1,7 @@
 # Ball Knowers — handoff
 
 **2026-10-02, branch `handoff-014-deployed` (worktree `.claude/worktrees/handoff-014-deployed`, off
-`origin/main` `af71a6c`): four fixes, verified locally, pushed to `main`.**
+`origin/main` `af71a6c`): five fixes, verified locally, pushed to `main`.**
 
 - **`RefreshControllerIT` was never flaky; it is fixed.** Its `lastSuccessAt` assertion was false, and it
   passed only when Postgres rounded the stored old timestamp up. Truncating that timestamp to µs made it
@@ -32,6 +32,14 @@
   week 3 went `f` → `t`, and expected wins reports `weeksScored: 3`. Backend: 1,068 tests, 0 skipped,
   0 failed. **Owed:** measure NBA's `last_scored_leg` mid-week after 2026-10-21; the NBA half still
   rests on R14's unmeasured reading.
+- **The transaction walk reaches the week being played.** It was bounded by NFL's `last_scored_leg`
+  (the last completed week), so this week's free-agent moves weren't stored until the week finished.
+  It now walks to `max(last_scored_leg, leg)`; that week is never final, so it's refetched every
+  refresh. Readers were checked first: adds in an unscored week sort last, and pickup attribution
+  only counts scored weeks. Verified live (local, real Sleeper): week 4 went from 0 to 8 stored
+  moves, matching Sleeper's 8. Backend: 1,071 tests, 0 skipped, 0 failed.
+- **Scheduled:** a one-off desktop task, `nba-first-week-checks`, runs 2026-10-22 09:00 local. It
+  measures NBA's mid-week `last_scored_leg` and runs spec 014's V6 night-cutoff check.
 
 ---
 

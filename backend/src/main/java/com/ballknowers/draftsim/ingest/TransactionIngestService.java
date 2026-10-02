@@ -32,6 +32,14 @@ import java.util.*;
  * last leg" gate froze it that way forever -- production NBA 2025 held 24 of
  * 53 moves for week 10 and none for weeks 11-21. A week with no fetch record
  * is fetched, which heals weeks stored before the record existed.
+ *
+ * <p><b>Bounded by {@code max(last_scored_leg, leg)}, not {@code last_scored_leg}</b>
+ * (2026-10-02). In NFL {@code last_scored_leg} is the last <i>completed</i> week, so
+ * the week being played -- whose free-agent moves Sleeper already lists (measured: 8
+ * on (Foot) Ball Knowers 2026 week 4 on its Friday) -- was not stored until it
+ * finished. {@code leg} is the week being played and never runs ahead of it; unlike
+ * the results walk, an unplayed week's transactions come back empty, not as
+ * real-looking rows. That week is never final, so it is refetched every refresh.
  */
 @Service
 public class TransactionIngestService {
@@ -68,7 +76,8 @@ public class TransactionIngestService {
         Map<String, Object> settings = asMap(raw == null ? null : raw.get("settings"));
         int lastScoredLeg = asInt(settings.get("last_scored_leg"), 0);
         int leg = asInt(settings.get("leg"), 0);
-        if (lastScoredLeg < 1) return 0;
+        int lastWeek = Math.max(lastScoredLeg, leg);
+        if (lastWeek < 1) return 0;
 
         Map<Integer, Long> managerByRoster = new HashMap<>();
         for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
@@ -77,7 +86,7 @@ public class TransactionIngestService {
 
         Set<Integer> finalWeeks = weekFetches.finalWeeks(league.id(), LeagueWeekFetchRepository.TRANSACTIONS);
         int count = 0;
-        for (int week = 1; week <= lastScoredLeg; week++) {
+        for (int week = 1; week <= lastWeek; week++) {
             if (WeekFinality.mayStopRefetching(finalWeeks.contains(week), week, lastScoredLeg)) continue;
             List<Map<String, Object>> payload = sleeper.transactions(sleeperLeagueId, week);
             if (payload == null) continue;
@@ -91,7 +100,7 @@ public class TransactionIngestService {
                     WeekFinality.isFinal(week, lastScoredLeg, leg));
         }
         log.info("transactions: league {} season {} -- {} stored through week {}",
-                league.id(), league.season(), count, lastScoredLeg);
+                league.id(), league.season(), count, lastWeek);
         return count;
     }
 
