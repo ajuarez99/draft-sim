@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlayerSpotlight as PlayerSpotlightData, PlayerSpotlightApplicable, WeeklyReport } from '../api'
-import type { Block } from '../pages/LeagueHome'
-import PlayerSpotlight from './PlayerSpotlight'
+import type { Block } from '../useBlock'
+import PlayerSpotlight, { SpotlightLists } from './PlayerSpotlight'
 
 const weekly: Block<WeeklyReport> = { status: 'loading' }
 
@@ -317,5 +317,23 @@ describe('Layout: rows, toggle, tabs', () => {
     expect(screen.getByRole('tab', { name: 'Trending' })).toHaveAttribute('aria-selected', 'true')
     fireEvent.click(screen.getByRole('tab', { name: 'Top' }))
     expect(screen.getByRole('tab', { name: 'Top' })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+describe('SpotlightLists', () => {
+  // specs/015: every visited league tab keeps its lists mounted, so ids must not collide.
+  it('builds every element id from idPrefix, so two copies in one page share no id', () => {
+    const s = applicable()
+    const { container } = render(
+      <>
+        <SpotlightLists spotlight={s} weekly={weekly} idPrefix="a" />
+        <SpotlightLists spotlight={s} weekly={weekly} idPrefix="b" />
+      </>,
+    )
+    const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id)
+    expect(ids.length).toBeGreaterThan(0)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids).toContain('a-spot-tab-top')
+    expect(ids).toContain('b-spot-panel-rookies')
   })
 })

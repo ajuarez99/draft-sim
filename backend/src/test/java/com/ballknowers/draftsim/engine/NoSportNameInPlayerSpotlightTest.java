@@ -65,6 +65,15 @@ class NoSportNameInPlayerSpotlightTest {
         assertNamesNoSport("../web/src/components/PlayerSpotlight.tsx");
     }
 
+    /**
+     * specs/015: the home page's spotlight tabs. Unlike the check above this one is unconditional:
+     * the file ships in the same change, so a rename must fail here rather than skip silently.
+     */
+    @Test
+    void theHomeSpotlightComponentNamesNoSport() throws Exception {
+        assertNamesNoSport("../web/src/components/HomeSpotlight.tsx");
+    }
+
     /** The scan must be able to fail, or a green run proves nothing. */
     @Test
     void theScanActuallyCatchesASportLiteral() throws Exception {

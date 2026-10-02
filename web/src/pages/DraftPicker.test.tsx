@@ -33,6 +33,8 @@ const refreshLeague = vi.fn()
 const ingestLeague = vi.fn()
 const ingestAdp = vi.fn()
 const ingestBoard = vi.fn()
+const getPlayerSpotlight = vi.fn()
+const getWeeklyReport = vi.fn()
 vi.mock('../api', () => ({
   getDrafts: (...args: unknown[]) => getDrafts(...args),
   getMockSessions: (...args: unknown[]) => getMockSessions(...args),
@@ -42,6 +44,8 @@ vi.mock('../api', () => ({
   ingestLeague: (...args: unknown[]) => ingestLeague(...args),
   ingestAdp: (...args: unknown[]) => ingestAdp(...args),
   ingestBoard: (...args: unknown[]) => ingestBoard(...args),
+  getPlayerSpotlight: (...args: unknown[]) => getPlayerSpotlight(...args),
+  getWeeklyReport: (...args: unknown[]) => getWeeklyReport(...args),
 }))
 
 vi.mock('../user', () => ({
@@ -70,6 +74,9 @@ beforeEach(() => {
   ingestLeague.mockReset().mockResolvedValue({})
   ingestAdp.mockReset().mockResolvedValue({})
   ingestBoard.mockReset().mockResolvedValue({})
+  // specs/015: the home spotlight fetches once drafts resolve. These tests are not about it, so it stays pending.
+  getPlayerSpotlight.mockReset().mockReturnValue(new Promise(() => {}))
+  getWeeklyReport.mockReset().mockReturnValue(new Promise(() => {}))
 })
 
 describe('DraftPicker "From Sleeper"', () => {
@@ -236,5 +243,41 @@ describe('DraftPicker league rows', () => {
     await user.click(mockIt)
     // StartMockModal opens seeded with this league
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
+  })
+})
+
+// specs/015: the player spotlight sits between From Sleeper and Mock drafts.
+describe('DraftPicker player spotlight', () => {
+  const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
+    id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
+    teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
+    previousLeagueId: null, sport: 'nfl', ...over,
+  })
+
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  it('comes after From Sleeper and before Mock drafts', async () => {
+    getDrafts.mockResolvedValue([draftRow({})])
+    getSleeperUserLeagues.mockResolvedValue([nbaLeague])
+    render(<DraftPicker />)
+
+    const spotlight = await screen.findByRole('heading', { name: 'Player spotlight' })
+    const sleeper = screen.getByRole('heading', { name: 'From Sleeper' })
+    const mocks = screen.getByRole('heading', { name: 'Mock drafts' })
+    expect(sleeper.compareDocumentPosition(spotlight) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(spotlight.compareDocumentPosition(mocks) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(getPlayerSpotlight).toHaveBeenCalledWith('L1')
+  })
+
+  it('is absent, not an empty state, when there are no leagues', async () => {
+    getDrafts.mockResolvedValue([])
+    getSleeperUserLeagues.mockResolvedValue([])
+    render(<DraftPicker />)
+
+    await screen.findByRole('heading', { name: 'Mock drafts' })
+    expect(screen.queryByRole('heading', { name: 'Player spotlight' })).not.toBeInTheDocument()
+    expect(getPlayerSpotlight).not.toHaveBeenCalled()
   })
 })

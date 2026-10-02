@@ -1,5 +1,35 @@
 # Ball Knowers — handoff
 
+**2026-10-02, branch `015-home-roster-players` (worktree `.claude/worktrees/015-home-roster-players`, off
+`origin/main` `29073a1`): built and verified locally. Not committed, not pushed, not deployed.**
+
+- **What it is.** The root home page (`/`) gets spec 014's Player spotlight (Top players, Trending,
+  Rookie watch), placed between From Sleeper and Mock drafts, with **one tab per league** in "Your
+  leagues" order under the rail's sport filter. Allan's words: "like this but on the main page".
+- **How.** Frontend only: no Java production code, no migration, no `api.ts` change. Each tab calls the
+  same `/player-spotlight` (and, for football's Top list, the same `weekly-report/0`) that
+  `LeagueHome` calls, so the two pages can't disagree. `PlayerSpotlight.tsx` was split into
+  `SpotlightLists` (reused by both pages) and its unchanged wrapper. `useBlock` moved to
+  `web/src/useBlock.ts`. The new component is `components/HomeSpotlight.tsx`. Only the open tab is
+  fetched; visited tabs stay mounted, so switching back makes no request.
+- **Measured:** web 78 files / 978 tests, `tsc` clean, `npm run build` ok. The backend source scan
+  `NoSportNameInPlayerSpotlightTest` ran 5 tests, 0 skipped, now covering `HomeSpotlight.tsx`
+  unconditionally. The full backend suite was **not** re-run: no backend production code changed.
+- **Live (local, dev build, worktree servers on :8085/:5185):** quickstart V1–V12 measured and
+  passing; V13 (past-season tab) not run, since no such league exists locally, but it's covered by a
+  unit test. The home tab and the league home's spotlight are text-identical for (Foot) Ball Knowers.
+  NFL tabs pay one extra weekly-report round trip (~170 ms locally). See the Results table in
+  `specs/015-home-roster-players/quickstart.md`.
+- **The review found and fixed one bug:** a finished refresh started a wasted, cancelled weekly
+  request. Its test was shown to fail on the old code (research.md, "Amended after review").
+- **Stated trade-offs.** The home page starts no data refresh (research R7). Seen live: Trending sat
+  at "Updated 27 hours ago" until a league page was opened. NBA's night cutoff is still owed after
+  2026-10-21, inherited from 014.
+- **Not measured:** the Slow-4G time-to-"Your leagues" versus `main` (V6, partial), and anything on
+  prod.
+
+---
+
 **2026-10-02, branch `handoff-014-deployed` (worktree `.claude/worktrees/handoff-014-deployed`, off
 `origin/main` `af71a6c`): five fixes, verified locally, pushed to `main`.**
 
