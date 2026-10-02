@@ -5125,6 +5125,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    Rows reuse .lh-row; "Yours" and "Free agent" are tinted pills with the word, never
    colour alone. Three columns on the dashboard's own grid; a segmented control on phones. */
 .lh-spotlight { margin-top: 16px; }
+/* specs/015: the same lists on the root home page under a league tab strip. The strip scrolls
+   within itself so the page never scrolls sideways at 375px (FR-011). */
+.home-spotlight { margin-top: 16px; }
+.home-spot-leagues { display: flex; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); overflow-x: auto; scrollbar-width: thin; min-width: 0; }
+.home-spot-league { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; white-space: nowrap; color: var(--muted); background: none; cursor: pointer; }
+.home-spot-league[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
 .lh-spotlight-tag { font-weight: 600; color: var(--teal); }
 .lh-spot-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
 .lh-spot-section { margin-top: 14px; min-width: 0; }

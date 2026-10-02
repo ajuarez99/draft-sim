@@ -8,7 +8,7 @@ import type {
   SpotlightTrendingEntry,
   WeeklyReport,
 } from '../api'
-import type { Block } from '../pages/LeagueHome'
+import type { Block } from '../useBlock'
 import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
 import { SkeletonRows } from './Skeleton'
@@ -74,9 +74,34 @@ function readTab(): TabKey {
 }
 
 export default function PlayerSpotlight({ spotlight, weekly }: Props) {
+  if (!spotlight.applies) return null
+  return (
+    <section className="section lh-spotlight" aria-labelledby="lh-spotlight-h">
+      <h2 className="section-title" id="lh-spotlight-h">
+        Player spotlight
+      </h2>
+      <SpotlightLists spotlight={spotlight} weekly={weekly} idPrefix="lh" />
+    </section>
+  )
+}
+
+/**
+ * specs/015 research R3: the phone segmented control plus the three columns, without the
+ * section chrome, so the root home page can mount one per league tab. Element ids come from
+ * `idPrefix` (several copies can be in the DOM at once); the league home passes "lh", which keeps
+ * its ids exactly as they were. The chosen list is shared across both pages through TAB_KEY.
+ */
+export function SpotlightLists({
+  spotlight,
+  weekly,
+  idPrefix,
+}: {
+  spotlight: PlayerSpotlightApplicable
+  weekly: Block<WeeklyReport>
+  idPrefix: string
+}) {
   const [tab, setTab] = useState<TabKey>(readTab)
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({})
-  if (!spotlight.applies) return null
 
   const choose = (key: TabKey, focus = false) => {
     setTab(key)
@@ -97,10 +122,7 @@ export default function PlayerSpotlight({ spotlight, weekly }: Props) {
   }
 
   return (
-    <section className="section lh-spotlight" aria-labelledby="lh-spotlight-h">
-      <h2 className="section-title" id="lh-spotlight-h">
-        Player spotlight
-      </h2>
+    <>
       {/* Phones only (CSS): one list at a time. */}
       <div className="lh-spot-tabs" role="tablist" aria-label="Player spotlight lists">
         {TABS.map((t, i) => (
@@ -108,9 +130,9 @@ export default function PlayerSpotlight({ spotlight, weekly }: Props) {
             key={t.key}
             type="button"
             role="tab"
-            id={`lh-spot-tab-${t.key}`}
+            id={`${idPrefix}-spot-tab-${t.key}`}
             aria-selected={tab === t.key}
-            aria-controls={`lh-spot-panel-${t.key}`}
+            aria-controls={`${idPrefix}-spot-panel-${t.key}`}
             tabIndex={tab === t.key ? 0 : -1}
             ref={(el) => {
               tabRefs.current[t.key] = el
@@ -126,14 +148,14 @@ export default function PlayerSpotlight({ spotlight, weekly }: Props) {
       <div className="lh-spot-cols">
         {/* Present only when the sport has a per-night list; football uses the weekly report. */}
         {spotlight.topOfNight ? (
-          <TopOfNight spotlight={spotlight} active={tab === 'top'} />
+          <TopOfNight spotlight={spotlight} active={tab === 'top'} idPrefix={idPrefix} />
         ) : (
-          <TopOfWeek spotlight={spotlight} weekly={weekly} active={tab === 'top'} />
+          <TopOfWeek spotlight={spotlight} weekly={weekly} active={tab === 'top'} idPrefix={idPrefix} />
         )}
-        <Trending spotlight={spotlight} active={tab === 'trending'} />
-        <RookieWatch spotlight={spotlight} active={tab === 'rookies'} />
+        <Trending spotlight={spotlight} active={tab === 'trending'} idPrefix={idPrefix} />
+        <RookieWatch spotlight={spotlight} active={tab === 'rookies'} idPrefix={idPrefix} />
       </div>
-    </section>
+    </>
   )
 }
 
@@ -141,12 +163,14 @@ export default function PlayerSpotlight({ spotlight, weekly }: Props) {
 
 function Section({
   tabKey,
+  idPrefix,
   active,
   title,
   tag,
   children,
 }: {
   tabKey: TabKey
+  idPrefix: string
   active: boolean
   title: string
   tag?: React.ReactNode
@@ -156,8 +180,8 @@ function Section({
     <div
       className="lh-spot-section"
       role="tabpanel"
-      id={`lh-spot-panel-${tabKey}`}
-      aria-labelledby={`lh-spot-tab-${tabKey}`}
+      id={`${idPrefix}-spot-panel-${tabKey}`}
+      aria-labelledby={`${idPrefix}-spot-tab-${tabKey}`}
       data-active={active}
     >
       <h3 className="lh-spot-h">
@@ -208,13 +232,13 @@ function emptyText(s: PlayerSpotlightApplicable, unavailable: string | null): st
   return 'Nothing to show yet.'
 }
 
-function TopOfNight({ spotlight, active }: { spotlight: PlayerSpotlightApplicable; active: boolean }) {
+function TopOfNight({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const section = spotlight.topOfNight
   if (!section) return null
   const period = spotlight.period
   const night = period?.kind === 'NIGHT' ? period : null
   return (
-    <Section tabKey="top" active={active} title={night ? `Top players · ${formatCalendarDate(night.date)}` : 'Top players'}>
+    <Section tabKey="top" idPrefix={idPrefix} active={active} title={night ? `Top players · ${formatCalendarDate(night.date)}` : 'Top players'}>
       {night && (
         <p className="muted small">
           {night.gamesCount} {night.gamesCount === 1 ? 'game' : 'games'}
@@ -251,7 +275,17 @@ function TopOfNight({ spotlight, active }: { spotlight: PlayerSpotlightApplicabl
   )
 }
 
-function TopOfWeek({ spotlight, weekly, active }: { spotlight: PlayerSpotlightApplicable; weekly: Block<WeeklyReport>; active: boolean }) {
+function TopOfWeek({
+  spotlight,
+  weekly,
+  active,
+  idPrefix,
+}: {
+  spotlight: PlayerSpotlightApplicable
+  weekly: Block<WeeklyReport>
+  active: boolean
+  idPrefix: string
+}) {
   const period = spotlight.period
   const spotlightWeek = period?.kind === 'WEEK' ? period.week : null
   // Labelled from the data actually rendered below (the weekly report), never from the spotlight's own week.
@@ -293,6 +327,7 @@ function TopOfWeek({ spotlight, weekly, active }: { spotlight: PlayerSpotlightAp
   return (
     <Section
       tabKey="top"
+      idPrefix={idPrefix}
       active={active}
       title={shownWeek != null && period ? `Top players · Week ${shownWeek}` : 'Top players'}
       tag={shownWeek != null ? notFinalTag(period) : null}
@@ -330,10 +365,10 @@ function periodPrefix(period: SpotlightPeriod | null): string | undefined {
   return period.kind === 'NIGHT' ? shortDate(period.date) : `Wk ${period.week}`
 }
 
-function Trending({ spotlight, active }: { spotlight: PlayerSpotlightApplicable; active: boolean }) {
+function Trending({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const t = spotlight.trending
   return (
-    <Section tabKey="trending" active={active} title={`Trending · last ${t.lookbackHours}h`}>
+    <Section tabKey="trending" idPrefix={idPrefix} active={active} title={`Trending · last ${t.lookbackHours}h`}>
       {t.stale && t.fetchedAt && <p className="muted small">Updated {relativeAge(t.fetchedAt)} ago</p>}
       {t.entries.length === 0 ? (
         <p className="muted small">
@@ -378,12 +413,13 @@ function Trending({ spotlight, active }: { spotlight: PlayerSpotlightApplicable;
   )
 }
 
-function RookieWatch({ spotlight, active }: { spotlight: PlayerSpotlightApplicable; active: boolean }) {
+function RookieWatch({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const section = spotlight.rookieWatch
   const period = spotlight.period
   return (
     <Section
       tabKey="rookies"
+      idPrefix={idPrefix}
       active={active}
       title={period ? `Rookie watch · ${periodLabel(period)}` : 'Rookie watch'}
       tag={notFinalTag(period)}

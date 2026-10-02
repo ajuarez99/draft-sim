@@ -11,6 +11,7 @@ import { useSportFilter, type SportFilter } from '../sportFilter'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
+import HomeSpotlight from '../components/HomeSpotlight'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
 import {
@@ -500,6 +501,14 @@ export default function DraftPicker() {
                 })}
             </div>
           </section>
+        )}
+
+        {/* specs/015: the player spotlight, one tab per league in "Your leagues" order. Its own
+            fetch starts only once `drafts` has resolved and never gates the sections around it. */}
+        {drafts && (
+          <HomeSpotlight
+            leagues={visibleLineages.map(({ current: d }) => ({ leagueId: d.sleeperLeagueId, name: d.leagueName, sport: d.sport }))}
+          />
         )}
 
         <section className="section picker-section">

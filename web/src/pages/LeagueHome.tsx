@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
@@ -25,13 +24,15 @@ import {
   type SuperlativesResponse,
   type WeeklyReport,
 } from '../api'
-import { isNotFound } from '../apiError'
 import { LEAGUE_DESTINATIONS } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { useBlock, type Block } from '../useBlock'
 import { cachedDrafts } from '../railLeague'
 import { ordinal } from '../rankOrder'
 import { buildHeadline, computeWeeklyStory, leagueVoteHero } from './PowerRankings'
 import { TITLES } from './Superlatives'
+
+export type { Block } from '../useBlock'
 
 /**
  * specs/013 US4: League home, the page a league's name leads to.
@@ -53,35 +54,6 @@ import { TITLES } from './Superlatives'
  * side, an analysis side), never a client-side name match. A reader who is not
  * in the league gets no "you" blocks and no error.
  */
-
-export type Block<T> = { status: 'idle' } | { status: 'loading' } | { status: 'error'; notFound: boolean } | { status: 'ok'; data: T }
-
-/** One endpoint, one block. `load` null means "this block does not apply"
- *  (idle): rendered as nothing, never as an empty state. */
-function useBlock<T>(load: (() => Promise<T>) | null, deps: readonly unknown[]): Block<T> {
-  const [state, setState] = useState<Block<T>>(load ? { status: 'loading' } : { status: 'idle' })
-  useEffect(() => {
-    if (!load) {
-      setState({ status: 'idle' })
-      return
-    }
-    let cancelled = false
-    setState({ status: 'loading' })
-    load()
-      .then((data) => {
-        if (!cancelled) setState({ status: 'ok', data })
-      })
-      .catch((e) => {
-        if (!cancelled) setState({ status: 'error', notFound: isNotFound(e) })
-      })
-    return () => {
-      cancelled = true
-    }
-    // `load` is a fresh closure every render; `deps` is the real identity of the request.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
-  return state
-}
 
 /** Football-only on the destination table's own rule, not a second copy of it. */
 function analysisOffered(sport: Sport): boolean {
