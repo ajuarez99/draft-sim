@@ -150,6 +150,8 @@ export type SeatsResponse = {
    * Sleeper's number; simply following Sleeper does not.
    */
   reversalRoundOverridden: boolean
+  /** Whether this caller is the league's Sleeper commissioner: only they may change the reversal round. Mirrors LeagueController.seats(). */
+  canCommission: boolean
 }
 
 export type SimRequest = {
@@ -555,7 +557,7 @@ export const clearTendencies = (managerId: number, sport: Sport) =>
  * carries, so the caller can re-render without refetching seats.
  */
 export const setReversalRound = (draftId: string, reversalRound: number | null) =>
-  apiFetch(`/api/drafts/${draftId}/reversal-round`, {
+  commissionerFetch(`/api/drafts/${draftId}/reversal-round`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reversalRound }),

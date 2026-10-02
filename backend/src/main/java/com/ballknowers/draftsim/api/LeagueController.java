@@ -212,6 +212,9 @@ public class LeagueController {
         response.put("reversalRound", reversal.effective());
         response.put("reversalRoundFromSleeper", reversal.fromSleeper());
         response.put("reversalRoundOverridden", reversal.override() != null);
+        // Whether this caller may change it (2026-10-02): the override re-lays the board
+        // for every viewer, so it is a commissioner action like /power/compute.
+        response.put("canCommission", membership.canCommission(draft.get().leagueId(), sleeperUserId));
         return ResponseEntity.ok(response);
     }
 
@@ -235,6 +238,10 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
+        // Commissioner action since 2026-10-02 (spec 013's open follow-up): any member could
+        // re-lay every viewer's board. Same two gates as /power/compute; the 409 below sits
+        // between them because a draft's status is something every member can already see.
+        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
 
         // 409 on a finished draft. The board places every cell by recomputing its
         // pick number from (round, slot, reversalRound) -- DraftBoard.tsx's
@@ -245,6 +252,11 @@ public class LeagueController {
         if ("complete".equals(draft.status())) {
             return ResponseEntity.status(409).body(Map.of("message",
                     "draft " + sleeperDraftId + " is complete -- its reversal round can no longer be overridden"));
+        }
+
+        if (!membership.canCommission(draft.leagueId(), sleeperUserId)) {
+            return ResponseEntity.status(403).body(Map.of("message",
+                    "only this league's Sleeper commissioner may change the reversal round"));
         }
 
         Integer override = body == null ? null : body.reversalRound();

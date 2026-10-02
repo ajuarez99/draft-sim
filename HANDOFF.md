@@ -1,7 +1,7 @@
 # Ball Knowers — handoff
 
 **2026-10-02, branch `handoff-014-deployed` (worktree `.claude/worktrees/handoff-014-deployed`, off
-`origin/main` `af71a6c`): two fixes, verified locally, not committed.**
+`origin/main` `af71a6c`): three fixes, verified locally, pushed to `main` (`49c28ba` and the commit after it).**
 
 - **`RefreshControllerIT` was never flaky; it is fixed.** Its `lastSuccessAt` assertion was false, and it
   passed only when Postgres rounded the stored old timestamp up. Truncating that timestamp to µs made it
@@ -15,8 +15,13 @@
   Web 957/957, `tsc` clean.
 - **Not verified:** the key prompt on History's Compute in a live browser. The same mechanism is live for
   `/power/compute`.
-- **Still open:** the reversal-round override (`PUT /drafts/{id}/reversal-round`) is still any-member.
-  It has live UI in the draft view, so gating it is a product call, not done here.
+- **The reversal-round override (`PUT /drafts/{id}/reversal-round`) is now commissioner-gated too.**
+  It re-lays every viewer's board. Order: visible → admin token → 409 if the draft is complete → Sleeper
+  commissioner (403). `GET /drafts/{id}/seats` gained `canCommission` (mirrored in `api.ts`). The draft
+  view still shows members the setting, disabled, with "Only the league's commissioner can change this."
+  Covered by unit tests plus `ManualPickGuardsIT` (admin token, no identity → 403, nothing written).
+  Backend after this: 1,064 tests, 0 skipped, 0 failed. **Not browser-verified:** the disabled control
+  and the key prompt.
 
 ---
 

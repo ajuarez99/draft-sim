@@ -158,4 +158,15 @@ class ManualPickGuardsIT {
         assertEquals(409, response.getStatusCode().value());
         assertNull(drafts.reversalRound(draftId).orElseThrow().override());
     }
+
+    @Test
+    void reversalRoundOnAnOpenDraftNeedsTheCommissionerNotJustTheAdminToken() {
+        // 2026-10-02: the admin token alone is the operator, not this league's commissioner.
+        ResponseEntity<?> response;
+        try (var admin = TestAdmin.asAdmin()) {
+            response = controller.setReversalRound(DRAFT, new LeagueController.ReversalRoundBody(3), null);
+        }
+        assertEquals(403, response.getStatusCode().value());
+        assertNull(drafts.reversalRound(draftId).orElseThrow().override());
+    }
 }

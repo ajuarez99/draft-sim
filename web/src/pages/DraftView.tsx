@@ -749,7 +749,7 @@ export default function DraftView() {
                   snake reversal
                   <select
                     value={seats.reversalRoundOverridden ? String(seats.reversalRound) : 'sleeper'}
-                    disabled={savingReversal}
+                    disabled={savingReversal || !seats.canCommission}
                     onChange={(e) => void changeReversalRound(e.target.value)}
                   >
                     <option value="sleeper">
@@ -780,7 +780,8 @@ export default function DraftView() {
                     + 'each round starts where a plain snake would have ended — Sleeper’s '
                     + '“reversal round”. Nothing in this app has ever run against a real '
                     + 'draft that does this.'}
-                {seats.reversalRoundOverridden && ' You set this; Sleeper said '
+                {!seats.canCommission && ' Only the league’s commissioner can change this.'}
+                {seats.reversalRoundOverridden && (seats.canCommission ? ' You set this' : ' The commissioner set this') + '; Sleeper said '
                   + (seats.reversalRoundFromSleeper === 0
                     ? 'it never flips.'
                     : `it flips from round ${seats.reversalRoundFromSleeper}.`)}

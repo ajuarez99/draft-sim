@@ -379,7 +379,7 @@ class LeagueControllerManualPickTest {
     void reversalRoundOnACompleteDraftIs409() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("complete")));
 
-        assertEquals(409, controller()
+        assertEquals(409, controllerAsOperator()
                 .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
                 .getStatusCode().value());
         verify(drafts, never()).setReversalRoundOverride(anyLong(), any());
@@ -388,10 +388,33 @@ class LeagueControllerManualPickTest {
     @Test
     void reversalRoundOnAPreDraftDraftIsStillAccepted() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+        when(membership.canCommission(anyLong(), eq("u-alice"))).thenReturn(true);
 
-        assertEquals(200, controller()
+        assertEquals(200, controllerAsOperator()
                 .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
                 .getStatusCode().value());
         verify(drafts).setReversalRoundOverride(1L, 3);
+    }
+
+    @Test
+    void reversalRoundFromAMemberWhoIsNotTheCommissionerIs403EvenWithTheAdminToken() {
+        // 2026-10-02: the override re-lays every viewer's board, so only the commissioner may set it.
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+        when(membership.canCommission(anyLong(), eq("u-bob"))).thenReturn(false);
+
+        assertEquals(403, controllerAsOperator()
+                .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-bob")
+                .getStatusCode().value());
+        verify(drafts, never()).setReversalRoundOverride(anyLong(), any());
+    }
+
+    @Test
+    void reversalRoundWithoutTheAdminTokenIsRefusedEvenForTheCommissioner() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+
+        assertEquals(403, controller()
+                .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
+                .getStatusCode().value());
+        verify(drafts, never()).setReversalRoundOverride(anyLong(), any());
     }
 }
