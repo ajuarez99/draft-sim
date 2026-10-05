@@ -269,6 +269,10 @@ Deliberately not planned here, with the reason:
   need a rest-of-season value model per player, and for basketball they need a projection source that
   does not exist. Planning them now would either commit to a football-only design or invent an NBA
   projection source on speculation. They get a documented seam, not an implementation.
+  > **Amended 2026-10-05 (spec 016):** the basketball half of this reason was wrong. Sleeper's
+  > `/projections/nba/{season}/{week}` returns per-game RotoWire projections (measured,
+  > `claude/projection-tools.md`). The tools are still out of scope here, but for want of building,
+  > not of a source.
 - **Historian** — an LLM Q&A surface over league data. It is a different kind of feature (a model
   integration, not an analysis), and it is worth doing only once the data it would answer from exists.
   This roadmap is what creates that data.

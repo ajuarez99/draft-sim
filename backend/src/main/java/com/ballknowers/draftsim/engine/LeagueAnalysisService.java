@@ -439,15 +439,12 @@ public class LeagueAnalysisService {
                             + " are scored), so there is nothing left to project");
         }
 
-        // Said before the cache is consulted, because for a sport with no
-        // projection source the cache will ALWAYS be empty and the "go and
+        // Said before the cache is consulted, because for a sport whose
+        // projections aren't ingested the cache will ALWAYS be empty and the "go and
         // ingest them" advice below would point at an endpoint that answers
         // 400. A reason the reader cannot act on is worse than no reason.
         if (league.sport() != Sport.NFL) {
-            return unavailable(groups, matchupWeek,
-                    "roster projections are football-only: the projection source wired up is Sleeper's"
-                            + " own weekly points (pts_ppr and friends), which has no "
-                            + league.sport().code() + " equivalent. See claude/league-analysis.md's non-goals.");
+            return unavailable(groups, matchupWeek, projectionsNotBuiltReason(league.sport()));
         }
 
         Map<String, Double> restOfSeason =
@@ -479,6 +476,20 @@ public class LeagueAnalysisService {
     private static Blocks unavailable(List<String> groups, int week, String reason) {
         return new Blocks(new Projections(false, reason, groups, List.of()),
                 new Matchups(false, reason, week, List.of()));
+    }
+
+    /**
+     * What a non-football league is told in place of roster projections
+     * (specs/016). It says only what is true of this app -- projections are
+     * not built for that sport yet -- and deliberately nothing about whether a
+     * source exists upstream. That claim used to be made ("no nba equivalent")
+     * and was false: Sleeper serves per-game NBA projections, measured
+     * 2026-10-05 (claude/projection-tools.md). For any other sport it would be
+     * unmeasured, and for basketball it goes stale the day they are wired up.
+     */
+    static String projectionsNotBuiltReason(Sport sport) {
+        return "Roster projections aren't built for " + sport.code()
+                + " leagues yet: so far this app only has football projections.";
     }
 
     private static String noProjectionsStored(LeagueRepository.LeagueRow league, int fromWeek, int toWeek) {

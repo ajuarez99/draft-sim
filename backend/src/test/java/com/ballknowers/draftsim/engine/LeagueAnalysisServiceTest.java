@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueAnalysisService.LineupPlayer;
 import com.ballknowers.draftsim.engine.LeagueAnalysisService.Matchup;
 import com.ballknowers.draftsim.engine.LeagueAnalysisService.RosterProjection;
@@ -365,5 +366,25 @@ class LeagueAnalysisServiceTest {
         assertTrue(svc.rankingScores(league, 2, 2).gradesEarly(), "unavailable shape still states it");
         assertTrue(svc.rankingScores(league, 3, 3).gradesEarly());
         assertFalse(svc.rankingScores(league, 4, 4).gradesEarly());
+    }
+
+    /**
+     * specs/016: the reason a basketball league gets in place of roster
+     * projections. It used to say Sleeper's projections have "no nba
+     * equivalent" -- false: Sleeper serves per-game NBA projections, measured
+     * 2026-10-05 (claude/projection-tools.md, research R0). The reason now says
+     * only what is true here -- not built yet -- and asserts nothing about
+     * whether a source exists, which would go stale or be unmeasured.
+     */
+    @Test
+    void basketballIsToldProjectionsArentBuiltYetNotThatNoSourceExists() {
+        String reason = LeagueAnalysisService.projectionsNotBuiltReason(Sport.NBA);
+        assertEquals("Roster projections aren't built for nba leagues yet: "
+                + "so far this app only has football projections.", reason);
+        assertTrue(reason.contains("aren't built"));
+        assertTrue(reason.contains("nba"));
+        assertFalse(reason.contains("equivalent"), reason);
+        assertFalse(reason.contains("/api/ingest"), reason);
+        assertFalse(reason.contains("POST /api/"), reason);
     }
 }

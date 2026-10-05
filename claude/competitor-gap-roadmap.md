@@ -26,6 +26,11 @@ reading the code, not from building anything. Treat them as guesses.
 
 ## Phase 0: fix what's wrong now (S, this week)
 
+> **Amended 2026-10-05 (spec 016 planning):** "a false statement on a live page" overstated it.
+> Analysis is `sports: ['nfl']` in `web/src/destinations.ts`, so no basketball league links to it.
+> The message reaches only a direct URL or an API caller. Still worth fixing (it's false). Spec 016
+> also found a second copy in the projection-ingest 400.
+
 | Item | Doc | Why now |
 |---|---|---|
 | Reword the "no nba equivalent" projection message | [projection-tools.md](projection-tools.md) | `LeagueAnalysisService.java:448-450` tells users something false. Reword it to "not wired up for basketball yet". Wiring real NBA projections is Phase 3. |
