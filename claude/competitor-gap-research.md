@@ -17,6 +17,8 @@ evidence behind it.
 >   004" below was withdrawn because spec 013 had already acted on it.
 > - All file:line references and migration numbers (highest is now V26) updated.
 
+**What to build next, in order:** [competitor-gap-roadmap.md](competitor-gap-roadmap.md).
+
 ## Sources looked at
 
 ffwrapped, FantasyPros (My Playbook), DraftSharks, StatsGuy Fantasy's Sleeper
