@@ -48,9 +48,9 @@ public class WebConfig implements WebMvcConfigurer {
                 // split-origin deploy (DEPLOY.md: Vercel frontend + Fly/Railway
                 // backend) needs it allowed here or the browser's preflight
                 // rejects every request, not just the ones that read it.
-                // X-Admin-Token: the operator/commissioner key (AdminAccess). Same
-                // reasoning as X-Sleeper-User: without it the preflight rejects the
-                // commissioner writes the browser sends it on.
+                // X-Admin-Token: the operator's key (AdminAccess). The web app stopped
+                // sending it on 2026-10-05, when commissioner writes dropped it; still
+                // allowed so an operator calling from a browser isn't preflight-rejected.
                 .allowedHeaders("Authorization", "Content-Type", "X-Sleeper-User", "X-Admin-Token")
                 .maxAge(3600);
     }

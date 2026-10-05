@@ -173,7 +173,7 @@ Set on the `draft-sim` (backend) service unless noted.
 | `LOG_LEVEL` | `INFO` in production; defaults to `DEBUG` |
 | `WEIGHTS_FILE` | The image sets it to `/app/config/weights.yml` |
 | `DB_POOL_SIZE` | Defaults to 10 |
-| `APP_OWNER_SLEEPER_USER_ID` | **A seat-preselect default only, never an authorization.** It picks which draft seat to highlight; a header-less request is no longer let through because of it. (It still satisfies the commissioner *identity* check, but that check is now backed by `ADMIN_TOKEN`, which is what actually gates) |
+| `APP_OWNER_SLEEPER_USER_ID` | **A seat-preselect default only, never an authorization.** It picks which draft seat to highlight; a header-less request is no longer let through because of it. (It still satisfies the commissioner *identity* check, which since 2026-10-05 is an honour system, not a gate) |
 | `VITE_API_BASE` | **Frontend service.** Baked in at Docker *build* time |
 
 **`VITE_API_BASE` is inlined by Vite at build time**, so changing it requires a
@@ -194,7 +194,7 @@ says so.
 | Mechanism | Header | Blank/unset means | Protects |
 |---|---|---|---|
 | Sign-in identity | `X-Sleeper-User` | **the request sees nothing league-scoped** (it used to see everything) | league, draft, mock, refresh, manager routes |
-| Admin token (`ADMIN_TOKEN`) | `X-Admin-Token` | admin **disabled**, its routes refuse | `/api/ingest/**`, commissioner-only actions, curl override |
+| Admin token (`ADMIN_TOKEN`) | `X-Admin-Token` | admin **disabled**, its routes refuse | `/api/ingest/**`, curl override (commissioner actions until 2026-10-05) |
 | Shared bearer (`API_TOKEN`) | `Authorization: Bearer` | gate **off**, every route open | a blanket gate; currently unused in production |
 
 **What changed on 2026-09-29 (claude/audit-2026-09-28/01 and /04, option D).** Before it,
@@ -224,12 +224,12 @@ only override is a valid `X-Admin-Token`.
   work, authorised by membership (the caller must be signed in and appear in the league, by
   our data or by Sleeper's public league-users list). `POST /api/refresh/players` needs an
   identity.
-- **Commissioner-only actions** (conduct-list add/remove, the commissioner ranking, and
-  "Recompute", i.e. `/power/compute`, which used to check membership only) need the admin
-  token **and** the commissioner identity. The identity is a header anyone can copy out of
-  Sleeper's public `GET /league/{id}/users` (`is_owner: true`), so the token is what actually
-  gates. In the browser the commissioner is asked for the key once; it is kept in
-  `localStorage` on that device, with a Clear control beside the controls.
+- **Commissioner-only actions** (conduct-list add/remove, the commissioner ranking,
+  "Recompute" (`/power/compute`), History's backfill, and a draft's reversal-round override)
+  check the commissioner identity only. **Amended 2026-10-05:** from 2026-09-29 to 2026-10-05
+  they also needed the admin token, but there was no way to get that token to another league's
+  commissioner short of handing over the operator's secret, so in practice only the operator
+  could use them. They are now on the honour system, like ballots (see below).
 
 **Operator escape hatches (curl).** A valid `X-Admin-Token` lets a request with *no*
 `X-Sleeper-User` through the membership checks. This is the draft-night manual pick:
@@ -238,7 +238,7 @@ only override is a valid `X-Admin-Token`.
          -d '{"pickNo":17,"sleeperPlayerId":"4046"}' https://api.ballknowers.co/api/drafts/<id>/picks
 
 The token overrides only a *blank* identity; a named stranger stays a stranger. A commissioner
-action from curl needs the commissioner's `X-Sleeper-User` as well as the token.
+action from curl needs the commissioner's `X-Sleeper-User` (and, since 2026-10-05, no token).
 
 **Local dev:** `ADMIN_TOKEN` defaults to blank, so locally `/api/ingest/**` **refuses** too. Set
 one in the shell that runs `bootRun` (`ADMIN_TOKEN=dev ./gradlew bootRun`) and pass
@@ -254,8 +254,13 @@ one in the shell that runs `bootRun` (`ADMIN_TOKEN=dev ./gradlew bootRun`) and p
   hands every visitor every league, and no longer gives anonymous callers *more* than members.
 - **Ballots are on the honour system.** `POST /leagues/{id}/ballot` maps to whatever member id
   the request names, so a member's id (public) is enough to submit or overwrite their ballot.
-  Option D covers commissioner actions only; the ballot UI now says ballots are not verified.
-  Real protection needs identity the app issues itself (audit plan 04, option B).
+  The ballot UI says ballots are not verified. Real protection needs identity the app issues
+  itself (audit plan 04, option B).
+- **Commissioner actions are on the honour system too** (since 2026-10-05). The commissioner
+  identity is a header anyone can copy from Sleeper's public `GET /league/{id}/users`
+  (`is_owner: true`), so anyone who looks it up can save a commissioner ranking, edit the
+  conduct list, recompute power rankings, or change a draft's reversal round. Accepted
+  deliberately: these are for fun, and the UI says so beside the controls.
 - The setup routes are bounded by membership, not by rate: a member can re-run their own
   league's ingest as often as they like. `POST /api/refresh/players` is "once per sport per UTC
   day" only in the steady state: concurrent first calls, and calls while Sleeper's player

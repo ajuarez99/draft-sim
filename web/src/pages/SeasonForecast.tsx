@@ -4,7 +4,7 @@ import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import { computePowerRankings, getSeasonForecast, type SeasonForecast as Data, type ForecastTeam } from '../api'
-import CommissionerKeyNote from '../components/CommissionerKeyNote'
+import CommissionerHonourNote from '../components/CommissionerHonourNote'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import PersonName from '../components/PersonName'
@@ -279,7 +279,7 @@ function RecomputeControl({
       >
         {computing ? 'Computing…' : label}
       </button>{' '}
-      <CommissionerKeyNote />
+      <CommissionerHonourNote />
     </p>
   )
 }
