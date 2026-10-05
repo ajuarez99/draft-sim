@@ -80,8 +80,16 @@ football-only. Don't restate the rule anywhere else;
 
 ## Acceptance criteria
 
-1. Stored schedule row count = 1,200 for nba/2026, and every team's season total
-   = 82 (assert).
+> **Amended 2026-10-05 (spec 017 planning):** #1 was wrong. On 2026-10-05 every team
+> has **80** games in Sleeper's 2026 schedule, not 82. The 2025 schedule grew to 1,235
+> rows by season's end. It kept postponed games beside their makeups (six teams at 83
+> raw rows), plus a canceled All-Star `STP`/`STR` game, and NYK/SAS also read 83. So
+> the stored schedule must be replaceable, and counts must skip postponed/canceled
+> games. Spec 017's SC-001 (stored = fetched) and SC-003 (2025 counted totals: 82,
+> NYK/SAS 83) replace #1. See `specs/017-nba-schedule-grid/research.md` R1.
+
+1. ~~Stored schedule row count = 1,200 for nba/2026, and every team's season total
+   = 82 (assert).~~ Superseded, see the note above.
 2. Grid week-1 counts match the measurement above (5×2, 24×3, 1×4), or the doc
    is amended if Sleeper's schedule changed.
 3. Streaming candidates exclude every player rostered in that league
