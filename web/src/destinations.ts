@@ -175,10 +175,11 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     formerLabel: 'Analysis',
     glyph: '◫',
     // Football-only on its own terms rather than by a shared sport gate: two of
-    // this page's three blocks are rest-of-season projections, and the only
-    // projection source wired up (Sleeper's pts_ppr and friends) has no
-    // basketball equivalent. A basketball league reaching it would get one
-    // working block and two explaining themselves. See claude/league-analysis.md.
+    // this page's three blocks are rest-of-season projections, and basketball
+    // projections aren't wired up yet. Sleeper does serve them
+    // (claude/projection-tools.md), but only football's are ingested. A
+    // basketball league reaching it would get one working block and two
+    // explaining themselves. See claude/league-analysis.md.
     sports: ['nfl'],
     label: 'Team strength',
     // one season: the page reads the season it is opened on

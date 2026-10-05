@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -140,5 +141,27 @@ class IngestControllerTest {
         verify(ffcAdp).ingest(Sport.NFL);
         verify(boards).rebuild(Sport.NFL);
         verify(profiles).persistFitted(Sport.NFL);
+    }
+
+    // ---- POST /api/ingest/projections ----
+
+    /**
+     * specs/016: basketball projection ingest is still refused -- the stored
+     * columns are football scoring totals -- but no longer on the false ground
+     * that Sleeper has "no basketball equivalent". It serves per-game NBA
+     * projections (measured 2026-10-05, claude/projection-tools.md).
+     */
+    @Test
+    void projectionsWithNbaAreStillRefusedButNotForWantOfASource() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> controller().projections("nba", 2026, 1, 1, false));
+        assertEquals("projections are football-only for now: the stored columns are Sleeper's "
+                + "pts_ppr / pts_half_ppr / pts_std, which are football scoring totals. "
+                + "Basketball projections need per-game stat lines scored with each league's "
+                + "settings, which isn't built yet (claude/projection-tools.md).", e.getMessage());
+        assertFalse(e.getMessage().contains("equivalent"), e.getMessage());
+        assertFalse(e.getMessage().contains("/api/ingest"), e.getMessage());
+        assertFalse(e.getMessage().contains("POST /api/"), e.getMessage());
+        verifyNoInteractions(projectionIngest);
     }
 }

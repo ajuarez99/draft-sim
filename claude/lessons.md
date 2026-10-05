@@ -668,3 +668,22 @@ showing an older played season. Mutation-checked: reverting either guarded behav
 **A test that fails "sometimes" with no concurrency in the asserted value is a deterministic bug
 plus a coin flip. Find the coin before re-running.** And compare timestamps that went through the
 DB at the column's precision (`truncatedTo(MICROS)` for `timestamptz`), or `isAfter` can pass on rounding.
+
+## 31. A guard test's javadoc is not its rule set
+
+Spec 016 rewrote two user-facing strings and planned them against
+`NoIngestHintsInMessagesTest`. The plan read the class javadoc, "fails if a string literal
+contains `/api/ingest` or `POST /api/`", and wrote wording that avoided both. Both strings
+still failed. `hasHint` has a second rule, added during live verification on 2026-09-28 and
+documented only in an inline comment: any sentence-like literal (one with a space) that
+uses the word "ingest" at all fails as developer jargon. The javadoc was never updated.
+The fix was the text ("only has football projections"), not the scanner.
+**When a guard test constrains what you're about to write, read its assertion code, not
+its summary.** A guard that grows by accretion documents its first rule and enforces all
+of them.
+
+Same feature, same class of miss, one layer out: the plan's live checks assumed
+`GET /analysis` and `POST /ingest/projections` were open locally. Since spec 013 / the
+honour-system change, one needs a member's `X-Sleeper-User` (else 404, by design) and the
+other `X-Admin-Token` (else 403, fail-closed when blank). A curl in a quickstart should
+name the identity it runs as.

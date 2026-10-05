@@ -266,8 +266,10 @@ class FootballRulesTest {
      * which asserted basketball threw here.
      *
      * <p>That refusal conflated two different questions. It was justified on
-     * the grounds that basketball has no projection source -- true, and still
-     * true -- but {@code startingLineup} is not a projection method. It values
+     * the grounds that basketball has no projection source -- believed true
+     * then, and wrong: Sleeper serves per-game NBA projections, measured
+     * 2026-10-05 (claude/projection-tools.md). Either way, {@code startingLineup}
+     * is not a projection method. It values
      * a lineup with whatever function the caller supplies, and a caller asking
      * "what would this roster have started in week 3" supplies points already
      * scored, which Sleeper reports for basketball exactly as for football.

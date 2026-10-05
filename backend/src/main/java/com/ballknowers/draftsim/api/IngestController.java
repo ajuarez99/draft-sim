@@ -141,9 +141,10 @@ public class IngestController {
         Sport s = Sport.fromCode(sport);
         if (s != Sport.NFL) {
             throw new IllegalArgumentException(
-                    "projections are football-only: the stat keys Sleeper returns (pts_ppr, "
-                            + "pts_half_ppr, pts_std) have no basketball equivalent. See "
-                            + "claude/league-analysis.md's non-goals.");
+                    "projections are football-only for now: the stored columns are Sleeper's "
+                            + "pts_ppr / pts_half_ppr / pts_std, which are football scoring totals. "
+                            + "Basketball projections need per-game stat lines scored with each league's "
+                            + "settings, which isn't built yet (claude/projection-tools.md).");
         }
         return projectionIngest.refresh(s.code(), season, fromWeek, toWeek, force);
     }

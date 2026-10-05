@@ -251,3 +251,7 @@ ever looks wrong.
 - A fifth `power_ranking.kind`.
 - Basketball. `pts_ppr` is a football stat key and the NBA leagues have no scored
   2026 week at all. The sport seam exists; nothing here fills it.
+  > **Amended 2026-10-05 (spec 016):** still true of `pts_ppr`, but not a reason
+  > basketball *can't* have projections. Sleeper serves per-game NBA projections
+  > (RotoWire), measured in `claude/projection-tools.md`. Basketball is unbuilt
+  > here, not unsupported upstream.
