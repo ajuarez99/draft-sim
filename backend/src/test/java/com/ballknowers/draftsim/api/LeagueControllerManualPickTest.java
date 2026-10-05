@@ -409,12 +409,15 @@ class LeagueControllerManualPickTest {
     }
 
     @Test
-    void reversalRoundWithoutTheAdminTokenIsRefusedEvenForTheCommissioner() {
+    void reversalRoundNeedsNoAdminTokenForTheCommissioner() {
+        // 2026-10-05: commissioner actions are an honour system (claude/audit-2026-09-28/04,
+        // amended) -- the admin token is the operator's alone and no commissioner ever has it.
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(rowWithStatus("pre_draft")));
+        when(membership.canCommission(anyLong(), eq("u-alice"))).thenReturn(true);
 
-        assertEquals(403, controller()
+        assertEquals(200, controller()   // not controllerAsOperator(): no admin token
                 .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
                 .getStatusCode().value());
-        verify(drafts, never()).setReversalRoundOverride(anyLong(), any());
+        verify(drafts).setReversalRoundOverride(1L, 3);
     }
 }

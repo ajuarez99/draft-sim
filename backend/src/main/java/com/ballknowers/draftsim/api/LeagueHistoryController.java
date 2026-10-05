@@ -832,8 +832,7 @@ public class LeagueHistoryController {
         Optional<LeagueRepository.LeagueRow> visible = membership.visibleLeague(sleeperId, sleeperUserId);
         if (visible.isEmpty()) return ResponseEntity.notFound().build();
         // History shows this button only when canCommission, but until 2026-10-02 the route
-        // checked membership alone (spec 013 open follow-up). Same two gates as power/compute.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // checked membership alone (spec 013 open follow-up). Same gate as power/compute.
         if (!membership.canCommission(visible.get().id(), sleeperUserId)) {
             return ResponseEntity.status(403).body(Map.of("message",
                     "only this league's Sleeper commissioner may compute past seasons' final ranks"));
@@ -883,10 +882,8 @@ public class LeagueHistoryController {
 
         // The UI labels this "Recompute (commissioner)" and shows it only when
         // ballot.canCommission, but the route used to check membership alone
-        // (claude/audit-2026-09-28/10). Same two gates as the other commissioner
-        // writes: the admin token gates, the commissioner identity backs it up.
-        // An operator curling this passes the commissioner's X-Sleeper-User too.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // (claude/audit-2026-09-28/10). Same gate as the other commissioner writes,
+        // an honour system since 2026-10-05 (claude/audit-2026-09-28/04, amended). An operator curling this passes the commissioner's X-Sleeper-User.
         if (!membership.canCommission(league.get().id(), sleeperUserId)) {
             return ResponseEntity.status(403).body(Map.of("message",
                     "only this league's Sleeper commissioner may recompute the power rankings"));
@@ -980,10 +977,9 @@ public class LeagueHistoryController {
             return ResponseEntity.badRequest().body(Map.of("message", "season and week are required"));
         }
 
-        // The admin token is what actually gates (claude/audit-2026-09-28/04, option
-        // D): the commissioner identity below is a header anyone can copy from
-        // Sleeper's public league-users list. Both are required.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // An honour system since 2026-10-05 (claude/audit-2026-09-28/04, amended): the commissioner identity below is a
+        // header anyone can copy from Sleeper's public league-users list. Commissioner
+        // rankings are for fun, so this stops honest mistakes and nothing more.
         if (!membership.canCommission(row.id(), sleeperUserId)) {
             boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
             String message = commissionerKnown

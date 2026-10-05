@@ -15,7 +15,7 @@ import {
   type StandingRow,
 } from '../api'
 import RankBoard, { type RankBoardMember } from '../components/RankBoard'
-import CommissionerKeyNote from '../components/CommissionerKeyNote'
+import CommissionerHonourNote from '../components/CommissionerHonourNote'
 import Avatar from '../components/Avatar'
 import HowThisWorks from '../components/HowThisWorks'
 import { managerHues } from '../managerColor'
@@ -30,8 +30,8 @@ import { useUser } from '../user'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 
 /**
- * Ballots stay on the honour system (claude/audit-2026-09-28/04, option D covers
- * commissioner actions only): the server maps a ballot to whatever Sleeper id the
+ * Ballots are on the honour system (claude/audit-2026-09-28/04), and so, since
+ * 2026-10-05, are commissioner actions: the server maps a ballot to whatever Sleeper id the
  * request names, and league members' ids are public. Said where it is submitted.
  */
 const BALLOT_HONOUR_NOTE =
@@ -957,7 +957,7 @@ export default function PowerRankings() {
                   {computing ? 'Computing…' : `Recompute ${weekIn(currentWeek)} (commissioner)`}
                 </button>
               )}
-              {ballot?.canCommission && <CommissionerKeyNote />}
+              {ballot?.canCommission && <CommissionerHonourNote />}
             </div>
 
             {/* The ladder deliberately shows the latest week this mode HAS,

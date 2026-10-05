@@ -95,10 +95,10 @@ class SuperlativesControllerIT {
     }
 
     /**
-     * Every conduct-list write now needs the admin token as well as the commissioner
-     * identity (claude/audit-2026-09-28/04, option D), so the tests that exercise the
-     * write path itself run inside a request that carries it. The tests at the bottom
-     * that are about the token drop it via {@link com.ballknowers.draftsim.TestAdmin#withToken}.
+     * Binds a request so {@code LeagueMembership} can read one; it carries the admin token,
+     * which conduct-list writes no longer need (claude/audit-2026-09-28/04, amended
+     * 2026-10-05). The tests at the bottom drop it via {@link com.ballknowers.draftsim.TestAdmin#withToken}
+     * to show the writes work without it.
      */
     @BeforeEach
     void bindAdminRequest() {
@@ -204,59 +204,41 @@ class SuperlativesControllerIT {
         assertEquals(false, memberBody.get("canEdit"));
     }
 
-    // --- the admin token (claude/audit-2026-09-28/04, option D) ---------------------------------
+    // --- no admin token (claude/audit-2026-09-28/04, amended 2026-10-05) ------------------------
 
     /**
-     * The commissioner identity is a header anyone can copy out of Sleeper's public
-     * league-users list (`is_owner: true`), so on its own it proves nothing. The true
-     * commissioner presenting no admin token must be refused, and nothing written.
+     * Commissioner writes are an honour system: the commissioner identity is a header anyone
+     * can copy from Sleeper's public league-users list, and the admin token is the operator's
+     * alone. The real commissioner with no token can add and remove an entry.
      */
     @Test
-    void theRealCommissionerWithoutTheAdminTokenIsRefusedOnBothWrites() {
+    void theRealCommissionerWithoutTheAdminTokenCanWriteBoth() {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
             ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "spoofed", 1), COMMISSIONER_USER);
-            assertEquals(403, post.getStatusCode().value());
-            assertAdminRequired(post);
-
-            ResponseEntity<?> delete = controller.deleteConductEntry(LEAGUE_SLEEPER_ID, 1L, COMMISSIONER_USER);
-            assertEquals(403, delete.getStatusCode().value());
-            assertAdminRequired(delete);
-        }
-        try (var asAdmin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "no token", 1), COMMISSIONER_USER);
+            assertEquals(200, post.getStatusCode().value());
             @SuppressWarnings("unchecked")
-            Map<String, Object> list = (Map<String, Object>) controller.conductList(LEAGUE_SLEEPER_ID, COMMISSIONER_USER).getBody();
-            assertEquals(0, ((List<?>) list.get("entries")).size(), "the refused POST must not have written anything");
+            long entryId = ((Number) ((Map<String, Object>) post.getBody()).get("id")).longValue();
+
+            assertEquals(204, controller.deleteConductEntry(LEAGUE_SLEEPER_ID, entryId, COMMISSIONER_USER)
+                    .getStatusCode().value());
         }
     }
 
+    /** Without a token, a member who is not the commissioner still gets the commissioner refusal. */
     @Test
-    void aWrongAdminTokenIsRefusedLikeAMissingOne() {
-        try (var wrong = com.ballknowers.draftsim.TestAdmin.withToken("not-the-token")) {
-            ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), COMMISSIONER_USER);
-            assertEquals(403, post.getStatusCode().value());
-            assertAdminRequired(post);
-        }
-        try (var blank = com.ballknowers.draftsim.TestAdmin.withToken("")) {
-            assertEquals(403, controller.deleteConductEntry(LEAGUE_SLEEPER_ID, 1L, COMMISSIONER_USER)
-                    .getStatusCode().value(), "a blank presented token must never match");
+    void aNonCommissionerWithoutTheAdminTokenIsRefusedAsNotTheCommissioner() {
+        try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
+            ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), MEMBER_USER);
+            assertEquals(403, response.getStatusCode().value());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            assertNotEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"));
         }
     }
 
-    /** The token alone is not enough either: defence in depth keeps the commissioner identity check. */
-    @Test
-    void theAdminTokenWithANonCommissionerIdentityIsStillRefused() {
-        ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), MEMBER_USER);
-        assertEquals(403, response.getStatusCode().value());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertNotEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"),
-                "this is the not-the-commissioner refusal, not the missing-token one");
-    }
-
-    /** Reads stay open to any member: only the writes moved behind the token. */
+    /** Reads stay open to any member. */
     @Test
     void readingTheListNeedsNoAdminToken() {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
@@ -269,12 +251,5 @@ class SuperlativesControllerIT {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
             assertEquals(404, controller.conductList(LEAGUE_SLEEPER_ID, null).getStatusCode().value());
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void assertAdminRequired(ResponseEntity<?> response) {
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
-        assertNotNull(body);
-        assertEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"));
     }
 }

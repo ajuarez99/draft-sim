@@ -88,11 +88,9 @@ public class SuperlativesController {
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = found.get();
 
-        // Commissioner-only writes need the admin token (claude/audit-2026-09-28/04,
-        // option D) AND the commissioner identity below. The identity is a header
-        // anyone can copy from Sleeper's public league-users list, so the token is
-        // what actually gates; the identity check stays as defence in depth.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // Commissioner-only writes, on an honour system since 2026-10-05 (claude/audit-2026-09-28/04, amended).
+        // The identity is a header anyone can copy from Sleeper's public league-users
+        // list, so this stops honest mistakes, not someone determined to get in.
         if (!membership.canCommission(row.id(), sleeperUserId)) return forbidden(row);
 
         if (body == null || body.playerId() == null || body.playerId().isBlank()) {
@@ -122,8 +120,7 @@ public class SuperlativesController {
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = found.get();
 
-        // See saveConductEntry: the admin token gates, the commissioner identity backs it up.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // See saveConductEntry: commissioner identity only, an honour system.
         if (!membership.canCommission(row.id(), sleeperUserId)) return forbidden(row);
 
         boolean deleted = conduct.delete(row.id(), entryId);

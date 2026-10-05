@@ -265,26 +265,39 @@ class AccessControlMvcIT {
 
     // ---------------------------------------------------------- commissioner-only actions
 
+    /**
+     * Commissioner actions are an honour system since 2026-10-05 (claude/audit-2026-09-28/04,
+     * amended): no commissioner ever holds the operator's admin token, so asking for it locked
+     * every one of them out. The commissioner identity is still checked.
+     */
     @Test
-    void commissionerActionsRefuseWithoutTheAdminTokenEvenForTheRealCommissioner() throws Exception {
+    void commissionerActionsNeverAskForTheAdminToken() throws Exception {
         String conduct = "{\"playerId\":\"x\",\"reason\":\"r\",\"appliesFromWeek\":1}";
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/conduct-list")
+        expectNoAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/conduct-list")
                 .contentType("application/json").content(conduct).header("X-Sleeper-User", COMMISSIONER)));
-        expectAdminRefusal(mvc.perform(delete("/api/leagues/" + LEAGUE + "/conduct-list/1")
+        expectNoAdminRefusal(mvc.perform(delete("/api/leagues/" + LEAGUE + "/conduct-list/1")
                 .header("X-Sleeper-User", COMMISSIONER)));
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/commissioner")
+        expectNoAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/commissioner")
                 .contentType("application/json").content("{\"season\":2026,\"week\":1,\"rosterIds\":[1]}")
                 .header("X-Sleeper-User", COMMISSIONER)));
-        // power/compute was labelled commissioner but only checked membership (audit 10).
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
-                .header("X-Sleeper-User", MEMBER)));
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
-                .header("X-Sleeper-User", COMMISSIONER).header("X-Admin-Token", "wrong")));
-        // power/backfill sat behind History's commissioner-only button but checked membership alone.
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
-                .header("X-Sleeper-User", MEMBER)));
-        expectAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+        expectNoAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
                 .header("X-Sleeper-User", COMMISSIONER)));
+        expectNoAdminRefusal(mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
+                .header("X-Sleeper-User", COMMISSIONER).header("X-Admin-Token", "wrong")));
+    }
+
+    @Test
+    void aMemberWhoIsNotTheCommissionerIsStillRefused() throws Exception {
+        // power/compute was labelled commissioner but only checked membership (audit 10); and
+        // power/backfill sat behind History's commissioner-only button. Both still check.
+        mvc.perform(post("/api/leagues/" + LEAGUE + "/power/compute?season=2026&week=1")
+                        .header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").doesNotExist());
+        mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
+                        .header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").doesNotExist());
     }
 
     @Test
@@ -300,10 +313,10 @@ class AccessControlMvcIT {
     }
 
     @Test
-    void theCommissionerWithTheAdminTokenCanBackfill() throws Exception {
+    void theCommissionerCanBackfillWithoutTheAdminToken() throws Exception {
         // The gate must not lock out the one caller History's button is shown to.
         mvc.perform(post("/api/leagues/" + LEAGUE + "/power/backfill")
-                        .header("X-Sleeper-User", COMMISSIONER).header("X-Admin-Token", TestAdmin.TOKEN))
+                        .header("X-Sleeper-User", COMMISSIONER))
                 .andExpect(status().isOk());
     }
 
@@ -363,6 +376,16 @@ class AccessControlMvcIT {
 
     private static void expectAdminRefusal(ResultActions r) throws Exception {
         r.andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("admin_token_required"));
+    }
+
+    /** Whatever the outcome (200, 400, 404 on a missing entry), it is never the admin-token refusal. */
+    private static void expectNoAdminRefusal(ResultActions r) throws Exception {
+        r.andExpect(result -> {
+            String body = result.getResponse().getContentAsString();
+            if (body.contains(AdminGateInterceptor.REFUSAL_CODE)) {
+                throw new AssertionError("asked for the admin token: " + result.getResponse().getStatus() + " " + body);
+            }
+        });
     }
 
     /**

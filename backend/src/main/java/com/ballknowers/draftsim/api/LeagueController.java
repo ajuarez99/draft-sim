@@ -239,9 +239,8 @@ public class LeagueController {
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
         // Commissioner action since 2026-10-02 (spec 013's open follow-up): any member could
-        // re-lay every viewer's board. Same two gates as /power/compute; the 409 below sits
-        // between them because a draft's status is something every member can already see.
-        if (!membership.isAdminRequest()) return AdminGateInterceptor.refusal();
+        // re-lay every viewer's board. The commissioner check below is an honour system since 2026-10-05 (claude/audit-2026-09-28/04, amended):
+        // it stops honest mistakes, not someone copying the commissioner's id from Sleeper.
 
         // 409 on a finished draft. The board places every cell by recomputing its
         // pick number from (round, slot, reversalRound) -- DraftBoard.tsx's

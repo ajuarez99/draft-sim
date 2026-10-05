@@ -46,7 +46,6 @@ class PowerComputeFinalityTest {
         var row = new LeagueRepository.LeagueRow(ID, Sport.NBA, LEAGUE, "fixture", 2026, 12,
                 List.of(), 1.0, null, "in_season");
         when(membership.visibleLeague(LEAGUE, "commish")).thenReturn(Optional.of(row));
-        when(membership.isAdminRequest()).thenReturn(true);
         when(membership.canCommission(ID, "commish")).thenReturn(true);
         when(power.computeWeek0IfMissing(anyLong(), any(), anyInt()))
                 .thenReturn(new PowerRankingService.Week0Result(new PowerRankingRepository.Entry[0], null));

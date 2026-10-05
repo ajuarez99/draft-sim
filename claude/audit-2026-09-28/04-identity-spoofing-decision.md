@@ -71,3 +71,27 @@ The browser asks for the key once when the server answers `403` with
 `code: "admin_token_required"`, keeps it in `localStorage` on that device, and offers a Clear
 control. It is never a `VITE_` variable. Ballots are unchanged and the ballot UI says they are not
 verified. Not built: option B (issued sessions), which is what would protect ballots.
+
+## Amended 2026-10-05: option D reversed, commissioner actions are an honour system (Allan)
+
+**What was wrong with D.** Its own table said it "only works while the operator is the
+commissioner or can hand them the token". In practice there was no way to hand it over: the
+token is the operator's `ADMIN_TOKEN`, one secret for the whole deployment, and it also unlocks
+`/api/ingest/**` and the blank-identity override for every league and draft. Giving it to another
+league's commissioner would make them the operator. So every commissioner but Allan was locked
+out of the controls the UI showed them. Allan's call: commissioner rankings and the rest are for
+fun, so a token is not worth that.
+
+**Now.** The admin-token check is removed from all six commissioner routes: conduct-list add and
+delete, `POST /power/commissioner`, `POST /power/compute`, `POST /power/backfill` (gated on
+2026-10-02, after this doc said it would not be) and `PUT /drafts/{id}/reversal-round`. Each keeps
+`LeagueMembership.canCommission`, which stops honest mistakes and nothing more. The browser no
+longer prompts for or stores the key (`commissionerKey.ts` and its Clear control are gone, and
+`main.tsx` removes any key already saved in `localStorage`), and a note beside the commissioner
+controls says they aren't verified, matching the ballot note. The admin token still gates
+`/api/ingest/**` and the operator overrides (seeing every league/mock, picking for any seat).
+
+**If this needs real protection later:** option B, or a self-serve proof of Sleeper account
+control (the commissioner puts an app-issued code in their Sleeper team name, the server reads it
+back from the public league-users endpoint and issues a session). Neither is built; the team-name
+read-back delay has not been measured.

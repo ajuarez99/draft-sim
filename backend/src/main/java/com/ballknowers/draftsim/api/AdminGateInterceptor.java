@@ -4,7 +4,6 @@ import com.ballknowers.draftsim.config.AdminAccess;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.HandlerInterceptor;
 
@@ -25,18 +24,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 public class AdminGateInterceptor implements HandlerInterceptor {
 
     public static final String REFUSAL_CODE = "admin_token_required";
-
-    /**
-     * The same refusal, as a controller return value, for the commissioner-only
-     * routes that gate inside the handler rather than by path. One body, one
-     * {@code code}, so a client has one thing to recognise.
-     */
-    public static ResponseEntity<java.util.Map<String, Object>> refusal() {
-        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
-        body.put("code", REFUSAL_CODE);
-        body.put("message", "this action needs the commissioner key (admin token)");
-        return ResponseEntity.status(HttpServletResponse.SC_FORBIDDEN).body(body);
-    }
 
     private final AdminAccess admin;
 

@@ -3,12 +3,6 @@
 import { ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
-import {
-  askForCommissionerKey,
-  clearCommissionerKey,
-  getCommissionerKey,
-  setCommissionerKey,
-} from './commissionerKey'
 
 export type PlayerRef = {
   id: number
@@ -217,49 +211,6 @@ function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const userId = currentUserId()
   if (userId) headers.set('X-Sleeper-User', userId)
   return fetch(apiUrl(path), { ...init, headers })
-}
-
-/**
- * True when the server refused because the request lacked a valid admin token
- * (claude/audit-2026-09-28/04, option D) -- as opposed to any other 403, such as
- * "you are not this league's commissioner". Reads a clone, so the caller can still
- * read the body.
- */
-async function isAdminRefusal(res: Response): Promise<boolean> {
-  if (res.status !== 403) return false
-  const body: { code?: string } = await res.clone().json().catch(() => ({}))
-  return body.code === 'admin_token_required'
-}
-
-/**
- * `apiFetch` for the commissioner-only actions, and only those: sends the saved
- * commissioner key as `X-Admin-Token`. If the server refuses for want of a valid
- * key, asks for it ONCE, saves it (see commissionerKey.ts) and retries once; a key
- * that is refused again is forgotten so it is not silently resent forever.
- *
- * Every other call stays on plain `apiFetch`, so the key never rides along on a
- * request that does not need it. Returns the final response either way; the caller
- * turns a still-refused 403 into an error with the server's message.
- */
-async function commissionerFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const send = (): Promise<Response> => {
-    const headers = new Headers(init.headers)
-    const key = getCommissionerKey()
-    if (key) headers.set('X-Admin-Token', key)
-    return apiFetch(path, { ...init, headers })
-  }
-
-  let res = await send()
-  if (!(await isAdminRefusal(res))) return res
-
-  const hadKey = getCommissionerKey() != null
-  const entered = askForCommissionerKey(hadKey)
-  if (!entered) return res
-  setCommissionerKey(entered)
-
-  res = await send()
-  if (await isAdminRefusal(res)) clearCommissionerKey()
-  return res
 }
 
 export const getSeats = (draftId: string) =>
@@ -557,7 +508,7 @@ export const clearTendencies = (managerId: number, sport: Sport) =>
  * carries, so the caller can re-render without refetching seats.
  */
 export const setReversalRound = (draftId: string, reversalRound: number | null) =>
-  commissionerFetch(`/api/drafts/${draftId}/reversal-round`, {
+  apiFetch(`/api/drafts/${draftId}/reversal-round`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ reversalRound }),
@@ -956,7 +907,7 @@ export type BackfillResult = {
  * carries.
  */
 export const backfillFinalRanks = (sleeperLeagueId: string, season?: number) =>
-  commissionerFetch(
+  apiFetch(
     `/api/leagues/${sleeperLeagueId}/power/backfill${season == null ? '' : `?season=${season}`}`,
     { method: 'POST' },
   ).then(json<BackfillResult>)
@@ -1535,7 +1486,7 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
   ).then(json<LeagueAnalysis>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
-  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
   }).then(
     json<{
@@ -1555,7 +1506,7 @@ export const saveCommissionerRanking = (
   week: number,
   rosterIds: number[],
 ) =>
-  commissionerFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/power/commissioner`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ season, week, rosterIds }),
@@ -2344,7 +2295,7 @@ export const saveConductEntry = (
   sleeperLeagueId: string,
   entry: { playerId: string; reason: string; appliesFromWeek: number },
 ) =>
-  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
@@ -2352,7 +2303,7 @@ export const saveConductEntry = (
 
 /** 204 on success; throws with the server's message on 403, or a 404 when entryId belongs to a different league. */
 export const deleteConductEntry = (sleeperLeagueId: string, entryId: number) =>
-  commissionerFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
+  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
     method: 'DELETE',
   }).then((res) => conductListResult<void>(res))
 

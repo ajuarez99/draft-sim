@@ -12,10 +12,11 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * where a blank token turns the gate off. That difference is deliberate: a
  * missing secret must never open a door.
  *
- * <p>What it unlocks: every {@code /api/ingest/**} route, the commissioner-only
- * writes (claude/audit-2026-09-28/04, option D), and an override for the
+ * <p>What it unlocks: every {@code /api/ingest/**} route, and an override for the
  * league/draft/mock membership checks so an operator can still curl a manual
- * pick on draft night ({@link AdminAccess}).
+ * pick on draft night ({@link AdminAccess}). Commissioner-only writes needed it
+ * from 2026-09-29 to 2026-10-05 (claude/audit-2026-09-28/04, amended); they no
+ * longer do, because no commissioner but the operator could ever hold it.
  */
 @ConfigurationProperties(prefix = "draftsim.admin")
 public record AdminProperties(String token) {
