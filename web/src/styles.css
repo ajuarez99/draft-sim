@@ -5512,3 +5512,27 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .sb-main { display: flex; flex-direction: column; min-width: 0; }
 .sb-name { font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .sb-cols { grid-template-columns: 1fr; } }
+
+/* --- Trends (specs/019-minutes-streaming) --------------------------------
+   Streaming candidates, risers and fallers. Each table scrolls inside its own
+   .pt-wrap so the page never scrolls sideways at 375px. */
+.pt-section { min-width: 0; margin-bottom: 28px; }
+.pt-window { margin: 0 0 8px; }
+.pt-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.pt-lists { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); min-width: 0; }
+.pt-list { min-width: 0; }
+.pt-list h3, .pt-sub { margin: 0 0 6px; font-size: 13px; }
+.pt-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.pt-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.pt-table th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pt-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+.pt-table tbody tr:hover > td { background: var(--row-hover); }
+.pt-table tbody tr:last-child > td { border-bottom: 0; }
+.pt-name { font-weight: 600; }
+.pt-meta { display: block; font-size: 11px; color: var(--muted); }
+.pt-num { font-weight: 700; }
+.pt-pill { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.pt-up { background: color-mix(in oklab, var(--up) 18%, transparent); color: var(--up); }
+.pt-down { background: color-mix(in oklab, var(--down) 18%, transparent); color: var(--down); }
+.pt-flat { background: color-mix(in oklab, var(--muted) 18%, transparent); color: var(--muted); }
+.pt-missed { color: var(--down); }

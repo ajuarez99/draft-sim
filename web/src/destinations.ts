@@ -39,7 +39,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -164,6 +164,21 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // one season: the page reads the season it is opened on (spec 011's rule)
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/schedule`,
     match: /^\/leagues\/([^/]+)\/schedule\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'trends',
+    group: 'thisWeek',
+    glyph: '↕',
+    // Basketball only: minutes, usage and games-per-week are NBA notions.
+    // See specs/019-minutes-streaming.
+    sports: ['nba'],
+    label: 'Trends',
+    // one season: the page reads the season it is opened on (spec 011's rule)
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/trends`,
+    match: /^\/leagues\/([^/]+)\/trends\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

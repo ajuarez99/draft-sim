@@ -65,27 +65,15 @@ public class SpotlightOwnership {
         int latest = all.stream().mapToInt(RosterWeekPointsRepository.WeekBreakdown::week).max().orElse(0);
         if (latest == 0) return out;
 
-        Map<Long, String> teamNameByManager = new HashMap<>();
-        for (LeagueMemberRepository.MemberRow m : memberRows) {
-            if (m.teamName() != null && !m.teamName().isBlank()) teamNameByManager.put(m.managerId(), m.teamName());
-        }
-        Map<Integer, String> nameByRoster = new HashMap<>();
-        Map<Integer, Boolean> mineByRoster = new HashMap<>();
-        Map<Integer, String> avatarByRoster = new HashMap<>();
-        for (RosterSeasonRepository.StandingRow s : standings) {
-            String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
-            if (name == null) name = s.managerName();
-            nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
-            if (s.avatarId() != null) avatarByRoster.put(s.rosterId(), s.avatarId());
-            mineByRoster.put(s.rosterId(), callerManagerId != null && callerManagerId.equals(s.managerId()));
-        }
+        Map<Integer, RosterOwners.RosterOwner> owners = RosterOwners.ownerNames(standings, memberRows, callerManagerId);
 
         for (RosterWeekPointsRepository.WeekBreakdown w : all) {
             if (w.week() != latest) continue;
             if (w.playersPointsJson() == null || w.playersPointsJson().isBlank()) continue;
-            String owner = nameByRoster.getOrDefault(w.rosterId(), "Roster " + w.rosterId());
-            boolean mine = mineByRoster.getOrDefault(w.rosterId(), false);
-            String avatar = avatarByRoster.get(w.rosterId());
+            RosterOwners.RosterOwner o = owners.get(w.rosterId());
+            String owner = o == null ? "Roster " + w.rosterId() : o.name();
+            boolean mine = o != null && o.isMe();
+            String avatar = o == null ? null : o.avatarId();
             for (String playerId : JsonUtil.readMap(w.playersPointsJson()).keySet()) {
                 out.put(playerId, new Ownership(true, owner, mine, avatar));
             }

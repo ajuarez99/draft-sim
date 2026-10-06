@@ -65,6 +65,12 @@ one implementation of the rule, and it's Sleeper's.
 3. **Your roster's games this week**: per rostered player, games this week and
    the off-nights. Needs the "which team is yours" join
    ([my-team-dashboard.md](my-team-dashboard.md)).
+> **Amended 2026-10-06 (spec 019 research R3, review F6/F7), measured:** the "≥ 4 games" filter is
+> dropped. In the measured league, a starter's week is credited one game, usually his best. For the
+> same player, 4 scheduled games vs 2 was worth +4.4% (2025). Spec 019 ranks free agents by
+> season-to-date points per game, which predicted next week's credited points better than last-5 form,
+> and shows games this week beside it.
+
 4. **Streaming candidates**: unrostered players on teams with ≥ 4 games this
    week, ranked by recent per-game production (`player_game` ×
    `GameScoringService`, last N games). This is **realized** data (recent

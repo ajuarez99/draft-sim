@@ -175,6 +175,8 @@ public class LeagueHistoryIngestService {
         boolean seasonComplete = LeagueRepository.LeagueRow.isComplete(statusRaw == null ? null : String.valueOf(statusRaw));
 
         List<RosterSeasonRepository.Upsert> rows = new ArrayList<>();
+        // Spec 019: the roster contents the same /rosters response already carries, stamped with this pass.
+        java.time.OffsetDateTime fetchedAt = java.time.OffsetDateTime.now(java.time.ZoneOffset.UTC);
         for (Map<String, Object> roster : sleeper.rosters(sleeperLeagueId)) {
             int rosterId = LeagueMapper.asInt(roster.get("roster_id"), -1);
             if (rosterId < 0) continue;
@@ -196,10 +198,26 @@ public class LeagueHistoryIngestService {
                     // skip gate in front of a column never repairs it, and
                     // roster_season already holds two wrong champions from
                     // before this gate existed.
-                    seasonComplete && championRosterId != null && championRosterId == rosterId ? 1 : null));
+                    seasonComplete && championRosterId != null && championRosterId == rosterId ? 1 : null,
+                    rosterPlayers(roster), fetchedAt));
         }
         rosterSeasons.upsertAll(rows);
         return rows.size();
+    }
+
+    /**
+     * The de-duplicated, sorted union of a roster's {@code players}, {@code reserve} and {@code taxi}
+     * (spec 019 data-model V28). Any may be null or absent, so the result is an empty list, never null:
+     * the roster WAS fetched. Pre-draft Sleeper sends {@code players: []}.
+     */
+    static List<String> rosterPlayers(Map<String, Object> roster) {
+        java.util.TreeSet<String> ids = new java.util.TreeSet<>();
+        for (String key : new String[]{"players", "reserve", "taxi"}) {
+            if (roster.get(key) instanceof java.util.Collection<?> c) {
+                for (Object o : c) if (o != null) ids.add(String.valueOf(o));
+            }
+        }
+        return new ArrayList<>(ids);
     }
 
     /**
