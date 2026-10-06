@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import WeeklyReport from './WeeklyReport'
@@ -25,9 +25,22 @@ function renderPage(url = '/leagues/L1/weekly-report') {
 }
 
 const getWeeklyReport = vi.fn()
+const fetchRecap = vi.fn()
 vi.mock('../api', () => ({
   getWeeklyReport: (...args: unknown[]) => getWeeklyReport(...args),
+  fetchRecap: (...args: unknown[]) => fetchRecap(...args),
 }))
+
+const recapOff = {
+  state: 'FEATURE_OFF', season: null, week: 1, model: null, generatedAt: null, revision: null,
+  revisionReason: null, stale: false, headline: null, sections: null, failureReason: null,
+}
+
+// Every test starts with the recap switched off, which is what main's page effectively had.
+beforeEach(() => {
+  fetchRecap.mockReset()
+  fetchRecap.mockResolvedValue(recapOff)
+})
 
 function data(over: Partial<Data> = {}): Data {
   return {
@@ -553,5 +566,27 @@ describe('Weekly report eyebrow names the season shown', () => {
     getWeeklyReport.mockReturnValue(new Promise(() => {}))
     renderPage()
     expect(screen.getByText('League')).toBeInTheDocument()
+  })
+})
+
+/**
+ * specs/020 SC-002: with the recap feature off the page is exactly what it was before the card
+ * existed. The card asks the server once the week has been on screen for a second, gets
+ * FEATURE_OFF, and must add nothing to the DOM, before or after.
+ */
+describe('Weekly report with the recap feature off', () => {
+  it('renders no recap markup, before or after the card asks', async () => {
+    getWeeklyReport.mockResolvedValue(data())
+    const { container } = renderPage()
+    await screen.findByRole('heading', { name: /week [0-9]+ matchups/i })
+    const before = container.innerHTML
+
+    // Real timers: the card's 1 s on-screen delay was scheduled when the page rendered.
+    await waitFor(() => expect(fetchRecap).toHaveBeenCalledTimes(1), { timeout: 3000 })
+    await act(async () => { await Promise.resolve() })
+
+    expect(container.innerHTML).toBe(before)
+    expect(container.querySelector('.recap-card')).toBeNull()
+    expect(container.innerHTML.toLowerCase()).not.toContain('recap')
   })
 })

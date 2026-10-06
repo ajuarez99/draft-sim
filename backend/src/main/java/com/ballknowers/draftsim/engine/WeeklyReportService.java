@@ -456,7 +456,7 @@ public class WeeklyReportService {
             for (Side s : List.of(g.home(), g.away())) {
                 Side other = s == g.home() ? g.away() : g.home();
                 if (s.points() >= other.points()) continue;   // only losers
-                int rank = allScores.indexOf(s.points()) + 1;
+                int rank = WeeklyAwards.competitionRank(allScores, s.points());
                 if (rank < bestRank) { bestRank = rank; best = s.rosterId(); }
             }
         }

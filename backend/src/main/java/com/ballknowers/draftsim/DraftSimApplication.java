@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim;
 
 import com.ballknowers.draftsim.config.*;
+import com.ballknowers.draftsim.recap.RecapProperties;
 import com.ballknowers.draftsim.refresh.RefreshProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,7 +21,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         RefreshProperties.class,
         GradeProperties.class,
         DraftGradeProperties.class,
-        PlayerTrendsProperties.class
+        PlayerTrendsProperties.class,
+        RecapProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

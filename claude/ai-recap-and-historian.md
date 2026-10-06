@@ -3,6 +3,19 @@
 Status: **design, not built.** 2026-10-05. Gap #10 in
 [competitor-gap-research.md](competitor-gap-research.md).
 
+> **Amended 2026-10-06 (spec 020):** the **weekly recap** half is built on branch
+> `020-ai-weekly-recap` behind a flag, not yet verified with a live model
+> ([specs/020-ai-weekly-recap](../specs/020-ai-weekly-recap/)). The historian is deferred to a
+> later spec. Three things below were wrong or changed:
+> - **Cost:** "~20K input tokens … ≈ $0.11 per league-week" was about 10× high. A real week's
+>   report measures 5.2 KB, and the reduced input sent to the model is 3.6 KB (NFL) / 3.0 KB
+>   (NBA), roughly 1K tokens (estimated from bytes; `count_tokens` not yet run).
+> - **Model:** Allan chose **Claude Haiku 4.5** (≈ $0.007 per league-week, estimated), not the
+>   Opus 5.5 default this doc assumed.
+> - **Off by default, premium per league:** it's off unless `RECAP_ENABLED` and a key are set, plus
+>   a per-league entitlement. Acceptance #1's grounding check also runs in production on every
+>   generation, not only as a test.
+
 Competitors: this is the most crowded category in the sweep. LeagueLogs
 (Tuesday recaps, Thursday previews, game-day briefings, "AI analyst"), Fantasy
 Pressbox (recaps with an "autopsy", awards, trash talk), The Front Office
