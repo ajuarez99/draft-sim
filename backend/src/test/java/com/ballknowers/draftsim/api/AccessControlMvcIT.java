@@ -26,6 +26,8 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -84,6 +86,7 @@ class AccessControlMvcIT {
     @Autowired private JdbcTemplate jdbc;
     @Autowired private LeagueMemberRepository leagueMembers;
     @Autowired private com.ballknowers.draftsim.store.MockDraftRepository mockDrafts;
+    @Autowired private com.ballknowers.draftsim.store.LeagueFeatureRepository features;
 
     private long leagueId;
     private long commissionerId;
@@ -126,7 +129,7 @@ class AccessControlMvcIT {
     void leagueRoutesAre404WithNoIdentityAndForAStranger() throws Exception {
         for (String path : List.of("analysis", "history", "power", "ballot", "superlatives", "conduct-list",
                 "roster-management", "transactions", "expected-wins", "forecast", "weekly-report/1",
-                "player-trends")) {
+                "player-trends", "recap/1")) {
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path)).andExpect(status().isNotFound());
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path).header("X-Sleeper-User", ""))
                     .andExpect(status().isNotFound());
@@ -249,6 +252,39 @@ class AccessControlMvcIT {
             expectAdminRefusal(mvc.perform(post(route).header("X-Sleeper-User", COMMISSIONER)));
         }
         verifyNoInteractions(playerIngest, leagueIngest, leagueHistoryIngest);
+    }
+
+    /** Spec 020 (N1): everything under /api/admin/** needs the token, handler or no handler. */
+    @Test
+    void adminRoutesRefuseWithoutTheAdminToken() throws Exception {
+        String base = "/api/admin/leagues/" + LEAGUE;
+        List<String> posts = List.of(base + "/features/RECAP", base + "/recap/1/regenerate",
+                base + "/recap/1/reroll",
+                base + "/recap/1/preview?model=x");
+        for (String route : posts) {
+            expectAdminRefusal(mvc.perform(post(route)));
+            expectAdminRefusal(mvc.perform(post(route).header("X-Admin-Token", "not-the-token")));
+            expectAdminRefusal(mvc.perform(post(route).header("X-Sleeper-User", COMMISSIONER)));
+        }
+        expectAdminRefusal(mvc.perform(delete(base + "/features/RECAP")));
+        expectAdminRefusal(mvc.perform(delete(base + "/features/RECAP").header("X-Sleeper-User", COMMISSIONER)));
+        assertFalse(features.has(leagueId, "RECAP"));
+    }
+
+    @Test
+    void theAdminTokenGrantsAndRevokesRecapIdempotentlyAndUnknownLeaguesAre404() throws Exception {
+        String url = "/api/admin/leagues/" + LEAGUE + "/features/RECAP";
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(post(url).header("X-Admin-Token", TestAdmin.TOKEN)).andExpect(status().isNoContent());
+        }
+        assertTrue(features.has(leagueId, "RECAP"));
+        for (int i = 0; i < 2; i++) {
+            mvc.perform(delete(url).header("X-Admin-Token", TestAdmin.TOKEN)).andExpect(status().isNoContent());
+        }
+        assertFalse(features.has(leagueId, "RECAP"));
+        mvc.perform(post("/api/admin/leagues/it-acl-no-such-league/features/RECAP")
+                        .header("X-Admin-Token", TestAdmin.TOKEN))
+                .andExpect(status().isNotFound());
     }
 
     @Test

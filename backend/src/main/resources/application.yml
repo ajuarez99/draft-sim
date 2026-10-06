@@ -42,6 +42,21 @@ draftsim:
     # Blank means slot auto-detection is OFF -- the local-dev default. Set to
     # your own Sleeper user id to have the draft view auto-select your seat.
     sleeper-user-id: ${APP_OWNER_SLEEPER_USER_ID:}
+  # AI weekly recap (specs/020-ai-weekly-recap). OFF unless RECAP_ENABLED=true AND a non-blank
+  # ANTHROPIC_API_KEY env var (RecapEnabledCondition). The key is deliberately NOT a property here:
+  # it is read from the environment only, so no properties record or log line can print it (F12).
+  # Every number below is ARBITRARY -- a hand-set bound on spend and waiting, not a measured
+  # optimum (research R2/R4, review F1/N7).
+  # NEVER set ANTHROPIC_LOG=debug in production: the SDK then logs full request and response bodies
+  # (that is league data). It redacts the key and auth headers either way, but not the bodies.
+  recap:
+    enabled: ${RECAP_ENABLED:false}
+    model: ${RECAP_MODEL:claude-haiku-4-5}
+    max-calls-per-league-per-day: 10   # Anthropic API calls (a grounding retry is 2), UTC day
+    max-calls-per-day: 50              # across all leagues
+    transient-retry-minutes: 15        # wait before retrying API_ERROR / RATE_LIMITED_UPSTREAM
+    timeout-seconds: 60
+    max-tokens: 2048                   # ~3x the expected recap; preview raises it for thinking models
 
 sleeper:
   base-url: ${SLEEPER_BASE_URL:https://api.sleeper.app/v1}

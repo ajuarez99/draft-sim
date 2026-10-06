@@ -28,14 +28,14 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     /**
-     * Every {@code /api/ingest/**} route is an operator action and needs the
+     * Every {@code /api/ingest/**} and {@code /api/admin/**} route is an operator action and needs the
      * admin token (claude/audit-2026-09-28/01). Blank ADMIN_TOKEN means these
      * all refuse. A signed-in member's own setup goes through the
      * membership-checked {@code /api/setup/**} routes instead.
      */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(new AdminGateInterceptor(admin)).addPathPatterns("/api/ingest/**");
+        registry.addInterceptor(new AdminGateInterceptor(admin)).addPathPatterns("/api/ingest/**", "/api/admin/**");
     }
 
     @Override

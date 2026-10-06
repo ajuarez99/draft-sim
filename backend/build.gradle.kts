@@ -20,6 +20,9 @@ dependencies {
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
+    // specs/020-ai-weekly-recap: the only paid outbound dependency. Inert unless
+    // draftsim.recap.enabled AND a non-blank ANTHROPIC_API_KEY (RecapEnabledCondition).
+    implementation("com.anthropic:anthropic-java:2.68.0")
 
     annotationProcessor("org.springframework.boot:spring-boot-configuration-processor")
 

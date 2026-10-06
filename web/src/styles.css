@@ -4832,6 +4832,36 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   border-radius: 8px;
 }
 
+/* --- 020: the AI weekly recap card ------------------------------------------
+   One raised surface with a teal edge to mark it as written text rather than
+   data; headline first, then the sections as a plain reading column. */
+.recap-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 14px 18px 12px;
+  margin-bottom: 16px;
+}
+.recap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.recap-head .section-title { margin: 0; }
+.recap-notice { margin: 4px 0 8px; color: var(--muted); }
+.recap-notice-fail { color: var(--down); }
+.recap-headline { margin: 4px 0 10px; font-size: 18px; line-height: 1.3; }
+.recap-sections { display: grid; gap: 10px; max-width: 70ch; }
+.recap-section h5 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+  font-weight: 600;
+}
+.recap-section p { margin: 0; line-height: 1.5; }
+.recap-stale .recap-headline, .recap-stale .recap-section p { opacity: 0.75; }
+.recap-previous, .recap-revised { margin: 0 0 6px; }
+.recap-foot { margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--line); }
+
 /* --- Superlatives full standings (specs/010-superlatives-full-standings) --
    "See all" opens every roster's place for one award. The card body is also a
    mouse target, so it gets a hover cue; the lift is a shadow, NOT a transform --

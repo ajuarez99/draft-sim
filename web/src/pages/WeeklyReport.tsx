@@ -5,6 +5,7 @@ import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import PlayerFace from '../components/PlayerFace'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
+import RecapCard from '../components/RecapCard'
 import {
   getWeeklyReport,
   type WeeklyReport as Data,
@@ -154,6 +155,7 @@ export default function WeeklyReport() {
               )}
             </p>
           )}
+          {sleeperLeagueId && <RecapCard sleeperLeagueId={sleeperLeagueId} week={data.week} />}
           <section className="section">
             <h3 className="section-title">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />

@@ -101,6 +101,14 @@ way.
 
 ## Phase 5: optional, needs a spend decision
 
+> **Status 2026-10-06 (spec 020):** Allan made the spend decision: Haiku 4.5, recap only, behind a
+> flag as a future premium feature.
+> - **Built** on branch `020-ai-weekly-recap`; verified with no key; **not verified with a live
+>   model**.
+> - **Cost:** the "~$0.11 per league-week" below was about 10× high (measured input size).
+> - **Ordering:** "it reads Phase 2–4 data" holds only for the historian. The recap reads only the
+>   existing weekly report, so it didn't have to wait.
+
 | Item | Doc | Notes |
 |---|---|---|
 | AI weekly recap, then historian | [ai-recap-and-historian.md](ai-recap-and-historian.md) | Adds a paid API dependency. The cost estimate (~$0.11 per league-week) is unmeasured. Its grounding test is the bar. It reads Phase 2–4 data, so it goes last. |
