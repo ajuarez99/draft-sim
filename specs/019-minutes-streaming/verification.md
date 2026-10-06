@@ -90,3 +90,20 @@ visibly in plan-review.md F2).
 - **Per-list cutover dates** in 10-20 … 10-29 (F1).
 - **Production timing** (F13) and production V4 before 10-20.
 - **The UI after the fixes** isn't re-checked in a browser. Unit tests cover the split and labels.
+
+## Production (T022)
+
+**Run, 2026-10-06**, after PR #17 merged (`36f77ca`).
+- Backend: `api.ballknowers.co/api/health` has `playerTrendsLoaded: true`, so the new build is
+  running and V28 applied on boot (it boots only after Flyway succeeds).
+- Frontend: bundle `index-b63vlLao.js` contains "Streaming candidates" and `player-trends`.
+- UI, signed in as `popsharky`, `/leagues/1339351318115946496/trends`:
+  - both fallback labels show (3 and 5 games), plus "This league hasn't drafted yet…";
+  - risers are led by Branden Carlson POR (11.6 → 37.4 min, 0.72 pts/min) and Rayan Rupert PHI,
+    which matches local;
+  - console clean.
+- Timing (F13): 1,680 ms for the first `player-trends` call and 762 ms for the second (browser
+  resource timing).
+
+Still owed (dated): the post-draft streaming and grid checks between 10-11 and 10-19, and the
+cutover dates between 10-20 and 10-29. Production's roster lists fill on the league's next refresh.

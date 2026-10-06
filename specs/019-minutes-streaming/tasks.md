@@ -107,7 +107,7 @@ Paths: `B/` = `backend/src/main/java/com/ballknowers/draftsim/`, `T/` = `backend
 
 - [X] T021a Backend + web fixes for code-review B1–B7 and the label note, per data-model "Amended after code review". Tests for each. Then the full backend suite and web tsc/vitest/build
 
-- [ ] T022 Ask Allan → commit, PR, merge, deploy both services, production V4 before 10-20. The dated post-draft check (10-11…10-19) and cutover dates (10-20…10-29) are recorded later
+- [X] T022 Ask Allan → commit, PR, merge, deploy both services, production V4 before 10-20. The dated post-draft check (10-11…10-19) and cutover dates (10-20…10-29) are recorded later
 
 ## Dependencies
 
