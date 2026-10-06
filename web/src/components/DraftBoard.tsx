@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties } from 'react'
-import type { PlayerRef, PredictedPick, Seat, Sport } from '../api'
+import type { PickGrade, ProductionBasis, PlayerRef, PredictedPick, Seat, Sport } from '../api'
 import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
@@ -7,6 +7,7 @@ import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
 import { pickNoAt } from '../snake'
 import { pickValue, signedPicks, tintPercent } from '../stealsReaches'
+import { signedPoints, valueTint } from '../draftGrades'
 
 type Props = {
   board: PredictedPick[]
@@ -47,6 +48,15 @@ type Props = {
    */
   valueView?: boolean
   adpAtDraft?: Record<number, number | null | undefined>
+  /**
+   * "How it played out" view (spec 018): pickNo -> PickGrade. When passed, a
+   * cell shows the signed value over slot (points) with its own tint scale, IN
+   * PLACE OF the ADP delta -- never beside it. Takes precedence over
+   * `valueView`; the page keeps the two views exclusive anyway.
+   */
+  grades?: Record<number, PickGrade>
+  /** With `grades`: basketball has no single position, so its hover says "player" rather than a position. */
+  gradesBasis?: ProductionBasis
 }
 
 /**
@@ -77,14 +87,19 @@ export default function DraftBoard({
   reversalRound = 0,
   valueView = false,
   adpAtDraft,
+  grades,
+  gradesBasis,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
   const mine = new Set(myPicks)
   const seatBySlot = new Map((seats ?? []).map((s) => [s.slot, s]))
+  const gradeValues = grades
+    ? Object.values(grades).flatMap((g) => (g.valueOverSlot != null ? [g.valueOverSlot] : []))
+    : []
 
   return (
     <div className="board-scroll panel-body">
-      <div className={`board${valueView ? ' value-view' : ''}`} style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
+      <div className={`board${valueView || grades ? ' value-view' : ''}`} style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
         <div className="corner" />
         {Array.from({ length: teams }, (_, i) => {
           const slot = i + 1
@@ -155,11 +170,19 @@ export default function DraftBoard({
                 // the fill up and become rings instead (styles.css `.cell.mine`).
                 const shown = chosen ?? visible?.player
                 // Only a real, revealed pick can be a steal or a reach.
-                const value = valueView && visible ? pickValue(pickNo, adpAtDraft?.[pickNo]) : null
+                const value = !grades && valueView && visible ? pickValue(pickNo, adpAtDraft?.[pickNo]) : null
+                const grade = grades && visible ? grades[pickNo] : undefined
+                const gradeKind =
+                  grade?.valueOverSlot != null && Math.abs(grade.valueOverSlot) >= 0.05
+                    ? grade.valueOverSlot > 0
+                      ? 'steal'
+                      : 'reach'
+                    : null
                 const cls =
                   'cell' +
                   (shown ? ` pos-${shown.position}` : '') +
                   (value && (value.kind === 'steal' || value.kind === 'reach') ? ` value-${value.kind}` : '') +
+                  (gradeKind ? ` value-${gradeKind}` : '') +
                   (mine.has(pickNo) ? ' mine' : '') +
                   (chosen ? ' chosen' : visible && !visible.isModal ? ' uncertain' : '')
                 const valueTitle =
@@ -170,12 +193,19 @@ export default function DraftBoard({
                       : value.delta != null && value.kind !== 'even'
                         ? `Taken ${Math.abs(Math.round(value.delta))} picks ${value.kind === 'steal' ? 'after' : 'before'} his ADP at draft time (${value.kind})`
                         : 'Taken right at his ADP at draft time'
+                const gradeTitle =
+                  grades && visible
+                    ? grade?.valueOverSlot != null
+                      ? `${signedPoints(grade.valueOverSlot)} points vs. what a ${gradesBasis === 'WEEKLY_AVERAGE_GAME' || !grade.position ? 'player' : grade.position} taken here scored in this draft (fitted)`
+                      : 'No comparison available for this pick'
+                    : ''
                 const titleAttr = chosen
                   ? `Your pick — ${chosen.name}`
                   : visible
                     ? // The cell shows an abbreviation now, so the hover is
                       // the only place the full name appears without a click.
                       (valueTitle ? `${valueTitle}\n` : '') +
+                      (gradeTitle ? `${gradeTitle}\n` : '') +
                       `${visible.player.name}\n${visible.manager} — ${Math.round(visible.probability * 100)}% of runs\n` +
                       (visible.isModal
                         ? ''
@@ -209,6 +239,16 @@ export default function DraftBoard({
                     <div className="meta">
                       <PlayerFace sport={sport} sleeperId={shown.sleeperId} team={shown.team} position={shown.position} name={shown.name} size={16} />
                       <span className="team-code mono">{shown.team ?? '—'}</span>
+                      {grades &&
+                        (grade?.valueOverSlot != null ? (
+                          <span className={`value-delta mono ${gradeKind ?? 'even'}`} title={gradeTitle}>
+                            {signedPoints(grade.valueOverSlot)}
+                          </span>
+                        ) : (
+                          <span className="value-delta none" title={gradeTitle}>
+                            —
+                          </span>
+                        ))}
                       {value &&
                         (value.kind === 'unknown' ? (
                           <span className="value-delta none" title="no ADP at draft time">
@@ -246,7 +286,9 @@ export default function DraftBoard({
                     style={
                       value && value.delta != null && (value.kind === 'steal' || value.kind === 'reach')
                         ? ({ '--vt': `${tintPercent(value.delta)}%` } as CSSProperties)
-                        : undefined
+                        : gradeKind && grade?.valueOverSlot != null
+                          ? ({ '--vt': `${8 + valueTint(grade.valueOverSlot, gradeValues) * 18}%` } as CSSProperties)
+                          : undefined
                     }
                     onClick={() => onCellClick?.(visible)}
                   >

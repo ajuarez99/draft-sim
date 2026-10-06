@@ -161,6 +161,17 @@ class AccessControlMvcIT {
                 .andExpect(status().isNotFound());
         mvc.perform(post("/api/drafts/it-acl-draft/track")).andExpect(status().isNotFound());
         mvc.perform(get("/api/drafts/it-acl-draft/seats").header("X-Sleeper-User", MEMBER)).andExpect(status().isOk());
+        // Spec 018 F11: draft grades are scoped like /board.
+        mvc.perform(get("/api/drafts/it-acl-draft/grades")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/drafts/it-acl-draft/grades").header("X-Sleeper-User", "  "))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/drafts/it-acl-draft/grades").header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        // The fixture draft is pre_draft, so the member gets the unavailable body, not a grade.
+        mvc.perform(get("/api/drafts/it-acl-draft/grades").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("DRAFT_NOT_COMPLETE"));
     }
 
     /** The manual pick was the worst write: any header-less curl could overwrite any seat. */

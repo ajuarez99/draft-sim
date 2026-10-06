@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.config.DraftGradeProperties;
 import com.ballknowers.draftsim.config.GradeProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +17,12 @@ public class HealthController {
 
     private final GradeProperties grades;
 
-    public HealthController(ScoringProperties scoring, GradeProperties grades) {
+    private final DraftGradeProperties draftGrades;
+
+    public HealthController(ScoringProperties scoring, GradeProperties grades, DraftGradeProperties draftGrades) {
         this.scoring = scoring;
         this.grades = grades;
+        this.draftGrades = draftGrades;
     }
 
     /**
@@ -36,7 +40,9 @@ public class HealthController {
                 "status", "up",
                 "weightsLoaded", scoring.football() != null,
                 // Spec 013: false means every letter grade is null (the numbers still show).
-                "gradesLoaded", grades.loaded()
+                "gradesLoaded", grades.loaded(),
+                // Spec 018: false means draft grades answer NOT_CONFIGURED.
+                "draftGradesLoaded", draftGrades.loaded()
         );
     }
 }

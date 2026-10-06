@@ -1,5 +1,43 @@
 # Ball Knowers — handoff
 
+**2026-10-06, branch `018-draft-grades` (worktree `.claude/worktrees/018-draft-grades`, off
+`origin/main` `c450f67`): spec 018 (roadmap Phase 2 items 2.1 + 2.2) built and verified locally.
+Not committed, not pushed, not deployed.**
+
+- **What it is.** On a finished draft's board (`/drafts/:id/board`), a "How it played out" view
+  shows the following. It's exclusive with Steals & reaches.
+  - Each pick's value over a fitted baseline.
+  - A grade strip per team, valued against the average team, with a letter.
+  - Steals & busts.
+  - On the PlayerCard: production, weeks played, the baseline, positional rank, and "counted
+    for {team}" (Sleeper's credited points too, in NBA).
+
+  Endpoint `GET /api/drafts/{id}/grades`. There's no migration, and everything is computed on
+  read.
+- **The rules, as decided:**
+  - **Production:** the sum over the league's final weeks (that also have final per-game stats)
+    of the week's average league-scored game. NFL: that's the game, verified exact. NBA: a
+    stand-in for the one game Sleeper credits per week, labelled that way.
+  - **Baseline:** a least-squares fit `a + b·ln(pick)` **per position in football** and **over
+    the whole draft in basketball** (`SportRules.draftGradeGroup`, no default). Min 8 picks per
+    group (`weights.yml`, ARBITRARY).
+  - Two earlier rules were measured and dropped: all-positions neighbours (QBs were every NFL
+    steal) and positional neighbours (Jokić and Dončić were "steals"). See `claude/lessons.md`
+    #32.
+- **Verified** (run, outputs in `specs/018-draft-grades/verification.md`):
+  - NFL scoring parity through `GameScoringService` is 0 mismatches over ~5,300 starter-weeks in
+    5 leagues. Roadmap 2.1 is closed.
+  - Live endpoint on all 7 completed drafts, plus edge means by draft region.
+  - UI at desktop and 375px.
+  - Backend 1,187 / 0 skipped. Web 1,036, tsc and build clean.
+- **Not verified / open:**
+  - `NOT_CONFIGURED` on a live server.
+  - Production.
+  - With grades on, the strip and panel push the board below the fold. That's a design call
+    for Allan.
+  - Contract invariant 8 (counted ≤ production) holds only without negative weeks. It's amended
+    in the contract, not the code.
+
 **2026-10-05, branch `017-nba-schedule-grid` (main checkout, off `origin/main` `fffce72`): spec 017
 (roadmap Phase 1) built and verified locally. Not committed beyond the plan docs, not pushed, not
 deployed.**

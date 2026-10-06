@@ -296,4 +296,12 @@ class FootballRulesTest {
         assertTrue(nba.startingLineup(new RosterState(), nbaSettings, nba::value).isEmpty(),
                 "an empty roster seats nobody -- but it answers the question instead of refusing it");
     }
+
+    @Test
+    void draftGradeGroupIsTheFirstListedPositionAndNullWhenNoneIsListed() {
+        Player two = new Player(1, Sport.NFL, "s1", "X", List.of(Position.RB, Position.WR), "FA", "Active", null, null, null);
+        Player none = new Player(2, Sport.NFL, "s2", "Y", List.of(), "FA", "Active", null, null, null);
+        assertEquals("RB", rules.draftGradeGroup(two));
+        assertNull(rules.draftGradeGroup(none));   // never Player.primary()'s WR fallback
+    }
 }

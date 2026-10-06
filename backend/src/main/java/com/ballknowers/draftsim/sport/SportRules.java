@@ -64,6 +64,18 @@ public interface SportRules {
      */
     boolean playsMultipleGamesPerScoringPeriod();
 
+    /**
+     * The group a player is graded within in a draft grade (specs/018-draft-grades, B1): the fit
+     * group for the production-versus-pick line and the group for positional ranks. Null means he
+     * belongs to none, so he is graded on production alone.
+     *
+     * <p><b>No default, deliberately</b> -- this is a rule about a sport (football groups by
+     * position, basketball has no single position and fits one curve), and a defaulted answer would
+     * assert one sport's rule for the other. Never {@code Player.primary()}, whose WR fallback would
+     * file a player with no position among the wide receivers.
+     */
+    String draftGradeGroup(Player player);
+
     /** Expected value of the seat's starting lineup as currently rostered. */
     double startingLineupValue(RosterState roster, LeagueSettings settings);
 

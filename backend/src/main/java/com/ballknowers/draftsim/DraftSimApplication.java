@@ -18,7 +18,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         OwnerProperties.class,
         AdminProperties.class,
         RefreshProperties.class,
-        GradeProperties.class
+        GradeProperties.class,
+        DraftGradeProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

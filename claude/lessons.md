@@ -687,3 +687,28 @@ Same feature, same class of miss, one layer out: the plan's live checks assumed
 honour-system change, one needs a member's `X-Sleeper-User` (else 404, by design) and the
 other `X-Admin-Token` (else 403, fail-closed when blank). A curl in a quickstart should
 name the identity it runs as.
+
+## 32. A baseline built from a draft's own picks is biased at its edges, and moving the edge doesn't fix it
+
+Spec 018 judged each pick against "the picks around it". Three versions, each measured on
+NBA and NFL 2025 after it looked right on paper:
+
+1. **All positions, ±half a round.** It passed the pick-10-beats-picks-1–9 ordering test.
+   On real data NFL 2025's top 5 steals were all late QBs (QB mean +94.9). It compared a QB
+   with the WRs taken beside him. Caught by the adversarial plan review.
+2. **Same-position neighbours, n each side, shifted inward at the ends.** Built and green, 20
+   unit tests. On real data Jokić (#1) and Dončić (#2) were top-4 *steals*, and picks 1–6
+   averaged +106.7. The first player at a position has only later, worse players to be
+   compared with. Same-position windows span more picks, so the bias got bigger than in
+   version 1, not smaller.
+3. **Rank-matched** (k-th drafted vs. k-th best finisher): the bias flips. Pick 1 can at
+   best break even, and the last 12 NBA picks averaged +227.
+
+What shipped: a per-position least-squares fit `production ≈ a + b·ln(pick)`. Its residuals
+sum to 0 within each position, so neither end is favoured by construction. Measured
+edges: NBA picks 1–6 +14.7, last 12 +56.7; NFL picks 1–12 +0.9.
+
+**For any "value vs. expectation" number, report the mean by draft region (first 6–12
+picks, the middle, the last 12) and by position before believing it.** Ordering tests on
+synthetic picks can't see an edge bias, because they don't have a sloped, skewed real
+distribution. Two of these three rules passed every test written for them.

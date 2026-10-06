@@ -17,6 +17,20 @@ Status: **design, not built.** 2026-10-05. Part of
 Competitors: ffwrapped "Draft Grades", LeagueLogs "Draft Report" (steals,
 reaches, picks that shaped each roster), StatChasers report card.
 
+> **Amended 2026-10-05 (spec 018 planning), measured against the local DB:**
+> - Acceptance #1 passes **in SQL**: 5,334 of 5,334 NFL starter-weeks with a game row match
+>   `players_points` exactly, across five leagues. The other 63 are 0-point starters. Spec
+>   018 US1 still runs it through `GameScoringService` itself.
+> - "Production = league-scored points this season" can't mean "sum every game" in
+>   basketball. These leagues credit one game per starter per week, so the sum is ~2.5× what
+>   was awarded. Spec 018 uses the week's average game (r ≈ 0.98–0.99 with credited points,
+>   ~12–16% low) and labels it that way. In football that's exactly the week's game.
+> - No NBA draft (2024, 2025) and no NFL 2025 draft has `adp_at_time` (0 of 168/180), so
+>   reach is unknown for all of them, not only "drafts older than the snapshot window" in
+>   general.
+> - Value over slot excludes the pick itself from its own neighbour median. The formula
+>   above doesn't say, and including it biases every value toward 0.
+
 ## Why this one first
 
 It is the payoff of a draft simulator. The app predicts drafts, tracks them
