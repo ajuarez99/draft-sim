@@ -5467,3 +5467,48 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .sg-c5 { background: color-mix(in oklab, var(--teal) 66%, var(--panel)); font-weight: 700; color: var(--bg); }
 .sg-c6 { background: color-mix(in oklab, var(--teal) 80%, var(--panel)); font-weight: 700; color: var(--bg); }
 .sg-missing { font-size: 10px; color: var(--muted); white-space: normal; max-width: 90px; }
+
+/* --- 018 US2: draft grade strip --------------------------------------------
+   Its own class: .team-strip is the live room's roster-vs-lineup strip. One
+   tinted item per slot, scrolling horizontally INSIDE the strip so the page
+   itself never scrolls sideways at phone width. */
+.draft-grade-strip {
+  display: flex; gap: 8px; overflow-x: auto; max-width: 100%; min-width: 0;
+  padding: 2px 2px 8px; margin: 0 0 8px; flex-shrink: 0;
+}
+.dgs-item {
+  flex: 0 0 168px; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border-radius: 12px; background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.dgs-item:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--teal); }
+.dgs-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dgs-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dgs-value { font-size: 18px; font-weight: 700; }
+.dgs-num.up { color: var(--up); }
+.dgs-num.down { color: var(--down); }
+.dgs-none { color: var(--muted); }
+.dgs-axis { font-size: 10px; }
+.dgs-picks { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dgs-pick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 018 US2: view control + "How he played out" ---------------------------- */
+.grades-legend { margin: 0 0 6px; }
+.played-out { margin-top: 14px; }
+.played-out dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; }
+.played-out dt { color: var(--muted); font-size: 12px; }
+.played-out dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.steals-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
+.sb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.sb-col { min-width: 0; padding: 8px 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.sb-steals { box-shadow: inset 3px 0 0 var(--teal), inset 0 0 0 1px var(--line); }
+.sb-busts { box-shadow: inset 3px 0 0 var(--down), inset 0 0 0 1px var(--line); }
+.sb-col h4 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
+.sb-col ol { list-style: none; margin: 0; padding: 0; }
+.sb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 6px; border-radius: 8px; transition: background 120ms ease; }
+.sb-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.sb-main { display: flex; flex-direction: column; min-width: 0; }
+.sb-name { font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .sb-cols { grid-template-columns: 1fr; } }

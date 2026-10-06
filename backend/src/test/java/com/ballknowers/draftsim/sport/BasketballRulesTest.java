@@ -193,4 +193,14 @@ class BasketballRulesTest {
                         + multiNeed + " vs " + pureNeed + ")");
         assertEquals(1.0, multiNeed, 1e-9, "SG is wide open -- he should start at full value");
     }
+
+    @Test
+    void draftGradeGroupIsOneGroupWhateverTheEligibility() {
+        Player pg = new Player(1, Sport.NBA, "s1", "X", List.of(Position.PG, Position.SG), "FA", "Active", null, null, null);
+        Player sg = new Player(2, Sport.NBA, "s2", "Y", List.of(Position.SG), "FA", "Active", null, null, null);
+        Player none = new Player(3, Sport.NBA, "s3", "Z", List.of(), "FA", "Active", null, null, null);
+        assertEquals("ALL", rules.draftGradeGroup(pg));
+        assertEquals("ALL", rules.draftGradeGroup(sg));
+        assertEquals("ALL", rules.draftGradeGroup(none));
+    }
 }

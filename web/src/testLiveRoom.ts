@@ -94,3 +94,53 @@ export function mkLive(picks: RealPick[], teams: number, over: Partial<LiveState
     ...over,
   }
 }
+
+/** A PickGrade with every optional number filled; override per test (spec 018). */
+export function mkPickGrade(pickNo: number, over: Partial<import('./api').PickGrade> = {}): import('./api').PickGrade {
+  return {
+    pickNo,
+    round: 1,
+    slot: pickNo,
+    sleeperPlayerId: `s${pickNo}`,
+    playerName: `Player ${pickNo}`,
+    position: 'WR',
+    production: 100,
+    weeksPlayed: 3,
+    slotBaseline: 80,
+    valueOverSlot: 20,
+    positionDrafted: 4,
+    positionFinish: 2,
+    countedForYou: null,
+    creditedForYou: null,
+    weeksStartedForYou: null,
+    weeksUnknownForYou: null,
+    ...over,
+  }
+}
+
+/** A DraftGrades payload; override per test (spec 018). */
+export function mkDraftGrades(over: Partial<import('./api').DraftGrades> = {}): import('./api').DraftGrades {
+  return {
+    draftId: 'd1',
+    sport: 'nba',
+    season: 2025,
+    available: true,
+    reason: null,
+    productionBasis: 'WEEKLY_AVERAGE_GAME',
+    countedWeeks: [1, 2, 3],
+    weeksCounted: 3,
+    weeksMissingGameData: [],
+    gradesEarly: false,
+    earlyThresholdWeeks: 4,
+    minPicksPerPosition: 8,
+    excludedPicks: 0,
+    unmappedPicks: 0,
+    unpositionedPicks: 0,
+    averageTeamRawValue: 0,
+    picks: [],
+    teams: [],
+    steals: [],
+    busts: [],
+    ...over,
+  }
+}

@@ -86,6 +86,12 @@ public class FootballRules implements SportRules {
      * than splitting one fact across two rankings
      * (specs/005-daily-weekly-top-players, US3).
      */
+    /** Football grades within a position: his first listed one, or none when the list is empty. */
+    @Override
+    public String draftGradeGroup(Player player) {
+        return player.positions().isEmpty() ? null : player.positions().getFirst().name();
+    }
+
     @Override
     public boolean playsMultipleGamesPerScoringPeriod() {
         return false;

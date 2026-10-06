@@ -127,6 +127,12 @@ public class BasketballRules implements SportRules {
      * what specs/005-daily-weekly-top-players exists to undo. This is what
      * turns the Weekly Report's single list into a pair for basketball.
      */
+    /** Basketball has no single position (four of nine lineup slots are flexible), so one curve covers the whole draft. */
+    @Override
+    public String draftGradeGroup(Player player) {
+        return "ALL";
+    }
+
     @Override
     public boolean playsMultipleGamesPerScoringPeriod() {
         return true;

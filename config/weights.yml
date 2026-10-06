@@ -167,3 +167,11 @@ draftsim:
       - { maxPercentile: 75,  grade: "C-" }
       - { maxPercentile: 92,  grade: "D" }
       - { maxPercentile: 100, grade: "F" }
+
+  # Draft grades (spec 018). ARBITRARY: not fitted to anything. A position needs at least
+  # this many graded picks in the draft to get a baseline (a line of production against
+  # ln(pick number), fitted per position from that draft's own picks); positions with fewer
+  # picks than this get no baseline and no value. Delete this block and draft grades report
+  # NOT_CONFIGURED; /api/health reports draftGradesLoaded.
+  draft-grades:
+    min-picks-per-position: 8

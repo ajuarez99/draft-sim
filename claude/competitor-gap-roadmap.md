@@ -53,6 +53,15 @@ by recent form means more once minutes are visible beside it.
 
 ## Phase 2: realized-data features (October–November)
 
+> **Status 2026-10-06 (spec 018):** 2.1 + 2.2 **built and verified locally** in
+> `specs/018-draft-grades` (worktree `018-draft-grades`), not deployed. 2.1 is closed by the Java
+> parity test (0 mismatches). The 2026-10-05 planning status follows:
+> **(2026-10-05)** 2.1 + 2.2 planned as `specs/018-draft-grades`, nothing
+> built. 2.1 already passes in SQL (5,334 / 5,334 starter-weeks, research R1), and the Java
+> check is spec 018 US1. **Amended:** "NFL drafts are five weeks old" is three *scored*
+> weeks (NFL 2026 final weeks = 3), so NFL grades read "early" until week 4 is final. 2.3–2.6
+> are later specs.
+
 | # | Item | Doc | Size | Notes |
 |---|---|---|---|---|
 | 2.1 | **NFL scoring check:** `GameScoringService` vs `players_points` | [draft-grades.md](draft-grades.md) acceptance #1 | S | Gate for 2.2 and 3.1's NFL path. If it fails, fix that before anything reads NFL `player_game`. |

@@ -17,6 +17,16 @@ correct), a player's weekly value is roughly per-game value × games played. A
 team with 4 games in a week is worth ~2× one with 2. Week 1 of 2026, measured:
 5 teams play 2 games, 24 play 3, 1 plays 4.
 
+> **Amended 2026-10-05 (spec 018 research R2), measured:** the "~2×" doesn't hold for
+> these leagues, and the memory this paragraph cites says why. In both NBA "Ball Knowers"
+> leagues (2024, 2025), `starters_points` equals the sum of the starters' `players_points`
+> in 540 of 540 roster-weeks, and each starter's `players_points` is **one game's** score
+> (2,153 of 2,171 multi-game starter-weeks in 2025), not the week's sum. So a starter's week
+> is credited one game, whatever his team plays. More games may still help: the credited
+> game beats the week's average by ~14–19%, so more games may mean more chances at a good
+> one. That mechanism is unmeasured. Whether the grid's framing should change is open, and
+> spec 018 doesn't change it.
+
 ## What's there now
 
 - `SleeperPlayerStatsClient.schedule(sport, season)`
