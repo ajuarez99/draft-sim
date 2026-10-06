@@ -298,3 +298,15 @@ describe('schedule grid destination', () => {
     expect(leagueIdFromPath('/leagues/x/schedule')).toEqual({ idKind: 'league', id: 'x' })
   })
 })
+
+// specs/019-minutes-streaming T016: a basketball tool, season-scoped.
+describe('trends destination', () => {
+  it('is offered to basketball and not football', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('trends')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('trends')
+  })
+
+  it('is recognised from its own path', () => {
+    expect(destinationFromPath('/leagues/x/trends')).toBe('trends')
+  })
+})

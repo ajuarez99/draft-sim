@@ -125,7 +125,8 @@ class AccessControlMvcIT {
     @Test
     void leagueRoutesAre404WithNoIdentityAndForAStranger() throws Exception {
         for (String path : List.of("analysis", "history", "power", "ballot", "superlatives", "conduct-list",
-                "roster-management", "transactions", "expected-wins", "forecast", "weekly-report/1")) {
+                "roster-management", "transactions", "expected-wins", "forecast", "weekly-report/1",
+                "player-trends")) {
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path)).andExpect(status().isNotFound());
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path).header("X-Sleeper-User", ""))
                     .andExpect(status().isNotFound());
@@ -137,6 +138,11 @@ class AccessControlMvcIT {
         // which needs no ingested data).
         mvc.perform(get("/api/leagues/" + LEAGUE + "/ballot").header("X-Sleeper-User", MEMBER))
                 .andExpect(status().isOk());
+        // Spec 019: the fixture league is NFL, so a member gets the unavailable body (200), not the scoping 404.
+        mvc.perform(get("/api/leagues/" + LEAGUE + "/player-trends").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("NOT_BASKETBALL"));
     }
 
     @Test

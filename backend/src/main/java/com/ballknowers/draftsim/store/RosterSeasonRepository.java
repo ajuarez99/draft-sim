@@ -1,10 +1,18 @@
 package com.ballknowers.draftsim.store;
 
 import com.ballknowers.draftsim.domain.Sport;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Array;
+import java.sql.PreparedStatement;
+import java.sql.Types;
+import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * One row per (league, roster) per season -- standings, as Sleeper reports
@@ -15,14 +23,21 @@ import java.util.List;
 public class RosterSeasonRepository {
 
     private final JdbcClient db;
+    private final JdbcTemplate jdbc;
 
-    public RosterSeasonRepository(JdbcClient db) {
+    public RosterSeasonRepository(JdbcClient db, JdbcTemplate jdbc) {
         this.db = db;
+        this.jdbc = jdbc;
     }
 
+    /**
+     * @param players          the roster's player ids (players, reserve and taxi, de-duplicated); null
+     *                         means "not known", an empty list means "known to be empty"
+     * @param playersFetchedAt when {@code players} was read from Sleeper; null iff players is null
+     */
     public record Upsert(long leagueId, Long managerId, int rosterId, Integer wins, Integer losses,
                          Integer ties, Double pointsFor, Double pointsAgainst, Double pointsPossible,
-                         Integer finalPlacement) {}
+                         Integer finalPlacement, List<String> players, OffsetDateTime playersFetchedAt) {}
 
     /**
      * T025 (specs/006-deeper-history-both-sports): confirmed this upsert
@@ -43,25 +58,99 @@ public class RosterSeasonRepository {
      */
     public void upsertAll(List<Upsert> rows) {
         if (rows.isEmpty()) return;
+        // JdbcTemplate + createArrayOf, as LeagueRepository#upsert does: a bare List/String[] bind relies on
+        // the driver inferring text[] (spec 019 N4). Null stays null (never fetched).
+        String sql = """
+                insert into roster_season (league_id, manager_id, roster_id, wins, losses, ties,
+                                           points_for, points_against, points_possible, final_placement,
+                                           players, players_fetched_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                on conflict (league_id, roster_id) do update set
+                    manager_id = excluded.manager_id,
+                    wins = excluded.wins,
+                    losses = excluded.losses,
+                    ties = excluded.ties,
+                    points_for = excluded.points_for,
+                    points_against = excluded.points_against,
+                    points_possible = excluded.points_possible,
+                    final_placement = excluded.final_placement,
+                    players = excluded.players,
+                    players_fetched_at = excluded.players_fetched_at
+                """;
         for (Upsert r : rows) {
-            db.sql("""
-                    insert into roster_season (league_id, manager_id, roster_id, wins, losses, ties,
-                                               points_for, points_against, points_possible, final_placement)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    on conflict (league_id, roster_id) do update set
-                        manager_id = excluded.manager_id,
-                        wins = excluded.wins,
-                        losses = excluded.losses,
-                        ties = excluded.ties,
-                        points_for = excluded.points_for,
-                        points_against = excluded.points_against,
-                        points_possible = excluded.points_possible,
-                        final_placement = excluded.final_placement
-                    """)
-                    .params(r.leagueId(), r.managerId(), r.rosterId(), r.wins(), r.losses(), r.ties(),
-                            r.pointsFor(), r.pointsAgainst(), r.pointsPossible(), r.finalPlacement())
-                    .update();
+            jdbc.execute(sql, (PreparedStatement ps) -> {
+                ps.setLong(1, r.leagueId());
+                setLongOrNull(ps, 2, r.managerId());
+                ps.setInt(3, r.rosterId());
+                setIntOrNull(ps, 4, r.wins());
+                setIntOrNull(ps, 5, r.losses());
+                setIntOrNull(ps, 6, r.ties());
+                setDoubleOrNull(ps, 7, r.pointsFor());
+                setDoubleOrNull(ps, 8, r.pointsAgainst());
+                setDoubleOrNull(ps, 9, r.pointsPossible());
+                setIntOrNull(ps, 10, r.finalPlacement());
+                if (r.players() == null) {
+                    ps.setNull(11, Types.ARRAY);
+                } else {
+                    Array a = ps.getConnection().createArrayOf("text", r.players().toArray());
+                    ps.setArray(11, a);
+                }
+                if (r.playersFetchedAt() == null) ps.setNull(12, Types.TIMESTAMP_WITH_TIMEZONE);
+                else ps.setObject(12, r.playersFetchedAt());
+                return ps.executeUpdate();
+            });
         }
+    }
+
+    private static void setLongOrNull(PreparedStatement ps, int i, Long v) throws java.sql.SQLException {
+        if (v == null) ps.setNull(i, Types.BIGINT); else ps.setLong(i, v);
+    }
+
+    private static void setIntOrNull(PreparedStatement ps, int i, Integer v) throws java.sql.SQLException {
+        if (v == null) ps.setNull(i, Types.INTEGER); else ps.setInt(i, v);
+    }
+
+    private static void setDoubleOrNull(PreparedStatement ps, int i, Double v) throws java.sql.SQLException {
+        if (v == null) ps.setNull(i, Types.NUMERIC); else ps.setDouble(i, v);
+    }
+
+    /**
+     * Who is on a roster, one league: player id to roster id, and when it was read
+     * (spec 019 data-model "Rostered").
+     *
+     * @param fetchedAt the MINIMUM {@code players_fetched_at} across the league's rows (N9): the page
+     *                  can only claim as much freshness as its stalest roster
+     */
+    public record Rostered(Map<String, Integer> byPlayer, OffsetDateTime fetchedAt) {}
+
+    private record PlayersRow(int rosterId, String[] players, OffsetDateTime fetchedAt) {}
+
+    /**
+     * Empty when the league has no rows or ANY row's {@code players} is null (never fetched): a partial
+     * map would read the missing roster's players as free agents. A player on two rosters maps to the
+     * first by roster id.
+     */
+    public Optional<Rostered> rosteredPlayers(long leagueId) {
+        List<PlayersRow> rows = db.sql("""
+                select roster_id, players, players_fetched_at
+                from roster_season where league_id = ? order by roster_id
+                """)
+                .param(leagueId)
+                .query((rs, i) -> {
+                    Array a = rs.getArray(2);
+                    return new PlayersRow(rs.getInt(1), a == null ? null : (String[]) a.getArray(),
+                            rs.getObject(3, OffsetDateTime.class));
+                })
+                .list();
+        if (rows.isEmpty()) return Optional.empty();
+        Map<String, Integer> by = new HashMap<>();
+        OffsetDateTime min = null;
+        for (PlayersRow r : rows) {
+            if (r.players() == null) return Optional.empty();
+            for (String p : r.players()) by.putIfAbsent(p, r.rosterId());
+            if (r.fetchedAt() != null && (min == null || r.fetchedAt().isBefore(min))) min = r.fetchedAt();
+        }
+        return Optional.of(new Rostered(by, min));
     }
 
     /**

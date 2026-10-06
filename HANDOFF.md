@@ -1,5 +1,31 @@
 # Ball Knowers — handoff
 
+**2026-10-06, branch `019-minutes-streaming` (worktree `.claude/worktrees/019-minutes-streaming`,
+off `origin/main` `787abd9`): spec 019 (roadmap 2.3 + 2.4) built and verified locally. Not committed.
+Due in production before 2026-10-20.**
+
+- **What it is.** A basketball-only **Trends** page (`/leagues/:id/trends`):
+  - **Streaming candidates:** free agents ranked by season points per game, with last-5 form,
+    the minutes trend and games this week and next beside them.
+  - **Minutes risers and fallers:** the median of the last 3 games vs. the season, plus pooled
+    usage rate and points per minute.
+  - **Stored rosters:** V28 stores each roster's players from the `/rosters` call the refresh
+    already made, so "rostered" is right between the draft and week 1.
+- **Findings that shaped it:**
+  - `player_game` holds `TEAM_*` team-total rows (excluded from players; they make true usage
+    computable).
+  - The credited NBA game is usually the week's best, so 4 scheduled games vs. 2 is worth about
+    +4%, not 2×.
+  - Lists read last season, labelled, until half the teams have played 3 (streaming) or 5 (roles)
+    games.
+- **Verified:**
+  - backend 1,243 / 0 skipped, web 1,055;
+  - V28 matches Sleeper `/rosters` exactly on an in-season league;
+  - the endpoint on NBA 2024/2025/2026 and NFL (`NOT_BASKETBALL`);
+  - the UI at desktop and 375px (before the review fixes).
+- **Owed, dated:** after the 10-10 NBA draft, check that the streaming list excludes drafted
+  players and that games match the grid. Record the cutover dates 10-20…10-29. Production timing.
+
 **2026-10-06, branch `018-draft-grades` (worktree `.claude/worktrees/018-draft-grades`, off
 `origin/main` `c450f67`): spec 018 (roadmap Phase 2 items 2.1 + 2.2) built and verified locally.
 Not committed, not pushed, not deployed.**

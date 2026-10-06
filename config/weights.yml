@@ -175,3 +175,22 @@ draftsim:
   # NOT_CONFIGURED; /api/health reports draftGradesLoaded.
   draft-grades:
     min-picks-per-position: 8
+
+  # Minutes trends and streaming candidates (spec 019). ARBITRARY: every number here is hand-set,
+  # not fitted (specs/019-minutes-streaming research R5, plan review F7). role-threshold-minutes:
+  # recent minus season minutes at which a player is flagged a riser/faller. min-season-games:
+  # games before a season minutes mean is shown. form-games / form-min-games: the "last N" points
+  # window and the games it needs. recency-days: a player whose last game is more than this many days
+  # before the season's latest game is excluded as stale. list-size / streaming-size: rows per list.
+  # one-game-share: the share of multi-game starter-weeks credited as exactly one game, at or above
+  # which the page says the league credits one game a week. Delete this block and the endpoint reports
+  # NOT_CONFIGURED; /api/health reports playerTrendsLoaded.
+  player-trends:
+    role-threshold-minutes: 6
+    min-season-games: 5
+    form-games: 5
+    form-min-games: 3
+    recency-days: 14
+    list-size: 10
+    streaming-size: 20
+    one-game-share: 0.9

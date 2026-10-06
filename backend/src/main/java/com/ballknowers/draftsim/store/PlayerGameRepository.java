@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -193,6 +194,57 @@ public class PlayerGameRepository {
                         rs.getString("opponent"),
                         (Boolean) rs.getObject("is_away"),
                         rs.getString("stats")))
+                .list();
+    }
+
+    /**
+     * The id prefix of a team-total row ({@code TEAM_DEN}): a box-score total stored in this table next
+     * to the players (spec 019 R2). Every player read excludes it, and it is measured on NFL too, so
+     * team reads filter by sport as well (N2). The All-Star game has a bare {@code TEAM_} (suffix empty).
+     */
+    public static final String TEAM_ID_PREFIX = "TEAM_";
+
+    /**
+     * One player-game with only the columns the trends read needs. {@code week} is the fantasy week
+     * (the one-game-credit measure groups a player's games by it); trends itself never reads it.
+     */
+    public record SeasonGame(String sleeperPlayerId, String gameId, LocalDate gameDate, String opponent,
+                             Map<String, Object> stats, int week) {}
+
+    /**
+     * One team's box-score total for one game. {@code code} is the id's suffix and may be empty (the
+     * All-Star game's bare {@code TEAM_}, review F9).
+     */
+    public record TeamGame(String code, String gameId, LocalDate date, String opponent, Map<String, Object> stats) {}
+
+    private static final int PREFIX_LEN = TEAM_ID_PREFIX.length();
+
+    /**
+     * Every PLAYER game of a sport-season (team-total rows excluded), projecting only what the trends
+     * read uses. {@code left(id, 5) <> 'TEAM_'} rather than LIKE: no escaping of the underscore (N3).
+     */
+    public List<SeasonGame> seasonPlayerGames(Sport sport, int season) {
+        return db.sql("""
+                select sleeper_player_id, game_id, game_date, opponent, stats::text, week
+                from player_game
+                where sport = ? and season = ? and left(sleeper_player_id, %d) <> '%s'
+                """.formatted(PREFIX_LEN, TEAM_ID_PREFIX))
+                .params(sport.code(), season)
+                .query((rs, n) -> new SeasonGame(rs.getString(1), rs.getString(2),
+                        rs.getDate(3).toLocalDate(), rs.getString(4), JsonUtil.readMap(rs.getString(5)), rs.getInt(6)))
+                .list();
+    }
+
+    /** The team-total rows of a sport-season, with the id's suffix as {@link TeamGame#code}. */
+    public List<TeamGame> seasonTeamGames(Sport sport, int season) {
+        return db.sql("""
+                select sleeper_player_id, game_id, game_date, opponent, stats::text
+                from player_game
+                where sport = ? and season = ? and left(sleeper_player_id, %d) = '%s'
+                """.formatted(PREFIX_LEN, TEAM_ID_PREFIX))
+                .params(sport.code(), season)
+                .query((rs, n) -> new TeamGame(rs.getString(1).substring(PREFIX_LEN), rs.getString(2),
+                        rs.getDate(3).toLocalDate(), rs.getString(4), JsonUtil.readMap(rs.getString(5))))
                 .list();
     }
 

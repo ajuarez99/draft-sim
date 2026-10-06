@@ -16,6 +16,12 @@ beyond what Sleeper's fantasy points give you, so a new data source." **Wrong.**
 rows for 2024 and 2025 (local DB, measured 2026-10-05). The data has been
 ingested since spec 005. Nothing reads it.
 
+> **Amended 2026-10-06 (spec 019 research R2), measured:** "True usage needs team totals Sleeper
+> doesn't give" (below) is wrong. `player_game` stores `TEAM_*` team box-score rows (sharing
+> `game_id` with the players), so the standard usage rate is computable, and spec 019 uses it,
+> pooled over the window. Those rows also have to be excluded from every player read, or average
+> "minutes" come out at 41.
+
 ## What's there now
 
 - `player_game` (V20): one row per player-game with `game_date`, `opponent`,

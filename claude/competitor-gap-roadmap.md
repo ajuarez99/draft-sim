@@ -53,6 +53,10 @@ by recent form means more once minutes are visible beside it.
 
 ## Phase 2: realized-data features (October–November)
 
+> **Status 2026-10-06 (spec 019):** 2.3 + 2.4 built and verified locally in
+> `specs/019-minutes-streaming`, not deployed. 2.4 was reshaped by measurement: a 4-game week is worth
+> about +4% in the measured league, so streaming ranks by season form, not game count.
+
 > **Status 2026-10-06 (spec 018):** 2.1 + 2.2 **built and verified locally** in
 > `specs/018-draft-grades` (worktree `018-draft-grades`), not deployed. 2.1 is closed by the Java
 > parity test (0 mismatches). The 2026-10-05 planning status follows:
