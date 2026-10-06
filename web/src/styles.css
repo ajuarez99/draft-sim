@@ -5379,3 +5379,91 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .signin-continue:disabled { opacity: 0.55; cursor: default; }
 .signin-note { max-width: 520px; margin: 0; }
 .signin-welcome .error { max-width: 520px; margin: 0; }
+
+/* --- Schedule grid (specs/017-nba-schedule-grid) -------------------------
+   Games per team per league week. The count is printed in each cell and the
+   tint tracks the same count (one encoding, number spelled out). The table
+   scrolls inside .sg-wrap with a sticky team column, so the page itself never
+   scrolls sideways at 375px. Tints mix --teal into --panel, so they follow
+   whatever the theme variables are. */
+
+.sg-section { min-width: 0; }
+.sg-fresh { margin: 0 0 12px; }
+.sg-controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.sg-over { margin: 8px 0; font-weight: 600; }
+
+.sg-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.sg-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  width: max-content;
+  min-width: 100%;
+}
+
+.sg-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 8px 10px;
+  text-align: center;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.sg-week { min-width: 84px; }
+.sg-wk { display: block; color: var(--text); text-transform: uppercase; }
+.sg-dates { display: block; font-weight: 400; letter-spacing: 0; }
+.sg-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: normal;
+  background: color-mix(in oklab, var(--teal) 18%, transparent);
+  color: var(--teal);
+}
+.sg-tag-po { background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
+.sg-now { box-shadow: inset 0 -2px 0 var(--teal); }
+
+.sg-team {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sg-table thead .sg-corner { z-index: 2; text-align: left; }
+
+.sg-table tbody tr > * { border-bottom: 1px solid var(--line); }
+.sg-table tbody tr:hover > .sg-team { background: color-mix(in oklab, var(--panel) 80%, white 8%); }
+.sg-table tbody tr:hover > .sg-cell { filter: brightness(1.15); }
+
+.sg-total { text-align: center; padding: 8px 12px; white-space: nowrap; }
+.sg-sum { font-weight: 700; color: var(--text); }
+
+.sg-cell { text-align: center; padding: 8px 10px; color: var(--text); }
+.sg-c0 { color: var(--muted); }
+.sg-c1 { background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.sg-c2 { background: color-mix(in oklab, var(--teal) 20%, var(--panel)); }
+.sg-c3 { background: color-mix(in oklab, var(--teal) 34%, var(--panel)); }
+.sg-c4 { background: color-mix(in oklab, var(--teal) 50%, var(--panel)); font-weight: 600; }
+.sg-c5 { background: color-mix(in oklab, var(--teal) 66%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-c6 { background: color-mix(in oklab, var(--teal) 80%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-missing { font-size: 10px; color: var(--muted); white-space: normal; max-width: 90px; }

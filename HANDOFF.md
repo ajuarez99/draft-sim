@@ -1,5 +1,34 @@
 # Ball Knowers — handoff
 
+**2026-10-05, branch `017-nba-schedule-grid` (main checkout, off `origin/main` `fffce72`): spec 017
+(roadmap Phase 1) built and verified locally. Not committed beyond the plan docs, not pushed, not
+deployed.**
+
+- **What it is.** Basketball leagues get a Schedule grid (`/leagues/:id/schedule`, NBA-only in the
+  rail): games per NBA team per fantasy week from the league's current week to its last week, with
+  "Next 1–4 weeks" sorting and a Playoff weeks view. NBA league home gets a Next opponent block
+  from the new projection-free `/next-matchup`. NFL league home is **deliberately unchanged** until
+  T004's Tue/Wed `leg` measurement (10-06/10-07).
+- **Stored schedule.** V27 `sport_schedule`. It's written by the per-game refresh after its week
+  loop (no new Sleeper call), and a storage failure fails the refresh only after stats and trending
+  have run.
+- **Verified (run, outputs in `specs/017-nba-schedule-grid/verification.md`):**
+  - backend 1,132 tests / 0 skipped, web 1,000 tests, tsc, build
+  - stored = fetched (1,200)
+  - week 1 = 5×2, 24×3, 1×4 (PHI)
+  - 2025 counted totals 82, NYK/SAS 83, no STP/STR
+  - playoffs 20–22 and 19–21
+  - schedule week = league week on 3,223 player-weeks
+  - next-matchup F1 live
+  - browser at desktop and 375px, plus refetch-after-refresh
+- **Not verified yet:** the basketball paired next opponent (after the 10-10 draft, T041), the NFL
+  switch (T042–T044), production (T049, which needs a one-off admin backfill of NBA 2025/2024
+  schedules after deploy, see tasks.md).
+- **Docs to read:** `specs/017-nba-schedule-grid/` (spec, plan with "Amended after review",
+  plan-review.md, code-review.md, verification.md, tasks.md).
+
+---
+
 **2026-10-02, branch `015-home-roster-players` (worktree `.claude/worktrees/015-home-roster-players`, off
 `origin/main` `29073a1`): built and verified locally. Not committed, not pushed, not deployed.**
 

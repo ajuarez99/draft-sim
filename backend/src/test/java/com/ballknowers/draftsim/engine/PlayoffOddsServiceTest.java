@@ -48,7 +48,7 @@ class PlayoffOddsServiceTest {
     }
 
     private static LeagueRepository.PlayoffFormat plainFormat() {
-        return new LeagueRepository.PlayoffFormat(6, 15, 0, false, false);
+        return new LeagueRepository.PlayoffFormat(6, 15, 0, false, false, 0);
     }
 
     private static RosterSeasonRepository.StandingRow standing(int rosterId, int wins, double pointsFor) {
@@ -113,7 +113,7 @@ class PlayoffOddsServiceTest {
     @Test
     void aDivisionLeagueGetsNoSnapshot() {
         when(leagues.playoffFormat(LEAGUE))
-                .thenReturn(Optional.of(new LeagueRepository.PlayoffFormat(6, 15, 0, true, false)));
+                .thenReturn(Optional.of(new LeagueRepository.PlayoffFormat(6, 15, 0, true, false, 0)));
 
         assertTrue(service.compute(LEAGUE, 2026, 1).isEmpty());
 
@@ -125,7 +125,7 @@ class PlayoffOddsServiceTest {
     @Test
     void aCustomSeedTypeGetsNoSnapshot() {
         when(leagues.playoffFormat(LEAGUE))
-                .thenReturn(Optional.of(new LeagueRepository.PlayoffFormat(6, 15, 1, false, false)));
+                .thenReturn(Optional.of(new LeagueRepository.PlayoffFormat(6, 15, 1, false, false, 0)));
 
         assertTrue(service.compute(LEAGUE, 2026, 1).isEmpty());
         verify(odds, never()).save(anyLong(), anyInt(), anyInt(), anyInt(), any(), any());

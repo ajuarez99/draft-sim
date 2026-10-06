@@ -10,6 +10,7 @@ import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.SportScheduleRepository;
 import com.ballknowers.draftsim.store.SportWeekStatsRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
@@ -68,6 +70,7 @@ public class PlayerGameIngestService {
     private final PlayerAbsenceRepository absences;
     private final SportWeekStatsRepository weekStats;
     private final SportRulesRegistry rulesRegistry;
+    private final SportScheduleRepository scheduleRepository;
 
     /**
      * Single-flight keyed {@code sport:season} (specs/009 research R4, T013/T020):
@@ -81,7 +84,8 @@ public class PlayerGameIngestService {
     public PlayerGameIngestService(SleeperPlayerStatsClient stats, LeagueRepository leagues,
                                    RosterWeekPointsRepository weekPoints, PlayerGameRepository games,
                                    PlayerAbsenceRepository absences, SportWeekStatsRepository weekStats,
-                                   SportRulesRegistry rulesRegistry) {
+                                   SportRulesRegistry rulesRegistry,
+                                   SportScheduleRepository scheduleRepository) {
         this.stats = stats;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
@@ -89,6 +93,7 @@ public class PlayerGameIngestService {
         this.absences = absences;
         this.weekStats = weekStats;
         this.rulesRegistry = rulesRegistry;
+        this.scheduleRepository = scheduleRepository;
     }
 
     /**
@@ -108,9 +113,13 @@ public class PlayerGameIngestService {
      *                          other entries -- not counted either way, and
      *                          reported so a coverage gap is visible rather
      *                          than silently folded into "bye" (research R9)
+     * @param scheduleStoreFailed the schedule could not be written to {@code sport_schedule}
+     *                          (specs/017 F3). Caught, not thrown, so the per-game data above
+     *                          still landed; the chain refresh turns it into a FAILED season
+     *                          after everything else has run.
      */
     public record Result(int weeksFetched, int gamesStored, int weeksFailed,
-                         int absencesStored, int weeksUnclassified) {}
+                         int absencesStored, int weeksUnclassified, boolean scheduleStoreFailed) {}
 
     /**
      * The manual endpoint's entry point. Resolves the league's sport (and its
@@ -119,7 +128,7 @@ public class PlayerGameIngestService {
      */
     public Result ingest(String sleeperLeagueId, Integer requestedSeason) {
         Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
-        if (found.isEmpty()) return new Result(0, 0, 0, 0, 0);
+        if (found.isEmpty()) return new Result(0, 0, 0, 0, 0, false);
         LeagueRepository.LeagueRow league = found.get();
         int season = requestedSeason == null ? league.season() : requestedSeason;
         return refreshSportSeason(league.sport(), season, Instant.now());
@@ -150,7 +159,7 @@ public class PlayerGameIngestService {
 
         // 1. The schedule, once. A schedule failure fails the whole run: without
         //    it there is no week range, no is_away and no bye evidence.
-        Schedule schedule = Schedule.parse(stats.schedule(code, season));
+        SportSchedule schedule = SportSchedule.parse(stats.schedule(code, season));
         int lastWeek = schedule.lastStartedWeek(today);
 
         Set<String> rostered = rosteredPlayers(sport, season);
@@ -329,10 +338,21 @@ public class PlayerGameIngestService {
             }
         }
 
+        // 4. Store the schedule itself (specs/017). After the week loop and the no-entry pass,
+        //    so a storage failure can never cost per-game data; caught and reported, never thrown.
+        boolean scheduleStoreFailed = false;
+        try {
+            scheduleRepository.replaceSeason(code, season, schedule.games(),
+                    OffsetDateTime.ofInstant(now, ZoneOffset.UTC));
+        } catch (RuntimeException e) {
+            scheduleStoreFailed = true;
+            log.warn("player-games: {} {} schedule store failed: {}", code, season, e.toString(), e);
+        }
+
         log.info("player-games: {} {} -- {} weeks fetched (of {}), {} games stored, {} weeks failed, "
                         + "{} absences stored, {} weeks unclassified",
                 code, season, fetched, lastWeek, stored, failed, absencesStored, weeksUnclassified);
-        return new Result(fetched, stored, failed, absencesStored, weeksUnclassified);
+        return new Result(fetched, stored, failed, absencesStored, weeksUnclassified, scheduleStoreFailed);
     }
 
     /**
@@ -349,145 +369,6 @@ public class PlayerGameIngestService {
             }
         }
         return ids;
-    }
-
-    /**
-     * A season's schedule, indexed by game and by week. Pure: built from the raw
-     * maps, so it is testable against a trimmed fixture.
-     *
-     * <p>The home/away value's shape differs by sport in Sleeper's payload -- a
-     * nested object carrying {@code team}, or a bare team-code string -- and
-     * {@link #sideTeam} resolves either, by looking at the value rather than at
-     * which sport it came from.
-     */
-    static final class Schedule {
-
-        /** Statuses that will not become "played" in this week: settled for finality purposes. */
-        private static final Set<String> SETTLED = Set.of("complete", "postponed", "canceled");
-
-        record Game(String gameId, int week, LocalDate date, String status, String home, String away) {}
-
-        private final Map<String, Game> byId = new HashMap<>();
-        private final Map<Integer, List<Game>> byWeek = new TreeMap<>();
-
-        static Schedule parse(List<Map<String, Object>> raw) {
-            Schedule s = new Schedule();
-            for (Map<String, Object> g : raw) {
-                Object id = g.get("game_id");
-                Object wk = g.get("week");
-                if (id == null || !(wk instanceof Number w)) continue;
-                LocalDate date = null;
-                Object d = g.get("date");
-                if (d != null) {
-                    String ds = String.valueOf(d);
-                    try {
-                        date = LocalDate.parse(ds.length() > 10 ? ds.substring(0, 10) : ds);
-                    } catch (RuntimeException e) {
-                        date = null;
-                    }
-                }
-                Game game = new Game(String.valueOf(id), w.intValue(), date,
-                        stringOrNull(g.get("status")), sideTeam(g.get("home")), sideTeam(g.get("away")));
-                s.byId.put(game.gameId(), game);
-                s.byWeek.computeIfAbsent(game.week(), k -> new ArrayList<>()).add(game);
-            }
-            return s;
-        }
-
-        /** A side's team code from either payload shape; null if it has none. */
-        static String sideTeam(Object side) {
-            if (side instanceof Map<?, ?> m) return stringOrNull(m.get("team"));
-            return stringOrNull(side);
-        }
-
-        /** The last week with a game that has started: complete, or dated today or earlier. */
-        int lastStartedWeek(LocalDate today) {
-            int last = 0;
-            for (Map.Entry<Integer, List<Game>> e : byWeek.entrySet()) {
-                for (Game g : e.getValue()) {
-                    boolean started = "complete".equals(g.status())
-                            || (g.date() != null && !g.date().isAfter(today));
-                    if (started) last = Math.max(last, e.getKey());
-                }
-            }
-            return last;
-        }
-
-        /**
-         * Whether this player's team was the away side of the game, from the
-         * schedule. Unknown (null) rather than defaulted to home when the game or
-         * team can't be matched.
-         */
-        Boolean isAway(String gameId, String team) {
-            if (gameId == null || team == null) return null;
-            Game g = byId.get(gameId);
-            if (g == null) return null;
-            if (team.equals(g.home())) return false;
-            if (team.equals(g.away())) return true;
-            return null;
-        }
-
-        /** A player's team in a game, given the opponent he faced; null if it can't be told. */
-        String teamOf(String gameId, String opponent) {
-            if (gameId == null || opponent == null) return null;
-            Game g = byId.get(gameId);
-            if (g == null) return null;
-            if (opponent.equals(g.home())) return g.away();
-            if (opponent.equals(g.away())) return g.home();
-            return null;
-        }
-
-        /** Whether any game in the week is {@code complete}. */
-        boolean hasCompleteGame(int week) {
-            for (Game g : byWeek.getOrDefault(week, List.of())) {
-                if ("complete".equals(g.status())) return true;
-            }
-            return false;
-        }
-
-        /**
-         * Whether {@code team} played a completed game in the week. A merely
-         * scheduled, postponed or canceled game is not a played one, so a rostered
-         * player's missing entry for it is not an absence.
-         */
-        boolean teamPlayed(int week, String team) {
-            for (Game g : byWeek.getOrDefault(week, List.of())) {
-                if ("complete".equals(g.status()) && (team.equals(g.home()) || team.equals(g.away()))) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /**
-         * A week is final once every game in it is settled and the fetch happened
-         * at least {@link RefreshProperties#WEEK_FINAL_AFTER} after the end of the
-         * week's last game date (specs/009 research R6).
-         *
-         * <p>Two readings, both chosen to err toward refetching. "Settled" counts
-         * {@code postponed} and {@code canceled} as well as {@code complete}:
-         * measured 2026-09-28, the reference basketball season's schedule keeps
-         * three postponed games in weeks 12 and 14 and one canceled game in week
-         * 17 forever, so requiring {@code complete} alone would refetch those
-         * weeks on every run and defeat the "an up-to-date season fetches
-         * nothing" goal. A postponed game that is later played arrives as entries
-         * in the week it was played (the entry's own {@code week}), and that week
-         * stays non-final until its own games settle. And "after the last game
-         * date" is measured from the <i>end</i> of that (date-only) day in UTC,
-         * not its start, so the window never begins before the game finished.
-         */
-        boolean isFinal(int week, Instant fetchedAt) {
-            List<Game> gs = byWeek.get(week);
-            if (gs == null || gs.isEmpty()) return false;
-            LocalDate last = null;
-            for (Game g : gs) {
-                if (g.status() == null || !SETTLED.contains(g.status())) return false;
-                if (g.date() == null) return false;
-                if (last == null || g.date().isAfter(last)) last = g.date();
-            }
-            Instant weekEnded = last.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-            return !fetchedAt.isBefore(weekEnded.plus(RefreshProperties.WEEK_FINAL_AFTER));
-        }
     }
 
     private static Integer weekOf(Map<String, Object> entry) {

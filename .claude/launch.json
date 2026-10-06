@@ -101,11 +101,20 @@
       "port": 5181
     },
     {
+      "name": "draft-sim-web-8084",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd web && set DRAFTSIM_PROXY_TARGET=http://localhost:8084 && npm run dev -- --port 5183 --strictPort"
+      ],
+      "port": 5183
+    },
+    {
       "name": "draft-sim-api-8084-admin",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [
         "/c",
-        "set ADMIN_TOKEN=local-admin-test&& set SERVER_PORT=8084&& cd backend && .\\gradlew.bat bootRun"
+        "set ADMIN_TOKEN=local-admin-test&& set SERVER_PORT=8084&& set CORS_ORIGINS=http://localhost:5183&& cd backend && .\\gradlew.bat bootRun"
       ],
       "port": 8084
     }

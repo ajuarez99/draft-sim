@@ -73,7 +73,7 @@ change (F4).
 | Field | Rule |
 |---|---|
 | `lastLeagueWeek` | `lastPlayoffWeek()` when present; else `playoff_week_start − 1` when start ≥ 2; else the last stored schedule week |
-| `seasonOver` | league `status` is complete (`LeagueRow.isComplete`), **or** `currentLeg` > `lastLeagueWeek` |
+| `seasonOver` | ~~league complete, **or** `currentLeg` > `lastLeagueWeek`~~ *Amended after code review R2 (2026-10-05):* league `status` is complete, **or** `currentLeg` > `lastPlayoffWeek()` **when that end is known**. The `lastLeagueWeek` fallbacks (`start − 1`, last stored week) only bound the default columns. Used for `seasonOver`, they made a league whose playoff length can't be worked out read "season over" during its own playoffs |
 
 ### Which league row (*added after review, F1*)
 

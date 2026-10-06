@@ -35,7 +35,7 @@ nullable). `web/src/api.ts` mirrors them field for field in the same change (FR-
 |---|---|---|
 | `currentWeek` | `int \| null` | league `settings.leg` (research R6); null when absent |
 | `lastLeagueWeek` | `int \| null` | *added after review (F2)*: the last week this league plays. Rule in [data-model.md](../data-model.md#league-span-for-the-grid-added-after-review-f2). The client's default columns and the Next-N sum stop here |
-| `seasonOver` | boolean | *added after review (F2)*: league `complete`, or `currentWeek` > `lastLeagueWeek`. Server-computed so the client doesn't restate the rule |
+| `seasonOver` | boolean | *added after review (F2)*: league `complete`, or `currentWeek` > the playoff end **when known** (*amended after code review R2*; it used to compare with `lastLeagueWeek`). Server-computed so the client doesn't restate the rule. If `currentWeek` > `lastLeagueWeek` and it isn't over, the client shows `currentWeek` … last stored week |
 | `season` | int | *amended after review (F1)*: the season of the league row the URL names, never a resolver fallback |
 | `weeks` | array | **every** week in the stored schedule, ascending. The client picks the columns (from `currentWeek`, or the playoff window). Dates are from counted games only. Both are null for a week with none |
 | `teams[].games` | `int[]` | same length and order as `weeks`; counted games (FR-004) |
@@ -52,7 +52,8 @@ it can be (it doesn't depend on the schedule). `fetchedAt` is null.
 | Case | `reason` |
 |---|---|
 | football league | "The schedule grid is for basketball leagues: an NFL team plays once a week." |
-| nothing stored for this sport-season | "The {season} NBA schedule hasn't been loaded yet. It loads with the league's next refresh." |
+| nothing stored, league not complete | "The {season} NBA schedule hasn't been loaded yet. It loads with the league's next refresh." |
+| nothing stored, league complete (*added after code review R1*: completed seasons are never refreshed again) | "The {season} NBA schedule wasn't saved for this season: it finished before the app started storing schedules." |
 
 ## C2. `GET /api/leagues/{sleeperLeagueId}/next-matchup`
 

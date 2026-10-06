@@ -37,6 +37,11 @@ reading the code, not from building anything. Treat them as guesses.
 
 ## Phase 1: before the NBA season (by 2026-10-20)
 
+> **Status 2026-10-05 (spec 017):** 1.1, 1.2 and 1.3 (basketball) are built and verified locally, but
+> not deployed. 1.1 turned out smaller than "S": the schedule was already fetched on every refresh.
+> Measuring also overturned the design doc's "82 games per team" (it's 80 today). 1.3's football half
+> waits on a measurement (spec 017 T004). See `specs/017-nba-schedule-grid/verification.md`.
+
 | # | Item | Doc | Size | Unblocks |
 |---|---|---|---|---|
 | 1.1 | Store the NBA schedule (`sport_schedule`, V27) | [nba-schedule-grid-and-streaming.md](nba-schedule-grid-and-streaming.md) | S | 1.2, 2.3, 4.x "your games this week" |

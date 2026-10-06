@@ -9,6 +9,7 @@ import {
   fetchSuperlatives,
   getLeagueAnalysis,
   getLeagueHistory,
+  getNextMatchup,
   getPlayerSpotlight,
   getPowerRankings,
   getWeeklyReport,
@@ -16,6 +17,7 @@ import {
   type DraftSummary,
   type LeagueAnalysis,
   type LeagueHistory,
+  type NextMatchup,
   type PlayerSpotlight as PlayerSpotlightData,
   type PowerRankings,
   type SeasonHistory,
@@ -24,7 +26,7 @@ import {
   type SuperlativesResponse,
   type WeeklyReport,
 } from '../api'
-import { LEAGUE_DESTINATIONS } from '../destinations'
+import { LEAGUE_DESTINATIONS, destinationsFor, labelOf } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock, type Block } from '../useBlock'
 import { cachedDrafts } from '../railLeague'
@@ -42,7 +44,10 @@ export type { Block } from '../useBlock'
  *
  *   standings + your record + position  <- getLeagueHistory  (both sports)
  *   latest matchup                      <- getWeeklyReport(id, 0) via WeeklySide.isMe  (both sports)
- *   next opponent                       <- getLeagueAnalysis matchups isMe  (football only)
+ *   next opponent                       <- football: getLeagueAnalysis matchups isMe (shows the
+ *                                          projected score); basketball: getNextMatchup (specs/017,
+ *                                          pairing only, no projection). Football moves to
+ *                                          getNextMatchup after spec 017 T043's measurement.
  *   power headline                      <- getPowerRankings, via PowerRankings' own
  *                                          computeWeeklyStory + buildHeadline
  *   top award                           <- fetchSuperlatives
@@ -120,6 +125,9 @@ export default function LeagueHome() {
   // Football only, and only once the sport is known: guessing it would fetch a
   // projection for a league that has none.
   const analysis = useBlock(sport && analysisOffered(sport) ? () => getLeagueAnalysis(id) : null, [id, sport, version])
+  // Basketball only (specs/017 F7: football stays on the analysis block until its Tue/Wed
+  // boundary is measured). Keyed on the data version so the visit's refresh refetches it (F8).
+  const nextMatchup = useBlock(id && sport === 'nba' ? () => getNextMatchup(id) : null, [id, sport, version])
 
   // An id the server does not know (or one that is not yours) is the shared
   // not-found state; any other failure stays inside its own block.
@@ -162,6 +170,7 @@ export default function LeagueHome() {
         {!preSeason && <MatchupBlock block={weekly} isMember={me != null} leagueId={id} seasonYear={seasonYear} />}
 
         {analysis.status !== 'idle' && <NextOpponentBlock block={analysis} leagueId={id} />}
+        {nextMatchup.status !== 'idle' && <NextMatchupBlock block={nextMatchup} draft={draft} />}
 
         <StandingsBlock block={history} season={anyGames ? season : null} meIndex={meIndex} leagueId={id} />
 
@@ -435,6 +444,71 @@ function NextOpponentBlock({ block, leagueId }: { block: Block<LeagueAnalysis>; 
       </Link>
     </section>
   )
+}
+
+/**
+ * Basketball's next opponent (specs/017 US3): the pairing from getNextMatchup.
+ * No projected line, since basketball has no projection source wired up here.
+ * Names go through the same fallback as the football block: team name, then
+ * username, then "roster N". Nothing renders when `me` is null (not a member),
+ * the same contract as the football block.
+ */
+function NextMatchupBlock({ block, draft }: { block: Block<NextMatchup>; draft: DraftSummary | null }) {
+  if (block.status === 'idle') return null
+  let body
+  if (block.status === 'loading') body = <p className="muted small">Loading…</p>
+  else if (block.status === 'error') body = <p className="muted small">Couldn't load the next matchup.</p>
+  else {
+    const m = block.data
+    if (!m.available) {
+      if (!m.reason) return null
+      body = <p className="muted small">{m.reason}</p>
+    } else if (!m.me) {
+      return null
+    } else if (!m.opponent) {
+      body = <p className="muted small">You have a bye in week {m.week}.</p>
+    } else {
+      body = (
+        <p>
+          Week {m.week} against{' '}
+          <strong>
+            <PersonName
+              teamName={m.opponent.teamName}
+              username={m.opponent.username}
+              fallback={`roster ${m.opponent.rosterId}`}
+            />
+          </strong>
+        </p>
+      )
+    }
+  }
+  // The link is whatever the destination table offers this league (F9): Team
+  // strength where Analysis exists, otherwise the schedule grid. No sport test here.
+  const target = !draft
+    ? null
+    : analysisOffered(draft.sport)
+      ? { to: `/leagues/${draft.sleeperLeagueId}/analysis`, label: 'Team strength' }
+      : scheduleLink(draft)
+  return (
+    <section className="section lh-next" aria-labelledby="lh-next-h">
+      <h2 className="section-title" id="lh-next-h">
+        Next opponent
+      </h2>
+      {body}
+      {target && (
+        <Link className="lh-link" to={target.to}>
+          {target.label}
+        </Link>
+      )}
+    </section>
+  )
+}
+
+function scheduleLink(draft: DraftSummary): { to: string; label: string } | null {
+  const d = destinationsFor({ lineage: { current: draft, seasons: [draft] }, season: draft }).find(
+    (x) => x.key === 'schedule',
+  )
+  return d ? { to: d.href({ lineage: { current: draft, seasons: [draft] }, season: draft }), label: labelOf(d, draft) } : null
 }
 
 function PowerBlock({ block, leagueId, seasonYear }: { block: Block<PowerRankings>; leagueId: string; seasonYear: number | null }) {

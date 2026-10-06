@@ -107,7 +107,7 @@ class TrendingRefreshIsolationIT {
     @Test
     void aTrendingFailureStillLeavesTheLeagueRefreshSuccessful() throws Exception {
         when(playerGames.refreshSportSeason(any(), anyInt(), any()))
-                .thenReturn(new PlayerGameIngestService.Result(0, 0, 0, 0, 0));
+                .thenReturn(new PlayerGameIngestService.Result(0, 0, 0, 0, 0, false));
 
         controller.trigger(LEAGUE, MEMBER);
         LeagueRefreshRepository.Row row = awaitRow(true);
@@ -122,7 +122,7 @@ class TrendingRefreshIsolationIT {
     void trendingStillRunsWhenPerGameFetchingFailedAndDoesNotChangeThatOutcome() throws Exception {
         // weeksFailed = 1: the refresh fails on its own account, and trending is attempted first.
         when(playerGames.refreshSportSeason(any(), anyInt(), any()))
-                .thenReturn(new PlayerGameIngestService.Result(0, 0, 1, 0, 0));
+                .thenReturn(new PlayerGameIngestService.Result(0, 0, 1, 0, 0, false));
 
         controller.trigger(LEAGUE, MEMBER);
         LeagueRefreshRepository.Row row = awaitRow(false);

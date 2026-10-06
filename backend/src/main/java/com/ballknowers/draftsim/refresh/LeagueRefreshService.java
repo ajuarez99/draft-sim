@@ -200,8 +200,11 @@ public class LeagueRefreshService {
             }
 
             int weeksFailed = 0;
+            int scheduleStoreFailures = 0;
             for (LeagueRepository.LeagueRow season : targets) {
-                weeksFailed += playerGames.refreshSportSeason(sport, season.season(), startedAt).weeksFailed();
+                var result = playerGames.refreshSportSeason(sport, season.season(), startedAt);
+                weeksFailed += result.weeksFailed();
+                if (result.scheduleStoreFailed()) scheduleStoreFailures++;
             }
             // Sport-wide and best-effort (spec 014): never throws, and its outcome is
             // deliberately not read, so it can change neither weeksFailed nor success.
@@ -211,6 +214,12 @@ public class LeagueRefreshService {
             // failed refresh, not a complete one, or loaded_complete could freeze a gap.
             if (weeksFailed > 0) {
                 throw new IllegalStateException(weeksFailed + " per-game week fetch(es) failed");
+            }
+            // Same shape, for the stored schedule (spec 017 F3): after the season loop and after
+            // trending, so per-game data and trending have already landed and only the season's
+            // status reads FAILED.
+            if (scheduleStoreFailures > 0) {
+                throw new IllegalStateException("schedule store failed");
             }
 
             Instant finishedAt = Instant.now();
