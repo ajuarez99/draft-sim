@@ -285,3 +285,16 @@ describe('groups (specs/013 US3)', () => {
     expect(leagueIdFromPath('/leagues/L7')).toEqual({ idKind: 'league', id: 'L7' })
   })
 })
+
+// specs/017-nba-schedule-grid T023: a basketball tool, season-scoped.
+describe('schedule grid destination', () => {
+  it('is offered to basketball and not football', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('schedule')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('schedule')
+  })
+
+  it('is recognised from its own path', () => {
+    expect(destinationFromPath('/leagues/x/schedule')).toBe('schedule')
+    expect(leagueIdFromPath('/leagues/x/schedule')).toEqual({ idKind: 'league', id: 'x' })
+  })
+})

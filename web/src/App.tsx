@@ -14,6 +14,7 @@ import PowerRankings from './pages/PowerRankings'
 import LeagueAnalysis from './pages/LeagueAnalysis'
 import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
+import ScheduleGrid from './pages/ScheduleGrid'
 import SeasonForecast from './pages/SeasonForecast'
 import WeeklyReport from './pages/WeeklyReport'
 import Superlatives from './pages/Superlatives'
@@ -119,6 +120,7 @@ export default function App() {
               <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
               <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} />} />
+              <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} />} />
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
                 element={<KeyedByLeague page={RosterManagement} />}

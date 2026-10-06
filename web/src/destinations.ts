@@ -39,7 +39,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -149,6 +149,21 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // one season: the page reads the season it is opened on
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/weekly-report`,
     match: /^\/leagues\/([^/]+)\/weekly-report\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+  },
+  {
+    key: 'schedule',
+    group: 'thisWeek',
+    glyph: '▤',
+    // Basketball only: an NFL team plays once a week, so the grid would be a
+    // column of ones. See specs/017-nba-schedule-grid.
+    sports: ['nba'],
+    label: 'Schedule grid',
+    // one season: the page reads the season it is opened on (spec 011's rule)
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/schedule`,
+    match: /^\/leagues\/([^/]+)\/schedule\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

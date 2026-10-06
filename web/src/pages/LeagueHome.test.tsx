@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api'
@@ -12,6 +12,7 @@ import type {
   WeeklyReport,
 } from '../api'
 import { invalidateRailLeagues } from '../railLeague'
+import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import LeagueHome from './LeagueHome'
 
 /*
@@ -174,6 +175,11 @@ function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
     power: vi.spyOn(api, 'getPowerRankings').mockImplementation((over.power ?? ok(power())) as never),
     awards: vi.spyOn(api, 'fetchSuperlatives').mockImplementation((over.awards ?? ok(awards())) as never),
     // Spec 014: the spotlight is its own block; by default it does not apply, so no existing test sees it.
+    // Spec 017: basketball's next opponent. Default is a non-member (me null), which renders nothing.
+    nextMatchup: vi.spyOn(api, 'getNextMatchup').mockImplementation(
+      (() =>
+        Promise.resolve({ sport: 'nba', season: 2026, week: 1, available: true, reason: null, me: null, opponent: null })) as never,
+    ),
     spotlight: vi
       .spyOn(api, 'getPlayerSpotlight')
       .mockImplementation(() => Promise.resolve({ applies: false, reason: 'PAST_SEASON', season: 2025, sport: 'nfl' }) as never),
@@ -231,7 +237,7 @@ describe('League home', () => {
     expect(within(next).getByText(/A projection, not a result/)).toBeInTheDocument()
   })
 
-  it('never asks basketball for a next opponent', async () => {
+  it('never asks basketball for the analysis projection', async () => {
     const spies = arrange({
       drafts: () => Promise.resolve([draft({ sport: 'nba' })]),
       weekly: () => Promise.resolve(weekly({ sport: 'nba' })),
@@ -240,7 +246,124 @@ describe('League home', () => {
     await waitFor(() => section('Latest matchup'))
     await waitFor(() => expect(section('Power rankings')).toBeInTheDocument())
     expect(spies.analysis).not.toHaveBeenCalled()
+    await waitFor(() => expect(spies.nextMatchup).toHaveBeenCalled())
+    // `me` is null in the default stub, so there is nothing to say about "you".
     expect(screen.queryByRole('heading', { name: 'Next opponent' })).toBeNull()
+  })
+
+  describe('basketball next opponent (specs/017 US3)', () => {
+    const side = (rosterId: number, teamName: string | null, username: string | null) => ({
+      rosterId,
+      teamName,
+      username,
+      avatarId: null,
+    })
+    const arrangeNba = (nm: Partial<api.NextMatchup> = {}) => {
+      const spies = arrange({
+        drafts: () => Promise.resolve([draft({ sport: 'nba' })]),
+        weekly: () => Promise.resolve(weekly({ sport: 'nba' })),
+      })
+      spies.nextMatchup.mockImplementation((() =>
+        Promise.resolve({
+          sport: 'nba',
+          season: 2026,
+          week: 3,
+          available: true,
+          reason: null,
+          me: side(6, 'Team 6', 'user6'),
+          opponent: side(3, 'Dunk Tank', 'popsharky'),
+          ...nm,
+        })) as never)
+      return spies
+    }
+
+    it('names the opponent and shows no projected line', async () => {
+      arrangeNba()
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText('Dunk Tank')).toBeInTheDocument())
+      expect(within(next).getByText(/Week 3 against/)).toBeInTheDocument()
+      expect(within(next).queryByText(/Projected/)).toBeNull()
+    })
+
+    it('falls back to the username when there is no team name', async () => {
+      arrangeNba({ opponent: side(3, null, 'popsharky') })
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText('popsharky')).toBeInTheDocument())
+    })
+
+    it('falls back to "roster N" when there is neither', async () => {
+      arrangeNba({ opponent: side(3, null, null) })
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText('roster 3')).toBeInTheDocument())
+    })
+
+    it('says so on a bye', async () => {
+      arrangeNba({ opponent: null })
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText('You have a bye in week 3.')).toBeInTheDocument())
+    })
+
+    it('shows the reason when pairings are not available', async () => {
+      arrangeNba({ available: false, me: null, opponent: null, reason: "Pairings for week 1 aren't out yet." })
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText(/aren't out yet/)).toBeInTheDocument())
+    })
+
+    it('renders nothing when the reader has no roster', async () => {
+      const spies = arrangeNba({ me: null, opponent: null })
+      renderHome()
+      await waitFor(() => section('Power rankings'))
+      await waitFor(() => expect(spies.nextMatchup).toHaveBeenCalled())
+      expect(screen.queryByRole('heading', { name: 'Next opponent' })).toBeNull()
+    })
+
+    // F9: Analysis is football-only, so a basketball league links to the schedule grid.
+    it('links to the schedule grid, not Team strength', async () => {
+      arrangeNba()
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      const link = await waitFor(() => within(next).getByRole('link', { name: 'Schedule grid' }))
+      expect(link).toHaveAttribute('href', '/leagues/L1/schedule')
+      expect(within(next).queryByRole('link', { name: 'Team strength' })).toBeNull()
+    })
+
+    // F8: the visit's own refresh must refill this block without a reload.
+    it('refetches when the league data version is bumped', async () => {
+      const spies = arrangeNba()
+      let bump: (id: string) => void = () => {}
+      function Grab() {
+        bump = useBumpLeagueDataVersion()
+        return null
+      }
+      render(
+        <LeagueDataVersionProvider>
+          <Grab />
+          <MemoryRouter initialEntries={['/leagues/L1']}>
+            <Routes>
+              <Route path="/leagues/:sleeperLeagueId" element={<LeagueHome />} />
+            </Routes>
+          </MemoryRouter>
+        </LeagueDataVersionProvider>,
+      )
+      await waitFor(() => expect(spies.nextMatchup).toHaveBeenCalledTimes(1))
+      act(() => bump('L1'))
+      await waitFor(() => expect(spies.nextMatchup).toHaveBeenCalledTimes(2))
+    })
+  })
+
+  // The guard until spec 017 T043: football is unchanged.
+  it('keeps football on the analysis block, with its Team strength link and projected line', async () => {
+    const spies = arrange()
+    renderHome()
+    const next = await waitFor(() => section('Next opponent'))
+    await waitFor(() => expect(within(next).getByText(/Projected 110.2 to 105.4/)).toBeInTheDocument())
+    expect(within(next).getByRole('link', { name: 'Team strength' })).toHaveAttribute('href', '/leagues/L1/analysis')
+    expect(spies.nextMatchup).not.toHaveBeenCalled()
   })
 
   it('shows the power headline the Power page would show', async () => {

@@ -8,11 +8,13 @@ import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.SportScheduleRepository;
 import com.ballknowers.draftsim.store.SportWeekStatsRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 import java.io.InputStream;
 import java.time.Instant;
@@ -90,6 +92,7 @@ class PlayerGameWeekIngestTest {
         final PlayerAbsenceRepository absences = mock(PlayerAbsenceRepository.class);
         final SportWeekStatsRepository weekStats = mock(SportWeekStatsRepository.class);
         final SportRulesRegistry registry = mock(SportRulesRegistry.class);
+        final SportScheduleRepository scheduleRepository = mock(SportScheduleRepository.class);
         final Sport sport;
         final int season;
 
@@ -116,7 +119,7 @@ class PlayerGameWeekIngestTest {
         }
 
         PlayerGameIngestService service() {
-            return new PlayerGameIngestService(stats, leagues, weekPoints, games, absences, weekStats, registry);
+            return new PlayerGameIngestService(stats, leagues, weekPoints, games, absences, weekStats, registry, scheduleRepository);
         }
 
         List<PlayerAbsenceRepository.Row> absenceUpserts() {
@@ -435,7 +438,7 @@ class PlayerGameWeekIngestTest {
 
     // ------------------------------------------------------------------- finality
 
-    private static PlayerGameIngestService.Schedule schedule(String... statusAndDate) {
+    private static SportSchedule schedule(String... statusAndDate) {
         List<Map<String, Object>> raw = new ArrayList<>();
         for (int i = 0; i < statusAndDate.length; i += 2) {
             Map<String, Object> g = new HashMap<>();
@@ -447,7 +450,7 @@ class PlayerGameWeekIngestTest {
             g.put("away", "BBB");
             raw.add(g);
         }
-        return PlayerGameIngestService.Schedule.parse(raw);
+        return SportSchedule.parse(raw);
     }
 
     /** The end of the week's last game date (UTC), from which the 48 h window is measured. */
@@ -507,10 +510,10 @@ class PlayerGameWeekIngestTest {
 
     @Test
     void theHomeAndAwayTeamAreResolvedFromEitherPayloadShape() {
-        assertEquals("LAL", PlayerGameIngestService.Schedule.sideTeam(Map.of("team", "LAL", "points", 3)));
-        assertEquals("ATL", PlayerGameIngestService.Schedule.sideTeam("ATL"));
-        assertNull(PlayerGameIngestService.Schedule.sideTeam(null));
-        assertNull(PlayerGameIngestService.Schedule.sideTeam(new HashMap<String, Object>()));
+        assertEquals("LAL", SportSchedule.sideTeam(Map.of("team", "LAL", "points", 3)));
+        assertEquals("ATL", SportSchedule.sideTeam("ATL"));
+        assertNull(SportSchedule.sideTeam(null));
+        assertNull(SportSchedule.sideTeam(new HashMap<String, Object>()));
     }
 
     // ---------------------------------------------------------------- single flight
@@ -571,6 +574,51 @@ class PlayerGameWeekIngestTest {
         assertEquals(3, service.refreshSportSeason(Sport.NBA, 2025, AFTER_NBA_WEEK_10).absencesStored());
     }
 
+    // ------------------------------------------------- stored schedule (specs/017 T014)
+
+    /** (a) The parsed schedule is stored, and only after every week has been fetched. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aRefreshStoresTheParsedScheduleAfterTheWeeks() throws Exception {
+        Rig rig = nba(List.of("2444"));
+
+        PlayerGameIngestService.Result r = rig.service().refreshSportSeason(Sport.NBA, 2025, AFTER_NBA_WEEK_10);
+
+        assertFalse(r.scheduleStoreFailed());
+        ArgumentCaptor<List<SportSchedule.Game>> stored = ArgumentCaptor.forClass(List.class);
+        InOrder order = inOrder(rig.stats, rig.scheduleRepository);
+        order.verify(rig.stats).week(Sport.NBA.code(), 2025, 10);
+        order.verify(rig.scheduleRepository).replaceSeason(eq("nba"), eq(2025), stored.capture(),
+                eq(java.time.OffsetDateTime.ofInstant(AFTER_NBA_WEEK_10, ZoneOffset.UTC)));
+        assertEquals(SportSchedule.parse(rig.stats.schedule("nba", 2025)).games().size(), stored.getValue().size());
+        assertFalse(stored.getValue().isEmpty());
+    }
+
+    /** (b) A schedule the client returns empty is passed on as an empty list, which the repository ignores. */
+    @Test
+    void anEmptyScheduleIsHandedToTheRepositoryAsAnEmptyList() throws Exception {
+        Rig rig = nba(List.of());
+        when(rig.stats.schedule("nba", 2025)).thenReturn(List.of());
+
+        PlayerGameIngestService.Result r = rig.service().refreshSportSeason(Sport.NBA, 2025, AFTER_NBA_WEEK_10);
+
+        assertFalse(r.scheduleStoreFailed());
+        verify(rig.scheduleRepository).replaceSeason(eq("nba"), eq(2025), eq(List.of()), any());
+    }
+
+    /** (c) A storage failure is reported, never thrown, and the per-game rows still land. */
+    @Test
+    void aFailedScheduleWriteStillStoresPerGameRowsAndSaysSo() throws Exception {
+        Rig rig = nba(List.of("2444"));
+        doThrow(new RuntimeException("boom")).when(rig.scheduleRepository).replaceSeason(any(), anyInt(), any(), any());
+
+        PlayerGameIngestService.Result r = rig.service().refreshSportSeason(Sport.NBA, 2025, AFTER_NBA_WEEK_10);
+
+        assertTrue(r.scheduleStoreFailed());
+        assertEquals(3, r.gamesStored());
+        assertEquals(3, rig.gameUpserts().size());
+    }
+
     // --------------------------------------------------------------- manual entry point
 
     @Test
@@ -580,7 +628,7 @@ class PlayerGameWeekIngestTest {
 
         var r = rig.service().ingest("nope", 2025);
 
-        assertEquals(new PlayerGameIngestService.Result(0, 0, 0, 0, 0), r);
+        assertEquals(new PlayerGameIngestService.Result(0, 0, 0, 0, 0, false), r);
         verifyNoInteractions(rig.stats, rig.games, rig.absences, rig.weekStats);
     }
 

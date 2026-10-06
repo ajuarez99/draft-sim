@@ -84,7 +84,7 @@ class RefreshControllerIT {
         leagueId = insertLeague("in_season");
         leagueMembers.upsert(leagueId, managerId, false, "IT Team");
         when(playerGames.refreshSportSeason(any(), anyInt(), any()))
-                .thenReturn(new PlayerGameIngestService.Result(0, 0, 0, 0, 0));
+                .thenReturn(new PlayerGameIngestService.Result(0, 0, 0, 0, 0, false));
     }
 
     @AfterEach

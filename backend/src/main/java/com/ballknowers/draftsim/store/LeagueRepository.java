@@ -220,7 +220,34 @@ public class LeagueRepository {
      *                       the weekly median, which silently doubles the games.
      */
     public record PlayoffFormat(int playoffTeams, int playoffWeekStart, int seedType,
-                                boolean hasDivisions, boolean medianMatch) {
+                                boolean hasDivisions, boolean medianMatch, Integer playoffRoundType) {
+
+        /**
+         * The last playoff week: {@code start + ceil(log2(teams)) - 1}, only for round type 0 (one
+         * week per round), a start of 2 or later and at least 2 teams. Measured against
+         * {@code last_scored_leg} for three seasons (specs/017 research R5); other round types are
+         * refused, not guessed. {@code playoffRoundType} is nullable and read uncoalesced: absent
+         * means unknown, not 0.
+         */
+        public java.util.OptionalInt lastPlayoffWeek() {
+            if (playoffRoundType == null || playoffRoundType != 0 || playoffWeekStart < 2 || playoffTeams < 2) {
+                return java.util.OptionalInt.empty();
+            }
+            int rounds = 32 - Integer.numberOfLeadingZeros(playoffTeams - 1);   // ceil(log2(teams))
+            return java.util.OptionalInt.of(playoffWeekStart + rounds - 1);
+        }
+
+        /**
+         * Why {@link #lastPlayoffWeek()} is empty, as a code ({@code store/} is not scanned for
+         * user-facing wording; the engine turns the code into a sentence). Empty when it is present.
+         */
+        public Optional<String> playoffWindowRefusal() {
+            if (lastPlayoffWeek().isPresent()) return Optional.empty();
+            if (playoffWeekStart < 2) return Optional.of("NO_START");
+            if (playoffTeams < 2) return Optional.of("TOO_FEW_TEAMS");
+            if (playoffRoundType == null) return Optional.of("ROUND_TYPE_UNKNOWN");
+            return Optional.of("ROUND_TYPE_UNSUPPORTED");
+        }
 
         /** claude/playoff-odds.md "Honesty rules": no snapshot at all for a format we cannot seed. */
         public boolean modelable() {
@@ -234,13 +261,33 @@ public class LeagueRepository {
                        coalesce((settings_json->>'playoff_week_start')::int, 0),
                        coalesce((settings_json->>'playoff_seed_type')::int, 0),
                        coalesce((settings_json->>'divisions')::int, 0) > 0,
-                       coalesce((settings_json->>'league_average_match')::int, 0) > 0
+                       coalesce((settings_json->>'league_average_match')::int, 0) > 0,
+                       (settings_json->>'playoff_round_type')::int
                 from league where id = ?
                 """)
                 .param(leagueId)
-                .query((rs, i) -> new PlayoffFormat(rs.getInt(1), rs.getInt(2), rs.getInt(3),
-                        rs.getBoolean(4), rs.getBoolean(5)))
+                .query((rs, i) -> {
+                    int roundType = rs.getInt(6);
+                    Integer round = rs.wasNull() ? null : roundType;
+                    return new PlayoffFormat(rs.getInt(1), rs.getInt(2), rs.getInt(3),
+                            rs.getBoolean(4), rs.getBoolean(5), round);
+                })
                 .optional();
+    }
+
+    /**
+     * The week Sleeper says the league is in ({@code settings_json->>'leg'}); empty when absent.
+     * Never defaulted to 1: a default would assert a week nobody reported (specs/017 research R6).
+     */
+    public java.util.OptionalInt currentLeg(long leagueId) {
+        return db.sql("select (settings_json->>'leg')::int from league where id = ?")
+                .param(leagueId)
+                .query((rs, i) -> {
+                    int leg = rs.getInt(1);
+                    return rs.wasNull() ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(leg);
+                })
+                .optional()
+                .orElse(java.util.OptionalInt.empty());
     }
 
     /**
