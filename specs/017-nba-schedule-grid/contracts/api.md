@@ -17,6 +17,8 @@ nullable). `web/src/api.ts` mirrors them field for field in the same change (FR-
   "reason": null,
   "fetchedAt": "2026-10-05T18:02:11Z",
   "currentWeek": 1,
+  "lastLeagueWeek": 22,
+  "seasonOver": false,
   "weeks": [
     { "week": 1, "firstDate": "2026-10-20", "lastDate": "2026-10-25" },
     { "week": 2, "firstDate": "2026-10-26", "lastDate": "2026-11-01" }
@@ -32,11 +34,14 @@ nullable). `web/src/api.ts` mirrors them field for field in the same change (FR-
 | Field | Type | Rule |
 |---|---|---|
 | `currentWeek` | `int \| null` | league `settings.leg` (research R6); null when absent |
+| `lastLeagueWeek` | `int \| null` | *added after review (F2)*: the last week this league plays. Rule in [data-model.md](../data-model.md#league-span-for-the-grid-added-after-review-f2). The client's default columns and the Next-N sum stop here |
+| `seasonOver` | boolean | *added after review (F2)*: league `complete`, or `currentWeek` > `lastLeagueWeek`. Server-computed so the client doesn't restate the rule |
+| `season` | int | *amended after review (F1)*: the season of the league row the URL names, never a resolver fallback |
 | `weeks` | array | **every** week in the stored schedule, ascending. The client picks the columns (from `currentWeek`, or the playoff window). Dates are from counted games only. Both are null for a week with none |
 | `teams[].games` | `int[]` | same length and order as `weeks`; counted games (FR-004) |
 | `teams[].seasonTotal` | int | sum of `games` |
 | `teams` order | team code ascending | the client sorts. The server doesn't encode a ranking |
-| `playoff` | object | `startWeek`: int or null. `endWeek`: int or null. `reason`: string or null, non-null iff `endWeek` is null (research R5) |
+| `playoff` | object | `startWeek`: int or null. `endWeek`: int or null. `reason`: string or null, non-null iff `endWeek` is null (research R5). The sentence is written in `engine/` from a `store/` code (N3). A playoff week beyond the last stored week is shown by the client as "not in Sleeper's schedule" (N6) |
 | `excluded` | object | how many stored games the rule left out, so the page can say so instead of hiding it |
 
 ### 200, unavailable
@@ -75,6 +80,10 @@ it can be (it doesn't depend on the schedule). `fetchedAt` is null.
 team name set). The full state table is in [data-model.md](../data-model.md#next-matchup-nextmatchupservice).
 `week` is null only when `leg` is absent.
 
+*Amended after review:* the league row is the URL's, never the resolver's (F1). The
+bye rule, the team-name source (`league_member`) and the two-rosters rule (lowest
+roster id) are in data-model (F10).
+
 ## TypeScript mirror (`web/src/api.ts`)
 
 ```ts
@@ -84,6 +93,7 @@ export type PlayoffWindow = { startWeek: number | null; endWeek: number | null; 
 export type LeagueSchedule = {
   sport: Sport; season: number; available: boolean; reason: string | null
   fetchedAt: string | null; currentWeek: number | null
+  lastLeagueWeek: number | null; seasonOver: boolean   // added after review (F2)
   weeks: ScheduleWeek[]; playoff: PlayoffWindow; teams: ScheduleTeam[]
   excluded: { postponed: number; canceled: number }
 }
@@ -100,6 +110,10 @@ export type NextMatchup = {
 - No team appears whose every game is postponed/canceled (2025 fixture: no STP/STR).
 - `playoff.reason === null` ⇔ `playoff.endWeek !== null`.
 - `next-matchup` never returns `opponent` without `me`.
+- *Added after review:* `seasonOver === true` when the league is complete (2025 fixture,
+  `leg` 21). For NBA 2026 the response's `season` is 2026 even though 2025 is the
+  newest season with scores (F1). The client looks columns up by `week`, not by index
+  offset (N5).
 - Neither response contains `/api/ingest` or `POST /api/` in any `reason`
   (`NoIngestHintsInMessagesTest`). The "hasn't been loaded" reason deliberately
   doesn't tell the reader to call an ingest route.

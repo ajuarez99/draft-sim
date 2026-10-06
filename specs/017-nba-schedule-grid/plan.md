@@ -21,6 +21,35 @@ Measuring before planning changed three things from the design doc:
 - "Next week" can't be "last stored + 1" for basketball, because NBA stores the
   current week partially. Sleeper's `leg` is used instead (R6).
 
+## Amended after review (2026-10-05)
+
+[plan-review.md](plan-review.md) read this plan cold against `78d86ad` and found 11
+problems. Each one is taken as below. The other docs carry matching dated notes, and
+the original text is corrected in place where it was wrong, not rewritten silently.
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Neither service said which season it reads. Copying neighbours (`LeagueSeasonResolver`) would answer about 2025 until 2026 scores a week | **Fixed.** Both services read the league row the URL names (`leagues.bySleeperId`), never the resolver. New two-season-chain test (data-model, research R6) |
+| F2 | The contract couldn't say "season over". A finished league would show weeks 21–25, and "Next N" would sum weeks after the league's playoffs | **Fixed.** C1 gains server-computed `seasonOver` and `lastLeagueWeek`. Default columns and Next-N stop at `lastLeagueWeek` |
+| F3 | A storage failure at step 1 would skip per-game stats, the rest of the chain and trending, and a duplicate `game_id` would make that permanent | **Fixed.** Store *after* the week loop. Catch the failure, set `Result.scheduleStoreFailed`, and have `refreshChain` throw after the loop and trending. Rows come from the parser's de-duplicated map, and the insert upserts on conflict |
+| F4 | "Existing tests unchanged" can't hold | **Fixed.** Step 2's proof is restated, with three named files and mechanical edits only |
+| F5 | "Other round types aren't measured" was false (West Coast FF uses round type 1). Round type 0 has three data points, not one | **Corrected text.** **Decision:** still refuse round type ≠ 0. That's now a choice: no NBA league uses 1, and one NFL league isn't enough to encode it. A test row covers (15, 6, 1) → refused |
+| F6 | V6 compared two NBA numberings, not league week vs schedule week | **Fixed.** V6 now compares league weeks to schedule weeks. The old query is kept as a separate, correctly labelled check |
+| F7 | NFL home switching to `leg` is unmeasured at the Tue/Wed boundary | **Open, blocks step 8 for NFL only.** Curl on 10-06 and 10-07 and record the result in R6. Until then, NFL league home keeps its current analysis-backed block, and only basketball uses the new endpoint |
+| F8 | The page and block didn't refetch after the visit's refresh | **Fixed.** Both key on `useLeagueDataVersion`, with a Vitest |
+| F9 | The NBA block would link to football-only Analysis | **Fixed.** That link only shows when `analysisOffered(sport)`. Basketball links to the schedule destination via `destinationsFor` |
+| F10 | Bye rule and name source were underspecified | **Fixed** in data-model: the bye rule, `LeagueMemberRepository` for team names, the name fallback stays client-side, and two rosters → lowest roster id |
+| F11 | Quickstart steps wouldn't run | **Fixed:** V2 header/1 h gate/poll, V4 `ADMIN_TOKEN`, V7 dated post-draft check, V8.2 expects PHI |
+
+Lower-severity notes taken: N1 (fixtures go in `src/test/resources/sleeper/`, nested
+shape kept), N2 (`OffsetDateTime`/`LocalDate` via `setObject`, `@Transactional`, and the
+IT reads values back), N3 (`store/` returns a code, `engine/` writes the sentence), N4
+(`DestinationKey` union), N5 (look weeks up by number), N6 (a playoff week missing from
+the schedule is shown as missing), N7 (R4 text corrected: exhibitions *were* observed),
+N8 (the current-week column is labelled "including played"), N10 (season-scoped link
+is spec 011's rule, not a bug), N11 (R5 contradiction removed). N9 is already covered
+(`seasonTotal` is in the contract). N12 is out of scope, but it's mentioned in V7.
+
 ## Technical Context
 
 **Language/Version**: Java 21 / Spring Boot 3.5 (backend), TypeScript + React + Vite
@@ -100,6 +129,7 @@ specs/017-nba-schedule-grid/
 ├── research.md          # R1–R9
 ├── data-model.md        # sport_schedule, SportSchedule, derived rules
 ├── quickstart.md        # V1–V8
+├── plan-review.md       # adversarial review, F1–F11 + N1–N12
 ├── contracts/
 │   └── api.md           # C1 /schedule, C2 /next-matchup, TS mirror, invariants
 └── tasks.md             # /speckit-tasks, not yet
@@ -115,7 +145,7 @@ backend/src/main/java/com/ballknowers/draftsim/
 ├── ingest/SportSchedule.java                    # new: lifted from PlayerGameIngestService.Schedule + counts()
 ├── ingest/PlayerGameIngestService.java          # use SportSchedule; store after parse (empty guard)
 ├── store/SportScheduleRepository.java           # new: replaceSeason, forSeason, fetchedAt
-├── store/LeagueRepository.java                  # PlayoffFormat.playoffRoundType (nullable) + lastPlayoffWeek(); currentLeg()
+├── store/LeagueRepository.java                  # PlayoffFormat.playoffRoundType (nullable) + lastPlayoffWeek() (code, not text); currentLeg()
 ├── engine/ScheduleGridService.java              # new: pure core + read
 ├── engine/NextMatchupService.java               # new
 ├── api/ScheduleController.java                  # new: C1
@@ -123,12 +153,12 @@ backend/src/main/java/com/ballknowers/draftsim/
 
 backend/src/test/java/com/ballknowers/draftsim/
 ├── ingest/SportScheduleTest.java                # parse both shapes, counts()
-├── ingest/PlayerGameIngestServiceTest.java      # stores the schedule; [] doesn't wipe
+├── ingest/PlayerGameWeekIngestTest.java        # mechanical rename only (F4); + stores after the loop, [] doesn't wipe, store failure keeps per-game rows (F3)
 ├── engine/ScheduleGridServiceTest.java          # 2025 fixture → SC-003; 2026 fixture → SC-002; sort ordering
-├── engine/NextMatchupServiceTest.java           # every state-table row
-├── store/PlayoffWindowTest.java                 # round type 0/null/1/2, teams 6/4/2/1
+├── engine/NextMatchupServiceTest.java           # every state-table row + two-season chain (F1)
+├── store/PlayoffWindowTest.java                 # round type 0/null/1/2, teams 6/4/2/1, (15,6,1) refused (F5)
 └── store/SportScheduleRepositoryIT.java         # replace, empty guard, rollback
-backend/src/test/resources/fixtures/
+backend/src/test/resources/sleeper/      # N1: where existing Sleeper fixtures live
 ├── nba-schedule-2025.json                       # trimmed real payload
 └── nba-schedule-2026.json
 
@@ -149,22 +179,39 @@ the `store/` → `engine/` → `api/` split that every league page uses.
 
 Ordered so each step is testable alone, and so US1 can ship by itself if time runs out.
 
-1. **Fixtures first.** Save trimmed real 2025 and 2026 payloads. Write
-   `SportScheduleTest` and `ScheduleGridServiceTest` asserting SC-002 and SC-003, and
-   watch them fail (no class yet).
-2. **Lift `SportSchedule`** with `counts()`. The existing `PlayerGameIngestService`
-   tests must stay green, unchanged. That's the proof the lift changed no behavior.
-3. **V27 + `SportScheduleRepository`** + the IT. Wire the store into `doRefresh`
-   with the empty guard. Run V2 and V3.
-4. **`LeagueRepository`**: `currentLeg`, `playoffRoundType`, `lastPlayoffWeek` +
-   `PlayoffWindowTest`.
-5. **`ScheduleGridService` + controller (C1)**. Run V4 and V5. → *US1/US2 backend done.*
-6. **Web: `api.ts` types, destination, route, `ScheduleGrid` page**. Run V8.1–4. →
-   *US1/US2 shippable.*
-7. **`NextMatchupService` + controller (C2)** + tests. Run V7.
-8. **`LeagueHome` NextOpponentBlock** on C2 for both sports. NFL projected line only
-   when weeks agree. Run V8.5.
-9. **Doc amendment** on the design doc (and HANDOFF/roadmap status lines).
+1. **Fixtures first.** Save trimmed real 2025 and 2026 payloads in
+   `src/test/resources/sleeper/` (six keys, nested `home`/`away` kept, ~158 KB and
+   ~153 KB measured). Write `SportScheduleTest` and `ScheduleGridServiceTest`
+   asserting SC-002 and SC-003, and watch them fail (no class yet).
+2. **Lift `SportSchedule`** with `counts()` and a de-duplicated `games()`.
+   *Amended (F4):* existing tests may change only mechanically:
+   - `PlayerGameWeekIngestTest` (`Schedule` → `SportSchedule` at :438, :450,
+     :510–513; one extra mock constructor argument at :119)
+   - `PlayoffOddsServiceTest` (`PlayoffFormat` arity at :51, :116, :128, in step 4)
+   - no assertion may change in either diff. That's the proof the lift changed no
+     behavior.
+3. **V27 + `SportScheduleRepository`** + the IT (values read back, not just counts).
+   *Amended (F3):* wire the store into `doRefresh` **after the week loop**. Add the
+   empty guard. A storage failure is caught, logged and returned as
+   `Result.scheduleStoreFailed`. `refreshChain` throws for it after the season loop
+   and after trending, like `weeksFailed`. Run V2 and V3.
+4. **`LeagueRepository`**: `currentLeg`, nullable `playoffRoundType`, and
+   `lastPlayoffWeek()` returning a refusal *code*, not a sentence (N3). Plus
+   `PlayoffWindowTest`, including (15, 6, 1) → refused (F5).
+5. **`ScheduleGridService` + controller (C1)**. It reads the URL's league row, never
+   the resolver (F1), and computes `seasonOver`/`lastLeagueWeek` (F2). Run V4 and V5.
+   → *US1/US2 backend done.*
+6. **Web: `api.ts` types, `DestinationKey` + destination, route, `ScheduleGrid` page**,
+   keyed on `useLeagueDataVersion` (F8). Run V8.1–4. → *US1/US2 shippable.*
+7. **`NextMatchupService` + controller (C2)** + tests. It uses the URL's league row
+   (F1), the bye rule and `LeagueMemberRepository` names (F10). Run V7.
+8. **`LeagueHome` NextOpponentBlock.** Basketball reads C2. The link is gated on
+   `analysisOffered`, so basketball links to Schedule (F9), and the block keys on the
+   version (F8). *NFL stays on the analysis block until F7's boundary measurement
+   (10-06/10-07) is recorded in R6.* Only then switch NFL to C2, with the projected
+   line only when weeks agree. Run V8.5.
+9. **HANDOFF/roadmap status lines.** The design-doc amendment is already in
+   `78d86ad`.
 10. **Bug-hunting review** (separate pass), then **live verification** V1–V8, each
     recorded as run or not run. Deploy **both** Railway services and repeat V8.1–2 in
     production before 2026-10-20.

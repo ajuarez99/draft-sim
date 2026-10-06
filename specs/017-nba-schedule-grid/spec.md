@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-05
 
-**Status**: Draft
+**Status**: Draft, amended after adversarial review 2026-10-05 ([plan-review.md](plan-review.md); dispositions in [plan.md](plan.md#amended-after-review-2026-10-05))
 
 **Input**: User description: "start on phase 1". That's Phase 1 of
 `claude/competitor-gap-roadmap.md`: 1.1 store the NBA schedule, 1.2 schedule grid +
@@ -133,8 +133,11 @@ block names the opponent from `league_matchup`. That matches Sleeper's
 - **Non-NBA team codes** (the All-Star `STP`/`STR` exhibition): they're excluded when
   the game is canceled, as in 2025. If one ever appears un-canceled, it's shown as
   scheduled rather than silently filtered out (research R4).
-- **Season over** (`leg` past the last scheduled week, or league `complete`): the grid
-  shows no upcoming weeks and says the season is over. The playoff view still works
+- **Season over** (league `complete`, or `leg` past the league's last week): the grid
+  shows no upcoming weeks and says the season is over. *Amended after review (F2):* the
+  original said "past the last scheduled week". A finished league's `leg` stays at its
+  last week (NBA 2025: 21) while the NBA schedule runs to 25, so the league's own last
+  week is the bound (FR-013). The playoff view still works
   for looking back.
 - **The league's current week** comes from its stored `settings.leg`, so it's as fresh
   as the league's last refresh.
@@ -173,7 +176,19 @@ block names the opponent from `league_matchup`. That matches Sleeper's
   manager id → roster), never by a name match.
 - **FR-010**: League home MUST take "next opponent" from FR-009 for both sports. It
   shows the projected line only for football, and only when the analysis payload's
-  matchup week equals FR-009's week.
+  matchup week equals FR-009's week. *Amended after review (F7):* the football half is
+  gated on measuring `leg` vs `last_scored_leg` across the Tue/Wed boundary (research
+  R6). Until then, football keeps its current block and only basketball uses FR-009.
+  The block's link MUST follow the sport gate, so basketball links to the schedule
+  grid, not Team strength (F9).
+- **FR-012** *(added after review, F1)*: both new services MUST read the league row
+  the URL names, never `LeagueSeasonResolver`'s newest-scored-season fallback.
+- **FR-013** *(added after review, F2)*: the schedule response MUST carry
+  server-computed `lastLeagueWeek` and `seasonOver`. Default columns and the Next-N
+  sum MUST stop at `lastLeagueWeek`.
+- **FR-014** *(added after review, F3)*: a schedule storage failure MUST NOT prevent
+  per-game stats, the rest of the chain or trending from running. It's reported, and
+  it fails the refresh afterwards.
 - **FR-011**: `web/src/api.ts` types MUST mirror the new response records field for
   field, in the same change.
 
@@ -205,14 +220,19 @@ block names the opponent from `league_matchup`. That matches Sleeper's
   `last_scored_leg` of 21.
 - **SC-005**: NFL league home shows the same next opponent before and after the change
   for the current week (measured: `leg` 4 = last stored + 1 on 2026-10-05).
+  *Amended after review (F7):* checked on a mid-week day **and on a Tuesday**, and only
+  once the boundary measurement is recorded.
 - **SC-006**: Live check in a real browser before 2026-10-20 on the NBA "Ball Knowers"
   2026 league, through the real `X-Sleeper-User` header path (bug class #6).
 
 ## Assumptions
 
-- `playoff_round_type` 0 means one week per round. Measured once: NBA 2025 (6 teams,
-  start 19) ended with `last_scored_leg` 21 = 19 + 3 − 1. Other values aren't
-  interpreted (FR-007).
+- `playoff_round_type` 0 means one week per round. ~~Measured once~~ *Amended after
+  review (F5):* measured three times. NBA 2025 19→21, NBA 2024 22→24 and (Foot) Ball
+  Knowers 2025 15→17, each = start + ⌈log₂ 6⌉ − 1. The original also implied no league
+  here uses another value. **False:** West Coast FF (NFL) uses 1, and its 2025 ran
+  15→18, which fits a two-week championship. Other values are still not interpreted
+  (FR-007). That's now a deliberate choice, since no NBA league uses them.
 - Sleeper's schedule `week` equals the league's matchup `leg` for basketball. That's
   reasoned from the per-game ingest already relying on it (absence classification,
   and memory's reconciliation to Sleeper's fpts). quickstart has a direct check.

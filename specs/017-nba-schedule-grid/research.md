@@ -40,8 +40,24 @@ visit-triggered chain refresh (`LeagueRefreshService.refreshChain` → `refreshS
 and the admin `POST /api/ingest/player-games/{id}`. It's single-flight per
 `sport:season`.
 
-**Decision**: write the parsed schedule right there, after a successful parse and
-before the week loop. No new Sleeper call and no new scheduler step.
+**Decision**: write the parsed schedule in that same run. No new Sleeper call and no
+new scheduler step.
+
+> **Amended after review (F3, 2026-10-05):** the first version wrote the schedule
+> *before* the week loop and let a storage failure throw. That would have skipped
+> every per-game week of the sport-season, the rest of the chain and the trending
+> refresh, retrying every 10 minutes. And since `Schedule.parse` de-duplicates
+> `game_id` silently while a raw list wouldn't, one duplicate id would have made the
+> failure permanent. Now:
+> - store **after** the week loop;
+> - catch and log a storage failure, and return it as `Result.scheduleStoreFailed`;
+> - `refreshChain` throws for it after the season loop and after trending, the same
+>   way it handles `weeksFailed`, so the season reads FAILED but per-game data lands;
+> - rows come from the parser's de-duplicated map (last wins, matching `byId`), and
+>   the insert is `on conflict (sport, season, game_id) do update`.
+>
+> The bullet "A storage failure fails the run" below now means "fails the run *after*
+> everything else has run".
 
 - **Replace, not upsert.** A delete + insert of the `(sport, season)` rows in one
   transaction. Games can disappear from Sleeper's list (a rescheduled game may get a
@@ -87,7 +103,13 @@ stored NBA players; (c) a hard-coded 30-team list.
 
 **Decision**: (a). In 2025 the only non-NBA codes (STP/STR) appear in a `canceled`
 game, so the counting rule removes them. (c) is a hand-maintained list that goes stale
-on relocation/rebrand. (b) adds a join for a case not observed. If an un-canceled
+on relocation/rebrand. (b) adds a join for a case not observed as un-canceled.
+
+> **Amended after review (N7):** the original said "a case not observed". An
+> exhibition row *was* observed (2025's All-Star game), just canceled. The 2026 one
+> isn't in the schedule yet (1,200 rows, 30 codes, measured). Decision unchanged,
+> because a live row would show up visibly, not silently. If it ever arrives as
+> `pre_game`, revisit (b). If an un-canceled
 exhibition ever appears, it shows up as a row with 1 game, visible and honest, and the
 service test asserting 30 rows on the 2025 fixture will catch it. Not a silent filter.
 
@@ -100,11 +122,23 @@ NBA 2026 has the same format with start 20, so weeks 20–22.
 
 **Decision**: `end = start + ⌈log₂(teams)⌉ − 1` **only when `playoff_round_type` = 0**.
 Any other value, or `start < 2`, or `teams < 2`, returns `end = null` with a reason.
-Sleeper's other round types (two-week rounds or championship) aren't measured in any
-league here, so the code doesn't interpret them (spec Assumptions).
 
-Put it on `LeagueRepository.PlayoffFormat` beside `playoffWeekStart`. That means
-reading `playoff_round_type` in the same query (`coalesce(...,0)`).
+> **Amended after review (F5):** the original said Sleeper's other round types "aren't
+> measured in any league here". **False.** The review measured *West Coast Fantasy
+> Football* (NFL, local ids 9466/9465) at `playoff_round_type` 1. Its 2025 season ran
+> 15 → `last_scored_leg` 18 = 15 + 3, which fits a two-week championship. Round type
+> 0 also has **three** confirmations, not one: NBA 2025 (19→21), NBA 2024 (22→24) and
+> (Foot) Ball Knowers 2025 (15→17). **Decision, now a choice rather than a gap:**
+> still refuse round type ≠ 0. The grid is basketball-only, no NBA league here uses
+> type 1, and one NFL league is too little to encode a rule. A `PlayoffWindowTest` row
+> pins (15, 6, 1) → refused.
+
+Put it on `LeagueRepository.PlayoffFormat` beside `playoffWeekStart`, reading
+`playoff_round_type` in the same query, **uncoalesced** (see the warning below;
+amended after review N11, which caught the earlier text contradicting it).
+`store/` returns a refusal *code* (`NO_START`, `TOO_FEW_TEAMS`, `ROUND_TYPE_UNKNOWN`,
+`ROUND_TYPE_UNSUPPORTED`). The sentence is written in `engine/`, where
+`NoIngestHintsInMessagesTest` scans it (N3).
 
 > ⚠️ **Watch the coalesce default**: a missing `playoff_round_type` coalescing to 0 would
 > *assert* one-week rounds for a league that never said so (memory: "optional params
@@ -134,6 +168,28 @@ one place: a new `LeagueRepository.currentLeg(leagueId)` returning `OptionalInt`
 Absent → the grid starts at week 1 and the next-matchup says the week isn't known.
 It's not defaulted to 1, for the same "optional that encodes a rule" reason as R5.
 
+> **Amended after review (F1):** "the league" means the row the URL names
+> (`leagues.bySleeperId`, the one `visibleLeague` returned), **never**
+> `LeagueSeasonResolver`. The resolver walks back to the newest season with scored
+> weeks. For NBA 2026 that's 2025, which would read `leg` 21 and "season over" for
+> this feature's whole launch window. Both services carry a two-season-chain test.
+>
+> **Amended after review (F2):** for a finished league, `leg` stays at its last week
+> (NBA 2025: 21), while the NBA schedule runs to 25. So `leg` alone can't say "season
+> over". The grid response adds `lastLeagueWeek` (= `lastPlayoffWeek` when known,
+> else `playoff_week_start − 1` when ≥ 1, else the last scheduled week) and
+> `seasonOver` (league `complete`, or `leg` > `lastLeagueWeek`). Default columns and
+> the Next-N sum stop at `lastLeagueWeek`.
+>
+> **Open after review (F7):** football's `leg` vs the analysis week hasn't been
+> observed across the Tue/Wed boundary (after MNF). If `last_scored_leg` can reach
+> `leg` before `leg` advances, "next opponent" would name the finished week. **Before
+> NFL league home switches to this endpoint**, curl
+> `/v1/league/1346366555759341568` several times on 2026-10-06 and 10-07, record the
+> pairs here, and define the rule for whichever order is seen. Until then NFL home
+> keeps its current block. This doesn't block basketball: NBA 2026 has no scored
+> week, and its week-boundary behaviour is checked in V7 after the draft.
+
 The analysis page keeps its own week (a), because it means "next unprojected week",
 a different question. League home shows the projected line only when the two weeks
 agree (FR-010), so the two rules never produce a contradictory block.
@@ -151,6 +207,14 @@ reads `LeagueMatchupRepository.between(leagueId, season, leg, leg)` and
 `RosterSeasonRepository.forLeague` for names and manager ids. "Me" comes from
 `managers.idsBySleeperUserId()`, the route `WeeklyReportService:213` and the analysis
 scores block already use.
+
+> **Amended after review (F10):** team names aren't on `RosterSeasonRepository`'s
+> `StandingRow` (it has `managerName`, `avatarId`, `managerId`). They come from
+> `LeagueMemberRepository.forLeague`, as in `WeeklyReportService:215-224` and
+> `LeagueAnalysisService.teamLabels`. `LeagueMatchupRepository.between` drops
+> null-`matchup_id` rows, so a bye roster has **no row at all**. The bye rule is in
+> data-model. The name fallback (team name → username → "roster N") stays client-side
+> as today, so the server doesn't grow a third copy.
 
 Measured: NBA 2026's `/matchups/1` returns `[]` today. So until Sleeper publishes
 pairings (after the draft), the block says "pairings for week 1 aren't out yet". That's
@@ -177,6 +241,15 @@ is "the latest scored week", and coupling them makes one request fail for both b
 - **Sort**: "Next 1 / 2 / 3 / 4 weeks" (sum over `leg` … `leg+N−1`), and "Playoff
   weeks" (the US2 view, which also hides non-playoff columns). The 1–4 range is a UI
   choice, not a modelled quantity.
+- *Amended after review:*
+  - Columns are looked up by `week` number, never by index offsets (N5).
+  - The current-week column is labelled "including games played" (N8).
+  - A playoff week missing from the schedule shows as "not in Sleeper's schedule",
+    not as 0 (N6).
+  - The page keys its fetch on `useLeagueDataVersion`, so the visit's own refresh
+    fills an empty grid without a reload (F8).
+  - From a past season, the rail opens that season's grid, which reads "season over".
+    That's spec 011's one-season rule, not a bug (N10).
 - **Freshness line**: "Schedule from Sleeper, fetched {relative time}. The NBA adds and
   moves games during the season." No mention of the Cup explanation (R1 is inferred).
 - Design per memory: card/dark UI, tinted pills, and a layout that fits the content.
@@ -186,12 +259,22 @@ is "the latest scored week", and coupling them makes one request fail for both b
 
 - **Pure, no DB** (can't be skipped silently): `SportScheduleTest` (parse both shapes,
   `counts`), `ScheduleGridServiceTest` against a trimmed **real** 2025 fixture
-  (keys `game_id, week, date, home.team, away.team, status` only). Its size is a guess,
-  roughly 1,235 × ~110 bytes ≈ 130 KB, so measure it when it's written and trim to
-  flat `home`/`away` strings if it's large. There's also a 2026 fixture. These assert SC-002/SC-003 on real data. `PlayoffWindowTest` covers 0/null/1/2
+  (keys `game_id, week, date, home.team, away.team, status` only), and a 2026 fixture.
+  *Amended after review (N1):* measured at 157,661 B (2025) and 153,207 B (2026).
+  They go in `src/test/resources/sleeper/` beside `nba-2025-w10.json`. **Keep the nested
+  `home`/`away` shape**, because flattening would stop testing `sideTeam`'s `Map`
+  branch on real data. The earlier "~130 KB, flatten if large" guess is withdrawn. These assert SC-002/SC-003 on real data. `PlayoffWindowTest` covers 0/null/1/2
   round types.
 - **DB ITs** (`SportScheduleRepositoryIT`: replace, empty-guard, and the transaction
-  rolling back on failure). These skip silently when Postgres is down (memory), so
+  rolling back on failure). *Amended after review (N2):* binds use
+  `OffsetDateTime`/`LocalDate` via `setObject`, following `SportTrendingRepository`, and
+  `replaceSeason` is `@Transactional`. The IT reads back a row's `fetched_at` and
+  `game_date`, not just a count. That's bug class #3, which only shows at runtime.
+- **Existing tests (F4):** `PlayerGameWeekIngestTest` and `PlayoffOddsServiceTest` get
+  mechanical edits only, with no assertion diffs.
+- **Two-season chain (F1)** for both services. **Season over (F2)** on the 2025
+  fixture with `leg` 21 and `complete`. **Store failure (F3):** a throwing repository
+  still yields per-game rows and a FAILED refresh. These skip silently when Postgres is down (memory), so
   check the skip count.
 - **Preference-ordering test** (bug class 1) for the sort: a 4-game team must rank
   above a 3-game team for N = 1, and ties go by team code.
