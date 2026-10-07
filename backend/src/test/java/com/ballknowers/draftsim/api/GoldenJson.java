@@ -84,7 +84,10 @@ public final class GoldenJson {
             if (writeMode()) {
                 Files.createDirectories(file.getParent());
                 Files.writeString(file, MAPPER.writeValueAsString(actual) + "\n");
-                return;
+                // Never green in write mode. A run that rewrote its own oracle has
+                // checked nothing, and a GOLDEN_WRITE left exported in a terminal
+                // would otherwise turn every characterization test into a pass.
+                fail("golden written to " + file + " -- rerun without GOLDEN_WRITE / -Dgolden.write to check it");
             }
             if (!Files.exists(file)) {
                 fail("No golden file at " + file.toAbsolutePath()

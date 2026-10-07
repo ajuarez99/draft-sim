@@ -77,6 +77,22 @@ class GoldenJsonTest {
     }
 
     @Test
+    void writeModeWritesTheGoldenButNeverPasses() throws IOException {
+        java.nio.file.Path file = java.nio.file.Path.of("src", "test", "resources", "golden", "_selftest", "write-mode.json");
+        System.setProperty("golden.write", "true");
+        try {
+            assertThrows(AssertionError.class,
+                    () -> GoldenJson.assertMatchesGolden(Map.of("a", 1), "_selftest/write-mode"),
+                    "a run that rewrote its own oracle must not be green");
+            org.junit.jupiter.api.Assertions.assertTrue(java.nio.file.Files.exists(file), "it still writes the file");
+        } finally {
+            System.clearProperty("golden.write");
+            java.nio.file.Files.deleteIfExists(file);
+            java.nio.file.Files.deleteIfExists(file.getParent());
+        }
+    }
+
+    @Test
     void linkedHashMapAndEquivalentRecordSerializeIdentically() {
         record Entry(Integer rosterId, Double makesPlayoffsPct, boolean isMe) {}
         Map<String, Object> m = new LinkedHashMap<>();
