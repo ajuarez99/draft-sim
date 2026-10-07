@@ -75,7 +75,7 @@ class LeagueControllerBoardTest {
         when(boards.currentBoardDate(Sport.NFL)).thenReturn(Optional.of(LocalDate.of(2026, 9, 1)));
         when(boards.picksWithAdpAtTime()).thenReturn(42);
 
-        Map<String, Object> response = controller().board(60, "nfl");
+        Map<String, Object> response = GoldenJson.wire(controller().board(60, "nfl"));
 
         assertEquals("2026-09-01", response.get("capturedOn"));
         @SuppressWarnings("unchecked")
@@ -93,7 +93,7 @@ class LeagueControllerBoardTest {
         // leaving the Sport.NFL stubs out entirely proves the sport actually
         // passed through rather than something a leftover NFL stub happened to
         // also satisfy.
-        Map<String, Object> response = controller().board(60, "nba");
+        Map<String, Object> response = GoldenJson.wire(controller().board(60, "nba"));
 
         assertEquals("none", response.get("capturedOn"), "must not have fallen back to the NFL board");
         @SuppressWarnings("unchecked")
