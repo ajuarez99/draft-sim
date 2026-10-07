@@ -1,0 +1,8 @@
+{
+  "week0" : 0,
+  "realized" : 0,
+  "playoffOdds" : 0,
+  "playoffOddsSkipped" : "no week of this season is final yet, so there is nothing to forecast from",
+  "realizedSkipped" : "week 1 is not final yet (scores can still change), so no ranking was saved for it",
+  "week0Skipped" : "the league has not drafted"
+}

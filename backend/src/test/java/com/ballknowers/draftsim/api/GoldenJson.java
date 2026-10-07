@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * using it.
  *
  * <p>Golden files live under {@code src/test/resources/golden/}. Running with
- * {@code -Dgolden.write=true} writes them instead of asserting. That is only for the
+ * {@code -Dgolden.write=true} (or {@code GOLDEN_WRITE=true} in the environment) writes them instead of asserting. That is only for the
  * characterization commit. A conversion commit that rewrites a golden file has
  * changed the oracle and proves nothing.
  */
@@ -68,7 +68,7 @@ public final class GoldenJson {
     static void assertTreeMatchesGolden(JsonNode actual, String resourcePath, String... orderSensitivePaths) {
         Path file = ROOT.resolve(resourcePath + ".json");
         try {
-            if (Boolean.getBoolean("golden.write")) {
+            if (writeMode()) {
                 Files.createDirectories(file.getParent());
                 Files.writeString(file, MAPPER.writeValueAsString(actual) + "\n");
                 return;
@@ -82,6 +82,15 @@ public final class GoldenJson {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * {@code -Dgolden.write=true}, or the environment variable {@code GOLDEN_WRITE=true}.
+     * Gradle forks the test JVM without forwarding {@code -D} flags, but the fork does
+     * inherit the environment.
+     */
+    private static boolean writeMode() {
+        return Boolean.getBoolean("golden.write") || "true".equalsIgnoreCase(System.getenv("GOLDEN_WRITE"));
     }
 
     /** The comparison itself, separated from file I/O so {@code GoldenJsonTest} can exercise it. */

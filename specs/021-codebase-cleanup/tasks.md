@@ -201,7 +201,7 @@ maps (spec SC-004, amended).
 
 ### LeagueHistoryController (43 map builds; 11 are error bodies, which stay)
 
-- [ ] T027 [US3] **Characterization commit.** Create `backend/src/test/java/com/ballknowers/draftsim/api/LeagueHistoryControllerCharacterizationIT.java`: a `@SpringBootTest` with MockMvc and `@MockitoBean` services, following `ManagerControllerMvcIT.java`. Cover:
+- [X] T027 [US3] **Characterization commit.** Create `backend/src/test/java/com/ballknowers/draftsim/api/LeagueHistoryControllerCharacterizationIT.java`: a `@SpringBootTest` with MockMvc and `@MockitoBean` services, following `ManagerControllerMvcIT.java`. Cover:
   - **endpoints**: `history`, `managerHistory`, `powerRankings`, `ballot` and the record book;
   - **sports**: NFL and NBA;
   - **`makesPlayoffsPct`**: null on an entry without odds, and present;

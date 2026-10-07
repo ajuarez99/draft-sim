@@ -10,8 +10,9 @@ import com.ballknowers.draftsim.store.PowerRankingRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -60,9 +61,10 @@ class PowerComputeFinalityTest {
         return org.mockito.ArgumentMatchers.any();
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> compute(int week) {
-        return (Map<String, Object>) controller.compute(LEAGUE, 2026, week, "commish").getBody();
+    /** The body as JSON, so these assertions hold whether the controller builds a map or a
+     *  response record (spec 021 moved off the cast to Map). */
+    private JsonNode compute(int week) {
+        return GoldenJson.MAPPER.valueToTree(controller.compute(LEAGUE, 2026, week, "commish").getBody());
     }
 
     private static ScoredWeeks.Snapshot snap(int stored, int latestFinal, Integer... finals) {
@@ -74,13 +76,13 @@ class PowerComputeFinalityTest {
     void anInProgressWeekIsNotSnapshottedAndOddsRunThroughThePreviousFinalWeek() {
         when(scoredWeeks.of(ID)).thenReturn(snap(3, 2, 1, 2));
 
-        Map<String, Object> body = compute(3);
+        JsonNode body = compute(3);
 
         verify(odds).compute(ID, 2026, 2);
         verify(power, never()).computeRealized(anyLong(), anyInt(), anyInt());
-        assertEquals(2, body.get("playoffOddsThroughWeek"));
-        assertEquals(0, body.get("realized"));
-        assertTrue(body.get("realizedSkipped").toString().contains("week 3 is not final"),
+        assertEquals(2, body.get("playoffOddsThroughWeek").asInt());
+        assertEquals(0, body.get("realized").asInt());
+        assertTrue(body.get("realizedSkipped").asText().contains("week 3 is not final"),
                 "the response says why nothing was saved: " + body.get("realizedSkipped"));
     }
 
@@ -88,13 +90,13 @@ class PowerComputeFinalityTest {
     void aFinalWeekIsSnapshottedAndOddsRunThroughIt() {
         when(scoredWeeks.of(ID)).thenReturn(snap(3, 2, 1, 2));
 
-        Map<String, Object> body = compute(2);
+        JsonNode body = compute(2);
 
         verify(power).computeRealized(ID, 2026, 2);
         verify(odds).compute(ID, 2026, 2);
-        assertEquals(2, body.get("playoffOddsThroughWeek"));
-        assertEquals(12, body.get("realized"));
-        assertFalse(body.containsKey("realizedSkipped"));
+        assertEquals(2, body.get("playoffOddsThroughWeek").asInt());
+        assertEquals(12, body.get("realized").asInt());
+        assertFalse(body.has("realizedSkipped"));
     }
 
     /** An earlier final week is honoured as asked: the clamp never widens a request. */
@@ -102,7 +104,7 @@ class PowerComputeFinalityTest {
     void anEarlierFinalWeekIsNotWidenedToTheLatestFinal() {
         when(scoredWeeks.of(ID)).thenReturn(snap(4, 3, 1, 2, 3));
 
-        assertEquals(1, compute(1).get("playoffOddsThroughWeek"));
+        assertEquals(1, compute(1).get("playoffOddsThroughWeek").asInt());
         verify(odds).compute(ID, 2026, 1);
     }
 
@@ -111,24 +113,24 @@ class PowerComputeFinalityTest {
     void whenEveryStoredWeekIsFinalTheRequestPassesThrough() {
         when(scoredWeeks.of(ID)).thenReturn(snap(3, 3, 1, 2, 3));
 
-        Map<String, Object> body = compute(3);
+        JsonNode body = compute(3);
 
         verify(power).computeRealized(ID, 2026, 3);
         verify(odds).compute(ID, 2026, 3);
-        assertEquals(3, body.get("playoffOddsThroughWeek"));
+        assertEquals(3, body.get("playoffOddsThroughWeek").asInt());
     }
 
     @Test
     void whenNothingIsFinalYetNeitherSnapshotIsWrittenAndTheReasonIsGiven() {
         when(scoredWeeks.of(ID)).thenReturn(snap(1, 0));
 
-        Map<String, Object> body = compute(1);
+        JsonNode body = compute(1);
 
         verify(odds, never()).compute(anyLong(), anyInt(), anyInt());
         verify(power, never()).computeRealized(anyLong(), anyInt(), anyInt());
-        assertFalse(body.containsKey("playoffOddsThroughWeek"));
-        assertNotNull(body.get("playoffOddsSkipped"));
-        assertNotNull(body.get("realizedSkipped"));
+        assertFalse(body.has("playoffOddsThroughWeek"));
+        assertTrue(body.hasNonNull("playoffOddsSkipped"));
+        assertTrue(body.hasNonNull("realizedSkipped"));
     }
 
     /** The preseason baseline is independent of the requested week and of finality. */
