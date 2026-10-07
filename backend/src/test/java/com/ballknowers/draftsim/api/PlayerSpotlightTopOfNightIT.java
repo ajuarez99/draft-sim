@@ -213,9 +213,9 @@ class PlayerSpotlightTopOfNightIT {
         seedOnce();
         List<Map<String, Object>> top = list(map(spotlightBody(USER_X).get("topOfNight")).get("entries"));
 
-        ResponseEntity<Map<String, Object>> report = weekly.weeklyReport(LEAGUE, 1, USER_X);
+        ResponseEntity<?> report = weekly.weeklyReport(LEAGUE, 1, USER_X);
         assertEquals(200, report.getStatusCode().value());
-        List<Map<String, Object>> nights = list(report.getBody().get("bestNights"));
+        List<Map<String, Object>> nights = list(GoldenJson.wire(report.getBody()).get("bestNights"));
         assertFalse(nights.isEmpty());
 
         int compared = 0;

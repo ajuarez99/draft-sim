@@ -1,0 +1,25 @@
+{
+  "available" : true,
+  "season" : 2026,
+  "requestedSeason" : null,
+  "week" : 1,
+  "latestScoredWeek" : 1,
+  "latestFinalWeek" : 1,
+  "weekFinal" : true,
+  "sport" : "nfl",
+  "playersPlayMultiplePerPeriod" : false,
+  "matchups" : [ ],
+  "topPerformers" : [ {
+    "playerId" : "4034",
+    "playerName" : "Caleb Williams",
+    "position" : "QB",
+    "teamName" : "Team",
+    "points" : 37.26,
+    "team" : "CHI",
+    "opponent" : "GB",
+    "isAway" : true,
+    "avatarId" : "av9"
+  } ],
+  "awards" : [ ],
+  "awardsOmitted" : [ ]
+}

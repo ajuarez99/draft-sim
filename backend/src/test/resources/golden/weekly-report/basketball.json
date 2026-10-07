@@ -1,0 +1,34 @@
+{
+  "available" : true,
+  "season" : 2025,
+  "requestedSeason" : null,
+  "week" : 5,
+  "latestScoredWeek" : 5,
+  "latestFinalWeek" : 5,
+  "weekFinal" : true,
+  "sport" : "nba",
+  "playersPlayMultiplePerPeriod" : true,
+  "matchups" : [ ],
+  "bestNights" : [ {
+    "playerId" : "1658",
+    "playerName" : "Nikola Jokic",
+    "position" : "C",
+    "teamName" : "FentMachines5:SoFkingOver",
+    "points" : 58.5,
+    "date" : "2025-11-17",
+    "opponent" : "CHI",
+    "isAway" : false
+  } ],
+  "bestWeek" : [ {
+    "playerId" : "1658",
+    "playerName" : "Nikola Jokic",
+    "position" : "C",
+    "teamName" : "FentMachines5:SoFkingOver",
+    "totalPoints" : 182.0,
+    "gamesPlayed" : 4
+  } ],
+  "basis" : "ALL_GAMES_PLAYED",
+  "sectionsUnavailable" : [ ],
+  "awards" : [ ],
+  "awardsOmitted" : [ ]
+}

@@ -166,7 +166,7 @@ class PlayerSpotlightWeekIT {
 
         Map<String, Object> period = map(body.get("period"));
         assertEquals("WEEK", period.get("kind"));
-        Object reportWeek = weekly.weeklyReport(LEAGUE, 0, USER_X).getBody().get("week");
+        Object reportWeek = GoldenJson.wire(weekly.weeklyReport(LEAGUE, 0, USER_X).getBody()).get("week");
         assertEquals(1, reportWeek, "the league's own weeks are final only through 1");
         assertEquals(2, period.get("week"), "stats weeks 1-2 are final and 3 is not: the newest final is 2");
         assertEquals(true, period.get("weekFinal"));
