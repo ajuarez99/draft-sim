@@ -35,9 +35,9 @@ auto-deploy on every push.
 **Purpose**: record what "unchanged" means before anything changes. Every later gate
 compares against this.
 
-- [ ] T001 Start the local Postgres per AGENTS.md, then run `cd backend && ./gradlew test` and record the totals: tests run, **skipped** and failed. Write them to `specs/021-codebase-cleanup/baseline.md`. If skipped > 0, stop and fix the database first; the P2b/P3 gates need **0 IT skips**.
-- [ ] T002 [P] Run `cd web && npx vitest run && npx tsc -b && npm run build`. Append to `specs/021-codebase-cleanup/baseline.md` the vitest totals, `ls -la web/dist/assets/*.js *.css` sizes, and `sha256sum web/dist/assets/index-*.css`.
-- [ ] T003 [P] Record the measured duplicate counts in `specs/021-codebase-cleanup/baseline.md`, so the SC-003 and SC-004 deltas are computed rather than guessed:
+- [X] T001 Start the local Postgres per AGENTS.md, then run `cd backend && ./gradlew test` and record the totals: tests run, **skipped** and failed. Write them to `specs/021-codebase-cleanup/baseline.md`. If skipped > 0, stop and fix the database first; the P2b/P3 gates need **0 IT skips**.
+- [X] T002 [P] Run `cd web && npx vitest run && npx tsc -b && npm run build`. Append to `specs/021-codebase-cleanup/baseline.md` the vitest totals, `ls -la web/dist/assets/*.js *.css` sizes, and `sha256sum web/dist/assets/index-*.css`.
+- [X] T003 [P] Record the measured duplicate counts in `specs/021-codebase-cleanup/baseline.md`, so the SC-003 and SC-004 deltas are computed rather than guessed:
   - `grep -rlE "static (double|Double) round[0-9]?\(" backend/src/main/java` (expect 17 files);
   - `grep -rn "function ordinal\|const ordinal" web/src` (expect 5);
   - per-controller `grep -c "new LinkedHashMap\|Map\.of(" backend/src/main/java/com/ballknowers/draftsim/api/*.java` (expect 141 total);
@@ -50,11 +50,11 @@ compares against this.
 **Purpose**: the shared JSON oracle that US3 and US4 depend on. US1 and US2 do **not**
 need it and can start right after Phase 1.
 
-- [ ] T004 Create `backend/src/test/java/com/ballknowers/draftsim/api/GoldenJson.java`, a test utility with these parts:
+- [X] T004 Create `backend/src/test/java/com/ballknowers/draftsim/api/GoldenJson.java`, a test utility with these parts:
   - `ObjectMapper MAPPER = Jackson2ObjectMapperBuilder.json().build()` (Boot's modules; **never** `new ObjectMapper()`, see research R4 amended);
   - `assertMatchesGolden(Object body, String resourcePath, String... orderSensitivePaths)`, which loads `src/test/resources/golden/<resourcePath>.json`, compares with `JsonNode.equals` (key-order-insensitive, type-strict: `1` ≠ `1.0`, null ≠ absent), then additionally asserts **field order** inside each JSON-pointer path in `orderSensitivePaths` (for dynamic-key maps such as `positionalTilt` and `seedOdds`, research R3 rule 5);
   - a `-Dgolden.write=true` mode that writes the file instead of asserting. It is only for the characterization commit; the conversion commit must never use it.
-- [ ] T005 Create `backend/src/test/java/com/ballknowers/draftsim/api/GoldenJsonTest.java`. It proves the utility itself catches each failure mode: a reordered object passes; `1` vs `1.0` fails; null vs absent fails; a reordered key inside an order-sensitive path fails; an extra key (`"empty":true` from a record helper method) fails.
+- [X] T005 Create `backend/src/test/java/com/ballknowers/draftsim/api/GoldenJsonTest.java`. It proves the utility itself catches each failure mode: a reordered object passes; `1` vs `1.0` fails; null vs absent fails; a reordered key inside an order-sensitive path fails; an extra key (`"empty":true` from a record helper method) fails.
 
 **Checkpoint**: the oracle is proven to catch every failure mode the review named.
 
