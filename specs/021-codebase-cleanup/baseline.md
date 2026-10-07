@@ -117,3 +117,22 @@ The "≤ 4" bound has the same mis-derivation as T029: the single-line grep miss
 and `SuperlativeHolder.teamName: string`, are accurate in production: `closeMargin`
 comes from a primitive `double`, and holder names default to "Roster N". Only the
 fixtures used nulls the service can't produce.
+
+## T035: LeagueController converted
+
+| check | result |
+|---|---|
+| characterization test (unedited by the conversion) | 11/11; all 75 LC-related tests and ManualPickGuardsIT green |
+| mutation check (applied, run, reverted) | caught all 3: `NON_NULL` on adpAtDraft (2 fail, **the REST board and the live SSE frame**), seat sort dropped (3), free-agent team as the string "null" (1) |
+| backend | 1384 tests, **0 skipped**, 0 failed |
+| vitest | 88 files, 1087 tests |
+| maps left | 8, **0 success bodies**: 6 error bodies + 2 SSE payloads (heartbeat, `state` frame) |
+
+**api.ts drift found and fixed** (types only; `tsc` is strict-clean, so no code
+relied on the old types): `SeatsResponse.status` was `string` but is null for a
+null status column (lessons #12), and `TrackResponse` was missing `draftId`, which
+the server has always sent.
+
+A pre-conversion miss, recorded: `LeagueControllerBoardTest` bound `board()`'s
+`Map` return type and wasn't caught by the T033 cast grep. It was fixed in its own
+commit before the conversion (`83e41fc`).

@@ -111,7 +111,8 @@ export type SeatsResponse = {
   draftId: string
   teams: number
   rounds: number
-  status: string
+  /** Null for a draft whose status column is null -- never the string "null" (lessons #12). */
+  status: string | null
   seats: Seat[]
   /** Auto-detected slot for the configured app owner, or null if unconfigured/not in this league. */
   mySlot: number | null
@@ -439,6 +440,7 @@ export type LiveState = {
  * contract and nothing reads it, so it isn't mirrored here.)
  */
 export type TrackResponse = {
+  draftId: string
   status: string | null
   observed: boolean
   tracking: boolean

@@ -227,8 +227,8 @@ maps (spec SC-004, amended).
 ### LeagueController (17 map builds; 6 are error bodies; the SSE heartbeat stays)
 
 - [X] T033 [US3] **Characterization commit.** Create `.../api/LeagueControllerCharacterizationIT.java` (MockMvc with stubbed `profiles`, membership and reversal lookups). Cover `seats()` (owner configured and owner unset), the real board, track and the pool endpoints, plus empty cases. Write the goldens to `golden/league/`. In the same commit, rewrite the casts in `LeagueControllerSeatsOwnerConfiguredIT.java`, `LeagueControllerSeatsUnsetOwnerIT.java`, `LeagueControllerRealBoardTest.java`, `LeagueControllerTrackTest.java` and `LeagueAnalyticsContractTest.java` (if it touches this controller's body) as `JsonNode` assertions.
-- [ ] T034 [US3] **Conversion commit.** Create `api/dto/LeagueResponses.java` (seats, board, track, pool). Convert the success bodies in `api/LeagueController.java`. The heartbeat at :565 and the error bodies stay as maps. Check the corresponding `web/src/api.ts` types.
-- [ ] T035 [US3] Gate as in T029: the map count must be ≤ 6 error bodies, plus 1 SSE heartbeat.
+- [X] T034 [US3] **Conversion commit.** Create `api/dto/LeagueResponses.java` (seats, board, track, pool). Convert the success bodies in `api/LeagueController.java`. The heartbeat at :565 and the error bodies stay as maps. Check the corresponding `web/src/api.ts` types.
+- [X] T035 [US3] Gate as in T029: the map count must be ≤ 6 error bodies, plus 1 SSE heartbeat.
 
 **Checkpoint — SC-004**: **55 of 108** in-scope success-body map builds are gone
 (50.9%; the denominator is from T003), and the three worst controllers' success bodies
