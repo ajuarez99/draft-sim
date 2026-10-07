@@ -75,7 +75,7 @@ class LeagueControllerTrackTest {
         ResponseEntity<?> response = controller().track("d1", null);
 
         assertEquals(200, response.getStatusCode().value());
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> body = GoldenJson.wire(response.getBody());
         assertNotNull(body);
         assertTrue(body.containsKey("status"), "status key must be present even when null");
         assertNull(body.get("status"));
@@ -97,7 +97,7 @@ class LeagueControllerTrackTest {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(draft));
         when(poller.track(draft)).thenReturn(new LiveDraftPoller.TrackResult(false, "drafting", 14, true, true));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
+        Map<String, Object> body = GoldenJson.wire(controller().track("d1", null).getBody());
 
         assertNotNull(body);
         assertEquals("drafting", body.get("status"));
@@ -124,7 +124,7 @@ class LeagueControllerTrackTest {
         when(poller.track(draft))
                 .thenReturn(new LiveDraftPoller.TrackResult(false, "complete", 14, true, false));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
+        Map<String, Object> body = GoldenJson.wire(controller().track("d1", null).getBody());
 
         assertNotNull(body);
         assertEquals(false, body.get("tracking"), "nothing polls a finished draft");
@@ -145,7 +145,7 @@ class LeagueControllerTrackTest {
         when(poller.track(draft))
                 .thenReturn(new LiveDraftPoller.TrackResult(true, "pre_draft", 0, false, true));
 
-        Map<String, Object> body = (Map<String, Object>) controller().track("d1", null).getBody();
+        Map<String, Object> body = GoldenJson.wire(controller().track("d1", null).getBody());
 
         assertNotNull(body);
         assertEquals(false, body.get("observed"));

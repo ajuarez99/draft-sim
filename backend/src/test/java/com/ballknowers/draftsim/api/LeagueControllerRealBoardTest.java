@@ -74,7 +74,7 @@ class LeagueControllerRealBoardTest {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> onlyPick(ResponseEntity<?> response) {
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> body = GoldenJson.wire(response.getBody());
         List<Map<String, Object>> picks = (List<Map<String, Object>>) body.get("picks");
         assertEquals(1, picks.size());
         return picks.get(0);
@@ -105,10 +105,10 @@ class LeagueControllerRealBoardTest {
         assertEquals(1, pick.get("round"));
         assertEquals(1, pick.get("slot"));
         assertEquals("Allan", pick.get("manager"));
-        SimulationResult.PlayerRef ref = (SimulationResult.PlayerRef) pick.get("player");
-        assertEquals("Bijan Robinson", ref.name());
-        assertEquals("RB", ref.position());
-        assertEquals(1, ref.positionalRank());
+        @SuppressWarnings("unchecked") Map<String, Object> ref = (Map<String, Object>) pick.get("player");
+        assertEquals("Bijan Robinson", ref.get("name"));
+        assertEquals("RB", ref.get("position"));
+        assertEquals(1, ref.get("positionalRank"));
     }
 
     /** No manager mapped for this pick's slot -- still renders, labeled by slot rather than dropped. */
@@ -142,10 +142,10 @@ class LeagueControllerRealBoardTest {
         when(managers.names()).thenReturn(Map.of(103L, "Sam"));
 
         Map<String, Object> pick = onlyPick(controller().realBoard("d1", null));
-        SimulationResult.PlayerRef ref = (SimulationResult.PlayerRef) pick.get("player");
-        assertEquals("Long Retired", ref.name());
-        assertEquals("TE", ref.position());
-        assertEquals(999, ref.positionalRank(), "BoardService's own no-rank sentinel");
+        @SuppressWarnings("unchecked") Map<String, Object> ref = (Map<String, Object>) pick.get("player");
+        assertEquals("Long Retired", ref.get("name"));
+        assertEquals("TE", ref.get("position"));
+        assertEquals(999, ref.get("positionalRank"), "BoardService's own no-rank sentinel");
     }
 
     /** A pick slot with no resolved player yet is left out rather than rendered as a hole. */
@@ -159,7 +159,7 @@ class LeagueControllerRealBoardTest {
         when(managers.names()).thenReturn(Map.of());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) controller().realBoard("d1", null).getBody();
+        Map<String, Object> body = GoldenJson.wire(controller().realBoard("d1", null).getBody());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> picks = (List<Map<String, Object>>) body.get("picks");
         assertTrue(picks.isEmpty());

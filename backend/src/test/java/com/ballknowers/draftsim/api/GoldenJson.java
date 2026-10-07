@@ -91,10 +91,23 @@ public final class GoldenJson {
                         + "; run once with -Dgolden.write=true in the characterization commit");
             }
             JsonNode expected = MAPPER.readTree(Files.readString(file));
-            assertTreesMatch(expected, actual, orderSensitivePaths);
+            assertTreesMatch(expected, onTheWire(actual), orderSensitivePaths);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * The tree a client would parse: written to JSON text and read back. A tree from
+     * {@code valueToTree} keeps Java's numeric types, so a {@code long} id is a
+     * {@code LongNode}, but the golden file is parsed text, where the same {@code 11}
+     * is an {@code IntNode}, and {@link JsonNode#equals} calls those different. The
+     * wire can't tell a long from an int, so neither should this. It still tells
+     * {@code 1} from {@code 1.0}, because that difference is on the wire. Found when the
+     * live-state-frame case failed against the very code its golden was written from.
+     */
+    static JsonNode onTheWire(JsonNode tree) throws IOException {
+        return MAPPER.readTree(MAPPER.writeValueAsString(tree));
     }
 
     /**

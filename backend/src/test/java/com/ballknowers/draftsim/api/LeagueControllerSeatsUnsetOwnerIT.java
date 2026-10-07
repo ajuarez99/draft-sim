@@ -120,7 +120,7 @@ class LeagueControllerSeatsUnsetOwnerIT {
         assertNotNull(body);
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> map = (Map<String, Object>) body;
+        Map<String, Object> map = GoldenJson.wire(body);
         assertTrue(map.containsKey("mySlot"), "mySlot key must be present even when null");
         assertNull(map.get("mySlot"), "no owner configured -- mySlot must be null, not throw");
 
@@ -146,7 +146,7 @@ class LeagueControllerSeatsUnsetOwnerIT {
         @SuppressWarnings("unchecked")
         Map<String, Object> body;
         try (var admin = com.ballknowers.draftsim.TestAdmin.asAdmin()) {
-            body = (Map<String, Object>) controller.seats(sleeperDraftId, null).getBody();
+            body = GoldenJson.wire(controller.seats(sleeperDraftId, null).getBody());
         }
         assertNotNull(body);
         assertNull(body.get("status"), "a null status column must stay null, not become \"null\"");

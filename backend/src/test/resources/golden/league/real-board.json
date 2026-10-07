@@ -1,0 +1,55 @@
+{
+  "draftId" : "D-1",
+  "teams" : 3,
+  "rounds" : 3,
+  "status" : "drafting",
+  "picks" : [ {
+    "pickNo" : 1,
+    "round" : 1,
+    "slot" : 1,
+    "manager" : "popsharky",
+    "avatarId" : "av11",
+    "player" : {
+      "id" : 1,
+      "sleeperId" : "s1",
+      "name" : "Bijan Robinson",
+      "position" : "RB",
+      "team" : "ATL",
+      "adp" : 1.5,
+      "positionalRank" : 1
+    },
+    "adpAtDraft" : 2.0
+  }, {
+    "pickNo" : 2,
+    "round" : 1,
+    "slot" : 2,
+    "manager" : "kieriskash",
+    "avatarId" : null,
+    "player" : {
+      "id" : 3,
+      "sleeperId" : "s3",
+      "name" : "Retired Guy",
+      "position" : "RB",
+      "team" : "NYG",
+      "adp" : 999.0,
+      "positionalRank" : 999
+    },
+    "adpAtDraft" : null
+  }, {
+    "pickNo" : 3,
+    "round" : 1,
+    "slot" : 3,
+    "manager" : "Slot 3",
+    "avatarId" : null,
+    "player" : {
+      "id" : 2,
+      "sleeperId" : "s2",
+      "name" : "Free Agent RB",
+      "position" : "RB",
+      "team" : null,
+      "adp" : 140.25,
+      "positionalRank" : 44
+    },
+    "adpAtDraft" : null
+  } ]
+}

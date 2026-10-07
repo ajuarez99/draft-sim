@@ -225,7 +225,7 @@ class LeagueControllerLiveStreamTest {
         Map<String, Object> payload = controller.statePayload(
                 "d1", row("drafting"), snapshot(stored), picks(stored),
                 controller.pickNaming(Sport.NFL));
-        return (List<Map<String, Object>>) payload.get("recentPicks");
+        return (List<Map<String, Object>>) GoldenJson.wire(payload).get("recentPicks");
     }
 
     /**
@@ -240,7 +240,7 @@ class LeagueControllerLiveStreamTest {
         Map<String, Object> newest = recent.get(2);
         assertEquals(3, newest.get("pickNo"));
         assertEquals("Allan", newest.get("manager"));
-        assertEquals("Player 3", ((SimulationResult.PlayerRef) newest.get("player")).name());
+        assertEquals("Player 3", ((Map<String, Object>) newest.get("player")).get("name"));
     }
 
     /**

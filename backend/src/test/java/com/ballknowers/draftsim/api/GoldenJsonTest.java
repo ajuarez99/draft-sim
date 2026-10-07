@@ -65,6 +65,18 @@ class GoldenJsonTest {
     }
 
     @Test
+    void aLongFromValueToTreeMatchesTheSameNumberParsedFromAGoldenFile() throws IOException {
+        // valueToTree keeps the Java type (LongNode); a parsed golden has IntNode.
+        JsonNode fromObject = GoldenJson.MAPPER.valueToTree(Map.of("id", 11L));
+        JsonNode fromGolden = json("{\"id\":11}");
+        assertThrows(AssertionError.class, () -> GoldenJson.assertTreesMatch(fromGolden, fromObject));
+        assertDoesNotThrow(() -> GoldenJson.assertTreesMatch(fromGolden, GoldenJson.onTheWire(fromObject)));
+        // ...and normalizing still keeps 1 apart from 1.0, which IS on the wire.
+        JsonNode dbl = GoldenJson.onTheWire(GoldenJson.MAPPER.valueToTree(Map.of("id", 11.0)));
+        assertThrows(AssertionError.class, () -> GoldenJson.assertTreesMatch(fromGolden, dbl));
+    }
+
+    @Test
     void linkedHashMapAndEquivalentRecordSerializeIdentically() {
         record Entry(Integer rosterId, Double makesPlayoffsPct, boolean isMe) {}
         Map<String, Object> m = new LinkedHashMap<>();

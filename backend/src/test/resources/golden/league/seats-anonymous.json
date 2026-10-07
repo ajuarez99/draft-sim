@@ -1,0 +1,59 @@
+{
+  "draftId" : "D-1",
+  "teams" : 3,
+  "rounds" : 3,
+  "status" : null,
+  "seats" : [ {
+    "slot" : 1,
+    "managerId" : 11,
+    "manager" : "popsharky",
+    "avatarId" : "av11",
+    "provenance" : "FITTED",
+    "reachBias" : -2.35,
+    "relativeReachBias" : -1.23,
+    "relativeReachStdErr" : 0.57,
+    "unpredictability" : 1.1,
+    "positionalTilt" : {
+      "WR" : 1.2,
+      "QB" : 0.7
+    },
+    "note" : "reaches for WRs",
+    "draftsObserved" : 2,
+    "picksScored" : 30
+  }, {
+    "slot" : 2,
+    "managerId" : 12,
+    "manager" : "kieriskash",
+    "avatarId" : null,
+    "provenance" : "STATED",
+    "reachBias" : 0.0,
+    "relativeReachBias" : null,
+    "relativeReachStdErr" : null,
+    "unpredictability" : 1.0,
+    "positionalTilt" : { },
+    "note" : null,
+    "draftsObserved" : 0,
+    "picksScored" : 0
+  }, {
+    "slot" : 3,
+    "managerId" : 13,
+    "manager" : "seat 3",
+    "avatarId" : null,
+    "provenance" : "NEUTRAL",
+    "reachBias" : 0.0,
+    "relativeReachBias" : null,
+    "relativeReachStdErr" : null,
+    "unpredictability" : 1.0,
+    "positionalTilt" : { },
+    "note" : null,
+    "draftsObserved" : 0,
+    "picksScored" : 0
+  } ],
+  "mySlot" : null,
+  "rosterPositions" : [ "QB", "RB", "FLEX" ],
+  "sport" : "nfl",
+  "reversalRound" : 0,
+  "reversalRoundFromSleeper" : 0,
+  "reversalRoundOverridden" : false,
+  "canCommission" : false
+}
