@@ -122,3 +122,132 @@ Every finding is tagged **measured** (a command was run, on 2026-10-07, against
   (7 principles, already written as rules), with AGENTS.md named as the source of
   truth so the two cannot drift. Delete the file only if the owner prefers. This is
   an owner choice, so it is flagged in tasks and not decided here.
+
+---
+
+## Amended after review (2026-10-07)
+
+[plan-review.md](plan-review.md) read this file cold and found it wrong or incomplete
+in the places below. The original text above is left as it was. **Where the two
+disagree, these amendments win.**
+
+### R1 (finding 12)
+`ballotBlockState`, `buildDeck`, `recordLabel` and `roomTakeSentence` are imported
+**only** by the verify page and have no test (measured). FR-003 therefore applies:
+P1 adds a unit test for each **before** deleting the verify page, and they stay
+exported only as long as a test imports them. The 12 `.verify-*` rules in
+`styles.css` (from about :3141) are deleted in the same change.
+
+### R2 (findings 9, 10)
+- **Five** ordinal copies, not four. `PowerRankings.tsx:139` uses a third algorithm
+  that disagrees on 267 of n ∈ [0,1000] (measured). It merges in a separate commit
+  labelled as a fix (spec FR-001 exception). The other four agree on 0..1000,
+  negatives, non-integers, NaN and ±Infinity (**measured**, so the "not yet executed"
+  above no longer applies).
+- `Rounding` needs a null-preserving boxed overload, `Double round2(Double)`, because
+  `DraftGradesService:519` relies on null passing through.
+- Inline copies (ManagerController:162-173, GameScoringService:54,
+  PlayoffOddsService:414, Ranker:54, TransactionAnalysisService:390,
+  WeeklyReportService:384) are replaced **only** where the expression is literally
+  `Math.round(E * 10^k) / 10^k` for a single expression E.
+  **`PlayoffOddsService:422` is excluded**: `round(v*1000/total)/1000` is not
+  `round3(v/total)` (24 measured differences).
+- Frontend `Math.round(v*10)/10` (`draftGrades.ts` `signedPoints`) is **out of
+  scope**: there's one copy, so nothing to consolidate.
+
+### R3 (findings 1, 2, 6, 7, 8, 20). Rules restated; these replace rules 1–4
+1. **Classify each key by its final emitted state on every path**, not by how the
+   `put` looks. For example, `makesPlayoffsPct` is always present (put null at
+   LHC:658, overwritten at :596), so it is a plain component and **not** `NON_NULL`.
+2. **One record per emitted shape**, not per builder. A base row that one path
+   extends (`standingRow` into history rows and career rows) becomes two records.
+   A value read back during the build (`(Long) e.get("managerId")`, LHC:559-561,
+   :593) becomes a typed local or component.
+3. A polymorphic detail row (`SuperlativesController.detailRow`, 8 sealed subtypes)
+   gets an explicit `String type` component per record. `@JsonTypeInfo` is used only
+   if a golden test proves it produces identical bytes.
+4. Numbers: the hazard is an int or long becoming a double (`1` vs `1.0`).
+   `Integer` and `Long` serialize identically.
+5. **Dynamic-key maps stay `Map`s** and keep their concrete, ordered type
+   (`positionalTilt` is rendered unsorted at ManagerHistory.tsx:292; also
+   `seedOdds`). Golden comparison is **order-sensitive inside them**.
+6. Response records have no `get*`/`is*` methods beyond their components, or those
+   methods carry `@JsonIgnore` (measured: `isEmpty()` leaks `"empty":true`).
+7. **Out of scope, and they stay maps:** error bodies (two key conventions, `error`
+   and `message`, read as `body.error ?? body.message` at api.ts:171; unifying them
+   is a behavior change and belongs in its own spec), SSE payloads (LeagueController
+   heartbeat, SimulationController events), and controllers outside `api/`.
+- Frontend key-presence grep, **measured** (this replaces the "assumed" above): one
+  `'rosterId' in d` (Superlatives.tsx:433), the `error ?? message` read, and
+  `Object.entries(positionalTilt)`. Nothing else.
+
+### R4 (findings 3, 4, 5)
+- **The static `body()` seam does not exist** for the three worst controllers
+  (LeagueController has none; LHC `history()` queries per season inside its loop;
+  `SuperlativesController.body` is private). Those three are characterized at the
+  **MockMvc level with stubbed services**, following the existing
+  `ManagerControllerMvcIT` / `ScheduleControllersMvcIT` pattern. That covers status
+  codes and error bodies too, and needs no seam extraction. The seam approach stays
+  for controllers that already have one (WeeklyReport, PlayerSpotlight,
+  SeasonForecast).
+- **Mapper**: every characterization test serializes with
+  `Jackson2ObjectMapperBuilder.json().build()` (Boot's modules), never
+  `new ObjectMapper()`.
+- **Test casts**: 37 `(Map<String,Object>)` casts in 17 test files would throw
+  `ClassCastException` after a conversion. Each controller's **characterization
+  commit** moves the tests touching its body to JSON-level assertions (`JsonNode`),
+  so the conversion commit edits no test.
+- **Gate**: P2b runs with Postgres up and **0 IT skips**, never "≤ baseline".
+
+### R5 (finding 17)
+The primary CSS gate becomes **byte-identical `dist/assets/index-*.css`**, before
+versus after, taken after P1's `.verify-*` removal. Screenshots are only a smoke
+check. The Google Fonts `@import` stays as line 1 of the index.
+
+### R6 (finding 18)
+Measured: no module-level state, `isolatedModules` on, `verbatimModuleSyntax` off, so
+the "assumed" above is now measured. New rules: no `api/*.ts` file imports `'../api'`
+(a cycle, with a temporal-dead-zone risk on top-level consts such as
+`ALL_POWER_RANKING_KINDS`), and the 26 `vi.mock('../api')` test files keep working
+only while every importer goes through the barrel. The "mirror `web/src/api.ts`"
+references (AGENTS.md:124, SeasonSuperlativesService:112 and :1205, RecapView:16) are
+updated in the same PR.
+
+### R7 (finding 13). Pruning rule, restated
+A worktree is a candidate only if **all** of these hold:
+- it is not the main worktree (`C:/Users/allan/source/draft-sim`);
+- it does not have `main` checked out;
+- its HEAD is an ancestor of `origin/main`;
+- `status --porcelain` is empty;
+- its newest reflog entry or file mtime is **≥ 3 days old**, as a guard against a
+  peer session that has just started.
+
+A branch is a candidate only if it is merged, is not `main`, and is not checked out
+anywhere. Worktrees are removed before branches. Each candidate is shown alongside
+its `status --ignored` list. Squash-merged branches fail `is-ancestor` and go to the
+owner, which is a safe failure. The unregistered directory
+`.claude/worktrees/phase1-normalization` is listed for the owner separately.
+
+### R8 (finding 19)
+AGENTS.md "Hard rules" has **6** bullets, not 7. The decision is a short constitution
+that quotes the six verbatim and names AGENTS.md as the source of truth (a comment
+says to update both together). Deleting it stays the owner's alternative.
+`speckit-analyze` treats the constitution as non-negotiable, so a placeholder is
+worse than either option.
+
+### P3 ordering (findings 14, 15)
+- **LHC: P2b conversion first, then the P3 split.** Dto files are named by **response
+  family** (`StandingsResponses`, `PowerRankingResponses`, …), not by controller, so
+  the split moves handlers without duplicating records.
+- **SeasonSuperlativesService:** the units stay in package `engine` (22
+  package-private statics are called 64 times from 10 test classes). Before the
+  split, a **service-level golden test** (stubbed repositories in, `Result` JSON out)
+  is added. The controller characterization never runs the service.
+
+### Deploy (finding 16)
+Both Railway services auto-deploy on every push to main, with no watch paths.
+- **Merge freeze**: nothing merges to main from 2026-10-09 through the end of the
+  2026-10-10 NBA draft, or while any live draft is polling.
+- Backend-only PRs are batched, as about 4 merges rather than about 25.
+- After each merge, check that both services report the merged commit (DEPLOY.md
+  traps).

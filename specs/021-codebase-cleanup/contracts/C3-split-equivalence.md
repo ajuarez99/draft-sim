@@ -30,3 +30,14 @@
 
 - The existing page tests pass unedited, except for import paths of moved helpers.
 - The same visual check as above, for that page only.
+
+## Amended after review (2026-10-07)
+
+Per [plan-review.md](../plan-review.md) findings 14, 15, 17 and 18:
+- **CSS:** the primary gate is byte-identical built `dist/assets/index-*.css`;
+  screenshots become a smoke check.
+- **SeasonSuperlativesService:** a service-level golden test (stubbed repositories →
+  `Result` JSON) is added **before** the split, and the units stay in package `engine`.
+- **LeagueHistoryController:** split only after its P2b conversion.
+- **`api.ts`:** no `api/*.ts` imports `'../api'`, and the "mirror `web/src/api.ts`"
+  references are updated in the same PR.

@@ -37,8 +37,11 @@ before. Every user-facing route must still render the same page.
 **Acceptance Scenarios**:
 
 1. **Given** the production frontend bundle, **When** someone requests
-   `/pr-reference/*.png`, **Then** the server returns not-found. Those mockups are no
-   longer published to the public site.
+   `/pr-reference/*.png`, **Then** the response is not an image (content-type is not
+   `image/png`). Those mockups are no longer published to the public site.
+   *Amended after review (finding 11): the first draft said "returns not-found", but
+   production's SPA fallback answers any missing path with `200 text/html` (measured), so
+   a 404 never comes. The check is on content-type.*
 2. **Given** a dev build, **When** someone navigates to `/leagues/:id/power/verify`,
    **Then** there is no such route, and the real Power Rankings page is unchanged.
 3. **Given** the local machine, **When** a maintainer runs `git worktree list` and
@@ -139,7 +142,9 @@ substantially.
 
 ### Functional Requirements
 
-- **FR-001**: The cleanup MUST NOT change any user-visible behavior. Every route
+- **FR-001**: The cleanup MUST NOT change any user-visible behavior. The one named
+  exception is the `PowerRankings.tsx` ordinal fix ("21th" becomes "21st"). It lands
+  as its own commit labelled as a fix, so it can be reverted or vetoed on its own. Every route
   renders the same, every API response body is identical for the same data, and
   every scheduled job does the same work.
 - **FR-002**: The production site MUST NOT serve development-only reference assets.
@@ -209,7 +214,7 @@ substantially.
 | Rule | Copies today | Target |
 |------|--------------|--------|
 | `round2` / `round3` / `round4` / `round(v, places)` | 17 backend files | One backend numeric helper |
-| `ordinal(n)` | 4 frontend files (`draftGrades.ts`, `rankOrder.ts`, `ExpectedWins.tsx`, `Superlatives.tsx`) | One frontend formatter module |
+| `ordinal(n)` | ~~4~~ **5** frontend files: `draftGrades.ts`, `rankOrder.ts`, `ExpectedWins.tsx`, `Superlatives.tsx` (agree everywhere, measured) and `PowerRankings.tsx:139` (**disagrees on 267 of 0..1000**: prints "21th") | One frontend formatter module. The PowerRankings copy merges in its own commit, labelled as a deliberate fix (see FR-001 exception) |
 | Hand-built `Map<String,Object>` responses | ~141 across `api/*.java`; worst offenders `LeagueHistoryController` (43), `SuperlativesController` (17), `LeagueController` (17) | Response records, one controller per change, each with a JSON-equality check |
 
 ### Split (P3), one file per change and largest first
@@ -234,13 +239,19 @@ substantially.
 - **SC-002**: The production site serves 0 development-only assets. Today it serves 2
   PNGs, about 860 KB; the first was measured live at 626,914 bytes.
 - **SC-003**: Every consolidated rule has exactly 1 definition per language, down from
-  17 backend rounding copies and 4 frontend ordinal copies.
-- **SC-004**: Hand-built map responses in the controllers drop by at least 50% in
-  P2. The three worst controllers reach 0.
+  17 backend rounding helper files and 5 frontend ordinal copies. Inline rounding is
+  replaced only where the expression is literally `round_k(expr)`;
+  `PlayoffOddsService:422` (`Math.round(v*1000/total)/1000`) is **excluded**, because
+  it is not the same function (24 measured differences).
+- **SC-004**: Hand-built map responses in `api/*.java` **success bodies** drop by at
+  least 50% in P2, and the three worst controllers' success bodies reach 0. Error
+  bodies (`error`/`message` keys) and SSE event payloads stay maps and are out of
+  scope. So do controllers outside `api/` (`recap/*`, `refresh/*`).
 - **SC-005**: No source file exceeds 1,000 lines after P3. Today 6 do.
 - **SC-006**: The backend suite, the frontend tests and the production build pass
   after every phase, with a skip count no higher than before (see the "suite skips
-  ITs silently" lesson).
+  ITs silently" lesson). **P2b and the P3 backend splits need 0 IT skips**, with
+  Postgres up.
 - **SC-007**: 0 branches or worktrees holding unmerged commits are deleted.
 
 ## Assumptions
@@ -259,3 +270,14 @@ substantially.
   plan touches the remote, Railway, or the database.
 - The `engine/` package split is opportunistic. It is not worth a standalone change,
   given how much it would conflict with the concurrent sessions.
+
+## Amended after review (2026-10-07)
+
+The adversarial plan review ([plan-review.md](plan-review.md)) changed this spec in
+these places, each marked inline:
+- AS-1: content-type, not 404 (finding 11).
+- Ordinal copies: 5, not 4 (finding 9).
+- SC-003: the rounding exclusion (finding 10).
+- SC-004: error, SSE and out-of-`api/` bodies scoped out (findings 4, 8 and 20).
+- SC-006: zero IT skips for P2b (finding 3).
+- FR-001: the ordinal exception.

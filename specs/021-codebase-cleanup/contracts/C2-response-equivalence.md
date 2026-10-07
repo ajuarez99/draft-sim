@@ -30,3 +30,20 @@ types describe.
 - The backend suite's skip count is not above the baseline taken at step 1.
 - `grep -c "new LinkedHashMap\|Map\.of("` for that controller drops to 0, or the PR
   explains each survivor.
+
+## Amended after review (2026-10-07)
+
+Per [plan-review.md](../plan-review.md) findings 1–8, the following supersede the
+steps above:
+- **Step 1 (seam)** applies only to controllers that already have, or trivially
+  expose, a pure body builder. **LeagueHistoryController, LeagueController and
+  SuperlativesController are characterized via MockMvc with stubbed services**
+  (status code and body), following `ManagerControllerMvcIT`.
+- **Step 2** uses `Jackson2ObjectMapperBuilder.json().build()`, not "the Spring
+  `ObjectMapper`" (which a unit test doesn't have). It also covers each key's
+  final-state variants (e.g. `makesPlayoffsPct` both null and present), and compares
+  **order-sensitively inside dynamic-key maps**. Existing tests that cast the body to
+  `Map` are rewritten to `JsonNode` assertions **in this commit**.
+- **Pass criteria:** **0 IT skips** (Postgres up) replaces "≤ baseline". The
+  map-count criterion counts success bodies only; error bodies and SSE payloads stay
+  maps.

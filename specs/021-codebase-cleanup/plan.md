@@ -52,7 +52,7 @@ here touches the simulation hot path.
 `../draft-sim-021` worktree as small, separate commits.
 
 **Scale/Scope**: About 141 map-built responses across 24 controllers, 17 backend
-rounding copies, 4 frontend ordinal copies, and 6 files over 1,000 lines.
+rounding copies, ~~4~~ 5 frontend ordinal copies, and 6 files over 1,000 lines.
 
 ## Constitution Check
 
@@ -124,10 +124,35 @@ re-exported from the old path, so import sites do not churn (research R6).
 
 | Phase | Merge unit | Gate before merge |
 |---|---|---|
-| P1 | 1 PR | C1 evidence recorded; suites green, skip count ≤ baseline; prod PNG URL 404s after deploy |
+| P1 | 1 PR | C1 evidence recorded; tests for the 4 verify-only builders added first; suites green, skip count ≤ baseline; prod PNG URL no longer returns `image/png` (*amended: it was "404s"; production's SPA fallback returns 200 HTML*) |
 | P2a, helpers | 1 PR | Helper tests over the full input range (R2); suites green |
-| P2b, responses | **1 PR per controller**, worst first | C2 characterization test committed *before* the conversion commit and passing on both sides |
-| P3, splits | **1 PR per file** | C3; `useNarrow.test.ts` updated for the CSS split (R5) |
+| P2b, responses | **1 PR per controller**, worst first, merged in **batches** | C2 characterization (MockMvc for LHC/LC/SC) committed *before* the conversion; **0 IT skips** |
+| P3, splits | **1 PR per file**; LHC only *after* its P2b conversion | C3; byte-identical built CSS; service-level golden test before the superlatives split |
+
+**Merge freeze**: nothing merges to main from 2026-10-09 through the end of the
+2026-10-10 NBA draft, because both Railway services auto-deploy.
+
+## Amended after review (2026-10-07)
+
+[plan-review.md](plan-review.md) returned **proceed after amendments** (4 blockers, 12
+should-fix, 4 nits). All 20 are folded in. The full resolutions are in
+[research.md § Amended after review](research.md#amended-after-review-2026-10-07); this
+section records what changed at plan level.
+
+- **Blockers 1–2:** the R3 rules are replaced. Keys are classified by final emitted
+  state, there is one record per emitted shape, and dynamic-key maps stay maps.
+- **Blockers 3–4:** the three worst controllers are characterized through MockMvc with
+  stubbed services, not through an extracted seam. Map-casting tests move to JSON
+  assertions in the characterization commit. P2b needs 0 IT skips.
+- **Scope cuts:** error bodies, SSE payloads, controllers outside `api/`, and
+  `PlayoffOddsService:422`.
+- **Ordering:** LHC is converted before it is split. Dto files are named by response
+  family. The superlatives units stay in `engine`, behind a new service-level golden
+  test.
+- **Deploy:** merge freeze over the NBA draft; backend PRs are batched; both services
+  are checked after each merge.
+- **Project Structure correction:** `engine/superlatives/` becomes new files *in*
+  `engine/`, and `api/dto/<Controller>…` becomes `api/dto/<ResponseFamily>Responses.java`.
 
 ## Complexity Tracking
 

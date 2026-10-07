@@ -23,3 +23,15 @@ recorded in the PR or commit body.
 2. A worktree's `git -C <path> status --porcelain` output is empty.
 3. The full list is shown to the owner in chat, and they explicitly say yes before
    any `git worktree remove` or `git branch -d` (never `-D`) is run.
+
+## Amended after review (2026-10-07)
+
+Per [plan-review.md](../plan-review.md) findings 12 and 13, the branch/worktree rules
+above are replaced by research.md R7 (amended):
+- Exclude the main worktree and `main` by name.
+- Exclude any worktree with activity in the last 3 days.
+- Remove worktrees before branches.
+- Show the `--ignored` files for each candidate.
+- List the unregistered `.claude/worktrees/phase1-normalization` separately.
+
+Before deleting a dev harness, its verify-only builders get tests (FR-003).

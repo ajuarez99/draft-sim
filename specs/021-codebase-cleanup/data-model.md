@@ -39,3 +39,18 @@ from `candidate` to `removed`.
   `double` stays `double`.
 - Each record is mirrored by an `api.ts` type in the same commit (AGENTS.md). If the
   `api.ts` type already matched, the commit message says so explicitly.
+
+## Amended after review (2026-10-07)
+
+The record conventions above are corrected by [plan-review.md](plan-review.md)
+findings 1, 2, 6, 7 and 14:
+- ~~one `dto/<Controller>Responses.java` per controller~~ becomes **one file per
+  response family** (e.g. `StandingsResponses`), so a controller split doesn't
+  duplicate records.
+- **One record per emitted shape**, not per builder.
+- ~~Conditionally-put keys get `@JsonInclude(NON_NULL)`~~: only keys that are
+  **finally absent** on some path get it. Classify by the final emitted state.
+- No `get*`/`is*` helper methods on response records unless they carry `@JsonIgnore`.
+- Dynamic-key maps (`positionalTilt`, `seedOdds`) stay ordered `Map`s.
+- `RemovalCandidate` adds the field `ignoredFiles`, the `status --ignored` list shown
+  to the owner, and the `kind` value `orphan-dir`.
