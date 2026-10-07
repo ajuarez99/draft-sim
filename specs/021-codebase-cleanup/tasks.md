@@ -242,7 +242,7 @@ stopping. P2b can stop here.
 These already expose a static seam, so a unit-level characterization test is enough.
 It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportShapeTest`.
 
-- [ ] T036 [P] [US3] `WeeklyReportController` (9): first rewrite the `.get()`/`.containsKey()` assertions in `WeeklyReportShapeTest.java` as `GoldenJson` goldens in `golden/weekly-report/`, then convert to `api/dto/WeeklyReportResponses.java`. The record **must not** rely on `@JsonInclude` on the service record; the shape test's header documents why.
+- [X] T036 [P] [US3] `WeeklyReportController` (9): first rewrite the `.get()`/`.containsKey()` assertions in `WeeklyReportShapeTest.java` as `GoldenJson` goldens in `golden/weekly-report/`, then convert to `api/dto/WeeklyReportResponses.java`. The record **must not** rely on `@JsonInclude` on the service record; the shape test's header documents why.
 - [ ] T037 [P] [US3] `PlayerSpotlightController` (7): rewrite `PlayerSpotlightShapeTest.java`, and the casts in `PlayerSpotlightTopOfNightIT.java` and `PlayerSpotlightWeekIT.java`, as goldens; then convert to `api/dto/PlayerSpotlightResponses.java`.
 - [ ] T038 [P] [US3] `SeasonForecastController` (4): rewrite `SeasonForecastShapeTest.java` as goldens, with `seedOdds` as an **order-sensitive** path; then convert to `api/dto/SeasonForecastResponses.java`, keeping `seedOdds` a `LinkedHashMap`.
 - [ ] T039 [P] [US3] `RosterManagementController` (8): char → conv commit pair following C2; dto `api/dto/RosterManagementResponses.java`.

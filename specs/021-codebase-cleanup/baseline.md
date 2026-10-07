@@ -136,3 +136,26 @@ the server has always sent.
 A pre-conversion miss, recorded: `LeagueControllerBoardTest` bound `board()`'s
 `Map` return type and wasn't caught by the T033 cast grep. It was fixed in its own
 commit before the conversion (`83e41fc`).
+
+## US3 checkpoint: SC-004, measured with a multi-line-aware classifier
+
+Every remaining `new LinkedHashMap|Map.of(` line in `api/*.java` was classified using
+a 4-line context window, not T003's single-line grep:
+
+| | lines |
+|---|---|
+| original total (T003) | 141 |
+| remaining after LHC + SC + LC (before T036) | 91: **33 error** · **5 SSE** · **3 non-response** (default `Map.of()` / lookup maps) · **50 success bodies** |
+| converted by LHC + SC + LC | 141 − 91 = **50** |
+| in-scope denominator | 50 converted + 50 remaining success = **100** (not T003's 108, whose error and SSE counts were single-line) |
+| after LHC + SC + LC | 50 / 100 = **50.0%**, which technically meets "≥ 50%" with zero margin |
+| **after T036 (WeeklyReport, 9)** | 141 − 82 = **59 / 100 = 59%** |
+
+The three worst controllers' success bodies are at 0 (SC-004's second clause). T036
+was taken because the plan says to fall back to it when the margin is thin, and 0
+lines of margin, resting on a classifier's judgement calls, is thin.
+
+T036 gate: WeeklyReportShapeTest 12/12 (unedited by the conversion; 4 new
+goldens); mutation check caught both (`NON_NULL` dropped from bestNights: 2 fail;
+unavailable's empty topPerformers as null: 1); backend 1385 tests, 0 skipped;
+controller ~200 → 51 lines; `api.ts` already models both shapes with optionals.
