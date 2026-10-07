@@ -14,7 +14,7 @@ import java.util.Map;
  * {@code GET /api/managers/{id}/history} on the wire (specs/006-deeper-history-both-sports,
  * specs/021-codebase-cleanup). One {@code draftHistory} entry and one {@code careers}
  * entry per sport, never a total across sports. Mirrored by {@code ManagerHistory} in
- * web/src/api.ts.
+ * web/src/api/managerHistory.ts.
  */
 public final class ManagerHistoryResponses {
 

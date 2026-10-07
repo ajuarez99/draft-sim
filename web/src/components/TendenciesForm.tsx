@@ -22,7 +22,7 @@ import { setTendencies, clearTendencies, type ManualTendencies, type Sport } fro
  * a small shared shape rather than teaching the shared function about either
  * type. Same move here: both `Seat.stated`-ish data (SeatPopover fetches it
  * async off getManagers()) and `ManagerSummary.stated` are already
- * `ManualTendencies` (api.ts), so that's the prop -- this component never
+ * `ManualTendencies` (api/managers.ts), so that's the prop -- this component never
  * needs to know a Seat or a ManagerSummary exists. Everything about *how* a
  * caller gets there (fetching, the editing on/off toggle, the "loading
  * stated values" spinner SeatPopover shows before this even mounts) stays at

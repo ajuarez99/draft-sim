@@ -268,15 +268,15 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `web/src/api.ts` (2,568 lines, 108 importers)
 
-- [ ] T047 [P] [US4] Move the types and fetchers into `web/src/api/<domain>.ts` files, **cut along the `// --- <source doc>: <title> ---` section markers already in `api.ts`** (16 markers, :336 to :2415, measured):
+- [X] T047 [P] [US4] Move the types and fetchers into `web/src/api/<domain>.ts` files, **cut along the `// --- <source doc>: <title> ---` section markers already in `api.ts`** (16 markers, :336 to :2415, measured):
   - `core.ts` gets everything above :336: `API_BASE`, `API_TOKEN`, the fetch helpers, error reading, and the draft, board and sim types;
   - each marker's section becomes one file named after its title, e.g. `identity.ts` (:336), `leagueHistory.ts` (:775), `managerComparison.ts` (:1167), `leagueAnalysis.ts` (:1361), `ballots.ts` (:1667), …, `transactions.ts` (:2415);
   - the two superlatives sections (:2122, :2355) both go to `superlatives.ts`;
   - the unmarked comment at :541 belongs to the identity section.
 
   Keep the original order inside each file. `web/src/api.ts` becomes only `export * from './api/<domain>'` lines. **No file under `web/src/api/` imports `'../api'`**; they import each other directly, which avoids a TDZ cycle with `ALL_POWER_RANKING_KINDS`.
-- [ ] T048 [US4] In the same PR, update the "mirror `web/src/api.ts`" references to point at the right `web/src/api/<domain>.ts`: `AGENTS.md:124`, `backend/src/main/java/com/ballknowers/draftsim/engine/SeasonSuperlativesService.java:112` and `:1205`, and `backend/src/main/java/com/ballknowers/draftsim/recap/RecapView.java:16`. Before editing, re-grep `grep -rn "api\.ts" AGENTS.md backend/src web/src` so that no reference is missed; the line numbers above may have drifted.
-- [ ] T049 [US4] Gate:
+- [X] T048 [US4] In the same PR, update the "mirror `web/src/api.ts`" references to point at the right `web/src/api/<domain>.ts`: `AGENTS.md:124`, `backend/src/main/java/com/ballknowers/draftsim/engine/SeasonSuperlativesService.java:112` and `:1205`, and `backend/src/main/java/com/ballknowers/draftsim/recap/RecapView.java:16`. Before editing, re-grep `grep -rn "api\.ts" AGENTS.md backend/src web/src` so that no reference is missed; the line numbers above may have drifted.
+- [X] T049 [US4] Gate:
   - `npx tsc -b` passes;
   - `git diff --stat` shows **0** changed importers outside `web/src/api*`;
   - all 26 `vi.mock('../api')` test files pass;

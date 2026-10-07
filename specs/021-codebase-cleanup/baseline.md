@@ -225,3 +225,28 @@ happened after the parity diff, so it doesn't affect the 37/37.
   uses `--bg`.
 - `useNarrow.test.ts` now follows the index's imports in order; vitest 1087/1087,
   `tsc` clean.
+
+## T049: api.ts split
+
+- `api.ts` (2,568 lines) → a 33-line barrel plus **25 domain files** in
+  `web/src/api/` (20–263 lines). The cuts are the 16 existing `// ---` markers **plus
+  13 anchors**. The markers alone would have named files falsely: unrelated types had
+  been appended under old markers (power rankings under "manager comparison",
+  schedule/trends under "transactions", setup/managers/mock under "identity"). Each
+  anchor cut lands on the comment attached to its declaration.
+- **Public surface unchanged:** 194 exports before and after, none missing, none
+  added. The transport internals (`apiFetch`, `json`, `apiError`) live in `http.ts`,
+  which the barrel does not `export *`. They stay private to `api/`, as they were
+  private to `api.ts`; only `apiUrl` is re-exported.
+- **Content unchanged:** all 2,359 non-blank lines are preserved (multiset check),
+  except for generated imports and the `export` on those three internals.
+- No value-import cycle (computed). Nothing in `api/` imports the barrel.
+- **0 of the 108 importers changed.** vitest 1087/1087, including all 26
+  `vi.mock('../api')` files. `tsc` clean. JS 512,991 B (−0.01%); CSS hash unchanged.
+- Caught by `tsc` during the build, before any commit: the first anchor pass cut
+  inside a `/* … */` block, because the walk-back recognized `/**` but not `/*`.
+- **T048:** every "mirror `api.ts`" pointer was repointed to the file that holds the
+  type: AGENTS.md hard rule 2 (and the constitution, re-diffed verbatim), 7 dto
+  files, SeasonSuperlativesService ×2, RecapView, and 7 frontend comments. One
+  pointer, `searchIndex.ts`'s `api.ts:426`, had **already been stale** before this
+  split. It now cites the file and the comment's text instead of a line number.

@@ -28,13 +28,13 @@ function readStored(): BkUser | null {
   }
 }
 
-// Module-level so api.ts's apiFetch can read the current id synchronously on
+// Module-level so api/http.ts's apiFetch can read the current id synchronously on
 // every request without importing React state. Kept in sync with
 // localStorage by setUser/clearUser below -- those are the only writers.
 let current: BkUser | null = readStored()
 const listeners = new Set<() => void>()
 
-/** Synchronous accessor for api.ts's request-header funnel. Null when signed out. */
+/** Synchronous accessor for api/http.ts's request-header funnel. Null when signed out. */
 export function currentUserId(): string | null {
   return current?.sleeperUserId ?? null
 }

@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  * Draft-room REST responses (LeagueController, specs/021-codebase-cleanup). Mirrored by
  * {@code SeatsResponse}, {@code RealBoard}/{@code RealPick} and the track and manual-pick
- * helpers in web/src/api.ts.
+ * helpers in web/src/api/draft.ts and web/src/api/setup.ts.
  *
  * <p>The live-stream {@code state} frame is an SSE payload and stays a map. Its
  * {@code recentPicks} are {@link RealPick}s, the same rows the REST board sends.

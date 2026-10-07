@@ -9,7 +9,7 @@ import java.util.Optional;
  * Power rankings, member ballots and their commissioner writes on the wire
  * (claude/league-suite.md, claude/power-rankings-ballots.md, specs/021-codebase-cleanup).
  * Mirrored by {@code PowerRankings}, {@code BallotState} and the write helpers in
- * web/src/api.ts.
+ * web/src/api/powerRankings.ts and web/src/api/ballots.ts.
  */
 public final class PowerRankingResponses {
 

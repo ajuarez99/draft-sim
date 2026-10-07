@@ -13,7 +13,7 @@ public record RecapView(
         String model, Instant generatedAt, Integer revision, String revisionReason,
         boolean stale, String headline, List<RecapOutput.Section> sections, String failureReason) {
 
-    /** Closed set; web/src/api.ts {@code RecapState} mirrors it. */
+    /** Closed set; web/src/api/recap.ts {@code RecapState} mirrors it. */
     public enum State { FEATURE_OFF, NOT_ENTITLED, WEEK_NOT_FINAL, GENERATING, READY, FAILED, RATE_LIMITED }
 
     public static RecapView bare(State state, Integer season, int week) {

@@ -111,7 +111,7 @@ public class SeasonSuperlativesService {
     /**
      * Copied unmodified from the bounded {@link ExpectedWinsService} row
      * (FR-004) -- never recomputed here. {@code reading} is new for T032 and
-     * must be mirrored into {@code web/src/api.ts}'s SuperlativeDetail union
+     * must be mirrored into {@code web/src/api/superlatives.ts}'s SuperlativeDetail union
      * (contracts/superlatives-api.md's LUCK row).
      */
     public record LuckDetail(int rosterId, double actualWins, double expectedWins, double winsAboveExpected,
@@ -1204,7 +1204,7 @@ public class SeasonSuperlativesService {
      * player-weeks per roster, not points or wins. {@code GAMES} is the
      * closest existing wire unit already used for a plain count
      * ({@code CLOSE_LOSSES}); a new literal isn't added here because
-     * {@code web/src/api.ts}'s {@code Superlative.unit} type is a fixed
+     * {@code web/src/api/superlatives.ts}'s {@code Superlative.unit} type is a fixed
      * {@code 'POINTS' | 'WINS' | 'GAMES'} union the frontend already ships
      * with, and widening it is outside this backend task.
      */

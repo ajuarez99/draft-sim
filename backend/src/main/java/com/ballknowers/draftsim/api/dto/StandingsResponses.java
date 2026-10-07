@@ -11,7 +11,7 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped;
  * {@code counted}. Neither shape has the other's extras, so they are separate records
  * (plan-review finding 2), sharing the base through {@link JsonUnwrapped}.
  *
- * <p>Mirrored by {@code StandingRow} / {@code CareerSeason} in web/src/api.ts.
+ * <p>Mirrored by {@code StandingRow} / {@code CareerSeason} in web/src/api/leagueHistory.ts and web/src/api/managerHistory.ts.
  */
 public final class StandingsResponses {
 
