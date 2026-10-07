@@ -1,0 +1,737 @@
+/*
+ * ============================================================================
+ * House style. Read this before adding a component. These are the rules every
+ * screen is checked against (specs/013-fan-first-redesign/contracts/ui-rules.md).
+ * ============================================================================
+ *
+ * SURFACES
+ *   At most TWO nested surfaces: the page (--bg) and one raised surface
+ *   (--panel). `.panel .panel` is flattened on purpose. A list or table inside
+ *   a panel uses a 1px divider BETWEEN rows (`.row-list`), never a box per row.
+ *   A card is for card-shaped content only (a matchup, a player, a seat); a
+ *   one-line record is a row. Section titles are headings on the surface
+ *   (`.section-title`), not the header strip of a box. Unboxed regions use
+ *   `.section`. Modals use `.modal-card`, not `.panel`. Elevation is a claim
+ *   about layering: only `.panel` and `.avail-sheet` float and carry a shadow;
+ *   grid tiles are on the plane. Radii by role: 999px badges and chips, 10px
+ *   tiles and controls, 12px floating sheets, 14px panels.
+ *
+ * TYPE
+ *   Oswald uppercase (`.cond`): the page H1 and hero numbers only. Section
+ *   titles: Plus Jakarta 600, sentence case. Numbers: Plus Jakarta with
+ *   tabular-nums (`.mono` is now exactly that). The monospace stack is `.code`
+ *   and is for things that really are code: ids, URLs, hashes.
+ *
+ * COLOR: ONE MEANING EACH
+ *   --crimson        YOU: rings, bars and other non-text marks. Never anything
+ *                    that is not the viewer's own.
+ *   --crimson-fill   YOU behind text. --text on it is >= 4.5:1.
+ *   --crimson-text   YOU as text. >= 4.5:1 on both --bg and --panel.
+ *   --teal           interaction (hover, focus, active chip). Never identity,
+ *                    never data.
+ *   --volt           the page's single primary action (max one per page), with
+ *                    --bg text. Never links, navigation or secondary actions.
+ *   --up / --down    better / worse. --down sits at hue 350, not crimson's 25,
+ *                    so "worse" is never read as "you". Never identity.
+ *   --fitted         earned / awards / provenance. Never a position.
+ *   position tokens  position only (see below).
+ *   Every text/background pair is >= 4.5:1; measure it, don't eyeball it.
+ *   Error colors (.error, .track-note.failed, .live-fresh.stale, the offline
+ *   banner) still use --crimson. That is a known, noted exception.
+ *
+ * POSITION COLOR IS A SYSTEM, NOT A DECORATION
+ *   Six football tokens (--qb --rb --wr --te --k --def) and five basketball
+ *   ones, always the same color for the same position. Three usages:
+ *     .pos.RB              solid badge, `--bg` text. Carries the positional
+ *                          rank too ("RB4" via posRank.ts).
+ *     .cell.pos-RB         22% of the position color over `--panel`, with
+ *                          `--text` on top. Measured (OKLCH math, not a
+ *                          browser) >= 11.7:1 for every position token
+ *                          against the 2026-09-30 --panel. Past ~25% the name
+ *                          starts losing; the old "12:1" claim was for the old
+ *                          --panel.
+ *     .chip.pos-chip.RB    filter control; 45% mix on the border, solid `.on`.
+ *   Never encode position with color alone: each also carries it as text.
+ *
+ * WORDS
+ *   A page subtitle is one sentence, the takeaway. It never says "computation",
+ *   "computed", "stored", "snapshot", "simulation run", "standard error",
+ *   "endpoint" or "payload" (PageHeader warns in dev). Methodology goes in a
+ *   `<HowThisWorks>` disclosure at the end of its section and keeps its
+ *   original text. A caveat that qualifies one number stays beside that
+ *   number as a badge, visible on touch. Caveats are never deleted.
+ *
+ * NAVIGATION
+ *   Groups: League home, This week, The season, Draft, History. The group that
+ *   holds the current page is expanded. The league + season switcher is at the
+ *   top of the league block. The collapsed rail keeps `title` and `aria-label`
+ *   from the destination's label; never an unlabeled mark. Addresses never
+ *   change; jump-to matches both the fan name and the former name.
+ *
+ * PLAYER FACES
+ *   photo, then team logo, then initials. Fixed size, lazy loading, no layout
+ *   shift, never a broken-image icon. Same for NFL and NBA.
+ *
+ * SIZES
+ *   Check every changed page at 1440x900, 768x1024 and 375x812: no horizontal
+ *   page scroll (the draft board scrolls inside its own frame), nothing
+ *   clipped, long team names truncate with the full name in `title`.
+ *
+ * COMMISSIONER CONTROLS
+ *   Shown only when the page's payload says `canCommission`. Never inferred on
+ *   the client.
+ *
+ * LAYOUT
+ *   The app is one screen: `.app` claims 100vh and every band scrolls
+ *   internally rather than growing the page. That only works if `min-height: 0`
+ *   (and `min-width: 0` beside a grid) appears at every level of the flex
+ *   chain -- a flex child refuses to shrink below its content otherwise and
+ *   the inner `overflow: auto` never engages.
+ *
+ * STACKING (over `.board-stage`)
+ *   0 cells · 1 sticky headers (2 for the corner) · 3 a focused cell ·
+ *   4 `.avail-sheet` · 5 `.start-overlay` · 7 `.pick-card` (the live room's
+ *   pick card; above the 6 below, which only exists pre-start when no card can).
+ *   Add a layer here, not inline.
+ *
+ * STACKING (page-level `position: fixed` layers, not scoped to `.board-stage`)
+ *   100  `.modal-backdrop`. The top of the app.
+ *    60  `.jumpto-backdrop` -- the jump-to palette. Above the page, below a
+ *         modal, because a rail row ("Mock it") can open one.
+ *    50  RankBoard's drag ghost (`.rankboard-ghost`) -- comfortably above
+ *         ordinary in-flow page content (which creates no stacking context of
+ *         its own) and deliberately still below a modal, even though the two
+ *         can never be open at once in practice (an active drag holds pointer
+ *         capture, and nothing that opens a modal can fire while it does).
+ *    45  `.jumpto-fab`, the phone-only return control. Below the overlay it
+ *         opens, and below a drag in progress. It was 50 first, which tied the
+ *         ghost and left DOM order to decide; a tie is not a decision.
+ *    44  `.pick-card` at phone width only (≤700px), where it leaves the
+ *         board stage and pins to the viewport bottom. Just below the
+ *         jump-to FAB so that control is never covered.
+ *   Add the next page-level fixed layer here, not inline.
+ *
+ * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
+ *   A strip of controls must say what kind of thing each one is. Mixing them
+ *   is how /leagues/:id/power ended up with six identical teal buttons doing
+ *   three different jobs.
+ *     exclusive choice  ->  `.segmented` + `.segment`, exactly one `.on`.
+ *                           One connected group, so it reads as one control
+ *                           with a current value rather than N buttons.
+ *     an action         ->  `.action-button` (outline) for a normal one,
+ *                           `.controls button` (solid teal) for the primary
+ *                           one on a screen. A control that WRITES must never
+ *                           share a treatment with one that only changes what
+ *                           you are looking at.
+ *     navigation        ->  a link, or `.chip` when it must sit in a control
+ *                           row. Never a filled button.
+ *   Beware `.controls button` (0,1,1): it out-specifies `.chip` (0,1,0), which
+ *   is why it carries `:not(.chip)`. Do not add another bare-element rule
+ *   inside a container class without checking what it will repaint.
+ */
+
+:root {
+  --bg: oklch(14% 0.025 255);       /* the page */
+  --panel: oklch(19% 0.03 255);     /* the one raised surface */
+  --line: oklch(28% 0.02 250);
+  --text: oklch(95% 0.005 250);
+  --muted: oklch(63% 0.02 250);
+  --crimson: oklch(58% 0.19 25);    /* YOU: rings, bars, non-text marks only */
+  --crimson-fill: oklch(54% 0.19 25);  /* YOU behind text; --text on it >= 4.5:1 */
+  --crimson-text: oklch(64% 0.19 25);  /* YOU as text; >= 4.5:1 on --bg and --panel */
+  --volt: oklch(88% 0.19 125);      /* the page's single primary action (--bg text) */
+  --up: oklch(74% 0.16 150);        /* better / gained */
+  --down: oklch(68% 0.18 350);      /* worse / lost; hue 350 keeps it off crimson ("you") */
+  --row-hover: oklch(22% 0.03 255); /* hover on a .row-list row */
+  --teal: oklch(72% 0.14 175);
+  /* provenance.ts's FITTED/BLENDED dot and border, split out from `--rb` --
+     .col-head-dot.fitted/.seat.fitted/.prov-dot.fitted all borrowed the RB
+     position token for an unrelated meaning ("this seat's tendencies came
+     from real history"), which happened to work only because RB's color was
+     never otherwise in the same view. That accident gets worse, not
+     better, with basketball's five new position tokens in the same
+     stylesheet -- a provenance color needs its own identity, not a position
+     token pressed into double duty. STATED already had its own answer,
+     `--teal` (generic interaction, see that token's own use below); this is
+     the equivalent for FITTED. Amber/gold, not a hue any position uses --
+     "earned from history" reads like a badge, not a pick. */
+  --fitted: oklch(68% 0.13 100);
+  --qb: oklch(68% 0.14 45); --rb: oklch(68% 0.14 150);
+  --wr: oklch(66% 0.15 235); --te: oklch(66% 0.14 300);
+  --k: oklch(65% 0.02 250); --def: oklch(58% 0.03 250);
+  /* Basketball's five (multi-sport-and-rebrand.md Phase 6): an oklch ramp
+     along the guard->center continuum (PG through C), evenly spaced 36deg
+     apart so it reads as one systematic sweep rather than six-and-five
+     unrelated palettes -- cool blue at the perimeter end, warming through
+     violet and magenta to a red at the paint end. L/C held at football's own
+     skill-position envelope (66-68% / 0.14-0.15) on purpose, per the design
+     note above: these are siblings of --qb/--rb/--wr/--te, not a second,
+     quieter system bolted on next to it. Hues were chosen clear of every
+     existing token above (and of --teal/--crimson below, which carry
+     unrelated system meanings a position color must not visually collide
+     with) with at least ~15deg of separation, except --sf/--te (13deg) and
+     --sg/--wr (16deg) -- both pairs are each sport's own "hybrid/tweener"
+     role, so sitting close is more honest than forcing distance that isn't
+     there, and the two sports never share one board to confuse at a glance. */
+  --pg: oklch(67% 0.145 215); --sg: oklch(67% 0.145 251);
+  --sf: oklch(67% 0.145 287); --pf: oklch(67% 0.145 323);
+  --c: oklch(67% 0.145 359);
+  /* "Which sport is this league" -- a card-level label, not a position. The
+     two live together on the picker screen and nowhere else, so the only
+     separation that matters is from each other (66deg) and from --teal, which
+     already means "a draft is happening" on the same card. Named for the two
+     sports' own colours rather than borrowed from anything above; see
+     --fitted's comment for what borrowing costs. */
+  --sport-nfl: oklch(70% 0.13 128); --sport-nba: oklch(72% 0.15 62);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.cond { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; }
+.mono { font-family: inherit; font-variant-numeric: tabular-nums; } /* numbers: the body face, aligned digits */
+.code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; } /* real code only: ids, URLs, hashes */
+.section-title { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
+.avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+/* Crimson ring, not fill, once a real photo replaces the initial -- the
+   "crimson-when-it's-you" identity rule stays visible without covering the
+   photo. Inset so the parent's overflow:hidden (which clips the image to the
+   circle) doesn't also clip an outward ring. */
+.avatar-me:has(img) { box-shadow: inset 0 0 0 2px var(--crimson); }
+/* An avatar that's also a button (e.g. the Realized popup trigger in
+   PowerRankings) needs the UA button chrome stripped back to plain .avatar. */
+button.avatar { border: 0; padding: 0; font-family: inherit; cursor: pointer; }
+button.avatar:hover { filter: brightness(1.2); }
+button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * A Sleeper draft room fits on one screen: the board and the panels below it
+ * share a fixed budget of vertical space and scroll internally, rather than
+ * each growing to its natural content height and stacking into one long
+ * page. `.app` claims the viewport height; `.content`'s three bands
+ * (board / availability+confidence / seats) split what's left after the
+ * header and any alert banners, each with its own internal scroller.
+ * `min-height: 0` shows up at every level of that chain on purpose --
+ * without it a flex/grid child refuses to shrink below its content size and
+ * the inner `overflow: auto` never actually kicks in.
+ */
+.app {
+  /* Sleeper's own draft room runs full-bleed; the old 1400px cap was the
+     actual cause of "squished" at wide monitors, not a lack of room. */
+  height: 100vh; max-width: none; margin: 0 auto; padding: 16px 20px;
+  display: flex; flex-direction: column; gap: 10px; box-sizing: border-box;
+}
+/* The shell is edge-to-edge on every route now, so .app contributes no
+   padding of its own -- .app-main carries it instead. This used to be a
+   `:has(> .home-shell)` special case for the one redesigned route; see
+   claude/site-wide-shell-propagation.md §C step 4. Signed out there is no
+   shell at all and SignIn is .app's only child, which is why the padding
+   lives on .app-main rather than being dropped entirely. */
+.app { padding: 0; gap: 0; }
+.app > .content { padding: 16px 20px; }
+
+/* The app-wide horizontal `.top` header lived here. It is gone: the rail is
+   the site's navigation on every route now (claude/site-wide-shell-
+   propagation.md). `.gear-chip` survives it -- DraftView's settings gear now
+   portals into `.app-main-head` instead of `.top-slot`. */
+.gear-chip { font-size: 14px; line-height: 1; padding: 5px 9px; }
+
+.controls {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  background: var(--panel); border-radius: 10px; padding: 8px 12px;
+}
+.controls label { display: flex; flex-direction: row; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.controls input, .controls select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font: inherit;
+}
+.controls .temp { min-width: 170px; }
+/* The reversal round is not a knob on this run like runs/chaos above it -- it
+   is a persisted fact about the draft that the board and the live room read
+   too. The rule says so; without it the popover reads as three equivalent
+   sliders, one of which quietly writes to the database. */
+.reversal-control {
+  margin-top: 12px; padding-top: 14px;
+  border-top: 1px solid var(--line); border-radius: 0;
+  background: none;
+}
+.temp-value { font-size: 11px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+/*
+ * `:not(.chip)` is load-bearing, not decoration. This selector is (0,1,1) and
+ * `.chip` is (0,1,0), so a `<button class="chip">` inside a `.controls` block
+ * used to lose to it and get repainted as a solid teal 6px primary button --
+ * measured on /leagues/:id/power, where all six controls came back identical
+ * and `.chip.on` was indistinguishable from `.chip`, i.e. the three-way mode
+ * selector had no visible selected state at all. It also flattened the pill to
+ * a rectangle, breaking this file's radius-by-role rule on that page.
+ *
+ * Fixed here rather than at the call site: any future chip inside any future
+ * `.controls` block would hit exactly the same thing.
+ *
+ * `.segment` is excluded for the same reason, pre-emptively: the B2 seat-strip
+ * work found it had to keep its `.segmented` OUTSIDE a `.controls` block to
+ * avoid being repainted identically, which is a trap worth removing rather
+ * than a rule worth remembering. Anything carrying its own complete button
+ * treatment belongs in this list.
+ */
+.controls button:not(.chip):not(.segment) {
+  background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
+  padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.controls button:not(.chip):not(.segment):hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.controls button:disabled { opacity: 0.6; cursor: default; }
+
+.progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
+.progress-bar { height: 100%; background: var(--teal); transition: width 120ms linear; }
+
+.error { background: #3a1d1d; border: 1px solid #6b2b2b; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+/* seatsDirty: the banner's own re-run action, not just a description of one
+   that lives elsewhere -- see DraftView.tsx's comment at this banner. */
+.error.seats-dirty { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+.panel {
+  background: var(--panel); border-radius: 14px; padding: 18px 20px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
+}
+.panel h2 { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
+/* Nested panels flatten: at most two surfaces (page + one panel). Modals use
+   .modal-card, not .panel, so they are unaffected. */
+.panel .panel { border: 0; background: transparent; box-shadow: none; padding: 0; border-radius: 0; }
+/* An unboxed region: a heading plus spacing, no border or fill. */
+.section { display: flex; flex-direction: column; gap: 10px; margin: 0 0 24px; }
+.section > .section-title { margin: 0; }
+/* A list on the surface: a divider between rows, hover tint, no per-row box. */
+.row-list { list-style: none; margin: 0; padding: 0; }
+.row-list > * { border-bottom: 1px solid var(--line); }
+.row-list > *:last-child { border-bottom: 0; }
+.row-list > *:hover { background: var(--row-hover); }
+/* "How this works": methodology kept, folded away. Muted, small, no box. */
+.how { font-size: 12px; color: var(--muted); margin-top: 12px; }
+.how > summary { cursor: pointer; font-weight: 600; color: var(--muted); width: fit-content; }
+.how > summary:hover { color: var(--text); }
+.how[open] > summary { margin-bottom: 8px; }
+.how p { margin: 0 0 8px; line-height: 1.5; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.tiny { font-size: 11px; }
+
+.controls-inline { display: flex; gap: 6px; align-items: center; }
+.chip {
+  background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+  padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+.chip:hover { border-color: var(--teal); color: var(--text); }
+.chip.on { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+.chip.on:hover { color: var(--bg); }
+.chip.status-drafting { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+.chip.status-complete { background: var(--line); border-color: var(--line); color: var(--muted); }
+/* `.chip` is written for <button>; the picker's "live ->" is an <a>. */
+a.chip { display: inline-flex; align-items: center; text-decoration: none; }
+/* Was a bare `input[type=range]` and a loose integer -- the one control in the
+   app that rendered in the browser's default blue, because a range input takes
+   none of this file's styling. Now the same pill vocabulary as the position
+   filters beside it. */
+/*
+ * SEGMENTED CONTROL -- one exclusive choice, not N buttons.
+ *
+ * Connected rather than gapped on purpose: a gap between the options makes
+ * them read as separate controls that happen to be adjacent, which is exactly
+ * the confusion this replaced on the power-rankings page. The group is one
+ * object with a current value.
+ */
+.segmented {
+  display: inline-flex; align-items: stretch; flex-shrink: 0;
+  background: var(--bg); border-radius: 10px; padding: 3px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.segment {
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
+  background: transparent; color: var(--muted);
+  font: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.segment:hover:not(:disabled):not(.on) { color: var(--text); background: color-mix(in oklch, var(--teal) 8%, transparent); }
+/* Filled, because the selected option is the control's *value* -- an outline
+   or a tint would leave it competing with hover instead of clearly reading as
+   "this is the one". --teal is generic interaction, which is what a view
+   selector is; --crimson stays reserved for "you". */
+.segment.on { background: var(--teal); color: var(--bg); }
+.segment:disabled { opacity: 0.4; cursor: default; }
+.segment:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.segmented.sm .segment { font-size: 11px; padding: 5px 11px; }
+
+/* A normal action: outline, so it is clearly pressable but does not compete
+   with a screen's one primary `.controls button`. Used for writes that sit
+   next to selectors, which must never share the selectors' treatment. */
+.action-button {
+  appearance: none; -webkit-appearance: none; margin: 0;
+  background: transparent; color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line); border: 0;
+  border-radius: 10px; padding: 7px 15px;
+  font: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.action-button:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--teal) 10%, transparent);
+  box-shadow: inset 0 0 0 1px var(--teal); transform: translateY(-1px);
+}
+.action-button:disabled { opacity: 0.55; cursor: default; }
+.action-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.power-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.power-controls-spacer { flex: 1; min-width: 0; }
+
+/*
+ * Power rankings page rebuild (claude/board-first-layout-and-pick-latency.md).
+ *
+ * The old layout spent its top half on a bump chart with one week of data and
+ * a 12-item manager legend, and pushed the actual answer -- this week's
+ * ranking -- below the fold next to a ballot editor eating the right half.
+ * This is a hierarchy fix, not a data fix: same entries, same modes, same
+ * caveats, just reordered so the ranking is the hero and the ballot board
+ * rides along in a sticky rail instead of competing with it for the top of
+ * the page.
+ */
+.power-head { margin-bottom: 16px; }
+.power-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.power-eyebrow {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-size: 11px; letter-spacing: 0.14em; color: var(--muted); margin: 0 0 2px;
+}
+.power-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-size: 22px; font-weight: 700; letter-spacing: 0.02em; color: var(--text); margin: 0;
+}
+.power-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.power-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-top: 10px; }
+/* Underlined tabs, not a `.segmented` pill -- an exclusive choice this
+   important (which of four independent rankings you're looking at) earns its
+   own weight instead of reading as one control among several. */
+.power-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.power-tab {
+  appearance: none; -webkit-appearance: none; background: none; border: 0;
+  border-bottom: 2px solid transparent; margin: 0; cursor: pointer;
+  text-transform: none;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.02em;
+  padding: 10px 15px; color: var(--muted);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.power-tab:hover:not(.on) { color: var(--text); }
+.power-tab.on { border-bottom-color: var(--teal); color: var(--text); }
+.power-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.power-caveat { font-size: 13px; max-width: 82ch; margin: 8px 0 0; }
+
+/* Two columns: the ranking (and everything under it) on the left, the ballot
+   board pinned in a sticky rail on the right. `.single` drops to one column
+   when this mode has no board to show (the two computed modes) -- a fixed
+   360px column of dead air would be worse than no column at all. */
+.power-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+.power-grid.single { grid-template-columns: minmax(0, 1fr); }
+.power-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.power-side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+@media (max-width: 900px) {
+  .power-grid { grid-template-columns: minmax(0, 1fr); }
+  .power-side { position: static; }
+}
+
+/*
+ * The ranking grid -- replaces a `<table className="standings">` with rows
+ * that carry an avatar and a two-line identity, the same "grid for the
+ * board, rows for lists" density rule as everywhere else, just with more per
+ * row than a table cell comfortably holds. rank / team / movement / score /
+ * range / source, matched on the header row so the two never drift apart.
+ */
+.rank-grid { display: flex; flex-direction: column; }
+.rank-grid-row {
+  /* Team is a fixed width, not the flexible column -- a name+subtitle earns
+     no more room on a 1900px monitor than it does on a laptop, and giving it
+     `1fr` was what stretched the whole row across the viewport with the
+     numbers stranded far to the right of it. The bar is the one column with
+     an actual reason to grow: more width is a more legible range, which is
+     the entire point of this column (see AC3 below). */
+  display: grid; grid-template-columns: 30px 260px 58px 88px minmax(120px, 1fr) 84px;
+  /* Caps the whole row, not just the team column -- past ~1100px the row
+     itself, not any one cell, should stop tracking the window. */
+  max-width: 1100px;
+  align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; border-radius: 10px; border: 0; border-bottom: 1px solid var(--line);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+.rank-grid-row:hover { background: color-mix(in oklch, var(--teal) 6%, transparent); }
+.rank-grid-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+/* Pinning is a tint plus a ring, not a lift -- rows are on the plane, per the
+   house style's ELEVATION rule; a lifted row would read as a card. */
+.rank-grid-row.pinned {
+  background: color-mix(in oklch, var(--teal) 12%, transparent);
+  box-shadow: inset 2px 0 0 var(--teal);
+}
+.rank-grid-header {
+  text-transform: uppercase;
+  font-size: 10.5px; letter-spacing: 0.09em; color: var(--muted);
+  cursor: default;
+}
+.rank-grid-header:hover { background: none; }
+.rank-grid-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
+.rank-grid-rank.top { color: var(--text); }
+.rank-grid-rank.mine { color: var(--crimson-text); }
+/* min-width: 0 on both -- the team column is a fixed 260px now, not `1fr`,
+   and a fixed track does not by itself shrink a grid item's content below its
+   min-content size (that needs an explicit 0 min-width); without it a long
+   name or team name would push past 260px into the movement column instead
+   of ellipsizing. */
+.rank-grid-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rank-grid-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.rank-grid-team-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-grid-team-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-grid-bar .spread-bar { width: 100%; }
+
+.rank-move { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.rank-move.up { color: var(--up); }
+.rank-move.down { color: var(--down); }
+
+@media (max-width: 700px) {
+  /* The full six-column budget (30+58+88+140+84 fixed, plus five gaps) does
+     not fit a phone-width panel -- measured at 375px, where it left the
+     `minmax(0, 1fr)` team column 0px wide and the movement/score/source text
+     overlapping it, since a grid track clamped to 0 does not clip the text
+     inside it. The bar is the one column that is purely reinforcing (Avg/
+     Value/Pts score is already a number in the next column over), so it is
+     what goes: `display: none` drops it out of grid flow entirely rather than
+     leaving an empty reserved track, and the template shrinks to five columns
+     to match. */
+  .rank-grid-row { grid-template-columns: 22px minmax(0, 1fr) 40px 50px 46px; gap: 6px; padding: 8px 6px; font-size: 12px; }
+  .rank-grid-row > :nth-child(5) { display: none; }
+  .rank-grid-team-sub { display: none; }
+}
+
+/* Trend panel -- with fewer than two weeks of the selected mode there is no
+   week-over-week bump chart to draw, so this replaces it with an honest
+   placeholder rather than a chart that would otherwise be a single dot.
+   `align-self: stretch` used to make every tick the full 30px row height, so
+   the strip of 17 read as large grey boxes rather than a hairline with a few
+   marks in it -- a tick without data is a short stub, not a block, and only
+   a week WITH data claims the full height. */
+.trend-ticks { display: flex; align-items: flex-end; gap: 4px; height: 30px; margin-top: 8px; }
+.trend-tick { flex: 1; height: 6px; border-radius: 1px; background: oklch(22% 0.02 250); }
+.trend-tick.has-data { height: 100%; background: var(--teal); }
+
+/* Homers -- moved under Trend in the left column. Three columns (manager,
+   centered +/- bar, signed value); the bar is a track with a hairline at
+   center rather than `.spread-bar`'s min..max shape, since this is a single
+   signed number either side of zero, not a range. Capped and left-aligned for
+   the same reason the ranking grid is -- a 1400px-wide row just strands the
+   bar at the far right with the names orphaned on the left. */
+.homers-list { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.homers-row { display: grid; grid-template-columns: 220px minmax(0, 240px) 40px; align-items: center; gap: 10px; }
+.homers-track { position: relative; height: 6px; border-radius: 999px; background: var(--line); }
+.homers-hairline { position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--line); }
+.homers-fill { position: absolute; top: 0; height: 100%; border-radius: 999px; }
+.homers-fill.neg { right: 50%; background: var(--down); }
+.homers-fill.pos { left: 50%; background: var(--up); }
+
+/* Per-team placement panel -- one row per mode, a dot on a shared 1..N axis,
+   rather than the transposed bump chart trying to say something with one
+   point per line. */
+.placement-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.placement-head h2 { margin: 0; }
+.placement-avatar { width: 32px; height: 32px; font-size: 12px; }
+.placement-rows { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.placement-row { display: grid; grid-template-columns: 140px 28px minmax(0, 1fr) 72px; align-items: center; gap: 10px; }
+.placement-mode { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.placement-dot { width: 9px; height: 9px; border-radius: 999px; flex-shrink: 0; }
+.placement-rank { font-size: 17px; font-weight: 600; text-align: right; }
+.placement-axis { position: relative; height: 6px; border-radius: 999px; background: var(--line); }
+.placement-axis-dot { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--text); }
+.placement-score { text-align: right; }
+/* Aligned under the axis column of `.placement-row` above: its own two
+   columns before the axis (140px mode + 28px rank + 2 gaps) become this
+   left padding, and the one column after it (72px score + 1 gap) the right. */
+.placement-axis-labels { display: flex; justify-content: space-between; padding: 0 82px 0 188px; font-size: 10px; color: var(--muted); }
+
+.depth { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); margin-left: 10px; }
+.depth-label { text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.depth-chip { padding: 3px 8px; min-width: 26px; text-align: center; }
+
+/*
+ * LEAGUE CARDS
+ *
+ * `.draft-list` below is still right for mock drafts -- one line of content
+ * each. A league is no longer one line: it has an identity, a season, a draft,
+ * a history and a power ranking, and as a row it answered that by growing a
+ * column of three identical chips a full 1400px from its own name, with the
+ * two "(Foot) Ball Knowers" seasons separated only by 11px of muted text.
+ *
+ * Not a grid of uniform boxes either, which is the other failure mode: the
+ * crest carries the league's own hue, a live draft tints the whole card and
+ * lifts on hover, and a finished one stays flat and quiet. What separates two
+ * cards is their content, not a shadow on both.
+ */
+.league-grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.league-card {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--panel); border-radius: 14px; padding: 14px 16px 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow 140ms ease, transform 140ms ease;
+}
+.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 40%, var(--line)); }
+/* A draft that hasn't finished is the only thing in this list worth an accent
+   -- crimson stays "you", so a live draft borrows --teal, the generic
+   "something is happening" color. */
+.league-card.live {
+  background: color-mix(in oklch, var(--teal) 7%, var(--panel));
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 45%, var(--line));
+}
+
+.league-card-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.league-crest { width: 34px; height: 34px; font-size: 14px; }
+.league-card-title { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.league-card-name {
+  font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.league-card-name:hover { color: var(--teal); }
+.league-card-sub { font-size: 11px; color: var(--muted); }
+/* Its own two tokens rather than borrowing a position colour -- see --fitted's
+   comment for why that borrowing is a bug and not a shortcut. These are the
+   only two hues in the app that mean "which sport", and the picker screen
+   renders no position chips, so they never share a view with --rb/--qb. */
+.sport-pill {
+  display: inline-block; margin-right: 7px; padding: 1px 6px; border-radius: 999px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
+  vertical-align: 1px;
+}
+/* One per sport on the manager-history page -- the same person can have two,
+   fitted from two separate sets of picks, so they need separating. */
+.manager-sport-block { margin-bottom: 14px; }
+.manager-sport-block:last-child { margin-bottom: 0; }
+.sport-pill.nfl {
+  color: var(--sport-nfl);
+  background: color-mix(in oklch, var(--sport-nfl) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nfl) 32%, transparent);
+}
+.sport-pill.nba {
+  color: var(--sport-nba);
+  background: color-mix(in oklch, var(--sport-nba) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nba) 32%, transparent);
+}
+/* The season is what tells two cards of the same league apart, so it is a
+   figure on the card rather than a footnote inside a row. */
+.league-card-season { font-size: 20px; color: var(--muted); letter-spacing: 0.02em; flex-shrink: 0; }
+
+/* The other seasons of this league. Years, not cards: History and Power
+   rankings are league-scoped and walk the whole chain themselves, so only the
+   draft board differs per season -- which makes a year exactly a link to one
+   board, and nothing more. Rendered only when there is more than one. */
+.league-seasons { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 11px; }
+.league-seasons-label {
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
+  font-size: 10px; margin-right: 2px;
+}
+.league-season-link {
+  color: var(--muted); text-decoration: none; padding: 2px 7px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-season-link:hover { background: color-mix(in oklch, var(--teal) 14%, transparent); color: var(--text); }
+/* The season the rest of the card is describing -- its managers, its status,
+   its "Draft board" link all belong to this one. */
+.league-season-link.on { color: var(--text); background: color-mix(in oklch, var(--line) 60%, transparent); font-weight: 600; }
+
+.league-card-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.league-link {
+  font-size: 12px; text-decoration: none; color: var(--muted);
+  padding: 5px 10px; border-radius: 8px;
+  transition: background 120ms ease, color 120ms ease;
+}
+/* league-link is normally an <a> (navigation); the "From Sleeper" list's "Set
+   up"/"Retry" trigger an ingest instead, so they're real <button>s -- reset
+   the UA button chrome so they still read as the same control. */
+button.league-link { background: none; border: 0; font: inherit; cursor: pointer; }
+.league-link:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+/* One primary destination, not three peers: the draft is what this app is for
+   and the other two are places you go afterwards. */
+.league-link.primary {
+  color: var(--text); font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--teal); color: var(--teal); }
+
+.league-card-foot {
+  /* nowrap, not wrap: flex-wrap's own line-breaking runs on items' natural
+     (unshrunk) width, so with `wrap` the live-status sentence's full length
+     decided whether Mock it fit *before* either one's flex-shrink ever got a
+     say -- which is what pushed Mock it onto its own line the moment the
+     grid went from two cards per row to three. `nowrap` forces genuine
+     shrinking: the live text (the only variable-length thing here) gives up
+     space to the two fixed-size actions instead of displacing them. */
+  display: flex; align-items: center; gap: 8px; flex-wrap: nowrap;
+  padding-top: 10px; border-top: 1px solid var(--line); font-size: 11px;
+}
+.league-card-foot-spacer { flex: 1 1 auto; min-width: 0; }
+.league-card-status { color: var(--muted); }
+.league-card-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--teal); text-decoration: none; font-weight: 600;
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.league-card-live:hover { text-decoration: underline; }
+.league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .league-live-dot { animation: live-pulse 2s ease-in-out infinite; }
+  @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+}
+/* Housekeeping, so it reads as housekeeping: no fill, no border, just a quiet
+   label that lifts on hover. It used to be a `.chip` sitting alongside two
+   navigation chips, which is what made three unrelated things look alike. */
+.league-card-refresh {
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0; padding: 4px 8px;
+  background: transparent; color: var(--muted); font: inherit; font-size: 11px;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-card-refresh:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.league-card-refresh:disabled { opacity: 0.55; cursor: default; }
+.league-card-refresh:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * A list of mock drafts to open, not a card grid -- there's one line of real
+ * content per row, so a row is the shape that matches it rather than padding
+ * each entry out into an empty-feeling card. (Leagues used to live here too;
+ * see the note above for why they no longer do.)
+ */
+.draft-list { display: flex; flex-direction: column; gap: 1px; background: var(--line); border-radius: 10px; overflow: hidden; }
+.draft-row {
+  display: flex; align-items: center; gap: 16px; padding: 12px 14px;
+  background: var(--panel); color: inherit; text-decoration: none;
+  transition: background 100ms ease;
+}
+.draft-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.draft-row-league { font-weight: 600; flex: 1; }
+.draft-row .chip { pointer-events: none; margin-left: auto; }
+
+.track-note { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Zero seats mapped, or a failed track, is the thing you most need to notice. */
+.track-note.failed { color: var(--crimson); }
+

@@ -262,9 +262,9 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `web/src/styles.css` (5,568 lines). Depends on T013's CSS hash
 
-- [ ] T044 [P] [US4] Cut `web/src/styles.css` into contiguous ranges along its existing section comments, **without reordering**: `web/src/styles/tokens.css`, `shell.css`, then one file per page section in source order. Make `web/src/styles.css` an index of `@import './styles/<file>.css';` lines in the original order, with the Google Fonts `@import url(...)` kept as **line 1**. `main.tsx`'s import is unchanged.
-- [ ] T045 [US4] In the same commit as T044, update `web/src/useNarrow.test.ts:10` to read and concatenate `src/styles/*.css` in index order, instead of `fs.readFileSync('src/styles.css')`. Its assertions are unchanged.
-- [ ] T046 [US4] Gate: `npm run build`, then `sha256sum web/dist/assets/index-*.css` must be **byte-identical** to the hash recorded in T013. As a smoke check, screenshot `/`, a league home, power rankings, superlatives and the draft board at 1280 and 375 px in the browser pane (hard-refresh after any dev-server restart).
+- [X] T044 [P] [US4] Cut `web/src/styles.css` into contiguous ranges along its existing section comments, **without reordering**: `web/src/styles/tokens.css`, `shell.css`, then one file per page section in source order. Make `web/src/styles.css` an index of `@import './styles/<file>.css';` lines in the original order, with the Google Fonts `@import url(...)` kept as **line 1**. `main.tsx`'s import is unchanged.
+- [X] T045 [US4] In the same commit as T044, update `web/src/useNarrow.test.ts:10` to read and concatenate `src/styles/*.css` in index order, instead of `fs.readFileSync('src/styles.css')`. Its assertions are unchanged.
+- [X] T046 [US4] Gate: `npm run build`, then `sha256sum web/dist/assets/index-*.css` must be **byte-identical** to the hash recorded in T013. As a smoke check, screenshot `/`, a league home, power rankings, superlatives and the draft board at 1280 and 375 px in the browser pane (hard-refresh after any dev-server restart).
 
 ### `web/src/api.ts` (2,568 lines, 108 importers)
 

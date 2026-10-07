@@ -206,3 +206,22 @@ this branch.
 `Origin: 5173`, triggered real refresh-on-visit runs for (Foot) Ball Knowers 2026 on
 the shared local DB: a normal app action, reading Sleeper into Postgres. That
 happened after the parity diff, so it doesn't affect the 37/37.
+
+## T046: styles.css split
+
+- `styles.css` (5,545 lines) → a 16-line `@import` index plus 7 pieces in
+  `web/src/styles/` (377–948 lines each). Every cut is at brace depth 0, computed by
+  a brace-aware scan that skips braces inside comments and strings. Original order is
+  kept; the Google Fonts import stays as line 1.
+- **Reassembly is byte-identical:** `cat styles/0*.css` `cmp`-equal to original lines
+  3–end. The first draft of the split script dropped a trailing blank line from 5
+  pieces; its own assertion caught it before anything was committed.
+- **Built CSS is byte-identical:** a fresh `npm run build` (`dist/` confirmed absent
+  first) produces `index-ROkkXWFm.css`, sha256 `3b8642…c667`, the same as T013.
+  (A first check had read a stale `dist/` after a failed chain; that result was
+  discarded.)
+- Dev server smoke check: `:root` tokens, `.pr-ladder-head` and `.signin-kicker` (the
+  first, middle and last pieces) are all in the CSSOM (1,704 rules), and the body
+  uses `--bg`.
+- `useNarrow.test.ts` now follows the index's imports in order; vitest 1087/1087,
+  `tsc` clean.

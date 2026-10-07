@@ -1,0 +1,756 @@
+/* The error banner carries its own recovery action now, so it needs the same
+   shape `.error.seats-dirty` already uses for the same reason. */
+.history-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+.history-season { margin-top: 18px; }
+.history-season:first-of-type { margin-top: 6px; }
+.history-season h3 { margin: 0 0 8px; color: var(--muted); font-size: 14px; letter-spacing: 0.02em; }
+
+
+.bump-chart { display: block; }
+.bump-gridline { stroke: var(--line); stroke-width: 1; }
+.bump-rank-label, .bump-week-label { fill: var(--muted); font-size: 9px; }
+.bump-series { cursor: pointer; }
+.bump-series circle { transition: r 0.1s; }
+
+/* 001-readable-bump-chart. Fourteen rosters cannot be told apart by hue -- on
+ * this surface fourteen evenly-spaced hues collapse to a colour-blind delta-E
+ * of 0.5, and even eight tuned slots fail. So context recedes, colour marks
+ * focus, and the name at the end of the line carries identity. Stroke, width
+ * and opacity are set inline from managerColor.ts; what is left here is the
+ * hover affordance and the labels. */
+.bump-series-context:hover { opacity: 0.75 !important; }
+.bump-hit { pointer-events: stroke; }
+
+.bump-end-label { fill: var(--muted); font-size: 10px; cursor: pointer; }
+.bump-end-label-me { fill: var(--crimson-text); font-weight: 600; }
+.bump-end-label-focus-1,
+.bump-end-label-focus-2,
+.bump-end-label-focus-3 { fill: var(--text); font-weight: 600; }
+
+.bump-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 10px 0; }
+.bump-legend-hint { flex-basis: 100%; margin: 0 0 2px; }
+.bump-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.bump-legend-swatch { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; }
+.bump-legend-avatar { width: 18px; height: 18px; font-size: 10px; }
+.bump-legend-button {
+  background: none; border: 1px solid transparent; padding: 2px 8px 2px 3px; border-radius: 999px;
+  cursor: pointer; color: var(--muted); font: inherit;
+}
+.bump-legend-button:hover:not(:disabled) { color: var(--text); background: var(--line); }
+/* The pinned chip wears the colour its line wears -- the legend and the chart
+ * agree, which is the whole job of a legend. */
+.bump-legend-button.on {
+  color: var(--text); border-color: var(--pin);
+  background: color-mix(in oklch, var(--pin) 22%, var(--panel));
+}
+.bump-legend-button.mine { color: var(--text); }
+.bump-legend-button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ===== B1: home hero + global nav =====
+ * design-review-next-steps.md B1 (home hero + disclosure) and the leftover
+ * of E5 (global nav). Appended here rather than edited in place among the
+ * rules above -- four parallel worktrees are touching this file this pass,
+ * and a rule added at the end can't collide with a line another branch also
+ * touched partway through the file.
+ */
+
+/* E5: two links, not a navbar redesign. Reuses `.chip`/`.chip.on` rather than
+   inventing a second "selected" language -- the app already marks a current
+   value that way (segmented controls, position filters). */
+.top-nav { display: flex; align-items: center; gap: 6px; }
+
+/*
+ * B1 hero. `.panel` alone only sets background/radius/shadow (no display),
+ * so this is the actual row layout: the sentence on the left, one pill CTA
+ * on the right, wrapping under it rather than squeezing at narrow widths --
+ * this screen has no responsive floor of its own to lean on otherwise.
+ */
+.home-hero {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; flex-wrap: wrap;
+}
+.home-hero-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
+/* 10px is the type floor this file's header sets -- not a step below it. */
+.home-hero-kicker { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin: 0; }
+.home-hero-title {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-size: 26px; font-weight: 700; letter-spacing: 0.01em; color: var(--text); margin: 0;
+}
+.home-hero-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+/* The recent league's name is the one piece of real data in the sentence --
+   lifted to --text so it reads as the fact, not part of the framing prose. */
+.home-hero-sub strong { color: var(--text); font-weight: 700; }
+/* This is navigation (it goes to a route, nothing on this screen changes),
+   so per the CONTROL HIERARCHY it must be a link, never `.controls button` --
+   but it also has to visibly outweigh every `.chip` on the page, which is
+   why it gets its own class instead of reusing `.chip` at a larger size. */
+.home-hero-cta {
+  flex-shrink: 0; display: inline-flex; align-items: center;
+  background: var(--volt); color: var(--bg); text-decoration: none;
+  font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 999px;
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.home-hero-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.home-hero-cta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * ============================================================================
+ * THE APP SHELL -- rail + main pane
+ * Shipped 2026-09-13 (design_handoff_multisport_mock_drafts) as a Home-only
+ * `.home-shell`, with every other route still on the horizontal `.top`
+ * header. Promoted to the whole site 2026-09-14; see
+ * claude/site-wide-shell-propagation.md for why and for the measurements
+ * behind the collapsed rail. Colors and type reuse this file's own tokens and
+ * fonts rather than the handoff's Barlow palette, so the app still reads as
+ * one design rather than two bolted together.
+ * ============================================================================
+ */
+.app-shell { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
+
+.app-rail {
+  flex: 0 0 200px; display: flex; flex-direction: column; gap: 22px;
+  padding: 18px 14px; background: var(--panel); border-right: 1px solid var(--line);
+  overflow-y: auto; box-sizing: border-box;
+  transition: flex-basis 140ms ease;
+}
+
+.app-rail-top { display: flex; align-items: flex-start; gap: 6px; }
+.app-wordmark {
+  font-size: 21px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.05;
+  padding: 0 6px; color: var(--text); text-decoration: none; flex: 1 1 auto; min-width: 0;
+}
+.app-wordmark:hover { color: var(--teal); }
+.app-wordmark-line { display: block; }
+.app-rail-toggle {
+  appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0;
+  padding: 2px 5px; border-radius: 7px; cursor: pointer; flex-shrink: 0;
+  font: inherit; font-size: 13px; line-height: 1; color: var(--muted);
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-rail-toggle:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.app-rail-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Page-supplied (appSlots.tsx). Most routes portal nothing into it today, and
+   an empty flex child would still spend the rail's 22px gap -- so collapse it
+   rather than leaving a hole above Menu. */
+.app-rail-context:empty { display: none; }
+
+.app-rail-section { display: flex; flex-direction: column; gap: 2px; }
+/* Holds the league's page links. On desktop it is invisible -- it reproduces
+   exactly the column the rows used to form as direct children of the section.
+   It exists for the phone breakpoint, which turns it into a scroll lane. */
+.app-rail-pages { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* Wraps the lane plus the phone-only "All pages" chip. `display: contents`
+   keeps the desktop column exactly as it was; the 860px block makes it a row. */
+.app-rail-pages-wrap { display: contents; }
+.app-rail-allpages { display: none; }
+.app-rail-label, .jumpto-group-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted); padding: 0 6px 6px;
+}
+.app-rail-row {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
+  font-size: 14px; font: inherit; color: var(--muted); font-weight: 500;
+  background: none; border: 0; text-decoration: none; cursor: pointer; text-align: left;
+  transition: background 120ms ease, color 120ms ease;
+}
+.app-rail-row:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
+.app-rail-row.on {
+  color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--line) 55%, transparent);
+}
+.app-rail-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+.app-rail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
+.app-rail-dot.on.all { background: var(--teal); }
+.app-rail-dot.on.nfl { background: var(--sport-nfl); }
+.app-rail-dot.on.nba { background: var(--sport-nba); }
+/* Menu rows get a glyph where sport rows get a color dot -- same 7px optical
+   slot, so the two sections align down one edge whether the rail is full or
+   collapsed. Not an icon font for four marks (§C step 7). */
+.app-rail-glyph {
+  width: 7px; flex-shrink: 0; font-size: 8px; line-height: 1; text-align: center; color: var(--muted);
+}
+.app-rail-row.on .app-rail-glyph { color: var(--teal); }
+.app-rail-count {
+  margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.app-rail-row.on .app-rail-count { color: var(--text); }
+
+.app-rail-spacer { flex: 1 1 auto; min-height: 8px; }
+.app-account { display: flex; align-items: center; gap: 8px; padding: 8px 6px 4px; border-top: 1px solid var(--line); }
+.app-account-name {
+  font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.app-signout {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: 0; font: inherit; cursor: pointer; text-align: left;
+  padding: 0 6px; font-size: 12.5px; color: var(--muted);
+}
+.app-signout:hover { color: var(--text); }
+.app-signout-glyph { display: none; }
+
+/*
+ * LEAGUE CONTEXT IN THE RAIL
+ * The home league card's menu -- draft, history, power rankings, mock -- used
+ * to vanish the moment you used it. It lives here now on every league-scoped
+ * route (claude/site-wide-shell-propagation.md Phase 3), which is also what
+ * finally gives the draft board and the mock room a way back that isn't the
+ * browser's Back button.
+ */
+.app-rail-league { gap: 2px; }
+
+.rail-league-id {
+  display: flex; align-items: center; gap: 9px; padding: 4px 6px 8px;
+  text-decoration: none; color: inherit; border-radius: 9px; min-width: 0;
+}
+.rail-league-id:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.rail-league-crest { width: 26px; height: 26px; font-size: 12px; flex-shrink: 0; }
+.rail-league-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rail-league-name {
+  font-size: 13.5px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rail-league-sub {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10.5px; color: var(--muted); white-space: nowrap;
+}
+/* The sport pill is sized for a card here, not a rail -- a 200px column can't
+   spend a card's padding on a three-letter badge. */
+.rail-league-sub .sport-pill { font-size: 8.5px; padding: 1px 4px; }
+
+/* specs/009: the refresh state under the league name -- the rail's existing small muted line. */
+.rail-league-refresh { font-size: 10.5px; color: var(--muted); padding: 0 6px 6px; }
+
+.rail-league-seasons { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 8px; }
+
+/* The live dot stands in for a glyph on the Follow-live row, so it has to
+   occupy the same 7px optical slot the glyphs do or that one row's label
+   would sit a pixel off every other row's. */
+.app-rail-row .league-live-dot { width: 7px; height: 7px; }
+.app-rail-row.live { color: var(--teal); }
+.app-rail-row.live:hover { color: var(--teal); }
+
+/*
+ * THE ICON RAIL (56px)
+ * Draft rooms default to it because they measurably have no horizontal room
+ * to give: at 1440px a 14-team board already overflows its scroller by 99px
+ * with no rail at all, and a column is 96px -- so 200px of permanent rail
+ * costs two columns (§B). Everything stays in place and only the text goes,
+ * which is why every row's label is its own span: hiding a span is a rule,
+ * re-laying-out a rail is a second component.
+ */
+.app-rail.collapsed { flex-basis: 56px; padding: 18px 8px; align-items: stretch; }
+.app-rail.collapsed .app-rail-row-label { display: none; }
+.app-rail.collapsed .app-rail-label { display: none; }
+.app-rail.collapsed .app-rail-row { justify-content: center; padding: 9px 0; gap: 0; }
+.app-rail.collapsed .app-rail-top { flex-direction: column; align-items: center; gap: 8px; }
+.app-rail.collapsed .app-wordmark { padding: 0; flex: 0 0 auto; }
+.app-wordmark-mark {
+  display: block; font-size: 17px; letter-spacing: 0.04em;
+}
+.app-rail.collapsed .app-account { justify-content: center; padding: 8px 0 4px; }
+.app-rail.collapsed .app-signout { justify-content: center; padding: 0; font-size: 14px; }
+.app-rail.collapsed .app-signout-glyph { display: block; }
+/* The dots carry the whole filter once the labels are gone, so they need to
+   be a target rather than a decoration. */
+.app-rail.collapsed .app-rail-dot { width: 9px; height: 9px; }
+/* The crest survives the collapse and the name does not: a 56px rail has room
+   for the league's mark, and that mark is already how this app says "which
+   league" on the home grid and the board's column heads. */
+.app-rail.collapsed .rail-league-id { justify-content: center; padding: 4px 0 8px; gap: 0; }
+/* The section LABELS are what separate League from Menu in the full rail, and
+   they are the first thing the icon rail hides -- so the groups need a line
+   instead, or eight identical glyphs read as one undifferentiated list.
+   `~` not `+`: the page-portal div sits between the two sections in the DOM
+   (display:none when empty, which adjacency still counts). */
+.app-rail.collapsed .app-rail-league ~ .app-rail-section { border-top: 1px solid var(--line); padding-top: 12px; }
+.app-rail.collapsed .app-rail-row .league-live-dot { width: 9px; height: 9px; }
+
+/*
+ * .app-main -- the one scrolling pane. It owns the page padding that `.app`
+ * used to apply, so every route sits in the same column the redesigned home
+ * screen established instead of two different insets.
+ */
+.app-main {
+  flex: 1 1 0; min-width: 0; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; padding: 20px 24px 40px; gap: 16px;
+}
+
+/* Portal target for page-scoped actions -- DraftView's settings gear is the
+   only one today (appSlots.tsx). Empty on every other route, and an empty
+   flex child would still spend .app-main's 16px gap. */
+.app-main-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.app-main-head:empty { display: none; }
+
+/*
+ * THE PAGE HEADER (components/PageHeader.tsx)
+ * Home and Power rankings each grew this same eyebrow/title/sub shape under
+ * their own class names, and every other page had no page title at all -- a
+ * `.panel h2` inside the first box was standing in for one. One definition
+ * now, with two scales: the default is a page title, `.hero` is Power
+ * rankings' editorial headline. See PageHeader.tsx for why that variant
+ * exists rather than one flattened size.
+ */
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+}
+.page-head-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 640px; }
+.page-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0; }
+/* Power rankings' eyebrow names the week and the league rather than the
+   section, and carries the accent that marks this page as the live one. */
+.page-eyebrow.accent {
+  font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 11px; font-weight: 600;
+  letter-spacing: 0.1em; color: var(--teal);
+}
+.page-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
+.page-title.hero {
+  font-size: 38px; line-height: 1.02; letter-spacing: 0; margin: 10px 0 8px;
+  max-width: 20ch; text-wrap: balance; color: var(--text);
+}
+.page-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
+.page-sub strong { color: var(--text); font-weight: 700; }
+.page-sub.wide { max-width: 58ch; font-size: 13.5px; }
+/* A manager's page is titled with their face as well as their name -- the
+   avatar is how this app says "which manager" on every other screen. */
+.page-title-avatar { display: inline-flex; align-items: center; gap: 9px; }
+
+/* Rounded-square, not a circle -- a league's own crest reads as an app icon,
+   distinct from the circular per-manager avatars everywhere else. */
+.league-crest { border-radius: 10px; }
+
+.league-card-mockit {
+  appearance: none; -webkit-appearance: none; border: 1px solid var(--sport-nfl); margin: 0;
+  padding: 4px 10px; background: color-mix(in oklch, var(--sport-nfl) 12%, transparent);
+  color: var(--sport-nfl); font: inherit; font-size: 11px; font-weight: 600;
+  border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  transition: background 120ms ease;
+}
+.league-card-mockit:hover:not(:disabled) { background: color-mix(in oklch, var(--sport-nfl) 22%, transparent); }
+
+/* Mock drafts list: sport badge, identity, a progress bar, recency, one CTA --
+   design_handoff_multisport_mock_drafts's fix for every row looking identical. */
+.mock-row { gap: 14px; flex-wrap: wrap; }
+.mock-row-sport { flex-shrink: 0; margin-right: 0; }
+.mock-row-identity { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 180px; }
+.mock-row-progress { display: flex; flex-direction: column; gap: 3px; min-width: 120px; flex-shrink: 0; }
+.mock-row-progress-track { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.mock-row-progress-fill { display: block; height: 100%; border-radius: 999px; background: var(--sport-nfl); }
+.mock-row-progress-fill.complete { background: var(--muted); }
+.mock-row-time { flex-shrink: 0; min-width: 90px; text-align: right; }
+.mock-row-cta { flex-shrink: 0; }
+
+/* "Start a mock draft" modal -- reuses .modal-backdrop/.modal-card (the same
+   pattern SeatPopover and the power-rankings ballot modal already use). */
+.start-mock-modal { max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+.start-mock-kicker { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin: 0; }
+.start-mock-title { font-size: 24px; font-weight: 700; margin: 2px 0 0; }
+.start-mock-step { display: flex; flex-direction: column; gap: 8px; }
+.start-mock-step-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+}
+.start-mock-sport-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.start-mock-sport-chip {
+  position: relative; padding: 9px 18px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  letter-spacing: 0.04em; background: var(--bg); color: var(--muted); border: 1px solid var(--line); cursor: pointer;
+}
+.start-mock-sport-chip.nfl.on { color: var(--sport-nfl); background: color-mix(in oklch, var(--sport-nfl) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nfl) 45%, transparent); }
+.start-mock-sport-chip.nba.on { color: var(--sport-nba); background: color-mix(in oklch, var(--sport-nba) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nba) 45%, transparent); }
+.start-mock-league-list { display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; }
+.start-mock-league-option {
+  display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;
+  border: 1px solid var(--line); background: var(--bg); cursor: pointer;
+}
+.start-mock-league-option.selected { border-color: color-mix(in oklch, var(--teal) 45%, var(--line)); background: color-mix(in oklch, var(--teal) 8%, var(--bg)); }
+.start-mock-league-option input { position: absolute; opacity: 0; width: 0; height: 0; }
+.start-mock-league-radio {
+  width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; box-sizing: border-box;
+}
+.start-mock-league-option.selected .start-mock-league-radio {
+  border-color: var(--teal); background: var(--teal); box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--teal) 8%, var(--bg));
+}
+.start-mock-league-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.start-mock-league-name { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.start-mock-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.start-mock-cta:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Below the rail's own comfortable width, stack it above the content as a
+   horizontal bar instead of squeezing a 200px rail beside a narrow main pane.
+   Shipped for Home only; it applies on every route now, which is the whole
+   point of the promotion. The collapsed/expanded distinction is meaningless
+   here -- there is no column to save -- so the bar wins over `.collapsed`
+   either way and the toggle hides rather than doing nothing visible. */
+@media (max-width: 860px) {
+  .app-shell { flex-direction: column; }
+  /* No `.collapsed` variants anywhere in here: AppShell forces the rail
+     expanded below this width (useNarrow), because in a horizontal bar there
+     is no column to save and the collapsed state also swaps the wordmark for
+     a "BK" mark. Handling it in CSS alone left a phone in a draft room with
+     the abbreviation in a bar wide enough for the whole name. */
+  .app-rail {
+    flex: 0 0 auto; flex-basis: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
+    border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible;
+    gap: 10px 16px; padding: 12px 16px;
+  }
+  .app-rail-top { flex: 0 0 auto; margin-right: auto; }
+  .app-wordmark { padding: 0; font-size: 19px; }
+  /* One line, not two: every line the bar spends is a line the page doesn't
+     get. Measured 149px -> 128px at 375x812. */
+  .app-wordmark-line { display: inline; }
+  .app-rail-toggle { display: none; }
+  .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; align-items: center; }
+
+  /*
+   * The league's nine page links ride ONE horizontally scrolling lane.
+   *
+   * Left to wrap they took five stacked lines -- measured 2026-09-22 on a
+   * 375x812 screen, the whole rail had grown to 388px, 48% of the viewport
+   * before a single row of content, of which ~200px was these links. That is
+   * past the line the note below already drew: "a third of the viewport spent
+   * permanently on navigation is worse than navigation you scroll back up to
+   * reach."
+   *
+   * Laid end to end the links are ~1250px (measured 1249 at 375px, 2026-09-28;
+   * it was ~1130 before Season forecast / Weekly report / Superlatives), so
+   * they will not fit any phone at any font size. A lane you swipe keeps
+   * every destination one gesture away and costs one line instead of five.
+   * The wrapper's `flex: 0 0 100%` puts the lane on its own row beneath the
+   * league's identity; `min-width: 0` is what actually lets it scroll rather
+   * than stretch its parent.
+   *
+   * A swipe lane hides what is off its edge, so it says so: an edge fade on
+   * whichever side still has pages (data-overflow-start/-end, set from the
+   * scroll position), the current page is scrolled into view on navigation,
+   * and a trailing "All pages" chip -- outside the scroller, so always on
+   * screen -- opens Jump to, which lists every page by name.
+   */
+  /* The rail and its sections must not be widened by their own contents --
+     without this the lane's `100%` resolves against a section that has already
+     stretched to the full width of the links, so nothing ever clips and the whole
+     page scrolls sideways instead. */
+  .app-rail { max-width: 100%; box-sizing: border-box; }
+  .app-rail-section { min-width: 0; max-width: 100%; }
+
+  .app-rail-pages-wrap {
+    display: flex; flex: 0 0 100%; min-width: 0; max-width: 100%; align-items: center; gap: 6px;
+  }
+  .app-rail-pages {
+    flex: 1 1 0; min-width: 0; max-width: 100%;
+    flex-direction: row; flex-wrap: nowrap;
+    overflow-x: auto; overflow-y: hidden;
+    gap: 4px; padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .app-rail-pages::-webkit-scrollbar { display: none; }
+  .app-rail-pages .app-rail-row { flex: 0 0 auto; }
+  /* Fade only the edge that still has content behind it. */
+  .app-rail-pages[data-overflow-end]:not([data-overflow-start]) {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-pages[data-overflow-start]:not([data-overflow-end]) {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-pages[data-overflow-start][data-overflow-end] {
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  }
+  .app-rail-allpages {
+    display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 4px;
+    min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 999px;
+    font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+    color: var(--text);
+    background: color-mix(in oklch, var(--teal) 14%, transparent);
+    border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line));
+  }
+  .app-rail-allpages:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  /* Tap targets: 44px is the floor for a finger, on the bar and the lane both. */
+  .app-rail-row, .rail-jumpto, .rail-switcher-toggle, .app-wordmark, .rail-league-id, .league-season-link {
+    min-height: 44px; box-sizing: border-box;
+  }
+  .app-rail-row { min-width: 44px; }
+}
+
+@media (max-width: 700px) {
+  /*
+   * Phone chrome, cut to what a phone needs.
+   *
+   * The lane above took the rail from 388px to 229px and that was still "a
+   * shit ton of space" -- 28% of an 812px screen, and more once the browser's
+   * own address bar takes its ~100px. What was left was five stacked rows:
+   * wordmark, league identity, the lane, the global menu, and the account.
+   *
+   * Three of those carry things a phone does not need on every page, and each
+   * is still reachable:
+   *   - the season pills (2026 / 2025) duplicate the Switch menu, which lists
+   *     Seasons and Leagues and is kept;
+   *   - the league's sport pill and manager count are context, not navigation;
+   *   - Home / Managers / Mock drafts and Sign out keep their glyphs and lose
+   *     their labels, so they cost icons rather than words -- and Jump to,
+   *     which is kept at full size, reaches all of them by name anyway.
+   *
+   * Nothing is removed from the DOM: this is all display and sizing, so the
+   * accessible names on every control are untouched.
+   */
+  .app-wordmark { font-size: 16px; }
+  .rail-league-seasons { display: none; }
+  .rail-league-sub { display: none; }
+
+  /* The global menu keeps a short label under its glyph. It was icon-only (24-27px
+     wide, unlabelled ◆ ● ▶), which is neither tappable nor readable. Each is a
+     44px-min tinted pill; the glyph goes on top so the label is what you read. */
+  .app-rail-section:not(.app-rail-league) .app-rail-row {
+    flex-direction: column; justify-content: center; gap: 3px;
+    min-width: 56px; padding: 5px 10px; border-radius: 12px; text-align: center;
+    background: color-mix(in oklch, var(--line) 35%, transparent);
+  }
+  .app-rail-section:not(.app-rail-league) .app-rail-row.on {
+    background: color-mix(in oklch, var(--teal) 16%, transparent);
+  }
+  .app-rail-section:not(.app-rail-league) .app-rail-glyph { width: auto; font-size: 12px; }
+  .app-rail-section:not(.app-rail-league) .app-rail-row-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
+  .app-wordmark { display: flex; align-items: center; }
+
+  /* Account: the avatar is a 44px button; Sign out lives in its popover. */
+  .app-account-name { display: none; }
+  .app-account-wrap { position: relative; }
+  .app-account-button {
+    display: flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; padding: 0; border-radius: 50%; cursor: pointer;
+    background: none; border: 1px solid var(--line);
+  }
+  .app-account-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .app-account-menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 180px;
+    display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 28px oklch(0% 0 0 / 0.45);
+  }
+  .app-account-menu-name {
+    padding: 4px 8px; font-size: 12px; color: var(--muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .app-account-menu-item {
+    min-height: 44px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer; text-align: left;
+    font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+    background: color-mix(in oklch, var(--crimson) 18%, transparent);
+  }
+  .app-account-menu-item:hover { background: color-mix(in oklch, var(--crimson) 30%, transparent); }
+  .app-account-menu-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+  .app-rail { gap: 8px 12px; padding: 10px 14px; }
+  .rail-league-id { padding: 0 6px 0 0; }
+  .rail-league-seasons { padding: 0; }
+  .app-rail-label { display: none; }
+  .app-rail-spacer { display: none; }
+  .app-account { border-top: 0; padding: 0; }
+  .app-main { padding: 16px 16px 32px; }
+
+  /*
+   * On a phone the chrome scrolls away with the page instead of pinning a
+   * band above a shorter pane. The app is a 100vh single screen on desktop
+   * (see LAYOUT at the top of this file) and that is right there -- but this
+   * bar carries the wordmark, the league's identity, its four actions, Menu
+   * and the account, and once league context landed that measured 252px of
+   * 812 on an iPhone-sized screen. A third of the viewport spent permanently
+   * on navigation is worse than navigation you scroll back up to reach.
+   */
+  .app { height: auto; min-height: 100vh; }
+  .app-shell { min-height: 100vh; }
+  .app-main { overflow-y: visible; }
+  /* The board is the one thing that was relying on the pane's fixed height
+     for its own: `.board-scroll`'s 200px floor is a floor, not a size, and
+     with the page scrolling it would have become the board's whole height. */
+  .board-scroll { min-height: 60vh; }
+}
+
+/* SignIn's own hero: same shape as the picker's, but it's the whole page
+   rather than one panel among several, so the form and its error need a
+   little more air above them than home-hero-body's 4px inter-line gap. */
+.signin-controls { margin-top: 10px; }
+.signin-hero .error { margin-top: 12px; margin-bottom: 0; max-width: 640px; }
+/* Inline retry inside an .error message -- text, not a control needing the
+   teal treatment `.controls button` would otherwise give it (it isn't one). */
+.link-button {
+  background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+  color: var(--text); text-decoration: underline; text-underline-offset: 2px;
+}
+
+/*
+ * "League data" disclosure (the old "Add a league" panel). A native
+ * <details> rather than a controlled boolean in DraftPicker -- the browser
+ * already gets open/closed state, keyboard toggling and focus handling
+ * right for free. The two rules below only replace ITS marker, a triangle
+ * whose default glyph and position differ enough across browsers to read as
+ * a rendering bug rather than a control.
+ */
+.league-data-summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+}
+.league-data-summary::-webkit-details-marker { display: none; }
+.league-data-summary::before {
+  content: '▸'; display: inline-block; color: var(--muted); font-size: 11px;
+  transition: transform 120ms ease;
+}
+.league-data[open] .league-data-summary::before { transform: rotate(90deg); }
+.league-data-summary span:first-child {
+  text-transform: none;
+  font-size: 15px; font-weight: 600; letter-spacing: 0; color: var(--text);
+}
+/* The body only exists in flow while open, so it only needs a gap from the
+   summary then -- closed, there is nothing below to space away from. */
+.league-data[open] .league-data-summary { margin-bottom: 12px; }
+/* ===== B2: mock setup seat strip ===== */
+/* claude/design-review-next-steps.md B2. Replaces up to thirteen identical
+   full-width `<select>`s (old `.seat-assign-list`/`.seat-assign-row`/
+   `.slot-label`, removed above once nothing rendered them any more) with a
+   room of seats you click. */
+
+.mock-team-size { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.mock-team-size-label { text-transform: uppercase; letter-spacing: 0.06em; }
+
+/* A grid, not flex-wrap, so 8 seats and 14 seats both line up in ranks
+   instead of however many happened to fit on the last flex line -- the
+   point is to show the room's shape, and a ragged last row undercuts that. */
+.mock-seat-strip {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px; margin: 10px 0 16px;
+}
+.mock-seat { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+/* Quiet by default (Bot) is the point: a grid where every seat competes for
+   attention would be worse than the select-per-row list it replaces.
+   `.mine`/`.assigned` below are the only color in here on purpose. */
+.mock-seat-face {
+  appearance: none; -webkit-appearance: none; width: 100%;
+  background: var(--bg); color: var(--muted); border: 1px solid var(--line);
+  border-radius: 10px; padding: 8px 6px; font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.mock-seat-face:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--teal); }
+.mock-seat-face:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.mock-seat-face:disabled { cursor: default; opacity: 0.7; }
+.mock-seat-pick { font-size: 13px; font-weight: 700; }
+.mock-seat-who { font-size: 11px; }
+
+/* Crimson fills here because nothing else owns this seat's background --
+   the same move `.segment.on` makes with teal, substituting the identity
+   color because this is specifically "you," not generic interaction. */
+.mock-seat.mine .mock-seat-face { background: var(--crimson-fill); color: var(--text); }
+.mock-seat.mine .mock-seat-who { font-weight: 700; }
+.mock-seat.assigned .mock-seat-who { font-weight: 600; }
+
+/* Compact on purpose -- this is the inline replacement for the old
+   full-width `<select>` per seat, not a restyle of it. Still carries the
+   same `seat ${slot}` aria-label the tests and a screen reader key off of. */
+.mock-seat-select {
+  width: 100%; background: var(--bg); color: var(--muted);
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px;
+  font: inherit; font-size: 10px;
+}
+.mock-seat-select:disabled { opacity: 0.6; }
+
+/* The CTA, moved below the seats it configures. `.controls` already gives
+   the primary-button treatment and the panel-toned bar; this only adds the
+   space-between so the summary and the button land at opposite ends. */
+.mock-seat-cta { justify-content: space-between; margin-top: 4px; }
+.mock-seat-summary { margin: 0; flex: 1; min-width: 0; }
+/* ===== B3 + B5: availability survival strips, narrow viewport ===== */
+
+/*
+ * B3 -- AvailabilityPanel used to give each of your next N picks its own
+ * `.bar-cell` column (a width% bar plus a "62%" label); the row read as a
+ * spreadsheet, not a curve. The strip below is the replacement: one column,
+ * one small tile per pick, shaded by survival, so a row reads as a decay
+ * curve at a glance instead of a run of numbers the reader has to compare by
+ * eye. Fill only, never text-in-the-cell -- the exact percentage lives in
+ * each tile's own `title`, the same convention DraftBoard's cells already
+ * use for the full player name. `.bar-cell` / `.bar` / `.bar-label` (the old
+ * per-pick cell's contents) are removed above -- AvailabilityPanel.tsx no
+ * longer renders them.
+ */
+.strip-col { min-width: 132px; }
+.strip-cell { padding: 6px 8px; }
+.survival-strip { display: flex; align-items: center; gap: 3px; }
+.survival-block {
+  /* 16x18 with a 4px radius -- proportioned to the tile itself, not lifted
+     from one of the house style's four named radii (999/10/12/14). A 999px
+     pill on something 16px wide reads as a dot, and 10px (the board-tile
+     radius, meant for ~70-96px cells) is more corner than straight edge at
+     this size. 4px is the smallest rounding that still reads as "rounded"
+     next to the `.pos` badges beside it -- checked by eye against them at
+     the same width, since none of the named roles fit a tile this small. */
+  width: 16px; height: 18px; border-radius: 4px; flex-shrink: 0;
+  /* A hairline border so a near-zero cell (survival close to 0, background
+     close to plain --panel) still reads as an empty tile rather than a gap
+     in the row -- only the fill goes to nothing, never the tile itself. */
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.verdict { font-size: 12px; white-space: nowrap; }
+/* Weight and shade carry the three-way hierarchy, not a new hue: --crimson
+   already means "you" only and --teal already means generic interaction
+   (house-style header, above) -- a fourth "risk" color would either collide
+   with one of those meanings or need a fifth token nothing else in the app
+   uses. The words already say what a color would only repeat, so the loudest
+   verdict ("act now") gets full --text at 700 weight and the quietest
+   ("safe") gets --muted at regular weight, with "coin flip" in between. */
+.verdict-risk { color: var(--text); font-weight: 700; }
+.verdict-even { color: var(--muted); font-weight: 600; }
+.verdict-safe { color: var(--muted); font-weight: 400; }
+
+/*
+ * B5 -- `.avail-sheet` is absolutely positioned against `.board-stage` with
+ * `left` and `right` both set, which fixes the *box's* width to the stage's,
+ * exactly as intended. Nothing, though, bounded the width of what's inside
+ * it: `.controls-inline` (position chips + depth chips + the collapse
+ * toggle) is a plain flex row with no wrap, sized to its own min-content.
+ * Once that min-content exceeds the box -- five position chips and up to six
+ * depth chips easily do, well before 700px -- a non-wrapping flex row does
+ * not shrink to fit, it overflows the box outward. That overflow is what
+ * verified as "renders outside the panel, over the board and off-screen" at
+ * 375px: the chips don't clip, they spill past `.board-stage`'s right edge
+ * and off the visible page.
+ *
+ * The fix is the same one the house-style LAYOUT rule already prescribes for
+ * this kind of overflow elsewhere in the file (`.panel-head` already wraps) --
+ * let the row wrap rather than adding a hard floor under the stage's width,
+ * because a floor would just move the failure to whatever gets squeezed
+ * below it. Applied unconditionally, not inside the 700px media query below:
+ * a 14-column board is one browser-zoom step from the same min-content
+ * overflow at 1280px, and wrapping costs nothing on a row that already fits
+ * on one line -- it only ever activates when there's no room, which is
+ * exactly the laptop case too.
+ */
+.avail-sheet .controls-inline { flex-wrap: wrap; row-gap: 6px; }
+
+@media (max-width: 700px) {
+  /* Tuned to sit inline after the position chips on one row; once the row
+     wraps, that left margin reads as a stray gap in front of "Next" instead
+     of a separation from what's beside it. */
+  .avail-sheet .depth { margin-left: 0; }
+  /* `.avail .player-col`'s 260px was sized for the sheet at its normal
+     width, most of a phone-width stage on its own. Narrowed here, scoped to
+     `.avail-sheet`, rather than in the shared rule near the top of this file
+     that `PlayerPicker` and `OnTheClockPickInput` also use unmodified --
+     they don't get squeezed into a `position: absolute` sheet and don't
+     need this. */
+  .avail-sheet .avail .player-col { width: 150px; }
+}
+/* ===== A3: shared tendencies form ===== */
+
+/* TendenciesForm.tsx's per-field caption (e.g. "Reads as ~4.8 picks early.",
+   "Wild card (1.6)") -- reusing `.muted.tiny` verbatim, which is already this
+   app's established under-a-field/under-a-row caption treatment (see
+   SeatPopover.tsx's footnote() line and the live room's freshness text), so
+   this doesn't invent a second caption style next to the one that already
+   exists. The negative margin pulls it up against the input it explains
+   instead of reading as a new field -- `.seat-form label` already puts 2px
+   between a label and its own input, and without this the 6px `.seat-form`
+   gap made the caption look like it belonged to the *next* field, not the
+   one above it. */
+.field-hint { margin: -3px 0 0; }
+
