@@ -88,7 +88,7 @@ branches are pruned after owner confirmation.
 - [X] T009 [P] [US1] Delete the directory `web/public/pr-reference/` (two PNGs, 626,914 + 235,172 bytes).
 - [X] T010 [P] [US1] Delete every `.verify-*` rule in `web/src/styles.css`. There are 12 rules, starting near :3141. Afterwards confirm that `grep -rn "verify-" web/src` returns no class usages.
 - [X] T011 [US1] Leave the four builders from T006 **exported**, because the new test imports them. In the commit message, say that `PowerRankings.tsx` exports are unchanged on purpose (research R1 amended).
-- [ ] T012 [P] [US1] Replace the placeholder `.specify/memory/constitution.md` with a short constitution:
+- [X] T012 [P] [US1] Replace the placeholder `.specify/memory/constitution.md` with a short constitution:
   - title "Ball Knowers Constitution";
   - a line naming `AGENTS.md` "Hard rules" as the source of truth, with a comment saying to change both together;
   - the **6** hard-rule bullets quoted verbatim from `AGENTS.md`;
@@ -117,7 +117,7 @@ branches are pruned after owner confirmation.
     Show `git -C <path> status --ignored --porcelain` beside each one.
   - **Branches.** Include `git branch --merged origin/main` minus `main`, minus any branch checked out in a remaining worktree.
   - **Orphans.** List the unregistered directory `.claude/worktrees/phase1-normalization` separately, under the heading "orphan-dir".
-- [ ] T015 [US1] Show the T014 list to the owner in chat and **wait for an explicit yes**. Then, in this order:
+- [X] T015 [US1] Show the T014 list to the owner in chat and **wait for an explicit yes**. Then, in this order:
   1. `git worktree remove <path>` for each approved worktree (never `--force`);
   2. `git worktree prune`;
   3. `git branch -d <name>` for each approved branch (never `-D`).

@@ -75,6 +75,17 @@ also refuses anything unmerged, which gives a second safety net.
 worktree. It has no `.git`; `git status` inside it resolves to the parent repo. It
 holds a copy of the tree (`DEPLOY.md`, `Dockerfile`, …). It needs a separate yes.
 
-## T015 outcome
+## T015 outcome (2026-10-07, after the owner's "Worktrees + branches" answer)
 
-*Pending the owner's confirmation.*
+- Every candidate was **re-checked against all five conditions at the moment of
+  removal**, then removed with `git worktree remove <path>` (no `--force`), followed
+  by `git worktree prune`. **28 removed, 0 skipped.**
+- Branches were then removed with `git branch -d` (no `-D`), run from the
+  `draft-sim-021` worktree, whose HEAD contains `origin/main`, so `-d`'s own
+  merged check measures against main. The candidates were the 22 above plus the 28
+  freed by the worktree removal. **50 deleted, 0 refused.**
+- After: 10 worktrees and 13 local branches, all of them the kept set above.
+- **Not touched:** the orphan directory `.claude/worktrees/phase1-normalization`
+  (the owner chose the option without it), every kept worktree, and every remote
+  branch.
+- Recovery: deleted branch tips stay in the reflog (`git reflog`) until gc expiry.
