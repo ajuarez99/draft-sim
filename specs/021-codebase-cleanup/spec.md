@@ -181,7 +181,17 @@ substantially.
 | Item | Evidence | Verdict |
 |------|----------|---------|
 | `web/src/pages/PowerRankings.verify.tsx` (379 lines) and its route at `App.tsx:149` | Header says "dev-only self-check harness"; it is the only consumer of the PNGs below | Remove. Any check still wanted moves to `PowerRankings.test.tsx` |
-| `web/public/pr-reference/*.png` (~860 KB) | Only referenced by the verify page. Anything in `public/` ships to ballknowers.co | Remove, or move to `specs/013-*/` if the mockup is worth keeping |
+| `web/public/pr-reference/*.png` (~860 KB) | Only referenced by the verify page. Anything in `public/` ships to the production site | Remove, or move to `specs/013-*/` if the mockup is worth keeping |
+
+> **Amended after planning (2026-10-07, measured against production).** The first draft
+> implied that both rows above ship to production. Only the PNGs do:
+> `GET https://www.ballknowers.co/pr-reference/2a-front-page-desktop.png` returned
+> `200 image/png 626914B`. The verify page is **already** gated on `import.meta.env.DEV`
+> (`App.tsx:148`), and the production JS bundle (513 KB) contains 0 occurrences of its
+> markers (`BANNED_TERMS`, `pr-reference`), so Vite tree-shakes it out. Removing it is
+> still worthwhile, because it is 379 lines that import the private builders of
+> `PowerRankings.tsx` and pin that file's exports. But it is source hygiene, not a
+> production fix. FR-002 and SC-002 apply to the PNGs only.
 | ~25 `.claude/worktrees/agent-*` worktrees plus finished feature worktrees (37 total) | `git worktree list` | Prune the merged ones after owner confirmation (FR-008) |
 | 54 local branches already merged into `origin/main` | `git branch --merged origin/main` | Delete after owner confirmation (FR-008) |
 | `.specify/memory/constitution.md` | Still `[PROJECT_NAME]` placeholders | Fill from AGENTS.md hard rules, or delete (FR-011) |
@@ -222,7 +232,7 @@ substantially.
   converted endpoint returns identical JSON against the same data. This is verified
   by a captured before/after comparison, not assumed.
 - **SC-002**: The production site serves 0 development-only assets. Today it serves 2
-  PNGs, about 860 KB.
+  PNGs, about 860 KB; the first was measured live at 626,914 bytes.
 - **SC-003**: Every consolidated rule has exactly 1 definition per language, down from
   17 backend rounding copies and 4 frontend ordinal copies.
 - **SC-004**: Hand-built map responses in the controllers drop by at least 50% in
