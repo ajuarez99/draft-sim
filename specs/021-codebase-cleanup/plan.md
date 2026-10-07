@@ -98,10 +98,10 @@ specs/021-codebase-cleanup/
 backend/src/main/java/com/ballknowers/draftsim/
 ├── util/Rounding.java               # NEW (P2): the one rounding implementation
 ├── api/                             # P2: map-built bodies → records; P3: LeagueHistoryController ÷ 3
-│   └── dto/                         # NEW (P2): response records, one file per controller
+│   └── dto/                         # NEW (P2): response records. SUPERSEDED: one file per *response family*, see Amended after review
 └── engine/
     ├── SeasonSuperlativesService.java   # P3: delegates to …
-    └── superlatives/                    # NEW (P3): one unit per kind
+    └── superlatives/                    # SUPERSEDED: units go in engine/ itself, see Amended after review
 backend/src/test/java/com/ballknowers/draftsim/api/
 └── *CharacterizationTest.java       # NEW (P2): golden JSON written BEFORE each conversion
 

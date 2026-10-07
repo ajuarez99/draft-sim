@@ -149,7 +149,9 @@ substantially.
   every scheduled job does the same work.
 - **FR-002**: The production site MUST NOT serve development-only reference assets.
 - **FR-003**: Development-only verification harnesses MUST be removed from the
-  shipped route table. If a harness is still wanted, it MUST be converted to an
+  ~~shipped~~ **source** route table. *(Amended after analysis, finding F1: the
+  verify route was measured as never shipping, because it is dev-gated and
+  tree-shaken out.)* If a harness is still wanted, it MUST be converted to an
   automated test first and only then removed.
 - **FR-004**: Each small formatting or rounding rule MUST have exactly one
   implementation per language (one in the backend, one in the frontend).
@@ -206,7 +208,7 @@ substantially.
 | Item | Why |
 |------|-----|
 | `POST /api/ingest/projections`, `POST /drafts/{id}/picks`, `GET /api/health` | Operator / deploy endpoints documented in README/DEPLOY; no UI caller by design |
-| `scripts/*.sh`, `scripts/*.py`, `scripts/*.sql` | One-off repair and audit tools tied to specs 009/fixes; low cost, high value if the bug recurs. Candidate: move under `scripts/oneoff/` with a README line each |
+| `scripts/*.sh`, `scripts/*.py`, `scripts/*.sql` | One-off repair and audit tools tied to specs 009/fixes; low cost, high value if the bug recurs. ~~Candidate: move under `scripts/oneoff/` with a README line each~~ *Amended after analysis (L2): files stay where they are, and each gets a one-line purpose comment (task T056). A move would churn paths that DEPLOY.md and specs cite.* |
 | `claude/*.md` (53 docs) | The repo's convention is visible history ("corrections shown, not hidden"). Candidate: an index in `claude/README.md` that marks each doc as shipped / idea / superseded, rather than deleting any |
 
 ### Consolidate (P2)
@@ -227,7 +229,7 @@ substantially.
 | `web/src/pages/PowerRankings.tsx` | 1,575 | Story/headline builders (already exported for the verify page) vs view |
 | `web/src/pages/LeagueAnalysis.tsx` | 1,346 | Per-tab components |
 | `api/LeagueHistoryController.java` | 1,022 | History / manager-history / power-rankings+ballots: three controllers |
-| `engine/` package | 49 files | Draft-sim core vs season analytics sub-packages (only if done alongside a split above; not on its own) |
+| `engine/` package | 49 files | Draft-sim core vs season analytics sub-packages (only if done alongside a split above; not on its own). *Amended after analysis (L1): **not planned**. The superlatives units stay in `engine` (review finding 15), so there is nothing to piggyback on (task T043).* |
 
 ## Success Criteria *(mandatory)*
 
@@ -246,8 +248,15 @@ substantially.
 - **SC-004**: Hand-built map responses in `api/*.java` **success bodies** drop by at
   least 50% in P2, and the three worst controllers' success bodies reach 0. Error
   bodies (`error`/`message` keys) and SSE event payloads stay maps and are out of
-  scope. So do controllers outside `api/` (`recap/*`, `refresh/*`).
-- **SC-005**: No source file exceeds 1,000 lines after P3. Today 6 do.
+  scope. So do controllers outside `api/` (`recap/*`, `refresh/*`). *Amended after
+  analysis (A1): the denominator is **108** in-scope builds (141 − 29 error − 4 SSE,
+  measured), and the three worst controllers remove 55 of them (50.9%). That
+  clears the bar by one build, so task T003 re-measures it and the US3 checkpoint
+  recounts.*
+- **SC-005**: No **non-test** source file exceeds 1,000 lines after P3. Today 6 do.
+  *Amended after analysis (A2): "source file" was ambiguous. Including tests, 7
+  exceed it; the seventh is `web/src/pages/Superlatives.test.tsx` (1,469 lines,
+  measured). Test files are out of scope for SC-005.*
 - **SC-006**: The backend suite, the frontend tests and the production build pass
   after every phase, with a skip count no higher than before (see the "suite skips
   ITs silently" lesson). **P2b and the P3 backend splits need 0 IT skips**, with
@@ -276,6 +285,8 @@ substantially.
 The adversarial plan review ([plan-review.md](plan-review.md)) changed this spec in
 these places, each marked inline:
 - AS-1: content-type, not 404 (finding 11).
+- A later consistency analysis (2026-10-07) amended FR-003 (F1), SC-004's
+  denominator (A1), SC-005's scope (A2), and the scripts and engine rows (L1, L2).
 - Ordinal copies: 5, not 4 (finding 9).
 - SC-003: the rounding exclusion (finding 10).
 - SC-004: error, SSE and out-of-`api/` bodies scoped out (findings 4, 8 and 20).
