@@ -99,3 +99,21 @@ at the US3 checkpoint with a multi-line-aware count.
 `submitBallot` was typed `{ saved: number }` but has always returned
 `{ saved: true, season, week }`. `computePowerRankings` lacked `playoffOdds` and
 `week0Skipped`, and didn't allow `realizedSkipped: null`.
+
+## T032: SuperlativesController converted
+
+| check | result |
+|---|---|
+| characterization test (unedited by the conversion) | 6/6; ControllerIT 9/9, StandingsIT 7/7, batch test 1/1 |
+| mutation check (applied, run, reverted) | caught all 3: `NON_NULL` on faabBid (1 fail), a mistyped `type` (1), coverage `{}` for null (1) |
+| backend | 1372 tests, **0 skipped**, 0 failed |
+| controller | 376 → 173 lines |
+| maps left | 6 lines, **0 success bodies**: 4 `Map.of` error bodies, the 403 `LinkedHashMap` (`message` + `commissionerKnown`), and one internal player-lookup `Map.of` that is never serialized |
+
+The "≤ 4" bound has the same mis-derivation as T029: the single-line grep missed the
+403 map and counted a non-response lookup map.
+
+**api.ts:** no change needed. The two candidate drifts, `closeGameMargin: number`
+and `SuperlativeHolder.teamName: string`, are accurate in production: `closeMargin`
+comes from a primitive `double`, and holder names default to "Roster N". Only the
+fixtures used nulls the service can't produce.
