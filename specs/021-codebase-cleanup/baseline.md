@@ -159,3 +159,50 @@ T036 gate: WeeklyReportShapeTest 12/12 (unedited by the conversion; 4 new
 goldens); mutation check caught both (`NON_NULL` dropped from bestNights: 2 fail;
 unavailable's empty topPerformers as null: 1); backend 1385 tests, 0 skipped;
 controller ~200 → 51 lines; `api.ts` already models both shapes with optionals.
+
+## Live verification of US1–US3 (2026-10-07, a T057 slice; the full T057 runs after US4)
+
+Run against the shared local Postgres (`draftsim-pg`, :5433) with two backends built
+from different code: **origin/main @ 7b7238e on :8088**, and **this branch on :8087**
+(frontend :5187 proxied to it). Read-only GETs, as `popsharky`.
+
+**1. Live JSON parity, 37/37 identical.** Compared type-strictly (`1` ≠ `1.0`,
+null ≠ absent), with key order ignored except inside `positionalTilt`. Covered:
+- history, power, ballot (default and `week=0`), superlatives and conduct-list for 3
+  leagues (NFL 2026, NBA 2026, NFL 2025);
+- the weekly report for NFL weeks 0–5 and 18 (weeks 5 and 18 are the *unavailable*
+  shape) and NBA weeks 0–1 (the basketball shape);
+- `managers/7/history`;
+- seats and board for 3 drafts (complete NFL ×2, pre_draft NBA);
+- `/api/board` for both sports;
+- 3 stranger 404s.
+
+About 500 KB of JSON per side. The comparator was checked against inputs that must
+differ (two leagues, `1` vs `1.0`, null vs absent, a tilt reorder) and flagged every
+one.
+
+**2. Click-through in the browser pane.** Every page that reads a converted endpoint
+rendered with real data:
+- league home;
+- history, with 🏆 only on completed 2025, "—" ranks for the in-progress season, and
+  the record book;
+- power rankings, with playoff %, your ballot, ballot ranges and the commissioner
+  note;
+- awards (NFL 2026; NBA falls back to 2025 with its note);
+- the weekly report (NFL week 3 with "WON by 32.64"; the NBA basketball shape);
+- manager history (both sports, tilt multipliers, the 🏆 row);
+- the real draft board (snake order);
+- the NBA draft room's seats, with "you're slot 5" and the 3rd-round reversal laid out.
+
+Not opened: `/drafts/:id/live`, because it starts a live Sleeper poller.
+
+**Console:** the only errors were 403s from `POST /api/leagues/:id/refresh`
+(refresh-on-visit). Measured as the **CORS allow-list rejecting the spare port
+5187**: both builds return 403 for `Origin: localhost:5187` and 200 for the default
+`5173`. That's environment, identical on main, and the endpoint isn't touched by
+this branch.
+
+**Side effect, disclosed:** diagnosing that 403 with header-less curl, and with
+`Origin: 5173`, triggered real refresh-on-visit runs for (Foot) Ball Knowers 2026 on
+the shared local DB: a normal app action, reading Sleeper into Postgres. That
+happened after the parity diff, so it doesn't affect the 37/37.
