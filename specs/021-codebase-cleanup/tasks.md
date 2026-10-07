@@ -220,7 +220,7 @@ maps (spec SC-004, amended).
 
 ### SuperlativesController (17 map builds; 4 are error bodies)
 
-- [ ] T030 [US3] **Characterization commit.** Create `.../api/SuperlativesControllerCharacterizationIT.java` (MockMvc with stubbed `SeasonSuperlativesService` and repositories). Cover each of the 8 `detailRow` subtypes with its `"type"` value, the full-standings body and the conduct-list body, plus empty cases. Write the goldens to `golden/superlatives/`. In the same commit, rewrite the casts in `SuperlativesControllerIT.java`, `SuperlativesStandingsIT.java` and `SuperlativesControllerConductListBatchTest.java` as `JsonNode` assertions.
+- [X] T030 [US3] **Characterization commit.** Create `.../api/SuperlativesControllerCharacterizationIT.java` (MockMvc with stubbed `SeasonSuperlativesService` and repositories). Cover each of the 8 `detailRow` subtypes with its `"type"` value, the full-standings body and the conduct-list body, plus empty cases. Write the goldens to `golden/superlatives/`. In the same commit, rewrite the casts in `SuperlativesControllerIT.java`, `SuperlativesStandingsIT.java` and `SuperlativesControllerConductListBatchTest.java` as `JsonNode` assertions.
 - [ ] T031 [US3] **Conversion commit.** Create `api/dto/SuperlativeResponses.java` with one record per detail subtype, each carrying an explicit `String type` component (use `@JsonTypeInfo` only if T030's goldens pass unchanged). Convert `body`, `detailRow` and `conductListBody` in `api/SuperlativesController.java`. Error bodies stay. Check the `SuperlativeDetail` union in `web/src/api.ts`, including `'rosterId' in d` at `Superlatives.tsx:433`: its presence or absence must be preserved.
 - [ ] T032 [US3] Gate as in T029: the map count must be ≤ 4.
 

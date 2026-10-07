@@ -56,6 +56,19 @@ public final class GoldenJson {
         assertTreeMatchesGolden(actual, resourcePath, orderSensitivePaths);
     }
 
+    /**
+     * A response body as the client receives it: serialized to JSON and read back as a
+     * plain map. Tests that used to cast {@code getBody()} to {@code Map<String,Object>}
+     * call this instead. It gives the same map whether the controller built a map or a
+     * response record, so converting a controller to records never breaks them
+     * (plan-review finding 3). Numbers come back as JSON reads them: a small long id
+     * becomes an Integer.
+     */
+    @SuppressWarnings("unchecked")
+    public static java.util.Map<String, Object> wire(Object body) {
+        return MAPPER.convertValue(body, java.util.Map.class);
+    }
+
     /** As {@link #assertMatchesGolden} but for a raw JSON string, such as a MockMvc response body. */
     public static void assertJsonMatchesGolden(String json, String resourcePath, String... orderSensitivePaths) {
         try {
