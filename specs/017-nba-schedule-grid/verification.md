@@ -129,6 +129,26 @@ Through vite on 5183, signed in as popsharky via the real sign-in form (the real
 | T042–T044 | football switch, gated on T004 |
 | T049 | production deploy and prod V8.1–2, needs Allan's go-ahead, before 2026-10-20 |
 
+## V9. Production deploy and backfill (T049, 2026-10-07): partly run, one bug found
+
+- **Deploy:** both services are on the 017 build. `/schedule` and `/next-matchup` answer 200 with a
+  member's `X-Sleeper-User`. The www bundle has "Schedule grid", "Playoff weeks" and `next-matchup`.
+- **2026 in prod** matches V5 exactly: 30 teams at 80, week 1 `{3: 24, 2: 5, 4: 1}` → PHI, playoff
+  20–22 with NOP 12 and CHA/MIL/MIN/NYK 9. Next matchup: "Pairings for week 1 aren't out yet".
+- **Backfill** (admin route, both 200, `scheduleStoreFailed: false`): 2025 reported
+  `absencesStored 160`, 2024 `absencesStored 77, weeksUnclassified 25` (not investigated; that's
+  the pre-existing absence pass).
+- **2025 after backfill:** 30 teams, 28 at 82, NYK/SAS 83, postponed 3, canceled 1. Matches V4.
+- **2024 after backfill: wrong.** 32 teams: `CHK` and `SHQ`, one game each in week 17. That's
+  the 2025 All-Star final, stored as `complete`. **Fixed** with an exhibition rule (contracts C1
+  amendment). `the2024AllStarFinalIsAnExhibitionNotTwoMoreTeams` runs on the real 2024 payload
+  and fails with the rule switched off (checked). It expects 30 teams, MIL/OKC 83, exhibition 1,
+  postponed 5. The stored rows are untouched: the rule applies on read, so nothing to re-backfill.
+- **Not checked:** whether Sleeper scores the 83rd game (likely the NBA Cup final) for fantasy.
+  The grid counts it either way, as V4 already did for 2025.
+- **Owed:** after the fix deploys, recheck 2024 in prod (30 teams, exhibition 1) and do the
+  V8.1–2 browser pass on ballknowers.co.
+
 ## After code review fixes (R1–R3): run
 
 Backend restarted on 8084 after the fixes:

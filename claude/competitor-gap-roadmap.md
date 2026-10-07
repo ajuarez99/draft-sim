@@ -41,6 +41,11 @@ reading the code, not from building anything. Treat them as guesses.
 > not deployed. 1.1 turned out smaller than "S": the schedule was already fetched on every refresh.
 > Measuring also overturned the design doc's "82 games per team" (it's 80 today). 1.3's football half
 > waits on a measurement (spec 017 T004). See `specs/017-nba-schedule-grid/verification.md`.
+>
+> **Status 2026-10-07:** 017 is deployed (both services checked), and the NBA 2025/2024 schedules
+> are backfilled. The backfill exposed the 2024 All-Star final as two fake teams, now fixed (spec
+> 017 V9). T004 missed its Tuesday window and moves to 2026-10-13. Specs 018, 019 and 020 are
+> deployed too (prod health reports their data loaded), despite the "not deployed" notes below.
 
 | # | Item | Doc | Size | Unblocks |
 |---|---|---|---|---|

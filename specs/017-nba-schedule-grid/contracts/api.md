@@ -27,7 +27,7 @@ nullable). `web/src/api.ts` mirrors them field for field in the same change (FR-
   "teams": [
     { "team": "ATL", "games": [3, 4], "seasonTotal": 80 }
   ],
-  "excluded": { "postponed": 0, "canceled": 0 }
+  "excluded": { "postponed": 0, "canceled": 0, "exhibition": 0 }
 }
 ```
 
@@ -96,7 +96,7 @@ export type LeagueSchedule = {
   fetchedAt: string | null; currentWeek: number | null
   lastLeagueWeek: number | null; seasonOver: boolean   // added after review (F2)
   weeks: ScheduleWeek[]; playoff: PlayoffWindow; teams: ScheduleTeam[]
-  excluded: { postponed: number; canceled: number }
+  excluded: { postponed: number; canceled: number; exhibition: number }
 }
 export type MatchupSide = { rosterId: number; teamName: string | null; username: string | null; avatarId: string | null }
 export type NextMatchup = {
@@ -109,6 +109,11 @@ export type NextMatchup = {
 
 - `teams[i].games.length === weeks.length` for every i.
 - No team appears whose every game is postponed/canceled (2025 fixture: no STP/STR).
+- *Amended 2026-10-07 (found in production):* the status rule isn't enough. Sleeper's 2024
+  schedule keeps the All-Star final (CHK vs SHQ) as `complete`. A side with fewer than a quarter
+  of the median team's counted games is an exhibition team, and its games go to
+  `excluded.exhibition` (2024: 1). The 2025 fixture passed only because its All-Star game was
+  `canceled`.
 - `playoff.reason === null` ⇔ `playoff.endWeek !== null`.
 - `next-matchup` never returns `opponent` without `me`.
 - *Added after review:* `seasonOver === true` when the league is complete (2025 fixture,

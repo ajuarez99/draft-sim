@@ -51,7 +51,18 @@ public class ScheduleGridService {
     /** {@code reason} is non-null iff {@code endWeek} is null (research R5). */
     public record Playoff(Integer startWeek, Integer endWeek, String reason) {}
 
-    public record Excluded(int postponed, int canceled) {}
+    /** {@code exhibition}: games with a non-franchise side, see {@link #EXHIBITION_SHARE}. */
+    public record Excluded(int postponed, int canceled, int exhibition) {}
+
+    /**
+     * A side with fewer counted games than this share of the median team's is an exhibition team,
+     * and its games aren't counted. Hand-set, not fitted: a franchise plays ~80, the All-Star teams
+     * 1-2, so anything between works. Measured 2026-10-07: Sleeper's 2024 schedule keeps the 2025
+     * All-Star final (CHK vs SHQ) as {@code complete}, so the status rule alone let it through.
+     * 2025's (STP/STR) happened to be {@code canceled}. Relative to the median rather than a list
+     * of 30 codes, so a renamed franchise can't silently vanish from the grid.
+     */
+    static final double EXHIBITION_SHARE = 0.25;
 
     public record Result(String sport, int season, boolean available, String reason, OffsetDateTime fetchedAt,
                          Integer currentWeek, Integer lastLeagueWeek, boolean seasonOver, List<Week> weeks,
@@ -106,11 +117,24 @@ public class ScheduleGridService {
         LocalDate[] first = new LocalDate[order.size()];
         LocalDate[] last = new LocalDate[order.size()];
         Map<String, int[]> byTeam = new TreeMap<>();   // sorted by code: no server ranking
+        Map<String, Integer> seasonGames = new TreeMap<>();
+        for (SportSchedule.Game g : games) {
+            if (!SportSchedule.counts(g.status())) continue;
+            for (String t : new String[]{g.home(), g.away()}) {
+                if (t != null) seasonGames.merge(t, 1, Integer::sum);
+            }
+        }
+        double floor = EXHIBITION_SHARE * median(seasonGames.values());
         int postponed = 0;
         int canceled = 0;
+        int exhibition = 0;
         for (SportSchedule.Game g : games) {
             if (!SportSchedule.counts(g.status())) {
                 if ("postponed".equals(g.status())) postponed++; else canceled++;
+                continue;
+            }
+            if (isExhibitionSide(g.home(), seasonGames, floor) || isExhibitionSide(g.away(), seasonGames, floor)) {
+                exhibition++;
                 continue;
             }
             int w = indexOf.get(g.week());
@@ -130,13 +154,24 @@ public class ScheduleGridService {
             teams.add(new Team(e.getKey(), e.getValue(), java.util.Arrays.stream(e.getValue()).sum()));
         }
         return new Result(sport, league.season(), true, null, fetchedAt.orElse(null), currentWeek,
-                lastLeagueWeek, seasonOver, weeks, playoff, teams, new Excluded(postponed, canceled));
+                lastLeagueWeek, seasonOver, weeks, playoff, teams, new Excluded(postponed, canceled, exhibition));
+    }
+
+    private static boolean isExhibitionSide(String team, Map<String, Integer> seasonGames, double floor) {
+        return team != null && seasonGames.getOrDefault(team, 0) < floor;
+    }
+
+    private static double median(java.util.Collection<Integer> counts) {
+        if (counts.isEmpty()) return 0;
+        int[] sorted = counts.stream().mapToInt(Integer::intValue).sorted().toArray();
+        int mid = sorted.length / 2;
+        return sorted.length % 2 == 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0;
     }
 
     private static Result unavailable(LeagueRow league, String reason, Integer currentWeek,
                                       Integer lastLeagueWeek, boolean seasonOver, Playoff playoff) {
         return new Result(league.sport().code(), league.season(), false, reason, null, currentWeek,
-                lastLeagueWeek, seasonOver, List.of(), playoff, List.of(), new Excluded(0, 0));
+                lastLeagueWeek, seasonOver, List.of(), playoff, List.of(), new Excluded(0, 0, 0));
     }
 
     /** data-model "League span": playoff end, else the week before playoffs, else the last stored week. */

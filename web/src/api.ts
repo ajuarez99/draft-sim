@@ -2484,7 +2484,8 @@ export type LeagueSchedule = {
   weeks: ScheduleWeek[]
   playoff: PlayoffWindow
   teams: ScheduleTeam[]
-  excluded: { postponed: number; canceled: number }
+  /** exhibition: games with a non-franchise side (an All-Star team), not counted either. */
+  excluded: { postponed: number; canceled: number; exhibition: number }
 }
 export const getLeagueSchedule = (id: string) =>
   apiFetch(`/api/leagues/${id}/schedule`).then(json<LeagueSchedule>)

@@ -712,3 +712,16 @@ edges: NBA picks 1–6 +14.7, last 12 +56.7; NFL picks 1–12 +0.9.
 picks, the middle, the last 12) and by position before believing it.** Ordering tests on
 synthetic picks can't see an edge bias, because they don't have a sloped, skewed real
 distribution. Two of these three rules passed every test written for them.
+
+## 33. A test named for a rule can pass because the fixture happens not to need it
+
+Spec 017's `sc003_2025HasThirtyTeams…AndNoExhibitionRows` asserted no All-Star rows on the real
+2025 schedule, and passed. The grid had no exhibition rule at all. It passed because Sleeper
+happened to mark 2025's All-Star game (STP/STR) `canceled`, so the postponed/canceled filter
+dropped it by accident. The 2024 schedule, backfilled to production on 2026-10-07, marks its
+All-Star final (CHK vs SHQ) `complete`, and the grid showed 32 teams.
+
+**When a test's name claims a rule, check the fixture actually exercises that rule rather than
+another one that happens to cover it, e.g. by switching the rule off and watching the test fail.**
+One real season is one sample of how the source encodes an edge case; a second season can
+encode it differently.
