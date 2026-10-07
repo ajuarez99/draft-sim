@@ -109,9 +109,11 @@ function excludedLine(e: LeagueSchedule['excluded']): string | null {
   const parts: string[] = []
   if (e.postponed > 0) parts.push(`${e.postponed} postponed`)
   if (e.canceled > 0) parts.push(`${e.canceled} canceled`)
+  if (e.exhibition > 0) parts.push(`${e.exhibition} exhibition`)
   if (parts.length === 0) return null
-  const total = e.postponed + e.canceled
-  return `${parts.join(' and ')} game${total === 1 ? '' : 's'} ${total === 1 ? "isn't" : "aren't"} counted.`
+  const total = e.postponed + e.canceled + e.exhibition
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  return `${list} game${total === 1 ? '' : 's'} ${total === 1 ? "isn't" : "aren't"} counted.`
 }
 
 export default function ScheduleGrid() {

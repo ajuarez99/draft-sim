@@ -160,6 +160,7 @@ class ScheduleControllersMvcIT {
                 .andExpect(jsonPath("$.teams[2].games", contains(1, 1)))
                 .andExpect(jsonPath("$.excluded.postponed").value(1))
                 .andExpect(jsonPath("$.excluded.canceled").value(0))
+                .andExpect(jsonPath("$.excluded.exhibition").value(0))
                 .andReturn().getResponse().getContentAsString();
         System.out.println("SCHEDULE-JSON " + body);
     }

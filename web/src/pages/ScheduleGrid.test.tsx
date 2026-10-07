@@ -49,7 +49,7 @@ function data(over: Partial<LeagueSchedule> = {}): LeagueSchedule {
       { team: 'ATL', games: [1, 2, 2, 2], seasonTotal: 7 },
       { team: 'CHI', games: [1, 3, 2, 3], seasonTotal: 9 },
     ],
-    excluded: { postponed: 0, canceled: 0 },
+    excluded: { postponed: 0, canceled: 0, exhibition: 0 },
     ...over,
   }
 }
@@ -185,7 +185,7 @@ describe('Schedule grid', () => {
   })
 
   it('says how many games were left out, only when some were', async () => {
-    getLeagueSchedule.mockResolvedValue(data({ excluded: { postponed: 3, canceled: 1 } }))
+    getLeagueSchedule.mockResolvedValue(data({ excluded: { postponed: 3, canceled: 1, exhibition: 0 } }))
     const { unmount } = render(<ScheduleGrid />)
     expect(await screen.findByText(/3 postponed and 1 canceled games aren't counted/)).toBeInTheDocument()
     unmount()
@@ -193,6 +193,12 @@ describe('Schedule grid', () => {
     render(<ScheduleGrid />)
     await screen.findByRole('rowheader', { name: 'BOS' })
     expect(screen.queryByText(/aren't counted/)).toBeNull()
+  })
+
+  it('names an exhibition game it left out (the 2024 All-Star final)', async () => {
+    getLeagueSchedule.mockResolvedValue(data({ excluded: { postponed: 5, canceled: 0, exhibition: 1 } }))
+    render(<ScheduleGrid />)
+    expect(await screen.findByText(/5 postponed and 1 exhibition games aren't counted/)).toBeInTheDocument()
   })
 
   // F8: the visit's own refresh must fill an empty grid without a reload.

@@ -90,6 +90,37 @@ class ScheduleGridServiceTest {
         assertTrue(r.teams().stream().noneMatch(t -> t.team().equals("STP") || t.team().equals("STR")));
         assertEquals(3, r.excluded().postponed());
         assertEquals(1, r.excluded().canceled());
+        assertEquals(0, r.excluded().exhibition());
+    }
+
+    /**
+     * Found in production 2026-10-07: Sleeper's 2024 schedule keeps the All-Star final (CHK vs SHQ)
+     * as {@code complete}, and the grid showed 32 teams. The 2025 test above passed only because
+     * its All-Star game happened to be {@code canceled}.
+     */
+    @Test
+    void the2024AllStarFinalIsAnExhibitionNotTwoMoreTeams() {
+        ScheduleGridService.Result r = compute(league(Sport.NBA, 2024, "complete"), OptionalInt.of(24),
+                format(22, 6, 0), fixture(2024));
+        assertEquals(30, r.teams().size());
+        assertTrue(r.teams().stream().noneMatch(t -> t.team().equals("CHK") || t.team().equals("SHQ")));
+        for (ScheduleGridService.Team t : r.teams()) {
+            int expected = t.team().equals("MIL") || t.team().equals("OKC") ? 83 : 82;
+            assertEquals(expected, t.seasonTotal(), t.team());
+        }
+        assertEquals(1, r.excluded().exhibition());
+        assertEquals(5, r.excluded().postponed());
+        assertEquals(0, r.excluded().canceled());
+    }
+
+    /** The floor is relative: a one-week schedule (every team 2-4 games) loses nobody. */
+    @Test
+    void aOneWeekScheduleExcludesNobody() {
+        List<SportSchedule.Game> week1 = fixture(2026).stream().filter(g -> g.week() == 1).toList();
+        ScheduleGridService.Result r = compute(league(Sport.NBA, 2026, "pre_draft"), OptionalInt.of(1),
+                format(20, 6, 0), week1);
+        assertEquals(30, r.teams().size());
+        assertEquals(0, r.excluded().exhibition());
     }
 
     // ---------------------------------------------------------------- shape invariants

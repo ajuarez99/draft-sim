@@ -42,6 +42,7 @@ US3's football half.
 - [X] T002 [P] Save the trimmed real 2025 schedule as `backend/src/test/resources/sleeper/nba-schedule-2025.json`. Fetch `https://api.sleeper.app/schedule/nba/regular/2025` and keep only `game_id, week, date, status, home.team, away.team`, with **`home`/`away` kept as nested `{"team": ...}` objects** (N1). Expect 1,235 rows, ~158 KB
 - [X] T003 [P] Save the trimmed real 2026 schedule as `backend/src/test/resources/sleeper/nba-schedule-2026.json` the same way from `/schedule/nba/regular/2026`. Expect 1,200 rows, ~153 KB. If Sleeper's numbers have changed since 2026-10-05, record the new counts in research.md R1 as an amended note rather than editing the measured ones
 - [ ] T004 F7 boundary measurement (gates T042–T044 only). On **2026-10-06 and 2026-10-07**, several times each, run `curl -s https://api.sleeper.app/v1/league/1346366555759341568`. Record `settings.leg` and `settings.last_scored_leg` with timestamps in `specs/017-nba-schedule-grid/research.md` R6, under the "Open after review (F7)" note. Then write the rule for whichever order was seen. If `last_scored_leg` can equal `leg` before `leg` advances, the rule is "next week = `leg + 1` when week `leg` is scored". Add that row to the state table in `data-model.md`
+  - *(2026-10-07)* Not done: the 10-06 readings weren't taken, and the two on 10-07 came after the boundary (`leg 5`, `lsl 4`, research R6). Redo Tue 2026-10-13.
 
 ---
 
@@ -290,6 +291,7 @@ with T004's numbers.
 - [X] T047 Bug-hunting code review of the full diff (`/code-review`, a separate pass, not by the agent that built it). Watch for bug classes #1 (sort direction), #2/#3 (run the SQL and binds for real), #6 (browser path) and two implementations of one rule (`counts` vs `SETTLED`, `leg` vs the analysis week). Record findings and fixes in `specs/017-nba-schedule-grid/code-review.md`
 - [X] T048 Full live verification, quickstart V1–V8, on a restarted `bootRun` (no hot reload) and a hard-refreshed vite tab. Each step is recorded **run (with output) or not run (and why)** in `verification.md`. Read the backend suite's skip count
 - [ ] T049 *(amended after code review R1)* After deploy, backfill finished NBA seasons once with the admin route: `POST /api/ingest/player-games/1229352720222134272?season=2025` and `…/1141438340626231296?season=2024` (`X-Admin-Token`). Completed seasons are never refreshed, so without this their grid says "wasn't saved". Deploy **both** Railway services (backend and web deploy independently and have drifted before), after asking Allan. Then repeat V8.1–2 on production (ballknowers.co) **before 2026-10-20**. Record in `verification.md`
+  - *(2026-10-07)* Both services confirmed on the 017 build. Backfill ran: 2025 correct; 2024 showed CHK/SHQ (the All-Star final) as two extra teams, fixed by the exhibition rule (verification V9). Prod recheck after that fix deploys, and the V8.1–2 browser pass, are still owed.
 
 ---
 

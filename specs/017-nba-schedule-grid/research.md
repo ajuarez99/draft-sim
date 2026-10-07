@@ -189,6 +189,19 @@ It's not defaulted to 1, for the same "optional that encodes a rule" reason as R
 > pairs here, and define the rule for whichever order is seen. Until then NFL home
 > keeps its current block. This doesn't block basketball: NBA 2026 has no scored
 > week, and its week-boundary behaviour is checked in V7 after the draft.
+>
+> **T004 readings (amended 2026-10-07): the window was missed, so no rule yet.** Nobody
+> took the 10-06 (Tuesday) readings, which were the ones that mattered.
+>
+> | UTC | `leg` | `last_scored_leg` |
+> |---|---|---|
+> | 2026-10-07T14:49:12Z (Wed) | 5 | 4 |
+> | 2026-10-07T14:54:05Z (Wed) | 5 | 4 |
+>
+> These are after the boundary, the same `leg N, lsl N−1` order spec 009 saw mid-week
+> (`leg 4, lsl 3`). They don't say what happens between MNF ending and `leg` moving.
+> Redo on **Tue 2026-10-13**, several readings from MNF's end until `leg` reads 7.
+> T042–T044 stay gated.
 
 The analysis page keeps its own week (a), because it means "next unprojected week",
 a different question. League home shows the projected line only when the two weeks
