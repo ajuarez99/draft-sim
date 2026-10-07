@@ -74,20 +74,20 @@ branches are pruned after owner confirmation.
 
 ### Tests for US1 (written first, against the current code)
 
-- [ ] T006 [P] [US1] Create `web/src/pages/PowerRankings.builders.test.ts`. It characterizes the four builders that are imported **only** by the verify page and have no test: `ballotBlockState`, `buildDeck`, `recordLabel` and `roomTakeSentence`, imported from `./PowerRankings`.
+- [X] T006 [P] [US1] Create `web/src/pages/PowerRankings.builders.test.ts`. It characterizes the four builders that are imported **only** by the verify page and have no test: `ballotBlockState`, `buildDeck`, `recordLabel` and `roomTakeSentence`, imported from `./PowerRankings`.
   - Build inputs from the fixtures the existing `PowerRankings.*.test.tsx` files use.
   - Assert today's exact outputs, including an empty case and a blocked-ballot case for `ballotBlockState`.
   - This satisfies FR-003 ("converted to an automated test first"). It must pass **before** T008.
 
 ### Implementation for US1
 
-- [ ] T007 [US1] Write the C1 evidence to `specs/021-codebase-cleanup/removal-evidence.md` for `web/src/pages/PowerRankings.verify.tsx`, its route, `web/public/pr-reference/` and the `.verify-*` CSS rules:
+- [X] T007 [US1] Write the C1 evidence to `specs/021-codebase-cleanup/removal-evidence.md` for `web/src/pages/PowerRankings.verify.tsx`, its route, `web/public/pr-reference/` and the `.verify-*` CSS rules:
   - grep each basename across `web/src backend/src scripts claude/scripts .github README.md DEPLOY.md HANDOFF.md`, and paste the output;
   - the expected hits are only the items being removed, plus `specs/` and `claude/` design docs, which are history and are left as they are.
-- [ ] T008 [US1] Delete `web/src/pages/PowerRankings.verify.tsx`. In `web/src/App.tsx`, remove the `import PowerRankingsVerify` line (about :22) and the `{import.meta.env.DEV && (<Route path="/leagues/:sleeperLeagueId/power/verify" …/>)}` block, together with its preceding comment (about :146–150).
-- [ ] T009 [P] [US1] Delete the directory `web/public/pr-reference/` (two PNGs, 626,914 + 235,172 bytes).
-- [ ] T010 [P] [US1] Delete every `.verify-*` rule in `web/src/styles.css`. There are 12 rules, starting near :3141. Afterwards confirm that `grep -rn "verify-" web/src` returns no class usages.
-- [ ] T011 [US1] Leave the four builders from T006 **exported**, because the new test imports them. In the commit message, say that `PowerRankings.tsx` exports are unchanged on purpose (research R1 amended).
+- [X] T008 [US1] Delete `web/src/pages/PowerRankings.verify.tsx`. In `web/src/App.tsx`, remove the `import PowerRankingsVerify` line (about :22) and the `{import.meta.env.DEV && (<Route path="/leagues/:sleeperLeagueId/power/verify" …/>)}` block, together with its preceding comment (about :146–150).
+- [X] T009 [P] [US1] Delete the directory `web/public/pr-reference/` (two PNGs, 626,914 + 235,172 bytes).
+- [X] T010 [P] [US1] Delete every `.verify-*` rule in `web/src/styles.css`. There are 12 rules, starting near :3141. Afterwards confirm that `grep -rn "verify-" web/src` returns no class usages.
+- [X] T011 [US1] Leave the four builders from T006 **exported**, because the new test imports them. In the commit message, say that `PowerRankings.tsx` exports are unchanged on purpose (research R1 amended).
 - [ ] T012 [P] [US1] Replace the placeholder `.specify/memory/constitution.md` with a short constitution:
   - title "Ball Knowers Constitution";
   - a line naming `AGENTS.md` "Hard rules" as the source of truth, with a comment saying to change both together;
@@ -95,7 +95,7 @@ branches are pruned after owner confirmation.
   - version 1.0.0, ratified 2026-10-07.
 
   **Owner decision**: the alternative is to delete the file. Ask before committing this task (research R8 amended).
-- [ ] T013 [US1] Gate:
+- [X] T013 [US1] Gate:
   - rerun T001 and T002; tests and skips must equal the baseline;
   - `test ! -e web/dist/pr-reference` must succeed;
   - the CSS hash may change (the `.verify-*` rules are gone), so record the **new** `sha256sum web/dist/assets/index-*.css` in `baseline.md` as the P3 baseline;
@@ -106,7 +106,7 @@ branches are pruned after owner confirmation.
 
 ### Worktree and branch pruning (local only, gated on the owner)
 
-- [ ] T014 [US1] Write the **read-only** candidate list to `specs/021-codebase-cleanup/prune-candidates.md`, using the amended rule in research R7.
+- [X] T014 [US1] Write the **read-only** candidate list to `specs/021-codebase-cleanup/prune-candidates.md`, using the amended rule in research R7.
   - **Worktrees.** For each entry of `git worktree list --porcelain`, include it only if **all** of these hold:
     - it is not `C:/Users/allan/source/draft-sim`;
     - its branch is not `main`;

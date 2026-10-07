@@ -3134,29 +3134,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .pr-ladder-head .action-button { width: 100%; }
 }
 
-/* ---------------------------------------------------------------------------
- * POWER RANKINGS -- verify harness (dev-only, PowerRankings.verify.tsx)
- * ------------------------------------------------------------------------ */
-
-.verify-swatches { display: flex; flex-wrap: wrap; gap: 14px; }
-.verify-swatch { display: flex; flex-direction: column; gap: 4px; width: 120px; }
-.verify-swatch-box { height: 40px; border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line); }
-
-.verify-checklist { display: flex; flex-direction: column; gap: 6px; }
-.verify-check-row {
-  display: grid; grid-template-columns: 24px minmax(0, 1fr) 110px minmax(0, 260px);
-  gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line);
-}
-.verify-check-row select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
-
-.verify-states { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.verify-state-card { padding: 12px 14px; }
-
-.verify-breakpoint-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
-.verify-iframe-wrap { max-height: 900px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
-.verify-iframe-wrap iframe { border: 0; display: block; }
-.verify-mockup-img { border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18); display: block; }
-
 /* --- claude/league-analysis.md: the League analysis page ---------------------
  *
  * Three blocks, three different shapes, deliberately: a ranked table where the

@@ -38,3 +38,20 @@ The JDK is 24.0.2 on PATH, with a toolchain-provisioned 21 for the build.
 - **In-scope success-body builds = 141 − 30 − 3 = 108.** This matches the tasks.md
   denominator. The three worst controllers' success bodies are LHC 32 (43 − 11),
   SC 13 (17 − 4) and LC 10 (17 − 6 − 1 heartbeat), so 55/108 = 50.9%.
+
+## T013: after US1 (the new P3 CSS baseline)
+
+| check | result |
+|---|---|
+| backend | 1346 tests (1340 + 6 GoldenJsonTest), **0 skipped**, 0 failed |
+| vitest | 86 files, 1083 tests (1074 + 9 builders) |
+| `tsc -b` | exit 0 |
+| `dist/pr-reference/` | **absent** |
+| JS | `index-CDEVlM9V.js` 513,385 B (-3) |
+| CSS | `index-ROkkXWFm.css` 138,080 B (-1,052, the `.verify-*` rules) |
+| **CSS sha256 (P3 oracle)** | `3b86420695aba6a42c4a9362570180d8da5eb196c22af70ded9771292c1fc667` |
+| `db/migration` diff vs origin/main | empty |
+
+The power rankings screenshot smoke check is deferred to T057's live pass. The only
+CSS removed was `.verify-*`, and the grep in removal-evidence.md shows no remaining
+user of those selectors anywhere in `web/src`. Not screenshotted yet.
