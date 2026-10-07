@@ -399,6 +399,25 @@ class LeagueHistoryControllerCharacterizationTest {
         check(as(post(url).param("season", "2026").param("week", "1"), ME), 200, "compute-nothing-final");
     }
 
+    /**
+     * Added before conversion, after the first draft of this file missed it.
+     * {@code realizedSkipped} has three wire states, not two: absent, a string, and
+     * present-with-null. The null comes from {@code realizedGap}, which returns null
+     * when scored points exist but no ranking was written. A {@code NON_NULL} record
+     * component would quietly turn this third state into the first.
+     */
+    @Test
+    void computeFinalWeekWhereTheGapHasNoReasonKeepsANullKey() throws Exception {
+        String url = "/api/leagues/" + LEAGUE + "/power/compute";
+        when(membership.visibleLeague(eq(LEAGUE), any())).thenReturn(Optional.of(CURRENT));
+        when(membership.canCommission(eq(100L), any())).thenReturn(true);
+        when(scoredWeeks.of(100L)).thenReturn(new ScoredWeeks.Snapshot(3, 2, Set.of(1, 2)));
+        when(power.computeWeek0IfMissing(100L, LEAGUE, 2026)).thenReturn(new PowerRankingService.Week0Result(entries(12), null));
+        when(power.computeRealized(100L, 2026, 2)).thenReturn(entries(0));
+        when(power.realizedGap(100L, 2)).thenReturn(null);
+        check(as(post(url).param("season", "2026").param("week", "2"), ME), 200, "compute-final-null-gap");
+    }
+
     // ------------------------------------------------------------------ commissioner
 
     @Test
