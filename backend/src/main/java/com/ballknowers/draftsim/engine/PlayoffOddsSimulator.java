@@ -3,6 +3,8 @@ package com.ballknowers.draftsim.engine;
 import java.util.*;
 import java.util.random.RandomGenerator;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * The playoff-odds Monte Carlo (claude/playoff-odds.md). Pure: every input is
  * a value, the only randomness comes from a seed the caller supplies, and it
@@ -236,10 +238,6 @@ public final class PlayoffOddsSimulator {
         List<Integer> out = new ArrayList<>(counts.length);
         for (int c : counts) out.add(c);
         return List.copyOf(out);
-    }
-
-    private static double round2(double v) {
-        return Math.round(v * 100.0) / 100.0;
     }
 
     // --- strength estimation ---------------------------------------------

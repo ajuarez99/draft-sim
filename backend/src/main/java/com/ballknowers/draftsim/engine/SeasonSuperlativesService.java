@@ -14,6 +14,8 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import com.ballknowers.draftsim.domain.LeagueSettings;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Season superlatives, so far (specs/008-season-superlatives). One payload for
  * the whole page: every superlative is computed against the same season
@@ -1534,10 +1536,6 @@ public class SeasonSuperlativesService {
 
     private static Superlative unavailable(Kind kind, String reason) {
         return new Superlative(kind, false, reason, false, null, null, List.of(), null, List.of(), null);
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 
     private static Holder holder(int rosterId, Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,

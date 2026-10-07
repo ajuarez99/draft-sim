@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * claude/league-suite.md Phase A: read-only league history and the power-rankings
  * page. Still no authentication here -- see the plan's auth-split table (mode 2,
@@ -1014,9 +1016,5 @@ public class LeagueHistoryController {
      */
     private static String weekLabel(int week) {
         return week == 0 ? "the preseason" : "week " + week;
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

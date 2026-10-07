@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Assembles the playoff-odds simulation's inputs out of the database and
  * stores what comes back (claude/playoff-odds.md). The model itself lives in
@@ -411,7 +413,7 @@ public class PlayoffOddsService {
         if (total == 0) return null;
         double sum = 0;
         for (Map.Entry<Integer, Integer> e : counts.entrySet()) sum += (double) e.getKey() * e.getValue();
-        return Math.round((sum / total) * 100.0) / 100.0;
+        return round2(sum / total);
     }
 
     /** Counts to fractions of the whole, so a caller renders odds not tallies. */
@@ -419,6 +421,9 @@ public class PlayoffOddsService {
         int total = counts.values().stream().mapToInt(Integer::intValue).sum();
         if (total == 0) return Map.of();
         Map<Integer, Double> out = new TreeMap<>();
+        // Deliberately not Rounding.round3(v / total): scaling before the divide rounds
+        // differently: 5005/10000 gives 0.501 here and 0.5 there, and 12 of the 10,001
+        // possible shares at total=10000 differ (measured, spec 021).
         counts.forEach((k, v) -> out.put(k, Math.round((v * 1000.0 / total)) / 1000.0));
         return out;
     }

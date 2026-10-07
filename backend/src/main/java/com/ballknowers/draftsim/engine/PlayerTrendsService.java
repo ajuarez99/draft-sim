@@ -30,6 +30,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 
+import static com.ballknowers.draftsim.util.Rounding.round;
+
 /**
  * NBA minutes trends and streaming candidates (specs/019-minutes-streaming; the math is
  * data-model.md, the wire shape contracts/api.md).
@@ -545,11 +547,6 @@ public class PlayerTrendsService {
 
     private static Double r2(Double v) {
         return v == null ? null : round(v, 2);
-    }
-
-    private static double round(double v, int dp) {
-        double f = Math.pow(10, dp);
-        return Math.round(v * f) / f;
     }
 
     // ------------------------------------------------------------------ one-game share

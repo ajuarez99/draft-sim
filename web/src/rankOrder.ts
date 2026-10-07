@@ -125,22 +125,7 @@ export function moveChipBy(order: RankOrder, chipId: ChipId, delta: number): Ran
   return move(order, from, to)
 }
 
-/**
- * "1st"/"2nd"/"3rd"/"4th"... for a 1-based rank, for the aria-live
- * announcement ("Placed 4th of 12"). Handles the 11th/12th/13th exception
- * (not "11st") -- easy to get wrong, worth its own tests.
- */
-export function ordinal(n: number): string {
-  const mod100 = n % 100
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`
-  switch (n % 10) {
-    case 1:
-      return `${n}st`
-    case 2:
-      return `${n}nd`
-    case 3:
-      return `${n}rd`
-    default:
-      return `${n}th`
-  }
-}
+/** "1st"/"2nd"/"3rd"... for the aria-live announcement ("Placed 4th of 12").
+ *  Re-exported from format.ts so RankBoard, LeagueHome and ManagerHistory keep
+ *  their imports (spec 021). */
+export { ordinal } from './format'

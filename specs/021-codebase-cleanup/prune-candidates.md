@@ -88,4 +88,4 @@ holds a copy of the tree (`DEPLOY.md`, `Dockerfile`, …). It needs a separate y
 - **Not touched:** the orphan directory `.claude/worktrees/phase1-normalization`
   (the owner chose the option without it), every kept worktree, and every remote
   branch.
-- Recovery: deleted branch tips stay in the reflog (`git reflog`) until gc expiry.
+- Recovery: every deleted branch tip is an ancestor of `origin/main` (that was the selection rule, and `-d` re-checked it), so no commit was lost. *(Corrected: an earlier line here said the reflog keeps them, but deleting a branch deletes its reflog.)*

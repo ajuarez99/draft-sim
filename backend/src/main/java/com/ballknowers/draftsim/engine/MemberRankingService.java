@@ -15,6 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.ballknowers.draftsim.util.Rounding.round1;
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * claude/power-rankings-ballots.md mode 2's aggregation -- computed on read
  * from {@code ranking_ballot}, never stored (see V9's migration comment for
@@ -176,14 +179,6 @@ public class MemberRankingService {
                 + (a.thinCoverage() ? " (thin coverage)" : "");
         return new Entry(a.rosterId(), managerId, rank, avgRank, a.bestRank(), a.worstRank(), stdev,
                 a.ballotCount(), a.thinCoverage(), selfRankBias, note);
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
-    }
-
-    private static double round1(double d) {
-        return Math.round(d * 10.0) / 10.0;
     }
 
     /**

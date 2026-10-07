@@ -6,6 +6,8 @@ import com.ballknowers.draftsim.store.LeagueTransactionRepository;
 import java.time.Instant;
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Waiver Wire Warrior attribution (specs/008-season-superlatives US3, research
  * R8): starting-lineup points from players whose most recent arrival on that
@@ -152,9 +154,5 @@ public final class WaiverPickupAttribution {
         if (a == null) return false;
         if (b == null) return true;
         return a.isAfter(b);
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

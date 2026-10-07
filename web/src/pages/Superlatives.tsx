@@ -23,6 +23,7 @@ import CommissionerHonourNote from '../components/CommissionerHonourNote'
 import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { ordinal } from '../format'
 
 /**
  * specs/008-season-superlatives US1: the season's extremes and close games.
@@ -650,13 +651,6 @@ function detailLine(d: SuperlativeDetail): string {
     default:
       return ''
   }
-}
-
-/** "1st"/"2nd"/"3rd"/"4th…", matching ExpectedWins.tsx's own helper. */
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }
 
 /**

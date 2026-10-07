@@ -83,14 +83,5 @@ export function signedPoints(v: number): string {
   return r > 0 ? `+${r.toFixed(1)}` : `−${Math.abs(r).toFixed(1)}`
 }
 
-/** 1st, 2nd, 3rd, 4th, 11th, 12th, 21st... */
-export function ordinal(n: number): string {
-  const m100 = n % 100
-  if (m100 >= 11 && m100 <= 13) return `${n}th`
-  switch (n % 10) {
-    case 1: return `${n}st`
-    case 2: return `${n}nd`
-    case 3: return `${n}rd`
-    default: return `${n}th`
-  }
-}
+// Re-exported so PlayerCard and draftGrades.test keep their imports (spec 021).
+export { ordinal } from './format'

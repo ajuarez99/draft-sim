@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * One week's digest: every matchup, the week's best performances, and the
  * awards that fall out of them (specs/004-ffwrapped-feature-parity, US5).
@@ -381,7 +383,7 @@ public class WeeklyReportService {
                     Integer rosterId = rosterByPlayer.get(e.getKey());
                     weeks.add(new PlayerWeek(e.getKey(), pl.name(), pl.primary().name(),
                             ownerByRoster.getOrDefault(rosterId, "Roster " + rosterId),
-                            Math.round(e.getValue()[0] * 100.0) / 100.0, played));
+                            round2(e.getValue()[0]), played));
                 }
                 bestWeek = rankWeeks(weeks, RANK_LIMIT);
             }

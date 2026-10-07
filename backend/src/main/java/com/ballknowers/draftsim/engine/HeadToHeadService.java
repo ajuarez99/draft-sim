@@ -13,6 +13,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Two managers, the seasons they actually shared, and the games that pairing
  * produced -- specs/006-deeper-history-both-sports US4 (research R6). ffwrapped
@@ -209,10 +211,5 @@ public class HeadToHeadService {
         if (everScheduled) return "fixtures are scheduled but no week is scored yet";
         if (!scheduled.isEmpty()) return "the schedule never paired them this season";
         return "fixtures haven't been loaded for this league's season yet";
-    }
-
-    /** Points are a two-decimal quantity everywhere Sleeper reports them (mirrors ManagerCareerService). */
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

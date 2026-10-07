@@ -4,6 +4,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * What one game is worth under one league's scoring
  * (specs/005-daily-weekly-top-players, research R3).
@@ -51,6 +53,6 @@ public class GameScoringService {
         }
         // Half-point categories make exact ties common and floating error visible;
         // two decimals is well inside what any fantasy scoring expresses.
-        return Math.round(total * 100.0) / 100.0;
+        return round2(total);
     }
 }

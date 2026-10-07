@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Reading and setting a private note about each manager.
  *
@@ -159,18 +161,18 @@ public class ManagerController {
         m.put("avatarId", p.avatarId());
         m.put("provenance", p.provenance().name());
         // The value the engine will actually use, after blending.
-        m.put("effectiveReachBias", Math.round(p.reachBias() * 100) / 100.0);
+        m.put("effectiveReachBias", round2(p.reachBias()));
         // The unshrunk average of this manager's own scoreable picks -- "what
         // they normally pick," independent of any stated belief. Null with no
         // scoreable picks.
-        m.put("empiricalReachBias", empiricalReachBias == null ? null : Math.round(empiricalReachBias * 100) / 100.0);
+        m.put("empiricalReachBias", empiricalReachBias == null ? null : round2(empiricalReachBias));
         // Reach measured against the OTHER managers in the same draft(s), not the market
         // board (audit 11: the board runs several picks off for every room). Positive =
         // earlier than the room. The standard error rides with it so the client can say
         // "drafts like the room" inside one SE. Both null with no scoreable picks; the
         // SE is also null with fewer than 2. Display only -- the engine never reads these.
-        m.put("relativeReachBias", relativeReachBias == null ? null : Math.round(relativeReachBias * 100) / 100.0);
-        m.put("relativeReachStdErr", relativeReachStdErr == null ? null : Math.round(relativeReachStdErr * 100) / 100.0);
+        m.put("relativeReachBias", relativeReachBias == null ? null : round2(relativeReachBias));
+        m.put("relativeReachStdErr", relativeReachStdErr == null ? null : round2(relativeReachStdErr));
         m.put("unpredictability", p.unpredictability());
         m.put("positionalTilt", p.positionalTilt());
         // The caller's own private note, never anything shared.

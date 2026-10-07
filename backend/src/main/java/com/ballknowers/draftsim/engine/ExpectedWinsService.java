@@ -6,6 +6,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Expected wins, schedule luck and strength of schedule
  * (specs/004-ffwrapped-feature-parity, US3).
@@ -369,9 +371,5 @@ public class ExpectedWinsService {
         int weeks = (int) games.stream().mapToInt(Game::week).distinct().count();
         return new Result(true, null, league.season(), found.requestedSeason(),
                 league.sport(), weeks, round2(leaguePpg(games)), teams);
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

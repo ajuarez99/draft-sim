@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round;
+
 /**
  * The League analysis page's three computed blocks (claude/league-analysis.md):
  * a composite ranking score, rest-of-season roster projections broken out by
@@ -326,7 +328,6 @@ public class LeagueAnalysisService {
 
         return new Scores(true, null, List.copyOf(byWeek.keySet()), List.copyOf(rows));
     }
-
 
     // ---- piece 1 ----
 
@@ -821,10 +822,5 @@ public class LeagueAnalysisService {
 
     private static int asInt(Object o) {
         return o instanceof Number n ? n.intValue() : -1;
-    }
-
-    private static double round(double v, int places) {
-        double f = Math.pow(10, places);
-        return Math.round(v * f) / f;
     }
 }
