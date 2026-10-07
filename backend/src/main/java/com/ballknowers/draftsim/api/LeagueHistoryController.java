@@ -25,6 +25,26 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+import com.ballknowers.draftsim.api.dto.ManagerHistoryResponses.CareerResponse;
+import com.ballknowers.draftsim.api.dto.ManagerHistoryResponses.DraftHistoryEntry;
+import com.ballknowers.draftsim.api.dto.ManagerHistoryResponses.ManagerHistoryResponse;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.BackfillResponse;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.Backfilled;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.BallotMemberRow;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.BallotResponse;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.BallotSaved;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.CommissionerSaved;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.ComputeResponse;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.MyBallot;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.PlayoffOddsSummaryRow;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.PowerEntry;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.PowerRankingsResponse;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.Skipped;
+import com.ballknowers.draftsim.api.dto.PowerRankingResponses.SportStateRow;
+import com.ballknowers.draftsim.api.dto.RecordBookResponses.RecordBookResponse;
+import com.ballknowers.draftsim.api.dto.StandingsResponses.HistoryStandingRow;
+import com.ballknowers.draftsim.api.dto.StandingsResponses.StandingBase;
+
 import static com.ballknowers.draftsim.util.Rounding.round2;
 
 /**
@@ -104,7 +124,7 @@ public class LeagueHistoryController {
         boolean callerAnonymous = LeagueMembership.isAnonymous(sleeperUserId);
         Long callerManagerId = callerAnonymous ? null : managers.idsBySleeperUserId().get(sleeperUserId);
 
-        List<Map<String, Object>> seasons = new ArrayList<>();
+        List<HistorySeason> seasons = new ArrayList<>();
         for (int i = 0; i < chain.size(); i++) {
             LeagueRepository.LeagueRow league = chain.get(i);
             // T028 (specs/006-deeper-history-both-sports research R2):
@@ -130,24 +150,27 @@ public class LeagueHistoryController {
             // season's own team name (it changes year to year), falling back to
             // the username the row already carries.
             Map<Long, String> teamNames = teamNamesByManager(league.id());
-            List<Map<String, Object>> standings = rosterSeasons.forLeague(league.id()).stream()
+            List<HistoryStandingRow> standings = rosterSeasons.forLeague(league.id()).stream()
                     .map(r -> {
-                        Map<String, Object> row = withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks);
-                        // Mutable map: teamName is legitimately null for an unowned roster.
-                        row.put("teamName", r.managerId() == null ? null
-                                : teamNames.getOrDefault(r.managerId(), r.managerName()));
-                        // Spec 013 T031: this row's manager is the caller's manager.
-                        row.put("isMe", callerManagerId != null && callerManagerId.equals(r.managerId()));
-                        return row;
+                        // The rank cell. rankStatus is on EVERY row, and finalRank is non-null exactly
+                        // when the status is RANKED. The other three statuses each carry a different
+                        // reason there is no rank, which is the point: a bare null on the wire would
+                        // leave the page nothing to say (FR-005). A roster missing from an
+                        // otherwise-present snapshot has no rank of its own, whatever the season's
+                        // status is.
+                        Integer rank = ranks.byRoster().get(r.rosterId());
+                        String rankStatus = (rank == null && ranks.status() == PowerRankingService.RankStatus.RANKED
+                                ? PowerRankingService.RankStatus.UNAVAILABLE : ranks.status()).name();
+                        return new HistoryStandingRow(
+                                StandingBase.of(r, league.complete()),
+                                rankStatus, rank, rank == null ? null : ranks.week(),
+                                // teamName is legitimately null for an unowned roster.
+                                r.managerId() == null ? null : teamNames.getOrDefault(r.managerId(), r.managerName()),
+                                // Spec 013 T031: this row's manager is the caller's manager.
+                                callerManagerId != null && callerManagerId.equals(r.managerId()));
                     })
                     .toList();
-            Map<String, Object> season = new LinkedHashMap<>();
-            season.put("season", league.season());
-            season.put("leagueId", league.id());
-            season.put("sleeperLeagueId", league.sleeperId());
-            season.put("name", league.name());
-            season.put("standings", standings);
-            seasons.add(season);
+            seasons.add(new HistorySeason(league.season(), league.id(), league.sleeperId(), league.name(), standings));
         }
 
         // Records span the CHAIN, not seasons[0]. league.id is a league-season
@@ -155,178 +178,19 @@ public class LeagueHistoryController {
         // could already answer (specs/002-league-history-record-book, FR-001).
         List<Long> chainIds = chain.stream().map(LeagueRepository.LeagueRow::id).toList();
 
-        // LinkedHashMap, not Map.of: marginsUnavailableReason is legitimately
-        // null once pairings exist, and Map.of throws on a null value. Same
-        // reason the power compute endpoint below builds its response this way.
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("sleeperLeagueId", sleeperId);
-        // Spec 013 T031: gates the History page's Compute control. Same rule as ballot().
-        response.put("canCommission", membership.canCommission(visible.get().id(), sleeperUserId));
-        response.put("records", recordBook(records.forChain(chainIds, WeekBound.ALL_WEEKS)));
-        response.put("seasons", seasons);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new HistoryResponse(sleeperId,
+                // Spec 013 T031: gates the History page's Compute control. Same rule as ballot().
+                membership.canCommission(visible.get().id(), sleeperUserId),
+                RecordBookResponse.of(records.forChain(chainIds, WeekBound.ALL_WEEKS)),
+                seasons));
     }
 
-    /**
-     * The record book as the client reads it. Always emitted, even when every
-     * list is empty -- an absent key would make "this league has no records"
-     * indistinguishable from "this endpoint is older than the record book"
-     * (contracts/league-history-api.md).
-     */
-    /**
-     * The rank cell on a standings row. rankStatus is present on EVERY row;
-     * finalRank is non-null exactly when the status is RANKED. The three other
-     * statuses each carry a different reason there is no rank, which is the
-     * point -- a bare null on the wire would leave the page nothing to say
-     * (FR-005).
-     */
-    private static Map<String, Object> withFinalRank(Map<String, Object> row, int rosterId,
-                                                     PowerRankingService.SeasonRanks ranks) {
-        Integer rank = ranks.byRoster().get(rosterId);
-        // A roster missing from an otherwise-present snapshot has no rank of its
-        // own, whatever the season's status is.
-        row.put("rankStatus", (rank == null && ranks.status() == PowerRankingService.RankStatus.RANKED
-                ? PowerRankingService.RankStatus.UNAVAILABLE : ranks.status()).name());
-        row.put("finalRank", rank);
-        row.put("finalRankWeek", rank == null ? null : ranks.week());
-        return row;
-    }
+    /** {@code GET /leagues/{id}/history}. The record book spans the chain; seasons are newest first. */
+    public record HistoryResponse(String sleeperLeagueId, boolean canCommission, RecordBookResponse records,
+                                  List<HistorySeason> seasons) {}
 
-    private static Map<String, Object> recordBook(LeagueRecordService.RecordBook b) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("limit", b.limit());
-        m.put("highestWeeks", b.highestWeeks().stream().map(LeagueHistoryController::weeklyScoreRow).toList());
-        m.put("lowestWeeks", b.lowestWeeks().stream().map(LeagueHistoryController::weeklyScoreRow).toList());
-        m.put("closestMatchups", b.closestMatchups().stream().map(LeagueHistoryController::marginRow).toList());
-        m.put("biggestBlowouts", b.biggestBlowouts().stream().map(LeagueHistoryController::marginRow).toList());
-        m.put("marginsUnavailableReason", b.marginsUnavailableReason());
-        // T063 (specs/006-deeper-history-both-sports, US5): always present,
-        // even empty -- an absent key here would be the same ambiguity the
-        // comment above already names for the four original lists, and this
-        // endpoint has shipped once already without these three.
-        m.put("pointsLeaders", b.pointsLeaders().stream().map(LeagueHistoryController::pointsLeaderRow).toList());
-        m.put("winStreaks", b.winStreaks().stream().map(LeagueHistoryController::streakRow).toList());
-        m.put("lossStreaks", b.lossStreaks().stream().map(LeagueHistoryController::streakRow).toList());
-        return m;
-    }
-
-    private static Map<String, Object> pointsLeaderRow(LeagueRecordService.PointsLeaderRecord r) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rosterId", r.rosterId());
-        m.put("managerId", r.managerId());
-        m.put("manager", r.manager());
-        m.put("avatarId", r.avatarId());
-        // BigDecimal, same reason weeklyScoreRow's points is -- the wire
-        // carries the stored number, formatting is the client's call.
-        m.put("points", r.points());
-        m.put("spanSeasons", r.spanSeasons());
-        return m;
-    }
-
-    private static Map<String, Object> streakRow(LeagueRecordService.StreakRecord r) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rosterId", r.rosterId());
-        m.put("managerId", r.managerId());
-        m.put("manager", r.manager());
-        m.put("avatarId", r.avatarId());
-        m.put("length", r.length());
-        m.put("spanSeasons", r.spanSeasons());
-        m.put("startWeek", r.startWeek());
-        m.put("endWeek", r.endWeek());
-        // Carried per-entry, not once for the list, so the page can state the
-        // rule beside the figure itself rather than leave it to the reader to
-        // assume (research R7, US5.2).
-        m.put("withinSeasonOnly", r.withinSeasonOnly());
-        return m;
-    }
-
-    private static Map<String, Object> weeklyScoreRow(LeagueRecordService.WeeklyScoreRecord r) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("season", r.season());
-        m.put("week", r.week());
-        m.put("rosterId", r.rosterId());
-        m.put("managerId", r.managerId());
-        m.put("manager", r.manager());
-        m.put("avatarId", r.avatarId());
-        // BigDecimal, so Jackson writes 205.04 rather than a pre-formatted
-        // string -- formatting is the client's call, not the wire's.
-        m.put("points", r.points());
-        return m;
-    }
-
-    private static Map<String, Object> marginRow(LeagueRecordService.MarginRecord r) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("season", r.season());
-        m.put("week", r.week());
-        m.put("margin", r.margin());
-        m.put("winner", marginSide(r.winner()));
-        m.put("loser", marginSide(r.loser()));
-        return m;
-    }
-
-    private static Map<String, Object> marginSide(LeagueRecordService.Side s) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rosterId", s.rosterId());
-        m.put("managerId", s.managerId());
-        m.put("manager", s.manager());
-        m.put("avatarId", s.avatarId());
-        m.put("points", s.points());
-        return m;
-    }
-
-    /**
-     * @param seasonComplete whether the season this row belongs to has
-     *                       actually finished -- resolved by the CALLER, not
-     *                       read off {@code r.complete()} directly, because
-     *                       that field is null from history()'s per-league
-     *                       call ({@code forLeague()} never joins
-     *                       {@code league.status}; the caller already holds
-     *                       this season's own {@code LeagueRow} and passes
-     *                       its {@code complete()}). {@code managerHistory()}
-     *                       has no per-row {@code LeagueRow} in scope, so it
-     *                       passes {@code r.complete()} itself, populated by
-     *                       {@code forManager()}'s join through the same
-     *                       {@code LeagueRow.complete()} rule (T014).
-     *                       specs/006-deeper-history-both-sports T026.
-     */
-    private static Map<String, Object> standingRow(RosterSeasonRepository.StandingRow r, boolean seasonComplete) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        // T040 (specs/006-deeper-history-both-sports): contracts/manager-profile-api.md's
-        // careers[].seasons[] shape names leagueId explicitly, alongside
-        // sleeperLeagueId -- the internal id is what a rank/chain lookup
-        // joins on, the Sleeper id is what a re-ingest or a deep link uses.
-        // Added here rather than only for the careers[] path since
-        // standingRow() is the one row-builder shared with history()'s league
-        // standings too -- an extra field is harmless there.
-        m.put("leagueId", r.leagueId());
-        m.put("rosterId", r.rosterId());
-        m.put("managerId", r.managerId());
-        m.put("manager", r.managerName());
-        m.put("avatarId", r.avatarId());
-        m.put("wins", r.wins());
-        m.put("losses", r.losses());
-        m.put("ties", r.ties());
-        m.put("pointsFor", r.pointsFor());
-        m.put("pointsAgainst", r.pointsAgainst());
-        // Gated on seasonComplete, not derived from finalPlacement alone, so a
-        // final_placement=1 stored before the T023 status gate existed (or a
-        // row whose league has not been re-ingested since V21) can never
-        // resurface here as a trophy -- the exact defect baseline.md T003
-        // measured: popsharky and gregmullen, both "champion" of a 2026
-        // season one week old.
-        m.put("champion", r.finalPlacement() != null && r.finalPlacement() == 1 && seasonComplete);
-        // Null from history()'s per-league call (the page already knows all
-        // five of these); populated from managerHistory(), which spans
-        // several leagues/seasons/sports and has no other way to tell its
-        // rows apart, link back to one, or say which sport it was
-        // (specs/006-deeper-history-both-sports US1).
-        m.put("season", r.season());
-        m.put("sleeperLeagueId", r.sleeperLeagueId());
-        m.put("sport", r.sport());
-        m.put("leagueName", r.leagueName());
-        m.put("complete", r.complete());
-        return m;
-    }
+    public record HistorySeason(int season, long leagueId, String sleeperLeagueId, String name,
+                                List<HistoryStandingRow> standings) {}
 
     /**
      * One manager's record across every ingested season, plus their career-wide
@@ -351,10 +215,6 @@ public class LeagueHistoryController {
         List<RosterSeasonRepository.StandingRow> seasons = rosterSeasons.forManager(managerId);
         if (seasons.isEmpty()) return ResponseEntity.notFound().build();
 
-        Map<String, Object> record = new LinkedHashMap<>();
-        record.put("managerId", managerId);
-        record.put("manager", seasons.get(0).managerName());
-        record.put("avatarId", seasons.get(0).avatarId());
         // The flat seasons[] that used to sit here is GONE (T076) -- step 3 of
         // the migration in specs/006-deeper-history-both-sports/contracts/manager-profile-api.md,
         // now that ManagerHistory.tsx reads careers[].seasons[] instead.
@@ -382,32 +242,25 @@ public class LeagueHistoryController {
         // Two fits per request, one per sport. ProfileService's own comment is
         // explicit that fitting is cheap at this data size and deliberately
         // uncached; the seats endpoint already pays for one on every call.
-        List<Map<String, Object>> draftHistory = new ArrayList<>();
+        List<DraftHistoryEntry> draftHistory = new ArrayList<>();
         for (Sport sport : Sport.values()) {
             ProfileService.Fit fit = profiles.fit(sport);
             ManagerProfile fitted = fit.profiles().get(managerId);
             if (fitted == null || fitted.draftsObserved() == 0) continue;
-            Map<String, Object> derived = new LinkedHashMap<>();
-            derived.put("sport", sport);
-            derived.put("reachBias", round2(fitted.reachBias()));
             // Room-relative reach and its standard error (audit 11); null when
-            // there are no scoreable picks / fewer than 2. Mutable map: null-safe.
+            // there are no scoreable picks / fewer than 2.
             Double rel = fit.relativeReachBias().get(managerId);
             Double se = fit.relativeReachStdErr().get(managerId);
-            derived.put("relativeReachBias", rel == null ? null : round2(rel));
-            derived.put("relativeReachStdErr", se == null ? null : round2(se));
-            derived.put("positionalTilt", fitted.positionalTilt());
-            derived.put("draftsObserved", fitted.draftsObserved());
-            // Carried so the client can tell "drafts the board" from "no reach
-            // signal exists" -- 0 here means reachBias is the league mean
-            // wearing this manager's name, which is every basketball manager,
-            // permanently (multi-sport-and-rebrand.md, "Basketball has no
-            // reach signal").
-            derived.put("picksScored", fitted.picksScored());
-            derived.put("provenance", fitted.provenance().name());
-            draftHistory.add(derived);
+            draftHistory.add(new DraftHistoryEntry(sport, round2(fitted.reachBias()),
+                    rel == null ? null : round2(rel), se == null ? null : round2(se),
+                    fitted.positionalTilt(), fitted.draftsObserved(),
+                    // Carried so the client can tell "drafts the board" from "no reach
+                    // signal exists" -- 0 here means reachBias is the league mean
+                    // wearing this manager's name, which is every basketball manager,
+                    // permanently (multi-sport-and-rebrand.md, "Basketball has no
+                    // reach signal").
+                    fitted.picksScored(), fitted.provenance().name()));
         }
-        record.put("draftHistory", draftHistory);
 
         // T040 (specs/006-deeper-history-both-sports, US3): careers[] is now
         // the ONLY season list in this response -- it shipped alongside the
@@ -415,94 +268,10 @@ public class LeagueHistoryController {
         // ManagerHistory.tsx had moved over. At no point does a caller see a
         // career total spanning two sports (careers[] is one entry per sport,
         // same rule draftHistory above already follows).
-        record.put("careers", careers.forManager(managerId).stream()
-                .map(LeagueHistoryController::careerRow)
-                .toList());
+        List<CareerResponse> careerList = careers.forManager(managerId).stream().map(CareerResponse::of).toList();
 
-        return ResponseEntity.ok(record);
-    }
-
-    private static Map<String, Object> careerRow(ManagerCareerService.CareerProfile c) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("sport", c.sport());
-        m.put("seasonsCounted", c.seasonsCounted());
-        m.put("seasons", c.seasons().stream().map(LeagueHistoryController::careerSeasonRow).toList());
-        m.put("wins", c.wins());
-        m.put("losses", c.losses());
-        m.put("ties", c.ties());
-        m.put("winRate", c.winRate());
-        m.put("pointsFor", c.pointsFor());
-        m.put("pointsAgainst", c.pointsAgainst());
-        m.put("pointsPerSeason", c.pointsPerSeason());
-        m.put("averageEfficiency", c.averageEfficiency());
-        m.put("weeksCounted", c.weeksCounted());
-        m.put("weeksExcluded", c.weeksExcluded());
-        m.put("winsAboveExpected", c.winsAboveExpected());
-        m.put("titles", c.titles());
-        m.put("unavailable", c.unavailable().stream().map(LeagueHistoryController::unavailableRow).toList());
-        m.put("ranks", c.ranks().stream().map(LeagueHistoryController::rankRow).toList());
-        // T073/US6: waivers rides alongside unavailable/ranks on the same
-        // per-sport career block, never a top-level total -- one entry per
-        // sport, same as every other figure on this object.
-        m.put("waivers", waiverTendencyRow(c.waivers()));
-        return m;
-    }
-
-    private static Map<String, Object> waiverTendencyRow(TransactionAnalysisService.WaiverTendency w) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("movesPerSeason", w.movesPerSeason());
-        m.put("seasonsCounted", w.seasonsCounted());
-        m.put("faab", w.faab() == null ? null : faabTendencyRow(w.faab()));
-        m.put("faabExcludedSeasons", w.faabExcludedSeasons().stream()
-                .map(LeagueHistoryController::excludedSeasonRow).toList());
-        return m;
-    }
-
-    private static Map<String, Object> faabTendencyRow(TransactionAnalysisService.FaabTendency f) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("typicalBidPct", f.typicalBidPct());
-        m.put("largestBidPct", f.largestBidPct());
-        m.put("spentPerSeasonPct", f.spentPerSeasonPct());
-        m.put("claimsPerSeason", f.claimsPerSeason());
-        m.put("bidSuccessRate", f.bidSuccessRate());
-        return m;
-    }
-
-    private static Map<String, Object> excludedSeasonRow(TransactionAnalysisService.ExcludedSeason e) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("season", e.season());
-        m.put("leagueName", e.leagueName());
-        m.put("reason", e.reason());
-        return m;
-    }
-
-    /**
-     * A careers[].seasons[] row is standingRow()'s own shape PLUS `counted` --
-     * the one field standingRow() cannot supply on its own, since counted is
-     * a fact about roster_week_points, not roster_season (T035, computed once
-     * in {@link ManagerCareerService}, not re-derived here).
-     */
-    private static Map<String, Object> careerSeasonRow(ManagerCareerService.SeasonEntry se) {
-        Map<String, Object> row = standingRow(se.row(), Boolean.TRUE.equals(se.row().complete()));
-        row.put("counted", se.counted());
-        return row;
-    }
-
-    private static Map<String, Object> unavailableRow(ManagerCareerService.Unavailable u) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("figure", u.figure());
-        m.put("reason", u.reason());
-        return m;
-    }
-
-    private static Map<String, Object> rankRow(ManagerCareerService.Rank r) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("figure", r.figure());
-        m.put("position", r.position());
-        m.put("population", r.population());
-        m.put("leagueName", r.leagueName());
-        m.put("sleeperLeagueId", r.sleeperLeagueId());
-        return m;
+        return ResponseEntity.ok(new ManagerHistoryResponse(managerId, seasons.get(0).managerName(),
+                seasons.get(0).avatarId(), draftHistory, careerList));
     }
 
     /**
@@ -538,7 +307,7 @@ public class LeagueHistoryController {
                 .filter(s -> !("COMPUTED_REALIZED".equals(s.kind()) && s.week() > 0 && s.week() > latestFinal))
                 .toList();
 
-        List<Map<String, Object>> entries = new ArrayList<>(
+        List<PowerEntry> entries = new ArrayList<>(
                 snapshots.stream().map(LeagueHistoryController::snapshotRow).toList());
 
         Map<Long, String> managerNames = managers.names();
@@ -558,45 +327,26 @@ public class LeagueHistoryController {
         // Every entry (computed and MEMBER alike) names its team, so the page can
         // put the team first and the username second without a second lookup.
         Map<Long, String> teamNames = teamNamesByManager(row.id());
-        for (Map<String, Object> e : entries) {
-            Object managerId = e.get("managerId");
-            e.put("teamName", managerId == null ? null : teamNames.getOrDefault((Long) managerId, (String) e.get("manager")));
-        }
+        entries.replaceAll(e -> e.withTeamName(
+                e.managerId() == null ? null : teamNames.getOrDefault(e.managerId(), e.manager())));
 
-        Map<String, Object> sportState = new LinkedHashMap<>();
-        sportState.put("week", state.week());
-        sportState.put("season", state.season());
-        sportState.put("seasonStartDate", state.seasonStartDate());
-        sportState.put("started", state.started());
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("sleeperLeagueId", sleeperId);
-        response.put("sportState", sportState);
-        response.put("entries", entries);
-        // Null when this league has no odds at all -- the page then says nothing
-        // about a simulation instead of describing one that never ran.
-        playoffOdds.summary(row.id(), row.season()).ifPresentOrElse(
-                s -> {
-                    Map<String, Object> odds = new LinkedHashMap<>();
-                    odds.put("week", s.week());
-                    odds.put("iterations", s.iterations());
-                    odds.put("model", s.model());
-                    odds.put("weeksOfScoring", s.weeksOfScoring());
-                    response.put("playoffOdds", odds);
-                },
-                () -> response.put("playoffOdds", null));
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new PowerRankingsResponse(sleeperId,
+                new SportStateRow(state.week(), state.season(), state.seasonStartDate(), state.started()),
+                entries,
+                // Null when this league has no odds at all -- the page then says nothing
+                // about a simulation instead of describing one that never ran.
+                playoffOdds.summary(row.id(), row.season())
+                        .map(o -> new PlayoffOddsSummaryRow(o.week(), o.iterations(), o.model(), o.weeksOfScoring()))
+                        .orElse(null)));
     }
 
-    private static void attachPlayoffOdds(List<Map<String, Object>> entries,
-                                          Map<Integer, Map<Integer, Double>> byWeek) {
+    private static void attachPlayoffOdds(List<PowerEntry> entries, Map<Integer, Map<Integer, Double>> byWeek) {
         if (byWeek.isEmpty()) return;
-        for (Map<String, Object> entry : entries) {
-            Map<Integer, Double> week = byWeek.get((Integer) entry.get("week"));
-            if (week == null) continue;
-            Double pct = week.get((Integer) entry.get("rosterId"));
-            if (pct != null) entry.put("makesPlayoffsPct", pct);
-        }
+        entries.replaceAll(e -> {
+            Map<Integer, Double> week = byWeek.get(e.week());
+            Double pct = week == null ? null : week.get(e.rosterId());
+            return pct == null ? e : e.withMakesPlayoffsPct(pct);
+        });
     }
 
     /** Sleeper's per-league team name by manager; the ingest already falls back to the display name and drops "TBD". */
@@ -608,12 +358,12 @@ public class LeagueHistoryController {
         return out;
     }
 
-    private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {
+    private static PowerEntry snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {
         return entryRow(r.season(), r.week(), r.kind(), r.rosterId(), r.managerId(), r.managerName(), r.avatarId(),
                 r.rank(), r.score(), r.note(), null, null, null, null, null);
     }
 
-    private static Map<String, Object> memberRow(int season, int week, MemberRankingService.Entry e,
+    private static PowerEntry memberRow(int season, int week, MemberRankingService.Entry e,
                                                   Map<Long, String> managerNames, Map<Long, String> managerAvatars) {
         String manager = e.managerId() == null ? null : managerNames.get(e.managerId());
         String avatarId = e.managerId() == null ? null : managerAvatars.get(e.managerId());
@@ -634,31 +384,15 @@ public class LeagueHistoryController {
      * and this roster's own owner's individual vote, and no other member's
      * individual ballot is ever exposed to compute it.
      */
-    private static Map<String, Object> entryRow(int season, int week, String kind, int rosterId, Long managerId,
-                                                 String manager, String avatarId, int rank, Double score, String note,
-                                                 Integer bestRank, Integer worstRank, Double stdev,
-                                                 Integer ballotCount, Integer selfRankBias) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("season", season);
-        m.put("week", week);
-        m.put("kind", kind);
-        m.put("rosterId", rosterId);
-        m.put("managerId", managerId);
-        m.put("manager", manager);
-        m.put("avatarId", avatarId);
-        m.put("rank", rank);
-        m.put("score", score);
-        m.put("note", note);
-        m.put("bestRank", bestRank);
-        m.put("worstRank", worstRank);
-        m.put("stdev", stdev);
-        m.put("ballotCount", ballotCount);
-        m.put("selfRankBias", selfRankBias);
-        // Always present, null until a stored odds snapshot fills it in
-        // (attachPlayoffOdds). Same discipline as bestRank/stdev above: the
-        // client's type is one shape, not one shape per kind.
-        m.put("makesPlayoffsPct", null);
-        return m;
+    private static PowerEntry entryRow(int season, int week, String kind, int rosterId, Long managerId,
+                                       String manager, String avatarId, int rank, Double score, String note,
+                                       Integer bestRank, Integer worstRank, Double stdev,
+                                       Integer ballotCount, Integer selfRankBias) {
+        // makesPlayoffsPct is always present, null until a stored odds snapshot fills it
+        // in (attachPlayoffOdds); teamName is filled in last. Same discipline as
+        // bestRank/stdev: the client's type is one shape, not one shape per kind.
+        return new PowerEntry(season, week, kind, rosterId, managerId, manager, avatarId, rank, score, note,
+                bestRank, worstRank, stdev, ballotCount, selfRankBias, null, null);
     }
 
     /**
@@ -691,19 +425,12 @@ public class LeagueHistoryController {
         boolean isMember = callerManagerId != null && leagueMembers.isMember(row.id(), callerManagerId);
         boolean canSubmit = !anonymous && isMember && effectiveWeek == state.week();
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("season", row.season());
-        response.put("week", effectiveWeek);
-        response.put("canSubmit", canSubmit);
-        response.put("canCommission", membership.canCommission(row.id(), sleeperUserId));
-        response.put("commissionerKnown", leagueMembers.anyCommissioner(row.id()));
-
+        boolean canCommission = membership.canCommission(row.id(), sleeperUserId);
+        boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
         List<MemberRankingService.BallotMember> members = memberRankings.members(row.id(), sleeperId, sleeperUserId);
-        response.put("memberCount", members.size());
-        response.put("ballotCount", ballots.forWeek(row.id(), effectiveWeek).size());
-        response.put("members", members.stream().map(LeagueHistoryController::ballotMemberRow).toList());
+        int ballotCount = ballots.forWeek(row.id(), effectiveWeek).size();
 
-        Map<String, Object> mine = null;
+        MyBallot mine = null;
         if (callerManagerId != null) {
             Optional<RankingBallotRepository.Ballot> myBallot = ballots.find(row.id(), effectiveWeek, callerManagerId);
             if (myBallot.isPresent()) {
@@ -711,25 +438,15 @@ public class LeagueHistoryController {
                         .sorted(Comparator.comparingInt(RankingBallotRepository.BallotEntry::rank))
                         .map(RankingBallotRepository.BallotEntry::rosterId)
                         .toList();
-                mine = new LinkedHashMap<>();
-                mine.put("rosterIds", orderedRosterIds);
-                mine.put("submittedAt", myBallot.get().submittedAt().toString());
+                mine = new MyBallot(orderedRosterIds, myBallot.get().submittedAt().toString());
             }
         }
-        response.put("mine", mine);
 
-        return ResponseEntity.ok(response);
-    }
-
-    private static Map<String, Object> ballotMemberRow(MemberRankingService.BallotMember m) {
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("rosterId", m.rosterId());
-        row.put("managerId", m.managerId());
-        row.put("manager", m.manager());
-        row.put("avatarId", m.avatarId());
-        row.put("teamName", m.teamName());
-        row.put("isMe", m.isMe());
-        return row;
+        return ResponseEntity.ok(new BallotResponse(row.season(), effectiveWeek, canSubmit, canCommission,
+                commissionerKnown, members.size(), ballotCount,
+                members.stream().map(m -> new BallotMemberRow(m.rosterId(), m.managerId(), m.manager(),
+                        m.avatarId(), m.teamName(), m.isMe())).toList(),
+                mine));
     }
 
     public record BallotSubmission(Integer week, List<Integer> rosterIds) {}
@@ -803,7 +520,7 @@ public class LeagueHistoryController {
         }
 
         ballots.upsert(row.id(), body.week(), managerId, body.rosterIds());
-        return ResponseEntity.ok(Map.of("saved", true, "season", row.season(), "week", body.week()));
+        return ResponseEntity.ok(new BallotSaved(true, row.season(), body.week()));
     }
 
     /**
@@ -849,30 +566,17 @@ public class LeagueHistoryController {
 
         List<PowerRankingService.BackfilledSeason> results = power.backfillFinalRanks(chain, season);
 
-        List<Map<String, Object>> backfilled = new ArrayList<>();
-        List<Map<String, Object>> skipped = new ArrayList<>();
+        List<Backfilled> backfilled = new ArrayList<>();
+        List<Skipped> skipped = new ArrayList<>();
         for (PowerRankingService.BackfilledSeason r : results) {
-            if (r.reason() == null) {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("season", r.season());
-                m.put("week", r.week());
-                m.put("entries", r.entries());
-                backfilled.add(m);
-            } else {
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("season", r.season());
-                m.put("reason", r.reason());
-                skipped.add(m);
-            }
+            if (r.reason() == null) backfilled.add(new Backfilled(r.season(), r.week(), r.entries()));
+            else skipped.add(new Skipped(r.season(), r.reason()));
         }
 
         // An empty "backfilled" always arrives with a populated "skipped". A
         // zero that does not say why reads as a broken feature -- the same
         // argument /power/compute below already makes about its own counts.
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("backfilled", backfilled);
-        response.put("skipped", skipped);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new BackfillResponse(backfilled, skipped));
     }
 
     @PostMapping("/leagues/{sleeperId}/power/compute")
@@ -911,38 +615,27 @@ public class LeagueHistoryController {
                 ? playoffOdds.compute(league.get().id(), season, oddsThrough)
                 : java.util.List.<com.ballknowers.draftsim.store.PlayoffOddsRepository.Entry>of();
 
-        // LinkedHashMap, not Map.of: the reason below is legitimately absent on
-        // the happy path, and Map.of throws on a null value.
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("week0", week0.entries().length);
-        response.put("realized", realized.length);
-        response.put("playoffOdds", odds.size());
-        // The week the odds were ACTUALLY computed through, which is the requested week only
-        // when that week is final. Absent when no week is final yet, with the reason beside it.
-        if (oddsThrough >= 1) {
-            response.put("playoffOddsThroughWeek", oddsThrough);
-        } else {
-            response.put("playoffOddsSkipped", "no week of this season is final yet, so there is nothing to forecast from");
-        }
         // A zero that does not say why reads as a broken feature. It is almost
         // always "this week has not been scored/ingested yet", which is a thing
         // the caller can act on -- so say so instead of leaving them to guess
-        // whether the snapshot failed to persist. A zero at week 0 usually
-        // means it was already set (write-once), which is not a gap -- but it
-        // can also mean the league has not drafted, and that one IS reported.
+        // whether the snapshot failed to persist. Three wire states; see ComputeResponse.
+        Optional<String> realizedSkipped = null;
         if (!weekFinal) {
-            response.put("realizedSkipped", "week " + week + " is not final yet (scores can still change), so no ranking was saved for it"
+            realizedSkipped = Optional.of("week " + week + " is not final yet (scores can still change), so no ranking was saved for it"
                     + (oddsThrough >= 1 ? "; odds ran through week " + oddsThrough : ""));
         } else if (realized.length == 0) {
-            response.put("realizedSkipped", power.realizedGap(league.get().id(), week));
+            realizedSkipped = Optional.ofNullable(power.realizedGap(league.get().id(), week));
         }
-        // Week 0 has one gap worth reporting and only one: a league that has
-        // not drafted yet. "Already set" is the ordinary case and carries no
-        // reason, so this key is absent then rather than present and empty.
-        if (week0.skipped() != null) {
-            response.put("week0Skipped", week0.skipped());
-        }
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new ComputeResponse(week0.entries().length, realized.length, odds.size(),
+                // The week the odds were ACTUALLY computed through, which is the requested week only
+                // when that week is final. Absent when no week is final yet, with the reason beside it.
+                oddsThrough >= 1 ? oddsThrough : null,
+                oddsThrough >= 1 ? null : "no week of this season is final yet, so there is nothing to forecast from",
+                realizedSkipped,
+                // Week 0 has one gap worth reporting and only one: a league that has
+                // not drafted yet. "Already set" is the ordinary case and carries no
+                // reason, so this key is absent then rather than present and empty.
+                week0.skipped()));
     }
 
     public record CommissionerRanking(Integer season, Integer week, List<Integer> rosterIds) {}
@@ -1000,7 +693,7 @@ public class LeagueHistoryController {
         }
 
         var entries = power.saveCommissionerRanking(row.id(), sleeperId, body.season(), body.week(), body.rosterIds());
-        return ResponseEntity.ok(Map.of("saved", entries.length));
+        return ResponseEntity.ok(new CommissionerSaved(entries.length));
     }
 
     /**

@@ -76,3 +76,26 @@ value. For `PlayoffOddsService:422`, the review's "24 differences" was not
 reproducible without its exact totals. The measured figure is 12 of 10,001 at
 total=10000, plus the confirmed 5005/10000 example, and that is what the code
 comment now cites.
+
+## T029: LeagueHistoryController converted
+
+| check | result |
+|---|---|
+| characterization test (unedited in the conversion commit) | 15/15 |
+| mutation check (each mutation applied, run, reverted) | caught all 4: `NON_NULL` on makesPlayoffsPct (2 fail), present-null realizedSkipped collapsed (1), `@JsonUnwrapped` dropped (2), positionalTilt reordered (2) |
+| backend | 1366 tests (1351 + 15), **0 skipped**, 0 failed |
+| `tsc -b` | exit 0 |
+| maps left in LHC | **13, all error bodies**; success bodies **0** |
+| `db/migration` | untouched |
+
+**Correction (measured):** T003 counted 11 LHC error bodies, but there are 13. Its
+grep matched `Map.of("message"` only on one line. It missed the two-line
+`Map.of(\n "error", …)` in backfill and the 403 `LinkedHashMap` in commissioner that
+carries `message` + `commissionerKnown`. So T029's "≤ 11" bound was mis-derived, and
+the right check (0 success-body maps) holds. The SC-004 denominator is re-measured
+at the US3 checkpoint with a multi-line-aware count.
+
+**api.ts drift found and fixed** (types only; all four callers discard the result):
+`submitBallot` was typed `{ saved: number }` but has always returned
+`{ saved: true, season, week }`. `computePowerRankings` lacked `playoffOdds` and
+`week0Skipped`, and didn't allow `realizedSkipped: null`.
