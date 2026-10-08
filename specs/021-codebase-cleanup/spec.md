@@ -257,6 +257,12 @@ substantially.
   *Amended after analysis (A2): "source file" was ambiguous. Including tests, 7
   exceed it; the seventh is `web/src/pages/Superlatives.test.tsx` (1,469 lines,
   measured). Test files are out of scope for SC-005.*
+  *Amended after US4 (2026-10-07, the owner's decision): **one exception,
+  `web/src/pages/PowerRankings.tsx` at 1,244 lines.** Its pure logic was moved out
+  (T052). What remains is a single component whose ~786-line JSX return closes over ~60
+  locals. Getting under 1,000 would mean extracting subcomponents, a real refactor
+  rather than a move. The owner chose to leave it. Every other non-test source file is
+  under 1,000 (the largest is 974).*
 - **SC-006**: The backend suite, the frontend tests and the production build pass
   after every phase, with a skip count no higher than before (see the "suite skips
   ITs silently" lesson). **P2b and the P3 backend splits need 0 IT skips**, with
