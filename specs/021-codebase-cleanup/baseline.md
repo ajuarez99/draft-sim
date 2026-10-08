@@ -277,3 +277,30 @@ happened after the parity diff, so it doesn't affect the 37/37.
   unit-test calls.
 - Backend 1386 tests, **0 skipped**, 0 failed (115 superlatives tests); the test tree
   is untouched.
+
+## T052–T053: PowerRankings.tsx and LeagueAnalysis.tsx
+
+- **PowerRankings.tsx:** all 373 lines of pure logic (story builders, labels, kind
+  constants, ballot state) moved to `pages/powerRankingsStory.ts`. The page
+  re-exports its 20 original public names (values with `export {}`, types with
+  `export type {}`), so LeagueHome and the 5 PowerRankings tests import as before.
+  1,575 → **1,244 lines.**
+- **LeagueAnalysis.tsx:** 26 top-level blocks moved verbatim into 7 modules in
+  `components/leagueAnalysis/` (shared, rankingScores, projections, positionGroups,
+  matchups, scores, headToHead; 51–368 lines each). There are no value-import cycles,
+  and the page keeps only its default export. 1,346 → **260 lines.**
+- **Content is preserved:** both line-multiset checks show 0 lines lost and 0 added
+  (apart from imports and `export` keywords). The tool's first draft **dropped
+  LeagueAnalysis's 11-line file-header comment** with the import region; the check
+  caught it, and the split was redone with the header kept.
+- **Rendered DOM is identical:** the pre-split build (`ae86bb7`, :5188) and the split
+  build (:5187), on the same backend and the same identity, give a byte-identical
+  `main.innerHTML` sha256 on all 5 pages: NFL and NBA league analysis (130,650 and
+  6,944 chars), NFL 2026 and 2025 power rankings (21,621 and 3,327), and the league
+  home (17,098).
+- vitest 1087/1087; `tsc` clean; JS is the same 512,991 B; CSS hash unchanged.
+- **SC-005 is still open for PowerRankings.tsx (1,244 lines).** The remaining bulk is
+  a single component whose `return` is ~786 lines of JSX that closes over ~60 locals
+  and setters. Getting under 1,000 needs JSX subcomponent extraction, which is a real
+  refactor (props threading), not a move. It is deliberately not done inside T052;
+  see the report to the owner.

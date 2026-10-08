@@ -295,11 +295,11 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `web/src/pages/PowerRankings.tsx` (1,575 lines)
 
-- [ ] T052 [P] [US4] Move **every exported non-component** from `web/src/pages/PowerRankings.tsx` (list them first with `grep -nE "^export (function|const)" web/src/pages/PowerRankings.tsx` and exclude anything returning JSX; at least `buildHeadline`, `computeWeeklyStory`, `buildDeck`, `ballotBlockState`, `ballotsCountedIn`, `recordLabel` and `roomTakeSentence`), plus the private helpers only they use, to `web/src/pages/powerRankingsStory.ts`, re-exported from `PowerRankings.tsx`, so `LeagueHome.tsx` and the tests (`PowerRankings.*.test.*` and T006's builders test) keep their imports. Gate: those tests pass unedited, and power rankings has a screenshot smoke check.
+- [X] T052 [P] [US4] Move **every exported non-component** from `web/src/pages/PowerRankings.tsx` (list them first with `grep -nE "^export (function|const)" web/src/pages/PowerRankings.tsx` and exclude anything returning JSX; at least `buildHeadline`, `computeWeeklyStory`, `buildDeck`, `ballotBlockState`, `ballotsCountedIn`, `recordLabel` and `roomTakeSentence`), plus the private helpers only they use, to `web/src/pages/powerRankingsStory.ts`, re-exported from `PowerRankings.tsx`, so `LeagueHome.tsx` and the tests (`PowerRankings.*.test.*` and T006's builders test) keep their imports. Gate: those tests pass unedited, and power rankings has a screenshot smoke check.
 
 ### `web/src/pages/LeagueAnalysis.tsx` (1,346 lines)
 
-- [ ] T053 [P] [US4] Extract one component per tab into `web/src/components/leagueAnalysis/<Tab>.tsx`; `LeagueAnalysis.tsx` keeps routing and state. Gate: `LeagueAnalysis.test.tsx` passes unedited except for import paths, and each tab has a screenshot smoke check.
+- [X] T053 [P] [US4] Extract one component per tab into `web/src/components/leagueAnalysis/<Tab>.tsx`; `LeagueAnalysis.tsx` keeps routing and state. Gate: `LeagueAnalysis.test.tsx` passes unedited except for import paths, and each tab has a screenshot smoke check.
 
 ### `api/LeagueHistoryController.java` (1,022 lines). **Depends on T028–T029**
 
