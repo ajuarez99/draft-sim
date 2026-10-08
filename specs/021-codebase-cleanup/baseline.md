@@ -304,3 +304,20 @@ happened after the parity diff, so it doesn't affect the 37/37.
   and setters. Getting under 1,000 needs JSX subcomponent extraction, which is a real
   refactor (props threading), not a move. It is deliberately not done inside T052;
   see the report to the owner.
+
+## T057: end to end on the final tree vs origin/main (2026-10-07)
+
+The finished branch compared directly with `origin/main @ 7b7238e`, not phase by phase.
+
+| check | result |
+|---|---|
+| backend suite | 1386 tests, **0 skipped**, 0 failed (Gradle up-to-date: no backend source changed since the last full run, so these results cover this tree) |
+| vitest / tsc | 88 files, 1087 tests / exit 0 |
+| production build | CSS sha256 `3b8642…c667` (only the deliberate `.verify-*` removal differs from main); JS 512,991 B |
+| `db/migration` vs origin/main | empty diff |
+| **live JSON parity**, final backend vs main backend, same DB | **37/37 identical** (every converted endpoint, both sports, 3 drafts, stranger 404s) |
+| **rendered DOM parity**, final frontend + backend vs main frontend + backend | **10/10 pages byte-identical** `main.innerHTML`: site home, league history, power rankings, awards, NFL weekly report, manager history, league analysis (130,650 chars), real draft board (98,749), NBA weekly report, NBA draft room |
+
+The two user-visible changes on the branch don't show up in these pages, as expected:
+"21th" → "21st" only matters at rank ≥ 21, and the removed verify page was never
+served in production.
