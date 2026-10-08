@@ -139,7 +139,7 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
  *
  * `/api/managers` answers per sport, and ten of the twelve Ball Knowers
  * managers are the same Sleeper user in both football and basketball
- * (api.ts:426). Keyed on manager id rather than display name: a name is not an
+ * (api/managers.ts: "Ten of the twelve Ball Knowers managers..."; the old api.ts:426 pointer was already stale). Keyed on manager id rather than display name: a name is not an
  * identity, and two people can share one.
  */
 export function mergeManagers(bySport: { sport: Sport; managers: ManagerSummary[] }[]): SearchDestination[] {

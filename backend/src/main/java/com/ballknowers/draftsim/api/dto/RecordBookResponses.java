@@ -15,7 +15,7 @@ import java.util.List;
  * <p>These mirror {@link LeagueRecordService}'s records field for field today. They
  * are separate types anyway, so the wire contract is declared here and an engine
  * change can't quietly reshape an API response. Mirrored by {@code LeagueRecords} and
- * friends in web/src/api.ts.
+ * friends in web/src/api/leagueHistory.ts.
  */
 public final class RecordBookResponses {
 

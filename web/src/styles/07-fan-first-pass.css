@@ -1,0 +1,377 @@
+/* --- 013 US4: site home league rows -----------------------------------------
+   One row per league: crest, name + sport + season, draft status, one action.
+   Separators come from .row-list; the live tint is the only accent. "Start a
+   mock draft" (.home-hero-cta) stays the page's one --volt. */
+.league-rows { display: block; }
+.league-row { display: flex; align-items: center; gap: 12px 14px; padding: 12px 8px; min-width: 0; flex-wrap: wrap; }
+.league-row.live { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.league-row .league-card-title { flex: 1 1 200px; min-width: 0; }
+.league-row .league-card-status, .league-row .league-card-live { flex: 0 1 auto; font-size: 12px; }
+.league-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+/* --- 013 US7: PlayerFace -------------------------------------------------
+   photo -> team logo -> initials, one fixed box in every state. Inline-block
+   with negative vertical margins so a face beside a line of text never makes
+   that line taller (the draft board's cell height must not change). The img is
+   a leaf, not a surface: no border, no panel fill. */
+.pface { display: inline-block; vertical-align: middle; border-radius: 50%; overflow: hidden; flex-shrink: 0; margin: -4px 5px -4px 0; line-height: 1; }
+.pface img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pface-logo img { object-fit: contain; }
+.pface-initials { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+
+/* --- 013 US5: WeeklyReport scoreboard + stepper ----------------------------
+   Your matchup is the one card-shaped thing here: two sides facing each other,
+   full width. Won/Lost always carries the word; --up/--down only reinforce it. */
+.wr-stepper { display: flex; align-items: center; gap: 8px; }
+.wr-stepper button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; cursor: pointer; }
+.wr-stepper button:disabled { opacity: 0.4; cursor: default; }
+.wr-stepper-label { font-variant-numeric: tabular-nums; min-width: 8ch; text-align: center; font-weight: 600; }
+.wr-weeknote { margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.wr-score { display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 12px 20px; padding: 16px 18px; background: var(--panel); border-radius: 12px; }
+.wr-score-side { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.wr-score-side.right { flex-direction: row-reverse; text-align: right; }
+.wr-score-id { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.wr-score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.wr-score-avatar { width: 40px; height: 40px; flex: 0 0 40px; font-size: 16px; }
+.wr-score-pts { font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; font-weight: 700; }
+.wr-result { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.wr-result.won { color: var(--up); }
+.wr-result.lost { color: var(--down); }
+.wr-score-result { grid-column: 1 / -1; margin: 0; text-align: center; }
+.wr-strip { margin-top: 12px; }
+@media (max-width: 640px) {
+  .wr-score { grid-template-columns: 1fr; gap: 10px; }
+  .wr-score-side.right { flex-direction: row; text-align: left; }
+}
+.wr-review.row-list { display: block; }
+.wr-review > li { padding: 10px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
+.wr-review-kind { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; flex: 0 0 100%; }
+
+/* --- 013 US6: tiers, faces and the run callout inside the availability sheet ---
+   Stays inside `.avail-sheet` (layer 4); nothing here adds a layer or a surface.
+   Tier headings are rows on the sheet's own surface, not boxes. */
+.avail tbody + tbody .tier-head th { border-top: 1px solid var(--line); }
+.avail .tier-head th {
+  position: static; background: transparent; text-align: left;
+  font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 6px 3px;
+}
+.avail .tier-head .tier-range { font-weight: 400; font-variant-numeric: tabular-nums; }
+.avail .player-col .pface { vertical-align: middle; margin: -4px 6px -4px 6px; }
+.avail-run { margin: 0 0 6px; font-size: 12px; color: var(--text); }
+.avail-reason { margin: 0 0 6px; }
+
+/* The simulator's placeholder board while seats load (SkeletonBoard). Tiles on
+   the page plane, no surface of their own; the pulse reuses the keyframes
+   defined with the other loading placeholders. */
+.board-skeleton { display: grid; gap: 4px; flex: 1; min-height: 0; padding: 4px 0; }
+.board-skeleton-tile {
+  min-height: 34px; border-radius: 6px;
+  background: color-mix(in oklch, var(--line) 45%, var(--bg));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board-skeleton-tile { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+}
+
+/* --- 013 US8: grade chip beside its number --------------------------------
+   Neutral on purpose: a letter is a rank, not a position or an identity, so it
+   borrows no position token. --up/--down are not used either (a grade is not a
+   signed change). The early badge is the shared .sl-early. */
+.grade-wrap { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.grade-chip {
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 1px 7px; border-radius: 999px; color: var(--text);
+  border: 1px solid var(--line);
+}
+.grade-early { white-space: nowrap; }
+
+/* --- 013 US8: steals & reaches on a finished board -------------------------
+   Tint = pickNo minus ADP at draft time. A gradient over the cell's position
+   fill (background-image, so the position color underneath is kept). --up is
+   always printed with a "+" and --down with a minus, never color alone. */
+.board.value-view .cell.value-steal {
+  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent));
+}
+.board.value-view .cell.value-reach {
+  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
+}
+.value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
+.value-delta.steal { color: var(--up); }
+.value-delta.reach { color: var(--down); }
+.value-delta.even, .value-delta.none { color: var(--muted); font-weight: 500; }
+.value-legend { margin: 0 0 6px; }
+/* The grade column's early caveat keeps its own case inside an uppercase table header. */
+th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 6px; }
+
+/* --- 013 US9: LeagueHistory (Standings) ------------------------------------
+   Best/worst per numeric column: a tint (--up/--down) AND a glyph with an
+   accessible label, never colour alone. "season in progress" is said once, in
+   the season's title. */
+.stand-inprogress { font-weight: 500; font-size: 13px; }
+.stand-mark { margin-left: 5px; font-size: 10px; font-weight: 700; }
+.stand-mark.best { color: var(--up); }
+.stand-mark.worst { color: var(--down); }
+.standings th.mono { line-height: 1.25; }
+
+/* --- 013 US9: Superlatives (Awards, trophy list) ---------------------------
+   One row per award on the page: trophy (--fitted, "earned"), name, the holder
+   with their detail lines, and the headline figure in big tabular numbers.
+   Rows are separated by a line, not boxed. "See all" expands the full standings
+   in place under the row. */
+.sl-list { display: flex; flex-direction: column; }
+.sl-card.sl-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: 4px 18px;
+  border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: transparent;
+  padding: 14px 6px;
+}
+.sl-card.sl-row:last-child { border-bottom: 0; }
+.sl-row .sl-card-head { margin-bottom: 0; flex-wrap: wrap; align-items: center; }
+.sl-row .sl-card-head h4 { font-size: 15px; font-weight: 600; }
+.sl-trophy { color: var(--fitted); flex-shrink: 0; }
+.sl-row-body { min-width: 0; }
+.sl-row-stat { text-align: right; align-self: center; min-width: 0; }
+.sl-row-action { align-self: center; }
+.sl-row .sl-value, .sl-row .sl-stat {
+  margin: 0; font-size: 24px; font-weight: 700; line-height: 1.1;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.sl-row .sl-value .muted { font-size: 12px; font-weight: 400; display: block; white-space: normal; }
+.sl-row .sl-see-all { margin-left: 0; border: 1px solid var(--line); padding: 4px 10px; }
+.sl-standings-panel {
+  grid-column: 1 / -1; margin-top: 10px; padding: 8px 4px 0 4px;
+  border-top: 1px dashed var(--line); cursor: auto; text-align: left;
+}
+.sl-standings-panel .sl-standings-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
+@media (max-width: 700px) {
+  .sl-card.sl-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .sl-row .sl-card-head { grid-column: 1 / -1; }
+  .sl-row-body { grid-column: 1; }
+  .sl-row-stat { grid-column: 2; align-self: start; }
+  .sl-row-action { grid-column: 1 / -1; }
+}
+
+/* --- 013 US9: ManagerHistory (Manager profile, player card) ----------------
+   Big avatar and name, then one line per sport: record, trophies and four
+   headline figures, with no boxes. */
+.mgr-card-avatar { width: 56px; height: 56px; font-size: 22px; }
+.mgr-card-title { gap: 14px; }
+.mgr-card { display: flex; flex-direction: column; gap: 14px; margin: 4px 0 18px; }
+.mgr-card-row { display: flex; flex-direction: column; gap: 8px; }
+.mgr-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; }
+.mgr-card-record { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-trophies { display: inline-flex; align-items: center; gap: 3px; color: var(--fitted); }
+.mgr-trophy-count { margin-left: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.mgr-card-stats { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; }
+.mgr-card-stat { min-width: 0; }
+.mgr-card-stat dt { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.mgr-card-stat dd { margin: 0; }
+.mgr-card-figure { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mgr-archetype { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 4px; }
+.mgr-archetype-label { font-size: 16px; font-weight: 700; }
+.career-rank-row { font-size: 14px; }
+.career-rank-pop { margin-left: 6px; }
+.career-rank-position { font-weight: 700; }
+
+/* --- 013 US9: ManagerTendencies (Scouting report) --------------------------
+   An archetype label under each manager's name; the selected league's managers
+   are grouped first under their own sub-heading. */
+.mgr-archetype-chip { font-size: 12px; font-weight: 600; color: var(--teal); width: fit-content; }
+.mgr-group { margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.mgr-group:first-of-type { margin-top: 6px; }
+
+/* --- 013 US9: MockSetup ----------------------------------------------------
+   One row of seat chips (it scrolls inside its own frame when the room is wider
+   than the page). "You" is --crimson-fill; a real manager shows avatar and
+   archetype; "Start the draft" is the page's one --volt (see US1 block above). */
+.mock-seat-strip {
+  grid-template-columns: none; grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, 1fr); overflow-x: auto; padding-bottom: 4px;
+}
+.mock-seat.assigned .mock-seat-face { background: var(--panel); color: var(--text); }
+.mock-seat-avatar { width: 28px; height: 28px; font-size: 11px; }
+.mock-seat-arch { font-size: 10px; color: var(--teal); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-seat-who { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 013 US9: SignIn (welcome) ---------------------------------------------
+   Centered, no box: product name (Oswald), the pitch, a large field and the
+   page's one --volt action. */
+.signin-welcome {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; gap: 14px; min-height: 70vh; max-width: 720px; margin: 0 auto;
+}
+.signin-kicker { margin: 0; font-size: 18px; letter-spacing: 0.12em; color: var(--muted); }
+.signin-pitch { margin: 0; font-size: clamp(26px, 4.4vw, 42px); line-height: 1.15; font-weight: 700; }
+.signin-form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; margin-top: 10px; }
+.signin-label { display: flex; flex-direction: column; gap: 6px; align-items: stretch; text-align: left; font-size: 12px; color: var(--muted); }
+.signin-input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 14px 16px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+}
+.signin-input:focus { outline: 2px solid var(--teal); outline-offset: 2px; }
+.signin-continue {
+  font: inherit; font-size: 17px; font-weight: 700; padding: 13px 18px; border: 0; border-radius: 10px;
+  background: var(--volt); color: var(--bg); cursor: pointer;
+}
+.signin-continue:disabled { opacity: 0.55; cursor: default; }
+.signin-note { max-width: 520px; margin: 0; }
+.signin-welcome .error { max-width: 520px; margin: 0; }
+
+/* --- Schedule grid (specs/017-nba-schedule-grid) -------------------------
+   Games per team per league week. The count is printed in each cell and the
+   tint tracks the same count (one encoding, number spelled out). The table
+   scrolls inside .sg-wrap with a sticky team column, so the page itself never
+   scrolls sideways at 375px. Tints mix --teal into --panel, so they follow
+   whatever the theme variables are. */
+
+.sg-section { min-width: 0; }
+.sg-fresh { margin: 0 0 12px; }
+.sg-controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.sg-over { margin: 8px 0; font-weight: 600; }
+
+.sg-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.sg-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  width: max-content;
+  min-width: 100%;
+}
+
+.sg-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  padding: 8px 10px;
+  text-align: center;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.sg-week { min-width: 84px; }
+.sg-wk { display: block; color: var(--text); text-transform: uppercase; }
+.sg-dates { display: block; font-weight: 400; letter-spacing: 0; }
+.sg-tag {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: normal;
+  background: color-mix(in oklab, var(--teal) 18%, transparent);
+  color: var(--teal);
+}
+.sg-tag-po { background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
+.sg-now { box-shadow: inset 0 -2px 0 var(--teal); }
+
+.sg-team {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  text-align: left;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+.sg-table thead .sg-corner { z-index: 2; text-align: left; }
+
+.sg-table tbody tr > * { border-bottom: 1px solid var(--line); }
+.sg-table tbody tr:hover > .sg-team { background: color-mix(in oklab, var(--panel) 80%, white 8%); }
+.sg-table tbody tr:hover > .sg-cell { filter: brightness(1.15); }
+
+.sg-total { text-align: center; padding: 8px 12px; white-space: nowrap; }
+.sg-sum { font-weight: 700; color: var(--text); }
+
+.sg-cell { text-align: center; padding: 8px 10px; color: var(--text); }
+.sg-c0 { color: var(--muted); }
+.sg-c1 { background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.sg-c2 { background: color-mix(in oklab, var(--teal) 20%, var(--panel)); }
+.sg-c3 { background: color-mix(in oklab, var(--teal) 34%, var(--panel)); }
+.sg-c4 { background: color-mix(in oklab, var(--teal) 50%, var(--panel)); font-weight: 600; }
+.sg-c5 { background: color-mix(in oklab, var(--teal) 66%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-c6 { background: color-mix(in oklab, var(--teal) 80%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-missing { font-size: 10px; color: var(--muted); white-space: normal; max-width: 90px; }
+
+/* --- 018 US2: draft grade strip --------------------------------------------
+   Its own class: .team-strip is the live room's roster-vs-lineup strip. One
+   tinted item per slot, scrolling horizontally INSIDE the strip so the page
+   itself never scrolls sideways at phone width. */
+.draft-grade-strip {
+  display: flex; gap: 8px; overflow-x: auto; max-width: 100%; min-width: 0;
+  padding: 2px 2px 8px; margin: 0 0 8px; flex-shrink: 0;
+}
+.dgs-item {
+  flex: 0 0 168px; display: flex; flex-direction: column; gap: 4px;
+  padding: 10px 12px; border-radius: 12px; background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.dgs-item:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--teal); }
+.dgs-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dgs-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dgs-value { font-size: 18px; font-weight: 700; }
+.dgs-num.up { color: var(--up); }
+.dgs-num.down { color: var(--down); }
+.dgs-none { color: var(--muted); }
+.dgs-axis { font-size: 10px; }
+.dgs-picks { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.dgs-pick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --- 018 US2: view control + "How he played out" ---------------------------- */
+.grades-legend { margin: 0 0 6px; }
+.played-out { margin-top: 14px; }
+.played-out dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 6px 0 0; }
+.played-out dt { color: var(--muted); font-size: 12px; }
+.played-out dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.steals-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
+.sb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
+.sb-col { min-width: 0; padding: 8px 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
+.sb-steals { box-shadow: inset 3px 0 0 var(--teal), inset 0 0 0 1px var(--line); }
+.sb-busts { box-shadow: inset 3px 0 0 var(--down), inset 0 0 0 1px var(--line); }
+.sb-col h4 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
+.sb-col ol { list-style: none; margin: 0; padding: 0; }
+.sb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 6px; border-radius: 8px; transition: background 120ms ease; }
+.sb-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.sb-main { display: flex; flex-direction: column; min-width: 0; }
+.sb-name { font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .sb-cols { grid-template-columns: 1fr; } }
+
+/* --- Trends (specs/019-minutes-streaming) --------------------------------
+   Streaming candidates, risers and fallers. Each table scrolls inside its own
+   .pt-wrap so the page never scrolls sideways at 375px. */
+.pt-section { min-width: 0; margin-bottom: 28px; }
+.pt-window { margin: 0 0 8px; }
+.pt-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.pt-lists { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); min-width: 0; }
+.pt-list { min-width: 0; }
+.pt-list h3, .pt-sub { margin: 0 0 6px; font-size: 13px; }
+.pt-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.pt-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.pt-table th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.pt-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+.pt-table tbody tr:hover > td { background: var(--row-hover); }
+.pt-table tbody tr:last-child > td { border-bottom: 0; }
+.pt-name { font-weight: 600; }
+.pt-meta { display: block; font-size: 11px; color: var(--muted); }
+.pt-num { font-weight: 700; }
+.pt-pill { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.pt-up { background: color-mix(in oklab, var(--up) 18%, transparent); color: var(--up); }
+.pt-down { background: color-mix(in oklab, var(--down) 18%, transparent); color: var(--down); }
+.pt-flat { background: color-mix(in oklab, var(--muted) 18%, transparent); color: var(--muted); }
+.pt-missed { color: var(--down); }

@@ -1,0 +1,948 @@
+/*
+ * LOADING PLACEHOLDERS
+ *
+ * `.skeleton-row` is `.draft-row`'s geometry on purpose -- same padding, same
+ * background, same 1px seam from the `.draft-list` it sits in -- so the real
+ * rows replace it without the page moving. A skeleton that is the wrong height
+ * shifts the layout twice instead of once, which is worse than no skeleton.
+ *
+ * The pulse is on the bars, not the row: a whole row breathing reads as the
+ * page doing something to itself, where a bar breathing reads as content on
+ * its way. Motion is opt-out per the file's own reduced-motion handling.
+ */
+.skeleton-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 14px; background: var(--panel);
+}
+.skeleton-bar {
+  height: 10px; border-radius: 999px;
+  background: color-mix(in oklch, var(--line) 70%, var(--panel));
+}
+/*
+ * The row's height comes from this, not from the text bar, because on a real
+ * `.draft-row` it comes from the status chip: `.chip` is 12px text at the
+ * body's 1.45 line-height (17.4px) plus 3px padding top and bottom plus its
+ * 1px border = 25px, which with `.draft-row`'s own 12px padding makes 49px.
+ * A 10px bar alone made the skeleton 34px, so every row shifted 15px when the
+ * real content landed -- the exact double-move this component's doc comment
+ * says is worse than showing no skeleton at all. Measured, not guessed.
+ * If `.chip` or `.draft-row` padding changes, this has to change with it.
+ */
+.skeleton-chip {
+  margin-left: auto; flex-shrink: 0;
+  width: 62px; height: 25px; border-radius: 999px;
+  background: color-mix(in oklch, var(--line) 55%, var(--panel));
+}
+
+/* The same shape `.start-overlay-status` gives "Simulating your draft…", so a
+   wait looks the same wherever the app does one. */
+.loading-screen {
+  flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center;
+}
+.loading-screen .cond { font-size: 15px; letter-spacing: 0.03em; color: var(--muted); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-bar, .skeleton-chip { animation: skeleton-pulse 1.4s ease-in-out infinite; }
+  /* Staggered so the row reads left-to-right rather than blinking as a block. */
+  .skeleton-chip { animation-delay: 0.2s; }
+  @keyframes skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+  }
+}
+
+.add-draft .controls { margin-top: 6px; }
+
+.pos { display: inline-block; min-width: 30px; text-align: center; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 2px 7px; margin-right: 6px; letter-spacing: 0.02em; }
+/* Solid, not tinted. The badge used to be a 24% tint of the position color on
+   `--panel`, which worked while every cell behind it was `--panel` -- now the
+   cell is itself a tint of the same color and a tinted badge sinks into it.
+   Solid on `--bg` text also makes the badge the one thing in a dense cell that
+   is legible at a glance, which is what carries the rank ("RB4"). */
+.pos.QB { background: var(--qb); color: var(--bg); }
+.pos.RB { background: var(--rb); color: var(--bg); }
+.pos.WR { background: var(--wr); color: var(--bg); }
+.pos.TE { background: var(--te); color: var(--bg); }
+.pos.K { background: var(--k); color: var(--bg); }
+.pos.DEF { background: var(--def); color: var(--bg); }
+.pos.PG { background: var(--pg); color: var(--bg); }
+.pos.SG { background: var(--sg); color: var(--bg); }
+.pos.SF { background: var(--sf); color: var(--bg); }
+.pos.PF { background: var(--pf); color: var(--bg); }
+.pos.C { background: var(--c); color: var(--bg); }
+
+table { border-collapse: collapse; width: 100%; }
+th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 8px; }
+td { padding: 6px 8px; border-top: 1px solid var(--line); }
+
+.avail .player-col { width: 260px; }
+.avail .team { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.avail .num { color: var(--muted); width: 60px; }
+
+/*
+ * Rounded tiles, not the hairline spreadsheet this used to be. The old grid
+ * drew its lines with `gap: 1px` over a `--line` background; rounded corners on
+ * that leave a dark notch at every cell corner, so the two changes had to
+ * happen together -- gap widened, container background dropped to `--bg`.
+ *
+ * Still one dense board, though, not a wall of floating cards: the gap is 4px
+ * rather than a card grid's 12-16, and no cell carries a shadow. What keeps
+ * cells from reading as uniform boxes is the position fill (`.cell.pos-*`) and
+ * the hover state, not elevation. The one element here that does float -- the
+ * availability sheet -- gets a shadow precisely because it genuinely sits above
+ * this plane.
+ *
+ * z-index order on the stage, defined here rather than discovered:
+ *   0  cells
+ *   1  sticky .col-head / .rnd, 2 for .corner (sticky in both directions)
+ *   3  a focused cell, so its outline is never clipped by a neighbour
+ *   4  .avail-sheet, the floating player list
+ *   5  .start-overlay, which covers everything by design
+ *   6  .board-stage.pre-start .col-head -- the ONE exception to 5, and only
+ *      before a run: the overlay says "click your name in the board above"
+ *      while sitting on top of the headers that sentence points at, which
+ *      made the seat popover unreachable until a simulation had been run.
+ *      The empty grid stays dimmed and blurred underneath; the room does not.
+ */
+.board {
+  display: grid; gap: 4px; background: var(--bg);
+  font-size: 11px;
+  /* Scrollable room after the last round equal to whatever the availability
+     sheet is currently covering (published by AvailabilityPanel, absent when
+     it is collapsed). The sheet floats over this grid, so without this the
+     deepest rounds are *permanently* unreachable: at maximum scroll they are
+     still underneath it. With it, every round can be scrolled up into the
+     clear -- which is the point of scrolling the board at all once the draft
+     is past round 6 or so. */
+  padding-bottom: var(--avail-sheet-reserve, 0px);
+}
+/* The sticky tiles each paint 4px of `--bg` around themselves. Without it the
+   gaps between them are transparent and rows scrolling underneath show through
+   the seams -- a strip of moving player names between every column header. */
+.board .corner {
+  background: var(--panel); position: sticky; top: 0; left: 0; z-index: 2;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
+}
+/* §C: the header now carries what SeatList's bottom band used to (name,
+   avatar, provenance, "you") -- it's a real <button> (opens SeatPopover), so
+   this resets browser button chrome the same way `.board button.cell`
+   already does for revealed cells. */
+.board .col-head {
+  background: var(--panel); display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 2px; text-align: center;
+  position: sticky; top: 0; z-index: 1;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0; width: 100%;
+  font: inherit; color: inherit; cursor: pointer; transition: background 100ms ease;
+}
+.board .col-head:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.board .col-head:disabled { cursor: default; }
+/* Layer 6, scoped to the pre-start state -- see the z-index list above. Paint
+   order is hit-test order, so this is what makes the header clickable again,
+   not just legible. Deliberately not applied once the draft is running: the
+   availability sheet (layer 4) is bottom-anchored and can grow tall enough to
+   reach the headers, and it should cover them when it does. */
+.board-stage.pre-start .board .col-head { z-index: 6; }
+.board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
+/* Same crimson identity as `.cell.mine` -- your own seat should read as the
+   same "you" everywhere on the board, not a second visual language. */
+.board .col-head.mine { background: color-mix(in oklch, var(--crimson-fill) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
+.board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson-fill) 22%, var(--panel)); }
+/* 9px mono was small enough to read as texture rather than names -- nothing
+   was truncated at that size, but nothing was legible either. 11px in the body
+   face (not `.mono`, which is wider per character) trades an occasional
+   ellipsis on the longest handles for fourteen headers you can actually read;
+   the full name is in the header's own `title` and in SeatPopover. */
+.board .col-head-name {
+  font-size: 11px; font-weight: 600;
+  color: color-mix(in oklch, var(--muted) 55%, var(--text));
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.board .col-head-meta { display: flex; align-items: center; gap: 5px; height: 8px; }
+/* A dot, not SeatList's old text chip -- fourteen "league average" chips
+   across the top would be exactly the noise that map's own comment warns
+   about (provenance.ts). */
+.board .col-head-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.board .col-head-dot.neutral { background: var(--muted); opacity: 0.5; }
+.board .col-head-dot.stated { background: var(--teal); }
+.board .col-head-dot.fitted { background: var(--fitted); }
+.board .col-head-you { font-size: 8px; color: var(--crimson-text); letter-spacing: 0.04em; }
+.board .rnd {
+  background: var(--panel); display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
+  position: sticky; left: 0; z-index: 1;
+  border-radius: 10px; box-shadow: 0 0 0 4px var(--bg);
+}
+.board .cell {
+  position: relative; background: var(--panel); padding: 6px 7px 7px; min-width: 0;
+  border-radius: 10px; transition: background 100ms ease;
+}
+/* The cell carries the position color now, not just its `.pos` badge. 22% is
+   as far as this can go while the name on top stays `--text` at oklch(95%):
+   Sleeper's own cells are near-fully saturated because their text is
+   near-black, and ours isn't. Measured in the running app at 22%: the name
+   clears 12:1 against every position (RB tightest), and the faded
+   `.uncertain` name (opacity 0.62) still clears 5.5:1. */
+.board .cell.pos-QB { background: color-mix(in oklch, var(--qb) 22%, var(--panel)); }
+.board .cell.pos-RB { background: color-mix(in oklch, var(--rb) 22%, var(--panel)); }
+.board .cell.pos-WR { background: color-mix(in oklch, var(--wr) 22%, var(--panel)); }
+.board .cell.pos-TE { background: color-mix(in oklch, var(--te) 22%, var(--panel)); }
+.board .cell.pos-K  { background: color-mix(in oklch, var(--k) 14%, var(--panel)); }
+.board .cell.pos-DEF { background: color-mix(in oklch, var(--def) 22%, var(--panel)); }
+.board .cell.pos-PG { background: color-mix(in oklch, var(--pg) 22%, var(--panel)); }
+.board .cell.pos-SG { background: color-mix(in oklch, var(--sg) 22%, var(--panel)); }
+.board .cell.pos-SF { background: color-mix(in oklch, var(--sf) 22%, var(--panel)); }
+.board .cell.pos-PF { background: color-mix(in oklch, var(--pf) 22%, var(--panel)); }
+.board .cell.pos-C  { background: color-mix(in oklch, var(--c) 22%, var(--panel)); }
+.board .cell.pos-QB:hover { background: color-mix(in oklch, var(--qb) 34%, var(--panel)); }
+.board .cell.pos-RB:hover { background: color-mix(in oklch, var(--rb) 34%, var(--panel)); }
+.board .cell.pos-WR:hover { background: color-mix(in oklch, var(--wr) 34%, var(--panel)); }
+.board .cell.pos-TE:hover { background: color-mix(in oklch, var(--te) 34%, var(--panel)); }
+.board .cell.pos-K:hover  { background: color-mix(in oklch, var(--k) 24%, var(--panel)); }
+.board .cell.pos-DEF:hover { background: color-mix(in oklch, var(--def) 34%, var(--panel)); }
+.board .cell.pos-PG:hover { background: color-mix(in oklch, var(--pg) 34%, var(--panel)); }
+.board .cell.pos-SG:hover { background: color-mix(in oklch, var(--sg) 34%, var(--panel)); }
+.board .cell.pos-SF:hover { background: color-mix(in oklch, var(--sf) 34%, var(--panel)); }
+.board .cell.pos-PF:hover { background: color-mix(in oklch, var(--pf) 34%, var(--panel)); }
+.board .cell.pos-C:hover  { background: color-mix(in oklch, var(--c) 34%, var(--panel)); }
+/* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
+   this strips the browser's default button chrome so they still read as
+   plain grid cells, not form controls. */
+.board button.cell {
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0;
+  font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer;
+}
+.board .cell:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+/* A revealed cell is a fresh DOM node the instant it mounts (the hidden ->
+   revealed switch is a <div> -> <button> swap, not a class toggle, so this
+   fires exactly once per pick). At the reveal's 450ms tick
+   (useRevealedBoard.ts) that reads as a stutter -- picks landing one at a
+   time -- instead of the flat pop a class-only change would give. */
+@media (prefers-reduced-motion: no-preference) {
+  .board button.cell { animation: cell-reveal 200ms ease-out; }
+  @keyframes cell-reveal {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+}
+/* outline-offset is negative because `.board-scroll` clips overflow -- a
+   positive offset would get cut off at the cell's outer edge. */
+.board .cell:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
+/* Was 8px at opacity 0.7 -- measured 2.79:1 on a position-tinted cell, which
+   fails AA outright for real content. 10px at full opacity against a slightly
+   lifted muted clears it; it is still the quietest thing in the cell. */
+.board .pickno {
+  position: absolute; top: 4px; right: 6px; font-size: 10px;
+  color: color-mix(in oklch, var(--muted) 72%, var(--text));
+}
+/* The name is abbreviated to an initial plus surname now (playerName.ts), so
+   the initial is de-emphasised: at a glance the cell should read "Gibbs", with
+   the "J." there only to separate him from another Gibbs. */
+.board .name-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
+/* The most-voted player here went earlier, so this cell is a second choice. */
+.board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
+/* Position owns the fill now (`.cell.pos-*`), so "your seat" had to become a
+   ring -- the two cannot both be the background. The ring is declared after
+   the position fills and sets no background of its own, so an empty seat of
+   yours still reads crimson-on-panel and a filled one reads crimson-on-
+   position. */
+.board .cell.mine { box-shadow: inset 0 0 0 1.5px var(--crimson); }
+/* chosen is always also mine -- an addition to that crimson ring (a second,
+   thicker inset ring), not a full recolor, so the far more common
+   mine-but-not-yet-chosen cell doesn't get harder to spot.
+   It used to carry a "✓ yours" badge as well. Dropped: your whole column is
+   already ringed crimson, so a badge on every cell in it was saying the same
+   thing a second time. What still separates a pick you made from one the model
+   guessed for you is this inner ring, plus the cell's own title ("Your pick --
+   <name>") and the fact that the player in it is the one you took. */
+.board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--crimson), inset 0 0 0 4px color-mix(in oklch, var(--crimson) 35%, transparent); }
+/* The 20px right gutter is gone. It was reserving room for `.pickno`, which
+   is absolutely positioned against the *cell* and sits on the badge's line --
+   measured in the running app, its bottom edge clears the name's top by 11px,
+   so the name never shared a row with it and the reservation only ever cost
+   width. With the abbreviation (playerName.ts) and this, 0 of 28 revealed
+   names truncate at 1440x900, down from 23. The cell's own 7px of padding is
+   the gutter. */
+.board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.board .meta { display: flex; align-items: center; margin-top: 3px; gap: 6px; }
+/* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
+.board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
+/* An undrafted cell is its pick number and nothing else -- in flow, not the
+   absolute `.pickno`, so the cell has a real height to stand on. Right-aligned
+   to sit exactly where the drafted cells' own number sits, so the column of
+   numbers runs straight down the board through both kinds of cell. */
+/* Plain `--muted`, no opacity on top of it. The first pass here stacked
+   `opacity: 0.55` over a lifted muted and measured 4.16:1 -- under AA, which
+   is the exact failure the step-1 type floor had just fixed two rules up.
+   `--muted` on `--panel` is 5.37:1 and is already the app's "quiet text"
+   token; it is also what the em dash it replaced was using, so this is no
+   louder than the thing being removed. Dimmer than a drafted cell's own
+   `.pickno` (which lifts toward `--text`), which is the hierarchy wanted. */
+.board .pickno-open {
+  display: block; text-align: right; font-size: 10px; color: var(--muted);
+}
+
+.panel-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
+/* The rounded-corner clip lives here, not on `.board`, on purpose: `.board`
+   having its own non-visible overflow would make it (not this element, the
+   ancestor that actually scrolls) the sticky containing block for the frozen
+   header/round-label cells, and it never scrolls -- they'd stop tracking
+   scroll position entirely. */
+/* min-height guards the grid itself, not just its containing panel -- the
+   panel's own min-height floor still lets the fixed content above the grid
+   (heading, description, reveal controls, and now the pause banner this
+   feature added) eat the whole floor and squeeze this to a few px. If even
+   this doesn't fit, the page scrolls -- better than an invisible board. */
+.board-scroll { border-radius: 10px; min-height: 200px; }
+
+/* Every page's vertical stack, inside .app-main. The gap was 12px while
+   pages sat in `.app`'s own column and the redesigned home pane used 16px;
+   one shell means one rhythm, and 16px is the one that was designed. */
+.content { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+
+/* min-width: 0 matters here for exactly the reason the file-level comment
+   above gives for min-height: 0 -- without it, the board grid's own intrinsic
+   minimum width (14 columns x each column's own minmax() floor) pushes this
+   whole chain wider instead of letting `.board-scroll` clip and scroll
+   internally. Confirmed live: at a 900px window this pushed the entire page
+   into horizontal scroll (documentElement.scrollWidth > innerWidth) rather
+   than staying contained to the board's own scroller. */
+/* The whole content area: the availability panel no longer takes a band of
+   its own, it floats over this one (`.avail-sheet`). */
+.board-panel { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; }
+.board-panel > .panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+
+/* Wraps DraftBoard so the pre-start overlay can position itself against the
+   grid rather than the whole page -- `position: relative` here, `absolute`
+   on the overlay. `.board-scroll` (DraftBoard's own root) is already
+   `flex: 1; min-height: 0`, so nesting it one level deeper changes nothing
+   about its own sizing. */
+.board-stage { position: relative; flex: 1; min-height: 0; min-width: 0; display: flex; }
+
+/* The pre-start empty-board screen: DraftBoard renders its normal grid, every
+   cell hidden (revealedThrough is 0 until a result exists), and this sits on
+   top of it -- a Sleeper-style "nothing has happened yet, here's the whole
+   room" moment, not a placeholder screen next to an empty grid. Translucent
+   rather than opaque so the empty grid is still visibly *there* underneath. */
+.start-overlay {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklch, var(--bg) 72%, transparent);
+  backdrop-filter: blur(2px);
+  text-align: center; padding: 24px;
+}
+.start-overlay-cta { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 420px; }
+.start-overlay-cta h2 { margin: 0; font-size: 20px; color: var(--text); }
+.start-overlay-status { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.start-overlay-status .cond { font-size: 15px; color: var(--text); letter-spacing: 0.02em; }
+.start-button {
+  background: var(--teal); color: var(--bg); border: 0; border-radius: 10px;
+  padding: 14px 34px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  margin: 14px 0 10px; transition: filter 120ms ease, transform 120ms ease;
+}
+.start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+/*
+ * The player list, floating over the board instead of splitting the page with
+ * it (claude/pill-board-and-player-list-on-top.md section E).
+ *
+ * Anchored to the BOTTOM of the stage. It was anchored to the top first, on the
+ * reasoning that the rows up there are already resolved -- which is exactly
+ * backwards for most of a draft: at pick 18 the only rows with anything in them
+ * *are* the top ones, and the sheet covered every pick that had happened while
+ * leaving seven empty rounds on show. The deep rounds are the ones that stay
+ * empty almost the whole session, so they are what the sheet should lie on.
+ * `bottom` clears the board's own horizontal scrollbar rather than sitting on
+ * top of it.
+ *
+ * It is a layer, not a modal: no backdrop, no dimming, no focus trap. The
+ * board stays live everywhere this doesn't cover, and the header's own
+ * show/hide gives all of it back.
+ */
+.avail-sheet {
+  position: absolute; z-index: 4;
+  bottom: 18px; left: 8px; right: 8px; max-height: 46%;
+  display: flex; flex-direction: column; min-height: 0;
+  padding: 10px 14px 12px; border-radius: 12px;
+  /* Near-opaque, unlike `.start-overlay`'s 72%: that recipe is for a centred
+     CTA, and under 60 rows of small text the board's position colors bleed
+     straight through the `.pos` pills. The shadow is the one in this file that
+     is earned -- section D bans them on cells because cells don't float; this
+     genuinely lies above the board. */
+  background: color-mix(in oklch, var(--panel) 95%, transparent);
+  backdrop-filter: blur(3px);
+  box-shadow: 0 0 0 1px var(--line), 0 14px 34px rgba(0,0,0,0.5);
+}
+ /* Collapsed: a single pill in the board's bottom-right corner. A full-width
+    collapsed bar still covered a whole round, which is not what "show the whole
+    board" means. */
+.avail-sheet.collapsed {
+  max-height: none; left: auto; padding: 5px 7px;
+  background: color-mix(in oklch, var(--panel) 92%, transparent);
+}
+.avail-sheet h2 { margin: 0; }
+.avail-sheet .panel-head { margin-bottom: 8px; }
+.avail-sheet.collapsed .panel-head { margin-bottom: 0; }
+.sheet-toggle { margin-left: 10px; }
+/* Reaching the end of the player list must not start scrolling the board
+   underneath it. */
+.avail-sheet .avail-scroll { overscroll-behavior: contain; }
+
+.avail-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+
+/* The filter chips carry the same six position colors as the board cells and
+   the `.pos` badges, so the sheet's header reads as part of the board it is
+   lying on. "ALL" has no position and stays the neutral `.chip`. */
+.chip.pos-chip.QB { color: var(--qb); border-color: color-mix(in oklch, var(--qb) 45%, var(--line)); }
+.chip.pos-chip.RB { color: var(--rb); border-color: color-mix(in oklch, var(--rb) 45%, var(--line)); }
+.chip.pos-chip.WR { color: var(--wr); border-color: color-mix(in oklch, var(--wr) 45%, var(--line)); }
+.chip.pos-chip.TE { color: var(--te); border-color: color-mix(in oklch, var(--te) 45%, var(--line)); }
+.chip.pos-chip.PG { color: var(--pg); border-color: color-mix(in oklch, var(--pg) 45%, var(--line)); }
+.chip.pos-chip.SG { color: var(--sg); border-color: color-mix(in oklch, var(--sg) 45%, var(--line)); }
+.chip.pos-chip.SF { color: var(--sf); border-color: color-mix(in oklch, var(--sf) 45%, var(--line)); }
+.chip.pos-chip.PF { color: var(--pf); border-color: color-mix(in oklch, var(--pf) 45%, var(--line)); }
+.chip.pos-chip.C  { color: var(--c);  border-color: color-mix(in oklch, var(--c)  45%, var(--line)); }
+.chip.pos-chip.QB.on { background: var(--qb); border-color: var(--qb); color: var(--bg); }
+.chip.pos-chip.RB.on { background: var(--rb); border-color: var(--rb); color: var(--bg); }
+.chip.pos-chip.WR.on { background: var(--wr); border-color: var(--wr); color: var(--bg); }
+.chip.pos-chip.TE.on { background: var(--te); border-color: var(--te); color: var(--bg); }
+.chip.pos-chip.PG.on { background: var(--pg); border-color: var(--pg); color: var(--bg); }
+.chip.pos-chip.SG.on { background: var(--sg); border-color: var(--sg); color: var(--bg); }
+.chip.pos-chip.SF.on { background: var(--sf); border-color: var(--sf); color: var(--bg); }
+.chip.pos-chip.PF.on { background: var(--pf); border-color: var(--pf); color: var(--bg); }
+.chip.pos-chip.C.on  { background: var(--c);  border-color: var(--c);  color: var(--bg); }
+.chip.pos-chip:hover { color: var(--text); }
+.chip.pos-chip.on:hover { color: var(--bg); }
+
+.seat {
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.22);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.seat:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(0,0,0,0.32); }
+.seat.me { border-color: var(--line); box-shadow: 0 0 0 1.5px var(--crimson), 0 1px 2px rgba(0,0,0,0.22); }
+.seat.me:hover { box-shadow: 0 0 0 1.5px var(--crimson), 0 5px 12px rgba(0,0,0,0.32); }
+/* A configured seat should be visibly different from an unconfigured one. */
+/* var(--teal)/var(--fitted), not the TE/RB position tokens -- same accidental
+   coupling as .board .col-head-dot.fitted above, fixed the same way. */
+.seat.stated { border-left: 3px solid var(--teal); }
+.seat.fitted { border-left: 3px solid var(--fitted); }
+.seat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
+.seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seat .who.mine-name { color: var(--crimson-text); }
+/* Was a filled uppercase badge. 23 of the 24 cards on /managers are FITTED,
+   so a bright "FROM HISTORY" chip on nearly all of them marked nothing while
+   outweighing the manager's own name -- the same "eleven identical league
+   average chips" noise provenance.ts was written to avoid on the board. Now
+   the board's own dot, which is what that module already renders there. */
+.prov-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.prov-dot.neutral { background: var(--muted); opacity: 0.5; }
+.prov-dot.stated { background: var(--teal); }
+.prov-dot.fitted { background: var(--fitted); }
+
+/*
+ * REACH AXIS -- one scale across every card.
+ *
+ * The page's question is comparative ("who is the biggest reacher in my
+ * league") and it used to answer with 24 sentences. Every card draws on the
+ * same fixed +-8 picks scale, so the ranking is legible across the grid
+ * without reading any single card. Fixed rather than data-derived on purpose:
+ * a per-render max would rescale everything when one number moved.
+ */
+.reach { margin: 8px 0 6px; }
+.reach-track {
+  position: relative; height: 6px; border-radius: 3px;
+  background: oklch(24% 0.02 250); overflow: hidden;
+}
+.reach-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.reach-band { position: absolute; top: 0; bottom: 0; background: oklch(34% 0.02 250); }
+.reach-se { font-weight: 400; font-size: 10px; }
+.reach-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+/* Two directions, two colors, because "reaches 5 early" and "waits 5 late"
+   are opposite behaviours and a single bar length cannot say which. Crimson
+   is not available here (it means "you"), so early borrows --qb's warm end
+   and late the cool --wr end. */
+.reach-fill.early { background: var(--qb); }
+.reach-fill.late { background: var(--wr); }
+.reach-caption {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 8px; margin-top: 4px; font-size: 10px;
+}
+.reach-caption b { font-size: 11px; font-weight: 700; }
+.reach-caption b.early { color: var(--qb); }
+.reach-caption b.late { color: var(--wr); }
+
+.tilt-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; font-size: 11px; color: var(--muted); }
+.tilt { display: inline-flex; align-items: center; gap: 5px; }
+.tilt .pos { margin-right: 0; }
+.tilt-note { font-style: italic; }
+.seat .note { color: var(--text); opacity: 0.85; font-style: italic; }
+.seat p { margin: 4px 0 0; }
+
+.seat-head-right { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.seat-edit {
+  background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+  padding: 1px 8px; font: inherit; font-size: 10px; cursor: pointer;
+}
+.seat-edit:hover { color: var(--text); border-color: var(--teal); }
+
+.seat-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.seat-form label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.seat-form input {
+  background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 6px; font: inherit;
+}
+.seat-form-actions { display: flex; gap: 6px; margin-top: 2px; }
+.seat-form-actions button {
+  background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
+  padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
+}
+.seat-form-actions button:disabled { opacity: 0.6; cursor: default; }
+.seat-form-actions button:nth-child(n+2) { background: var(--line); color: var(--text); }
+.seat-form-error { color: #e07a7a; }
+
+/* /managers -- the same `.seat` card SeatPopover uses for one seat inside a
+   modal, reused as a grid of many. A neutral row (nothing entered, no
+   history) is dimmed rather than dropped, so it still reads as "checked,
+   nothing here" instead of the list looking incomplete. */
+/*
+ * MANAGER TENDENCIES -- rows, not a card grid
+ * This was `repeat(auto-fill, minmax(260px, 1fr))`: four identical cards
+ * across, each holding a name, a pill, one bar and two tilt pills. Two things
+ * were wrong with that. It is the shape DENSITY at the top of this file warns
+ * about -- a one-line record padded out into a card. And it broke the bar:
+ * the axis exists so the reader can rank the room at a glance, and bars in
+ * three or four different columns share no baseline, so the comparison the
+ * page is built around could not actually be made. One column, one scale.
+ */
+.mgr-list { display: flex; flex-direction: column; }
+
+.mgr-row {
+  border-top: 1px solid var(--line);
+  transition: background 120ms ease;
+}
+.mgr-row:first-child { border-top: 0; }
+.mgr-row:hover { background: color-mix(in oklch, var(--teal) 5%, transparent); }
+
+/* Provenance as a left edge, the same vocabulary `.seat` used when these were
+   cards -- it reads down a list of rows better than it ever did across a
+   grid, because the marks line up. */
+.mgr-row.stated { box-shadow: inset 3px 0 0 var(--teal); }
+.mgr-row.fitted { box-shadow: inset 3px 0 0 var(--fitted); }
+.mgr-row.neutral-row { opacity: 0.72; }
+
+.mgr-row-main {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.3fr) minmax(190px, 1.6fr) minmax(120px, 0.9fr) auto;
+  align-items: center; gap: 16px; padding: 9px 12px;
+}
+
+.mgr-identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.mgr-identity-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mgr-identity .who { font-size: 13.5px; }
+.mgr-note {
+  font-size: 11px; font-style: italic; color: var(--text); opacity: 0.8;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mgr-cmp { font-size: 10px; color: var(--muted); }
+.mgr-identity .sport-pill { flex-shrink: 0; margin-left: auto; }
+
+/* The meter cell owns the axis' own margins now that it is a grid cell rather
+   than a stacked block inside a card. */
+.mgr-meter { min-width: 0; }
+.mgr-meter .reach { margin: 0; }
+.mgr-meter p { margin: 0; }
+/* Two lines, not four: the leading clause is the part that differs between
+   managers, and the rest repeats verbatim down the whole basketball list. */
+.mgr-meter .reach-gap {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; line-height: 1.35;
+}
+
+.mgr-tilt { margin: 0; min-width: 0; }
+.mgr-actions { display: flex; align-items: center; gap: 8px; justify-self: end; }
+
+/* The form spans the row, so it needs the row's own padding back. */
+.mgr-row .seat-form { padding: 0 12px 12px; }
+
+/* Four columns stop being four columns well before phone width -- the tilt
+   pills and the axis caption are the first things to run out of room. */
+@media (max-width: 1000px) {
+  .mgr-row-main { grid-template-columns: minmax(150px, 1fr) minmax(170px, 1.4fr) auto; }
+  .mgr-tilt { grid-column: 1 / -1; margin-top: -4px; }
+}
+@media (max-width: 640px) {
+  .mgr-row-main { grid-template-columns: 1fr auto; gap: 8px 12px; }
+  .mgr-meter { grid-column: 1 / -1; }
+  .mgr-tilt { grid-column: 1 / -1; margin-top: 0; }
+  /* Pinned to the name row. Left to flow, the two full-width cells above push
+     it onto a fourth row of its own, where a lone Edit button reads as if it
+     belongs to the row below. */
+  .mgr-actions { grid-row: 1; grid-column: 2; }
+}
+.seat.neutral-row { opacity: 0.65; }
+
+
+
+/* Same crimson-tinted "your pick" language as `.board .cell.mine`, so a
+   paused board reads as one system rather than two different UIs. */
+.pause-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
+  box-shadow: inset 0 0 0 1.5px var(--crimson);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px;
+}
+.pause-banner .chip.on { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
+
+/* PickPrompt: the same crimson pause-banner, now carrying two actions and an
+   honesty line instead of one bare "Continue" -- wraps rather than truncating
+   at narrower widths since it's carrying more content than before. */
+.pause-banner.pick-prompt { flex-wrap: wrap; }
+.pick-prompt-info { display: flex; flex-direction: column; gap: 2px; }
+/* `flex-wrap` here, and `flex-shrink: 0` only on the buttons themselves.
+   The banner above wraps, but this row did not, and its three buttons ("Take
+   <player>", "Take <player> (best available)", "Choose a player") carry real
+   names -- measured 469px of min-content at a 375px viewport, which was the
+   actual reason the whole page scrolled sideways there. B5 contained the
+   availability sheet; this was the other element doing the same thing, and
+   the page still scrolled until both were fixed. */
+.pick-prompt-actions { display: flex; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.pick-prompt-actions > * { flex-shrink: 0; }
+
+/*
+ * ON THE CLOCK + PICK FEED
+ *
+ * The draft room's header, shared by both rooms (OnTheClock.tsx; the mock room
+ * reaches it through TurnIndicator). It replaced two things at once: this
+ * file's old `.turn-indicator` in the mock room, and the batch room's
+ * `.reveal-controls` scrubber -- two visual languages for the one question
+ * "whose turn is it". Same crimson-means-you rule as the board.
+ */
+.on-clock {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--line);
+  border-radius: 12px; padding: 9px 14px; margin-bottom: 8px;
+}
+.on-clock.mine {
+  background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
+  box-shadow: inset 0 0 0 1.5px var(--crimson);
+}
+.on-clock-avatar { width: 30px; height: 30px; font-size: 12px; }
+.on-clock-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.on-clock-kicker {
+  font-size: 10px; letter-spacing: 0.1em; color: var(--muted);
+}
+.on-clock.mine .on-clock-kicker { color: var(--crimson-text); }
+.on-clock-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.on-clock-spacer { flex: 1; min-width: 0; }
+/* The right-hand readout is one number with its own label under it, not a row
+   of stats -- it is answering exactly one question at a time (see the
+   component's comment on which). */
+.on-clock-eta {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 0;
+  font-size: 10px; color: var(--muted); text-align: right; flex-shrink: 0;
+  line-height: 1.25;
+}
+.on-clock-eta b { font-size: 20px; color: var(--text); letter-spacing: 0.02em; font-weight: 700; }
+.on-clock.idle { justify-content: space-between; }
+.on-clock-idle-label { font-size: 14px; letter-spacing: 0.03em; color: var(--muted); }
+.on-clock .chip { flex-shrink: 0; }
+
+/* The identity block. A plain span in the batch and mock rooms; a real button
+   in the live room, where it opens the same SeatPopover a board column header
+   does -- the seat on the clock is exactly the manager you want to check
+   before they pick. Hover depth only on the button form: it is the one thing
+   in this strip that does something. */
+.on-clock-identity {
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  appearance: none; -webkit-appearance: none; border: 0; margin: 0 0 0 -6px;
+  background: transparent; color: inherit; font: inherit; text-align: left;
+  padding: 4px 6px; border-radius: 10px;
+}
+button.on-clock-identity {
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+button.on-clock-identity:hover {
+  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
+}
+.on-clock.mine button.on-clock-identity:hover {
+  background: color-mix(in oklch, var(--crimson) 12%, transparent);
+}
+button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/*
+ * The feed: three rows, newest first. Rows, not cards -- one line of content
+ * each, which is the shape `.draft-list` already uses for the same reason.
+ * The newest row carries a position-run callout when there is one, tinted with
+ * that position's own color so it reads as part of the same system as the
+ * board cells rather than a fifth kind of alert.
+ */
+.pick-feed {
+  list-style: none; margin: 0 0 10px; padding: 0;
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--line); border-radius: 10px; overflow: hidden;
+}
+.pick-feed-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 11px; background: var(--panel); font-size: 12px; min-width: 0;
+}
+.pick-feed-no { font-size: 11px; color: var(--muted); width: 34px; flex-shrink: 0; }
+.pick-feed-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-feed-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
+.pick-feed-by { margin-left: auto; font-size: 11px; color: var(--muted); flex-shrink: 0; padding-left: 8px; }
+.pick-feed-run { margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px; }
+.pick-feed-row.pos-run-QB { background: color-mix(in oklch, var(--qb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-RB { background: color-mix(in oklch, var(--rb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-WR { background: color-mix(in oklch, var(--wr) 12%, var(--panel)); }
+.pick-feed-row.pos-run-TE { background: color-mix(in oklch, var(--te) 12%, var(--panel)); }
+.pos-run-QB .pick-feed-run { color: var(--qb); }
+.pos-run-RB .pick-feed-run { color: var(--rb); }
+.pos-run-WR .pick-feed-run { color: var(--wr); }
+.pos-run-TE .pick-feed-run { color: var(--te); }
+/* The announcement row: the pick that just landed. An inset left edge in the
+   player's own positional color rather than a tinted background, because the
+   background is already spoken for by a position run -- both can be true of
+   the same pick and neither should have to give way. --lead-hue is set inline
+   from the position code (PickFeed.tsx). */
+.pick-feed-row.lead {
+  box-shadow: inset 3px 0 0 var(--lead-hue, var(--line));
+  padding-top: 8px; padding-bottom: 8px;
+}
+.pick-feed-row.lead .pick-feed-name { font-size: 13px; }
+.pick-feed-fit {
+  margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px;
+  color: color-mix(in oklch, var(--lead-hue, var(--text)) 70%, var(--text));
+}
+
+/* Live feed rows become buttons only when the room passes onPickClick (the
+   mock room and simulator never do). The button carries the row's padding so
+   the whole strip is the hit target, and reads as the same row, not a control. */
+.pick-feed-row.clickable { padding: 0; }
+.pick-feed-btn {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0;
+  padding: 6px 11px; background: none; border: 0; color: inherit; font: inherit;
+  text-align: left; cursor: pointer;
+}
+.pick-feed-row.lead .pick-feed-btn { padding-top: 8px; padding-bottom: 8px; }
+.pick-feed-btn:hover { background: color-mix(in oklch, var(--lead-hue, var(--teal)) 10%, transparent); }
+.pick-feed-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+
+/*
+ * The live room's pick card (PickInsightCard). Floats over the top of
+ * `.board-stage` -- layer 7 in the stacking list at the top of this file -- and
+ * is the one thing on this page that genuinely floats, so it carries the
+ * shadow; `--lead-hue` (set inline from the position code, like the feed's
+ * announcement row) gives it a tinted edge so it reads as that player's card
+ * and not a fifth kind of alert. At phone width it spans the stage.
+ */
+.pick-card {
+  position: absolute; top: 8px; left: 8px; z-index: 7;
+  width: min(440px, calc(100% - 16px)); box-sizing: border-box; min-width: 0;
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  background: color-mix(in oklch, var(--lead-hue, var(--teal)) 9%, var(--panel));
+  border-radius: 14px; box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 8px 24px rgb(0 0 0 / 0.45);
+  outline: none; transition: box-shadow 0.15s, transform 0.15s;
+}
+.pick-card:hover, .pick-card:focus-within {
+  box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 12px 32px rgb(0 0 0 / 0.6);
+  transform: translateY(-1px);
+}
+.pick-card-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pick-card-head .avatar { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; overflow: hidden; }
+.pick-card-head .avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pick-card-mgr { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pick-card-no { font-size: 11px; margin-left: auto; }
+.pick-card-close {
+  background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1;
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+}
+.pick-card-close:hover { color: var(--text); background: color-mix(in oklch, var(--text) 10%, transparent); }
+.pick-card-player { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.pick-card-player .pos { margin-right: 0; }
+.pick-card-name { font-size: 16px; overflow-wrap: anywhere; }
+.pick-card-fit { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.pick-card-fills {
+  font-size: 11px; letter-spacing: 0.06em; padding: 2px 9px; border-radius: 999px;
+  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+}
+.pick-card-summary { margin: 0; color: color-mix(in oklch, var(--text) 80%, transparent); }
+.pick-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-card-tag {
+  font-size: 11px; padding: 2px 9px; border-radius: 999px;
+  color: var(--text); background: color-mix(in oklch, var(--lead-hue, var(--teal)) 18%, transparent);
+}
+/*
+ * Phone: the board collapses (`.board-stage` measured 0px tall at 375px), so a
+ * card hung off the stage's top landed below the fold -- and wherever the page
+ * happened to be scrolled, a pick arriving meant a card nobody could see (found
+ * in live verification, T042). Pinned to the viewport instead: a page-level
+ * fixed layer (44, see the STACKING list), capped in height and scrolling
+ * inside itself rather than pushing past the screen.
+ */
+@media (max-width: 700px) {
+  .pick-card {
+    position: fixed; top: auto; bottom: 12px; left: 12px; right: 12px;
+    width: auto; max-height: 60vh; overflow-y: auto; z-index: 44;
+  }
+}
+
+/* "Simulate again", moved out of the board header into the settings modal. */
+.modal-actions {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line);
+}
+
+.modal-backdrop, .jumpto-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.modal-card {
+  position: relative; background: var(--panel); border-radius: 14px; padding: 22px 24px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
+  max-width: 420px; width: 100%;
+}
+/* PlayerPicker needs room for a filterable row list, not just a stat block. */
+.modal-card.wide { max-width: 640px; max-height: 80vh; display: flex; flex-direction: column; }
+.modal-close {
+  position: absolute; top: 8px; right: 8px; background: transparent; color: var(--muted);
+  border: 0; cursor: pointer; font-size: 13px; line-height: 1; padding: 7px; border-radius: 999px;
+}
+.modal-close:hover { color: var(--text); background: var(--line); }
+.modal-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.modal-name { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.modal-alts { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.modal-alts h3 { font-size: 12px; color: var(--muted); margin: 0 0 8px; letter-spacing: 0.04em; }
+.modal-alt-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.modal-alt-row .name { flex: 1; }
+
+/* PlayerCard's yourPick block: your actual pick shown first, the model's own
+   projection clearly relabeled below it rather than either silently
+   overwriting the other. */
+.modal-your-pick { padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); }
+.modal-your-pick h3, .modal-model-pick h3 { font-size: 11px; margin: 0 0 6px; letter-spacing: 0.04em; }
+
+/* PlayerPicker: "your team so far" strip -- one small block per starting
+   roster slot, filled (shows the player, same .pos badge language as
+   DraftBoard's cells) or open (dimmed position abbreviation). A row of
+   compact blocks, not a card grid -- there's one line of real content
+   (filled or open) per slot, matching feedback_avoid_flat_uniform_cards. */
+.team-strip { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+/* The live room's "your team" line: a label, a count, and the strip on one
+   row rather than the picker's stacked block -- this sits between the pick
+   feed and the board and has to cost as little vertical space as it can. */
+.live-team { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.live-team .team-strip { margin: 0; flex: 1 1 auto; }
+/* "Fills RB" beside a name in the availability sheet. Teal like every other
+   generic interaction cue in the house style -- this is not a positional
+   identity, it is a note about your roster. */
+.need-tag {
+  margin-left: 8px; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap;
+  padding: 1px 6px; border-radius: 999px;
+  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+}
+.team-slot {
+  display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+  border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 11px;
+}
+.team-slot.filled { border-color: color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.team-slot.open { color: var(--muted); }
+.team-slot-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.team-slot-empty { font-weight: 700; letter-spacing: 0.03em; }
+
+/* Row-level tags in the picker table: "fills a need", the only one left now
+   that low-survival rows are filtered out of the list rather than tagged. */
+.tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
+.tag.need { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
+
+/* PlayerPicker: position chips above a scrollable, reused avail table. */
+.picker-filters { margin: 10px 0; }
+.picker-scroll { overflow: auto; min-height: 0; flex: 1; }
+.picker-row { cursor: pointer; transition: background 100ms ease; }
+.picker-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.picker-row:focus-visible { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); outline: 2px solid var(--teal); outline-offset: -2px; }
+
+/*
+ * Live draft: one status bar above the board.
+ *
+ * A bar, not a row of cards. The content is one status word, one identity
+ * (whose pick it is), one fraction and one freshness clock -- four equal cards
+ * would give the status word the same weight as the thing you actually look
+ * at, and would be exactly the flat-uniform-card treatment this project has
+ * already rejected twice. `flex: 0 0 auto` so it never eats into the board's
+ * vertical budget, which is the whole point of the board-first layout.
+ * Shallower shadow than `.panel`: it sits above the board, it isn't a panel.
+ */
+/* Just a sticky wrapper now. The panel background, radius and shadow all live
+   on `.on-clock` inside it -- this used to paint its own and would otherwise
+   be a second card behind the strip. `.live-onclock` and its eight rules are
+   gone with it: the live room draws the same OnTheClock the other two rooms
+   do, and only the telemetry below is still this room's own. */
+.live-bar {
+  flex: 0 0 auto; position: sticky; top: 0; z-index: 5;
+}
+.live-bar .on-clock { margin-bottom: 0; }
+
+/* Reusing `.progress`/`.progress-bar` rather than inventing a second bar --
+   only the run-level margin comes off. Narrow, because the fraction it used to
+   spell out is now OnTheClock's own eta readout; this is the shape of the
+   draft's progress, not a number to read. */
+.live-progress { margin-bottom: 0; width: 90px; flex-shrink: 0; }
+
+.live-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.live-track { transition: border-color 120ms ease, color 120ms ease, transform 120ms ease; }
+.live-track:hover:not(:disabled) { transform: translateY(-1px); }
+.live-track-note { font-variant-numeric: tabular-nums; }
+/*
+ * The bar's real job: everything else here is a number the backend sent, and a
+ * number it sent ten minutes ago looks identical to one it sent a second ago.
+ * Two states only -- an amber middle tier would just make "is it dead" a
+ * judgement call at exactly the moment nobody wants to make one.
+ */
+.live-fresh {
+  font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  padding: 3px 10px; border-radius: 999px;
+}
+.live-fresh.ok { color: var(--teal); background: color-mix(in oklch, var(--teal) 15%, var(--panel)); }
+.live-fresh.stale { color: var(--crimson); background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); }
+
+.live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.live-resim-progress { margin-bottom: 10px; }
+/* Once a projection exists, the pre-draft waiting copy shrinks to this line
+   instead of covering the board it is worth looking at. */
+.live-waiting {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px; padding: 8px 12px; border-radius: 8px;
+  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.live-waiting strong { font-size: 13px; letter-spacing: 0.03em; }
+/* Waiting for a draft to start is a teal (nothing wrong) state; waiting
+   because the backend isn't answering is not, and shouldn't wear the same
+   color as a healthy one. */
+.live-waiting.offline { background: color-mix(in oklch, var(--crimson) 14%, var(--panel)); }
+.live-waiting.offline strong { color: var(--crimson); }
+
+/* Breathing room only, not a restyle -- same tokens, larger at the width
+   the 1400px cap used to keep this app from ever reaching. */
+@media (min-width: 1800px) {
+  .app { padding: 20px 32px; gap: 14px; }
+  .panel { padding: 22px 26px; }
+  .content { gap: 16px; }
+}
+
+/* claude/league-suite.md Phase A -- league history and power rankings. Rows
+   for the standings list (matches the "grid for the board, rows for lists"
+   density rule), a hand-rolled bump chart for the rank-over-time graph. */
+.table-wrap { overflow-x: auto; }
+.standings { width: 100%; border-collapse: collapse; font-size: 13px; }
+.standings th {
+  text-align: left; font-weight: 600; color: var(--muted); text-transform: uppercase;
+  font-size: 10px; letter-spacing: 0.05em; padding: 6px 10px; border-bottom: 1px solid var(--line);
+}
+.standings td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.standings tr:last-child td { border-bottom: none; }
+.standings-manager { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
+.standings-manager:hover { color: var(--teal); }

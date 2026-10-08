@@ -391,7 +391,7 @@ export default function DraftView() {
   // screen (see §C's "watch out for").
   const started = result != null
 
-  // SimulationResult carries no `sport` of its own (see api.ts's comment on
+  // SimulationResult carries no `sport` of its own (see api/draft.ts's comment on
   // why); `seats` does (LeagueController.seats(), Phase 6), and it's fetched
   // independently of a run, so this is available even on the pre-start empty
   // board. Defaults to 'nfl' only for the render(s) before `seats` has

@@ -6,7 +6,7 @@ import { Link, useLocation } from 'react-router-dom'
  * page unmounted the whole tree and left a blank screen -- no rail, no way
  * back, nothing on the page saying what happened. That has now bitten twice:
  * `d.status.replace(...)` on a draft row Sleeper returned without a status
- * (see DraftSummary.status in api.ts), and `data.sportState.season` on the
+ * (see DraftSummary.status in api/draft.ts), and `data.sportState.season` on the
  * power-rankings page when the deployed backend was older than the deployed
  * frontend and still answered `nflState` (2026-09-15).
  *

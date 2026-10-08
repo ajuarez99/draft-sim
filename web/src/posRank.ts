@@ -1,7 +1,7 @@
 import type { PlayerRef } from './api'
 
 // 999 is Sleeper's own "no rank" sentinel (BoardService's default, never null
-// -- see api.ts). This module is the only place that knows that, so a new
+// -- see api/draft.ts). This module is the only place that knows that, so a new
 // caller can't quietly render "RB999".
 const NO_RANK = 999
 

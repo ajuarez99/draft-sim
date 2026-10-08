@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * {@code GET /leagues/{id}/weekly-report/{week}} on the wire (specs/004, 005, 013,
- * 021). Mirrored by {@code WeeklyReport} in web/src/api.ts.
+ * 021). Mirrored by {@code WeeklyReport} in web/src/api/weeklyReport.ts.
  *
  * <p>There are two emitted shapes, so there are two records (plan-review finding 2):
  * <ul>

@@ -14,8 +14,8 @@ The six hard rules from `AGENTS.md`, verbatim:
 - **Schema migrations are append-only.** `backend/src/main/resources/db/migration/`
   — check the highest `V<n>__*.sql` already there and do not edit it once applied;
   any change is the next `V<n+1>`.
-- **`web/src/api.ts` types are hand-maintained and must mirror the Java records
-  field-for-field**, in the same change that touches the backend record. TypeScript
+- **`web/src/api/*.ts` types (re-exported through `web/src/api.ts`) are hand-maintained
+  and must mirror the Java records field-for-field**, in the same change that touches the backend record. TypeScript
   gives no warning about an extra field a JSON response now carries that the type
   doesn't know about — a stale type fails silently, not loudly, and has shipped a
   real bug before (a configured value rendered as if it were absent, one layer

@@ -206,3 +206,118 @@ this branch.
 `Origin: 5173`, triggered real refresh-on-visit runs for (Foot) Ball Knowers 2026 on
 the shared local DB: a normal app action, reading Sleeper into Postgres. That
 happened after the parity diff, so it doesn't affect the 37/37.
+
+## T046: styles.css split
+
+- `styles.css` (5,545 lines) → a 16-line `@import` index plus 7 pieces in
+  `web/src/styles/` (377–948 lines each). Every cut is at brace depth 0, computed by
+  a brace-aware scan that skips braces inside comments and strings. Original order is
+  kept; the Google Fonts import stays as line 1.
+- **Reassembly is byte-identical:** `cat styles/0*.css` `cmp`-equal to original lines
+  3–end. The first draft of the split script dropped a trailing blank line from 5
+  pieces; its own assertion caught it before anything was committed.
+- **Built CSS is byte-identical:** a fresh `npm run build` (`dist/` confirmed absent
+  first) produces `index-ROkkXWFm.css`, sha256 `3b8642…c667`, the same as T013.
+  (A first check had read a stale `dist/` after a failed chain; that result was
+  discarded.)
+- Dev server smoke check: `:root` tokens, `.pr-ladder-head` and `.signin-kicker` (the
+  first, middle and last pieces) are all in the CSSOM (1,704 rules), and the body
+  uses `--bg`.
+- `useNarrow.test.ts` now follows the index's imports in order; vitest 1087/1087,
+  `tsc` clean.
+
+## T049: api.ts split
+
+- `api.ts` (2,568 lines) → a 33-line barrel plus **25 domain files** in
+  `web/src/api/` (20–263 lines). The cuts are the 16 existing `// ---` markers **plus
+  13 anchors**. The markers alone would have named files falsely: unrelated types had
+  been appended under old markers (power rankings under "manager comparison",
+  schedule/trends under "transactions", setup/managers/mock under "identity"). Each
+  anchor cut lands on the comment attached to its declaration.
+- **Public surface unchanged:** 194 exports before and after, none missing, none
+  added. The transport internals (`apiFetch`, `json`, `apiError`) live in `http.ts`,
+  which the barrel does not `export *`. They stay private to `api/`, as they were
+  private to `api.ts`; only `apiUrl` is re-exported.
+- **Content unchanged:** all 2,359 non-blank lines are preserved (multiset check),
+  except for generated imports and the `export` on those three internals.
+- No value-import cycle (computed). Nothing in `api/` imports the barrel.
+- **0 of the 108 importers changed.** vitest 1087/1087, including all 26
+  `vi.mock('../api')` files. `tsc` clean. JS 512,991 B (−0.01%); CSS hash unchanged.
+- Caught by `tsc` during the build, before any commit: the first anchor pass cut
+  inside a `/* … */` block, because the walk-back recognized `/**` but not `/*`.
+- **T048:** every "mirror `api.ts`" pointer was repointed to the file that holds the
+  type: AGENTS.md hard rule 2 (and the constitution, re-diffed verbatim), 7 dto
+  files, SeasonSuperlativesService ×2, RecapView, and 7 frontend comments. One
+  pointer, `searchIndex.ts`'s `api.ts:426`, had **already been stale** before this
+  split. It now cites the file and the comment's text instead of a line number.
+
+## T051: SeasonSuperlativesService split
+
+- 1,586 → **852 lines**, plus 5 package-private classes in `engine`:
+  `SuperlativeStandingBuilders` (231), `SuperlativeGameMath` (109),
+  `SuperlativeAbsenceMath` (279), `SuperlativeWaiverMath` (161) and
+  `SuperlativeConductMath` (91).
+- **It's a pure move** (line-multiset diff against `HEAD`): of 1,435 non-blank lines,
+  the only 8 not carried verbatim are the deliberate edits (the absence builder's
+  signature and its call site, plus 6 `private` → package-private). Everything added
+  is class wrappers, imports and **23 one-line forwarders**, kept because tests call
+  those methods as `SeasonSuperlativesService.x(...)`. The nested public types stayed
+  in the service, so no FQN changed.
+- `absenceSuperlative`, the one moved instance method, now takes its 4 repositories
+  explicitly. Compiling caught 2 mistakes before any commit:
+  - `forLeague` has a **local** `games` that shadows the field, so the call site now
+    passes `this.games`, `this.absences`, `this.gameScoring` and `this.leagues`;
+  - my first dependency scan looked only for `field.` and missed `gameScoring` being
+    passed as an argument.
+- **Live parity (the T050 oracle, amended):** the pre-split build `eb35636` on :8088
+  vs this one on :8087, same DB, `/superlatives` for all **9 leagues**: **9/9
+  identical**, 354 KB, all 13 kinds present. JOEL_EMBIID, WAIVER_WIRE_WARRIOR,
+  JABARI_SMITH_JR and MOST_BENCH_POINTS all produced real winners and full standings.
+  UNETHICAL ran its empty path live; its populated path is covered by 7 unedited
+  unit-test calls.
+- Backend 1386 tests, **0 skipped**, 0 failed (115 superlatives tests); the test tree
+  is untouched.
+
+## T052–T053: PowerRankings.tsx and LeagueAnalysis.tsx
+
+- **PowerRankings.tsx:** all 373 lines of pure logic (story builders, labels, kind
+  constants, ballot state) moved to `pages/powerRankingsStory.ts`. The page
+  re-exports its 20 original public names (values with `export {}`, types with
+  `export type {}`), so LeagueHome and the 5 PowerRankings tests import as before.
+  1,575 → **1,244 lines.**
+- **LeagueAnalysis.tsx:** 26 top-level blocks moved verbatim into 7 modules in
+  `components/leagueAnalysis/` (shared, rankingScores, projections, positionGroups,
+  matchups, scores, headToHead; 51–368 lines each). There are no value-import cycles,
+  and the page keeps only its default export. 1,346 → **260 lines.**
+- **Content is preserved:** both line-multiset checks show 0 lines lost and 0 added
+  (apart from imports and `export` keywords). The tool's first draft **dropped
+  LeagueAnalysis's 11-line file-header comment** with the import region; the check
+  caught it, and the split was redone with the header kept.
+- **Rendered DOM is identical:** the pre-split build (`ae86bb7`, :5188) and the split
+  build (:5187), on the same backend and the same identity, give a byte-identical
+  `main.innerHTML` sha256 on all 5 pages: NFL and NBA league analysis (130,650 and
+  6,944 chars), NFL 2026 and 2025 power rankings (21,621 and 3,327), and the league
+  home (17,098).
+- vitest 1087/1087; `tsc` clean; JS is the same 512,991 B; CSS hash unchanged.
+- **SC-005 is still open for PowerRankings.tsx (1,244 lines).** The remaining bulk is
+  a single component whose `return` is ~786 lines of JSX that closes over ~60 locals
+  and setters. Getting under 1,000 needs JSX subcomponent extraction, which is a real
+  refactor (props threading), not a move. It is deliberately not done inside T052;
+  see the report to the owner.
+
+## T057: end to end on the final tree vs origin/main (2026-10-07)
+
+The finished branch compared directly with `origin/main @ 7b7238e`, not phase by phase.
+
+| check | result |
+|---|---|
+| backend suite | 1386 tests, **0 skipped**, 0 failed (Gradle up-to-date: no backend source changed since the last full run, so these results cover this tree) |
+| vitest / tsc | 88 files, 1087 tests / exit 0 |
+| production build | CSS sha256 `3b8642…c667` (only the deliberate `.verify-*` removal differs from main); JS 512,991 B |
+| `db/migration` vs origin/main | empty diff |
+| **live JSON parity**, final backend vs main backend, same DB | **37/37 identical** (every converted endpoint, both sports, 3 drafts, stranger 404s) |
+| **rendered DOM parity**, final frontend + backend vs main frontend + backend | **10/10 pages byte-identical** `main.innerHTML`: site home, league history, power rankings, awards, NFL weekly report, manager history, league analysis (130,650 chars), real draft board (98,749), NBA weekly report, NBA draft room |
+
+The two user-visible changes on the branch don't show up in these pages, as expected:
+"21th" → "21st" only matters at rank ≥ 21, and the removed verify page was never
+served in production.

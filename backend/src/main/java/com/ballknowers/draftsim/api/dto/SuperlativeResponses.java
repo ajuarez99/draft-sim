@@ -9,7 +9,7 @@ import java.util.List;
  * Season superlatives and the commissioner's conduct list on the wire
  * (specs/008-season-superlatives contracts/superlatives-api.md, specs/021-codebase-cleanup).
  * Mirrored by {@code Superlatives}, {@code SuperlativeDetail} and {@code ConductList} in
- * web/src/api.ts.
+ * web/src/api/superlatives.ts.
  *
  * <p>Several fields are legitimately null, which is why these were never {@code Map.of}:
  * reason, coverage, emptyReason, value, unit, regularSeasonEnd, managerId and avatarId.

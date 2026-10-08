@@ -1,5 +1,49 @@
 # Ball Knowers — handoff
 
+**2026-10-07, branch `021-codebase-cleanup` (worktree `../draft-sim-021`, off `origin/main`
+`7b7238e`): spec 021, codebase cleanup. Built, reviewed and verified locally; committed, NOT
+pushed. Merges wait for the merge freeze (nothing to main 2026-10-09 through the 10-10 NBA
+draft).** Spec, plan, plan review, analysis, tasks and every measurement are in
+`specs/021-codebase-cleanup/` (`baseline.md` is the record).
+
+- **What it is.** A no-behaviour-change cleanup in four parts:
+  - **US1, removed:** the dev-only Power Rankings verify page; the two mockup PNGs that
+    `web/public` was serving in production (627 KB); 18 lines of dead CSS; and the
+    placeholder speckit constitution, which now quotes AGENTS.md's hard rules verbatim.
+  - **US2, one implementation per rule:** `util/Rounding` replaces 21 private helpers in 17
+    files, and `format.ts` holds the one `ordinal`.
+  - **US3, typed responses:** LeagueHistory, Superlatives, League and WeeklyReport controllers
+    send records instead of hand-built maps (59% of in-scope success bodies; target 50%).
+  - **US4, splits:** `styles.css` into 7 ordered pieces; `api.ts` into 25 domain files behind
+    a barrel; SeasonSuperlativesService 1,586 → 852 lines; LeagueAnalysis.tsx → 260 lines;
+    PowerRankings.tsx's logic into `powerRankingsStory.ts`.
+- **The two user-visible changes**, both deliberate:
+  - "21th" → "21st" in Power Rankings, its own revertable commit (`3dd0292`), reachable only
+    at rank ≥ 21;
+  - the PNGs stop being served (still to check in production: T016).
+- **Verified (executed, not assumed):**
+  - Final tree vs origin/main on the same DB: **37/37 JSON responses identical** and **10/10
+    pages render byte-identical DOM**.
+  - Every typed-response conversion was gated by characterization goldens written green on
+    the old code and unedited by the conversion commit; **12 injected mutations, all caught**.
+  - Built CSS is byte-identical; migrations are untouched.
+  - backend 1,386 / **0 skipped**; web 1,087; `tsc` clean.
+- **Found along the way (fixed, types only):** `api.ts` had drifted from the wire in 4 places:
+  `submitBallot.saved` was typed as a number but is a boolean; `SeatsResponse.status` can be
+  null; `TrackResponse.draftId` was missing; `computePowerRankings` lacked 3 fields. No caller
+  read the drifted fields.
+- **Decisions, recorded in the spec:**
+  - PowerRankings.tsx stays at 1,244 lines (owner's call; the rest is one component's JSX);
+  - T054/T055 (split LeagueHistoryController) not done, as it is already 713 lines;
+  - T050 used live parity across all 9 leagues instead of stubbed repositories.
+- **Local side effects (this machine only):** with the owner's yes, 28 merged worktrees and
+  50 merged branches were pruned (`prune-candidates.md`). Diagnosing a CORS 403 triggered
+  real refresh-on-visit runs on the local DB.
+- **Owed:**
+  - after the freeze, merge in the batches in `pr-description.md`;
+  - after deploy, check `/pr-reference/*.png` no longer returns `image/png` (T016);
+  - optionally, T037–T042, the six smaller controllers.
+
 **2026-10-06, branch `019-minutes-streaming` (worktree `.claude/worktrees/019-minutes-streaming`,
 off `origin/main` `787abd9`): spec 019 (roadmap 2.3 + 2.4) built and verified locally. Not committed.
 Due in production before 2026-10-20.**

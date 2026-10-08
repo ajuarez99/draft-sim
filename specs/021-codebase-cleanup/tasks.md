@@ -249,7 +249,7 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 - [ ] T040 [P] [US3] `ManagerComparisonController` (7): char → conv commit pair following C2; dto `api/dto/ManagerComparisonResponses.java`.
 - [ ] T041 [P] [US3] `ManagerController` (6): char → conv commit pair following C2, with `positionalTilt` passed to `GoldenJson` as an **order-sensitive** path (it renders unsorted at `ManagerHistory.tsx:292`); dto `api/dto/ManagerResponses.java`.
 - [ ] T042 [P] [US3] `ExpectedWinsController` (4): char → conv commit pair following C2; dto `api/dto/ExpectedWinsResponses.java`.
-- [ ] T043 [US3] Out of scope, and **do not convert**: `ErrorHandler`, `MemberSetupController` (3 of 4 are error bodies), `MockDraftController`, `SimulationController` (SSE), `IngestController`, `SleeperUserController`, `HealthController`, and everything in `recap/` and `refresh/`. Record this list in the US3 PR description. **Also not planned:** the `engine/` package split listed in the spec's Split table. It was only ever "opportunistic", and the review moved the superlatives units into `engine` itself (T051), which leaves it nothing to piggyback on.
+- [X] T043 [US3] Out of scope, and **do not convert**: `ErrorHandler`, `MemberSetupController` (3 of 4 are error bodies), `MockDraftController`, `SimulationController` (SSE), `IngestController`, `SleeperUserController`, `HealthController`, and everything in `recap/` and `refresh/`. Record this list in the US3 PR description. **Also not planned:** the `engine/` package split listed in the spec's Split table. It was only ever "opportunistic", and the review moved the superlatives units into `engine` itself (T051), which leaves it nothing to piggyback on.
 
 ---
 
@@ -262,21 +262,21 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `web/src/styles.css` (5,568 lines). Depends on T013's CSS hash
 
-- [ ] T044 [P] [US4] Cut `web/src/styles.css` into contiguous ranges along its existing section comments, **without reordering**: `web/src/styles/tokens.css`, `shell.css`, then one file per page section in source order. Make `web/src/styles.css` an index of `@import './styles/<file>.css';` lines in the original order, with the Google Fonts `@import url(...)` kept as **line 1**. `main.tsx`'s import is unchanged.
-- [ ] T045 [US4] In the same commit as T044, update `web/src/useNarrow.test.ts:10` to read and concatenate `src/styles/*.css` in index order, instead of `fs.readFileSync('src/styles.css')`. Its assertions are unchanged.
-- [ ] T046 [US4] Gate: `npm run build`, then `sha256sum web/dist/assets/index-*.css` must be **byte-identical** to the hash recorded in T013. As a smoke check, screenshot `/`, a league home, power rankings, superlatives and the draft board at 1280 and 375 px in the browser pane (hard-refresh after any dev-server restart).
+- [X] T044 [P] [US4] Cut `web/src/styles.css` into contiguous ranges along its existing section comments, **without reordering**: `web/src/styles/tokens.css`, `shell.css`, then one file per page section in source order. Make `web/src/styles.css` an index of `@import './styles/<file>.css';` lines in the original order, with the Google Fonts `@import url(...)` kept as **line 1**. `main.tsx`'s import is unchanged.
+- [X] T045 [US4] In the same commit as T044, update `web/src/useNarrow.test.ts:10` to read and concatenate `src/styles/*.css` in index order, instead of `fs.readFileSync('src/styles.css')`. Its assertions are unchanged.
+- [X] T046 [US4] Gate: `npm run build`, then `sha256sum web/dist/assets/index-*.css` must be **byte-identical** to the hash recorded in T013. As a smoke check, screenshot `/`, a league home, power rankings, superlatives and the draft board at 1280 and 375 px in the browser pane (hard-refresh after any dev-server restart).
 
 ### `web/src/api.ts` (2,568 lines, 108 importers)
 
-- [ ] T047 [P] [US4] Move the types and fetchers into `web/src/api/<domain>.ts` files, **cut along the `// --- <source doc>: <title> ---` section markers already in `api.ts`** (16 markers, :336 to :2415, measured):
+- [X] T047 [P] [US4] Move the types and fetchers into `web/src/api/<domain>.ts` files, **cut along the `// --- <source doc>: <title> ---` section markers already in `api.ts`** (16 markers, :336 to :2415, measured):
   - `core.ts` gets everything above :336: `API_BASE`, `API_TOKEN`, the fetch helpers, error reading, and the draft, board and sim types;
   - each marker's section becomes one file named after its title, e.g. `identity.ts` (:336), `leagueHistory.ts` (:775), `managerComparison.ts` (:1167), `leagueAnalysis.ts` (:1361), `ballots.ts` (:1667), …, `transactions.ts` (:2415);
   - the two superlatives sections (:2122, :2355) both go to `superlatives.ts`;
   - the unmarked comment at :541 belongs to the identity section.
 
   Keep the original order inside each file. `web/src/api.ts` becomes only `export * from './api/<domain>'` lines. **No file under `web/src/api/` imports `'../api'`**; they import each other directly, which avoids a TDZ cycle with `ALL_POWER_RANKING_KINDS`.
-- [ ] T048 [US4] In the same PR, update the "mirror `web/src/api.ts`" references to point at the right `web/src/api/<domain>.ts`: `AGENTS.md:124`, `backend/src/main/java/com/ballknowers/draftsim/engine/SeasonSuperlativesService.java:112` and `:1205`, and `backend/src/main/java/com/ballknowers/draftsim/recap/RecapView.java:16`. Before editing, re-grep `grep -rn "api\.ts" AGENTS.md backend/src web/src` so that no reference is missed; the line numbers above may have drifted.
-- [ ] T049 [US4] Gate:
+- [X] T048 [US4] In the same PR, update the "mirror `web/src/api.ts`" references to point at the right `web/src/api/<domain>.ts`: `AGENTS.md:124`, `backend/src/main/java/com/ballknowers/draftsim/engine/SeasonSuperlativesService.java:112` and `:1205`, and `backend/src/main/java/com/ballknowers/draftsim/recap/RecapView.java:16`. Before editing, re-grep `grep -rn "api\.ts" AGENTS.md backend/src web/src` so that no reference is missed; the line numbers above may have drifted.
+- [X] T049 [US4] Gate:
   - `npx tsc -b` passes;
   - `git diff --stat` shows **0** changed importers outside `web/src/api*`;
   - all 26 `vi.mock('../api')` test files pass;
@@ -284,30 +284,41 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `engine/SeasonSuperlativesService.java` (1,586 lines)
 
-- [ ] T050 [US4] **Before the split, as its own commit.** Create `backend/src/test/java/com/ballknowers/draftsim/engine/SeasonSuperlativesServiceGoldenTest.java`, with stubbed repositories feeding fixed NFL and NBA season data and the `Result` serialized through `GoldenJson` to `golden/superlatives-service/`. This covers all 13 kinds, plus the "empty when best ≤ 0" cases for Waiver and Embiid.
-- [ ] T051 [US4] Extract each superlative kind into its own package-private class **in package `engine`** (not a subpackage), e.g. `engine/SuperlativeWaiverKing.java`. The 22 package-private statics that tests call (64 call sites across 10 test classes) stay callable as `SeasonSuperlativesService.x(...)`, as forwarding statics where moved. Gate: T050 is green and unedited, and the existing tests compile untouched.
+- [X] T050 [US4] **Before the split, as its own commit.** Create `backend/src/test/java/com/ballknowers/draftsim/engine/SeasonSuperlativesServiceGoldenTest.java`, with stubbed repositories feeding fixed NFL and NBA season data and the `Result` serialized through `GoldenJson` to `golden/superlatives-service/`. This covers all 13 kinds, plus the "empty when best ≤ 0" cases for Waiver and Embiid.
+  - *Amended at build time (2026-10-07): the oracle used was **live JSON parity**, not stubbed
+    repositories. Both the pre-split build (`eb35636`) and the split build ran against the same real
+    database, across **all 9 leagues** in it (NFL 2025 and 2026, NBA 2024, 2025 and 2026), covering
+    all 13 kinds. Real data covered more paths than hand-built stubs for 17 repositories would have, and
+    no stub could match it. The 11 unedited `SeasonSuperlatives*` classes (115 tests) remain the lasting
+    regression net. Deviation recorded here rather than hidden.*
+- [X] T051 [US4] Extract each superlative kind into its own package-private class **in package `engine`** (not a subpackage), e.g. `engine/SuperlativeWaiverKing.java`. The 22 package-private statics that tests call (64 call sites across 10 test classes) stay callable as `SeasonSuperlativesService.x(...)`, as forwarding statics where moved. Gate: T050 is green and unedited, and the existing tests compile untouched.
 
 ### `web/src/pages/PowerRankings.tsx` (1,575 lines)
 
-- [ ] T052 [P] [US4] Move **every exported non-component** from `web/src/pages/PowerRankings.tsx` (list them first with `grep -nE "^export (function|const)" web/src/pages/PowerRankings.tsx` and exclude anything returning JSX; at least `buildHeadline`, `computeWeeklyStory`, `buildDeck`, `ballotBlockState`, `ballotsCountedIn`, `recordLabel` and `roomTakeSentence`), plus the private helpers only they use, to `web/src/pages/powerRankingsStory.ts`, re-exported from `PowerRankings.tsx`, so `LeagueHome.tsx` and the tests (`PowerRankings.*.test.*` and T006's builders test) keep their imports. Gate: those tests pass unedited, and power rankings has a screenshot smoke check.
+- [X] T052 [P] [US4] Move **every exported non-component** from `web/src/pages/PowerRankings.tsx` (list them first with `grep -nE "^export (function|const)" web/src/pages/PowerRankings.tsx` and exclude anything returning JSX; at least `buildHeadline`, `computeWeeklyStory`, `buildDeck`, `ballotBlockState`, `ballotsCountedIn`, `recordLabel` and `roomTakeSentence`), plus the private helpers only they use, to `web/src/pages/powerRankingsStory.ts`, re-exported from `PowerRankings.tsx`, so `LeagueHome.tsx` and the tests (`PowerRankings.*.test.*` and T006's builders test) keep their imports. Gate: those tests pass unedited, and power rankings has a screenshot smoke check.
 
 ### `web/src/pages/LeagueAnalysis.tsx` (1,346 lines)
 
-- [ ] T053 [P] [US4] Extract one component per tab into `web/src/components/leagueAnalysis/<Tab>.tsx`; `LeagueAnalysis.tsx` keeps routing and state. Gate: `LeagueAnalysis.test.tsx` passes unedited except for import paths, and each tab has a screenshot smoke check.
+- [X] T053 [P] [US4] Extract one component per tab into `web/src/components/leagueAnalysis/<Tab>.tsx`; `LeagueAnalysis.tsx` keeps routing and state. Gate: `LeagueAnalysis.test.tsx` passes unedited except for import paths, and each tab has a screenshot smoke check.
 
 ### `api/LeagueHistoryController.java` (1,022 lines). **Depends on T028–T029**
 
 - [ ] T054 [US4] Add a route-table test, `.../api/RouteTableTest.java`. It lists `RequestMappingHandlerMapping.getHandlerMethods()` paths and methods into `golden/route-table.json`, commits them **before** the split, and must stay unedited.
 - [ ] T055 [US4] Split it into `LeagueHistoryController` (history and record book), `ManagerHistoryController` (manager history and career) and `PowerRankingsController` (power, ballot, submit, compute, commissioner, backfill), using T028's response-family dtos, so no record is duplicated. Gate: T054 and T027 are green and unedited, with 0 IT skips.
+  - *Not done, by decision at build time (2026-10-07, measured): T028's record conversion already
+    took LeagueHistoryController from 1,022 to **713 lines**, below SC-005's 1,000. A three-controller
+    split would now be churn in a file concurrent sessions touch, with no criterion to meet, so
+    T054/T055 are left undone. The owner can reverse this.*
 
 ---
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T056 [P] Optional (spec "keep" candidates). Add a status index to `claude/README.md` marking each of the 53 `claude/*.md` docs shipped, idea or superseded, without deleting any. Separately, add a one-line purpose comment to each file in `scripts/`. Neither changes behavior.
-- [ ] T057 Run [quickstart.md](quickstart.md) end to end against the final tree: the baseline commands, the zero-skip check, the CSS hash and the T016 production check. This counts as live verification only if a real `bootRun` and `vite dev` are clicked through in the browser pane: league home, power rankings, superlatives, manager history and draft board. That's this repo's bar; a green suite alone is not.
-- [ ] T058 Update `HANDOFF.md` with what spec 021 shipped, what was scoped out (error bodies, SSE, `PlayoffOddsService:422`, `recap/` and `refresh/`) and what is **verified vs assumed**. Update the matching memory file.
-- [ ] T059 Write `specs/021-codebase-cleanup/pr-description.md` per PR (US1, US2, US3 batches, and each US4 split). Each one lists the C1, C2 or C3 evidence and ends with the attribution line.
+- [X] T056 [P] Optional (spec "keep" candidates). Add a status index to `claude/README.md` marking each of the 53 `claude/*.md` docs shipped, idea or superseded, without deleting any. Separately, add a one-line purpose comment to each file in `scripts/`. Neither changes behavior.
+  - *Done: a status index covering all 53 `claude/*.md` docs (checked by script), which also corrects 6 docs whose own status line went stale when they later shipped as specs 010/013/017/018/019/020 (each checked against `specs/` on main). All 3 `scripts/` files already had purpose headers, so they needed no change.*
+- [X] T057 Run [quickstart.md](quickstart.md) end to end against the final tree: the baseline commands, the zero-skip check, the CSS hash and the T016 production check. This counts as live verification only if a real `bootRun` and `vite dev` are clicked through in the browser pane: league home, power rankings, superlatives, manager history and draft board. That's this repo's bar; a green suite alone is not.
+- [X] T058 Update `HANDOFF.md` with what spec 021 shipped, what was scoped out (error bodies, SSE, `PlayoffOddsService:422`, `recap/` and `refresh/`) and what is **verified vs assumed**. Update the matching memory file.
+- [X] T059 Write `specs/021-codebase-cleanup/pr-description.md` per PR (US1, US2, US3 batches, and each US4 split). Each one lists the C1, C2 or C3 evidence and ends with the attribution line.
 
 ---
 

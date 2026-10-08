@@ -1,0 +1,944 @@
+/* --- Weekly report (specs/004-ffwrapped-feature-parity US5) -------------
+   Matchups are cards, not table rows: a matchup is a pair facing each other,
+   and the layout should look like the thing it describes. Awards are a third
+   shape again, tinted so they do not read as more matchups. */
+
+.wr-weekpick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.wr-weekpick input {
+  width: 4.5rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.wr-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.wr-game {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.wr-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-side + .wr-side {
+  border-top: 1px solid var(--line);
+}
+
+/* The winner gets weight and a tint, so the result reads without comparing
+   two numbers first. */
+.wr-won {
+  background: color-mix(in oklab, var(--panel) 82%, white 6%);
+  font-weight: 600;
+}
+
+.wr-avatar {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  font-size: 11px;
+}
+
+.wr-team {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-record {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.wr-points {
+  flex: 0 0 auto;
+  min-width: 7ch;
+  text-align: right;
+}
+
+.wr-awards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.wr-award {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.wr-award h4 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.wr-award-team {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.wr-omitted {
+  margin: 14px 0 0;
+  padding: 10px 0 0 18px;
+  border-top: 1px solid var(--line);
+  line-height: 1.5;
+}
+
+.wr-performers {
+  margin: 0;
+  padding-left: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-performers li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.wr-performers li:last-child {
+  border-bottom: 0;
+}
+
+.wr-pname {
+  font-weight: 500;
+}
+
+.wr-ppos {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.wr-pteam {
+  flex: 1 1 auto;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-ppts {
+  flex: 0 0 auto;
+  min-width: 6ch;
+  text-align: right;
+}
+
+/* --- Transactions on the roster-management page (US6) -------------------
+   Counts are a stacked bar with the number ON each segment, so the reader
+   never has to match a length against a legend to learn "three waivers". */
+
+.tx-counts,
+.tx-adds,
+.tx-trades {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tx-counts li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.tx-name {
+  flex: 0 0 15rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tx-bar {
+  flex: 1 1 auto;
+  display: flex;
+  gap: 2px;
+  height: 18px;
+}
+
+.tx-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6rem;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--bg);
+}
+
+.tx-waiver { background: oklch(70% 0.13 250); }
+.tx-free_agent { background: oklch(72% 0.13 150); }
+.tx-trade { background: oklch(75% 0.14 80); }
+.tx-commissioner { background: oklch(60% 0.02 250); }
+
+.tx-total {
+  flex: 0 0 auto;
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+.tx-legend {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.tx-key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin: 0 5px 0 12px;
+}
+
+.tx-legend .tx-key:first-child {
+  margin-left: 0;
+}
+
+.tx-adds li,
+.tx-trades li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.tx-adds li:last-child,
+.tx-trades li:last-child {
+  border-bottom: 0;
+}
+
+.tx-week {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 4rem;
+}
+
+.tx-added {
+  font-weight: 500;
+}
+
+.tx-pos {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-right: 6px;
+}
+
+.tx-rank {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.tx-dropped {
+  flex: 0 0 auto;
+}
+
+.tx-team {
+  flex: 1 1 auto;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.tx-faab {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: oklch(74% 0.13 150);
+}
+
+.tx-side {
+  margin-right: 14px;
+}
+
+@media (max-width: 720px) {
+  .tx-name { flex-basis: 8rem; }
+  .tx-team { display: none; }
+}
+
+/* Season fallback note: the page moved to an earlier year and says so. */
+.season-fallback {
+  margin: -4px 0 12px;
+  padding: 8px 10px;
+  border-left: 2px solid oklch(62% 0.13 80);
+  background: color-mix(in oklab, var(--panel) 88%, white 4%);
+  border-radius: 0 4px 4px 0;
+}
+
+/* --- Best nights / Best week, side by side (specs/005) ------------------ */
+
+/*
+ * Two rankings of one week that answer different questions. Side by side on a
+ * wide screen because the comparison IS the feature -- a player can top one
+ * and be absent from the other -- and stacked on a phone, where side-by-side
+ * would squeeze both into unreadable columns.
+ */
+.wr-rankings {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 860px) {
+  .wr-rankings {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The night, or the games-played denominator. Sits before the value so the
+   number stays hard against the right edge with the other rankings' totals. */
+.wr-when {
+  flex: 0 0 auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Team name yields first when the row is tight -- the night and the value are
+   the two things this section exists to say. */
+.wr-rankings .wr-pteam {
+  flex: 1 1 40%;
+  min-width: 0;
+}
+
+/* --- Season superlatives (specs/008-season-superlatives) -----------------
+   One card per kind, always -- an unavailable or empty kind renders its own
+   reason rather than vanishing, per memory "avoid flat uniform cards": each
+   card carries a hue-tinted left edge (per its position in the payload) so
+   twelve cards don't read as one repeated shape, and the grid collapses to a
+   single column under 375px rather than scrolling sideways. */
+
+.sl-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.sl-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid oklch(60% 0.12 var(--sl-hue, 250));
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+  min-width: 0;
+}
+
+.sl-card-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.sl-card-head h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.sl-subtitle {
+  font-style: italic;
+}
+
+.sl-early {
+  color: oklch(75% 0.15 80);
+}
+
+.sl-holders {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* A column, not a row: a tied holder's own figure/week/opponent (FR-002)
+   prints directly beneath its name, so a reader never has to expand "Games"
+   to see the week the card is even about. */
+.sl-holder {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sl-holder-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sl-avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.sl-holder-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24ch;
+}
+
+.sl-holder-detail {
+  padding-left: 26px;
+}
+
+.sl-value {
+  margin: 2px 0 6px;
+  font-size: 15px;
+}
+
+.sl-coverage {
+  margin: 0 0 6px;
+}
+
+.sl-detail summary {
+  cursor: pointer;
+}
+
+.sl-detail-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* T049/T060: an unconditional line under a card's title (Embiid's "cause
+   unknown", Unethical's tracking-began line) -- not tied to holders/coverage. */
+.sl-note {
+  margin: 0 0 8px;
+}
+
+/* --- The Jabari Smith Jr. Award (specs/008-season-superlatives T079/US7) --
+   Player-headed, not team-headed: reuses .sl-holder for a player's own block,
+   with a per-add list of the teams that picked him up beneath it. */
+.sl-player-holder {
+  gap: 4px;
+}
+
+.sl-add-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 0 0 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* One line per add: the team name truncates, and week + move type stay
+   together at the end rather than wrapping back under the avatar. */
+.sl-add-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.sl-add-team {
+  font-weight: 600;
+  font-size: 13px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sl-add-meta {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* --- Commissioner's conduct list (specs/008-season-superlatives T060) ---- */
+
+.sl-conduct-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sl-conduct-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: color-mix(in oklab, var(--panel) 86%, white 4%);
+}
+
+.sl-conduct-player {
+  font-weight: 600;
+  flex: 1 1 100%;
+}
+
+.sl-conduct-remove {
+  margin-left: auto;
+}
+
+.sl-conduct-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.sl-conduct-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sl-conduct-field label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sl-conduct-form input {
+  font: inherit;
+}
+
+/* PersonName: team name first, Sleeper username as a muted second line. */
+.person-name { display: inline-flex; flex-direction: column; min-width: 0; max-width: 100%; line-height: 1.25; vertical-align: middle; }
+.person-team, .person-user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-user { font-size: 11px; font-weight: 400; color: var(--muted); }
+
+.analysis-formula p { margin: 0 0 4px; }
+.analysis-formula summary { cursor: pointer; }
+.analysis-formula code { display: block; margin-top: 4px; }
+
+.sf-stale {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.sf-stale p { margin: 0; }
+.sf-stale p + p { margin-top: 6px; }
+
+.wr-inprogress {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* --- 020: the AI weekly recap card ------------------------------------------
+   One raised surface with a teal edge to mark it as written text rather than
+   data; headline first, then the sections as a plain reading column. */
+.recap-card {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--teal);
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 14px 18px 12px;
+  margin-bottom: 16px;
+}
+.recap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.recap-head .section-title { margin: 0; }
+.recap-notice { margin: 4px 0 8px; color: var(--muted); }
+.recap-notice-fail { color: var(--down); }
+.recap-headline { margin: 4px 0 10px; font-size: 18px; line-height: 1.3; }
+.recap-sections { display: grid; gap: 10px; max-width: 70ch; }
+.recap-section h5 {
+  margin: 0 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--teal);
+  font-weight: 600;
+}
+.recap-section p { margin: 0; line-height: 1.5; }
+.recap-stale .recap-headline, .recap-stale .recap-section p { opacity: 0.75; }
+.recap-previous, .recap-revised { margin: 0 0 6px; }
+.recap-foot { margin: 12px 0 0; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* --- Superlatives full standings (specs/010-superlatives-full-standings) --
+   "See all" opens every roster's place for one award. The card body is also a
+   mouse target, so it gets a hover cue; the lift is a shadow, NOT a transform --
+   a transformed ancestor becomes the containing block for `position: fixed`,
+   and the modal renders inside the card, so a transform would pin the backdrop
+   to the card instead of the viewport. */
+.sl-card-openable { cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+.sl-card-openable:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  border-color: color-mix(in oklab, var(--line) 60%, oklch(60% 0.12 var(--sl-hue, 250)));
+}
+.sl-card-openable .sl-detail { cursor: auto; }
+.sl-see-all {
+  margin-left: auto; background: transparent; border: 0; padding: 2px 6px; border-radius: 999px;
+  font: inherit; font-size: 12px; color: oklch(75% 0.11 var(--sl-hue, 250)); cursor: pointer;
+}
+.sl-see-all:hover { background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250))); }
+
+.sl-standings-modal { cursor: auto; text-align: left; }
+.sl-standings-title { margin: 0 32px 6px 0; font-size: 18px; }
+.sl-standings-sub { margin: 0 0 6px; }
+.sl-standings-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; }
+.sl-standings {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+/* rank | who (+ note beneath) | figure. The figure is right-aligned and
+   tabular so a column of values scans as a column. */
+.sl-standing {
+  display: grid; grid-template-columns: 2.2ch minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: 8px; border: 1px solid transparent;
+  font-variant-numeric: tabular-nums;
+}
+.sl-standing-top {
+  border-color: color-mix(in oklab, var(--line) 50%, oklch(60% 0.12 var(--sl-hue, 250)));
+  background: color-mix(in oklab, var(--panel) 88%, oklch(60% 0.12 var(--sl-hue, 250)) 12%);
+}
+.sl-standing-rank { color: var(--muted); text-align: right; }
+.sl-standing-top .sl-standing-rank { color: var(--text); font-weight: 700; }
+.sl-standing-who { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.sl-standing-name { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.sl-standing-note { padding-left: 28px; }
+/* Player rows have no avatar, so their team line sits under the name, not indented past an avatar (T031). */
+.sl-player-standing .sl-standing-note { padding-left: 0; }
+.sl-standing-figure { text-align: right; white-space: nowrap; }
+.sl-standing-missing .sl-standing-figure { white-space: normal; max-width: 22ch; }
+@media (max-width: 700px) {
+  .modal-backdrop:has(.sl-standings-modal) { padding: 0; align-items: stretch; }
+  /* Three classes, to beat the shared .modal-card.wide max-height: 80vh (T031: the sheet stopped at 650px of 812). */
+  .modal-card.wide.sl-standings-modal { max-width: none; max-height: none; height: 100%; border-radius: 0; }
+  .sl-standing { grid-template-columns: 2.2ch minmax(0, 1fr); }
+  .sl-standing-figure { grid-column: 2; text-align: left; }
+  .sl-standing-missing .sl-standing-figure { max-width: none; }
+}
+
+/* ---- Spec 012 US4/US5: scarcity meter + room read (T035/T037) ---- */
+.scarcity-meter { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.scarcity-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.scarcity-chip {
+  display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px;
+  border: 1px solid color-mix(in oklch, var(--scar-hue, var(--line)) 45%, var(--line));
+  background: color-mix(in oklch, var(--scar-hue, var(--line)) 14%, var(--panel));
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.scarcity-chip:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+.scarcity-chip.running { border-color: var(--scar-hue, var(--line)); background: color-mix(in oklch, var(--scar-hue, var(--line)) 26%, var(--panel)); }
+.scarcity-pos { font-weight: 700; color: var(--scar-hue, var(--text)); }
+.scarcity-next { color: var(--muted); }
+.scarcity-run { font-size: 10px; letter-spacing: 0.06em; color: var(--scar-hue, var(--text)); }
+.scarcity-note { margin: 0; font-size: 11px; }
+
+.onbrand-panel { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.onbrand-summary { cursor: pointer; padding: 8px 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.onbrand-summary:hover { color: var(--text); }
+.onbrand-rows { list-style: none; margin: 0; padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 4px; }
+.onbrand-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  padding: 6px 8px; border-radius: 8px; font-size: 12px;
+  transition: background 0.12s ease;
+}
+.onbrand-row:hover { background: color-mix(in oklch, var(--text) 6%, var(--panel)); }
+.onbrand-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.onbrand-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+.onbrand-verdict { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; letter-spacing: 0.04em; cursor: help; }
+.onbrand-verdict.on { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
+.onbrand-verdict.off { background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); color: var(--text); }
+.onbrand-verdict.none { color: var(--muted); border: 1px dashed var(--line); }
+
+/* T034/T035: the meters' place in the live room. Chips already wrap (flex-wrap),
+   and min-width: 0 keeps long names/lines from forcing horizontal scroll at 375px. */
+.live-meters { display: flex; flex-direction: column; gap: 8px; min-width: 0; max-width: 100%; }
+.live-meters .scarcity-meter, .live-meters .onbrand-panel { margin-top: 0; min-width: 0; }
+.pick-card-scarcity { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.seat-onbrand { margin: 6px 0 0; min-width: 0; }
+
+
+/* --- 013 US1: DraftPicker (site home) ---------------------------------------
+   The three list sections are unboxed (.section) with a heading on the page.
+   "Start a mock draft" (.home-hero-cta, --volt above) is the page's one primary
+   action. The league cards stay cards until T047 turns them into rows. */
+.picker-section .panel-head { margin: 0; }
+.picker-section .panel-head .section-title { margin: 0; }
+
+
+/* --- 013 US1: PowerRankings ------------------------------------------------
+   The hero (headline, #1 card, Riser/Free fall) sits on the page, unboxed. The
+   ladder is a .section whose rows are a .row-list: the divider between rows and
+   the hover come from the shared utility, not from a box per row. */
+.pr-number-one { padding: 4px 0 4px 20px; border-left: 1px solid var(--line); }
+.pr-stories { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.pr-story { padding: 0; }
+.pr-story-name { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.pr-story .pr-move { display: inline-flex; font-size: 13px; }
+.pr-section .pr-ladder-head { margin-bottom: 4px; }
+.pr-list .row-list > .pr-row { border-bottom: 1px solid var(--line); border-radius: 0; }
+.pr-list .row-list > .pr-row:last-child { border-bottom: 0; }
+.pr-list .row-list > .pr-row:hover { background: var(--row-hover); }
+.pr-list .row-list > .pr-row.on { background: color-mix(in oklch, var(--teal) 12%, transparent); }
+.pr-list .row-list > .pr-row.mine { background: color-mix(in oklch, var(--crimson) 12%, transparent); }
+
+
+/* --- 013 US1: LeagueAnalysis (Team strength) -------------------------------
+   Sections sit on the page (.section) instead of in a box each. Best/worst
+   High and Low carry a tint AND an arrow, so colour is never the only signal. */
+.analysis-section { margin-bottom: 28px; }
+.analysis-section .panel-head { margin: 0; }
+.analysis-section .panel-head .section-title { margin: 0; }
+.analysis-heat { display: inline-block; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+.analysis-heat.best { background: color-mix(in oklch, var(--up) 16%, transparent); color: var(--up); }
+.analysis-heat.worst { background: color-mix(in oklch, var(--down) 16%, transparent); color: var(--down); }
+.analysis-formula { font-size: 12px; }
+
+
+/* --- 013 US1: RosterManagement (Bench points) ------------------------------
+   One bar colour: the rainbow by rank encoded rank a second time, and rank is
+   already the order of the rows. The three largest bench gaps read in --down;
+   the words "left on the bench" travel with it, so colour never stands alone. */
+.rm-track { --hue: 250; }
+.rm-left-big { color: var(--down); font-weight: 600; }
+
+
+/* --- 013 US1: ExpectedWins (Luck) ------------------------------------------
+   Sections sit on the page. The early badge reuses .sl-early (the Superlatives
+   one), so "early, mostly noise" looks the same everywhere it appears. */
+.ew-table + .how { margin-top: 14px; }
+
+
+/* --- 013 US1: SeasonForecast (Playoff odds) --------------------------------
+   Sections sit on the page. The commissioner recompute stays an .action-button
+   (teal, an interaction); --volt is reserved for a page's one primary action
+   and this page's only action is commissioner-only. */
+.sf-table + .sf-note { margin-top: 10px; }
+
+
+/* --- 013 US1: WeeklyReport (Matchups & awards) -----------------------------
+   Matchups stay cards: a matchup is a pair facing each other. The weekly
+   awards are one-line records, so they are a .row-list, not a card each. */
+.wr-awards.row-list { display: block; }
+.wr-awards.row-list .wr-award { border: 0; border-radius: 0; background: transparent; padding: 10px 4px; }
+
+
+/* --- 013 US1: Superlatives (Awards) ----------------------------------------
+   One raised surface per award card, no per-card coloured top/left border (the
+   hue encoded nothing; position in the grid is already the order). The cards
+   keep their grid until the trophy-list rework (T086). */
+.sl-card { border-left: 1px solid var(--line); background: var(--panel); }
+.sl-card-openable:hover { border-color: var(--line); background: var(--row-hover); box-shadow: none; }
+.sl-conduct { margin-top: 28px; }
+
+
+/* --- 013 US1: LeagueHistory (Standings) ------------------------------------
+   Seasons and the record book sit on the page (.section), tables on the
+   surface with row separators. Matchup margin cards stay cards: a margin is
+   two sides facing each other. */
+.history-season { margin-top: 6px; margin-bottom: 18px; }
+.history-season h3 { margin: 0 0 8px; color: var(--text); font-size: 15px; letter-spacing: 0; }
+
+
+/* --- 013 US1: ManagerTendencies (Scouting report) --------------------------
+   The list sits on the page; the (±n) beside each reach caption stays visible
+   (it qualifies that one number), the method moved to How this works. */
+.mgr-list { margin-top: 4px; }
+
+
+/* --- 013 US1: ManagerHistory (Manager profile) -----------------------------
+   Career figures are one unboxed row (.career-stats), not a card each; ranks
+   are separated by row dividers instead of a border per row. Meetings and
+   matchup margins elsewhere keep .margin-card, because those are card-shaped. */
+.career-stats { display: flex; flex-wrap: wrap; gap: 14px 36px; margin-top: 6px; }
+.career-stats .margin-card { border: 0; border-radius: 0; padding: 0; background: transparent; min-width: 120px; max-width: 260px; }
+.career-ranks { gap: 0; }
+.career-rank-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 4px; }
+.career-rank-row:last-child { border-bottom: 0; }
+.career-rank-row:hover { background: var(--row-hover); }
+
+
+/* --- 013 US1: ManagerComparison --------------------------------------------
+   Shared rules only (sections on the page); no page-specific styling. */
+
+
+/* --- 013 US1: DraftBoard (.board / .cell) ----------------------------------
+   The cell's position tint is its only surface. The solid position badge
+   (`.pos`, "RB4") stays: it is a leaf, not a container, so it adds no nesting,
+   and it is the position-color system's primary mark (parent review reverted
+   a build-agent change that had flattened it to plain text, along with the
+   loss of the "second choice" dotted underline, which carries meaning).
+   Empty future cells are softened so the filled rounds read as the front line. */
+.board .cell:not([class*="pos-"]) { background: color-mix(in oklch, var(--panel) 45%, var(--bg)); }
+.board .cell:not([class*="pos-"]) .pickno-open { color: var(--muted); }
+
+
+/* --- 013 US1: MockSetup ----------------------------------------------------
+   Seats are chips on the page; "Start the draft" is the page's one --volt. */
+.controls.mock-seat-cta button:not(.chip):not(.segment) { background: var(--volt); color: var(--bg); border-color: transparent; font-weight: 700; }
+
+/* --- 013 US1: phone width (T030) ---------------------------------------------
+   Flattening .panel into .section removed the scroll container the stat tables
+   relied on (.panel-body { overflow: auto }), so at 375px they pushed the page
+   sideways. A section now lets its own wide table scroll instead of the page;
+   the weekly performer rows and the live status bar wrap. Measured with the
+   spec 013 harness: 7 routes had page-level horizontal scroll at 375 before this. */
+.section { min-width: 0; }
+.section > table, .section .table-scroll { display: block; max-width: 100%; overflow-x: auto; }
+.wr-performers li { flex-wrap: wrap; min-width: 0; }
+.wr-performers li > * { min-width: 0; overflow-wrap: anywhere; }
+.live-bar { flex-wrap: wrap; }
+.live-right { flex-wrap: wrap; min-width: 0; }
+/* Waiver adds (Bench points): rows wrap on a phone instead of pushing the page. */
+.tx-adds li { flex-wrap: wrap; min-width: 0; }
+
+/* --- 013 US3: rail groups (This week / The season / Draft / History) ---
+   Desktop: a heading button per group; closed groups are not rendered at all.
+   Phone lane (<= 860px, matched in LeagueRailSection's PHONE_LANE_QUERY): every
+   group is open, headings are small separators inside the swipe lane, and the
+   group wrappers dissolve so the lane stays one row. Collapsed rail: headings
+   shrink to a hairline between groups. */
+.app-rail-group { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.app-rail-group-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 6px;
+  padding: 4px 10px; background: none; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.app-rail-group-head:hover { color: var(--text); }
+.app-rail-group-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 6px; }
+.app-rail-group-head.static { cursor: default; }
+.app-rail-group-caret { font-size: 9px; }
+.app-rail.collapsed .app-rail-group { margin-top: 4px; }
+.app-rail.collapsed .app-rail-group-head.static {
+  font-size: 0; height: 1px; padding: 0; margin: 4px 10px; background: var(--line);
+}
+@media (max-width: 860px) {
+  .app-rail-group { display: contents; }
+  .app-rail-group-head.static {
+    flex: 0 0 auto; align-self: center; padding: 0 2px 0 8px; font-size: 10px;
+    letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .app-rail.collapsed .app-rail-group-head.static { height: auto; margin: 0; background: none; font-size: 10px; }
+}
+
+/* --- 013 US4: League home ---------------------------------------------------
+   Sections sit on the page (.section); standings are a .row-list. The only
+   --volt is "Open the draft room" (.home-hero-cta), and only before the draft.
+   Win/loss colours always travel with the words Won / Lost / Tied. */
+.lh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
+.lh-grid > .section { min-width: 0; }
+.lh-draft { margin-bottom: 20px; }
+.lh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+.lh-link { font-size: 13px; color: var(--teal); text-decoration: none; align-self: flex-start; }
+.lh-link:hover { text-decoration: underline; }
+.lh-hero-nums { display: flex; flex-wrap: wrap; gap: 8px 40px; }
+.lh-hero-nums > div { display: flex; flex-direction: column; gap: 2px; }
+.lh-hero-num { font-size: 40px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.lh-hero-label { font-size: 12px; color: var(--muted); }
+.lh-rows { list-style: none; margin: 0; padding: 0; }
+.lh-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
+.lh-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-pos { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-rec, .lh-pts { font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.lh-matchup { display: flex; flex-direction: column; gap: 6px; }
+.lh-side { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.lh-pts { font-weight: 600; }
+.lh-result.won { color: var(--up); font-weight: 600; }
+.lh-result.lost { color: var(--down); font-weight: 600; }
+.lh-result.tied { font-weight: 600; }
+.lh-headline { font-weight: 600; margin: 0; }
+.lh-award-title { font-weight: 600; margin: 0; }
+
+/* --- 014: player spotlight -------------------------------------------------
+   Rows reuse .lh-row; "Yours" and "Free agent" are tinted pills with the word, never
+   colour alone. Three columns on the dashboard's own grid; a segmented control on phones. */
+.lh-spotlight { margin-top: 16px; }
+/* specs/015: the same lists on the root home page under a league tab strip. The strip scrolls
+   within itself so the page never scrolls sideways at 375px (FR-011). */
+.home-spotlight { margin-top: 16px; }
+.home-spot-leagues { display: flex; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); overflow-x: auto; scrollbar-width: thin; min-width: 0; }
+.home-spot-league { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; white-space: nowrap; color: var(--muted); background: none; cursor: pointer; }
+.home-spot-league[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
+.lh-spotlight-tag { font-weight: 600; color: var(--teal); }
+.lh-spot-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
+.lh-spot-section { margin-top: 14px; min-width: 0; }
+.lh-spot-cols > .lh-spot-section { margin-top: 0; }
+.lh-spot-h { margin: 0 0 2px; font-size: 14px; font-weight: 600; }
+.lh-spot-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.lh-spot-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; min-width: 0; }
+.lh-spot-line .lh-name { flex: 0 1 auto; }
+.lh-spot-extra { flex: 0 1 auto; }
+.lh-spot-sub2 { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lh-spot-sub { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lh-spot-owner { flex: 0 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 5px; }
+.lh-spot-owner-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar.lh-spot-avatar { width: 16px; height: 16px; font-size: 8px; }
+.lh-spot-toggle { background: none; border: 0; padding: 6px 0 2px; cursor: pointer; font-family: inherit; }
+.lh-spot-credit { margin-top: 6px; }
+.lh-yours, .lh-fa { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.lh-yours { margin-left: 3px; color: var(--crimson-text); background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 18%, transparent); }
+.lh-fa { color: var(--teal); background: color-mix(in oklch, var(--teal) 16%, transparent); }
+.lh-spot-tabs { display: none; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); }
+.lh-spot-tab { flex: 1 1 0; border: 0; border-radius: 999px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--muted); background: none; cursor: pointer; }
+.lh-spot-tab[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
+@media (max-width: 639px) {
+  .lh-spot-tabs { display: flex; }
+  .lh-spot-cols { display: block; }
+  .lh-spot-section[data-active="false"] { display: none; }
+}
+

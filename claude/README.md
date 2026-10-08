@@ -82,3 +82,53 @@ is most likely to be *wrong*, ranked by how little scrutiny it has had:
    his picks — that invariant is not currently tested.
 5. **`available.remove(choice)`** in `DraftSimulator` — linear scan, 210 removals
    per iteration. Fine at 2k iterations, possibly minutes at 10k.
+
+## Doc status index (spec 021, 2026-10-07)
+
+Where each doc stands **today**. A doc's own status line is what was true when it was
+written, and several are now stale (they say "design, not built" for something that
+later shipped as a spec). Per this repo's convention the docs themselves are not
+rewritten. This index is the correction, and every "shipped as spec N" below was
+checked against `specs/` on main, not assumed.
+
+**Reference, always current:** `README.md` (this file), `environment.md`, `lessons.md`.
+
+**Built** (the doc is the design of record for something that shipped):
+`board-first-layout-and-pick-latency.md`, `board-redesign-pick-by-pick-playercard.md`,
+`live-poller-plan.md`, `live-reveal-and-tendencies-ui.md`, `your-pick-and-pacing.md`,
+`reactive-resimulation.md`, `pill-board-and-player-list-on-top.md`,
+`on-the-clock-and-name-abbreviation.md`, `live-pick-names-and-team-fit.md`,
+`multi-sport-and-rebrand.md`, `league-suite.md` (Phase A), `league-analysis.md`,
+`league-analysis-lineups-and-matchups.md`, `league-analysis-week-by-week.md`,
+`nba-mock-drafts.md`, `nba-power-rankings.md`, `playoff-odds.md`,
+`power-rankings-ballots.md`, `season-scoped-rail-links.md`,
+`site-wide-shell-propagation.md`, `user-identity-and-onboarding.md`,
+`my-team-dashboard.md` (mostly; its remainder is designed in the doc).
+
+**Shipped later as a spec, so the doc's own status line is stale:**
+
+| Doc says | Actually |
+|---|---|
+| `superlatives-full-standings.md`: "planned, nothing built" | built as **spec 010** |
+| `design-review-fan-first.md`: "planning doc, nothing built" | built as **spec 013** |
+| `nba-schedule-grid-and-streaming.md`: "design, not built" | grid built as **spec 017**; streaming as **spec 019** |
+| `draft-grades.md`: "design, not built" | built as **spec 018** |
+| `nba-minutes-trends.md`: "design, not built" | built as **spec 019** |
+| `ai-recap-and-historian.md`: "design, not built" | **recap only** built as spec 020; the historian is still unbuilt (spec 020 scopes it out) |
+
+**Designed, not built:** `hall-of-fame-and-rivalries.md`, `schedule-swap.md`,
+`season-wrapped.md`, `trade-grades-and-trade-tree.md`, `projection-tools.md`.
+
+**Reconciled, recommendation is don't build:** `auction-drafts.md`,
+`keeper-calculator.md`.
+
+**Planning, research and reconciliation** (a legitimate outcome can be "nothing
+built"): `competitor-gap-research.md`, `competitor-gap-roadmap.md`,
+`next-features-roadmap.md`, `borrowed-drafts.md`, `adp-sources.md`,
+`player-affinity.md`, `optimization-ideas.md`, `ui-polish-roadmap.md`,
+`design-review-next-steps.md`.
+
+**Reviews and verification records** (kept as history; not specs):
+`plan-review-A.md`, `plan-review-B.md`, `plan-review-league-suite.md`,
+`plan-review-power-rankings-ballots.md`, `merge-review-multi-sport.md`,
+`live-verification-A.md`, `audit-2026-09-28/` (all done; see HANDOFF).

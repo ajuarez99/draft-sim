@@ -47,7 +47,7 @@ export type RankBoardMember = {
   rosterId: number
   managerId: number | null
   /** Display name -- already resolved (Sleeper display name, or better),
-   *  same convention as `StandingRow.manager` in api.ts. */
+   *  same convention as `StandingRow.manager` in api/leagueHistory.ts. */
   manager: string | null
   avatarId?: string | null
   /** Sleeper's `metadata.team_name`, resolved by the caller. Rendered only
