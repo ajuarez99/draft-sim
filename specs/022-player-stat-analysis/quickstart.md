@@ -1,5 +1,13 @@
 # Quickstart: verifying spec 022
 
+> **Amended after review, 2026-10-07** ([plan-review.md](plan-review.md)):
+>
+> - **V5**: Superlatives replaces League Analysis, which is NFL-only (F11).
+> - **V6**: 2024 ownership is "end of regular season (week 21)", because 2024's `playoff_week_start` is 22; for 2025 it is week 18 (F5). V6 also covers forward season picks (F4) and `currentOwnership` (F6).
+> - **V1**: two baselines, from the 2025 and 2026 leagues, with time-varying fields stripped (N13).
+> - **V10**: adds a postponed-game night, the All-Star night and a 2024 night (F3), plus a current-week night (F2).
+> - **V12**: opening night is 2026-10-20 (N10).
+
 Each step is labelled with the chunk it verifies: F (foundation), US1, US2, US4 or US3. Every
 result is recorded in `verification.md` as **measured**, with the number, or as **not run**, with
 the reason.
@@ -20,11 +28,10 @@ the reason.
 
 **V1. The extractions leave existing behaviour unchanged.**
 
-- `./gradlew test`: Player Trends' existing tests pass unchanged after the `NbaGameLines`,
-  `AdvancedStats.usage` and `contributions` extractions.
+- `./gradlew test`: Player Trends' existing tests pass after the `NbaGameLines`, `AdvancedStats.usage` and `contributions` extractions. Only the test helpers change, for `SeasonGame.isAway` (F7, N12).
 - Invariant I1: `score` is identical on every 2025 NBA game.
-- `GET /api/leagues/{nba2026}/player-trends` gives JSON identical to before the change. Compare
-  with `jq -S`.
+- `GET /api/leagues/{nba2026}/player-trends` and `GET /api/leagues/{nba2025}/player-trends` each give JSON identical to before the change. Compare with `jq -S`, after deleting `rostersFetchedAt`, `currentWeek` and `staleReferenceDate` (N13).
+- I1 also covers NFL 2025 games (N3).
 
 **V2. The cache is correct and gets invalidated.**
 
@@ -55,7 +62,7 @@ the reason.
 - the Weekly Report;
 - Trends;
 - Roster Management;
-- League Analysis.
+- Superlatives (amended F11: League Analysis is NFL-only).
 
 Each must land on that player's page in the same league-season.
 
@@ -63,7 +70,9 @@ Each must land on that player's page in the same league-season.
 
 - Before 2026 has games, the 2026 league's player page opens on 2025 and says so
   (`requestedSeason`).
-- Picking 2024 shows the 2024 league's scoring and week-21 ownership, never current rosters (I8).
+- Picking 2024 shows the 2024 league's scoring and "end of regular season (week 21)" ownership, never current rosters (I8).
+- From the 2024 page, the picker lists 2026, 2025 and 2024 (F4).
+- Between the draft and 10-20, the 2026 page falls back to 2025 and shows both 2025's week-18 ownership and the labelled `currentOwnership` (F6).
 
 ## US2: advanced stats
 
@@ -116,6 +125,13 @@ only if the measurements call for it.
 - every standout flag meets its rule;
 - the member's roster lines match the week's `players_points` keys.
 
+Also check these nights (F3, F2):
+
+- 2026-01-08 and 2026-01-25, nights with postponed games: they read complete, and the postponed games are not counted as missing;
+- 2026-02-15, the All-Star night: no STP/STR game is listed;
+- one 2024 night: games list correctly with no schedule, and `missingGames` is null with `NO_SCHEDULE`;
+- once 2026 is in season, last night: `mine` shows `asOf CURRENT`, not unavailable.
+
 ## Manual check against Basketball Reference
 
 **V11. Cross-check (SC-003).** In a browser, read Basketball Reference's 2025-26 season:
@@ -130,7 +146,7 @@ Nothing from the page is stored.
 
 ## After opening night
 
-**V12. Box score delay (FR-036).** On the first regular-season nights from 2026-10-21, record for
+**V12. Box score delay (FR-036).** On the first regular-season nights from 2026-10-20, record for
 5 games:
 
 - the game's final time, from the schedule's status change;

@@ -44,6 +44,61 @@ The other measurements that shaped the design:
 - **Seasons.** The season picker is the existing league chain, and the resolver gets an explicit
   "has stored games" rule (R7).
 
+## Amended after review (2026-10-07)
+
+[plan-review.md](plan-review.md) read the plan cold and re-measured against the DB and code. About
+18 claims held. It found 13 findings and 17 notes. The four high findings were re-checked by the
+parent session before acceptance:
+
+- **F1**: the NFL 2026 leagues are `in_season` with `complete` drafts.
+- **F3**: 2024 has no `sport_schedule` rows; there are three postponed January games and a
+  `canceled` STP–STR All-Star game.
+- **F4**: `chainBySleeperId` follows `previous_league_id` only.
+
+All 13 findings are accepted. The docs are amended in place, each with a dated note.
+
+| # | Finding | Disposition |
+|---|---|---|
+| F1 | Draft state keyed on `league.status` | **Fixed.** It reads `draft.status`: `complete` gives `COMPLETE`, any other draft row `NOT_HAPPENED`, and no row `NONE`. This is the field `DraftGradesService.read` already gates on. T041 adds an `in_season` + `complete` case |
+| F2 | The current unscored week has no `roster_week_points` row | **Fixed.** A night in the league's current, unscored week uses V28 current rosters (`asOf CURRENT`, same draft gating). A scored week uses its `players_points`. Only weeks after the league's last week are `UNAVAILABLE` |
+| F3 | Night completeness duplicated Spotlight's rule, and breaks on postponed games, the All-Star game and 2024 | **Fixed.** Spotlight's night rule (`isComplete`/`choosePeriod`) is extracted and shared. The game list is built from stored team rows, already All-Star filtered. The schedule is used only for `missingGames`, through `ScheduleGridService`'s real-game rule. T054 adds postponed, All-Star and 2024 cases |
+| F4 | The picker can't move forward | **Fixed.** `seasons` is built from the chain head: a new successor lookup (`where previous_league_id = ?`) walks forward, then the chain walks back. T023 tests from the 2024 id |
+| F5 | "End of regular season, week N" was the wrong week | **Fixed, rule chosen.** A completed season's ownership is week `playoff_week_start − 1` (2025: week 18, 2024: week 21), labelled "end of regular season (week N)". NBA games after the league's last week say no roster covers them. V6 corrected |
+| F6 | The fallback season showed March owners right after the draft | **Fixed.** When `requestedSeason != null`, C1 and C2 also carry `currentOwnership` for the requested season, labelled separately. `ownership` stays the shown season's, so I8 holds |
+| F7 | The cache switch changed Trends' inputs; `isHome` had no input | **Fixed.** The cache stores raw rows (`SeasonGame` + `TeamGame`, with `isAway` added from `player_game.is_away`, which is 100% populated). `NbaGameLines` is applied over them. Trends' `oneGameShare` keeps the All-Star row in this spec so V1 stays byte-identical; excluding it is a named follow-up. `SeasonGame` gains a field, and the test helpers are updated (not "unchanged") |
+| F8 | Cache lock, read order and reloads unspecified | **Fixed.** Uses a lock-free single flight on the `refresh/SingleFlight` pattern (its own instance), never `synchronized` (virtual-thread pinning on 21). The token is read **before** the rows. `PlayerGameIngestService.refreshSportSeason` calls `invalidate(sport, season)` when it finishes, with the token as a safety net, and no reload starts while a refresh of that season is in flight. Cached lists and maps are unmodifiable, with a T013 case |
+| F9 | LAST_N windows had no recency | **Fixed.** `WindowStats` carries `firstGameDate`/`lastGameDate`. A player whose last game is more than `recency-days` (new key, 14, ARBITRARY) before the season's latest game is excluded from LAST_N ranks, percentiles and leaders, and labelled "hasn't played since {date}". LAST_N qualification is defined as playing all N games, with the minutes rule. Test with a 60-day-old last game |
+| F10 | `missedTeamGames` undefined, and the name collides with Trends' field | **Fixed.** Renamed `teamGamesMissed`. Rule: for each team he played for, that team's games between his first and last game with it, minus the games he played. Traded-player test |
+| F11 | League Analysis is NFL-only; the pages had no sport rule or league id | **Fixed.** Superlatives replaces League Analysis in FR-014, SC-001 and V5 (dated amendment). One gate, `playerPagesFor(sport)`, is derived from a `players` destination row with `inRail: false` (N5). `PlayerSpotlight` receives `sleeperLeagueId` |
+| F12 | Draft-value and ADP join gaps | **Fixed.** C2 gains `draftGrades {available, reason, gradesEarly, weeksCounted}`. `DraftRow` gains `startTime`, and a null start time gives `NO_DRAFT_DATE`. A new `BoardRepository.latestBefore(sport, source, date)` returns the capture date with its rows, with an IT on 2025 (empty) and 2026 (09-28). Drafting-manager names use Draft Grades' rule. The Draft Grades read is memoised on the season token, and V9 times it |
+| F13 | Rank, percentile and contract contradictions | **Fixed.** Ranks are competition ranks on the **wire-rounded** value (2 decimals); games, name and id set display order only. A free agent's `LEAGUE_ROSTERED` percentile ranks his value against the rostered group, so no "not in group" code is needed. Percentiles are per window in C1. `Ownership` carries `rosterId` |
+
+Notes taken:
+
+- **Counts and data**:
+  - **N1**: player rows are 26,680 (2025) and 26,335 (2024), corrected in R1.
+  - **N2**: store `double`; there are 31 keys per row on average.
+  - **N3**: naive left-to-right sum in scoring-key order, and I1 covers NFL 2025 too.
+  - **N6**: any empty roster makes the week `UNAVAILABLE`.
+  - **N7**: `didNotPlay` comes from game-level `player_absence` `ENTRY_WITHOUT_PLAY` rows, not
+    `player.team`.
+  - **N8**: every scoring key gets a label, and `share` is null when the season total ≤ 0.
+  - **N11**: `start_time` is the scheduled time, stated in R10.
+  - **N14**: C2 is ~0.75 MB per window uncompressed; compression is expected and V9 decides it.
+  - **N17**: the resolver shares the cache's token.
+- **Client and routes**:
+  - **N4**: the player route is keyed on both ids.
+  - **N5**: the `players` destination row has `inRail: false`.
+  - **N15**: the fallback note *is* the "explicitly picked current season" statement; spec edge
+    case reworded.
+  - **N16**: one line on the fallback note about Trends' different season switch.
+- **Codes and tests**:
+  - **N9**: `NO_PLAYER_GAMES` for a player with no games in a season that has games.
+  - **N10**: opening night is 10-20.
+  - **N12**: Trends' usage tests stay in place as its guard, and direct `AdvancedStats.usage` tests
+    are added.
+  - **N13**: two baselines (2026 and 2025 leagues), with the time-varying fields stripped.
+
 ## Technical Context
 
 **Language/Version**: Java 21 / Spring Boot 3.5; TypeScript + React + Vite.

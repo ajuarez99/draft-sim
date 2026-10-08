@@ -135,7 +135,9 @@ The user asked for a placement recommendation. The design rests on four decision
   page therefore sits under a league, like every other page in the app, and shows both kinds of
   number, each labelled.
 - **It opens from every player name.** Rows in the spotlight, Weekly Report, Player Trends,
-  rosters and analysis views that name an NBA player link to the player's page. Draft boards are
+  roster and Superlatives views that name an NBA player link to the player's page (amended
+  2026-10-07, review F11: League Analysis is NFL-only, so it can't link to a basketball page).
+  Draft boards are
   not league pages, so linking them is out of scope here. A detail that only one entry point can
   reach would get little use.
 - **The nightly report is a new page in the league's navigation, beside the Weekly Report.**
@@ -193,8 +195,9 @@ night.
    more than one team.
 4. **Given** a player who missed team games, **When** the page is shown, **Then** it states how
    many of his team's games he missed. Missed games are not shown as zero-stat rows.
-5. **Given** any player name in the spotlight, Weekly Report, Player Trends, roster or analysis
-   views of a basketball league, **When** the member clicks it, **Then** they land on that
+5. **Given** any player name in the spotlight, Weekly Report, Player Trends, Roster Management
+   or Superlatives views of a basketball league (amended at review, F11: Superlatives replaces
+   League Analysis, which is NFL-only), **When** the member clicks it, **Then** they land on that
    player's page for the same league.
 6. **Given** a player with no games yet this season (before opening night, or a rookie yet to
    debut), **When** the page is opened, **Then** it says no games have been played yet. It
@@ -408,7 +411,10 @@ clarification. It still comes after US1 and US2, because it reuses every number 
   is known and labels missing identity details as unknown.
 - **Before the season starts**: the player page, nightly report and leaderboard open on last
   season and say the current season has no games yet. A member who picks the current season
-  explicitly sees that statement, not an empty table.
+  explicitly sees that statement, not an empty table. Because seasons are URLs, an explicit pick
+  and the default link are the same page, so the fallback note is that statement (amended at
+  review, N15). The same note also shows who owns the player now, in the newer season, labelled
+  separately (F6).
 - **A past season's ownership**: "rostered", "free agent" and "your roster" for a past season or
   night come from that season's stored rosters. Where none are stored for that point in time, the
   page says ownership is unavailable rather than showing today's rosters.

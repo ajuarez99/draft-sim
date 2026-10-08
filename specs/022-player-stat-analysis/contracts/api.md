@@ -1,5 +1,18 @@
 # Contract: player stat analysis (spec 022)
 
+> **Amended after review, 2026-10-07** ([plan-review.md](../plan-review.md)). Changed fields:
+>
+> - **`seasons`**: entries gain `hasGames`, and the list is built from the chain head, so a past season reaches newer ones (F4).
+> - **`currentOwnership`** is added to C1 and C2, only when `requestedSeason` is set (F6).
+> - **`Ownership`** carries `rosterId` (F13).
+> - **`missedTeamGames`** is renamed `teamGamesMissed` (F10).
+> - **C1 `percentiles`** is keyed by window, then rate (F13).
+> - **Window dates**: `WindowStats` gains `firstGameDate` and `lastGameDate` (F9).
+> - **New reason codes**: `NOT_QUALIFIED_STALE` (F9) and `NO_PLAYER_GAMES` (N9).
+> - **C2 draft**: `draft.state` reads `draft.status` (F1). C2 gains `draftGrades`, and `adp` gains `NO_DRAFT_DATE` (F12).
+> - **C3 games**: `games` come from stored team rows, `complete` follows Spotlight's shared rule, and `missingGames` can be null with `NO_SCHEDULE` (F3).
+> - **C3 ownership**: `mine.ownership` can be `CURRENT` for the unscored week (F2).
+
 All three routes are league routes. They take `X-Sleeper-User` and are scoped by
 `LeagueMembership.visibleLeague`: a caller who can't see the league gets the same 404 as a league
 that doesn't exist. Each route is added to `AccessControlMvcIT`'s hand-listed league routes.
@@ -16,18 +29,19 @@ season picker in the web client switches it.
 | `available` | bool | |
 | `reason` | string, nullable | `NOT_BASKETBALL`, `NOT_CONFIGURED` or `NO_GAMES` (this season has no stored games) |
 | `dataAsOf` | timestamp, nullable | `max(player_game.fetched_at)` for the season (FR-008) |
-| `seasons` | `[{season, sleeperLeagueId}]` | The picker's options: every chain season with stored games, newest first |
+| `seasons` | `[{season, sleeperLeagueId, hasGames}]` | The picker's options: **every** season in the chain, newest first, walked from the chain head (F4). `hasGames: false` is shown as "no games yet" |
+| `currentOwnership` | `Ownership`, nullable | C1 and C2 only, present only when `requestedSeason` is set: the requested season's current ownership, labelled separately (F6) |
 
 `Rate` is `{ "value": 61.6, "reason": null }`. Exactly one of the two is non-null. `reason` is one
 of `NO_ATTEMPTS`, `NO_MINUTES` or `NO_TEAM_ROW`.
 
 `Pct` is `{ "value": 88.0, "group": "NBA_POSITION" | "LEAGUE_ROSTERED", "n": 97, "reason": null }`.
-`reason` is one of `NOT_QUALIFIED`, `GROUP_TOO_SMALL` or `OWNERSHIP_UNAVAILABLE`.
+`reason` is one of `NOT_QUALIFIED`, `NOT_QUALIFIED_STALE`, `GROUP_TOO_SMALL` or `OWNERSHIP_UNAVAILABLE`. A free agent's `LEAGUE_ROSTERED` value is his percentile **against** the rostered group (F13).
 
 `Ownership` is:
 
 ```json
-{ "state": "ROSTERED", "ownerName": "…", "avatarId": "…", "isMe": false,
+{ "state": "ROSTERED", "rosterId": 4, "ownerName": "…", "avatarId": "…", "isMe": false,
   "asOf": { "kind": "CURRENT", "fetchedAt": "…" } }
 ```
 
@@ -45,7 +59,7 @@ The player page (US1 and US2).
   "player": { "sleeperPlayerId": "4046", "name": "Nikola Jokić", "positions": ["C"],
               "team": "DEN", "known": true },
   "teamsThisSeason": ["DEN"],
-  "missedTeamGames": 17,
+  "teamGamesMissed": 17,
   "ownership": { "…": "Ownership" },
   "windows": {
     "SEASON":  { "WindowStats": "…" },
@@ -59,14 +73,14 @@ The player page (US1 and US2).
     "breakdown": [ { "key": "reb", "points": 820.0, "share": 0.21 } ],
     "seasonTotal": 3978.5
   },
-  "percentiles": { "ts": ["Pct", "Pct"], "usg": ["Pct", "Pct"] },
+  "percentiles": { "SEASON": { "ts": ["Pct", "Pct"], "usg": ["Pct", "Pct"] }, "LAST_10": {}, "LAST_5": {} },
   "gameLog": [ { "GameLogRow": "…" } ]
 }
 ```
 
 `WindowStats` holds:
 
-- `games` (the games the window actually covers), `minutes`, `minutesPerGame`, `smallSample`;
+- `games` (the games the window actually covers), `firstGameDate`, `lastGameDate`, `minutes`, `minutesPerGame`, `smallSample`;
 - `perGame`, `totals` and `per36`, each `{pts, reb, oreb, dreb, ast, stl, blk, tov, pf, fgm, fga,
   tpm, tpa, ftm, fta}`;
 - `shooting`: `{fgPct, tpPct, ftPct}`, each a `Rate`;
@@ -82,7 +96,7 @@ the full counting line, `plusMinus`, `gameScore` and `fantasyPoints`. Rows are n
 - **Unknown player**: a player id with stored games but no `player` row is
   `player.known: false`, `name: null`, `positions: []`, `team: null`.
 - **No games**: a player id with no stored games and no player row gives 404.
-- **No games this season**: `available` is true and `reason` is `NO_GAMES`. The windows are empty
+- **No games this season**: `available` is true and `reason` is `NO_PLAYER_GAMES` (N9; `NO_GAMES` means the season itself has no stored games). The windows are empty
   and the game log is `[]`.
 - **Unqualified player**: `fantasy.ranks.reason` is `NOT_QUALIFIED`, and the rank numbers are null.
 
@@ -99,6 +113,7 @@ window is a rule and is never defaulted.
   "ownershipAsOf": { "kind": "WEEK", "week": 21 },
   "draft": { "state": "COMPLETE", "draftId": "…" },
   "adp": { "source": "blend", "capturedOn": null, "reason": "NO_ADP_STORED" },
+  "draftGrades": { "available": true, "reason": null, "gradesEarly": false, "weeksCounted": 18 },
   "replacement": { "byPosition": { "PG": 31.2, "SG": 27.0, "SF": 28.4, "PF": 29.1, "C": 33.5 },
                    "rule": "GREEDY_SLOT_FILL", "teams": 12,
                    "slots": ["PG","SG","SF","PF","C","G","F","UTIL","UTIL"] },
@@ -106,7 +121,9 @@ window is a rule and is never defaulted.
 }
 ```
 
-- `draft.state` is `COMPLETE`, `NOT_HAPPENED` or `NONE`.
+- `draft.state` is `COMPLETE`, `NOT_HAPPENED` or `NONE`, read from **`draft.status`**, never `league.status` (F1).
+- `adp.reason` is `NO_ADP_STORED` or `NO_DRAFT_DATE` (F12).
+- `draftGrades` is copied from that draft's Draft Grades result, so a null `draftValue` is never ambiguous (F12).
 - `adp` is `{source, capturedOn}` when ADP is stored, or carries `reason: NO_ADP_STORED`.
 
 `LeaderboardRow` holds:
@@ -133,8 +150,9 @@ window is a rule and is never defaulted.
 ## C3. `GET /api/leagues/{sleeperLeagueId}/nightly?date=YYYY-MM-DD`
 
 The nightly report (US3). `date` is optional, because the default is a stated rule rather than a
-value: the most recent date with at least one complete game. The response always names the date
-it answers about.
+value: the latest night that is complete by the rule shared with Spotlight (amended F3; this was
+"the most recent date with at least one complete game", which would have landed on tonight's
+partial slate). The response always names the date it answers about.
 
 ```json
 {
@@ -158,7 +176,9 @@ it answers about.
 
 **Rules:**
 
-- `mine.reason` is `NOT_SIGNED_IN`, `NO_ROSTER` or `OWNERSHIP_UNAVAILABLE`.
+- `mine.reason` is `NOT_SIGNED_IN`, `NO_ROSTER` or `OWNERSHIP_UNAVAILABLE`. `mine.ownership.kind` is `CURRENT` for a night in the current, unscored week (F2).
+- `games` come from stored team rows, so 2024 works (F3). `complete` uses the rule shared with Spotlight. `missingGames` is null when the season has no schedule, and then `missingGamesReason` is `NO_SCHEDULE`.
+- The default `date` is the latest **complete** night by the shared rule (F3).
 - A date with no scheduled games gives `games: []` and `reason: "NO_GAMES_ON_DATE"`, with no empty
   sections.
 - A date outside the season gives 400.
