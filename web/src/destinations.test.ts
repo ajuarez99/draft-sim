@@ -316,6 +316,29 @@ describe('trends destination', () => {
   })
 })
 
+// specs/022-player-stat-analysis T055: the stats leaderboard, a basketball rail page, season-scoped.
+describe('stats destination', () => {
+  const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'stats')!
+
+  it('is offered to basketball and not football, and sits in the rail', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('stats')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('stats')
+    expect(row().inRail).toBe(true)
+  })
+
+  it('is recognised from its own path and carries the league id', () => {
+    expect(destinationFromPath('/leagues/x/stats')).toBe('stats')
+    expect(destinationFromPath('/leagues/x/stats/')).toBe('stats')
+    expect(leagueIdFromPath('/leagues/x/stats')).toEqual({ idKind: 'league', id: 'x' })
+  })
+
+  it('links the season being viewed, not the newest', () => {
+    const older = draft({ sleeperLeagueId: 'L_OLD', season: 2025 })
+    const current = draft({ sleeperLeagueId: 'L_NEW', season: 2026 })
+    expect(row().href({ lineage: { current, seasons: [current, older] }, season: older })).toBe('/leagues/L_OLD/stats')
+  })
+})
+
 // specs/022-player-stat-analysis T027: the player page is reached from a name,
 // never from the rail, and its sport gate is the only one PlayerLink consults.
 describe('players destination', () => {

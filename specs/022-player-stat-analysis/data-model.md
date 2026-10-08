@@ -299,9 +299,25 @@ Amended F1, F12:
 - **`draftGrades`**: `{available, reason, gradesEarly, weeksCounted}`, copied from that draft's
   `DraftGradesService` result, so a null `draftValue` can always be told apart from "Draft Grades
   unavailable or early".
-- **`draftValue`**: that pick's `valueOverSlot`, labelled "per counted week, from Draft Grades" and
-  linked to that page. It is null for undrafted players, and when `draftGrades.available` is false.
-- **The Draft Grades read** is memoised on the season token (V9 times it).
+- **`draftValue`**: that pick's `valueOverSlot`, labelled "fantasy points over the pick's slot, summed
+  over the league's counted weeks, from Draft Grades" and linked to that page. It is null for
+  undrafted players, and when `draftGrades.available` is false.
+  - *Amended 2026-10-08 (US4 live check #1, bug class #5): this was labelled "per counted week". It is
+    a season total: Draft Grades' `production` is the sum over counted weeks of each week's value
+    (`DraftGradesService.java:382`; spec 018 data-model). The number was right; the label implied the
+    wrong unit.*
+- **The Draft Grades read** is memoised on the season token and a hash of the league's scoring
+  (`leagues.scoringOf`), so a commissioner scoring change re-reads it (amended 2026-10-08, review
+  doc gap). Still not covered: weekly-stats finality and roster weeks.
+- **Which league's draft (amended 2026-10-08, code-review V2)**: the draft columns, the drafting
+  managers and ADP follow the **requested** season's league, not the season the stats fell back to.
+  Before a new NBA season's first game the board answers with last season's stats, but the draft has
+  usually happened or is scheduled, so `draft.state` is `NOT_HAPPENED` (or `COMPLETE` after the
+  draft) for the requested season, ADP is the blend capture on or before **that** draft's date
+  (2026: the 2026-09-28 capture), and `draftValue` is unavailable (`DRAFT_NOT_COMPLETE` or
+  `NO_SCORED_WEEKS`) until games are scored. The draft state carries `draftSeason` so the page can
+  label the columns "2026-27 draft". This replaces the earlier behaviour (draft joined to the answered
+  season), which made US4 scenario 9 and R10's "2026 reads 09-28" unreachable.
 
 ## Night (US3)
 

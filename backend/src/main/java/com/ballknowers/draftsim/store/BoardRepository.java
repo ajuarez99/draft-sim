@@ -148,4 +148,27 @@ public class BoardRepository {
                 .optional();
         return d.map(date -> load(sport, source, date)).orElse(List.of());
     }
+
+    /** One capture: the date it was taken and its complete row set (best ADP first). */
+    public record Capture(LocalDate capturedOn, List<Row> rows) {}
+
+    /**
+     * The latest capture of {@code source} whose {@code captured_on} is on or before {@code onOrBefore},
+     * with its date and rows; empty when no capture is that early (spec 022 T048, F12).
+     *
+     * <p>Rows key on {@code player.id}, the local id, not the Sleeper id. The date comes from
+     * {@code order by ... limit 1}, not {@code max()}: an aggregate over no rows is one row holding null, which
+     * is not "no capture". {@link #asOf}, which has no callers, is deliberately left alone.
+     */
+    public Optional<Capture> latestBefore(Sport sport, String source, LocalDate onOrBefore) {
+        Optional<LocalDate> date = db.sql("""
+                select captured_on from adp_snapshot
+                where sport = ? and source = ? and captured_on <= ?
+                order by captured_on desc limit 1
+                """)
+                .params(sport.code(), source, onOrBefore)
+                .query(LocalDate.class)
+                .optional();
+        return date.map(d -> new Capture(d, load(sport, source, d)));
+    }
 }

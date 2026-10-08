@@ -365,7 +365,7 @@ class PlayerStatsServiceTest {
 
         PlayerStatsService service(PlayerStatsProperties props) {
             return new PlayerStatsService(props, box, resolver, SCORER, leagues, players, rosterSeasons, members,
-                    managers, weekPoints, rules, absences);
+                    managers, weekPoints, rules, absences, org.mockito.Mockito.mock(DraftAndAdpJoin.class));
         }
     }
 
@@ -418,6 +418,30 @@ class PlayerStatsServiceTest {
         assertEquals("NO_GAMES", page.reason());
         assertNull(page.qualification());
         assertEquals(List.of(new SeasonOption(2026, "L26", false)), page.seasons());
+    }
+
+    @Test
+    void theLeaderboardGatesAreTheSameAsThePlayerPages() {
+        LeagueRow league = row(1, 2025, "L25", "complete");
+        var cfg = new Wiring(true).service(new PlayerStatsProperties(null, null, null, null, null, null, null, null,
+                null)).readLeaderboard(league, WindowKind.LAST_10, null);
+        assertFalse(cfg.available());
+        assertEquals("NOT_CONFIGURED", cfg.reason());
+        assertEquals(WindowKind.LAST_10, cfg.window());
+        assertTrue(cfg.rows().isEmpty());
+
+        var nfl = new Wiring(false).service(PROPS).readLeaderboard(league, WindowKind.SEASON, null);
+        assertEquals("NOT_BASKETBALL", nfl.reason());
+        assertNull(nfl.replacement());
+
+        Wiring w = new Wiring(true);
+        LeagueRow l26 = row(1, 2026, "L26", "pre_draft");
+        when(w.resolver.resolve("L26", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(l26, null)));
+        when(w.resolver.seasons("L26")).thenReturn(List.of(new SeasonOption(2026, "L26", false)));
+        when(w.box.get(Sport.NBA, 2026)).thenReturn(season(Map.of(), 0, false));
+        var none = w.service(PROPS).readLeaderboard(l26, WindowKind.SEASON, null);
+        assertEquals("NO_GAMES", none.reason());
+        assertEquals(List.of(new SeasonOption(2026, "L26", false)), none.seasons());
     }
 
     @Test

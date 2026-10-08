@@ -306,6 +306,17 @@ public class DraftGradesService {
         return new RosterInputs(rosterByManager, starters, points, matchupWeeks, unknown);
     }
 
+    /**
+     * Draft slot to the drafting manager's display name, by Draft Grades' own naming rule (slot, then manager,
+     * then display name: {@link #teamsOf}). The stats leaderboard names a pick's manager through this so it
+     * matches the Draft Grades page it links to (spec 022 F12). A slot with no known manager is absent.
+     */
+    public Map<Integer, String> managerNamesBySlot(DraftRepository.DraftRow draft, List<DraftRepository.PickRow> stored) {
+        Map<Integer, String> out = new HashMap<>();
+        for (TeamIn t : teamsOf(draft, stored)) if (t.manager() != null) out.put(t.slot(), t.manager());
+        return out;
+    }
+
     /** One team per draft slot, named the way {@code /board} names a pick: by the slot's manager. */
     private List<TeamIn> teamsOf(DraftRepository.DraftRow draft, List<DraftRepository.PickRow> stored) {
         Map<Long, String> names = managers.names();

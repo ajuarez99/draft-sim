@@ -43,7 +43,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -325,6 +325,21 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // one season: the page reads the season it is opened on
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/superlatives`,
     match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inRail: true,
+  },
+  {
+    key: 'stats',
+    group: 'season',
+    glyph: '▥',
+    // Basketball only, like the player page it links into (specs/022 US4).
+    sports: ['nba'],
+    label: 'Player stats',
+    // one season: the page reads the season it is opened on (spec 011's rule)
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/stats`,
+    match: /^\/leagues\/([^/]+)\/stats\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

@@ -2732,6 +2732,95 @@ export type PlayerQualificationRule = {
 export const getPlayerStats = (leagueId: string, playerId: string) =>
   apiFetch(`/api/leagues/${leagueId}/players/${encodeURIComponent(playerId)}`).then(json<PlayerStatsPage>)
 
+// --- specs/022-player-stat-analysis: the stats leaderboard (contracts/api.md C2) ---
+// Mirrors PlayerStatsService.StatLeaderboard / LeaderboardRow, ReplacementLevel.Replacement and
+// DraftAndAdpJoin's records field for field. `window` is required by the route (a missing or unknown
+// value is a 400). A row's `stats`, `fpPerGame` and ranks are the player page's for the same window.
+
+export type DraftStateKind = 'COMPLETE' | 'NOT_HAPPENED' | 'NONE'
+/**
+ * `draftId` is the Sleeper draft id; null when the state is NONE. `draftSeason` is the season of the league the
+ * draft columns and ADP were read from: the REQUESTED season even when the stats fell back to an earlier one
+ * (amended 2026-10-08), so it can differ from the board's `season`.
+ */
+export type DraftState = { state: DraftStateKind; draftId: string | null; draftSeason: number }
+export type AdpReason = 'NO_ADP_STORED' | 'NO_DRAFT_DATE'
+/**
+ * Blend ADP provenance. `source` is always "blend" (a blend of Sleeper search rank and observed mock drafts,
+ * never the raw search rank). Exactly one of `capturedOn` (a date, YYYY-MM-DD) and `reason` is non-null.
+ */
+export type AdpState = { source: string; capturedOn: string | null; reason: AdpReason | null }
+/**
+ * What Draft Grades said about this draft, so a null `draftValue` is never ambiguous. `reason` is one of
+ * NOT_CONFIGURED, DRAFT_NOT_COMPLETE, NO_SCORED_WEEKS or NO_DRAFT (the league has no draft row).
+ */
+export type DraftGradesState = {
+  available: boolean
+  reason: string | null
+  gradesEarly: boolean
+  weeksCounted: number
+}
+/** Per NBA position (PG, SG, SF, PF, C); a null level means no eligible player is left unplaced. */
+export type Replacement = {
+  byPosition: Record<string, number | null>
+  /** "GREEDY_SLOT_FILL". */
+  rule: string
+  teams: number
+  /** The starting slots in fill order (BN, IR, TAXI removed; singles, then G/F, then UTIL). */
+  slots: string[]
+}
+export type LeaderboardDraftPick = { pickNo: number; round: number; managerName: string | null }
+export type LeaderboardRow = {
+  sleeperPlayerId: string
+  /** Null when there are games but no player row. */
+  name: string | null
+  positions: string[]
+  team: string | null
+  ownership: PlayerOwnership
+  /** Present only when the board's `requestedSeason` is set (the requested season's current owner). */
+  currentOwnership: PlayerOwnership | null
+  qualified: boolean
+  /** NOT_QUALIFIED or NOT_QUALIFIED_STALE when `qualified` is false, else null. */
+  reason: PlayerRanksReason | null
+  stats: PlayerWindow
+  fpPerGame: number | null
+  /** Ranks, and the two replacement fields, are null unless `qualified`. */
+  leagueRank: number | null
+  positionRank: number | null
+  pointsRank: number | null
+  rankMove: number | null
+  valueOverReplacement: number | null
+  vorPosition: string | null
+  /** Null for a player with no pick, and unless `draft.state` is COMPLETE. */
+  draft: LeaderboardDraftPick | null
+  /** Draft Grades' valueOverSlot for that pick, or null (see `draftGrades`). */
+  draftValue: number | null
+  /** The blend ADP at the draft's scheduled date, or null. */
+  adp: number | null
+}
+export type StatLeaderboard = {
+  sport: Sport
+  season: number
+  requestedSeason: number | null
+  available: boolean
+  reason: PlayerStatsReason | null
+  dataAsOf: string | null
+  seasons: PlayerSeasonOption[]
+  window: PlayerWindowKind
+  /** The rule behind `qualified`; null when `available` is false. */
+  qualification: PlayerQualificationRule | null
+  /** The point in time every row's ownership is read at; null when unknown. */
+  ownershipAsOf: OwnershipAsOf | null
+  draft: DraftState | null
+  adp: AdpState | null
+  draftGrades: DraftGradesState | null
+  replacement: Replacement | null
+  /** Every player with a game in the window, qualified or not; empty when `available` is false. */
+  rows: LeaderboardRow[]
+}
+export const getStatLeaderboard = (leagueId: string, window: PlayerWindowKind) =>
+  apiFetch(`/api/leagues/${leagueId}/stats?window=${encodeURIComponent(window)}`).then(json<StatLeaderboard>)
+
 export type MatchupSide = {
   rosterId: number
   teamName: string | null

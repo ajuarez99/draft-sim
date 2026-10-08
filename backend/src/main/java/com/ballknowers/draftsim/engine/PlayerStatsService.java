@@ -8,6 +8,11 @@ import com.ballknowers.draftsim.engine.AdvancedStats.Window;
 import com.ballknowers.draftsim.engine.AdvancedStats.WindowKind;
 import com.ballknowers.draftsim.engine.LeagueSeasonResolver.SeasonOption;
 import com.ballknowers.draftsim.engine.NbaGameLines.Line;
+import com.ballknowers.draftsim.engine.DraftAndAdpJoin.AdpState;
+import com.ballknowers.draftsim.engine.DraftAndAdpJoin.DraftGradesState;
+import com.ballknowers.draftsim.engine.DraftAndAdpJoin.DraftPick;
+import com.ballknowers.draftsim.engine.DraftAndAdpJoin.DraftState;
+import com.ballknowers.draftsim.engine.PlayerOwnership.AsOf;
 import com.ballknowers.draftsim.engine.PlayerOwnership.Facts;
 import com.ballknowers.draftsim.engine.PlayerOwnership.Ownership;
 import com.ballknowers.draftsim.engine.PlayerTrendsService.PlayerInfo;
@@ -143,6 +148,35 @@ public class PlayerStatsService {
         }
     }
 
+    // ------------------------------------------------------------------ wire records (contract C2, user story 4)
+
+    /**
+     * One player in the leaderboard. {@code stats} is {@code read}'s window for the same player and window
+     * (I6). {@code qualified} follows the window's rule and {@code reason} is {@code NOT_QUALIFIED} or
+     * {@code NOT_QUALIFIED_STALE} when it is false. The four ranks and the two replacement fields are null for a
+     * player who is not qualified; {@code fpPerGame} is not. {@code draft} is null for a player with no pick (and
+     * always unless the draft state is {@code COMPLETE}), {@code draftValue} is Draft Grades' {@code valueOverSlot}
+     * for that pick or null, {@code adp} the blend's ADP at the draft's start or null.
+     * {@code currentOwnership} is set only when the answered season fell back from the one asked for (F6).
+     */
+    public record LeaderboardRow(String sleeperPlayerId, String name, List<String> positions, String team,
+                                 Ownership ownership, Ownership currentOwnership, boolean qualified, String reason,
+                                 Window stats, Double fpPerGame, Integer leagueRank, Integer positionRank,
+                                 Integer pointsRank, Integer rankMove, Double valueOverReplacement,
+                                 String vorPosition, DraftPick draft, Double draftValue, Double adp) {}
+
+    /**
+     * Contract C2. When {@code available} is false only {@code sport}, {@code season}, {@code requestedSeason},
+     * {@code reason}, {@code window} and {@code seasons} are meaningful; the rest is null and {@code rows} empty.
+     * {@code ownershipAsOf} is the point in time every row's ownership is read at (null when unknown).
+     * Ranks, replacement and the qualification rule are over the qualified, non-stale group of this window only.
+     */
+    public record StatLeaderboard(String sport, int season, Integer requestedSeason, boolean available,
+                                  String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
+                                  WindowKind window, QualificationRule qualification, AsOf ownershipAsOf,
+                                  DraftState draft, AdpState adp, DraftGradesState draftGrades,
+                                  ReplacementLevel.Replacement replacement, List<LeaderboardRow> rows) {}
+
     // ------------------------------------------------------------------ pure core types
 
     /**
@@ -181,12 +215,14 @@ public class PlayerStatsService {
     private final RosterWeekPointsRepository weekPoints;
     private final SportRulesRegistry rules;
     private final PlayerAbsenceRepository absences;
+    private final DraftAndAdpJoin draftJoin;
 
     public PlayerStatsService(PlayerStatsProperties props, SeasonBoxCache boxCache, LeagueSeasonResolver resolver,
                               GameScoringService scorer, LeagueRepository leagues, PlayerRepository players,
                               RosterSeasonRepository rosterSeasons, LeagueMemberRepository members,
                               ManagerRepository managers, RosterWeekPointsRepository weekPoints,
-                              SportRulesRegistry rules, PlayerAbsenceRepository absences) {
+                              SportRulesRegistry rules, PlayerAbsenceRepository absences,
+                              DraftAndAdpJoin draftJoin) {
         this.props = props;
         this.boxCache = boxCache;
         this.resolver = resolver;
@@ -199,6 +235,7 @@ public class PlayerStatsService {
         this.weekPoints = weekPoints;
         this.rules = rules;
         this.absences = absences;
+        this.draftJoin = draftJoin;
     }
 
     // ------------------------------------------------------------------ read
@@ -309,6 +346,128 @@ public class PlayerStatsService {
                 List.of(), null);
     }
 
+    // ------------------------------------------------------------------ leaderboard (contract C2)
+
+    /**
+     * Every player with a game in the answered season, in {@code window}, with ranks, value over
+     * replacement and the draft join. The gates and the season resolution are {@link #read}'s.
+     *
+     * <p>Each row's window, qualification and fantasy points per game come from {@link #windowFigures}, the
+     * computation {@link #read} uses, so they equal the player page's (I6). Ranks, replacement and the
+     * qualification are over the qualified, non-stale group of this window; the order of the rows is
+     * {@link #rank}'s (value, games, name, id), over every row.
+     */
+    public StatLeaderboard readLeaderboard(LeagueRow requested, WindowKind window, String requester) {
+        Sport sport = requested.sport();
+        if (!props.loaded()) return unavailableBoard(sport, requested.season(), null, NOT_CONFIGURED, null, List.of(), window);
+        if (!rules.get(sport).playsMultipleGamesPerScoringPeriod()) {
+            return unavailableBoard(sport, requested.season(), null, NOT_BASKETBALL, null, List.of(), window);
+        }
+        LeagueSeasonResolver.Resolved resolved = resolver.resolve(requested.sleeperId(),
+                LeagueSeasonResolver.Rule.STORED_GAMES).orElse(new LeagueSeasonResolver.Resolved(requested, null));
+        LeagueRow league = resolved.league();
+        List<SeasonOption> seasons = resolver.seasons(requested.sleeperId());
+        SeasonBoxCache.Season box = boxCache.get(sport, league.season());
+        OffsetDateTime dataAsOf = box.token().maxFetchedAt();
+        if (box.games().isEmpty()) {
+            return unavailableBoard(sport, league.season(), resolved.requestedSeason(), NO_GAMES, dataAsOf, seasons, window);
+        }
+
+        NbaGameLines lines = box.lines();
+        Map<String, Player> byId = players.byIds(sport, lines.byPlayer().keySet());
+        Map<String, Double> scoring = leagues.scoringOf(league.id());
+        int minGames = minGames(lines, props);
+        LocalDate latest = latestGame(lines);
+
+        Map<String, WindowFigures> figures = new HashMap<>();
+        Map<String, List<Line>> inWindow = new HashMap<>();
+        for (Map.Entry<String, List<Line>> e : lines.byPlayer().entrySet()) {
+            if (e.getValue().isEmpty()) continue;
+            figures.put(e.getKey(), windowFigures(window, e.getValue(), scoring, scorer, minGames, props, latest));
+            inWindow.put(e.getKey(), window.select(e.getValue()));
+        }
+
+        // The qualified, non-stale group: the only one ranks and replacement are taken over.
+        List<Candidate> everyone = new ArrayList<>();
+        List<Candidate> byFp = new ArrayList<>();
+        List<Candidate> byPts = new ArrayList<>();
+        Map<String, List<Candidate>> byPositionFp = new HashMap<>();
+        List<ReplacementLevel.Qualified> qualified = new ArrayList<>();
+        for (Map.Entry<String, WindowFigures> e : figures.entrySet()) {
+            String id = e.getKey();
+            Player pl = byId.get(id);
+            String name = pl == null ? null : pl.name();
+            List<Line> sub = inWindow.get(id);
+            WindowFigures f = e.getValue();
+            everyone.add(new Candidate(id, name, sub.size(), f.fpPerGame()));
+            if (!f.qualification().qualified()) continue;
+            Candidate fp = new Candidate(id, name, sub.size(), f.fpPerGame());
+            byFp.add(fp);
+            byPts.add(new Candidate(id, name, sub.size(), ptsPerGame(sub)));
+            if (pl != null && !pl.positions().isEmpty()) {
+                byPositionFp.computeIfAbsent(pl.positions().getFirst().name(), k -> new ArrayList<>()).add(fp);
+            }
+            if (pl != null) qualified.add(new ReplacementLevel.Qualified(pl, sub.size(), f.fpPerGame()));
+        }
+        Map<String, Integer> leagueRank = ranks(byFp);
+        Map<String, Integer> pointsRank = ranks(byPts);
+        Map<String, Integer> positionRank = new HashMap<>();
+        for (List<Candidate> group : byPositionFp.values()) positionRank.putAll(ranks(group));
+        ReplacementLevel.Result replacement = ReplacementLevel.of(qualified, league.rosterPositions(),
+                league.totalRosters(), rules.get(sport));
+
+        Long callerManagerId = requester == null || requester.isBlank() ? null
+                : managers.idsBySleeperUserId().get(requester);
+        Map<Integer, RosterOwners.RosterOwner> owners = RosterOwners.ownerNames(rosterSeasons.forLeague(league.id()),
+                members.forLeague(league.id()), callerManagerId);
+        Facts seasonFacts = facts(league, owners);
+        Facts requestedFacts = null;
+        if (resolved.requestedSeason() != null) {
+            requestedFacts = facts(requested, RosterOwners.ownerNames(rosterSeasons.forLeague(requested.id()),
+                    members.forLeague(requested.id()), callerManagerId));
+        }
+        AsOf ownershipAsOf = PlayerOwnership.forSeasonView("", seasonFacts).asOf();
+        DraftAndAdpJoin.Joined joined = draftJoin.join(requested, box.token());
+
+        List<LeaderboardRow> rows = new ArrayList<>(everyone.size());
+        for (Ranked r : rank(everyone)) {
+            String id = r.candidate().sleeperPlayerId();
+            Player pl = byId.get(id);
+            WindowFigures f = figures.get(id);
+            boolean q = f.qualification().qualified();
+            ReplacementLevel.Vor vor = q && pl != null ? replacement.byPlayer().get(pl.sleeperId()) : null;
+            Integer lr = q ? leagueRank.get(id) : null;
+            Integer pr = q ? pointsRank.get(id) : null;
+            rows.add(new LeaderboardRow(id, pl == null ? null : pl.name(),
+                    pl == null ? List.of() : pl.positions().stream().map(Enum::name).toList(),
+                    pl == null ? null : pl.team(),
+                    PlayerOwnership.forSeasonView(id, seasonFacts),
+                    requestedFacts == null ? null : PlayerOwnership.currentOf(id, requestedFacts),
+                    q, f.qualification().reason(), f.window(), f.fpPerGame(), lr,
+                    q ? positionRank.get(id) : null, pr, lr == null || pr == null ? null : pr - lr,
+                    vor == null ? null : vor.value(), vor == null ? null : vor.position(),
+                    joined.picks().get(id), joined.draftValue().get(id), joined.adpOf(id)));
+        }
+        return new StatLeaderboard(sport.code(), league.season(), resolved.requestedSeason(), true, null, dataAsOf,
+                seasons, window,
+                new QualificationRule(props.rankMinGamesShare(), minGames, maxTeamGames(lines),
+                        props.rankMinMinutesPerGame(), props.recencyDays()),
+                ownershipAsOf, joined.draft(), joined.adp(), joined.draftGrades(), replacement.replacement(), rows);
+    }
+
+    private static Map<String, Integer> ranks(List<Candidate> group) {
+        Map<String, Integer> out = new HashMap<>();
+        for (Ranked r : rank(group)) out.put(r.candidate().sleeperPlayerId(), r.rank());
+        return out;
+    }
+
+    private static StatLeaderboard unavailableBoard(Sport sport, int season, Integer requestedSeason, String reason,
+                                                    OffsetDateTime dataAsOf, List<SeasonOption> seasons,
+                                                    WindowKind window) {
+        return new StatLeaderboard(sport.code(), season, requestedSeason, false, reason, dataAsOf, seasons, window,
+                null, null, null, null, null, null, List.of());
+    }
+
     // ------------------------------------------------------------------ pure core
 
     public static Computed compute(Input in, GameScoringService scorer) {
@@ -323,10 +482,10 @@ public class PlayerStatsService {
         Map<WindowKind, Qualification> qualification = new EnumMap<>(WindowKind.class);
         Map<WindowKind, Double> fpPerGame = new EnumMap<>(WindowKind.class);
         for (WindowKind k : WindowKind.values()) {
-            List<Line> sub = k.select(lines);
-            windows.put(k, AdvancedStats.window(sub, p.smallSampleMinutes()));
-            qualification.put(k, qualify(k, sub, minGames, p, latest));
-            fpPerGame.put(k, sub.isEmpty() ? null : round2(fantasyTotal(scorer, in.scoring(), sub) / sub.size()));
+            WindowFigures f = windowFigures(k, lines, in.scoring(), scorer, minGames, p, latest);
+            windows.put(k, f.window());
+            qualification.put(k, f.qualification());
+            fpPerGame.put(k, f.fpPerGame());
         }
 
         // Season ranks over every qualified player.
@@ -339,7 +498,7 @@ public class PlayerStatsService {
             String name = info == null ? null : info.name();
             byFp.add(new Candidate(e.getKey(), name, season.size(),
                     round2(fantasyTotal(scorer, in.scoring(), season) / season.size())));
-            byPts.add(new Candidate(e.getKey(), name, season.size(), round2(ptsTotal(season) / season.size())));
+            byPts.add(new Candidate(e.getKey(), name, season.size(), ptsPerGame(season)));
         }
         PlayerInfo targetInfo = in.infos().get(in.target());
         String position = targetInfo == null || targetInfo.positions().isEmpty() ? null : targetInfo.positions().getFirst();
@@ -394,6 +553,29 @@ public class PlayerStatsService {
 
         return new Computed(windows, new Fantasy(fpPerGame, ranks, breakdown, seasonTotal),
                 AdvancedStats.teamGamesMissed(lines, in.lines().teamGames(), in.absences()), List.copyOf(teams), log, qualification);
+    }
+
+    /** One player's figures in one window: the numbers the player page and a leaderboard row both show. */
+    record WindowFigures(Window window, Qualification qualification, Double fpPerGame) {}
+
+    /**
+     * The one per-player computation of a window (spec 022 I6, FR-025): the player page's
+     * {@link #compute} and the leaderboard's rows both call it, so a row's values equal the page's by
+     * construction. {@code seasonLines} is the player's season, oldest first; {@code fpPerGame} is null for
+     * an empty window and is rounded to two decimals, the value the ranks use.
+     */
+    static WindowFigures windowFigures(WindowKind k, List<Line> seasonLines, Map<String, Double> scoring,
+                                       GameScoringService scorer, int minGames, PlayerStatsProperties p,
+                                       LocalDate latest) {
+        List<Line> sub = k.select(seasonLines);
+        return new WindowFigures(AdvancedStats.window(sub, p.smallSampleMinutes()),
+                qualify(k, sub, minGames, p, latest),
+                sub.isEmpty() ? null : round2(fantasyTotal(scorer, scoring, sub) / sub.size()));
+    }
+
+    /** Points per game over {@code lines}, rounded to two decimals: the value of the points rank. */
+    static double ptsPerGame(List<Line> lines) {
+        return round2(ptsTotal(lines) / lines.size());
     }
 
     /** The most games any team has played so far, times the rank share, rounded up (the SEASON qualification). */

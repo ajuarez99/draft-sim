@@ -208,3 +208,87 @@ Two differences to note:
   None of the listed risers, fallers or streaming players is affected, so the baselines stay valid.
   This is a property of today's lists, not a guarantee that Trends can never change.
 - **Backend**: 1,477 tests, 0 skipped.
+
+## US4: T042–T056 live check (2026-10-08, measured)
+
+### Build
+
+- **Backend**: 1,509 tests, 0 skipped. `BoardRepositoryLatestBeforeIT` and
+  `PlayerStatsLeaderboardReadIT` ran against the real DB (agent-reported).
+- **Web**: 1,214 tests, `tsc` and build clean.
+
+### C2 checks (local backend on 8092)
+
+| Check | Result |
+|---|---|
+| `GET …/stats?window=SEASON` (2025) | 200. Cold 1.83 s, warm **0.28 s**; LAST_10 warm 0.16 s. |
+| Missing window / `window=season` (lowercase) | **400** / **400** |
+| Rows | 582 for 2025 SEASON; 303 qualified (rule from the payload: ≥ 41 games of 82, 15+ MPG) |
+| Payload size | **1,417,811 B uncompressed**, and the server does not compress. gzip would make it 326,523 B. It is re-fetched on every window switch. → **V9 calls for compression** (fix 2). |
+| SC-009, the 2025 draft | All 168 picks, rounds and managers match `draft_pick` and Draft Grades. 167 are on the board, because one drafted player had no 2025 game (IT). |
+| ADP 2025 | "no ADP stored for this season" ✅. 2026 `latestBefore` returns 2026-09-28 with 553 rows (IT). |
+| Replacement levels (2025 SEASON) | PG 16.5 · SG 16.9 · SF 16.9 · PF 16.6 · C 16.6, stated on the page as a simplification ✅ |
+
+### Browser checks (`http://localhost:5192/leagues/1229352720222134272/stats`)
+
+- **Table**: renders, Fantasy group by default, sorted by FP/G: Jokić 42.73, Dončić 36.63,
+  Wembanyama 35.28.
+- **Notes**: qualification note and ownership as-of (week 18) are shown.
+- **Draft value group**: pick, round and "Drafted by" are right. Bruce Brown reads "undrafted".
+- **Stat leaders**: the 9 categories render. Points: Dončić 33.5, SGA 31.1, Edwards 28.8.
+- **Phone (375 px)**: no page-level sideways scroll. The table is 862 px inside a 307 px box. The
+  name cell (`th`, `position: sticky`) stays at x=34 after scrolling the box 300 px, while the Owner
+  column moves to x=−79 (SC-010; checked on the Fantasy group).
+
+### Problems found
+
+1. **Mislabelled draft value (bug class #5; the error was in the data model).** Draft Value says
+   "per counted week". Draft Grades' `production` is Σ over counted weeks
+   (`DraftGradesService.java:382`; spec 018 data-model "production(p) = Σ_{w ∈ counted}
+   weekValue"), so `valueOverSlot` is a **season total over counted weeks**, not a per-week
+   figure. Dončić's +77.9 against Jokić's +35.9 is consistent with that: Jokić was pick 1, with a
+   higher slot baseline.
+2. **No compression**: the C2 payload is 1.4 MB per window and not compressed (above).
+3. **Unreadable button**: the active "Stat leaders" view button has teal text on a teal
+   background.
+4. **Misleading toggle**: the Stat leaders view still shows the "Qualified players only" toggle,
+   but the leaders ignore it, because they always use qualified, non-stale rows.
+
+### US4 fixes re-checked live (2026-10-08, measured)
+
+Ten fixes (4 from the live check, V1–V6 from review, and the memo doc gap) were made in a Sonnet
+pass. The parent session re-checked them.
+
+**Compression**: `server.compression` is on, `application/json` only.
+- C2 for 2025 SEASON is **327,043 B on the wire** with `Content-Encoding: gzip`, down from
+  1,417,811 B. That holds both directly on 8092 and through the Vite proxy on 5192.
+- The live-draft SSE stream (`text/event-stream`) is deliberately not in `mime-types`, because
+  compressing it would buffer events.
+- The `ResponseCompressionIT` test was added.
+
+**2026 fallback (league `1339351318115946496`)**:
+- API: `season` 2025, `requestedSeason` 2026. Draft is `{NOT_HAPPENED, draftSeason 2026}` and ADP
+  `{blend, capturedOn 2026-09-28}`. `draftGrades` is unavailable (`DRAFT_NOT_COMPLETE`). All 582
+  rows carry `currentOwnership` (V1, V2).
+- Page:
+  - the header reads "Owner (now 2026–27)", and rows show "not drafted";
+  - the filters are disabled, with the reason "Nobody is on a roster yet (now 2026–27)…";
+  - Board ADP shows the 2026 values, e.g. Podziemski 124.0;
+  - the fallback banner reads "2026–27 has no games yet; showing 2025–26".
+
+**Other fixes**:
+- The "Stat leaders" button is readable: background `oklch(0.72 0.14 175)`, text
+  `oklch(0.14 0.025 255)`.
+- In that view the qualification toggle is hidden, and the rule is stated instead.
+- Draft value is relabelled as a season total over counted weeks; data-model and C2 are amended
+  with dated notes.
+- Rank move shows whole places.
+- The qualified-only filter applies to rate and rank sorts (FR-025).
+- Rank headers name their window.
+
+**Tests**:
+- Backend: 1,513 tests, 0 skipped.
+- Web: 1,228 tests, with `tsc` and build clean.
+
+**SC-006 (local only)**: player page ≈ 0.1–0.2 s warm; leaderboard 0.28 s warm. Measured with
+compression on; the first request after a restart is 1.5–2.0 s. Production is not measured yet.

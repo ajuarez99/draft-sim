@@ -5625,3 +5625,35 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
   .pp-break li { grid-template-columns: minmax(80px, 1fr) minmax(32px, 1fr) 52px 48px; gap: 6px; }
   .pp-rank { grid-template-columns: auto auto 1fr auto; }
 }
+
+/* --- Stats leaderboard (specs/022 US4) --------------------------------------
+   The table scrolls inside .sl-wrap; the player column is pinned (sticky) so the
+   name stays visible while the numbers scroll. The page never scrolls sideways. */
+.sl-controls .segment { transition: none; } /* the clicked View segment froze mid-transition (muted text on a half-teal fill) when the table/leaders subtree swapped; instant is enough (live #3) */
+.sl-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; min-width: 0; }
+.sl-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
+.sl-field { display: grid; gap: 2px; }
+.sl-field select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; }
+.sl-qual { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin: 0 0 6px; }
+.sl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.sl-wrap { max-width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sl-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.sl-table th, .sl-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-size: 13px; background: var(--panel); }
+.sl-table thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.sl-table th.sl-pin { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 150px; max-width: 190px; box-shadow: 1px 0 0 var(--line); }
+.sl-table tbody th.sl-pin { font-weight: 600; white-space: normal; }
+.sl-table td.sl-owner { text-align: left; }
+.sl-table tbody tr:hover > * { background: var(--row-hover); }
+.sl-table tbody tr:last-child > * { border-bottom: 0; }
+.sl-sub { display: block; font-weight: 400; line-height: 1.3; }
+.sl-unranked { color: var(--muted); font-style: italic; white-space: normal; }
+.sl-sort { appearance: none; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; letter-spacing: inherit; font-weight: inherit; }
+.sl-sort:hover, .sl-sort.on { color: var(--text); }
+.sl-arrow { display: inline-block; min-width: 10px; margin-left: 3px; font-size: 9px; }
+.sl-move { margin-left: 0; }
+.sl-notes { margin: 8px 0 0; }
+.sl-leaders { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); min-width: 0; }
+.sl-leader { min-width: 0; border-top: 2px solid var(--line); padding-top: 8px; }
+.sl-leader-list { list-style: decimal inside; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.sl-leader-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 13px; }
+.sl-leader-val { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }

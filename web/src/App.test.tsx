@@ -32,6 +32,14 @@ vi.mock('./pages/PlayerPage', () => ({
     return <div data-instance={instance}>player page</div>
   },
 }))
+// specs/022 US4: stamped the same way, to prove the stats route is keyed by league.
+const statsMounts = vi.hoisted(() => ({ n: 0 }))
+vi.mock('./pages/StatLeaderboard', () => ({
+  default: function StatLeaderboardStub() {
+    const [instance] = useState(() => ++statsMounts.n)
+    return <div data-instance={instance}>stat leaderboard</div>
+  },
+}))
 // Mounted by the rail-collapse test below; the real one fetches on mount.
 vi.mock('./pages/DraftView', () => ({
   default: () => <div>draft view</div>,
@@ -250,5 +258,26 @@ describe('league routes remount on a league change', () => {
     await user.click(screen.getByRole('button', { name: 'go' }))
 
     expect(screen.getByText('player page').getAttribute('data-instance')).not.toBe(before)
+  })
+
+  // specs/022 US4 T055: /leagues/:id/stats renders the leaderboard and is keyed by league.
+  it('routes /leagues/:id/stats to the leaderboard and mounts a fresh one for another season', async () => {
+    setUser(sampleUser)
+    const user = userEvent.setup()
+    function GoTo() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate('/leagues/2/stats')}>go</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/leagues/1/stats']}>
+        <App />
+        <GoTo />
+      </MemoryRouter>,
+    )
+
+    const before = (await screen.findByText('stat leaderboard')).getAttribute('data-instance')
+    await user.click(screen.getByRole('button', { name: 'go' }))
+
+    expect(screen.getByText('stat leaderboard').getAttribute('data-instance')).not.toBe(before)
   })
 })

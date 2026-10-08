@@ -118,7 +118,7 @@ window is a rule and is never defaulted.
   "dataAsOf": "…", "seasons": [], "window": "SEASON",
   "qualification": { "minGames": 41, "minMinutesPerGame": 15, "maxTeamGames": 82 },
   "ownershipAsOf": { "kind": "WEEK", "week": 21 },
-  "draft": { "state": "COMPLETE", "draftId": "…" },
+  "draft": { "state": "COMPLETE", "draftId": "…", "draftSeason": 2025 },
   "adp": { "source": "blend", "capturedOn": null, "reason": "NO_ADP_STORED" },
   "draftGrades": { "available": true, "reason": null, "gradesEarly": false, "weeksCounted": 18 },
   "replacement": { "byPosition": { "PG": 31.2, "SG": 27.0, "SF": 28.4, "PF": 29.1, "C": 33.5 },
@@ -129,6 +129,9 @@ window is a rule and is never defaulted.
 ```
 
 - `draft.state` is `COMPLETE`, `NOT_HAPPENED` or `NONE`, read from **`draft.status`**, never `league.status` (F1).
+- `draft.draftSeason` (int) is the season of the league the draft columns and ADP were read from: the
+  **requested** season, even when `season` (the stats) fell back to an earlier one. *Amended 2026-10-08
+  (code-review V2); before, the draft was read from the answered season.* Mirrored in `web/src/api.ts`.
 - `adp.reason` is `NO_ADP_STORED` or `NO_DRAFT_DATE` (F12).
 - `draftGrades` is copied from that draft's Draft Grades result, so a null `draftValue` is never ambiguous (F12).
 - `adp` is `{source, capturedOn}` when ADP is stored, or carries `reason: NO_ADP_STORED`.
@@ -143,7 +146,7 @@ window is a rule and is never defaulted.
 - **Replacement**: `valueOverReplacement`, and `vorPosition` (the position it used).
 - **Draft**: `{pickNo, round, managerName}` or null; null means undrafted when `draft.state` is
   `COMPLETE`.
-- **Draft value**: `draftValue`, Draft Grades' `valueOverSlot`, or null.
+- **Draft value**: `draftValue`, Draft Grades' `valueOverSlot`, or null. It is a **season total over the league's counted weeks** (`draftGrades.weeksCounted`), not per week. *Amended 2026-10-08: it was labelled per counted week.*
 - **ADP**: `adp`, a number or null.
 
 **Rules:**

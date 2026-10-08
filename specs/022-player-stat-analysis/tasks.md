@@ -366,7 +366,7 @@ definition.
 
 ### Tests for User Story 4
 
-- [ ] T042 [P] [US4] Write backend/src/test/java/com/ballknowers/draftsim/engine/ReplacementLevelTest.java, covering data-model "Replacement":
+- [x] T042 [P] [US4] Write backend/src/test/java/com/ballknowers/draftsim/engine/ReplacementLevelTest.java, covering data-model "Replacement":
   - starting slots are `roster_positions` minus BN, IR and TAXI, ordered single positions first, then G and F, then UTIL;
   - eligibility comes from `BasketballRules.isEligible`;
   - the `teams × slots` fill takes the best remaining qualified player each time;
@@ -374,7 +374,7 @@ definition.
   - VOR is the maximum across a player's eligible positions, reported with the position used;
   - preference ordering (I7): a lower replacement level gives a higher VOR;
   - a C-scarce league gets a lower C replacement level than PG.
-- [ ] T043 [P] [US4] Write backend/src/test/java/com/ballknowers/draftsim/engine/DraftAndAdpJoinTest.java (F1, F12):
+- [x] T043 [P] [US4] Write backend/src/test/java/com/ballknowers/draftsim/engine/DraftAndAdpJoinTest.java (F1, F12):
   - **Draft state** reads `draft.status`:
     - an **`in_season` league with a `complete` draft** gives `COMPLETE`;
     - a `pre_draft` draft row gives `NOT_HAPPENED`;
@@ -386,8 +386,8 @@ definition.
     - no capture gives `NO_ADP_STORED`;
     - `sleeper_search_rank` is never read.
   - **Draft Grades**: `draftGrades` copies `{available, reason, gradesEarly, weeksCounted}`. `draftValue` equals `valueOverSlot`, and is null when grades aren't available.
-- [ ] T044 [P] [US4] Add `GET /api/leagues/{id}/stats?window=…` to backend/src/test/java/com/ballknowers/draftsim/api/AccessControlMvcIT.java. A controller test asserts that a missing or unknown `window` gives 400.
-- [ ] T045 [P] [US4] Write web/src/statLeaderboard.test.ts:
+- [x] T044 [P] [US4] Add `GET /api/leagues/{id}/stats?window=…` to backend/src/test/java/com/ballknowers/draftsim/api/AccessControlMvcIT.java. A controller test asserts that a missing or unknown `window` gives 400.
+- [x] T045 [P] [US4] Write web/src/statLeaderboard.test.ts:
   - **Comparator**: one comparator orders by value, then games, then name, then id, deterministically (I4).
   - **Column groups**: the five groups hold the right columns. Switching group keeps the sort, window and filters, and a sort outside the current group isn't offered (FR-038).
   - **Stat leaders**: the top `leaders-size` per category, using the same comparator, qualification and staleness rule (F9).
@@ -395,46 +395,46 @@ definition.
 
 ### Implementation for User Story 4
 
-- [ ] T046 [US4] Create backend/src/main/java/com/ballknowers/draftsim/engine/ReplacementLevel.java, a pure class for research R11.
+- [x] T046 [US4] Create backend/src/main/java/com/ballknowers/draftsim/engine/ReplacementLevel.java, a pure class for research R11.
   - It takes the qualified players with their `fpPerGame`, the league's `roster_positions` and `total_rosters`, and the `SportRules`.
   - It returns `record Replacement(Map<String, Double> byPosition, String rule, int teams, List<String> slots)`, plus `(valueOverReplacement, vorPosition)` for each player.
-- [ ] T047 [US4] Add `Instant startTime` (nullable) to `DraftRepository.DraftRow` and to its `forLeague`/`bySleeperId` queries in backend/src/main/java/com/ballknowers/draftsim/store/DraftRepository.java (F12).
-- [ ] T048 [US4] Add `Optional<Capture> latestBefore(Sport, String source, LocalDate onOrBefore)` to backend/src/main/java/com/ballknowers/draftsim/store/BoardRepository.java, where `record Capture(LocalDate capturedOn, List<Row> rows)` (F12).
+- [x] T047 [US4] Add `Instant startTime` (nullable) to `DraftRepository.DraftRow` and to its `forLeague`/`bySleeperId` queries in backend/src/main/java/com/ballknowers/draftsim/store/DraftRepository.java (F12).
+- [x] T048 [US4] Add `Optional<Capture> latestBefore(Sport, String source, LocalDate onOrBefore)` to backend/src/main/java/com/ballknowers/draftsim/store/BoardRepository.java, where `record Capture(LocalDate capturedOn, List<Row> rows)` (F12).
   - Add an IT in backend/src/test/java/com/ballknowers/draftsim/store/BoardRepositoryLatestBeforeIT.java that runs it against the real DB.
   - The IT checks that NBA blend on or before the 2025 draft is empty, and that on or before 2026-10-10 it returns 2026-09-28.
   - The existing, never-called `asOf` is left alone.
-- [ ] T049 [US4] Add the draft, ADP and Draft Grades join to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java:
+- [x] T049 [US4] Add the draft, ADP and Draft Grades join to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java:
   - `draft.state` from `draft.status` (F1);
   - picks from `DraftRepository.picks`, with managers named by Draft Grades' rule (`DraftGradesService.java:310-329`; F12);
   - ADP from `latestBefore(NBA, BoardRepository.SOURCE_BLEND, startTime)`;
   - `draftGrades` and `draftValue` from `DraftGradesService.read(draft)`, matched by `pickNo`, and memoised on the season token (F12).
-- [ ] T050 [US4] Add `readLeaderboard(LeagueRow, WindowKind window, String requester)` to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java, building contract C2.
+- [x] T050 [US4] Add `readLeaderboard(LeagueRow, WindowKind window, String requester)` to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java, building contract C2.
   - `rows` holds every player with at least one game in the window.
   - Ranks, replacement and leaders are computed over the qualified, non-stale group only.
   - Each value **is** the value `readPlayer` gives for the same player and window (I6, FR-025).
   - Include `currentOwnership` when the season fell back (F6).
   - Add `GET /api/leagues/{sleeperLeagueId}/stats` with a required `window` param to backend/src/main/java/com/ballknowers/draftsim/api/PlayerStatsController.java.
-- [ ] T051 [US4] Add backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsLeaderboardReadIT.java over the real 2025 data:
+- [x] T051 [US4] Add backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsLeaderboardReadIT.java over the real 2025 data:
   - all 168 picks match `draft_pick` (SC-009);
   - ADP reads `NO_ADP_STORED`;
   - TS% and FP/G for 5 rows equal C1's (I6);
   - there are no `TEAM_` ids (I5);
   - 582 rows for SEASON (N14).
-- [ ] T052 [P] [US4] Add C2's types to web/src/api.ts, mirroring the Java records: `StatLeaderboard`, `LeaderboardRow`, `Replacement`, `DraftGradesState` and `getStatLeaderboard(leagueId, window)`.
-- [ ] T053 [P] [US4] Create web/src/statLeaderboard.ts, holding (research R14):
+- [x] T052 [P] [US4] Add C2's types to web/src/api.ts, mirroring the Java records: `StatLeaderboard`, `LeaderboardRow`, `Replacement`, `DraftGradesState` and `getStatLeaderboard(leagueId, window)`.
+- [x] T053 [P] [US4] Create web/src/statLeaderboard.ts, holding (research R14):
   - the single comparator;
   - the column-group definitions (Basic, Shooting, Advanced, Fantasy, Draft value);
   - the filters;
   - the stat-leaders selection.
-- [ ] T054 [US4] Create web/src/pages/StatLeaderboard.tsx, with tests in web/src/pages/StatLeaderboard.test.tsx. The page has:
+- [x] T054 [US4] Create web/src/pages/StatLeaderboard.tsx, with tests in web/src/pages/StatLeaderboard.test.tsx. The page has:
   - **Controls**: window and mode (per game, totals, per 36), and the group switcher. The name column is pinned, and the table scrolls sideways inside itself.
   - **Filters**: position, team, and availability with its as-of.
   - **Notes**: the qualification note, with an off switch, and the "hasn't played since" exclusion. A replacement-rule note gives the level for each position.
   - **Draft and ADP columns**: draft columns reading "undrafted" or "draft hasn't happened", and an ADP column with its source and capture date, or "no ADP stored" / "no draft date".
   - **Draft value**: labelled "per counted week, from Draft Grades", linked to that page, and showing the `gradesEarly` caveat and the unavailable state.
   - **Stat leaders**, plus `PlayerLink` on every name.
-- [ ] T055 [US4] Add the `stats` destination to web/src/destinations.ts: sports `['nba']`, group `season`, and the one-season href `/leagues/{id}/stats`. Add a case in web/src/destinations.test.ts, and the route in web/src/App.tsx.
-- [ ] T056 [US4] Run quickstart V8 and V9 live:
+- [x] T055 [US4] Add the `stats` destination to web/src/destinations.ts: sports `['nba']`, group `season`, and the one-season href `/leagues/{id}/stats`. Add a case in web/src/destinations.test.ts, and the route in web/src/App.tsx.
+- [x] T056 [US4] Run quickstart V8 and V9 live:
   - **V8**:
     - the 2025 draft;
     - an in-season league with a complete draft (F1);
