@@ -2,6 +2,8 @@ package com.ballknowers.draftsim.engine;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * How a missed game costs a roster points (specs/008-season-superlatives US4,
  * research R10, <b>amended 2026-09-23</b>). Pure and static, deliberately --
@@ -134,9 +136,5 @@ public final class AbsenceCost {
         int started = m.startedWeeks().size();
         if (started < MIN_STARTED_WEEKS) return false;
         return started >= rosteredAndPlayed / 2.0;
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * {@code GET /api/managers/{aId}/versus/{bId}} -- specs/006-deeper-history-both-sports
  * US4. The head-to-head record ffwrapped leaves permanently at {@code 0-0},
@@ -169,9 +171,5 @@ public class ManagerComparisonController {
         m.put("a", a == null ? null : f.apply(a));
         m.put("b", b == null ? null : f.apply(b));
         return m;
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

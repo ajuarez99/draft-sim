@@ -30,6 +30,8 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 @RestController
 @RequestMapping("/api")
 public class LeagueController {
@@ -797,9 +799,5 @@ public class LeagueController {
                 "capturedOn", boards.currentBoardDate(s).map(Object::toString).orElse("none"),
                 "picksWithContemporaneousBoard", boards.picksWithAdpAtTime(),
                 "entries", entries);
-    }
-
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round3;
+
 /**
  * Combines two sources of knowledge about each seat.
  *
@@ -257,10 +259,6 @@ public class ProfileService {
         });
         log.info("persisted {} fitted profiles", fit.profiles().size());
         return fit.profiles().size();
-    }
-
-    private static double round3(double d) {
-        return Math.round(d * 1000.0) / 1000.0;
     }
 
     private Map<Position, Double> fitTilt(Map<Position, Integer> mine,

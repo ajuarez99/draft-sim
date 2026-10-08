@@ -5,6 +5,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.ToDoubleFunction;
 
+import static com.ballknowers.draftsim.util.Rounding.round4;
+
 /**
  * Standard competition ranking (1, 2, 2, 4), direction supplied by the
  * caller's {@link Comparator} -- shared by {@link PowerRankingService}'s
@@ -51,7 +53,7 @@ final class Ranker {
         Double prevRounded = null;
         for (T item : sorted) {
             seen++;
-            double rounded = Math.round(scoreOf.applyAsDouble(item) * 10000.0) / 10000.0;
+            double rounded = round4(scoreOf.applyAsDouble(item));
             if (prevRounded == null || !Double.valueOf(rounded).equals(prevRounded)) {
                 rank = seen;
                 prevRounded = rounded;

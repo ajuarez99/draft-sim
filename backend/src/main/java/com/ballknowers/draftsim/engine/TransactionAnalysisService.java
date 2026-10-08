@@ -6,6 +6,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+// Counts (moves per season) keep two decimals, the scale pointsPerSeason uses (round2);
+// rates and percentages keep four, the scale winRate/averageEfficiency use (round4).
+import static com.ballknowers.draftsim.util.Rounding.round1;
+import static com.ballknowers.draftsim.util.Rounding.round2;
+import static com.ballknowers.draftsim.util.Rounding.round4;
+
 /**
  * What a league's roster moves were worth
  * (specs/004-ffwrapped-feature-parity, US6).
@@ -206,16 +212,6 @@ public class TransactionAnalysisService {
         return new WaiverTendency(movesPerSeason, seasonsCounted, faab, excluded);
     }
 
-    /** Counts (moves per season) keep two decimals, the same scale {@code pointsPerSeason} uses. */
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
-    }
-
-    /** Rates and percentages keep four decimals, the same scale {@code winRate}/{@code averageEfficiency} use. */
-    private static double round4(double d) {
-        return Math.round(d * 10000.0) / 10000.0;
-    }
-
     public Optional<Result> forLeague(String sleeperLeagueId) {
         Optional<LeagueRepository.LeagueRow> found = leagues.bySleeperId(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
@@ -387,7 +383,7 @@ public class TransactionAnalysisService {
             if (rank != null) ranks.add(rank);
         }
         Double avg = ranks.isEmpty() ? null
-                : Math.round(ranks.stream().mapToInt(Integer::intValue).average().orElse(0) * 10.0) / 10.0;
+                : round1(ranks.stream().mapToInt(Integer::intValue).average().orElse(0));
         return new MovedPlayer(playerId,
                 p == null ? "Unknown player" : p.name(),
                 p == null ? null : p.primary().name(),

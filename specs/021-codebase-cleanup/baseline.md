@@ -55,3 +55,24 @@ The JDK is 24.0.2 on PATH, with a toolchain-provisioned 21 for the build.
 The power rankings screenshot smoke check is deferred to T057's live pass. The only
 CSS removed was `.verify-*`, and the grep in removal-evidence.md shows no remaining
 user of those selectors anywhere in `web/src`. Not screenshotted yet.
+
+## T025: after US2
+
+| check | result |
+|---|---|
+| backend | 1351 tests (1346 + 5 RoundingTest), **0 skipped**, 0 failed |
+| vitest | 87 files, 1086 tests (1083 + 3 format) |
+| `tsc -b` | exit 0 |
+| CSS sha256 | `3b8642…c667`, **unchanged** from T013 |
+| JS | 513,044 B (-341, the deleted duplicates) |
+| private `roundN` helpers | 17 files → **0**; `util/Rounding` is the one definition |
+| `ordinal` definitions | 5 → 2 (`format.ts`, plus PowerRankings until T026) |
+| `db/migration` diff | empty |
+
+Measured while building: the RoundingTest edge case `round2(2.675)` was first
+written expecting 2.67 as a guess, and it failed. It is 2.68, because `2.675 * 100.0`
+is exactly 267.5. The test and the `Rounding` Javadoc were corrected to the measured
+value. For `PlayoffOddsService:422`, the review's "24 differences" was not
+reproducible without its exact totals. The measured figure is 12 of 10,001 at
+total=10000, plus the confirmed 5005/10000 example, and that is what the code
+comment now cites.

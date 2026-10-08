@@ -10,6 +10,7 @@ import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { ordinal } from '../format'
 
 /**
  * specs/004-ffwrapped-feature-parity US3: expected wins, schedule luck and
@@ -269,10 +270,4 @@ function noSwingCopy(wae: number, sos: number): string {
 
 function signed(n: number): string {
   return `${n >= 0 ? '+' : ''}${n.toFixed(1)}`
-}
-
-function ordinal(n: number): string {
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] ?? s[v] ?? s[0])
 }

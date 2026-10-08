@@ -141,31 +141,31 @@ the suites match the baseline, and the grep counts from T003 drop to 1 definitio
 
 ### Tests for US2 (written first)
 
-- [ ] T017 [P] [US2] Create `backend/src/test/java/com/ballknowers/draftsim/util/RoundingTest.java`, an agreement test against the old formula `Math.round(x * 10^k) / 10^k` for k ∈ {1,2,3,4}:
+- [X] T017 [P] [US2] Create `backend/src/test/java/com/ballknowers/draftsim/util/RoundingTest.java`, an agreement test against the old formula `Math.round(x * 10^k) / 10^k` for k ∈ {1,2,3,4}:
   - 100,000 doubles from a fixed-seed `java.util.Random(21)` over [-1e6, 1e6];
   - the explicit edge values 1.005, 2.675, 0.125, -0.5, -1.5, 0.0, -0.0, NaN, ±Infinity and `Double.MAX_VALUE`;
   - `round2OrNull(null)` returns `null`, and `round2OrNull(x)` equals `round2(x)` for non-null x.
 
   The test references `Rounding`, so it fails to compile until T019. That is expected; commit it with T019.
-- [ ] T018 [P] [US2] Create `web/src/format.test.ts`, which asserts that the switch algorithm (`draftGrades.ts:87`) and the table algorithm (`ExpectedWins.tsx:274`) agree for n ∈ [0,1000], -5..-1, 1.5, NaN and ±Infinity. Paste both bodies into the test as local functions, so the oracle survives their deletion. Then assert that `format.ts`'s `ordinal` equals the switch algorithm on the same inputs.
+- [X] T018 [P] [US2] Create `web/src/format.test.ts`, which asserts that the switch algorithm (`draftGrades.ts:87`) and the table algorithm (`ExpectedWins.tsx:274`) agree for n ∈ [0,1000], -5..-1, 1.5, NaN and ±Infinity. Paste both bodies into the test as local functions, so the oracle survives their deletion. Then assert that `format.ts`'s `ordinal` equals the switch algorithm on the same inputs.
 
 ### Implementation for US2
 
-- [ ] T019 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/util/Rounding.java`, a `final` class with a private constructor and these methods:
+- [X] T019 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/util/Rounding.java`, a `final` class with a private constructor and these methods:
   - `round(double v, int places)` computed as `Math.round(v * f) / f` with `f = Math.pow(10, places)`;
   - `round1`, `round2`, `round3` and `round4`;
   - a null-preserving `static Double round2OrNull(Double v)`, needed by `DraftGradesService:519`. It **must have a different name** from `round2`. If it were an overload, the wildcard static import in T020/T021 would route every call that passes a `Double` object to it. Those calls crash on null today and would quietly return null instead, which is a hidden behavior change (analysis finding I1). Only `DraftGradesService` calls `round2OrNull`.
 
   There must be **no** `BigDecimal`: half-up via `Math.round` exactly matches today's output (research R2).
-- [ ] T020 [P] [US2] In `api/LeagueController.java`, `api/LeagueHistoryController.java` and `api/ManagerComparisonController.java`, delete the private `roundN` methods and add `import static com.ballknowers.draftsim.util.Rounding.*;`. The call sites are unchanged.
-- [ ] T021 [P] [US2] Do the same in these `engine/` files: `AbsenceCost`, `DraftGradesService` (its boxed `round2(Double)` call sites become `round2OrNull`), `ExpectedWinsService`, `HeadToHeadService`, `LeagueAnalysisService` (its `round(v, places)` maps to `Rounding.round`), `ManagerCareerService`, `MemberRankingService`, `PlayerTrendsService`, `PlayoffOddsSimulator`, `RosterManagementService`, `SeasonSuperlativesService`, `TransactionAnalysisService` and `WaiverPickupAttribution`. Also do `profile/ProfileService.java` (`round3`). All paths are under `backend/src/main/java/com/ballknowers/draftsim/`.
-- [ ] T022 [US2] Replace inline rounding **only** where the expression is literally `Math.round(E * 10^k) / 10^k` for a single expression `E`, at ManagerController:162-173, GameScoringService:54, PlayoffOddsService:414, Ranker:54, TransactionAnalysisService:390 and WeeklyReportService:384. **Do not touch `PlayoffOddsService:422`** (`Math.round(v * 1000.0 / total) / 1000.0`): it is not `round3(v/total)`, with 24 measured differences. Add a one-line comment there saying why it stays inline.
-- [ ] T023 [US2] Create `web/src/format.ts`, exporting `ordinal(n: number): string` with the switch algorithm copied verbatim from `web/src/draftGrades.ts:87`.
-- [ ] T024 [US2] Point the copies that already agree at `format.ts`:
+- [X] T020 [P] [US2] In `api/LeagueController.java`, `api/LeagueHistoryController.java` and `api/ManagerComparisonController.java`, delete the private `roundN` methods and add `import static com.ballknowers.draftsim.util.Rounding.*;`. The call sites are unchanged.
+- [X] T021 [P] [US2] Do the same in these `engine/` files: `AbsenceCost`, `DraftGradesService` (its boxed `round2(Double)` call sites become `round2OrNull`), `ExpectedWinsService`, `HeadToHeadService`, `LeagueAnalysisService` (its `round(v, places)` maps to `Rounding.round`), `ManagerCareerService`, `MemberRankingService`, `PlayerTrendsService`, `PlayoffOddsSimulator`, `RosterManagementService`, `SeasonSuperlativesService`, `TransactionAnalysisService` and `WaiverPickupAttribution`. Also do `profile/ProfileService.java` (`round3`). All paths are under `backend/src/main/java/com/ballknowers/draftsim/`.
+- [X] T022 [US2] Replace inline rounding **only** where the expression is literally `Math.round(E * 10^k) / 10^k` for a single expression `E`, at ManagerController:162-173, GameScoringService:54, PlayoffOddsService:414, Ranker:54, TransactionAnalysisService:390 and WeeklyReportService:384. **Do not touch `PlayoffOddsService:422`** (`Math.round(v * 1000.0 / total) / 1000.0`): it is not `round3(v/total)`, with 24 measured differences. Add a one-line comment there saying why it stays inline.
+- [X] T023 [US2] Create `web/src/format.ts`, exporting `ordinal(n: number): string` with the switch algorithm copied verbatim from `web/src/draftGrades.ts:87`.
+- [X] T024 [US2] Point the copies that already agree at `format.ts`:
   - in `web/src/draftGrades.ts` and `web/src/rankOrder.ts`, replace the local function with `export { ordinal } from './format'`, so `PlayerCard.tsx`, `LeagueHome.tsx`, `ManagerHistory.tsx`, `RankBoard.tsx` and `draftGrades.test.ts` keep their imports;
   - in `web/src/pages/ExpectedWins.tsx` (:274) and `web/src/pages/Superlatives.tsx` (:656), delete the local `ordinal` and import it from `../format`.
-- [ ] T025 [US2] Gate: rerun T001 and T002. Backend and vitest totals must equal the baseline plus the new tests; the built CSS hash must be unchanged; `git diff --stat origin/main -- backend/src/main/resources/db/migration` must be empty; the T003 greps must now show 1 `Rounding` and 1 `ordinal` definition (plus the PowerRankings copy, until T026). One commit for T017–T025.
-- [ ] T026 [US2] **Own commit, labelled as a fix (spec FR-001 exception).** In `web/src/pages/PowerRankings.tsx:139`, replace `export const ordinal = (n) => …'th'` with `export { ordinal } from '../format'`. This changes "21th" to "21st" for any rank ≥ 21. Grep `web/src` for test expectations of the old strings and update them in this commit. Message: `Fix PowerRankings ordinal: 21th -> 21st (spec 021 FR-001 exception)`.
+- [X] T025 [US2] Gate: rerun T001 and T002. Backend and vitest totals must equal the baseline plus the new tests; the built CSS hash must be unchanged; `git diff --stat origin/main -- backend/src/main/resources/db/migration` must be empty; the T003 greps must now show 1 `Rounding` and 1 `ordinal` definition (plus the PowerRankings copy, until T026). One commit for T017–T025.
+- [X] T026 [US2] **Own commit, labelled as a fix (spec FR-001 exception).** In `web/src/pages/PowerRankings.tsx:139`, replace `export const ordinal = (n) => …'th'` with `export { ordinal } from '../format'`. This changes "21th" to "21st" for any rank ≥ 21. Grep `web/src` for test expectations of the old strings and update them in this commit. Message: `Fix PowerRankings ordinal: 21th -> 21st (spec 021 FR-001 exception)`.
 
 **Checkpoint**: US2 is shippable on its own. T026 can be reverted alone.
 

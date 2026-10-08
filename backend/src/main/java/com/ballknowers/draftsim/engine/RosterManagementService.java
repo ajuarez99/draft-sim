@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+
 /**
  * Total points, potential points and efficiency per team -- the Roster
  * Management view (specs/004-ffwrapped-feature-parity, US2).
@@ -241,10 +243,5 @@ public class RosterManagementService {
 
         return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
                 settings.sport(), scoredWeeks.size(), teams));
-    }
-
-    /** Points are a two-decimal quantity everywhere Sleeper reports them. */
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
     }
 }

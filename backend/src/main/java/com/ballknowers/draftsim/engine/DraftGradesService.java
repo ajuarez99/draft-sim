@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import static com.ballknowers.draftsim.util.Rounding.round2;
+import static com.ballknowers.draftsim.util.Rounding.round2OrNull;
+
 /**
  * How each pick of a completed draft actually played out (specs/018-draft-grades; math in
  * data-model.md). Production is the league's own scoring applied to the player's real games; a pick
@@ -428,10 +431,10 @@ public class DraftGradesService {
             for (Acc a : accs) {
                 if (a.in.slot() != t.in.slot() || a.value == null) continue;
                 // accs is in pickNo order, and values compare as shown (2 dp), so ties keep the lower pickNo.
-                if (best == null || round2(a.value) > round2(best.value)) best = a;
-                if (worst == null || round2(a.value) < round2(worst.value)) worst = a;
+                if (best == null || round2OrNull(a.value) > round2OrNull(best.value)) best = a;
+                if (worst == null || round2OrNull(a.value) < round2OrNull(worst.value)) worst = a;
             }
-            teamOut.add(new TeamGrade(t.in.slot(), t.in.manager(), t.in.avatarId(), round2(t.centred), rank,
+            teamOut.add(new TeamGrade(t.in.slot(), t.in.manager(), t.in.avatarId(), round2OrNull(t.centred), rank,
                     rank == null ? null : letterGrades.grade(rank, rankedCount),
                     best == null ? null : best.in.pickNo(), worst == null ? null : worst.in.pickNo()));
         }
@@ -439,10 +442,10 @@ public class DraftGradesService {
         // Steals and busts.
         List<Acc> valued = accs.stream().filter(a -> a.value != null).toList();
         List<Acc> top = new ArrayList<>(valued);
-        top.sort(Comparator.comparingDouble((Acc a) -> round2(a.value)).reversed().thenComparingInt(a -> a.in.pickNo()));
+        top.sort(Comparator.comparingDouble((Acc a) -> round2OrNull(a.value)).reversed().thenComparingInt(a -> a.in.pickNo()));
         List<Integer> steals = top.stream().limit(LIST_SIZE).map(a -> a.in.pickNo()).toList();
         List<Acc> bottom = new ArrayList<>(valued);
-        bottom.sort(Comparator.comparingDouble((Acc a) -> round2(a.value)).thenComparingInt(a -> a.in.pickNo()));
+        bottom.sort(Comparator.comparingDouble((Acc a) -> round2OrNull(a.value)).thenComparingInt(a -> a.in.pickNo()));
         List<Integer> busts = bottom.stream().map(a -> a.in.pickNo()).filter(n -> !steals.contains(n))
                 .limit(LIST_SIZE).toList();
 
@@ -485,10 +488,10 @@ public class DraftGradesService {
                 unknown = un;
             }
             picksOut.add(new PickGrade(a.in.pickNo(), a.in.round(), a.in.slot(), a.in.sleeperId(), a.in.name(),
-                    a.position, round2(a.production), a.weeksPlayed, round2(a.baseline), round2(a.value),
+                    a.position, round2(a.production), a.weeksPlayed, round2OrNull(a.baseline), round2OrNull(a.value),
                     a.positionDrafted, a.positionFinish, counted, credited, started, unknown));
         }
-        return new Result(picksOut, teamOut, steals, busts, unpositioned, unmapped, round2(average));
+        return new Result(picksOut, teamOut, steals, busts, unpositioned, unmapped, round2OrNull(average));
     }
 
     /**
@@ -514,13 +517,5 @@ public class DraftGradesService {
         if (sxx < 1e-12) return null;
         double b = sxy / sxx;
         return new double[] {my - b * mx, b};
-    }
-
-    private static Double round2(Double v) {
-        return v == null ? null : Math.round(v * 100.0) / 100.0;
-    }
-
-    private static double round2(double v) {
-        return Math.round(v * 100.0) / 100.0;
     }
 }

@@ -28,6 +28,7 @@ export { segmentsOf }
 export type { SeriesPoint }
 import { useUser } from '../user'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { ordinal } from '../format'
 
 /**
  * Ballots are on the honour system (claude/audit-2026-09-28/04), and so, since
@@ -135,8 +136,6 @@ function buildSeries(
   return [...byRoster.values()].sort((a, b) => (a.manager ?? '').localeCompare(b.manager ?? ''))
 }
 
-
-export const ordinal = (n: number) => `${n}${n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'}`
 
 // Week 0 never reads as a number in the UI, only as "Preseason".
 //

@@ -9,6 +9,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
+// Points are a two-decimal quantity everywhere Sleeper reports them (round2). Rates
+// (winRate, averageEfficiency) keep four: ffwrapped's 73.3% needs three digits (round4).
+import static com.ballknowers.draftsim.util.Rounding.round2;
+import static com.ballknowers.draftsim.util.Rounding.round4;
+
 /**
  * One {@link CareerProfile} per sport, built from a manager's own
  * roster-seasons (specs/006-deeper-history-both-sports, US3).
@@ -389,15 +394,5 @@ public class ManagerCareerService {
 
     private static double nz(Double v) {
         return v == null ? 0 : v;
-    }
-
-    /** Points are a two-decimal quantity everywhere Sleeper reports them. */
-    private static double round2(double d) {
-        return Math.round(d * 100.0) / 100.0;
-    }
-
-    /** Rates (winRate, averageEfficiency) keep more precision -- ffwrapped's 73.3% needs three digits. */
-    private static double round4(double d) {
-        return Math.round(d * 10000.0) / 10000.0;
     }
 }
