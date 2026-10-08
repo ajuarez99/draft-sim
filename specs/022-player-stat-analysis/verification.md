@@ -67,3 +67,70 @@ the number is shown. **Not run** means it wasn't, and the reason is given.
 | 2025 | 0.89 s | 0.29 s | 1.58 s |
 
 **Gate: passed.** No user-story work had started before this point.
+
+## US1 backend: T018–T026 (2026-10-08)
+
+**Suite** (agent's `cleanTest test` run): 1,439 tests, 0 skipped, 0 failures.
+
+**SC-002**, from `PlayerStatsReadIT` against the real 2025 rows (agent-reported):
+- The sample was 10 players: the 9 with the most games, plus Luke Kennard (id 1777, traded ATL → LAL, 78 games).
+- Every per-game average and FG/3P/FT% equalled a direct SQL recomputation, with **0 mismatches**.
+- The comparison is exact to 1e-9, and also checked at 1 decimal.
+
+**Live C1 check** (parent session, port 8092, 2025 league `1229352720222134272`, measured).
+These are the app's real `GameScoringService` figures, replacing the 2026-10-07 SQL estimate:
+
+| Player | GP | PPG | FP/G | League rank | Position rank | Points rank | Move | Biggest contributions | Ownership |
+|---|---|---|---|---|---|---|---|---|---|
+| Rudy Gobert | 76 | 10.9 | 22.56 | 40 | 12 | 152 | **+112** | reb 872, pts 415, blk 248 | ROSTERED, week 18 |
+| Donovan Clingan | 77 | 12.1 | 24.52 | 29 | 8 | 129 | **+100** | reb 892, pts 467, blk 260 | ROSTERED, week 18 |
+| Dillon Brooks | 56 | 20.2 | 16.55 | 112 | 31 | 35 | **−77** | pts 566, reb 203, stl 114 | FREE_AGENT, week 18 |
+
+- **Rank group**: 299 qualified players.
+- **Earlier estimate, corrected**: the 2026-10-07 SQL estimate put Gobert at 139 → 37 and Clingan at 118 → 26. The real scorer gives 152 → 40 and 129 → 29. Same direction, different numbers. The estimate used a ≥50-games group and its own stat×weight sum. **The estimate was wrong in detail. Nothing was tuned to match it.**
+- **Ownership** reads week 18, which is `playoff_week_start − 1` (F5).
+- **Fallback** (2026 league `1339351318115946496`, Gobert):
+  - `season` 2025, `requestedSeason` 2026.
+  - `seasons` is [2026 (no games), 2025, 2024] (F4).
+  - `ownership` is the 2025 week-18 roster, and `currentOwnership` is `NOT_DRAFTED` (F6; the draft is 10-10).
+- **Errors**: an unknown player id gives 404, and no identity gives 404.
+- **Timing**: 1.39 s cold (first request after boot), then about 0.10 s.
+
+## T034: US1 live verification, first pass (2026-10-08)
+
+**Setup**: web on `draft-sim-022-web-5192`, proxied to the backend `draft-sim-022-api-8092`, both
+from this worktree. Signed in through the app's own screen as `popsharky`.
+
+**Results (measured in the browser)**
+
+| Check | Result |
+|---|---|
+| Player page renders (Gobert, 2025) | ✅ Header with photo, team, position, ownership as "End of 2025–26 regular season (week 18)". Season / last-10 / last-5 table with real-vs-fantasy split. Ranks #40 of 299, C #12 of 81, ▲112. Breakdown with negatives. 76-game log, newest first, team per night. |
+| V5, links on each page (2025 league unless noted) | ✅ Trends 20 links (clicked Branden Carlson → his page); Weekly Report 10; Roster Management 2,059; Superlatives 8; Home spotlight (2026 league) 5. The 2025 home has no spotlight, as before this spec. |
+| NFL names stay plain | ✅ NFL 2026 league `1389361939561332736`: 0 player links on Weekly Report and Roster Management. |
+| V6, season picker from 2024 | ✅ Year links and season tabs both reach 2026, 2025 and 2024 on the same player. 2024 ownership reads "week 21" (F4, F5). |
+| Fallback (2026 league) | ✅ API: season 2025, requested 2026, `currentOwnership` NOT_DRAFTED (see the T018–T026 entry). |
+| Phone, 375 px | ✅ Page width 375, no page-level sideways scroll. Both tables (680 px and 751 px) scroll inside their own boxes (`overflow-x: auto`). |
+| SC-005, zero attempts (Deandre Ayton, 0 3PA in 72 games) | ⚠️ Shows "—", not a false 0%. But FR-006 needs a stated "no attempts". Fix 2 below. |
+
+**Problems found, to fix before US1 ships**
+
+1. **FR-011**: the season line shows shooting % without makes and attempts. Gobert's "0.0%" 3P is 0 of 5, which the reader can't see.
+2. **FR-006**: a zero-attempt rate shows a bare "—". It needs a stated reason.
+3. **Rank sentence**: "Ranked #152 by season total points…" is wrong. `pointsRank` is by points **per game**.
+4. **Freshness label**: "Stats through Sep 28, 2026" is `dataAsOf`, the last refresh, not the last game covered. The 2025 season ended in April.
+5. **Minutes format**: "34" sits next to "33.4". Use one decimal throughout.
+6. **Minus sign**: the breakdown mixes "−12.0" with "-0.7%".
+
+## T034: second pass after fixes (2026-10-08, measured in the browser)
+
+Checked on Deandre Ayton (2025, 0 3PA in 72 games). All six fixes hold:
+
+1. **Makes and attempts**: shooting cells show them, e.g. "67.1% / 403-601", "64.5% / 91-141". 403/601 is 67.05%, which is correct.
+2. **Zero attempts**: renders "no att.", with the full sentence as `title` and `aria-label`. The sentence was reworded from "No attempts yet…" to "No attempts in these games…", because "yet" is wrong for a finished season.
+3. **Rank sentence**: "By real points per game he's #119 of 299; in this league's scoring he's #98 — 21 places higher."
+4. **Freshness label**: the footer reads "Data refreshed Sep 28, 2026."
+5. **Minutes**: one decimal throughout.
+6. **Minus signs**: "−" (U+2212) throughout.
+
+**Web**: `tsc -b` clean, vitest 89 files / 1,131 tests passing, `npm run build` OK.

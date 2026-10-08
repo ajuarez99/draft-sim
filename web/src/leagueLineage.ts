@@ -77,3 +77,21 @@ export function leagueLineages(drafts: DraftSummary[]): LeagueLineage[] {
     // start_time ordering has, preserved across the grouping.
     .sort((a, b) => b.current.season - a.current.season)
 }
+
+/**
+ * The Sleeper league id of the season `season` in the same lineage as `routeLeagueId`.
+ *
+ * A page that falls back to an earlier season (a `requestedSeason` note) shows data from that
+ * season's league, so a link out of one of its rows must name that league, not the route's. Falls
+ * back to `routeLeagueId` when the season is null/undefined, the lineage is not known, or it holds
+ * no row for that season.
+ */
+export function leagueIdForSeason(
+  drafts: DraftSummary[],
+  routeLeagueId: string,
+  season: number | null | undefined,
+): string {
+  if (season == null) return routeLeagueId
+  const lineage = leagueLineages(drafts).find((l) => l.seasons.some((s) => s.sleeperLeagueId === routeLeagueId))
+  return lineage?.seasons.find((s) => s.season === season)?.sleeperLeagueId ?? routeLeagueId
+}

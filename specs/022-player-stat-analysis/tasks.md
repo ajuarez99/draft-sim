@@ -163,14 +163,14 @@ league pages. It shows:
 
 ### Tests for User Story 1
 
-- [ ] T018 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsWindowTest.java for the traditional parts of `AdvancedStats.window`:
+- [x] T018 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsWindowTest.java for the traditional parts of `AdvancedStats.window`:
   - per-game, totals and per-36 figures are pooled;
   - `fgPct`, `tpPct` and `ftPct` are `Rate`s, with `NO_ATTEMPTS` when there are 0 attempts (FR-006);
   - a last-N window covers `min(N, games)` games and states that count;
   - `firstGameDate` and `lastGameDate` are set (F9);
   - `smallSample` is true below `small-sample-minutes`;
   - `teamGamesMissed` follows data-model's rule, tested with a traded player and a mid-season signing (F10).
-- [ ] T019 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsServiceTest.java for the pure core, using synthetic lines and two leagues with different scoring.
+- [x] T019 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsServiceTest.java for the pure core, using synthetic lines and two leagues with different scoring.
   - **Qualification**:
     - SEASON: `games ≥ ceil(share × maxTeamGames)` and minutes per game at or above the minimum.
     - LAST_N: all N games played, the minutes rule, and a last game within `recency-days`. A player whose last game is 60 days old gets `NOT_QUALIFIED_STALE` (F9).
@@ -185,7 +185,7 @@ league pages. It shows:
   - **Leagues and empty seasons**:
     - identical real stats across the two leagues, with different fantasy figures (I6);
     - `NO_PLAYER_GAMES`, distinct from `NO_GAMES` (N9).
-- [ ] T020 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/PlayerOwnershipTest.java against data-model's "Ownership" table (F2, F5, F6, N6). Cases:
+- [x] T020 [P] [US1] Write backend/src/test/java/com/ballknowers/draftsim/engine/PlayerOwnershipTest.java against data-model's "Ownership" table (F2, F5, F6, N6). Cases:
   - current season: V28 rosters, `CURRENT`;
   - `pre_draft` or `drafting`: `NOT_DRAFTED`;
   - completed season: week `playoff_week_start − 1` (18 for 2025, 21 for 2024), labelled end of regular season;
@@ -196,11 +196,11 @@ league pages. It shows:
   - `currentOwnership` present only on a fallback;
   - a past season's `ownership` never uses current rosters (I8);
   - owner names come from `RosterOwners.ownerNames`, and `rosterId` is carried.
-- [ ] T021 [P] [US1] Add `GET /api/leagues/{id}/players/{sleeperPlayerId}` to the hand-listed league routes in backend/src/test/java/com/ballknowers/draftsim/api/AccessControlMvcIT.java. A stranger, or a request with no identity, gets 404.
+- [x] T021 [P] [US1] Add `GET /api/leagues/{id}/players/{sleeperPlayerId}` to the hand-listed league routes in backend/src/test/java/com/ballknowers/draftsim/api/AccessControlMvcIT.java. A stranger, or a request with no identity, gets 404.
 
 ### Implementation for User Story 1
 
-- [ ] T022 [US1] Extend backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java.
+- [x] T022 [US1] Extend backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java.
   - Add `record Window` with:
     - games, `firstGameDate`, `lastGameDate`, minutes and minutesPerGame;
     - perGame, totals and per36 for pts, reb, oreb, dreb, ast, stl, blk, tov, pf, fgm, fga, tpm, tpa, ftm and fta;
@@ -211,7 +211,7 @@ league pages. It shows:
   - Add `enum WindowKind { SEASON, LAST_10, LAST_5 }`.
   - Add `static int teamGamesMissed(List<Line>, Map<String, List<TeamGame>> teamGames)`, per data-model (F10).
   - A missing stat key in an existing line counts as 0.
-- [ ] T023 [US1] Create backend/src/main/java/com/ballknowers/draftsim/engine/PlayerOwnership.java, a pure resolver for data-model's "Ownership" table.
+- [x] T023 [US1] Create backend/src/main/java/com/ballknowers/draftsim/engine/PlayerOwnership.java, a pure resolver for data-model's "Ownership" table.
   - It returns `record Ownership(String state, Integer rosterId, String ownerName, String avatarId, boolean isMe, AsOf asOf)`. `state` is one of `ROSTERED`, `FREE_AGENT`, `NOT_DRAFTED` or `UNAVAILABLE`.
   - `AsOf` is `(String kind, OffsetDateTime fetchedAt, Integer week)`, where `kind` is `CURRENT` or `WEEK`.
   - Inputs:
@@ -222,7 +222,7 @@ league pages. It shows:
     - `RosterWeekPointsRepository.breakdownsFor`;
     - `RosterOwners.ownerNames`.
   - Expose two entry points: `forSeasonView(...)`, and `forNight(..., int week)` for US3.
-- [ ] T024 [US1] Create backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java.
+- [x] T024 [US1] Create backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java.
   - **Pure core** `compute(Input)`:
     - qualification per window (F9);
     - `fpPerGame` per window via `GameScoringService.score`;
@@ -237,33 +237,33 @@ league pages. It shows:
     - `dataAsOf` from the token.
   - **Gates**: `NOT_BASKETBALL` (through the sport rules), `NOT_CONFIGURED`, `NO_GAMES` and `NO_PLAYER_GAMES`.
   - Use records only, never `Map.of` (constitution rule 4).
-- [ ] T025 [US1] Create backend/src/main/java/com/ballknowers/draftsim/api/PlayerStatsController.java with `GET /api/leagues/{sleeperLeagueId}/players/{sleeperPlayerId}`, shaped like backend/src/main/java/com/ballknowers/draftsim/api/PlayerTrendsController.java.
+- [x] T025 [US1] Create backend/src/main/java/com/ballknowers/draftsim/api/PlayerStatsController.java with `GET /api/leagues/{sleeperLeagueId}/players/{sleeperPlayerId}`, shaped like backend/src/main/java/com/ballknowers/draftsim/api/PlayerTrendsController.java.
   - It uses `LeagueMembership.visibleLeague`, and returns 404 when the league isn't visible.
   - It also returns 404 for a player id with no stored games and no player row.
-- [ ] T026 [US1] Add backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsReadIT.java over the real 2025 rows (SC-002).
+- [x] T026 [US1] Add backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsReadIT.java over the real 2025 rows (SC-002).
   - For 10 players, one traded mid-season, every per-game average and shooting percentage must equal a direct SQL recomputation that excludes `TEAM_` rows and the All-Star game. Zero mismatches.
   - From the 2024 league id, `seasons` lists 2026, 2025 and 2024 (F4, I9).
-- [ ] T027 [US1] Add a `players` row to web/src/destinations.ts (F11, N5).
+- [x] T027 [US1] Add a `players` row to web/src/destinations.ts (F11, N5).
   - It has a new `inRail: false` field, which the rail rendering honours. Its sports are `['nba']`.
   - Its `match` is `/^\/leagues\/([^/]+)\/players\/[^/]+\/?$/`.
   - Its href is one-season: `/leagues/{ctx.season.sleeperLeagueId}/players/...`, so the rail's year links stay on the player page.
   - Export `playerPagesFor(sport)`, derived from that row's `sports`. It is the only gate deciding whether a name links, and the client never compares a sport string.
   - Test it in web/src/destinations.test.ts: hidden from the rail, matched on the route, and `playerPagesFor('nfl')` is false.
-- [ ] T028 [P] [US1] Add C1's types to web/src/api.ts, mirroring the Java records field for field in the same change, with contracts/api.md's nullability (constitution rule 2):
+- [x] T028 [P] [US1] Add C1's types to web/src/api.ts, mirroring the Java records field for field in the same change, with contracts/api.md's nullability (constitution rule 2):
   - `Rate`, `Pct`, `Ownership` (with `rosterId`), `AsOf`;
   - `WindowStats` (with `firstGameDate` and `lastGameDate`), `GameLogRow`;
   - `SeasonOption` (with `hasGames`), and `PlayerStatsPage` (with `teamGamesMissed` and `currentOwnership`);
   - `getPlayerStats(leagueId, playerId)`.
-- [ ] T029 [P] [US1] Create web/src/statCopy.ts, with a test in web/src/statCopy.test.ts asserting every code has a non-empty sentence. It holds:
+- [x] T029 [P] [US1] Create web/src/statCopy.ts, with a test in web/src/statCopy.test.ts asserting every code has a non-empty sentence. It holds:
   - **Reason sentences**: `NO_ATTEMPTS`, `NO_MINUTES`, `NO_TEAM_ROW`, `NOT_QUALIFIED`, `NOT_QUALIFIED_STALE` ("hasn't played since {date}"), `NO_GAMES`, `NO_PLAYER_GAMES`, `NOT_BASKETBALL`, `NOT_CONFIGURED`, `NOT_DRAFTED` and `UNAVAILABLE`.
   - **Figure labels**: "Real stat" and "This league's fantasy".
   - **Scoring-key labels** (N8): every NBA scoring key, including `dd`, `td`, `ff`, `tf`, `bonus_pt_40p`, `bonus_pt_50p`, `bonus_reb_20p` and `bonus_ast_15p`.
   - **Fallback note** (N15, N16): "{requested} has no games yet; showing {shown}. Trends may show a different season."
-- [ ] T030 [P] [US1] Create web/src/components/PlayerLink.tsx, with a test in web/src/components/PlayerLink.test.tsx.
+- [x] T030 [P] [US1] Create web/src/components/PlayerLink.tsx, with a test in web/src/components/PlayerLink.test.tsx.
   - It links to `/leagues/{sleeperLeagueId}/players/{sleeperPlayerId}`.
   - It takes a required `sleeperLeagueId` and a required `sport`, neither defaulted.
   - It renders plain children, with no link, when `playerPagesFor(sport)` is false.
-- [ ] T031 [US1] Create web/src/pages/PlayerPage.tsx, with tests in web/src/pages/PlayerPage.test.tsx. The page shows:
+- [x] T031 [US1] Create web/src/pages/PlayerPage.tsx, with tests in web/src/pages/PlayerPage.test.tsx. The page shows:
   - **Header**: `PlayerFace`, team and positions, plus ownership with its as-of.
   - **`currentOwnership`**: labelled separately when present (F6).
   - **Season line**: every figure labelled real or fantasy (FR-005).
@@ -275,12 +275,12 @@ league pages. It shows:
   - **Empty and reason states**: never an empty table or zeros.
 
   Tests cover a traded player, `NO_PLAYER_GAMES`, a fallback season with `currentOwnership`, `NOT_QUALIFIED_STALE`, and a football league.
-- [ ] T032 [US1] Add the route `/leagues/:sleeperLeagueId/players/:sleeperPlayerId` to web/src/App.tsx. Key its element on **both** ids, so moving from one player to another remounts it (N4). Add a case to web/src/App.test.tsx.
-- [ ] T033 [US1] Wrap NBA player names in `PlayerLink` in web/src/components/PlayerSpotlight.tsx, web/src/pages/WeeklyReport.tsx, web/src/pages/PlayerTrends.tsx, web/src/pages/RosterManagement.tsx and web/src/pages/Superlatives.tsx (F11 replaces LeagueAnalysis.tsx; FR-014).
+- [x] T032 [US1] Add the route `/leagues/:sleeperLeagueId/players/:sleeperPlayerId` to web/src/App.tsx. Key its element on **both** ids, so moving from one player to another remounts it (N4). Add a case to web/src/App.test.tsx.
+- [x] T033 [US1] Wrap NBA player names in `PlayerLink` in web/src/components/PlayerSpotlight.tsx, web/src/pages/WeeklyReport.tsx, web/src/pages/PlayerTrends.tsx, web/src/pages/RosterManagement.tsx and web/src/pages/Superlatives.tsx (F11 replaces LeagueAnalysis.tsx; FR-014).
   - Pass `sleeperLeagueId` and the payload's `sport` into `PlayerSpotlight` from web/src/components/HomeSpotlight.tsx (F11).
   - The gate is `PlayerLink`'s `playerPagesFor`, so NFL names in WeeklyReport and RosterManagement stay unlinked.
   - Update each page's existing test to assert the href on NBA and its absence on NFL.
-- [ ] T034 [US1] Run quickstart V3–V6 live.
+- [x] T034 [US1] Run quickstart V3–V6 live.
   - The API by curl with a member identity.
   - V5's five-page click-through in a real browser via `preview_start`, after checking the bootRun classpath is this worktree's (memory "Worktree preview serves main").
   - V6's forward and backward picks, and the fallback with `currentOwnership`.

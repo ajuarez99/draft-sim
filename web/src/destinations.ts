@@ -35,11 +35,15 @@ export type LeagueContext = {
   /** The season actually being viewed -- not always `lineage.current`, since
    *  an older season's board is its own route. */
   season: DraftSummary
+  /** The player a player page is about. Only the `players` row reads it: that
+   *  page is addressed by a league AND a player, and a league context alone
+   *  cannot build its URL. Everything else ignores it. */
+  playerId?: string
 }
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -89,6 +93,12 @@ export type LeagueDestination = {
   /** True for a row that runs something instead of navigating -- "Mock it"
    *  opens the new-mock modal and has no route of its own. */
   isAction: boolean
+  /** False for a page that is reached from a link rather than from the rail.
+   *  Required, never defaulted: a defaulted flag would offer a page that needs
+   *  an id nobody has to every league. The rail and the jump-to palette skip
+   *  rows where this is false; `destinationFromPath` and the sport gate still
+   *  see them. */
+  inRail: boolean
 }
 
 /** The same rule the home card uses: a complete draft has real picks to show,
@@ -136,6 +146,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'weeklyReport',
@@ -152,6 +163,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'schedule',
@@ -167,6 +179,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'trends',
@@ -182,6 +195,29 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
+  },
+  {
+    key: 'players',
+    group: 'thisWeek',
+    glyph: '◉',
+    // Basketball only: the stat lines this page reads exist for the NBA alone.
+    // This is the ONE place that says so -- PlayerLink asks playerPagesFor().
+    sports: ['nba'],
+    label: 'Player',
+    // one season: the page reads the season it is opened on, so the rail's year
+    // links keep you on the player. The id rides on the context; without one
+    // there is no player page to link to, so fall back to the league's home.
+    href: (ctx) =>
+      ctx.playerId
+        ? `/leagues/${ctx.season.sleeperLeagueId}/players/${encodeURIComponent(ctx.playerId)}`
+        : `/leagues/${ctx.season.sleeperLeagueId}`,
+    match: /^\/leagues\/([^/]+)\/players\/[^/]+\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    // Reached from a player's name, not from the rail or the palette.
+    inRail: false,
   },
   {
     key: 'power',
@@ -198,6 +234,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'analysis',
@@ -218,6 +255,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'expectedWins',
@@ -235,6 +273,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'rosterManagement',
@@ -254,6 +293,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'forecast',
@@ -271,6 +311,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'superlatives',
@@ -287,6 +328,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'board',
@@ -301,6 +343,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'draft',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
   {
     key: 'live',
@@ -313,6 +356,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'draft',
     requiresStatus: ['pre_draft', 'drafting'],
     isAction: false,
+    inRail: true,
   },
   {
     key: 'mock',
@@ -328,6 +372,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: null,
     requiresStatus: null,
     isAction: true,
+    inRail: true,
   },
   {
     key: 'history',
@@ -342,8 +387,22 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
+    inRail: true,
   },
 ]
+
+/** True when this sport has player pages. The only gate for linking a player's
+ *  name: derived from the `players` row's `sports`, so no caller compares a sport
+ *  string. */
+export function playerPagesFor(sport: Sport): boolean {
+  return LEAGUE_DESTINATIONS.find((d) => d.key === 'players')?.sports.includes(sport) ?? false
+}
+
+/** The player id in a player-page pathname, or null on any other path. */
+export function playerIdFromPath(pathname: string): string | null {
+  const m = pathname.match(/^\/leagues\/[^/]+\/players\/([^/]+)\/?$/)
+  return m ? decodeURIComponent(m[1]) : null
+}
 
 /** The rows of one group, in table order. */
 export function destinationsInGroup(rows: LeagueDestination[], group: DestinationGroup): LeagueDestination[] {

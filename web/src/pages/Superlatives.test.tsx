@@ -7,6 +7,12 @@ import type { ConductList, Superlative, SuperlativesResponse } from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
+  // PlayerLink renders a router Link; this page's tests need only its href.
+  Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
 }))
 
 const fetchSuperlatives = vi.fn()
@@ -1465,5 +1471,87 @@ describe('Superlatives trophy list', () => {
     expect(screen.getByText('nobody yet')).toBeInTheDocument()
     // The headline figure is its own element.
     expect(container.querySelector('.sl-row-stat .sl-stat')?.textContent).toBe('180.50 points')
+  })
+})
+
+// specs/022 T033: every place this page names a player opens his page on basketball, and none does on football.
+describe('Superlatives player links', () => {
+  beforeEach(() => {
+    fetchSuperlatives.mockReset()
+    fetchConductList.mockReset().mockResolvedValue(conductList())
+  })
+
+  const waiver: Superlative = {
+    kind: 'WAIVER_WIRE_WARRIOR', available: true, reason: null, early: false, value: 88.4, unit: 'POINTS',
+    holders: [{ rosterId: 3, managerId: 30, teamName: 'Waiver Wire Warriors', username: null, avatarId: null }],
+    emptyReason: null,
+    detail: [
+      { type: 'PICKUP', rosterId: 3, playerId: 'p1', playerName: 'Some Guy', position: 'RB', addedWeek: 4, addType: 'WAIVER', startedWeeks: [5, 6], points: 52.1 },
+    ],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [],
+  }
+  const jabari: Superlative = {
+    kind: 'JABARI_SMITH_JR', available: true, reason: null, early: false, value: 14, unit: 'ADDS',
+    holders: [], emptyReason: null, detail: [], coverage: null,
+    playerHolders: [{ playerId: 'p9', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 }],
+    standings: [],
+    playerStandings: [{ rank: 1, playerId: 'p9', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 }],
+  }
+  const embiid: Superlative = {
+    kind: 'JOEL_EMBIID', available: true, reason: null, early: false, value: 10, unit: 'POINTS',
+    holders: [{ rosterId: 3, managerId: 30, teamName: 'Waiver Wire Warriors', username: null, avatarId: null }],
+    emptyReason: null,
+    detail: [
+      { type: 'ABSENCE', rosterId: 3, playerId: 'p5', playerName: 'Big Man', position: 'C', gamesMissed: 7, weeksAffected: 3, pointsPerGame: 1.5, estimatedPointsLost: 10, estimated: true },
+    ],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [],
+  }
+
+  function payload(sport: 'nba' | 'nfl'): SuperlativesResponse {
+    let d = withKind(baseline(), waiver)
+    d = withKind(d, jabari)
+    d = withKind(d, embiid)
+    return { ...d, sport }
+  }
+
+  it('links pickups, absences and the Jabari holder and standings on basketball', async () => {
+    fetchSuperlatives.mockResolvedValue(payload('nba'))
+    render(<Superlatives />)
+
+    expect(await screen.findByRole('link', { name: 'Some Guy' })).toHaveAttribute('href', '/leagues/L1/players/p1')
+    expect(screen.getByRole('link', { name: 'Big Man' })).toHaveAttribute('href', '/leagues/L1/players/p5')
+    expect(screen.getByRole('link', { name: 'Jake LaRavia' })).toHaveAttribute('href', '/leagues/L1/players/p9')
+
+    // the standings row inside the opened Jabari card
+    const jabariCard = screen.getByText('The Jabari Smith Jr. Award').closest('article') as HTMLElement
+    await userEvent.click(within(jabariCard).getByRole('button', { name: 'See all' }))
+    const panel = within(jabariCard).getByRole('region')
+    expect(within(panel).getByRole('link', { name: 'Jake LaRavia' })).toHaveAttribute('href', '/leagues/L1/players/p9')
+  })
+
+  it('links the conduct list entries on basketball', async () => {
+    fetchSuperlatives.mockResolvedValue({ ...payload('nba'), commissionerListAvailable: true })
+    fetchConductList.mockResolvedValue(
+      conductList({
+        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
+      }),
+    )
+    render(<Superlatives />)
+
+    expect(await screen.findByRole('link', { name: 'Flagged Guy' })).toHaveAttribute('href', '/leagues/L1/players/p7')
+  })
+
+  it('links nothing on football', async () => {
+    fetchSuperlatives.mockResolvedValue({ ...payload('nfl'), commissionerListAvailable: true })
+    fetchConductList.mockResolvedValue(
+      conductList({
+        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
+      }),
+    )
+    render(<Superlatives />)
+
+    expect(await screen.findByText('Flagged Guy')).toBeInTheDocument()
+    expect(screen.getByText(/Some Guy/)).toBeInTheDocument()
+    expect(screen.queryByRole('link')).not.toBeInTheDocument()
   })
 })

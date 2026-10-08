@@ -152,6 +152,17 @@ describe('what a league is offered', () => {
     ])
   })
 
+  // specs/022 T027: the player page is reached from a name, never listed in the rail --
+  // and being on it must not make the League section vanish.
+  it('keeps the League section on a player page without listing a row for it', async () => {
+    const { leagueSection, rowLabels, currentRowLabels } = renderAtPath('/leagues/L_NBA/players/1350', { drafts: [NBA] })
+
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    expect(rowLabels()).toContain('League home')
+    expect(rowLabels()).not.toContain('Player')
+    expect(currentRowLabels()).toEqual([])
+  })
+
   // The sport gate is one-way, and it now lives in one place rather than in
   // this component's JSX -- so the rail and the palette cannot disagree about
   // whether basketball has an Analysis page.
@@ -483,6 +494,17 @@ describe('year links keep the page', () => {
     const nbaLineage: LeagueLineage = { current: nba26, seasons: [nba26, nba25] }
     const nbaCtx: LeagueContext = { lineage: nbaLineage, season: nba26 }
     expect(switchTarget('analysis', nbaCtx)).toBe('/leagues/L_NBA26')
+  })
+
+  // specs/022 T027: the player page lives at /leagues/:league/players/:player, and
+  // the rail's year links must keep the player, not drop to League home.
+  it('(i) a year link on a player page keeps the player id read from the path', () => {
+    const nba25 = draftSummary({ sleeperDraftId: 'D_NBA25', sleeperLeagueId: 'L_NBA25', sport: 'nba', season: 2025 })
+    const nba26 = draftSummary({ sleeperDraftId: 'D_NBA26', sleeperLeagueId: 'L_NBA26', previousLeagueId: 'L_NBA25', sport: 'nba', season: 2026 })
+    const ctx: LeagueContext = { lineage: { current: nba26, seasons: [nba26, nba25] }, season: nba25 }
+    expect(switchTarget('players', ctx, '/leagues/L_NBA26/players/1350')).toBe('/leagues/L_NBA25/players/1350')
+    // no player in the path: League home rather than a broken URL
+    expect(switchTarget('players', ctx)).toBe('/leagues/L_NBA25')
   })
 })
 

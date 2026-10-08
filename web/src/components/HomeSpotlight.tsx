@@ -117,5 +117,5 @@ function LeaguePanel({ league, idPrefix }: { league: HomeSpotlightLeague; idPref
     // specs/015 research R4: the league home renders nothing here; a tab that opens blank is worse.
     return <p className="muted small">No player spotlight for {spotlight.data.season}: it covers the current season only.</p>
   }
-  return <SpotlightLists spotlight={spotlight.data} weekly={weekly} idPrefix={idPrefix} />
+  return <SpotlightLists sleeperLeagueId={league.leagueId} spotlight={spotlight.data} weekly={weekly} idPrefix={idPrefix} />
 }

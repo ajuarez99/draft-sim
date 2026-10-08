@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { leagueLineages } from './leagueLineage'
+import { leagueIdForSeason, leagueLineages } from './leagueLineage'
 import type { DraftSummary } from './api'
 
 // Shapes mirror what /api/drafts actually returns for Allan's leagues -- two
@@ -104,5 +104,30 @@ describe('leagueLineages', () => {
 
   it('returns nothing for no drafts', () => {
     expect(leagueLineages([])).toEqual([])
+  })
+})
+
+describe('leagueIdForSeason', () => {
+  const drafts = [
+    draft({ sleeperLeagueId: '2', season: 2026, leagueName: 'BK', previousLeagueId: '1', sport: 'nba' }),
+    draft({ sleeperLeagueId: '1', season: 2025, leagueName: 'BK', sport: 'nba' }),
+    draft({ sleeperLeagueId: '9', season: 2025, leagueName: 'Other', sport: 'nba' }),
+  ]
+
+  it('maps a season to the league id of that season within the route lineage', () => {
+    expect(leagueIdForSeason(drafts, '2', 2025)).toBe('1')
+    expect(leagueIdForSeason(drafts, '1', 2026)).toBe('2')
+    expect(leagueIdForSeason(drafts, '2', 2026)).toBe('2')
+  })
+
+  it('does not reach into an unrelated league that shares a season', () => {
+    expect(leagueIdForSeason(drafts, '2', 2025)).not.toBe('9')
+  })
+
+  it('falls back to the route id for a null season, an unknown league or a missing season', () => {
+    expect(leagueIdForSeason(drafts, '2', null)).toBe('2')
+    expect(leagueIdForSeason(drafts, '2', undefined)).toBe('2')
+    expect(leagueIdForSeason(drafts, 'zzz', 2025)).toBe('zzz')
+    expect(leagueIdForSeason(drafts, '2', 2019)).toBe('2')
   })
 })

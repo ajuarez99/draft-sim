@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import SuperlativeStandings from '../components/SuperlativeStandings'
 import PlayerFace from '../components/PlayerFace'
+import PlayerLink from '../components/PlayerLink'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   fetchSuperlatives,
@@ -142,6 +143,7 @@ export default function Superlatives() {
                 s={s}
                 hue={hueForIndex(i, data.superlatives.length)}
                 sport={data.sport}
+                leagueId={data.leagueSleeperId ?? sleeperLeagueId ?? ''}
                 closeGameMargin={data.closeGameMargin}
                 throughWeek={data.throughWeek}
                 suspensionWeeksObserved={data.suspensionWeeksObserved}
@@ -159,6 +161,7 @@ export default function Superlatives() {
               commissionerListAvailable={data.commissionerListAvailable}
               season={data.season}
               requestedSeason={data.requestedSeason ?? null}
+              sport={data.sport}
               onChanged={refetchSuperlatives}
             />
           )}
@@ -180,6 +183,7 @@ function SuperlativeCard({
   s,
   hue,
   sport,
+  leagueId,
   closeGameMargin,
   throughWeek,
   suspensionWeeksObserved,
@@ -187,6 +191,8 @@ function SuperlativeCard({
   s: Superlative
   hue: number
   sport: Sport
+  /** The league season the cards resolved to; where a player's name links. */
+  leagueId: string
   closeGameMargin: number
   throughWeek: number | null
   suspensionWeeksObserved: number[]
@@ -290,7 +296,9 @@ function SuperlativeCard({
                   <span className="sl-holder-top">
                     <span className="sl-holder-name">
                       <PlayerFace sport={sport} sleeperId={ph.playerId} team={ph.team} position={ph.position ?? ''} name={ph.playerName} size={20} />
-                      {ph.playerName}
+                      <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={ph.playerId} sport={sport}>
+                        {ph.playerName}
+                      </PlayerLink>
                       {ph.position ? ` (${ph.position})` : ''}
                     </span>
                   </span>
@@ -327,7 +335,7 @@ function SuperlativeCard({
         <>
           <div className="sl-holders">
             {s.holders.map((h) => {
-              const holderLines = holderDetailLines(s, h.rosterId, throughWeek)
+              const holderLines = holderDetailLines(s, h.rosterId, throughWeek, leagueId, sport)
               return (
                 <div className="sl-holder" key={h.rosterId}>
                   <span className="sl-holder-top">
@@ -403,6 +411,8 @@ function SuperlativeCard({
           s={s}
           title={meta.title}
           hue={hue}
+          leagueId={leagueId}
+          sport={sport}
           figure={(v) => standingFigure(s.kind, s.unit, v)}
         />
       )}
@@ -429,7 +439,18 @@ function TrophyIcon() {
  * Ties (e.g. three CLOSEST_GAME holders) each get their own line rather than
  * one shared figure, since a tie can span different weeks and opponents.
  */
-function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number | null): string[] {
+function holderDetailLines(
+  s: Superlative,
+  rosterId: number,
+  throughWeek: number | null,
+  leagueId: string,
+  sport: Sport,
+): ReactNode[] {
+  const who = (id: string, name: string) => (
+    <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={id} sport={sport}>
+      {name}
+    </PlayerLink>
+  )
   const rows = s.detail.filter((d): d is Extract<SuperlativeDetail, { rosterId: number }> =>
     'rosterId' in d && d.rosterId === rosterId,
   )
@@ -482,8 +503,11 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
       const source = d.addType === 'WAIVER' ? 'waivers' : 'free agency'
       const weeksWord = d.startedWeeks.length === 1 ? 'week' : 'weeks'
       return (
-        `${d.playerName} (${d.position}) — ${d.points.toFixed(2)} pts, added week ${d.addedWeek} ` +
-        `off ${source}, started ${weeksWord} ${d.startedWeeks.join(', ')}`
+        <>
+          {who(d.playerId, d.playerName)}
+          {` (${d.position}) — ${d.points.toFixed(2)} pts, added week ${d.addedWeek} ` +
+            `off ${source}, started ${weeksWord} ${d.startedWeeks.join(', ')}`}
+        </>
       )
     })
     return [...total, ...pickupLines]
@@ -498,9 +522,13 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
     // The total ("62.40 estimated points lost") is the row's headline figure now
     // (the stat column, via standingFigure), so it is not printed a second time here.
     const absenceLines = absences.map(
-      (d) =>
-        `${d.playerName} (${d.position}) — ${d.gamesMissed} games missed (${d.weeksAffected} weeks), ` +
-        `~${d.pointsPerGame.toFixed(2)} per game (estimated)`,
+      (d) => (
+        <>
+          {who(d.playerId, d.playerName)}
+          {` (${d.position}) — ${d.gamesMissed} games missed (${d.weeksAffected} weeks), ` +
+            `~${d.pointsPerGame.toFixed(2)} per game (estimated)`}
+        </>
+      ),
     )
     return absenceLines
   }
@@ -519,7 +547,12 @@ function holderDetailLines(s: Superlative, rosterId: number, throughWeek: number
           d.source === 'SUSPENDED'
             ? `Suspended${weeksPart}`
             : `Commissioner's call: ${d.reason ?? ''}${weeksPart}`
-        return `${d.playerName} — ${label}`
+        return (
+          <>
+            {who(d.playerId, d.playerName)}
+            {` — ${label}`}
+          </>
+        )
       })
   }
   return []
@@ -689,9 +722,11 @@ function ConductListSection({
   commissionerListAvailable,
   season,
   requestedSeason,
+  sport,
   onChanged,
 }: {
   leagueSleeperId: string
+  sport: Sport
   commissionerListAvailable: boolean
   season: number
   /** Non-null when LeagueSeasonResolver walked back from the URL's own
@@ -798,7 +833,11 @@ function ConductListSection({
         <ul className="sl-conduct-list">
           {list?.entries.map((e) => (
             <li key={e.id} className="sl-conduct-row">
-              <span className="sl-conduct-player">{e.playerName}</span>
+              <span className="sl-conduct-player">
+                <PlayerLink sleeperLeagueId={leagueSleeperId} sleeperPlayerId={e.playerId} sport={sport}>
+                  {e.playerName}
+                </PlayerLink>
+              </span>
               <span className="muted small">{e.reason}</span>
               <span className="muted small">applies from week {e.appliesFromWeek}</span>
               <span className="muted small">added by {e.addedBy ?? 'the commissioner'}</span>

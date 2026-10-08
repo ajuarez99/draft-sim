@@ -24,6 +24,14 @@ vi.mock('./pages/PowerRankings', () => ({
     return <div data-instance={instance}>power rankings</div>
   },
 }))
+// specs/022: stamped like the Power rankings stub, so a test can tell a remount from a re-render.
+const playerMounts = vi.hoisted(() => ({ n: 0 }))
+vi.mock('./pages/PlayerPage', () => ({
+  default: function PlayerPageStub() {
+    const [instance] = useState(() => ++playerMounts.n)
+    return <div data-instance={instance}>player page</div>
+  },
+}))
 // Mounted by the rail-collapse test below; the real one fetches on mount.
 vi.mock('./pages/DraftView', () => ({
   default: () => <div>draft view</div>,
@@ -217,5 +225,30 @@ describe('league routes remount on a league change', () => {
     await user.click(screen.getByRole('button', { name: 'go to 2025' }))
 
     expect(screen.getByText('power rankings').getAttribute('data-instance')).not.toBe(before)
+  })
+
+  // specs/022 N4: the player page is keyed on BOTH ids -- another player in the same
+  // league, and the same player in another season, are each a fresh page.
+  it.each([
+    ['another player', '/leagues/1/players/9'],
+    ['another season', '/leagues/2/players/8'],
+  ])('mounts a fresh player page for %s', async (_what, target) => {
+    setUser(sampleUser)
+    const user = userEvent.setup()
+    function GoTo() {
+      const navigate = useNavigate()
+      return <button onClick={() => navigate(target)}>go</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/leagues/1/players/8']}>
+        <App />
+        <GoTo />
+      </MemoryRouter>,
+    )
+
+    const before = (await screen.findByText('player page')).getAttribute('data-instance')
+    await user.click(screen.getByRole('button', { name: 'go' }))
+
+    expect(screen.getByText('player page').getAttribute('data-instance')).not.toBe(before)
   })
 })

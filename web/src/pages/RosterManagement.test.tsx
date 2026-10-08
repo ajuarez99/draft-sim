@@ -1,15 +1,24 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import RosterManagement from './RosterManagement'
+import { invalidateRailLeagues } from '../railLeague'
 import type { RosterManagement as Data, RosterManagementTeam, LeagueTransactions } from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
+  // PlayerLink renders a router Link; this page's tests need only its href.
+  Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
 }))
 
 const getRosterManagement = vi.fn()
 const getLeagueTransactions = vi.fn()
+const getDrafts = vi.fn()
 vi.mock('../api', () => ({
+  getDrafts: (...args: unknown[]) => getDrafts(...args),
   getRosterManagement: (...args: unknown[]) => getRosterManagement(...args),
   getLeagueTransactions: (...args: unknown[]) => getLeagueTransactions(...args),
 }))
@@ -253,6 +262,66 @@ describe('Roster management', () => {
     render(<RosterManagement />)
 
     expect(await screen.findByText('ungraded')).toBeInTheDocument()
+  })
+
+  // specs/022 T033: waiver adds, drops and trade receipts open the player page on basketball only.
+  describe('player links', () => {
+    const withTrade = (sport: 'nba' | 'nfl') =>
+      transactions({
+        sport,
+        trades: [
+          {
+            week: 2,
+            sides: [
+              {
+                teamName: 'Master Bates',
+                received: [
+                  { playerId: '77', playerName: 'Trade One', position: 'C', postMovePositionalRank: null, weeksCounted: 0 },
+                  { playerId: '78', playerName: 'Trade Two', position: 'PF', postMovePositionalRank: null, weeksCounted: 0 },
+                ],
+              },
+            ],
+          },
+        ],
+      })
+
+    it('links added, dropped and traded players on basketball', async () => {
+      getRosterManagement.mockResolvedValue(data({ sport: 'nba' }))
+      getLeagueTransactions.mockResolvedValue(withTrade('nba'))
+      render(<RosterManagement />)
+
+      expect(await screen.findByRole('link', { name: 'Tyler Loop' })).toHaveAttribute('href', '/leagues/L1/players/12711')
+      expect(screen.getByRole('link', { name: 'Najee Harris' })).toHaveAttribute('href', '/leagues/L1/players/2')
+      expect(screen.getByRole('link', { name: 'Trade One' })).toHaveAttribute('href', '/leagues/L1/players/77')
+      expect(screen.getByRole('link', { name: 'Trade Two' })).toHaveAttribute('href', '/leagues/L1/players/78')
+    })
+
+    it('links a fallback-season transaction to that season league id', async () => {
+      invalidateRailLeagues()
+      getDrafts.mockResolvedValue([
+        { sleeperLeagueId: 'L1', sleeperDraftId: 'd1', season: 2026, previousLeagueId: 'L0', leagueName: 'BK', sport: 'nba' },
+        { sleeperLeagueId: 'L0', sleeperDraftId: 'd0', season: 2025, previousLeagueId: null, leagueName: 'BK', sport: 'nba' },
+      ])
+      getRosterManagement.mockResolvedValue(data({ sport: 'nba' }))
+      getLeagueTransactions.mockResolvedValue({ ...withTrade('nba'), season: 2025 })
+      render(<RosterManagement />)
+
+      await screen.findByRole('link', { name: 'Tyler Loop' })
+      await waitFor(() =>
+        expect(screen.getByRole('link', { name: 'Tyler Loop' })).toHaveAttribute('href', '/leagues/L0/players/12711'),
+      )
+      expect(screen.getByRole('link', { name: 'Trade One' })).toHaveAttribute('href', '/leagues/L0/players/77')
+      invalidateRailLeagues()
+    })
+
+    it('leaves the same names unlinked on football', async () => {
+      getRosterManagement.mockResolvedValue(data())
+      getLeagueTransactions.mockResolvedValue(withTrade('nfl'))
+      render(<RosterManagement />)
+
+      expect(await screen.findByText('Tyler Loop')).toBeInTheDocument()
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+    })
   })
 
   it('still renders the standings when transactions have not been ingested', async () => {

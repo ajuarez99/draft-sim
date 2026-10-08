@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
 import PlayerFace from '../components/PlayerFace'
+import PlayerLink from '../components/PlayerLink'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import RecapCard from '../components/RecapCard'
 import {
@@ -17,6 +18,7 @@ import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import PersonName from '../components/PersonName'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { useSeasonLeagueIds } from '../railLeague'
 
 /**
  * specs/004-ffwrapped-feature-parity US5: one week, read back.
@@ -42,6 +44,7 @@ export default function WeeklyReport() {
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
+  const leagueIdForSeason = useSeasonLeagueIds(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -64,6 +67,9 @@ export default function WeeklyReport() {
   }, [sleeperLeagueId, requestedWeek, dataVersion])
 
   const latest = data?.latestScoredWeek ?? 0
+  // Links out of a row name the league of the season the data came from: the page can show an earlier
+  // season than the route's (a requestedSeason fallback), and the player page opens that season's games.
+  const dataLeagueId = data ? leagueIdForSeason(data.season) : (sleeperLeagueId ?? '')
 
   // A link (or a stale bookmark) past the last scored week is pulled back to it rather
   // than left showing "week 99 has not been scored".
@@ -180,7 +186,7 @@ export default function WeeklyReport() {
           </section>
 
           {mine ? (
-            <WeekInReview data={data} />
+            <WeekInReview data={data} leagueId={dataLeagueId} />
           ) : (
             <>
               <section className="section">
@@ -207,7 +213,7 @@ export default function WeeklyReport() {
                   <ol className="wr-performers">
                     {(data.topPerformers ?? []).map((p) => (
                       <li key={p.playerId}>
-                        <PerformerLine p={p} sport={data.sport} />
+                        <PerformerLine p={p} sport={data.sport} leagueId={dataLeagueId} />
                       </li>
                     ))}
                   </ol>
@@ -216,7 +222,7 @@ export default function WeeklyReport() {
             </>
           )}
 
-          {data.playersPlayMultiplePerPeriod && <Rankings data={data} />}
+          {data.playersPlayMultiplePerPeriod && <Rankings data={data} leagueId={dataLeagueId} />}
         </>
       )}
     </div>
@@ -244,7 +250,7 @@ function Omitted({ data }: { data: Data }) {
  * Awards and (football) top performers as one list of one-line records, used when the
  * reader's own matchup leads the page. The same facts as the two sections it replaces.
  */
-function WeekInReview({ data }: { data: Data }) {
+function WeekInReview({ data, leagueId }: { data: Data; leagueId: string }) {
   const performers = data.playersPlayMultiplePerPeriod ? [] : (data.topPerformers ?? [])
   return (
     <section className="section">
@@ -263,7 +269,7 @@ function WeekInReview({ data }: { data: Data }) {
           {performers.map((p) => (
             <li key={`p-${p.playerId}`} className="wr-perf-row">
               <span className="wr-review-kind">Top performer</span>
-              <PerformerLine p={p} sport={data.sport} />
+              <PerformerLine p={p} sport={data.sport} leagueId={leagueId} />
             </li>
           ))}
         </ul>
@@ -278,11 +284,15 @@ function WeekInReview({ data }: { data: Data }) {
  * playersBySleeperId), so the face can use it. The row carries the FANTASY team name, not
  * the player's pro team, so there is no logo step: photo, then initials.
  */
-function PerformerLine({ p, sport }: { p: WeeklyPerformer; sport: Data['sport'] }) {
+function PerformerLine({ p, sport, leagueId }: { p: WeeklyPerformer; sport: Data['sport']; leagueId: string }) {
   return (
     <>
       <PlayerFace sport={sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
-      <span className="wr-pname">{p.playerName}</span>
+      <span className="wr-pname">
+        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={sport}>
+          {p.playerName}
+        </PlayerLink>
+      </span>
       <span className="wr-ppos">{p.position}</span>
       <span className="wr-pteam muted">{p.teamName}</span>
       <span className="wr-ppts">{p.points.toFixed(2)}</span>
@@ -337,7 +347,7 @@ function ScoreSide({ side, isMe, right }: { side: WeeklySide; isMe?: boolean; ri
  * with four steady games can top the week without owning a single night --
  * and that disagreement is the reason both are here.
  */
-function Rankings({ data }: { data: Data }) {
+function Rankings({ data, leagueId }: { data: Data; leagueId: string }) {
   const missing = (section: 'BEST_NIGHTS' | 'BEST_WEEK') =>
     (data.sectionsUnavailable ?? []).find((s) => s.section === section)
   const nights = data.bestNights ?? []
@@ -354,7 +364,11 @@ function Rankings({ data }: { data: Data }) {
             {nights.map((p) => (
               <li key={`${p.playerId}-${p.date}`}>
                 <PlayerFace sport={data.sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
-                <span className="wr-pname">{p.playerName}</span>
+                <span className="wr-pname">
+        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={data.sport}>
+          {p.playerName}
+        </PlayerLink>
+      </span>
                 <span className="wr-ppos">{p.position}</span>
                 <span className="wr-pteam muted">{p.teamName}</span>
                 <span className="wr-when muted">{whenLabel(p.date, p.opponent, p.isAway)}</span>
@@ -388,7 +402,11 @@ function Rankings({ data }: { data: Data }) {
             {weeks.map((p) => (
               <li key={p.playerId}>
                 <PlayerFace sport={data.sport} sleeperId={p.playerId} team={null} position={p.position} name={p.playerName} size={24} />
-                <span className="wr-pname">{p.playerName}</span>
+                <span className="wr-pname">
+        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={data.sport}>
+          {p.playerName}
+        </PlayerLink>
+      </span>
                 <span className="wr-ppos">{p.position}</span>
                 <span className="wr-pteam muted">{p.teamName}</span>
                 {/* The denominator, always beside the total: 182.0 means

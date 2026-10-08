@@ -2549,6 +2549,138 @@ export type PlayerTrends = {
 export const getPlayerTrends = (id: string) =>
   apiFetch(`/api/leagues/${id}/player-trends`).then(json<PlayerTrends>)
 
+// --- specs/022-player-stat-analysis: the player page (contracts/api.md C1) ---
+// Mirrors PlayerStatsPage and its nested Java records field for field. Jackson
+// serialises EnumMap keys as the enum names and OffsetDateTime/LocalDate as ISO
+// strings. Shooting percentages are percent points (47.3, not 0.473). Every
+// number except Fantasy.fpPerGame (rounded to 2 dp) is a raw double: format it
+// where it is shown.
+
+export type PlayerStatsReason = 'NOT_CONFIGURED' | 'NOT_BASKETBALL' | 'NO_GAMES' | 'NO_PLAYER_GAMES'
+export type PlayerWindowKind = 'SEASON' | 'LAST_10' | 'LAST_5'
+/** Why a Rate has no value; exactly one of `value` / `reason` is non-null. */
+export type RateReason = 'NO_ATTEMPTS' | 'NO_MINUTES' | 'NO_TEAM_ROW'
+export type Rate = { value: number | null; reason: RateReason | null }
+export type PlayerShooting = { fgPct: Rate; tpPct: Rate; ftPct: Rate }
+export type PlayerCounting = {
+  pts: number
+  reb: number
+  oreb: number
+  dreb: number
+  ast: number
+  stl: number
+  blk: number
+  tov: number
+  pf: number
+  fgm: number
+  fga: number
+  tpm: number
+  tpa: number
+  ftm: number
+  fta: number
+}
+export type PlayerWindow = {
+  games: number
+  firstGameDate: string | null
+  lastGameDate: string | null
+  minutes: number
+  minutesPerGame: number
+  /** Null when the player has no games in the window. */
+  perGame: PlayerCounting | null
+  totals: PlayerCounting
+  /** Null when he has no minutes. */
+  per36: PlayerCounting | null
+  shooting: PlayerShooting
+  gameScorePerGame: number | null
+  plusMinusPerGame: number | null
+  smallSample: boolean
+}
+export type PlayerRanksReason = 'NOT_QUALIFIED' | 'NOT_QUALIFIED_STALE'
+export type PlayerRanks = {
+  leagueRank: number | null
+  positionRank: number | null
+  pointsRank: number | null
+  rankMove: number | null
+  groupSize: number | null
+  positionGroupSize: number | null
+  position: string | null
+  reason: PlayerRanksReason | null
+}
+export type PlayerBreakdownRow = {
+  /** The league's scoring key (pts, reb, to, dd, bonus_pt_40p ...). */
+  key: string
+  /** Negative for a category that costs points (turnovers). */
+  points: number
+  /** Null when the season total is not positive. */
+  share: number | null
+}
+export type PlayerFantasy = {
+  /** Null per window when he has no games in it. */
+  fpPerGame: Partial<Record<PlayerWindowKind, number | null>>
+  ranks: PlayerRanks
+  breakdown: PlayerBreakdownRow[]
+  seasonTotal: number
+}
+export type PlayerGameLogRow = {
+  gameId: string
+  date: string
+  week: number
+  /** The team he played for that night; null if unknown. */
+  team: string | null
+  opponent: string
+  isHome: boolean | null
+  minutes: number
+  line: PlayerCounting
+  plusMinus: number
+  gameScore: number
+  fantasyPoints: number
+}
+export type PlayerSeasonOption = { season: number; sleeperLeagueId: string; hasGames: boolean }
+export type OwnershipState = 'ROSTERED' | 'FREE_AGENT' | 'NOT_DRAFTED' | 'UNAVAILABLE'
+export type OwnershipAsOf =
+  | { kind: 'CURRENT'; fetchedAt: string; week: null }
+  | { kind: 'WEEK'; fetchedAt: null; week: number }
+export type PlayerOwnership = {
+  state: OwnershipState
+  /** ROSTERED only. */
+  rosterId: number | null
+  ownerName: string | null
+  avatarId: string | null
+  isMe: boolean
+  /** Null for NOT_DRAFTED and some UNAVAILABLE. */
+  asOf: OwnershipAsOf | null
+}
+export type PlayerStatsPlayer = {
+  sleeperPlayerId: string
+  /** Null when `known` is false: stored games but no player row. */
+  name: string | null
+  positions: string[]
+  team: string | null
+  known: boolean
+}
+export type PlayerStatsPage = {
+  sport: Sport
+  /** The season whose numbers are shown (can differ from the one asked for). */
+  season: number
+  /** Set (to the league's own season) only when `season` is a fallback. */
+  requestedSeason: number | null
+  available: boolean
+  reason: PlayerStatsReason | null
+  dataAsOf: string | null
+  seasons: PlayerSeasonOption[]
+  /** Present only when requestedSeason is: who owns him now, labelled apart from `ownership`. */
+  currentOwnership: PlayerOwnership | null
+  player: PlayerStatsPlayer
+  teamsThisSeason: string[]
+  teamGamesMissed: number
+  ownership: PlayerOwnership | null
+  windows: Partial<Record<PlayerWindowKind, PlayerWindow>>
+  fantasy: PlayerFantasy | null
+  gameLog: PlayerGameLogRow[]
+}
+export const getPlayerStats = (leagueId: string, playerId: string) =>
+  apiFetch(`/api/leagues/${leagueId}/players/${encodeURIComponent(playerId)}`).then(json<PlayerStatsPage>)
+
 export type MatchupSide = {
   rosterId: number
   teamName: string | null

@@ -140,6 +140,17 @@ the team to his last, minus the games he played for it. Sum across his teams.
   stay distinct.
 - Tested with a traded player and a mid-season signing.
 
+> **Amended after code review, 2026-10-08 (B1).** The rule above dropped every team game after
+> his last appearance, so a season-ending injury disappeared. Measured: Jimmy Butler, 2025, played
+> 38 of GSW's 82 games and read "missed 6", where the correct figure is 44. The amended rule:
+>
+> - Count the span as above.
+> - **For his last team only**, also add that team's games after his last appearance that have a
+>   game-level `ENTRY_WITHOUT_PLAY` absence row for him (a row whose team is another team is
+>   ignored; a row with a null team is accepted).
+> - A later team game with no absence row is **not** counted, because he may have been waived or
+>   traded. This uses only what Sleeper recorded, with no guess.
+
 ## League layer (per league-season)
 
 ### Qualification (R12)

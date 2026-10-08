@@ -179,7 +179,7 @@ export default function LeagueHome() {
         <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
       </div>
 
-      <SpotlightArea block={spotlight} weekly={weekly} />
+      <SpotlightArea id={id} block={spotlight} weekly={weekly} />
     </div>
   )
 }
@@ -187,7 +187,7 @@ export default function LeagueHome() {
 // --- blocks ------------------------------------------------------------------
 
 /** The spotlight's own error/loading handling: a failure or a 404 here never touches another block. */
-function SpotlightArea({ block, weekly }: { block: Block<PlayerSpotlightData>; weekly: Block<WeeklyReport> }) {
+function SpotlightArea({ id, block, weekly }: { id: string; block: Block<PlayerSpotlightData>; weekly: Block<WeeklyReport> }) {
   if (block.status === 'idle') return null
   if (block.status === 'loading') {
     return (
@@ -205,7 +205,7 @@ function SpotlightArea({ block, weekly }: { block: Block<PlayerSpotlightData>; w
     )
   }
   if (!block.data.applies) return null
-  return <PlayerSpotlight spotlight={block.data} weekly={weekly} />
+  return <PlayerSpotlight sleeperLeagueId={id} spotlight={block.data} weekly={weekly} />
 }
 
 function DraftBlock({ draft }: { draft: DraftSummary }) {

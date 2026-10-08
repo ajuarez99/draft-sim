@@ -161,6 +161,55 @@ class SeasonBoxCacheTest {
     }
 
     @Test
+    void overlappingRefreshMarksAreCountedSoOneEndingKeepsTheSeasonRefreshing() {
+        Fake f = new Fake();
+        SeasonBoxCache c = new SeasonBoxCache(f);
+        SeasonBoxCache.Season a = c.get(Sport.NBA, 2025);
+        c.markRefreshing(Sport.NBA, 2025, true);
+        c.markRefreshing(Sport.NBA, 2025, true);
+        c.markRefreshing(Sport.NBA, 2025, false);
+        f.token.set(new SeasonToken(9, T0.plusDays(1)));
+        assertSame(a, c.get(Sport.NBA, 2025), "one mark is still outstanding");
+        assertEquals(1, f.loads.get());
+        c.markRefreshing(Sport.NBA, 2025, false);
+        assertNotSame(a, c.get(Sport.NBA, 2025), "both ended: the token is honoured");
+        assertEquals(2, f.loads.get());
+    }
+
+    @Test
+    void anExtraClearNeverGoesBelowZero() {
+        Fake f = new Fake();
+        SeasonBoxCache c = new SeasonBoxCache(f);
+        c.markRefreshing(Sport.NBA, 2025, false);       // nothing to clear
+        c.markRefreshing(Sport.NBA, 2025, true);
+        SeasonBoxCache.Season a = c.get(Sport.NBA, 2025);
+        f.token.set(new SeasonToken(9, T0.plusDays(1)));
+        assertSame(a, c.get(Sport.NBA, 2025), "the later mark counts, the stray clear did not go negative");
+    }
+
+    @Test
+    void aGetThatJoinsALoadStartedBeforeAnInvalidateReloadsOnceInsteadOfReturningItsRows() throws Exception {
+        Fake f = new Fake();
+        f.gate = new CountDownLatch(1);
+        f.entered = new CountDownLatch(1);
+        SeasonBoxCache c = new SeasonBoxCache(f);
+        try (ExecutorService ex = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<SeasonBoxCache.Season> first = ex.submit(() -> c.get(Sport.NBA, 2025));
+            assertTrue(f.entered.await(10, TimeUnit.SECONDS), "the first load is running");
+            c.invalidate(Sport.NBA, 2025);
+            Future<SeasonBoxCache.Season> second = ex.submit(() -> c.get(Sport.NBA, 2025));
+            Thread.sleep(150);                      // the second joins the running (pre-invalidate) load
+            f.gate.countDown();
+            SeasonBoxCache.Season preInvalidate = first.get(10, TimeUnit.SECONDS);
+            SeasonBoxCache.Season fresh = second.get(10, TimeUnit.SECONDS);
+            assertNotSame(preInvalidate, fresh, "the joiner did not take the pre-invalidate rows");
+        }
+        assertEquals(2, f.loads.get(), "one load for the first caller, one retry for the joiner");
+        c.get(Sport.NBA, 2025);
+        assertEquals(2, f.loads.get(), "the retry's entry is current");
+    }
+
+    @Test
     void twoConcurrentColdGetsLoadOnce() throws Exception {
         Fake f = new Fake();
         f.gate = new CountDownLatch(1);

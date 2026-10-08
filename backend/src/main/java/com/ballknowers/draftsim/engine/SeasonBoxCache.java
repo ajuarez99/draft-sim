@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -75,7 +76,8 @@ public class SeasonBoxCache {
     private final Source source;
     private final ConcurrentHashMap<Key, Stored> entries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Key, AtomicLong> generations = new ConcurrentHashMap<>();
-    private final Set<Key> refreshing = ConcurrentHashMap.newKeySet();
+    /** Overlapping refreshes of one season each hold a count; "refreshing" is a count above 0. */
+    private final ConcurrentHashMap<Key, AtomicInteger> refreshing = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Key, CompletableFuture<Stored>> inFlight = new ConcurrentHashMap<>();
 
     @Autowired
@@ -111,7 +113,7 @@ public class SeasonBoxCache {
         long gen = generation(key).get();
         Stored have = entries.get(key);
         if (have != null && have.generation() == gen) {
-            if (refreshing.contains(key)) return have.season();     // a changed token is the refresh's own doing
+            if (isRefreshing(key)) return have.season();     // a changed token is the refresh's own doing
             if (Objects.equals(have.season().token(), source.token(sport, season))) return have.season();
         }
         return reload(key);
@@ -122,11 +124,24 @@ public class SeasonBoxCache {
         generation(new Key(sport, season)).incrementAndGet();
     }
 
-    /** While {@code true}, a changed token does not trigger a reload of an existing entry. */
+    /**
+     * While any mark is outstanding, a changed token does not trigger a reload of an existing entry.
+     * Marks are counted: each {@code true} must be paired with one {@code false}, so two overlapping
+     * refreshes of a season keep it "refreshing" until both end.
+     */
     public void markRefreshing(Sport sport, int season, boolean refreshing) {
         Key key = new Key(sport, season);
-        if (refreshing) this.refreshing.add(key);
-        else this.refreshing.remove(key);
+        if (refreshing) {
+            this.refreshing.computeIfAbsent(key, k -> new AtomicInteger()).incrementAndGet();
+        } else {
+            AtomicInteger count = this.refreshing.get(key);
+            if (count != null) count.updateAndGet(n -> Math.max(0, n - 1));     // never below 0
+        }
+    }
+
+    private boolean isRefreshing(Key key) {
+        AtomicInteger count = refreshing.get(key);
+        return count != null && count.get() > 0;
     }
 
     private AtomicLong generation(Key key) {
@@ -134,9 +149,22 @@ public class SeasonBoxCache {
     }
 
     private Season reload(Key key) {
+        return loadOrJoin(key, true).season();
+    }
+
+    /**
+     * Loads the season, or joins the load already running. A joined load that started before an
+     * {@link #invalidate} carries an older generation and would hand back pre-invalidate rows, so a
+     * join that finds its result stale starts a fresh load, once ({@code mayRetry}).
+     */
+    private Stored loadOrJoin(Key key, boolean mayRetry) {
         CompletableFuture<Stored> mine = new CompletableFuture<>();
         CompletableFuture<Stored> running = inFlight.putIfAbsent(key, mine);
-        if (running != null) return join(running);
+        if (running != null) {
+            Stored joined = join(running);
+            if (mayRetry && joined.generation() < generation(key).get()) return loadOrJoin(key, false);
+            return joined;
+        }
         try {
             long gen = generation(key).get();       // before the load: an invalidate during it leaves this stale
             Stored loaded = new Stored(load(key), gen);
@@ -145,7 +173,7 @@ public class SeasonBoxCache {
             // instead of joining this finished one (SingleFlight does the same).
             inFlight.remove(key, mine);
             mine.complete(loaded);
-            return loaded.season();
+            return loaded;
         } catch (Throwable t) {
             inFlight.remove(key, mine);
             mine.completeExceptionally(t);
@@ -153,9 +181,9 @@ public class SeasonBoxCache {
         }
     }
 
-    private static Season join(CompletableFuture<Stored> f) {
+    private static Stored join(CompletableFuture<Stored> f) {
         try {
-            return f.join().season();
+            return f.join();
         } catch (CompletionException e) {
             if (e.getCause() instanceof RuntimeException re) throw re;
             if (e.getCause() instanceof Error err) throw err;

@@ -1,8 +1,12 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PlayerSpotlight as PlayerSpotlightData, PlayerSpotlightApplicable, WeeklyReport } from '../api'
 import type { Block } from '../useBlock'
 import PlayerSpotlight, { SpotlightLists } from './PlayerSpotlight'
+
+// NBA rows link to the player page, so every render needs a router.
+const render = (ui: React.ReactElement) => rtlRender(ui, { wrapper: MemoryRouter })
 
 const weekly: Block<WeeklyReport> = { status: 'loading' }
 
@@ -22,7 +26,7 @@ function applicable(over: Partial<PlayerSpotlightApplicable> = {}): PlayerSpotli
   }
 }
 
-const show = (s: PlayerSpotlightData) => render(<PlayerSpotlight spotlight={s} weekly={weekly} />)
+const show = (s: PlayerSpotlightData) => render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={s} weekly={weekly} />)
 
 describe('PlayerSpotlight foundation', () => {
   it('renders nothing when the spotlight does not apply', () => {
@@ -92,6 +96,19 @@ describe('Top players of the night', () => {
     expect(screen.getAllByText('Yours')).toHaveLength(1)
   })
 
+  // specs/022 T033: the name opens the player page on basketball and stays plain on football.
+  it('links an NBA player name to the player page, in the league the spotlight is for', () => {
+    show(nba({ topOfNight: { entries: [perf()], unavailable: null } }))
+    expect(screen.getByRole('link', { name: 'AJ Dybantsa' })).toHaveAttribute('href', '/leagues/L1/players/1')
+  })
+
+  it('leaves an NFL player name unlinked', () => {
+    const w = { status: 'ok', data: { week: 3, topPerformers: [{ playerId: 'p1', playerName: 'Player 1', position: 'RB', teamName: 'T', points: 9, team: null, opponent: null, isAway: null, avatarId: null }] } } as unknown as Block<WeeklyReport>
+    render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable()} weekly={w} />)
+    expect(screen.getByText('Player 1')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Player 1' })).toBeNull()
+  })
+
   it('never renders a bare empty list', () => {
     show(nba({ topOfNight: { entries: [], unavailable: 'SECTION_FAILED' } }))
     expect(screen.getByText("Couldn't load this section.")).toBeInTheDocument()
@@ -116,7 +133,7 @@ describe('Top players of the week (football)', () => {
 
   it('renders the weekly report performers in order with their points', () => {
     const w = { status: 'ok', data: { week: 3, topPerformers: [performer(1, 31.2), performer(2, 28), performer(3, 25.55)] } } as unknown as Block<WeeklyReport>
-    render(<PlayerSpotlight spotlight={applicable()} weekly={w} />)
+    render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable()} weekly={w} />)
     expect(screen.getByRole('heading', { name: 'Top players · Week 3' })).toBeInTheDocument()
     const names = screen.getAllByText(/^Player \d$/).map((n) => n.textContent)
     expect(names).toEqual(['Player 1', 'Player 2', 'Player 3'])
@@ -129,7 +146,7 @@ describe('Top players of the week (football)', () => {
 
   it('labels the week from the weekly report data it renders, not the spotlight week', () => {
     const w = { status: 'ok', data: { week: 2, topPerformers: [performer(1, 31.2)] } } as unknown as Block<WeeklyReport>
-    render(<PlayerSpotlight spotlight={applicable({ period: { kind: 'WEEK', week: 3, weekFinal: true } })} weekly={w} />)
+    render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable({ period: { kind: 'WEEK', week: 3, weekFinal: true } })} weekly={w} />)
     expect(screen.getByRole('heading', { name: 'Top players · Week 2' })).toBeInTheDocument()
   })
 
@@ -140,7 +157,7 @@ describe('Top players of the week (football)', () => {
   })
 
   it('says so when the weekly report failed', () => {
-    render(<PlayerSpotlight spotlight={applicable()} weekly={{ status: 'error', notFound: false }} />)
+    render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable()} weekly={{ status: 'error', notFound: false }} />)
     expect(screen.getByText("Couldn't load this week's top players.")).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Trending · last 24h' })).toBeInTheDocument()
   })
@@ -257,6 +274,7 @@ describe('Layout: rows, toggle, tabs', () => {
     const t = { rank: 1, playerId: 't1', name: 'Trend One', position: 'WR', team: 'DAL', addCount: 5, ownership: { rostered: false }, outcome: 'PLAYED', points: 3 }
     render(
       <PlayerSpotlight
+        sleeperLeagueId="L1"
         weekly={w}
         spotlight={applicable({
           trending: { entries: [t], lookbackHours: 24, fetchedAt: null, stale: false, omittedUnknownPlayers: 0, unavailable: null } as never,
@@ -326,8 +344,8 @@ describe('SpotlightLists', () => {
     const s = applicable()
     const { container } = render(
       <>
-        <SpotlightLists spotlight={s} weekly={weekly} idPrefix="a" />
-        <SpotlightLists spotlight={s} weekly={weekly} idPrefix="b" />
+        <SpotlightLists sleeperLeagueId="L1" spotlight={s} weekly={weekly} idPrefix="a" />
+        <SpotlightLists sleeperLeagueId="L1" spotlight={s} weekly={weekly} idPrefix="b" />
       </>,
     )
     const ids = Array.from(container.querySelectorAll('[id]')).map((el) => el.id)
