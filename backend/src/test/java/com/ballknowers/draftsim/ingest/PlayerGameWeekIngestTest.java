@@ -119,7 +119,8 @@ class PlayerGameWeekIngestTest {
         }
 
         PlayerGameIngestService service() {
-            return new PlayerGameIngestService(stats, leagues, weekPoints, games, absences, weekStats, registry, scheduleRepository);
+            return new PlayerGameIngestService(stats, leagues, weekPoints, games, absences, weekStats, registry, scheduleRepository,
+                    new com.ballknowers.draftsim.engine.SeasonBoxCache(games));
         }
 
         List<PlayerAbsenceRepository.Row> absenceUpserts() {

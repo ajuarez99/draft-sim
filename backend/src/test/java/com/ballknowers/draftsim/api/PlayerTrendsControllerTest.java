@@ -80,7 +80,7 @@ class PlayerTrendsControllerTest {
     }
 
     private PlayerTrendsService service(PlayerTrendsProperties props) {
-        return new PlayerTrendsService(props, playerGames, absences, players, leagues, grid, rosterSeasons,
+        return new PlayerTrendsService(props, new com.ballknowers.draftsim.engine.SeasonBoxCache(playerGames), absences, players, leagues, grid, rosterSeasons,
                 members, managers, weekPoints, rules);
     }
 

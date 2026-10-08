@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.SeasonBoxCache;
 import com.ballknowers.draftsim.refresh.RefreshProperties;
 import com.ballknowers.draftsim.refresh.SingleFlight;
 import com.ballknowers.draftsim.sport.SportRules;
@@ -71,6 +72,7 @@ public class PlayerGameIngestService {
     private final SportWeekStatsRepository weekStats;
     private final SportRulesRegistry rulesRegistry;
     private final SportScheduleRepository scheduleRepository;
+    private final SeasonBoxCache boxCache;
 
     /**
      * Single-flight keyed {@code sport:season} (specs/009 research R4, T013/T020):
@@ -85,7 +87,7 @@ public class PlayerGameIngestService {
                                    RosterWeekPointsRepository weekPoints, PlayerGameRepository games,
                                    PlayerAbsenceRepository absences, SportWeekStatsRepository weekStats,
                                    SportRulesRegistry rulesRegistry,
-                                   SportScheduleRepository scheduleRepository) {
+                                   SportScheduleRepository scheduleRepository, SeasonBoxCache boxCache) {
         this.stats = stats;
         this.leagues = leagues;
         this.weekPoints = weekPoints;
@@ -94,6 +96,7 @@ public class PlayerGameIngestService {
         this.weekStats = weekStats;
         this.rulesRegistry = rulesRegistry;
         this.scheduleRepository = scheduleRepository;
+        this.boxCache = boxCache;
     }
 
     /**
@@ -140,11 +143,18 @@ public class PlayerGameIngestService {
      */
     public Result refreshSportSeason(Sport sport, int season, Instant now) {
         String key = sport.code() + ":" + season;
+        // Every refresh re-stamps fetched_at on each non-final row, so the season cache must not chase its
+        // validity token mid-run (markRefreshing); it is invalidated when the run ends, success or not
+        // (specs/022 F8).
+        boxCache.markRefreshing(sport, season, true);
         try {
             return inFlight.run(key, () -> doRefresh(sport, season, now)).join();
         } catch (CompletionException e) {
             if (e.getCause() instanceof RuntimeException re) throw re;
             throw e;
+        } finally {
+            boxCache.invalidate(sport, season);
+            boxCache.markRefreshing(sport, season, false);
         }
     }
 

@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.engine;
 
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -23,6 +24,9 @@ import java.util.Map;
  * in 10 of 10 weeks for the 2024 league and 18 of 18 across two players for
  * 2025.
  *
+ * <p>The per-category breakdown ({@link #contributions}) and the total ({@link #score}) share this one
+ * rule: the total is the sum of the breakdown, so the two cannot disagree.
+ *
  * <p>Sleeper's precomputed {@code pts_std} is deliberately never read: it is
  * <i>standard</i> scoring and matches neither league. For one week of Jokić it
  * gives 56.5/32.0/43.0/44.5 where the league scores 58.5/34.0/44.0/45.5.
@@ -36,21 +40,37 @@ public class GameScoringService {
      * @return the game's points under that scoring
      */
     public double score(Map<String, ? extends Number> scoring, Map<String, ?> stats) {
-        if (scoring == null || stats == null) return 0.0;
-
+        // A plain left-to-right sum in scoring-key order, on purpose: DoubleStream.sum() uses
+        // compensated summation and can differ from this in the last ulp, which would move a total
+        // across a rounding boundary (spec 022 N3).
         double total = 0.0;
-        for (Map.Entry<String, ? extends Number> e : scoring.entrySet()) {
-            // Iterating the SCORING keys, not the stat keys, is the direction that
-            // matters. A stat the league does not score must contribute nothing,
-            // and a category the league scores but the game did not produce is a
-            // zero rather than a missing entry -- which is also why a box score
-            // gaining a new field upstream cannot silently change a total.
-            Object raw = stats.get(e.getKey());
-            if (!(raw instanceof Number n)) continue;
-            total += e.getValue().doubleValue() * n.doubleValue();
+        for (double v : contributions(scoring, stats).values()) {
+            total += v;
         }
         // Half-point categories make exact ties common and floating error visible;
         // two decimals is well inside what any fantasy scoring expresses.
         return Math.round(total * 100.0) / 100.0;
+    }
+
+    /**
+     * Points each scored category contributed to one game (spec 022 I1).
+     *
+     * @return category to {@code weight * stat}, in scoring-key order; empty when either input is null
+     */
+    public Map<String, Double> contributions(Map<String, ? extends Number> scoring, Map<String, ?> stats) {
+        Map<String, Double> out = new LinkedHashMap<>();
+        if (scoring == null || stats == null) return out;
+
+        for (Map.Entry<String, ? extends Number> e : scoring.entrySet()) {
+            // Iterating the SCORING keys, not the stat keys, is the direction that
+            // matters. A stat the league does not score must contribute nothing,
+            // and a category the league scores but the game did not produce gets
+            // no entry, so it adds nothing to the total -- which is also why a box score
+            // gaining a new field upstream cannot silently change a total.
+            Object raw = stats.get(e.getKey());
+            if (!(raw instanceof Number n)) continue;
+            out.put(e.getKey(), e.getValue().doubleValue() * n.doubleValue());
+        }
+        return out;
     }
 }

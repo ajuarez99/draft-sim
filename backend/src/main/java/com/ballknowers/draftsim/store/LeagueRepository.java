@@ -325,6 +325,19 @@ public class LeagueRepository {
                 .optional();
     }
 
+    /**
+     * The league that names {@code sleeperId} as its {@code previous_league_id} -- the next season
+     * forward in the chain, the reverse of {@link #chainBySleeperId}'s step. Empty at the chain head.
+     * More than one match should not happen; if it does, the highest season (then highest id) wins,
+     * deterministically.
+     */
+    public Optional<LeagueRow> successorOf(String sleeperId) {
+        return db.sql("select " + ROW_COLUMNS + " from league where previous_league_id = ? order by season desc, id desc limit 1")
+                .param(sleeperId)
+                .query((rs, i) -> mapRow(rs))
+                .optional();
+    }
+
     public List<LeagueRow> chainBySleeperId(String sleeperId) {
         List<LeagueRow> chain = new ArrayList<>();
         String id = sleeperId;

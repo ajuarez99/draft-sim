@@ -40,7 +40,7 @@ Every path is written out in full. The backend main tree is
 ## Phase 1: Setup
 
 - [x] T001 Run the adversarial plan review, a cold read with re-measurement. Output in specs/022-player-stat-analysis/plan-review.md. **Done 2026-10-07**: 13 findings and 17 notes, all accepted; the dispositions are in specs/022-player-stat-analysis/plan.md.
-- [ ] T002 [P] Add a `draftsim.player-stats` block to config/weights.yml with these keys, each commented as ARBITRARY and hand-set (research R12):
+- [x] T002 [P] Add a `draftsim.player-stats` block to config/weights.yml with these keys, each commented as ARBITRARY and hand-set (research R12):
   - `rank-min-games-share: 0.5`
   - `rank-min-minutes-per-game: 15`
   - `small-sample-minutes: 100`
@@ -50,13 +50,13 @@ Every path is written out in full. The backend main tree is
   - `standout-ts-min-attempts: 10`
   - `standout-minutes-jump: 10`
   - `leaders-size: 5`
-- [ ] T003 [P] Create backend/src/main/java/com/ballknowers/draftsim/config/PlayerStatsProperties.java on PlayerTrendsProperties' pattern:
+- [x] T003 [P] Create backend/src/main/java/com/ballknowers/draftsim/config/PlayerStatsProperties.java on PlayerTrendsProperties' pattern:
   - It is a `@ConfigurationProperties(prefix = "draftsim.player-stats")` record with nullable boxed fields.
   - A missing block binds to nulls, and startup still succeeds.
   - A value that is present must be positive. `rank-min-games-share` must be in (0, 1].
   - A bad value fails startup.
   - Register it in backend/src/main/java/com/ballknowers/draftsim/DraftSimApplication.java's `@EnableConfigurationProperties`.
-- [ ] T004 Add `playerStatsLoaded` to backend/src/main/java/com/ballknowers/draftsim/api/HealthController.java. It is true when the block is present. Add a case for it in backend/src/test/java/com/ballknowers/draftsim/api/HealthControllerTest.java.
+- [x] T004 Add `playerStatsLoaded` to backend/src/main/java/com/ballknowers/draftsim/api/HealthController.java. It is true when the block is present. Add a case for it in backend/src/test/java/com/ballknowers/draftsim/api/HealthControllerTest.java.
 
 ---
 
@@ -68,22 +68,22 @@ change: V1 compares JSON byte for byte. Its test helpers may change only for `Se
 
 **⚠️ CRITICAL**: no user-story work starts until T017 passes.
 
-- [ ] T005 Capture the baselines before any refactor (N13):
+- [x] T005 Capture the baselines before any refactor (N13):
   - Save the JSON of `GET /api/leagues/{nba2026}/player-trends` and `GET /api/leagues/{nba2025}/player-trends`, each with a member `X-Sleeper-User`.
   - Delete `rostersFetchedAt`, `currentWeek` and `staleReferenceDate`, sort with `jq -S`, and save the results to specs/022-player-stat-analysis/baseline/player-trends-2026.json and specs/022-player-stat-analysis/baseline/player-trends-2025.json.
   - Record the backend suite's pass and skip counts in specs/022-player-stat-analysis/verification.md. The skip count must be 0 (memory "Backend suite skips ITs silently").
-- [ ] T006 [P] Write the I1 tests in backend/src/test/java/com/ballknowers/draftsim/engine/GameScoringServiceTest.java:
+- [x] T006 [P] Write the I1 tests in backend/src/test/java/com/ballknowers/draftsim/engine/GameScoringServiceTest.java:
   - `contributions(scoring, stats)` returns one entry per scoring key whose stat is a Number, valued `weight × stat`.
   - `score` equals the rounded **naive left-to-right sum in scoring-key order** (N3).
   - The existing cases still pass.
 
   Also add backend/src/test/java/com/ballknowers/draftsim/engine/GameScoringParityIT.java. On every stored NBA 2025 **and NFL 2025** game (N3), the new `score` must equal a copy of the pre-change algorithm kept inside the test.
-- [ ] T007 Add `public Map<String, Double> contributions(Map<String, ? extends Number> scoring, Map<String, ?> stats)` to backend/src/main/java/com/ballknowers/draftsim/engine/GameScoringService.java.
+- [x] T007 Add `public Map<String, Double> contributions(Map<String, ? extends Number> scoring, Map<String, ?> stats)` to backend/src/main/java/com/ballknowers/draftsim/engine/GameScoringService.java.
   - It iterates the scoring keys and skips non-Number stats, exactly as `score` does.
   - It returns a `LinkedHashMap` in scoring-key order.
   - Rewrite `score` as `round2` of a plain `for` loop sum over that map. Don't use `DoubleStream.sum()` (N3).
   - Keep the class javadoc's one-implementation note (research R4).
-- [ ] T008 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/NbaGameLinesTest.java over synthetic rows, covering data-model "NbaGameLines":
+- [x] T008 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/NbaGameLinesTest.java over synthetic rows, covering data-model "NbaGameLines":
   - `TEAM_` rows are never lines (I5).
   - The bare `TEAM_` row, and any game whose opponent isn't a season team code (All-Star), are dropped.
   - A game with `sp <= 0` is not a game.
@@ -92,22 +92,22 @@ change: V1 compares JSON byte for byte. Its test helpers may change only for `Se
   - A traded player's lines carry each game's own team.
   - `isHome` is `!isAway`, or null when `isAway` is null (F7).
   - The returned lists and maps throw on mutation (F8).
-- [ ] T009 Add `Boolean isAway` (from `player_game.is_away`) to `PlayerGameRepository.SeasonGame` and its `seasonPlayerGames` query in backend/src/main/java/com/ballknowers/draftsim/store/PlayerGameRepository.java (F7). Then create backend/src/main/java/com/ballknowers/draftsim/engine/NbaGameLines.java, a pure class:
+- [x] T009 Add `Boolean isAway` (from `player_game.is_away`) to `PlayerGameRepository.SeasonGame` and its `seasonPlayerGames` query in backend/src/main/java/com/ballknowers/draftsim/store/PlayerGameRepository.java (F7). Then create backend/src/main/java/com/ballknowers/draftsim/engine/NbaGameLines.java, a pure class:
   - Move the join out of `PlayerTrendsService.prepare` (backend/src/main/java/com/ballknowers/draftsim/engine/PlayerTrendsService.java:414-470) with its behaviour unchanged.
   - `record Line(String gameId, LocalDate date, int week, String team, String opponent, Boolean isHome, double minutes, Map<String,Object> stats, TeamGame teamRow, TeamGame oppRow)`. `isHome` is nullable, and so are `teamRow` and `oppRow`.
   - It exposes unmodifiable `Map<String, List<Line>> byPlayer` (oldest first), `Map<String, List<TeamGame>> teamGames` and `Set<String> teamCodes`.
   - `PlayerTrendsService.prepare` calls it, sorting a copy if it needs another order.
   - Update the `SeasonGame` construction in backend/src/test/java/com/ballknowers/draftsim/engine/PlayerTrendsServiceTest.java's helpers for the new field. Change nothing else in that file.
-- [ ] T010 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsUsageTest.java: direct `AdvancedStats.usage` tests on hand-computed pooled values. Trends' own usage assertions stay where they are, in PlayerTrendsServiceTest, as its guard (N12).
-- [ ] T011 Create backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java, a pure class.
+- [x] T010 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsUsageTest.java: direct `AdvancedStats.usage` tests on hand-computed pooled values. Trends' own usage assertions stay where they are, in PlayerTrendsServiceTest, as its guard (N12).
+- [x] T011 Create backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java, a pure class.
   - Move `PlayerTrendsService.usage` (`:515-526`) into it as `static Rate usage(List<Line>)`.
   - `Rate` is a record `{Double value, String reason}`. `reason` is one of `NO_ATTEMPTS`, `NO_MINUTES` or `NO_TEAM_ROW`, and exactly one of the two fields is non-null (I2).
   - Trends unwraps `.value()`, so its wire shape is unchanged.
-- [ ] T012 Add `public record SeasonToken(long count, OffsetDateTime maxFetchedAt)` and `seasonToken(Sport, int)` to backend/src/main/java/com/ballknowers/draftsim/store/PlayerGameRepository.java.
+- [x] T012 Add `public record SeasonToken(long count, OffsetDateTime maxFetchedAt)` and `seasonToken(Sport, int)` to backend/src/main/java/com/ballknowers/draftsim/store/PlayerGameRepository.java.
   - The query is `select count(*), max(fetched_at) from player_game where sport = ? and season = ?`.
   - Use `.single()`, never `.stream()` (the connection-leak note at `:261`).
   - Add a round-trip case to backend/src/test/java/com/ballknowers/draftsim/store/PlayerGameRepositoryIT.java.
-- [ ] T013 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/SeasonBoxCacheTest.java against a fake loader:
+- [x] T013 [P] Write backend/src/test/java/com/ballknowers/draftsim/engine/SeasonBoxCacheTest.java against a fake loader:
   - The same token causes no reload, and a changed token reloads.
   - The token is read before the rows: a write between the token read and the row read still reloads on the next `get` (F8).
   - `invalidate(sport, season)` forces a reload.
@@ -116,23 +116,23 @@ change: V1 compares JSON byte for byte. Its test helpers may change only for `Se
   - Every list and map in an entry throws on mutation (F8).
   - The compact `Map` view returns the source value as a `double` for every key, and null for absent keys (N2). A missing key is never 0.
   - Raw `SeasonGame` and `TeamGame` lists are available alongside the lines (F7).
-- [ ] T014 Create backend/src/main/java/com/ballknowers/draftsim/engine/SeasonBoxCache.java, a Spring `@Service` (research R6 as amended).
+- [x] T014 Create backend/src/main/java/com/ballknowers/draftsim/engine/SeasonBoxCache.java, a Spring `@Service` (research R6 as amended).
   - **What it stores**: the raw rows (`SeasonGame` with `isAway`, plus `TeamGame`), with stats as interned key indexes and `double[]` behind a read-only `AbstractMap` view. It also stores the `NbaGameLines` result over them.
   - **`get(Sport, int season)`**: reads `seasonToken` **before** the rows.
   - **Concurrency**: reloads go through a lock-free single flight on backend/src/main/java/com/ballknowers/draftsim/refresh/SingleFlight.java's pattern, as its own instance. Never use `synchronized`.
   - **Invalidation**: add `invalidate(sport, season)` and `markRefreshing(sport, season, boolean)`. Call both from `refreshSportSeason` in backend/src/main/java/com/ballknowers/draftsim/ingest/PlayerGameIngestService.java, at its start and end, with `finally`.
   - **Trends**: switch `PlayerTrendsService.read` to the cache. `oneGameShare` keeps receiving the raw lists, **including the All-Star row**, unchanged (F7). Excluding that row is a follow-up, and it goes in T068's handoff notes.
-- [ ] T015 Extend backend/src/main/java/com/ballknowers/draftsim/engine/LeagueSeasonResolver.java with `enum Rule { PLAYED_WEEKS, STORED_GAMES }` and `resolve(String sleeperLeagueId, Rule rule)`.
+- [x] T015 Extend backend/src/main/java/com/ballknowers/draftsim/engine/LeagueSeasonResolver.java with `enum Rule { PLAYED_WEEKS, STORED_GAMES }` and `resolve(String sleeperLeagueId, Rule rule)`.
   - `STORED_GAMES` walks back to the newest chain season whose `SeasonBoxCache` token count is above 0 (shared token, N17).
   - The existing `resolve(String)` delegates to `PLAYED_WEEKS`.
   - The rule is a required argument and is never defaulted (memory "Optional params that encode rules").
   - Add tests for both rules in a **new** test file, backend/src/test/java/com/ballknowers/draftsim/engine/LeagueSeasonResolverTest.java (none exists today).
-- [ ] T016 Add `Optional<LeagueRow> successorOf(String sleeperId)` (`where previous_league_id = ?`) to backend/src/main/java/com/ballknowers/draftsim/store/LeagueRepository.java, with a **new** IT, backend/src/test/java/com/ballknowers/draftsim/store/LeagueRepositorySuccessorIT.java, because none exists for that repository today (F4). Then add `LeagueSeasonResolver.seasons(String sleeperLeagueId)`:
+- [x] T016 Add `Optional<LeagueRow> successorOf(String sleeperId)` (`where previous_league_id = ?`) to backend/src/main/java/com/ballknowers/draftsim/store/LeagueRepository.java, with a **new** IT, backend/src/test/java/com/ballknowers/draftsim/store/LeagueRepositorySuccessorIT.java, because none exists for that repository today (F4). Then add `LeagueSeasonResolver.seasons(String sleeperLeagueId)`:
   - It walks forward to the chain head with `successorOf`, then back with `chainBySleeperId`.
   - It returns `[{season, sleeperLeagueId, hasGames}]`, newest first.
 
   Test: from the 2024 id, it returns 2026, 2025 and 2024.
-- [ ] T017 Run the foundation gate (quickstart V1, V2):
+- [x] T017 Run the foundation gate (quickstart V1, V2):
   - `cd backend && ./gradlew test` with 0 skipped.
   - Both Trends baselines are byte-identical after stripping the time-varying fields.
   - GameScoringParityIT shows 0 mismatches on NBA and NFL 2025.

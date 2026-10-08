@@ -194,3 +194,26 @@ draftsim:
     list-size: 10
     streaming-size: 20
     one-game-share: 0.9
+
+  # Player stat analysis (spec 022). ARBITRARY: every number here is hand-set, not fitted
+  # (specs/022-player-stat-analysis research R12). rank-min-games-share: share of the season's team
+  # games a player must have played to be ranked. rank-min-minutes-per-game: minutes per game floor
+  # for ranking. small-sample-minutes: total minutes below which a shooting/usage rate is flagged as
+  # a small sample. recency-days: a player whose last game is more than this many days before the
+  # season's latest game is stale. standout-min-prior-games: prior games needed before a game can
+  # stand out. standout-ts-delta: true-shooting percentage points above OR below the player's season
+  # TS% before that night.
+  # standout-ts-min-attempts: true-shooting attempts (FGA + 0.44 FTA) a game needs for its TS% to count. standout-minutes-jump:
+  # minutes above the player's last-5 mean before that night (free agents only). leaders-size: rows
+  # per stat-leaders category. Delete this block and
+  # the feature reports NOT_CONFIGURED; /api/health reports playerStatsLoaded.
+  player-stats:
+    rank-min-games-share: 0.5
+    rank-min-minutes-per-game: 15
+    small-sample-minutes: 100
+    recency-days: 14
+    standout-min-prior-games: 5
+    standout-ts-delta: 15
+    standout-ts-min-attempts: 10
+    standout-minutes-jump: 10
+    leaders-size: 5
