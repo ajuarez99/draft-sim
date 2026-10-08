@@ -104,7 +104,9 @@ describe('the destination table', () => {
     expect(destinationFromPath('/drafts/D7/live')).toBe('live')
   })
 
-  it('treats the dev-only verify harness as inside the league', () => {
+  // The path is the old dev-only verify harness's (removed in spec 021). It still
+  // stands in for any deeper path under a league page, so the case stays.
+  it('treats a deeper path under a league page as inside the league', () => {
     expect(destinationFromPath('/leagues/L7/power/verify')).toBe('power')
     expect(leagueIdFromPath('/leagues/L7/power/verify')).toEqual({ idKind: 'league', id: 'L7' })
   })

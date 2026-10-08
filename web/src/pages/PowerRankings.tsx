@@ -384,8 +384,8 @@ export type BallotBlockState = 'loading' | 'signed-out' | 'not-member' | 'voting
  *  same as "haven't loaded yet" -- 2d's "Couldn't load" state needs the two
  *  told apart). `signedIn` is `!!useUser()`; the global route table already
  *  gates every page behind sign-in (App.tsx), so 'signed-out' cannot actually
- *  fire from this page in production today -- it's kept for the verify
- *  harness and for if that gate ever moves. */
+ *  fire from this page in production today -- it's kept for if that gate
+ *  ever moves, and PowerRankings.builders.test.ts pins it. */
 export function ballotBlockState(signedIn: boolean, ballot: BallotState | null, ballotFailed: boolean): BallotBlockState {
   if (!signedIn) return 'signed-out'
   if (ballotFailed) return 'load-error'
