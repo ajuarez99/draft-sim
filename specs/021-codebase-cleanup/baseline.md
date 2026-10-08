@@ -250,3 +250,30 @@ happened after the parity diff, so it doesn't affect the 37/37.
   files, SeasonSuperlativesService ×2, RecapView, and 7 frontend comments. One
   pointer, `searchIndex.ts`'s `api.ts:426`, had **already been stale** before this
   split. It now cites the file and the comment's text instead of a line number.
+
+## T051: SeasonSuperlativesService split
+
+- 1,586 → **852 lines**, plus 5 package-private classes in `engine`:
+  `SuperlativeStandingBuilders` (231), `SuperlativeGameMath` (109),
+  `SuperlativeAbsenceMath` (279), `SuperlativeWaiverMath` (161) and
+  `SuperlativeConductMath` (91).
+- **It's a pure move** (line-multiset diff against `HEAD`): of 1,435 non-blank lines,
+  the only 8 not carried verbatim are the deliberate edits (the absence builder's
+  signature and its call site, plus 6 `private` → package-private). Everything added
+  is class wrappers, imports and **23 one-line forwarders**, kept because tests call
+  those methods as `SeasonSuperlativesService.x(...)`. The nested public types stayed
+  in the service, so no FQN changed.
+- `absenceSuperlative`, the one moved instance method, now takes its 4 repositories
+  explicitly. Compiling caught 2 mistakes before any commit:
+  - `forLeague` has a **local** `games` that shadows the field, so the call site now
+    passes `this.games`, `this.absences`, `this.gameScoring` and `this.leagues`;
+  - my first dependency scan looked only for `field.` and missed `gameScoring` being
+    passed as an argument.
+- **Live parity (the T050 oracle, amended):** the pre-split build `eb35636` on :8088
+  vs this one on :8087, same DB, `/superlatives` for all **9 leagues**: **9/9
+  identical**, 354 KB, all 13 kinds present. JOEL_EMBIID, WAIVER_WIRE_WARRIOR,
+  JABARI_SMITH_JR and MOST_BENCH_POINTS all produced real winners and full standings.
+  UNETHICAL ran its empty path live; its populated path is covered by 7 unedited
+  unit-test calls.
+- Backend 1386 tests, **0 skipped**, 0 failed (115 superlatives tests); the test tree
+  is untouched.

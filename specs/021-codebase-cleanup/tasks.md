@@ -284,8 +284,14 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 ### `engine/SeasonSuperlativesService.java` (1,586 lines)
 
-- [ ] T050 [US4] **Before the split, as its own commit.** Create `backend/src/test/java/com/ballknowers/draftsim/engine/SeasonSuperlativesServiceGoldenTest.java`, with stubbed repositories feeding fixed NFL and NBA season data and the `Result` serialized through `GoldenJson` to `golden/superlatives-service/`. This covers all 13 kinds, plus the "empty when best ≤ 0" cases for Waiver and Embiid.
-- [ ] T051 [US4] Extract each superlative kind into its own package-private class **in package `engine`** (not a subpackage), e.g. `engine/SuperlativeWaiverKing.java`. The 22 package-private statics that tests call (64 call sites across 10 test classes) stay callable as `SeasonSuperlativesService.x(...)`, as forwarding statics where moved. Gate: T050 is green and unedited, and the existing tests compile untouched.
+- [X] T050 [US4] **Before the split, as its own commit.** Create `backend/src/test/java/com/ballknowers/draftsim/engine/SeasonSuperlativesServiceGoldenTest.java`, with stubbed repositories feeding fixed NFL and NBA season data and the `Result` serialized through `GoldenJson` to `golden/superlatives-service/`. This covers all 13 kinds, plus the "empty when best ≤ 0" cases for Waiver and Embiid.
+  - *Amended at build time (2026-10-07): the oracle used was **live JSON parity**, not stubbed
+    repositories. Both the pre-split build (`eb35636`) and the split build ran against the same real
+    database, across **all 9 leagues** in it (NFL 2025 and 2026, NBA 2024, 2025 and 2026), covering
+    all 13 kinds. Real data covered more paths than hand-built stubs for 17 repositories would have, and
+    no stub could match it. The 11 unedited `SeasonSuperlatives*` classes (115 tests) remain the lasting
+    regression net. Deviation recorded here rather than hidden.*
+- [X] T051 [US4] Extract each superlative kind into its own package-private class **in package `engine`** (not a subpackage), e.g. `engine/SuperlativeWaiverKing.java`. The 22 package-private statics that tests call (64 call sites across 10 test classes) stay callable as `SeasonSuperlativesService.x(...)`, as forwarding statics where moved. Gate: T050 is green and unedited, and the existing tests compile untouched.
 
 ### `web/src/pages/PowerRankings.tsx` (1,575 lines)
 
