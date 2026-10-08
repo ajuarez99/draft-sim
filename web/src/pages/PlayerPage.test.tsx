@@ -1,9 +1,10 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerPage from './PlayerPage'
 import { LeagueDataVersionProvider } from '../leagueDataVersion'
 import type {
+  Pct,
   PlayerCounting,
   PlayerGameLogRow,
   PlayerOwnership,
@@ -37,6 +38,11 @@ function win(over: Partial<PlayerWindow> = {}): PlayerWindow {
     gameScorePerGame: 14.8,
     plusMinusPerGame: 2.4,
     smallSample: false,
+    advanced: {
+      ts: rate(66.4), efg: rate(66.4), ftr: rate(83.3), tpar: rate(0), usg: rate(13), minutesShare: rate(57.5),
+      astPct: rate(7.3), orbPct: rate(12), drbPct: rate(28), trbPct: rate(20), stlPct: rate(0.9), blkPct: rate(4.8),
+      tovPct: rate(18),
+    },
     ...over,
   }
 }
@@ -79,6 +85,7 @@ function page(over: Partial<PlayerStatsPage> = {}): PlayerStatsPage {
     teamGamesMissed: 0,
     ownership: owner(),
     windows: { SEASON: win(), LAST_10: win({ games: 10 }), LAST_5: win({ games: 5, smallSample: true }) },
+    percentiles: {},
     fantasy: {
       fpPerGame: { SEASON: 22.56, LAST_10: 24.1, LAST_5: 25 },
       ranks: { leagueRank: 40, positionRank: 12, pointsRank: 152, rankMove: 112, groupSize: 299, positionGroupSize: 60, position: 'C', reason: null },
@@ -91,6 +98,7 @@ function page(over: Partial<PlayerStatsPage> = {}): PlayerStatsPage {
       seasonTotal: 1714,
     },
     gameLog: [game(), game({ gameId: 'g0', date: '2026-04-10', team: 'LAL', opponent: 'PHX', isHome: false, fantasyPoints: 20 })],
+    qualification: { minGamesShare: 0.5, minGames: 42, maxTeamGames: 83, minMinutesPerGame: 15, recencyDays: 14 },
     ...over,
   }
 }
@@ -346,5 +354,241 @@ describe('PlayerPage', () => {
     getPlayerStats.mockRejectedValue(new Error('boom'))
     mount()
     expect(await screen.findByText('Couldn’t load this player.')).toBeInTheDocument()
+  })
+})
+
+const KEYS = ['ts', 'efg', 'ftr', 'tpar', 'usg', 'minutesShare', 'astPct', 'orbPct', 'drbPct', 'trbPct', 'stlPct', 'blkPct', 'tovPct'] as const
+const pctPair = (nba: Partial<Pct>, rostered: Partial<Pct>): Pct[] => [
+  { value: 50, group: 'NBA_POSITION', n: 59, reason: null, ...nba },
+  { value: 50, group: 'LEAGUE_ROSTERED', n: 120, reason: null, ...rostered },
+]
+/** Percentiles for every window and key, with per-key overrides applied to all three windows. */
+function percentiles(over: Partial<Record<(typeof KEYS)[number], Pct[]>> = {}): PlayerStatsPage['percentiles'] {
+  const all = Object.fromEntries(KEYS.map((k) => [k, over[k] ?? pctPair({}, {})]))
+  return { SEASON: all, LAST_10: all, LAST_5: all }
+}
+
+describe('PlayerPage advanced view', () => {
+  it('shows season, last 10 and last 5 side by side with real counts and date spans', async () => {
+    show(
+      page({
+        windows: {
+          SEASON: win(),
+          LAST_10: win({ games: 10, firstGameDate: '2026-03-20', lastGameDate: '2026-04-07' }),
+          LAST_5: win({ games: 3, firstGameDate: '2026-04-01', lastGameDate: '2026-04-07' }),
+        },
+        percentiles: percentiles(),
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const heads = within(adv).getAllByRole('columnheader')
+    expect(heads).toHaveLength(4)
+    expect(heads[1]).toHaveTextContent('Season76 games · Oct 22–Apr 12')
+    expect(heads[2]).toHaveTextContent('Last 1010 games · Mar 20–Apr 7')
+    expect(heads[3]).toHaveTextContent('Last 53 games · Apr 1–Apr 7')
+    expect(heads[3]).toHaveTextContent('only 3 played, fewer than 5')
+    expect(heads[2]).not.toHaveTextContent('fewer than')
+    expect(within(adv).getAllByText('66.4%').length).toBeGreaterThan(0)
+  })
+
+  it('shows a zero-attempt rate as a short label with the sentence, never 0%', async () => {
+    const advanced = { ...win().advanced, ts: rate(null, 'NO_ATTEMPTS'), efg: rate(null, 'NO_ATTEMPTS'), tpar: rate(0) }
+    show(page({ windows: { SEASON: win({ advanced }) }, percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const row = within(adv).getByRole('row', { name: /True shooting %/ })
+    const none = within(row).getByText('no att.')
+    expect(none).toHaveAttribute('title', 'No attempts in these games, so there is no percentage.')
+    expect(within(row).queryByText('0.0%')).not.toBeInTheDocument()
+    expect(within(row).queryByText(/percentile/)).not.toBeInTheDocument()
+    // A real zero is still a zero.
+    expect(within(within(adv).getByRole('row', { name: /3-point attempt rate/ })).getByText('0.0%')).toBeInTheDocument()
+  })
+
+  it('labels a small sample', async () => {
+    show(page({ percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).getAllByText('small sample')).toHaveLength(1)
+  })
+
+  it('says he has not played since his last game when the percentile is stale', async () => {
+    const stale: Pct[] = pctPair({ value: null, reason: 'NOT_QUALIFIED_STALE' }, { value: null, reason: 'NOT_QUALIFIED_STALE' })
+    show(
+      page({
+        windows: { SEASON: win({ lastGameDate: '2026-03-04' }), LAST_10: win({ games: 10 }) },
+        percentiles: { SEASON: Object.fromEntries(KEYS.map((k) => [k, stale])), LAST_10: percentiles().LAST_10 },
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    // Written out under the table once, naming the window, not only on hover.
+    expect(within(adv).getAllByText('Season: not ranked — Hasn’t played since Mar 4, 2026, so he isn’t ranked.')).toHaveLength(1)
+    expect(within(adv).getAllByText('not ranked').length).toBeGreaterThan(0)
+  })
+
+  it('compares a free agent with rostered players and shows his value beside the percentile', async () => {
+    show(
+      page({
+        ownership: { state: 'FREE_AGENT', rosterId: null, ownerName: null, avatarId: null, isMe: false, asOf: null },
+        percentiles: percentiles({ ts: pctPair({ value: 71.4, n: 59 }, { value: 40.2, n: 120 }) }),
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const row = () => within(adv).getByRole('row', { name: /True shooting %/ })
+    expect(within(row()).getAllByText('66.4%')).toHaveLength(3)
+    expect(within(row()).getAllByText('71st percentile')).toHaveLength(3)
+    expect(within(row()).getAllByText(/^59 others/)).toHaveLength(3)
+
+    fireEvent.click(within(adv).getByRole('button', { name: 'vs players rostered in this league' }))
+    expect(within(row()).getAllByText('66.4%')).toHaveLength(3)
+    expect(within(row()).getAllByText('40th percentile')).toHaveLength(3)
+    expect(within(row()).getAllByText(/^120 others/)).toHaveLength(3)
+    expect(within(row()).queryByText(/^59 others/)).not.toBeInTheDocument()
+  })
+
+  it('names the position group from his first position', async () => {
+    show(page({ percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).getByRole('button', { name: 'vs Cs across the NBA' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(adv).getByRole('button', { name: 'vs players rostered in this league' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('states OWNERSHIP_UNAVAILABLE on the rostered group instead of a number', async () => {
+    show(
+      page({
+        percentiles: percentiles({
+          ts: pctPair({}, { value: null, n: 0, reason: 'OWNERSHIP_UNAVAILABLE' }),
+        }),
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    fireEvent.click(within(adv).getByRole('button', { name: 'vs players rostered in this league' }))
+    const row = within(adv).getByRole('row', { name: /True shooting %/ })
+    const none = within(row).getAllByText('rosters unavailable')[0]
+    expect(none).toHaveAttribute('title', expect.stringContaining('isn’t available'))
+    expect(within(row).getAllByText('66.4%')).toHaveLength(3)
+  })
+
+  it('has a definition for all 13 stats, the pooling note, and says turnover % is lower-is-better', async () => {
+    show(page({ percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const labels = [
+      'True shooting %', 'Effective FG %', 'Free throw rate', '3-point attempt rate', 'Usage rate', 'Share of game minutes played',
+      'Assist %', 'Offensive rebound %', 'Defensive rebound %', 'Total rebound %', 'Steal %', 'Block %', 'Turnover %',
+    ]
+    for (const l of labels) {
+      const summary = within(adv).getByText(l, { selector: 'summary' })
+      expect(summary.parentElement!.querySelector('p')!.textContent!.length, l).toBeGreaterThan(20)
+    }
+    expect(within(adv).getAllByText(/Uses only the games he played/)).toHaveLength(8)
+    const tov = within(adv).getByRole('row', { name: /Turnover %/ })
+    expect(within(tov).getAllByText(/lower is better/i).length).toBeGreaterThan(0)
+    expect(within(tov).queryByText(/fewer is better/)).not.toBeInTheDocument()
+    expect(within(tov).getAllByText(/higher percentile = fewer turnovers/)).toHaveLength(3)
+  })
+
+  it('labels plus-minus as noisy', async () => {
+    show(page({ percentiles: percentiles() }))
+    expect(await screen.findByRole('row', { name: /Plus-minus per game \(noisy\)/ })).toBeInTheDocument()
+    expect(screen.getByText(/Plus-minus is noisy/, { selector: 'p' })).toBeInTheDocument()
+  })
+
+  const distinct = () =>
+    page({
+      windows: {
+        SEASON: win({ games: 70, gameScorePerGame: 14.8, plusMinusPerGame: 2.4, per36: { ...zero, pts: 14.2, reb: 12.3, ast: 1.6, stl: 1.1, blk: 2.2, tpm: 0.4, tov: 2.5 } }),
+        LAST_10: win({ games: 10, gameScorePerGame: 11.1, plusMinusPerGame: -3.2, per36: { ...zero, pts: 20.5, reb: 8.8, ast: 3.3, stl: 0.7, blk: 1.4, tpm: 1.9, tov: 3.6 } }),
+        LAST_5: win({ games: 5, gameScorePerGame: 9.9, plusMinusPerGame: 5.5, per36: { ...zero, pts: 25.5, reb: 6.6, ast: 4.4, stl: 0.2, blk: 0.8, tpm: 2.7, tov: 4.9 } }),
+      },
+      percentiles: percentiles(),
+    })
+
+  it('shows per-36, game score and plus-minus for all three windows side by side', async () => {
+    show(distinct())
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const cells = (name: RegExp) =>
+      within(within(adv).getByRole('row', { name })).getAllByRole('cell').map((c) => c.textContent)
+    expect(cells(/^Points per 36/)).toEqual(['14.2', '20.5', '25.5'])
+    expect(cells(/^Rebounds per 36/)).toEqual(['12.3', '8.8', '6.6'])
+    expect(cells(/^Assists per 36/)).toEqual(['1.6', '3.3', '4.4'])
+    expect(cells(/^Steals per 36/)).toEqual(['1.1', '0.7', '0.2'])
+    expect(cells(/^Blocks per 36/)).toEqual(['2.2', '1.4', '0.8'])
+    expect(cells(/^Three-pointers made per 36/)).toEqual(['0.4', '1.9', '2.7'])
+    expect(cells(/^Turnovers per 36/)).toEqual(['2.5', '3.6', '4.9'])
+    expect(cells(/^Game score per game/)).toEqual(['14.8', '11.1', '9.9'])
+    expect(cells(/^Plus-minus per game \(noisy\)/)).toEqual(['+2.4', '−3.2', '+5.5'])
+  })
+
+  it('writes every reason under the table with the windows it applies to', async () => {
+    const advanced = { ...win().advanced, ts: rate(null, 'NO_ATTEMPTS') }
+    const notQualified = Object.fromEntries(KEYS.map((k) => [k, pctPair({ value: null, reason: 'NOT_QUALIFIED' }, {})]))
+    show(
+      page({
+        windows: { SEASON: win(), LAST_10: win({ games: 10, advanced }), LAST_5: win({ games: 5 }) },
+        percentiles: { SEASON: percentiles().SEASON, LAST_10: notQualified, LAST_5: percentiles().LAST_5 },
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const notes = within(adv).getAllByRole('listitem').map((li) => li.textContent)
+    expect(notes).toContain('Last 10: no att. — No attempts in these games, so there is no percentage.')
+    expect(notes).toContain('Last 10: not ranked — Hasn’t played enough games or minutes to be ranked.')
+  })
+
+  it('states the qualification rule from the page payload', async () => {
+    show(page({ percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).getByText(/at least 42 games \(half of the most any team has played, 83\) and 15\+ minutes per game/)).toBeInTheDocument()
+    expect(within(adv).getByText(/game in the last 14 days/)).toBeInTheDocument()
+  })
+
+  it('dates the rostered group beside its toggle', async () => {
+    show(page({ percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).queryByText(/Players rostered in this league ·/)).not.toBeInTheDocument()
+    fireEvent.click(within(adv).getByRole('button', { name: 'vs players rostered in this league' }))
+    expect(within(adv).getByText('Players rostered in this league · End of 2025–26 regular season (week 18).')).toBeInTheDocument()
+  })
+
+  it('says the rostered group is last season’s rosters when the page fell back', async () => {
+    show(page({ requestedSeason: 2026, percentiles: percentiles() }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    fireEvent.click(within(adv).getByRole('button', { name: 'vs players rostered in this league' }))
+    expect(within(adv).getByText(/These are 2025–26 rosters, not today’s\./)).toBeInTheDocument()
+  })
+
+  it('uses a neutral bar for style stats and the colour bar for the rest; prints exact values', async () => {
+    show(page({ percentiles: percentiles({ ftr: pctPair({ value: 94.2 }, {}), ts: pctPair({ value: 71.4 }, {}) }) }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    const fill = (name: RegExp) => within(adv).getByRole('row', { name }).querySelector('.pp-meter-fill')!
+    expect(fill(/Free throw rate/)).toHaveClass('neutral')
+    expect(fill(/Usage rate/)).toHaveClass('neutral')
+    expect(fill(/3-point attempt rate/)).toHaveClass('neutral')
+    expect(fill(/Share of game minutes played/)).toHaveClass('neutral')
+    expect(fill(/True shooting %/)).not.toHaveClass('neutral')
+    expect(fill(/Turnover %/)).not.toHaveClass('neutral')
+    const ftr = within(adv).getByRole('row', { name: /Free throw rate/ })
+    expect(within(ftr).getAllByText('94th percentile')).toHaveLength(3)
+    expect(ftr.querySelector('[title="Exact percentile 94.2"]')).not.toBeNull()
+  })
+
+  it('never prints 100th or 0th percentile', async () => {
+    show(page({ percentiles: percentiles({ ts: pctPair({ value: 99.69 }, {}), efg: pctPair({ value: 0.3 }, {}) }) }))
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).queryByText(/100th|\b0th/)).not.toBeInTheDocument()
+    expect(within(within(adv).getByRole('row', { name: /True shooting %/ })).getAllByText('99th percentile')).toHaveLength(3)
+    expect(within(within(adv).getByRole('row', { name: /Effective FG %/ })).getAllByText('1st percentile')).toHaveLength(3)
+  })
+
+  it('says there is no position on file, not that too few players qualify, for a player with none', async () => {
+    const none = Object.fromEntries(KEYS.map((k) => [k, pctPair({ value: null, n: 0, reason: 'GROUP_TOO_SMALL' }, {})]))
+    show(
+      page({
+        player: { sleeperPlayerId: '1350', name: 'Rudy Gobert', positions: [], team: 'MIN', known: true },
+        percentiles: { SEASON: none, LAST_10: none, LAST_5: none },
+      }),
+    )
+    const adv = await screen.findByRole('region', { name: 'Advanced' })
+    expect(within(adv).getAllByText('group too small')[0]).toHaveAttribute('title', expect.stringContaining('no position on file'))
+    const notes = within(adv).getAllByRole('listitem').map((li) => li.textContent ?? '')
+    expect(notes.some((n) => n.includes('group too small — He has no position on file'))).toBe(true)
+    expect(notes.some((n) => n.includes('Too few other players'))).toBe(false)
   })
 })

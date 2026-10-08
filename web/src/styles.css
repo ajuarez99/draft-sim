@@ -5588,15 +5588,14 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .pp-rate-none { color: var(--muted); font-size: 12px; cursor: help; }
 .pp-small { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; color: var(--muted); background: color-mix(in oklab, var(--muted) 18%, transparent); }
 .pp-notes { margin: 8px 0 0; padding-left: 0; list-style: none; }
-.pp-facts { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); margin: 12px 0 0; }
-.pp-facts dt { font-size: 11px; color: var(--muted); }
-.pp-facts dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 .pp-rank { display: grid; grid-template-columns: minmax(64px, auto) auto 1fr auto; align-items: center; gap: 10px; margin-top: 10px; }
 .pp-rank-label { font-size: 12px; color: var(--muted); }
 .pp-rank-num { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .pp-meter { display: block; height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--muted) 20%, transparent); overflow: hidden; min-width: 40px; }
 .pp-meter-fill { display: block; height: 100%; border-radius: 999px; background: var(--teal); }
 .pp-meter-fill.down { background: var(--down); }
+.pp-meter-fill.neutral { background: var(--muted); }
+.pp-adv-sep td { font-size: 11px; color: var(--muted); padding-top: 14px; text-align: left; }
 .pp-move { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 0; }
 .pp-move .pt-pill { margin-left: 0; }
 .pp-break { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
@@ -5606,6 +5605,21 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .pp-break-pts.neg { color: var(--down); }
 .pp-break-share { text-align: right; font-variant-numeric: tabular-nums; }
 .pp-reason { margin: 0 0 16px; }
+.pp-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.pp-tog { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pp-tog:hover { background: var(--row-hover); }
+.pp-tog.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.pp-adv th, .pp-adv td { white-space: normal; vertical-align: top; text-align: left; }
+.pp-adv-head { min-width: 150px; }
+.pp-adv-win { display: block; font-size: 13px; color: var(--text); letter-spacing: 0; }
+.pp-adv-sub { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.pp-adv-stat { min-width: 170px; }
+.pp-def summary { cursor: pointer; font-weight: 600; }
+.pp-def p { margin: 4px 0 0; max-width: 260px; font-weight: 400; }
+.pp-adv-cell > * { display: block; }
+.pp-pct { display: grid; gap: 2px; margin-top: 4px; }
+.pp-pct .pp-meter { min-width: 60px; max-width: 120px; }
+.pp-pct-text { font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   .pp-head { flex-direction: column; }
   .pp-break li { grid-template-columns: minmax(80px, 1fr) minmax(32px, 1fr) 52px 48px; gap: 6px; }

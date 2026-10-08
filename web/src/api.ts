@@ -2562,6 +2562,27 @@ export type PlayerWindowKind = 'SEASON' | 'LAST_10' | 'LAST_5'
 export type RateReason = 'NO_ATTEMPTS' | 'NO_MINUTES' | 'NO_TEAM_ROW'
 export type Rate = { value: number | null; reason: RateReason | null }
 export type PlayerShooting = { fgPct: Rate; tpPct: Rate; ftPct: Rate }
+/**
+ * Pooled advanced rates over the window, all in percent points (61.6; ftr and tpar
+ * too: FTA/FGA x 100). `tovPct` is the one where lower is better. Reasons: shot-based
+ * rates NO_ATTEMPTS; team-relative ones NO_TEAM_ROW / NO_MINUTES / NO_ATTEMPTS.
+ */
+export type PlayerAdvanced = {
+  ts: Rate
+  efg: Rate
+  ftr: Rate
+  tpar: Rate
+  usg: Rate
+  minutesShare: Rate
+  astPct: Rate
+  orbPct: Rate
+  drbPct: Rate
+  trbPct: Rate
+  stlPct: Rate
+  blkPct: Rate
+  tovPct: Rate
+}
+export type PlayerAdvancedKey = keyof PlayerAdvanced
 export type PlayerCounting = {
   pts: number
   reb: number
@@ -2594,6 +2615,7 @@ export type PlayerWindow = {
   gameScorePerGame: number | null
   plusMinusPerGame: number | null
   smallSample: boolean
+  advanced: PlayerAdvanced
 }
 export type PlayerRanksReason = 'NOT_QUALIFIED' | 'NOT_QUALIFIED_STALE'
 export type PlayerRanks = {
@@ -2635,6 +2657,22 @@ export type PlayerGameLogRow = {
   gameScore: number
   fantasyPoints: number
 }
+export type PctGroup = 'NBA_POSITION' | 'LEAGUE_ROSTERED'
+/** NO_ATTEMPTS / NO_MINUTES / NO_TEAM_ROW appear when his own rate has no value. */
+export type PctReason =
+  | 'NOT_QUALIFIED'
+  | 'NOT_QUALIFIED_STALE'
+  | 'GROUP_TOO_SMALL'
+  | 'OWNERSHIP_UNAVAILABLE'
+  | RateReason
+/**
+ * A percentile (0..100) of one advanced rate against one group; exactly one of
+ * `value` / `reason` is non-null. `n` is the group's size excluding the player.
+ * For `tovPct` a lower rate gives a higher percentile.
+ */
+export type Pct = { value: number | null; group: PctGroup; n: number; reason: PctReason | null }
+/** Window, then advanced key, then [NBA_POSITION, LEAGUE_ROSTERED] in that order. */
+export type PlayerPercentiles = Partial<Record<PlayerWindowKind, Partial<Record<PlayerAdvancedKey, Pct[]>>>>
 export type PlayerSeasonOption = { season: number; sleeperLeagueId: string; hasGames: boolean }
 export type OwnershipState = 'ROSTERED' | 'FREE_AGENT' | 'NOT_DRAFTED' | 'UNAVAILABLE'
 export type OwnershipAsOf =
@@ -2676,7 +2714,20 @@ export type PlayerStatsPage = {
   ownership: PlayerOwnership | null
   windows: Partial<Record<PlayerWindowKind, PlayerWindow>>
   fantasy: PlayerFantasy | null
+  /** Empty when `available` is false. */
+  percentiles: PlayerPercentiles
   gameLog: PlayerGameLogRow[]
+  /** The ranking rule the server applied; null when `available` is false. */
+  qualification: PlayerQualificationRule | null
+}
+export type PlayerQualificationRule = {
+  minGamesShare: number
+  /** ceil(minGamesShare x maxTeamGames). */
+  minGames: number
+  /** The most games any team has played in the stored data. */
+  maxTeamGames: number
+  minMinutesPerGame: number
+  recencyDays: number
 }
 export const getPlayerStats = (leagueId: string, playerId: string) =>
   apiFetch(`/api/leagues/${leagueId}/players/${encodeURIComponent(playerId)}`).then(json<PlayerStatsPage>)

@@ -134,3 +134,59 @@ Checked on Deandre Ayton (2025, 0 3PA in 72 games). All six fixes hold:
 6. **Minus signs**: "−" (U+2212) throughout.
 
 **Web**: `tsc -b` clean, vitest 89 files / 1,131 tests passing, `npm run build` OK.
+
+## US2: T035–T041 (2026-10-08)
+
+### Build
+
+- **Backend**: `cleanTest test` gives 1,472 tests, 0 skipped, 0 failures.
+- **Web**: `tsc` clean, 1,151 tests passing, build OK.
+- **Java vs independent SQL** (`PlayerStatsReadIT`, same pooled definitions): Dončić, Jokić and
+  Gobert agree to 3 decimals on TS, USG, TRB and AST.
+- **Live**: Dončić's Advanced view renders the season, last-10 and last-5 windows, with game counts
+  and date spans, a group toggle, and exact values beside the percentile bars. Season TS is 61.6%,
+  87th percentile among 87 other point guards.
+- **Timing**: warm C1 with percentiles is 0.18 s locally (1.53 s for the first request after
+  boot).
+
+### V11 / SC-003: Basketball Reference cross-check (manual, measured)
+
+Read 2026-10-08 in the browser from Basketball Reference's 2025-26 season. Sleeper's 2025 is
+Basketball Reference's `NBA_2026`. Two page loads: `NBA_2026_advanced.html` (TS, USG, TRB, AST)
+and `NBA_2026_per_game.html` (eFG). The values were read off the rendered tables. **Nothing was
+stored or ingested.** The tolerances are TS and eFG ±0.5 points, USG and TRB ±1.0 point.
+
+| Player | GP ours / BR | TS ours / BR (Δ) | eFG ours / BR (Δ) | USG ours / BR (Δ) | TRB ours / BR (Δ) | AST ours / BR (Δ, no tolerance set) |
+|---|---|---|---|---|---|---|
+| Luka Dončić | 64 / 64 | 61.6 / 61.6 (0.0) | 56.3 / 56.3 (0.0) | 38.4 / 38.1 (+0.3) | 12.6 / 12.7 (−0.1) | 40.5 / 40.5 (0.0) |
+| Nikola Jokić | 65 / 65 | 67.0 / 67.0 (0.0) | 61.8 / 61.8 (0.0) | 30.2 / 30.4 (−0.2) | 20.8 / 20.7 (+0.1) | 48.6 / 50.3 (**−1.7**) |
+| Rudy Gobert | 76 / 76 | 66.4 / 66.4 (0.0) | 68.2 / 68.2 (0.0) | 13.0 / 12.9 (+0.1) | 20.0 / 20.1 (−0.1) | 7.3 / 7.2 (+0.1) |
+| Shai Gilgeous-Alexander | 68 / 68 | 66.5 / 66.5 (0.0) | 59.7 / 59.7 (0.0) | 33.8 / 33.4 (+0.4) | 7.0 / 7.0 (0.0) | 35.1 / 35.0 (+0.1) |
+| Jalen Brunson | **75 / 74** | 57.8 / 58.0 (−0.2) | 53.1 / 53.3 (−0.2) | 30.8 / 30.4 (+0.4) | 5.3 / 5.3 (0.0) | 31.5 / 31.3 (+0.2) |
+
+**SC-003 passes**: every toleranced stat is within tolerance for all 5 players. The largest gaps
+are 0.4 (USG) and 0.2 (TS/eFG). Nothing was tuned.
+
+Two differences to note:
+
+- **Jokić AST% (−1.7)** has no tolerance in SC-003. It is consistent with research R5's known
+  pooling deviation: we pair his games with those games' team totals, while Basketball Reference
+  uses whole-season team totals, and he missed 17 games. Reported, not adjusted.
+- **Brunson GP 75 vs 74** is a real data finding, below.
+
+### Finding: the NBA Cup final is stored and counted as a regular-season game (measured)
+
+- **The game**: id `1305814461864501248`, 2025-12-16, NYK vs SAS. It is the only game on that date
+  in `sport_schedule`, with status `complete`.
+- **Team counts**: `TEAM_NYK` and `TEAM_SAS` have **83** games in 2025; every other team has 82.
+  The All-Star filter doesn't catch it, because both teams are real team codes.
+- **Effect**: the NBA (and Basketball Reference) exclude the Cup final from regular-season stats.
+  Ours counts it, so:
+  - Brunson shows 75 games, against 74 there;
+  - every NYK and SAS player's season averages, rates, `teamGamesMissed` and `maxTeamGames`
+    include it (82 vs 83 changes `minGames` from 41 to 42);
+  - Trends (spec 019) does the same today. **This predates spec 022.**
+- **Fantasy**: Brunson's week 9 was credited 31.0, his Dec 18 game, not the Cup final (23.0). That
+  can't tell whether Sleeper treats the final as fantasy-eligible.
+- **Status**: not fixed. It is a decision for Allan, because the fix changes Trends output, an
+  existing feature, and needs an identification rule Sleeper doesn't supply.

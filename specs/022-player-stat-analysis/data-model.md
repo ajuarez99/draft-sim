@@ -210,6 +210,19 @@ For each advanced rate there are two groups:
 `percentile = 100 × (count of group values strictly below + 0.5 × count of ties excluding self) /
 (n − 1)`, where `n` counts the group **excluding the player himself** when he is a member.
 
+> **Amended at build, 2026-10-08 (US2).** That formula was wrong. With `n` already excluding the
+> player, dividing by `n − 1` gives the best player `100 × n / (n − 1)`, which is above 100. The
+> implemented and correct form divides by `n`, the number of other players, so the range is
+> [0, 100]:
+>
+> `100 × (below + 0.5 × ties) / n`
+>
+> - Comparisons use values rounded to 2 decimals, so values that display as equal count as ties,
+>   the same rule as the ranks.
+> - A group member whose own value for a rate is null is left out of that rate's group.
+> - The reasons apply in this order: not qualified, then his own rate has no value, then
+>   `OWNERSHIP_UNAVAILABLE`, then `GROUP_TOO_SMALL`.
+
 - **TOV%**: lower is better, so the percentile is inverted and labelled as such.
 - **A small group**: n < 2 gives null with `GROUP_TOO_SMALL`.
 - **Not in the group** (amended F13): a player's value is still ranked **against** the group. A

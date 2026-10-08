@@ -107,6 +107,7 @@ public class PlayerStatsService {
      * {@code windows} is empty, {@code fantasy} and {@code ownership} are null, the lists are empty.
      * NO_PLAYER_GAMES is available: windows with 0 games, fantasy without ranks, a game log of [].
      *
+     * @param qualification    the ranking rule in force, computed from the season's data; null when unavailable
      * @param requestedSeason  set when the resolver moved to an earlier season (R7); else null
      * @param dataAsOf         {@code max(player_game.fetched_at)} for the season; null when unknown
      * @param currentOwnership the requested season's current ownership; only when {@code requestedSeason} is set (F6)
@@ -116,7 +117,31 @@ public class PlayerStatsService {
                                   String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
                                   Ownership currentOwnership, PlayerRef player, List<String> teamsThisSeason,
                                   int teamGamesMissed, Ownership ownership, Map<WindowKind, Window> windows,
-                                  Fantasy fantasy, List<GameLogRow> gameLog) {}
+                                  Fantasy fantasy, Map<WindowKind, Map<String, List<Pct>>> percentiles,
+                                  List<GameLogRow> gameLog, QualificationRule qualification) {}
+
+    /**
+     * Who the page ranks (the rule behind {@link #qualify}), so the client never restates it. {@code minGames}
+     * is {@code ceil(minGamesShare x maxTeamGames)} and {@code maxTeamGames} the most games any team has played
+     * in the season's stored data. Null on a gated page.
+     */
+    public record QualificationRule(double minGamesShare, int minGames, int maxTeamGames, int minMinutesPerGame,
+                                    int recencyDays) {}
+
+    /**
+     * One percentile of one advanced rate against one group (see {@link PlayerPercentiles}). Exactly one of
+     * {@code value} (0..100) and {@code reason} is non-null. {@code group} is {@code NBA_POSITION} or
+     * {@code LEAGUE_ROSTERED}; {@code n} is the group's size excluding the player himself. Reasons:
+     * {@code NOT_QUALIFIED}, {@code NOT_QUALIFIED_STALE}, {@code GROUP_TOO_SMALL}, {@code OWNERSHIP_UNAVAILABLE},
+     * or, when his own rate has none, that rate's reason ({@code NO_ATTEMPTS}, {@code NO_MINUTES}, {@code NO_TEAM_ROW}).
+     */
+    public record Pct(Double value, String group, int n, String reason) {
+        public Pct {
+            if ((value == null) == (reason == null)) {
+                throw new IllegalArgumentException("a Pct has exactly one of value and reason");
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ pure core types
 
@@ -233,7 +258,14 @@ public class PlayerStatsService {
                 : managers.idsBySleeperUserId().get(requester);
         Map<Integer, RosterOwners.RosterOwner> owners = RosterOwners.ownerNames(rosterSeasons.forLeague(league.id()),
                 members.forLeague(league.id()), callerManagerId);
-        Ownership ownership = PlayerOwnership.forSeasonView(sleeperPlayerId, facts(league, owners));
+        Facts seasonFacts = facts(league, owners);
+        Ownership ownership = PlayerOwnership.forSeasonView(sleeperPlayerId, seasonFacts);
+        java.util.Set<String> rostered = PlayerOwnership.rosteredAtSeasonView(seasonFacts).orElse(null);
+        String firstPosition = targetInfo == null || targetInfo.positions().isEmpty() ? null
+                : targetInfo.positions().getFirst();
+        Map<WindowKind, Map<String, List<Pct>>> percentiles = PlayerPercentiles.of(
+                PlayerPercentiles.population(box.lines(), infos, props), sleeperPlayerId, firstPosition, c.windows(),
+                c.qualification(), rostered);
         Ownership currentOwnership = null;
         if (resolved.requestedSeason() != null) {
             Map<Integer, RosterOwners.RosterOwner> requestedOwners = RosterOwners.ownerNames(
@@ -243,7 +275,9 @@ public class PlayerStatsService {
 
         return Optional.of(new PlayerStatsPage(sport.code(), league.season(), resolved.requestedSeason(), true,
                 hasGames ? null : NO_PLAYER_GAMES, dataAsOf, seasons, currentOwnership, ref, c.teams(),
-                c.teamGamesMissed(), ownership, c.windows(), c.fantasy(), c.gameLog()));
+                c.teamGamesMissed(), ownership, c.windows(), c.fantasy(), percentiles, c.gameLog(),
+                new QualificationRule(props.rankMinGamesShare(), minGames(box.lines(), props),
+                        maxTeamGames(box.lines()), props.rankMinMinutesPerGame(), props.recencyDays())));
     }
 
     /**
@@ -271,7 +305,8 @@ public class PlayerStatsService {
     private static PlayerStatsPage unavailable(Sport sport, int season, Integer requestedSeason, String reason,
                                                OffsetDateTime dataAsOf, List<SeasonOption> seasons, PlayerRef player) {
         return new PlayerStatsPage(sport.code(), season, requestedSeason, false, reason, dataAsOf, seasons, null,
-                player, List.of(), 0, null, new EnumMap<>(WindowKind.class), null, List.of());
+                player, List.of(), 0, null, new EnumMap<>(WindowKind.class), null, new EnumMap<>(WindowKind.class),
+                List.of(), null);
     }
 
     // ------------------------------------------------------------------ pure core
@@ -281,14 +316,8 @@ public class PlayerStatsService {
         Map<String, List<Line>> byPlayer = in.lines().byPlayer();
         List<Line> lines = byPlayer.getOrDefault(in.target(), List.of());
 
-        int maxTeamGames = 0;
-        for (List<?> g : in.lines().teamGames().values()) maxTeamGames = Math.max(maxTeamGames, g.size());
-        LocalDate latest = null;
-        for (List<Line> l : byPlayer.values()) {
-            LocalDate d = l.getLast().date();
-            if (latest == null || d.isAfter(latest)) latest = d;
-        }
-        int minGames = (int) Math.ceil(p.rankMinGamesShare() * maxTeamGames);
+        LocalDate latest = latestGame(in.lines());
+        int minGames = minGames(in.lines(), p);
 
         Map<WindowKind, Window> windows = new EnumMap<>(WindowKind.class);
         Map<WindowKind, Qualification> qualification = new EnumMap<>(WindowKind.class);
@@ -365,6 +394,28 @@ public class PlayerStatsService {
 
         return new Computed(windows, new Fantasy(fpPerGame, ranks, breakdown, seasonTotal),
                 AdvancedStats.teamGamesMissed(lines, in.lines().teamGames(), in.absences()), List.copyOf(teams), log, qualification);
+    }
+
+    /** The most games any team has played so far, times the rank share, rounded up (the SEASON qualification). */
+    static int minGames(NbaGameLines lines, PlayerStatsProperties p) {
+        return (int) Math.ceil(p.rankMinGamesShare() * maxTeamGames(lines));
+    }
+
+    /** The most games any team has played in the season's stored data. */
+    static int maxTeamGames(NbaGameLines lines) {
+        int max = 0;
+        for (List<?> g : lines.teamGames().values()) max = Math.max(max, g.size());
+        return max;
+    }
+
+    /** The season's latest stored game date; null when there are no player lines. */
+    static LocalDate latestGame(NbaGameLines lines) {
+        LocalDate latest = null;
+        for (List<Line> l : lines.byPlayer().values()) {
+            LocalDate d = l.getLast().date();
+            if (latest == null || d.isAfter(latest)) latest = d;
+        }
+        return latest;
     }
 
     /**

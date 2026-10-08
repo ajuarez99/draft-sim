@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Avatar from '../components/Avatar'
 import NotFound from '../components/NotFound'
@@ -5,6 +6,8 @@ import PageHeader from '../components/PageHeader'
 import PlayerFace from '../components/PlayerFace'
 import {
   getPlayerStats,
+  type Pct,
+  type PctGroup,
   type PlayerCounting,
   type PlayerGameLogRow,
   type PlayerOwnership,
@@ -16,7 +19,17 @@ import {
 } from '../api'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import {
+  ADVANCED_KEYS,
+  ADVANCED_LABELS,
   FANTASY_LABEL,
+  PLUS_MINUS_NOISY,
+  STYLE_KEYS,
+  advancedDefinition,
+  percentileMeaning,
+  qualificationRule,
+  rosteredGroupNote,
+  ordinal,
+  pctGroupLabel,
   REAL_STAT_LABEL,
   fallbackNote,
   longDate,
@@ -26,6 +39,7 @@ import {
   reasonShort,
   scoringKeyLabel,
   seasonLabel,
+  type AdvancedKey,
   type StatReason,
 } from '../statCopy'
 import { useBlock } from '../useBlock'
@@ -41,10 +55,10 @@ import { useBlock } from '../useBlock'
  * NOT_BASKETBALL for anything else.
  */
 
-const WINDOWS: { kind: PlayerWindowKind; label: string }[] = [
+const WINDOWS: { kind: PlayerWindowKind; label: string; size?: number }[] = [
   { kind: 'SEASON', label: 'Season' },
-  { kind: 'LAST_10', label: 'Last 10' },
-  { kind: 'LAST_5', label: 'Last 5' },
+  { kind: 'LAST_10', label: 'Last 10', size: 10 },
+  { kind: 'LAST_5', label: 'Last 5', size: 5 },
 ]
 
 const DASH = '—'
@@ -197,7 +211,6 @@ function SeasonLine({ d }: { d: PlayerStatsPage }) {
   if (rows.length === 0) return null
   const reasons = rateReasons(rows.map((r) => r.win))
   const season = d.windows.SEASON
-  const per36 = season?.per36 ?? null
   const dates = season && season.firstGameDate && season.lastGameDate
     ? `${longDate(season.firstGameDate)} to ${longDate(season.lastGameDate)}`
     : null
@@ -274,32 +287,12 @@ function SeasonLine({ d }: { d: PlayerStatsPage }) {
           ))}
         </ul>
       )}
-      {season && (
-        <dl className="pp-facts">
-          <div>
-            <dt>{`${REAL_STAT_LABEL} · per 36 minutes`}</dt>
-            <dd>
-              {per36
-                ? `${per36.pts.toFixed(1)} pts · ${per36.reb.toFixed(1)} reb · ${per36.ast.toFixed(1)} ast`
-                : reasonSentence('NO_MINUTES')}
-            </dd>
-          </div>
-          <div>
-            <dt>{`${REAL_STAT_LABEL} · game score`}</dt>
-            <dd>{num(season.gameScorePerGame)} per game</dd>
-          </div>
-          <div>
-            <dt>{`${REAL_STAT_LABEL} · plus-minus`}</dt>
-            <dd>{season.plusMinusPerGame == null ? DASH : `${signed(season.plusMinusPerGame)} per game`}</dd>
-          </div>
-        </dl>
-      )}
     </section>
   )
 }
 
 /** A thin bar with its exact value printed beside it. */
-function Meter({ fraction, tone }: { fraction: number; tone?: 'down' }) {
+function Meter({ fraction, tone }: { fraction: number; tone?: 'down' | 'neutral' }) {
   const pct = Math.max(0, Math.min(1, fraction)) * 100
   return (
     <span className="pp-meter" aria-hidden="true">
@@ -378,6 +371,198 @@ function BreakdownCard({ d }: { d: PlayerStatsPage }) {
   )
 }
 
+
+const GROUPS: PctGroup[] = ['NBA_POSITION', 'LEAGUE_ROSTERED']
+
+/**
+ * A percentile cell: the percentile in words and the group size beside a bar, or the reason there is none.
+ * The bar is neutral for style stats (a fuller bar there is not "better"); the exact value rides in the title.
+ */
+function PctLine({ pct, statKey, noPosition }: { pct: Pct | undefined; statKey: AdvancedKey; noPosition: boolean }) {
+  if (!pct || pct.value == null) {
+    const code: StatReason = pct ? (pct.reason ?? 'UNAVAILABLE') : 'UNAVAILABLE'
+    const sentence = reasonSentence(code, { noPosition })
+    return (
+      <span className="pp-rate-none" title={sentence} aria-label={sentence}>
+        {reasonShort(code)}
+      </span>
+    )
+  }
+  const others = `${pct.n} ${pct.n === 1 ? 'other' : 'others'}`
+  const style = STYLE_KEYS.has(statKey)
+  return (
+    <span className="pp-pct" title={`Exact percentile ${pct.value.toFixed(1)}`}>
+      <Meter fraction={pct.value / 100} tone={style ? 'neutral' : undefined} />
+      <span className="pp-pct-text small">{`${ordinal(pct.value)} percentile`}</span>
+      <span className="muted small">{`${others} · ${percentileMeaning(statKey)}`}</span>
+    </span>
+  )
+}
+
+type CountingKey = keyof PlayerCounting
+const PER36_ROWS: { key: CountingKey; label: string }[] = [
+  { key: 'pts', label: 'Points' },
+  { key: 'reb', label: 'Rebounds' },
+  { key: 'ast', label: 'Assists' },
+  { key: 'stl', label: 'Steals' },
+  { key: 'blk', label: 'Blocks' },
+  { key: 'tpm', label: 'Three-pointers made' },
+  { key: 'tov', label: 'Turnovers' },
+]
+
+/** One visible note per distinct reason shown in the table, with the windows it applies to. */
+function reasonNotes(
+  cols: { kind: PlayerWindowKind; label: string; win: PlayerWindow }[],
+  d: PlayerStatsPage,
+  group: PctGroup,
+  noPosition: boolean,
+): { id: string; text: string }[] {
+  const notes = new Map<string, { code: StatReason; date: string | null; labels: string[] }>()
+  const add = (code: StatReason, label: string, date: string | null) => {
+    const id = code === 'NOT_QUALIFIED_STALE' ? `${code}:${date}` : code
+    const n = notes.get(id) ?? { code, date, labels: [] }
+    if (!n.labels.includes(label)) n.labels.push(label)
+    notes.set(id, n)
+  }
+  for (const { kind, label, win } of cols) {
+    for (const key of ADVANCED_KEYS) {
+      const r = win.advanced[key]
+      if (r.value == null) {
+        add(r.reason ?? 'UNAVAILABLE', label, win.lastGameDate)
+        continue
+      }
+      const pct = d.percentiles[kind]?.[key]?.find((p) => p.group === group)
+      if (!pct) add('UNAVAILABLE', label, win.lastGameDate)
+      else if (pct.value == null) add(pct.reason ?? 'UNAVAILABLE', label, win.lastGameDate)
+    }
+    if (win.per36 == null) add('NO_MINUTES', label, win.lastGameDate)
+  }
+  return [...notes.entries()].map(([id, n]) => ({
+    id,
+    text: `${n.labels.join(', ')}: ${reasonShort(n.code)} — ${reasonSentence(n.code, { date: n.date, noPosition })}`,
+  }))
+}
+
+/**
+ * User Story 2: every advanced rate for the season, last 10 and last 5, each with
+ * its percentile against one of two peer groups, then per-36, game score and plus-minus
+ * for the same three windows. His own value is always printed; the bar only decorates
+ * the percentile, whose number is printed too. Every reason is written out below the table.
+ */
+function AdvancedCard({ d }: { d: PlayerStatsPage }) {
+  const [group, setGroup] = useState<PctGroup>('NBA_POSITION')
+  const cols = WINDOWS.flatMap((w) => {
+    const win = d.windows[w.kind]
+    return win ? [{ ...w, win }] : []
+  })
+  if (cols.length === 0) return null
+  const position = d.player.positions[0] ?? null
+  const noPosition = position == null
+
+  const pctFor = (kind: PlayerWindowKind, key: AdvancedKey) => d.percentiles[kind]?.[key]?.find((p) => p.group === group)
+  const notes = reasonNotes(cols, d, group, noPosition)
+
+  return (
+    <section className="pp-card" aria-label="Advanced">
+      <h3 className="pp-h">{`${REAL_STAT_LABEL} · advanced`}</h3>
+      <p className="muted small pp-line">
+        Rates over the games in each window. A percentile is his position among other qualified players, not a grade; the group size excludes him.
+      </p>
+      <div className="pp-toggle" role="group" aria-label="Compare against">
+        {GROUPS.map((g) => (
+          <button key={g} type="button" className={`pp-tog${g === group ? ' on' : ''}`} aria-pressed={g === group} onClick={() => setGroup(g)}>
+            {pctGroupLabel(g, position)}
+          </button>
+        ))}
+      </div>
+      {d.qualification && <p className="muted small pp-line pp-qual">{qualificationRule(d.qualification)}</p>}
+      {group === 'LEAGUE_ROSTERED' && (
+        <p className="muted small pp-line pp-rostered-note">
+          {rosteredGroupNote(d.ownership?.asOf ?? null, d.season, d.requestedSeason != null)}
+        </p>
+      )}
+      <div className="pp-wrap">
+        <table className="pp-table pp-adv">
+          <thead>
+            <tr>
+              <th scope="col">Stat</th>
+              {cols.map(({ kind, label, size, win }) => (
+                <th key={kind} scope="col" className="pp-adv-head">
+                  <span className="pp-adv-win">{label}</span>
+                  <span className="pp-adv-sub">
+                    {`${win.games} ${win.games === 1 ? 'game' : 'games'}`}
+                    {win.firstGameDate && win.lastGameDate ? ` · ${shortDay(win.firstGameDate)}–${shortDay(win.lastGameDate)}` : ''}
+                  </span>
+                  {size != null && win.games < size && <span className="pp-adv-sub">{`only ${win.games} played, fewer than ${size}`}</span>}
+                  {win.smallSample && <span className="pp-small">small sample</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ADVANCED_KEYS.map((key) => (
+              <tr key={key}>
+                <th scope="row" className="pp-adv-stat">
+                  <details className="pp-def">
+                    <summary>{ADVANCED_LABELS[key]}</summary>
+                    <p className="muted small">{advancedDefinition(key)}</p>
+                  </details>
+                  {key === 'tovPct' && <span className="muted small">lower is better</span>}
+                </th>
+                {cols.map(({ kind, win }) => (
+                  <td key={kind} className="pp-adv-cell">
+                    <span className="pp-strong">
+                      <RateValue r={win.advanced[key]} />
+                    </span>
+                    {win.advanced[key].value != null && <PctLine pct={pctFor(kind, key)} statKey={key} noPosition={noPosition} />}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          <tbody>
+            <tr className="pp-adv-sep">
+              <td colSpan={cols.length + 1}>{`${REAL_STAT_LABEL} · per 36 minutes, game score and plus-minus (no percentile)`}</td>
+            </tr>
+            {PER36_ROWS.map(({ key, label }) => (
+              <tr key={key}>
+                <th scope="row" className="pp-adv-stat">{`${label} per 36`}</th>
+                {cols.map(({ kind, win }) => (
+                  <td key={kind} className="pp-adv-cell pp-strong">
+                    {win.per36 ? num(win.per36[key]) : <span className="pp-rate-none" title={reasonSentence('NO_MINUTES')}>{reasonShort('NO_MINUTES')}</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <th scope="row" className="pp-adv-stat">Game score per game</th>
+              {cols.map(({ kind, win }) => (
+                <td key={kind} className="pp-adv-cell pp-strong">{num(win.gameScorePerGame)}</td>
+              ))}
+            </tr>
+            <tr>
+              <th scope="row" className="pp-adv-stat" title={PLUS_MINUS_NOISY}>Plus-minus per game (noisy)</th>
+              {cols.map(({ kind, win }) => (
+                <td key={kind} className="pp-adv-cell pp-strong" title={PLUS_MINUS_NOISY}>
+                  {win.plusMinusPerGame == null ? DASH : signed(win.plusMinusPerGame)}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {notes.length > 0 && (
+        <ul className="muted small pp-notes">
+          {notes.map((n) => (
+            <li key={n.id}>{n.text}</li>
+          ))}
+        </ul>
+      )}
+      <p className="muted small pp-line">{`Comparing ${pctGroupLabel(group, position)}. Plus-minus: ${PLUS_MINUS_NOISY}`}</p>
+    </section>
+  )
+}
+
 function oppText(g: PlayerGameLogRow) {
   return g.isHome == null ? g.opponent : g.isHome ? `vs ${g.opponent}` : `@ ${g.opponent}`
 }
@@ -405,7 +590,9 @@ function GameLog({ d }: { d: PlayerStatsPage }) {
               <th scope="col">FG</th>
               <th scope="col">3P</th>
               <th scope="col">FT</th>
-              <th scope="col">+/−</th>
+              <th scope="col" title={PLUS_MINUS_NOISY}>
+                +/− (noisy)
+              </th>
               <th scope="col" className="pp-fant">
                 Fantasy pts
               </th>
@@ -488,6 +675,7 @@ export default function PlayerPage() {
           ) : (
             <>
               <SeasonLine d={d} />
+              <AdvancedCard d={d} />
               <div className="pp-cols">
                 {d.fantasy && <RanksCard ranks={d.fantasy.ranks} />}
                 <BreakdownCard d={d} />

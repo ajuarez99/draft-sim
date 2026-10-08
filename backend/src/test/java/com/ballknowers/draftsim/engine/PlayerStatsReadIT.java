@@ -128,6 +128,10 @@ class PlayerStatsReadIT {
             PlayerStatsPage page = service.read(l2025, id, MEMBER).orElseThrow();
             assertTrue(page.available(), id);
             assertEquals(2025, page.season());
+            var qr = page.qualification();
+            assertNotNull(qr);
+            assertEquals((int) Math.ceil(qr.minGamesShare() * qr.maxTeamGames()), qr.minGames());
+            assertTrue(qr.maxTeamGames() > 0);
             assertNull(page.requestedSeason());
             var w = page.windows().get(WindowKind.SEASON);
             assertEquals(((Number) sql.get("g")).intValue(), w.games(), id + " games");
@@ -176,6 +180,94 @@ class PlayerStatsReadIT {
         }
         assertTrue(sawTraded, "one of the ten played for two teams");
         assertEquals(0, mismatches, "SC-002: zero mismatches");
+    }
+
+    /** {@code coalesce((stats->>'key')::float, 0)} for an alias of player_game. */
+    private static String f(String alias, String key) {
+        return "coalesce((" + alias + ".stats->>'" + key + "')::float, 0)";
+    }
+
+    /**
+     * Spec 022 T037/T038: TS%, USG%, TRB% and AST% against an independent SQL implementation of the same
+     * pooled definitions (research R5): each of the player's games joined to its own team and opponent row,
+     * numerators and denominators summed. This checks the Java against the definition, NOT against Basketball
+     * Reference (a manual cross-check, because BR pairs a player with whole-season team totals).
+     */
+    @Test
+    void advancedRatesMatchAnIndependentPooledSqlImplementation() {
+        var l2025 = league(NBA_2025);
+        String[][] who = {{"Luka Don%"}, {"Nikola Joki%"}, {"Rudy Gobert"}};
+        int checked = 0;
+        for (String[] w : who) {
+            List<String> found = jdbc.queryForList("""
+                    select p.sleeper_id from player p
+                    join player_game g on g.sport = p.sport and g.sleeper_player_id = p.sleeper_id and g.season = 2025
+                    where p.sport = 'nba' and p.name like ? group by p.sleeper_id order by count(*) desc limit 1
+                    """, String.class, w[0]);
+            Assumptions.assumeFalse(found.isEmpty(), "no 2025 rows for " + w[0]);
+            String id = found.get(0);
+            Map<String, Object> sql = jdbc.queryForMap("""
+                    with codes as (%s)
+                    select
+                      100 * sum(%s) / (2 * (sum(%s) + 0.44 * sum(%s))) ts,
+                      100 * sum((%s + 0.44 * %s + %s) * (%s / 60.0 / 5)) / sum(%s / 60.0 * (%s + 0.44 * %s + %s)) usg,
+                      100 * sum(%s * (%s / 60.0 / 5)) / sum(%s / 60.0 * (%s + %s)) trb,
+                      100 * sum(%s) / sum(%s / 60.0 / (%s / 60.0 / 5) * %s - %s) ast,
+                      count(*) g
+                    from player_game p
+                    join player_game t on t.sport = p.sport and t.season = p.season and t.game_id = p.game_id
+                         and t.sleeper_player_id like 'TEAM\\_%%' and length(t.sleeper_player_id) > 5
+                         and substr(t.sleeper_player_id, 6) <> p.opponent
+                    join player_game o on o.sport = p.sport and o.season = p.season and o.game_id = p.game_id
+                         and o.sleeper_player_id like 'TEAM\\_%%' and length(o.sleeper_player_id) > 5
+                         and substr(o.sleeper_player_id, 6) = p.opponent
+                    where p.sport = 'nba' and p.season = 2025 and p.sleeper_player_id = ?
+                      and (p.stats->>'sp')::float > 0 and p.opponent in (select * from codes)
+                    """.formatted(SEASON_CODES,
+                    f("p", "pts"), f("p", "fga"), f("p", "fta"),
+                    f("p", "fga"), f("p", "fta"), f("p", "to"), f("t", "sp"),
+                    f("p", "sp"), f("t", "fga"), f("t", "fta"), f("t", "to"),
+                    f("p", "reb"), f("t", "sp"), f("p", "sp"), f("t", "reb"), f("o", "reb"),
+                    f("p", "ast"), f("p", "sp"), f("t", "sp"), f("t", "fgm"), f("p", "fgm")), id);
+
+            PlayerStatsPage page = service.read(l2025, id, MEMBER).orElseThrow();
+            AdvancedStats.Advanced a = page.windows().get(WindowKind.SEASON).advanced();
+            assertEquals(((Number) sql.get("g")).intValue(), page.windows().get(WindowKind.SEASON).games(), id + " games");
+            System.out.printf("REPORT-ADV %s (%s): TS java=%.3f sql=%.3f | USG java=%.3f sql=%.3f | TRB java=%.3f sql=%.3f"
+                            + " | AST java=%.3f sql=%.3f | eFG=%.2f%n", page.player().name(), id,
+                    a.ts().value(), ((Number) sql.get("ts")).doubleValue(),
+                    a.usg().value(), ((Number) sql.get("usg")).doubleValue(),
+                    a.trbPct().value(), ((Number) sql.get("trb")).doubleValue(),
+                    a.astPct().value(), ((Number) sql.get("ast")).doubleValue(), a.efg().value());
+            assertEquals(((Number) sql.get("ts")).doubleValue(), a.ts().value(), 0.05, id + " TS%");
+            assertEquals(((Number) sql.get("usg")).doubleValue(), a.usg().value(), 0.05, id + " USG%");
+            assertEquals(((Number) sql.get("trb")).doubleValue(), a.trbPct().value(), 0.05, id + " TRB%");
+            assertEquals(((Number) sql.get("ast")).doubleValue(), a.astPct().value(), 0.05, id + " AST%");
+            // every window and rate has two percentiles with a group, and the season ones are in range
+            for (WindowKind k : WindowKind.values()) {
+                for (String rate : AdvancedStats.ADVANCED_KEYS) {
+                    var two = page.percentiles().get(k).get(rate);
+                    assertEquals(2, two.size(), id + " " + k + " " + rate);
+                    for (var pct : two) {
+                        assertTrue(pct.value() == null ? pct.reason() != null : pct.value() >= 0 && pct.value() <= 100,
+                                id + " " + k + " " + rate + " " + pct);
+                    }
+                }
+            }
+            assertNotNull(page.percentiles().get(WindowKind.SEASON).get("ts").get(0).value(), id + " season TS position percentile");
+            System.out.println("REPORT-PCT " + page.player().name() + " SEASON ts " + page.percentiles().get(WindowKind.SEASON).get("ts")
+                    + " tovPct " + page.percentiles().get(WindowKind.SEASON).get("tovPct"));
+            checked++;
+        }
+        assertTrue(checked > 0);
+        // warm timing of the whole page, percentiles included (the box cache is warm after the reads above)
+        long best = Long.MAX_VALUE;
+        for (int i = 0; i < 5; i++) {
+            long t0 = System.nanoTime();
+            service.read(l2025, "1000", MEMBER).orElseThrow();
+            best = Math.min(best, (System.nanoTime() - t0) / 1_000_000);
+        }
+        System.out.println("REPORT-TIMING warm C1 read best of 5 = " + best + " ms");
     }
 
     /**

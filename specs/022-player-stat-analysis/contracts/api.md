@@ -36,7 +36,7 @@ season picker in the web client switches it.
 of `NO_ATTEMPTS`, `NO_MINUTES` or `NO_TEAM_ROW`.
 
 `Pct` is `{ "value": 88.0, "group": "NBA_POSITION" | "LEAGUE_ROSTERED", "n": 97, "reason": null }`.
-`reason` is one of `NOT_QUALIFIED`, `NOT_QUALIFIED_STALE`, `GROUP_TOO_SMALL` or `OWNERSHIP_UNAVAILABLE`. A free agent's `LEAGUE_ROSTERED` value is his percentile **against** the rostered group (F13).
+`reason` is one of `NOT_QUALIFIED`, `NOT_QUALIFIED_STALE`, `GROUP_TOO_SMALL`, `OWNERSHIP_UNAVAILABLE`, or, when his own rate has no value, that rate's reason (`NO_ATTEMPTS`, `NO_MINUTES`, `NO_TEAM_ROW`). `GROUP_TOO_SMALL` is also sent when he has no position on file (`n` is 0). *(Amended 2026-10-08 after the US2 review, U7: the list had only the first four.)* A free agent's `LEAGUE_ROSTERED` value is his percentile **against** the rostered group (F13).
 
 `Ownership` is:
 
@@ -74,9 +74,16 @@ The player page (US1 and US2).
     "seasonTotal": 3978.5
   },
   "percentiles": { "SEASON": { "ts": ["Pct", "Pct"], "usg": ["Pct", "Pct"] }, "LAST_10": {}, "LAST_5": {} },
-  "gameLog": [ { "GameLogRow": "…" } ]
+  "gameLog": [ { "GameLogRow": "…" } ],
+  "qualification": { "minGamesShare": 0.5, "minGames": 42, "maxTeamGames": 83,
+                     "minMinutesPerGame": 15, "recencyDays": 14 }
 }
 ```
+
+**`qualification`** (amended 2026-10-08): the ranking rule the server applied, so the client never
+restates it. `minGames` is `ceil(minGamesShare x maxTeamGames)`; `maxTeamGames` is the most games any
+team has played in the season's stored data (83 for 2025, since NYK and SAS include the NBA Cup final;
+reported as computed). Null when `available` is false.
 
 `WindowStats` holds:
 

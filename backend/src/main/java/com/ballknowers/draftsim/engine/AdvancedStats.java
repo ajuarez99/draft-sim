@@ -8,9 +8,11 @@ import com.ballknowers.draftsim.store.PlayerGameRepository.TeamGame;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.ToDoubleFunction;
 
 /**
  * Real-basketball derived figures over {@link Line}s (specs/022-player-stat-analysis). Pure: no I/O,
@@ -136,7 +138,120 @@ public final class AdvancedStats {
      */
     public record Window(int games, LocalDate firstGameDate, LocalDate lastGameDate, double minutes,
                          double minutesPerGame, Counting perGame, Counting totals, Counting per36,
-                         Shooting shooting, Double gameScorePerGame, Double plusMinusPerGame, boolean smallSample) {}
+                         Shooting shooting, Double gameScorePerGame, Double plusMinusPerGame, boolean smallSample,
+                         Advanced advanced) {}
+
+    // ------------------------------------------------------------------ advanced rates (spec 022 US2, research R5)
+
+    /** The keys of {@link Advanced}, in its component order: the wire keys of a window's {@code advanced} block. */
+    public static final List<String> ADVANCED_KEYS = List.of("ts", "efg", "ftr", "tpar", "usg", "minutesShare",
+            "astPct", "orbPct", "drbPct", "trbPct", "stlPct", "blkPct", "tovPct");
+
+    /** The one advanced rate where a lower figure is better (percentiles invert it). */
+    public static final String LOWER_IS_BETTER = "tovPct";
+
+    /**
+     * Research R5's rates over a window, <b>pooled</b>: numerators and denominators are summed over the
+     * games, each game paired with its own team and opponent rows, never averaged per game.
+     *
+     * <p><b>Convention: every figure is in percent points</b> (61.6, not 0.616), like {@link Shooting}:
+     * {@code ts}, {@code efg}, {@code usg}, {@code minutesShare}, {@code astPct}..{@code tovPct}, and also
+     * {@code ftr} and {@code tpar} (FTA/FGA and 3PA/FGA times 100, so 30.0 means 0.30 free throws per shot).
+     *
+     * <p><b>Reasons.</b> The box-score-only rates ({@code ts}, {@code efg}, {@code ftr}, {@code tpar},
+     * {@code tovPct}) never need a team row: a zero denominator (including an empty window) is
+     * {@code NO_ATTEMPTS}. The team-relative rates ({@code usg}, {@code minutesShare}, {@code astPct},
+     * {@code orbPct}, {@code drbPct}, {@code trbPct}, {@code stlPct}, {@code blkPct}) only count games that have
+     * the rows they need (the team row; plus the opponent row for the rebound, steal and block rates):
+     * no such game, or an empty window, is {@code NO_TEAM_ROW}; such games but no minutes in them is
+     * {@code NO_MINUTES}; minutes but a non-positive denominator is {@code NO_ATTEMPTS}. {@code usg} is
+     * {@link AdvancedStats#usage}, one definition. TmMP is the team row's {@code sp / 60} (240 regulation,
+     * 265 with one overtime). A team's possessions are R5's {@code Poss}; the opponent's are taken as equal.
+     */
+    public record Advanced(Rate ts, Rate efg, Rate ftr, Rate tpar, Rate usg, Rate minutesShare, Rate astPct,
+                           Rate orbPct, Rate drbPct, Rate trbPct, Rate stlPct, Rate blkPct, Rate tovPct) {
+
+        /** The rates by {@link #ADVANCED_KEYS}, in that order. */
+        public Map<String, Rate> byKey() {
+            Map<String, Rate> m = new LinkedHashMap<>();
+            m.put("ts", ts); m.put("efg", efg); m.put("ftr", ftr); m.put("tpar", tpar); m.put("usg", usg);
+            m.put("minutesShare", minutesShare); m.put("astPct", astPct); m.put("orbPct", orbPct);
+            m.put("drbPct", drbPct); m.put("trbPct", trbPct); m.put("stlPct", stlPct); m.put("blkPct", blkPct);
+            m.put("tovPct", tovPct);
+            return m;
+        }
+    }
+
+    /** All of R5's rates over {@code games}; see {@link Advanced}. */
+    public static Advanced advanced(List<Line> games) {
+        double pts = 0, fgm = 0, fga = 0, tpm = 0, tpa = 0, fta = 0, to = 0;
+        for (Line g : games) {
+            Map<String, Object> s = g.stats();
+            pts += num(s, "pts"); fgm += num(s, "fgm"); fga += num(s, "fga"); tpm += num(s, "tpm");
+            tpa += num(s, "tpa"); fta += num(s, "fta"); to += num(s, "to");
+        }
+        Rate ts = ratio(100.0 * pts, 2.0 * (fga + 0.44 * fta));
+        Rate efg = ratio(100.0 * (fgm + 0.5 * tpm), fga);
+        Rate ftr = ratio(100.0 * fta, fga);
+        Rate tpar = ratio(100.0 * tpa, fga);
+        Rate tov = ratio(100.0 * to, fga + 0.44 * fta + to);
+
+        Rate minutesShare = pooled(games, false, g -> g.minutes(), g -> tmMp(g) / 5.0, 100.0);
+        Rate ast = pooled(games, false, g -> num(g.stats(), "ast"),
+                g -> g.minutes() / (tmMp(g) / 5.0) * num(g.teamRow().stats(), "fgm") - num(g.stats(), "fgm"), 100.0);
+        Rate orb = pooled(games, true, g -> num(g.stats(), "oreb") * (tmMp(g) / 5.0),
+                g -> g.minutes() * (num(g.teamRow().stats(), "oreb") + num(g.oppRow().stats(), "dreb")), 100.0);
+        Rate drb = pooled(games, true, g -> num(g.stats(), "dreb") * (tmMp(g) / 5.0),
+                g -> g.minutes() * (num(g.teamRow().stats(), "dreb") + num(g.oppRow().stats(), "oreb")), 100.0);
+        Rate trb = pooled(games, true, g -> num(g.stats(), "reb") * (tmMp(g) / 5.0),
+                g -> g.minutes() * (num(g.teamRow().stats(), "reb") + num(g.oppRow().stats(), "reb")), 100.0);
+        Rate stl = pooled(games, true, g -> num(g.stats(), "stl") * (tmMp(g) / 5.0),
+                g -> g.minutes() * possessions(g.teamRow().stats(), g.oppRow().stats()), 100.0);
+        Rate blk = pooled(games, true, g -> num(g.stats(), "blk") * (tmMp(g) / 5.0),
+                g -> g.minutes() * (num(g.oppRow().stats(), "fga") - num(g.oppRow().stats(), "tpa")), 100.0);
+        return new Advanced(ts, efg, ftr, tpar, usage(games), minutesShare, ast, orb, drb, trb, stl, blk, tov);
+    }
+
+    private static double tmMp(Line g) {
+        return num(g.teamRow().stats(), "sp") / 60.0;
+    }
+
+    /** R5's {@code Poss}: the mean of each side's {@code T(A, B)}. A zero ORB + DRB term contributes 0 to T. */
+    static double possessions(Map<String, Object> tm, Map<String, Object> opp) {
+        return 0.5 * (t(tm, opp) + t(opp, tm));
+    }
+
+    private static double t(Map<String, Object> a, Map<String, Object> b) {
+        double reboundable = num(a, "oreb") + num(b, "dreb");
+        double orShare = reboundable > 0 ? num(a, "oreb") / reboundable : 0.0;
+        return num(a, "fga") + 0.4 * num(a, "fta") - 1.07 * orShare * (num(a, "fga") - num(a, "fgm")) + num(a, "to");
+    }
+
+    private static Rate ratio(double numerator, double denominator) {
+        return denominator > 0 ? Rate.of(numerator / denominator) : Rate.none(NO_ATTEMPTS);
+    }
+
+    /**
+     * {@code scale x sum(num) / sum(den)} over the games that carry the team row (and the opponent row when
+     * {@code needsOpp}); reasons as in {@link Advanced}.
+     */
+    private static Rate pooled(List<Line> games, boolean needsOpp, ToDoubleFunction<Line> num,
+                               ToDoubleFunction<Line> den, double scale) {
+        double n = 0;
+        double d = 0;
+        double minutes = 0;
+        boolean any = false;
+        for (Line g : games) {
+            if (g.teamRow() == null || (needsOpp && g.oppRow() == null)) continue;
+            any = true;
+            minutes += g.minutes();
+            n += num.applyAsDouble(g);
+            d += den.applyAsDouble(g);
+        }
+        if (!any) return Rate.none(NO_TEAM_ROW);
+        if (minutes <= 0) return Rate.none(NO_MINUTES);
+        return d > 0 ? Rate.of(scale * n / d) : Rate.none(NO_ATTEMPTS);
+    }
 
     /**
      * Pools {@code games} (oldest first): totals are sums, per-game is total over games, per-36 is
@@ -164,11 +279,12 @@ public final class AdvancedStats {
                 pct(totals.ftm(), totals.fta()));
         boolean small = minutes < smallSampleMinutes;
         if (n == 0) {
-            return new Window(0, null, null, 0.0, 0.0, null, Counting.zero(), null, shooting, null, null, small);
+            return new Window(0, null, null, 0.0, 0.0, null, Counting.zero(), null, shooting, null, null, small,
+                    advanced(games));
         }
         return new Window(n, games.getFirst().date(), games.getLast().date(), minutes, minutes / n,
                 totals.scaled(1.0 / n), totals, minutes > 0 ? totals.scaled(36.0 / minutes) : null, shooting,
-                gameScore / n, plusMinus / n, small);
+                gameScore / n, plusMinus / n, small, advanced(games));
     }
 
     private static Rate pct(double made, double attempted) {

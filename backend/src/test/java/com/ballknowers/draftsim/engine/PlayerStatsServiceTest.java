@@ -401,6 +401,7 @@ class PlayerStatsServiceTest {
         assertFalse(page.available());
         assertEquals("NOT_BASKETBALL", page.reason());
         assertNull(page.fantasy());
+        assertNull(page.qualification());
         assertFalse(page.player().known());
     }
 
@@ -415,6 +416,7 @@ class PlayerStatsServiceTest {
         PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
         assertFalse(page.available());
         assertEquals("NO_GAMES", page.reason());
+        assertNull(page.qualification());
         assertEquals(List.of(new SeasonOption(2026, "L26", false)), page.seasons());
     }
 
@@ -434,6 +436,7 @@ class PlayerStatsServiceTest {
         assertEquals("NO_PLAYER_GAMES", page.reason());
         assertTrue(page.player().known());
         assertEquals("Old Timer", page.player().name());
+        assertEquals(new PlayerStatsService.QualificationRule(0.5, 3, 5, 15, 14), page.qualification());
         assertTrue(page.gameLog().isEmpty());
         assertEquals(0, page.windows().get(WindowKind.SEASON).games());
         assertNotNull(page.ownership());

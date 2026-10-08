@@ -112,6 +112,33 @@ public final class PlayerOwnership {
         return ofWeek(sleeperPlayerId, f, start - 1);
     }
 
+    /**
+     * Every player rostered at the point {@link #forSeasonView} reads, or empty when that answer is
+     * {@code UNAVAILABLE} or {@code NOT_DRAFTED} for the league as a whole (so "rostered" has no meaning).
+     * The same gates as {@code forSeasonView}/{@code currentOf}/{@code ofWeek}; a test asserts that every id
+     * returned here reads {@code ROSTERED} there.
+     */
+    public static java.util.Optional<Set<String>> rosteredAtSeasonView(Facts f) {
+        if (!isComplete(f)) {
+            String st = f.leagueStatus();
+            if ("pre_draft".equals(st) || "drafting".equals(st)) return java.util.Optional.empty();
+            Rostered cur = f.current();
+            if (cur == null) return java.util.Optional.empty();
+            if (st == null && cur.byPlayer().isEmpty()) return java.util.Optional.empty();
+            return java.util.Optional.of(cur.byPlayer().keySet());
+        }
+        Integer start = f.playoffWeekStart();
+        if (start == null || start < 2) return java.util.Optional.empty();
+        Map<Integer, Set<String>> rosters = f.weekRosters().get(start - 1);
+        if (rosters == null || rosters.isEmpty()) return java.util.Optional.empty();
+        Set<String> all = new HashSet<>();
+        for (Set<String> ids : rosters.values()) {
+            if (ids.isEmpty()) return java.util.Optional.empty();
+            all.addAll(ids);
+        }
+        return java.util.Optional.of(all);
+    }
+
     /** A night in fantasy week {@code week}: see the class table. */
     public static Ownership forNight(String sleeperPlayerId, Facts f, int week) {
         if (f.weekRosters().containsKey(week)) return ofWeek(sleeperPlayerId, f, week);

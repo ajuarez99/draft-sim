@@ -302,14 +302,14 @@ definition.
 
 ### Tests for User Story 2
 
-- [ ] T035 [P] [US2] Extend backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsWindowTest.java with every research R5 rate: `ts`, `efg`, `ftr`, `tpar`, `minutesShare`, `astPct`, `orbPct`, `drbPct`, `trbPct`, `stlPct`, `blkPct` and `tovPct`. Cover:
+- [x] T035 [P] [US2] Extend backend/src/test/java/com/ballknowers/draftsim/engine/AdvancedStatsWindowTest.java with every research R5 rate: `ts`, `efg`, `ftr`, `tpar`, `minutesShare`, `astPct`, `orbPct`, `drbPct`, `trbPct`, `stlPct`, `blkPct` and `tovPct`. Cover:
   - hand-computed values over 2–3 synthetic games with team and opponent rows;
   - pooling, never averaging per-game rates;
   - an overtime game with team minutes (TmMP) of 265;
   - each zero-denominator `reason`;
   - a game with no team row, which gives `NO_TEAM_ROW`.
-- [ ] T036 [P] [US2] Write backend/src/test/java/com/ballknowers/draftsim/engine/PercentilesTest.java, covering data-model's "Percentiles" (F13):
-  - **Formula**: `100 × (below + 0.5 × tiesExcludingSelf) / (n − 1)`, with n excluding the player himself.
+- [x] T036 [P] [US2] Write backend/src/test/java/com/ballknowers/draftsim/engine/PercentilesTest.java, covering data-model's "Percentiles" (F13):
+  - **Formula**: `100 × (below + 0.5 × ties) / n`, with n the other group members (amended at build, 2026-10-08: dividing by `n − 1` exceeded 100; see data-model "Percentiles").
   - **Inversion**: TOV% is inverted, so a higher TOV% gets a lower percentile (I7).
   - **Reasons**: n < 2 gives `GROUP_TOO_SMALL`; an unqualified or stale player gives `NOT_QUALIFIED` or `NOT_QUALIFIED_STALE`.
   - **Free agents**: their value is ranked against the rostered group, and gets a value, not a reason.
@@ -319,16 +319,16 @@ definition.
 
 ### Implementation for User Story 2
 
-- [ ] T037 [US2] Add research R5's rates and the team possessions estimate to `Window` in backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java.
+- [x] T037 [US2] Add research R5's rates and the team possessions estimate to `Window` in backend/src/main/java/com/ballknowers/draftsim/engine/AdvancedStats.java.
   - Pool them over each line's own `teamRow` and `oppRow`, with TmMP equal to the team row's `sp / 60`.
   - `usage` stays the implementation moved in T011.
-- [ ] T038 [US2] Add `percentiles` to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java and contract C1, keyed **by window, then rate**, with both groups (F13), plus the advanced fields for `LAST_10` and `LAST_5`. Mirror them in web/src/api.ts in the same change.
-- [ ] T039 [P] [US2] Add plain-language definitions of the advanced stats to web/src/statCopy.ts (FR-017):
+- [x] T038 [US2] Add `percentiles` to backend/src/main/java/com/ballknowers/draftsim/engine/PlayerStatsService.java and contract C1, keyed **by window, then rate**, with both groups (F13), plus the advanced fields for `LAST_10` and `LAST_5`. Mirror them in web/src/api.ts in the same change.
+- [x] T039 [P] [US2] Add plain-language definitions of the advanced stats to web/src/statCopy.ts (FR-017):
   - one or two sentences each;
   - R5's pooling deviation, where it applies: "uses only the games he played".
 
   Extend web/src/statCopy.test.ts to require a definition for every advanced key.
-- [ ] T040 [US2] Add the Advanced view to web/src/pages/PlayerPage.tsx. It shows:
+- [x] T040 [US2] Add the Advanced view to web/src/pages/PlayerPage.tsx. It shows:
   - season, last-10 and last-5 side by side, each with its real game count and date span;
   - small-sample and "hasn't played since" labels;
   - a toggle between the NBA-position and rostered-in-league groups, showing group, n, and the exact value beside each percentile;
@@ -336,7 +336,7 @@ definition.
   - plus-minus labelled noisy.
 
   Extend web/src/pages/PlayerPage.test.tsx with the zero-attempt, small-sample, stale, free-agent-against-rostered and `OWNERSHIP_UNAVAILABLE` states.
-- [ ] T041 [US2] Run quickstart V7 live. Then run V11: in a browser, read Basketball Reference's 2025-26 season (`NBA_2026`) TS%, eFG%, USG% and TRB% for 5 players, and record each actual difference against its tolerance.
+- [x] T041 [US2] Run quickstart V7 live. Then run V11: in a browser, read Basketball Reference's 2025-26 season (`NBA_2026`) TS%, eFG%, USG% and TRB% for 5 players, and record each actual difference against its tolerance.
   - A stat outside tolerance is reported with R5's explanation, and **not tuned**.
   - Record the results in specs/022-player-stat-analysis/verification.md.
 

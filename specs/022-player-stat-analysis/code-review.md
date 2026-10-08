@@ -199,3 +199,176 @@ After the fixes:
 - **Web**: `tsc` clean, 1,139 tests passing, build OK.
 - **Trends**: after the cache changes, `player-trends` JSON for both leagues is still
   **byte-identical** to the T005 baselines (re-measured live).
+
+## US2 review (2026-10-08)
+
+Bug-hunting review of the uncommitted US2 diff against 38ee108 (AdvancedStats.advanced, PlayerPercentiles,
+PlayerStatsService wiring, PlayerOwnership.rosteredAtSeasonView, api.ts, statCopy.ts, PlayerPage Advanced
+section, styles, tests). Read every changed file. Re-ran PercentilesTest + AdvancedStatsWindowTest (green),
+and PlayerPage.test + statCopy.test (38/38). Curled C1 live for Jokić (1658) and Gobert (1350). Ran
+read-only SQL on :5433. Did not run the full backend suite or a browser.
+
+**Verdict: the backend math and percentile ranking are correct; I found no wrong-direction or crash
+defect.** Every R5 formula matches Basketball Reference. TOV% is the only inversion, and it points the
+right way. The ownership set agrees with the page's ownership. Findings U1–U3 are gaps between what the page
+renders and spec requirements. U4–U7 are wording and display issues.
+
+### U1 (medium): per-36, game score and plus-minus are shown for the season only, not for last 10 and last 5
+
+- **Evidence (read)**: `web/src/pages/PlayerPage.tsx` SeasonLine renders `per36`, `gameScorePerGame` and
+  `plusMinusPerGame` from `d.windows.SEASON` only, in the `pp-facts` `<dl>`. AdvancedCard (`:420–492`)
+  renders only the 13 rates. The wire already carries all three figures for every window (`Window` record).
+- **Failure scenario**: FR-016 and US2 acceptance 1 require "every stat listed above … for the season and for
+  the last 5 and last 10 games, side by side". The list includes per-36, game score and plus-minus. A reader
+  cannot see a player's last-5 game score or per-36 anywhere. The season per-36 also shows only
+  pts/reb/ast, while FR-016 asks for "per-36-minute traditional stats".
+- **Fix**: add rows to AdvancedCard for per-36 (the counting set), game score per game and plus-minus per
+  game (noisy), one value per window column. These rows get no percentile. Add a test that asserts last-5
+  and last-10 values appear.
+
+### U2 (medium): an unranked player is never told why, and every reason sentence in the Advanced card needs hover
+
+- **Evidence (read)**: `PctLine` (`PlayerPage.tsx:394–403`) and `RateValue` show only `reasonShort`
+  ("not ranked", "no att.", "group too small"). The sentence is only in `title`/`aria-label`. The card's
+  header prints a sentence only for `NOT_QUALIFIED_STALE` (`stale(kind)`). SeasonLine has a `pp-notes`
+  list for this; AdvancedCard does not.
+- **Failure scenario**: suppose a player has played 10 games at 12 mpg. His LAST_10 cells read "not ranked"
+  and nothing visible says he falls short of the 15-minute rule. On a phone, `title` cannot be reached at
+  all. This breaks US2 acceptance 4 ("is not ranked, and the page says why") and FR-018 ("with the reason
+  stated"). The SEASON window happens to be covered by RanksCard's sentence, but only because both use the
+  same qualification. A test also pins the hover-only form for NO_ATTEMPTS.
+- **Fix**: reuse SeasonLine's notes pattern. Below the table, list each distinct reason code present in the
+  shown cells (rates and the selected group's percentiles) as `short: sentence`. Optionally put a
+  `NOT_QUALIFIED` sub-line in the column header, as is already done for stale.
+
+### U3 (medium): the peer group's qualification rule and the rostered group's as-of are not stated
+
+- **Evidence (read)**: the card's copy says "other qualified players" and `pctGroupLabel` gives "vs Cs
+  across the NBA" / "vs players rostered in this league". C1 does not carry the rule
+  (`rank-min-games-share` 0.5, `rank-min-minutes-per-game` 15, recency 14 days). The rostered group's
+  as-of is not shown next to the toggle.
+- **Failure scenario**: US2 acceptance 4 requires naming the peer group's "minimum-minutes rule". FR-030
+  requires the rostered group's "size and ownership refresh time are stated, alongside". Measured on the
+  live 2025 league: the rostered group is the week-18 (end of regular season) rosters
+  (`ownership.asOf.week = 18`). If the route is a 2026 league that fell back to 2025, the button still
+  says "players rostered in this league" without saying it means last season's week-18 rosters. A reader
+  takes that as today's rosters (bug class #5).
+- **Fix**: add the qualification numbers to C1 (or reuse C2's `qualification` block) and print them, e.g.
+  "qualified: 15+ min/game, half his team's games; last-N: all N, within 14 days". Print the ownership
+  as-of next to the rostered toggle with the Header's `ownershipAsOf(...)`, e.g. "rostered as of week 18,
+  2025".
+
+### U4 (low-medium): the "Share of team minutes" definition is wrong by a factor of 5
+
+- **Evidence (read + measured)**: the formula is `MP / (TmMP/5)`, the share of the game's minutes he was on
+  the floor (data-model:118). The definition (`statCopy.ts` ADVANCED_DEFINITIONS.minutesShare) says "The
+  share of his team's total player minutes that he played". Live, Jokić shows 71.6% and Gobert 64.9%. Read
+  literally, no player can play 71% of his team's 240 player-minutes; the literal share is about 14%.
+- **Failure scenario**: a correct number displayed as the wrong thing (bug class #5).
+- **Fix**: reword it to "The share of his team's game minutes he was on the floor (48 of 48 is 100%)." The
+  label could be "Share of game minutes".
+
+### U5 (low): bar meters on style stats read as good or bad, and "fewer is better" sits beside a percentile where higher is better
+
+- **Evidence (read + measured)**: every percentile gets the same teal `Meter`. TOV% is inverted so that a
+  fuller bar means better, which teaches the reader that a full bar is good. FTr, 3PAr, USG and minutes
+  share are style or role stats, not quality stats. Live, Gobert's 3PAr is the 4th percentile among
+  rostered players and his USG is the 4th percentile, both with near-empty bars. Separately, the TOV cell
+  reads "16th percentile · 80 others · fewer is better". That phrasing invites "a low percentile is good",
+  which is the opposite of the inverted value. Only the collapsed `<details>` definition says "a high
+  percentile here means few turnovers".
+- **Fix**: say in the card that a percentile is a position in the group, not a grade. Either drop or
+  neutralise the meter for ftr/tpar/usg/minutesShare, or label it "more often than X% of …". For TOV,
+  print "higher percentile = fewer turnovers" instead of "fewer is better".
+
+### U6 (low): rounding can print "100th percentile" for someone who is not alone at the top
+
+- **Evidence (inferred from code)**: `ordinal` rounds `Math.round(value)`. With n = 162 and one tie at the
+  top, the value is (161 + 0.5)/162 = 99.69, which prints "100th". A value of 0.3 prints "0th".
+- **Fix**: floor the value, clamp it to 1..99 unless it is exactly 0 or 100, or show one decimal near the
+  ends.
+
+### U7 (low): two small copy and doc mismatches
+
+- `GROUP_TOO_SMALL` is also returned when the player has **no position** (`PlayerPercentiles.pct`,
+  `position == null`, n = 0). The sentence says "Too few other players qualify", which is false there.
+- The `PlayerPercentiles` javadoc says values are compared "at the wire precision (two decimals) … so
+  shown-equal figures tie". The UI shows rates to one decimal (`fixed(r.value, 1)`), so two cells that both
+  show "61.6%" can still rank apart. The behaviour matches data-model's 2-decimal rule; only the "shown"
+  claim is untrue.
+- C1 (`contracts/api.md:39`) lists four Pct reasons. The code also returns the player's own rate reason
+  (`NO_ATTEMPTS`/`NO_MINUTES`/`NO_TEAM_ROW`). `api.ts` has it right; the contract text is stale.
+
+### Checked and fine
+
+- **R5 formulas against Basketball Reference**: TS, eFG, FTr, 3PAr, TOV% (FGA + 0.44 FTA + TOV), USG via
+  `usage()`, AST% (`MP/(TmMP/5)·TmFG − FG`), ORB%/DRB%/TRB% (team plus opponent reboundable), STL% (opponent
+  possessions = R5 `Poss`, and the `T(A,B)` ORB share uses `A.oreb + B.dreb`), BLK% (OppFGA − Opp3PA). Units
+  are percent points throughout. TmMP = team `sp/60`; the team row's `sp` is 14,400 in regulation and
+  17,400 with overtime (measured). The team-row keys `to`, `oreb`, `dreb`, `reb`, `tpa`, `fgm` and `sp`
+  are present (measured).
+- **Exclusion is consistent**: `pooled()` drops a game from the numerator, the denominator and the minutes
+  together. Shot-based rates use every game. All 1,231 stored games in each of 2024 and 2025 have both team
+  rows (measured), so exclusion is theoretical today.
+- **Jokić AST% −1.7 is pooling, as the parent attributed (measured)**: SQL over his 65 games gives 48.58
+  pooled per game, and 50.34 using Denver's whole-season TmFG/TmMP. Basketball Reference shows 50.3.
+- **Percentile direction**: higher ranks higher everywhere except tovPct. Live, Jokić's TOV% 15.3 is the
+  16th percentile among Cs (inverted correctly) and his AST% is 100th. No other R5 rate here is
+  lower-is-better. Formula `100(below + 0.5·ties)/n` with self excluded; a free agent ranks against the
+  whole group; members with a null rate are dropped per rate; ties compare at round2 on both sides; the
+  value stays in [0, 100].
+- **Groups and reasons**: the first listed position on both sides; per-window qualification (stale
+  included) uses the same `qualify` and `minGames` as the target. Precedence: not qualified → own rate →
+  OWNERSHIP_UNAVAILABLE → GROUP_TOO_SMALL (n < 2). `rosteredAtSeasonView` uses the same gates as
+  `forSeasonView`: pre_draft/drafting and null-status-empty go to OWNERSHIP_UNAVAILABLE; a completed
+  season uses week `playoff_week_start − 1` with the N6 poison rule; the facts come from the answered
+  (fallback) season's league. The test asserts that the set and `forSeasonView` agree.
+- **Performance**: the population is about players × 3 windows × one `advanced()` pass (linear in lines),
+  and ranking is about 3 × 13 × 2 × members. Nothing is O(players²) per rate. This agrees with the
+  measured 0.18 s warm.
+- **Wire and types**: `Advanced.byKey()` is not serialized (measured: a window's `advanced` has exactly
+  the 13 keys). `api.ts` `PlayerAdvanced`, `Pct`, `PctReason` and `PlayerPercentiles` (window → key →
+  [NBA_POSITION, LEAGUE_ROSTERED]) match the Java records field for field, including nullability. The
+  `unavailable()` path sends `{}`, which the optional chaining handles.
+- **Web states**: an own-rate reason hides the percentile and shows the rate reason, never 0% or a blank.
+  A real 0.0 still shows. Missing Pct → "unavailable". "N other(s)" is shown. The toggle uses
+  `aria-pressed`. Definitions are `<details>`, reachable by tap. `.pp-adv` scrolls inside `.pp-wrap`
+  (`overflow-x: auto`) and the toggle wraps, so the CSS should not cause page-level horizontal scroll
+  (inferred from the CSS, not checked in a browser).
+- **Tests**: PercentilesTest asserts the ordering both ways (TOV inversion and higher TS → higher). The
+  AdvancedStatsWindowTest hand values recompute correctly against the R5 formulas. I found no test that
+  cannot fail.
+
+### US2 dispositions (2026-10-08, parent session)
+
+All seven findings were accepted and fixed (Sonnet pass), then re-checked in the browser on Gobert
+and Ayton (2025):
+
+- **U1**: per-36 (pts, reb, ast, stl, blk, 3PM, TO), game score and plus-minus (noisy) now show
+  for Season, Last 10 and Last 5. Live, Gobert's points per 36 read 12.5 / 14.1 / 10.2.
+- **U2**: a visible reason-notes list sits under the tables; Ayton shows "no att.: No attempts in
+  these games…".
+- **U3**: the qualification rule is stated on the page. The fix pass first **hard-coded** the
+  thresholds in `statCopy.ts`, mirroring `weights.yml`. The parent rejected that, because it is a
+  second copy of one rule, and had it moved to the wire. C1 now has a new
+  `qualification: QualificationRule(minGamesShare, minGames, maxTeamGames, minMinutesPerGame,
+  recencyDays)` field (contracts C1 amended).
+  - Live: "Ranked among players with at least 42 games (half of the most any team has played, 83)
+    and 15+ minutes per game; last-5/last-10 also require a game in the last 14 days."
+  - The rostered group names its as-of, and on a fallback it states that those are the earlier
+    season's rosters.
+- **U4**: the label is now "Share of game minutes played", and the definition is corrected
+  (MP / (TmMP/5)).
+- **U5**: style stats (FTr, 3PAr, USG, minutes share) have neutral bars, 12 of them on Gobert's
+  page. TOV% reads "higher percentile = fewer turnovers".
+- **U6**: ordinals are clamped to 1st–99th; no "100th" or "0th" appears live.
+- **U7**: `GROUP_TOO_SMALL` has its own sentence for a player with no position on file, and the
+  contracts C1 reason list is completed.
+
+**Totals after the fixes**:
+- Backend: 1,472 tests, 0 skipped.
+- Web: 1,171 tests passing; `tsc` and build clean.
+- Phone (375 px): no page-level sideways scroll.
+
+**One number to watch**: "the most any team has played, 83" is the NBA Cup final finding (see
+verification.md). Only NYK and SAS have an 83rd game.

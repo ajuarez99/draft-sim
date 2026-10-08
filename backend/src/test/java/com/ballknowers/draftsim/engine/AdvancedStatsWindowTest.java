@@ -245,4 +245,183 @@ class AdvancedStatsWindowTest {
                 absent("BBB", 16, "BBB", "ENTRY_WITHOUT_PLAY"));
         assertEquals(2, AdvancedStats.teamGamesMissed(lines, teamGames, abs));
     }
+
+    // ------------------------------------------------------------------ advanced rates (spec 022 T035, research R5)
+
+    private static Map<String, Object> m(Object... kv) {
+        Map<String, Object> out = new HashMap<>();
+        for (int i = 0; i < kv.length; i += 2) out.put((String) kv[i], ((Number) kv[i + 1]).doubleValue());
+        return out;
+    }
+
+    private static TeamGame tg(String code, int day, Map<String, Object> stats) {
+        return new TeamGame(code, "g" + day, D0.plusDays(day), "X", stats);
+    }
+
+    private static Line adv(int day, double minutes, Map<String, Object> stats, Map<String, Object> team,
+                            Map<String, Object> opp) {
+        return new Line("g" + day, D0.plusDays(day), 1, "AAA", "OPP", true, minutes, stats,
+                team == null ? null : tg("AAA", day, team), opp == null ? null : tg("OPP", day, opp));
+    }
+
+    /** Game 1 regulation (240 team minutes), game 2 one overtime (265). Expected values: hand arithmetic in comments. */
+    private static List<Line> twoRealGames() {
+        Map<String, Object> p1 = m("pts", 20, "fgm", 8, "fga", 15, "tpm", 2, "tpa", 5, "ftm", 2, "fta", 5, "to", 3,
+                "ast", 6, "oreb", 2, "dreb", 5, "reb", 7, "stl", 2, "blk", 1);
+        Map<String, Object> t1 = m("sp", 14400, "fga", 90, "fta", 20, "to", 12, "fgm", 40, "oreb", 10, "dreb", 30,
+                "reb", 40, "tpa", 30);
+        Map<String, Object> o1 = m("fga", 88, "fta", 18, "to", 14, "fgm", 38, "oreb", 8, "dreb", 32, "reb", 40,
+                "tpa", 28);
+        Map<String, Object> p2 = m("pts", 30, "fgm", 11, "fga", 25, "tpm", 3, "tpa", 10, "ftm", 5, "fta", 6, "to", 5,
+                "ast", 4, "oreb", 1, "dreb", 9, "reb", 10, "stl", 1, "blk", 3);
+        Map<String, Object> t2 = m("sp", 15900, "fga", 100, "fta", 30, "to", 10, "fgm", 45, "oreb", 12, "dreb", 35,
+                "reb", 47, "tpa", 40);
+        Map<String, Object> o2 = m("fga", 95, "fta", 25, "to", 16, "fgm", 41, "oreb", 11, "dreb", 33, "reb", 44,
+                "tpa", 35);
+        return List.of(adv(1, 30, p1, t1, o1), adv(2, 40, p2, t2, o2));
+    }
+
+    @Test
+    void everyAdvancedRateIsThePooledHandComputedValue() {
+        AdvancedStats.Advanced a = AdvancedStats.window(twoRealGames(), 100).advanced();
+        // PTS 50, FGA 40, FTA 11, FGM 19, 3PM 5, 3PA 15, TOV 8
+        assertEquals(55.753791257805524, a.ts().value(), 1e-9);   // 100 x 50 / (2 x (40 + 0.44 x 11)) = 5000 / 89.68
+        assertEquals(53.75, a.efg().value(), 1e-9);                // 100 x (19 + 2.5) / 40
+        assertEquals(27.5, a.ftr().value(), 1e-9);                 // 100 x 11 / 40: percent points
+        assertEquals(37.5, a.tpar().value(), 1e-9);                // 100 x 15 / 40
+        assertEquals(15.140045420136259, a.tovPct().value(), 1e-9); // 100 x 8 / (40 + 4.84 + 8)
+        // 70 of the 101.0 player-minute slots: (30 + 40) / (48 + 53)
+        assertEquals(69.3069306930693, a.minutesShare().value(), 1e-9);
+        assertEquals(25.02360717658168, a.astPct().value(), 1e-9); // 100 x 10 / (30/48 x 40 - 8 + 40/53 x 45 - 11)
+        assertEquals(4.869281045751634, a.orbPct().value(), 1e-9);  // 100 x (2 x 48 + 1 x 53) / (30 x 42 + 40 x 45)
+        assertEquals(24.06040268456376, a.drbPct().value(), 1e-9);  // 100 x (5 x 48 + 9 x 53) / (30 x 62 + 40 x 68)
+        assertEquals(14.33774834437086, a.trbPct().value(), 1e-9);  // 100 x (7 x 48 + 10 x 53) / (30 x 80 + 40 x 91)
+        // Poss = 97.5994 (game 1), 106.7449 (game 2): 100 x (2 x 48 + 1 x 53) / (30 x 97.5994 + 40 x 106.7449)
+        assertEquals(2.070084041212781, a.stlPct().value(), 1e-9);
+        assertEquals(4.928571428571429, a.blkPct().value(), 1e-9); // 100 x (1 x 48 + 3 x 53) / (30 x 60 + 40 x 60)
+    }
+
+    @Test
+    void usageIsExactlyTheOneImplementation() {
+        List<Line> games = twoRealGames();
+        assertEquals(AdvancedStats.usage(games), AdvancedStats.window(games, 100).advanced().usg());
+        assertEquals(32.71352399418323, AdvancedStats.window(games, 100).advanced().usg().value(), 1e-9);
+    }
+
+    @Test
+    void ratesArePooledNeverAveragedPerGame() {
+        List<Line> games = twoRealGames();
+        double game1 = AdvancedStats.window(games.subList(0, 1), 100).advanced().ts().value();
+        double game2 = AdvancedStats.window(games.subList(1, 2), 100).advanced().ts().value();
+        double meanOfRates = (game1 + game2) / 2;                   // 56.204, which a pooled rate must not be
+        double pooled = AdvancedStats.window(games, 100).advanced().ts().value();
+        assertEquals(55.753791257805524, pooled, 1e-9);
+        assertTrue(Math.abs(meanOfRates - pooled) > 0.4);
+        // the same for a team-relative rate: the mean of per-game TRB% is not the pooled one
+        double t1 = AdvancedStats.window(games.subList(0, 1), 100).advanced().trbPct().value();
+        double t2 = AdvancedStats.window(games.subList(1, 2), 100).advanced().trbPct().value();
+        assertTrue(Math.abs((t1 + t2) / 2 - AdvancedStats.window(games, 100).advanced().trbPct().value()) > 0.01);
+    }
+
+    @Test
+    void anOvertimeGameUsesTheTeamMinutesOfThatGame() {
+        Map<String, Object> p = m("fga", 10, "fta", 0, "to", 0, "reb", 10);
+        Map<String, Object> team = m("sp", 15900, "fga", 100, "reb", 50, "fgm", 40);
+        Map<String, Object> opp = m("fga", 90, "reb", 50, "tpa", 30);
+        // 40 minutes of 265 / 5 = 53: 100 x 40 / 53
+        assertEquals(100.0 * 40 / 53, AdvancedStats.advanced(List.of(adv(1, 40, p, team, opp))).minutesShare().value(), 1e-9);
+        // the same minutes in regulation: 100 x 40 / 48
+        Map<String, Object> reg = m("sp", 14400, "fga", 100, "reb", 50, "fgm", 40);
+        assertEquals(100.0 * 40 / 48, AdvancedStats.advanced(List.of(adv(1, 40, p, reg, opp))).minutesShare().value(), 1e-9);
+        // TRB%: 100 x 10 x 53 / (40 x 100)
+        assertEquals(100.0 * 10 * 53 / (40 * 100), AdvancedStats.advanced(List.of(adv(1, 40, p, team, opp))).trbPct().value(), 1e-9);
+    }
+
+    @Test
+    void zeroDenominatorsGiveTheirReasonNeverZero() {
+        // box-only rates: no attempts at all
+        Map<String, Object> idle = m("pts", 0, "fga", 0, "fta", 0, "to", 0, "reb", 2);
+        Map<String, Object> team = m("sp", 14400, "fga", 80, "fta", 20, "to", 12, "fgm", 30, "reb", 40, "oreb", 8, "dreb", 32);
+        Map<String, Object> opp = m("fga", 80, "tpa", 25, "reb", 40, "oreb", 8, "dreb", 32);
+        AdvancedStats.Advanced a = AdvancedStats.advanced(List.of(adv(1, 10, idle, team, opp)));
+        for (Rate r : List.of(a.ts(), a.efg(), a.ftr(), a.tpar(), a.tovPct())) {
+            assertNull(r.value());
+            assertEquals("NO_ATTEMPTS", r.reason());
+        }
+        // an empty window: shot-based are NO_ATTEMPTS, team-relative are NO_TEAM_ROW
+        AdvancedStats.Advanced empty = AdvancedStats.advanced(List.of());
+        assertEquals("NO_ATTEMPTS", empty.ts().reason());
+        assertEquals("NO_TEAM_ROW", empty.usg().reason());
+        assertEquals("NO_TEAM_ROW", empty.minutesShare().reason());
+        assertEquals("NO_TEAM_ROW", empty.blkPct().reason());
+        // team rows but no minutes
+        AdvancedStats.Advanced noMin = AdvancedStats.advanced(List.of(adv(1, 0, idle, team, opp)));
+        assertEquals("NO_MINUTES", noMin.minutesShare().reason());
+        assertEquals("NO_MINUTES", noMin.astPct().reason());
+        assertEquals("NO_MINUTES", noMin.trbPct().reason());
+        assertEquals("NO_MINUTES", noMin.usg().reason());
+        // minutes, but a zero denominator: nobody rebounded, the opponent took only threes, no team FGM to assist
+        Map<String, Object> deadTeam = m("sp", 14400);
+        Map<String, Object> threesOnly = m("fga", 20, "tpa", 20);
+        AdvancedStats.Advanced zeroDen = AdvancedStats.advanced(List.of(adv(1, 10, idle, deadTeam, threesOnly)));
+        assertEquals("NO_ATTEMPTS", zeroDen.usg().reason());
+        assertEquals("NO_ATTEMPTS", zeroDen.orbPct().reason());
+        assertEquals("NO_ATTEMPTS", zeroDen.drbPct().reason());
+        assertEquals("NO_ATTEMPTS", zeroDen.trbPct().reason());
+        assertEquals("NO_ATTEMPTS", zeroDen.blkPct().reason());
+        assertEquals("NO_ATTEMPTS", zeroDen.astPct().reason());   // 10/48 x 0 - 0 = 0
+        assertEquals(100.0 * 10 / 48, zeroDen.minutesShare().value(), 1e-9);   // an unrelated zero denominator leaves it alone
+    }
+
+    @Test
+    void aGameWithoutATeamRowIsLeftOutOfTheTeamRelativeRates() {
+        List<Line> both = new ArrayList<>(twoRealGames());
+        Line noTeam = adv(3, 25, m("pts", 40, "fga", 20, "fta", 10, "to", 1, "reb", 9, "ast", 9, "stl", 3, "blk", 3), null, null);
+        both.add(noTeam);
+        AdvancedStats.Advanced withExtra = AdvancedStats.advanced(both);
+        AdvancedStats.Advanced base = AdvancedStats.advanced(twoRealGames());
+        // team-relative: the unmatched game contributes nothing, not even minutes
+        assertEquals(base.minutesShare().value(), withExtra.minutesShare().value(), 1e-9);
+        assertEquals(base.usg().value(), withExtra.usg().value(), 1e-9);
+        assertEquals(base.trbPct().value(), withExtra.trbPct().value(), 1e-9);
+        assertEquals(base.stlPct().value(), withExtra.stlPct().value(), 1e-9);
+        // box-only: it counts
+        assertNotEquals(base.ts().value(), withExtra.ts().value());
+        // a window of only such games: NO_TEAM_ROW for every team-relative rate, a value for the box-only ones
+        AdvancedStats.Advanced only = AdvancedStats.advanced(List.of(noTeam));
+        assertEquals("NO_TEAM_ROW", only.usg().reason());
+        assertEquals("NO_TEAM_ROW", only.minutesShare().reason());
+        assertEquals("NO_TEAM_ROW", only.astPct().reason());
+        assertEquals("NO_TEAM_ROW", only.orbPct().reason());
+        assertEquals("NO_TEAM_ROW", only.drbPct().reason());
+        assertEquals("NO_TEAM_ROW", only.trbPct().reason());
+        assertEquals("NO_TEAM_ROW", only.stlPct().reason());
+        assertEquals("NO_TEAM_ROW", only.blkPct().reason());
+        assertEquals(100.0 * 40 / (2 * (20 + 4.4)), only.ts().value(), 1e-9);
+    }
+
+    @Test
+    void aMissingOpponentRowOnlyAffectsTheRatesThatNeedIt() {
+        Map<String, Object> p = m("fga", 10, "fgm", 5, "ast", 3, "reb", 6, "to", 1);
+        Map<String, Object> team = m("sp", 14400, "fga", 80, "fta", 10, "to", 10, "fgm", 35, "reb", 40);
+        AdvancedStats.Advanced a = AdvancedStats.advanced(List.of(adv(1, 30, p, team, null)));
+        assertNotNull(a.usg().value());
+        assertNotNull(a.minutesShare().value());
+        assertNotNull(a.astPct().value());
+        assertEquals("NO_TEAM_ROW", a.trbPct().reason());
+        assertEquals("NO_TEAM_ROW", a.stlPct().reason());
+        assertEquals("NO_TEAM_ROW", a.blkPct().reason());
+    }
+
+    @Test
+    void theWindowCarriesTheAdvancedRatesForEveryWindowIncludingAnEmptyOne() {
+        Window empty = AdvancedStats.window(List.of(), 100);
+        assertNotNull(empty.advanced());
+        assertEquals("NO_ATTEMPTS", empty.advanced().ts().reason());
+        List<Line> games = twoRealGames();
+        // LAST_5 of two games is both games
+        Window last5 = AdvancedStats.window(WindowKind.LAST_5.select(games), 100);
+        assertEquals(AdvancedStats.window(games, 100).advanced(), last5.advanced());
+        assertEquals(AdvancedStats.ADVANCED_KEYS, List.copyOf(last5.advanced().byKey().keySet()));
+    }
 }
