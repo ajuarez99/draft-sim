@@ -1,5 +1,61 @@
 # Ball Knowers — handoff
 
+**2026-10-08, branch `022-player-stat-analysis` (worktree `../draft-sim-022`, off `origin/main`
+`2c72ead`): spec 022 (player stat analysis) US1, US2 and US4 built, reviewed and verified locally.
+They are committed on the branch, but not pushed, not merged and not deployed. US3 (the nightly
+report) is not built: it waits for an opening-night measurement, 2026-10-20 or later.**
+
+- **What it is.** Basketball-only, league-scoped pages built entirely from Sleeper box scores we
+  already store, including the `TEAM_*` rows. Basketball Reference was used only as a hand
+  cross-check, because its terms forbid ingesting it.
+  - **Player page** (`/leagues/:id/players/:pid`) shows:
+    - the season line with makes and attempts, and a game log;
+    - this league's fantasy points, league and position rank against his rank by real points,
+      and a breakdown of where his fantasy points come from;
+    - ownership as of a stated week, and a season picker that walks both ways;
+    - an Advanced card: 13 pooled rates, per-36, game score and plus-minus for season / last 10
+      / last 5, plus percentiles against NBA position peers and against this league's rostered
+      players.
+
+    NBA names link to it from Trends, Weekly Report, Roster Management, Superlatives and the home
+    spotlight.
+  - **Player stats** (`/leagues/:id/stats`, in the rail):
+    - a sortable table with five column groups and a pinned name column;
+    - filters, and the top 5 in nine categories;
+    - value over replacement for this league's slots;
+    - draft pick and drafting manager, Board ADP, and Draft Grades' value over slot.
+- **Rules reused, not duplicated**: the Trends game-to-team join (`NbaGameLines`), usage rate,
+  `GameScoringService` (now `contributions()` + `score()`), Draft Grades' value over slot, and
+  `BasketballRules.isEligible`.
+  - New shared infrastructure: `SeasonBoxCache` (one entry per season, lock-free, invalidated by
+    the player-game refresh), and response compression for JSON only.
+- **Data rule changed by decision (Allan, 2026-10-08)**: NBA Cup finals are excluded from every
+  real-basketball figure, Trends included. Sleeper stores them as regular-season games, which made
+  NYK/SAS show 83 games.
+  - The ids are hand-listed in `weights.yml` (`draftsim.nba-games.excluded-game-ids`).
+  - **Add the 2026-27 Cup final's id after it is played in mid-December.**
+- **Verified** (details in `specs/022-player-stat-analysis/verification.md`):
+  - backend 1,513 / 0 skipped; web 1,228, `tsc` and build clean;
+  - Trends JSON byte-identical to pre-022 baselines on both NBA leagues, after every change;
+  - scorer rebuild: 0 mismatches over 78,572 game×league pairs;
+  - the hand cross-check against Basketball Reference (2025-26): all 5 players within tolerance
+    on TS, eFG, USG and TRB;
+  - all 168 picks of the 2025 draft;
+  - browser checks at desktop and 375 px.
+- **Not verified / owed:**
+  - **US3 (T057–T067)**: measure how soon after a game goes final its box score is stored,
+    starting 2026-10-20 (FR-036), then build the nightly report.
+  - **Production timing (SC-006)**: measured locally only (warm player page ~0.1–0.2 s,
+    leaderboard 0.28 s, gzipped 327 KB).
+  - **After the 10-10 draft**: the 2026 leaderboard's "now" ownership and draft columns have only
+    been seen pre-draft.
+  - **SC-007**: a league member reading the definitions has not been checked.
+- **Process notes**:
+  - A plan review (13 findings), three code reviews and four live checks each changed the code or
+    the docs. The corrections are dated in place.
+  - Two of those corrections were wrong statements in our own docs: the percentile formula could
+    exceed 100, and Draft Grades' value was mislabelled as per-week.
+
 **2026-10-06, branch `019-minutes-streaming` (worktree `.claude/worktrees/019-minutes-streaming`,
 off `origin/main` `787abd9`): spec 019 (roadmap 2.3 + 2.4) built and verified locally. Not committed.
 Due in production before 2026-10-20.**

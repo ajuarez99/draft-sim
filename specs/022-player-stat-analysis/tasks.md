@@ -546,14 +546,14 @@ The night's completeness and the default night use the rule Spotlight already us
 
 ## Phase 7: Polish and cross-cutting
 
-- [ ] T068 [P] Update HANDOFF.md and README.md with what shipped, what is verified, and what is still owed:
+- [x] T068 [P] Update HANDOFF.md and README.md with what shipped, what is verified, and what is still owed:
   - the V12 delay;
   - V9's production numbers;
   - V11's differences;
   - the `oneGameShare` All-Star follow-up (F7).
 
   Add any durable lesson to claude/lessons.md. The review's F3 qualifies: "a plan's survey of existing rules missed three, all in the area it covered least".
-- [ ] T069 [P] Add a basketball-only source-scan test, on spec 014's pattern, in backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsSportRuleScanTest.java. `PlayerStatsService`, `NightlyReportService` and `AdvancedStats` must never compare a sport by string or enum; the gate goes through `SportRules`.
+- [x] T069 [P] Add a basketball-only source-scan test, on spec 014's pattern, in backend/src/test/java/com/ballknowers/draftsim/engine/PlayerStatsSportRuleScanTest.java. `PlayerStatsService`, `NightlyReportService` and `AdvancedStats` must never compare a sport by string or enum; the gate goes through `SportRules`.
 - [ ] T070 Write the bug-hunting code review for each chunk, as a separate pass rather than a style pass, to specs/022-player-stat-analysis/code-review.md. Then fix what it finds, adding dated amendment notes wherever a doc was wrong.
 
 ---
