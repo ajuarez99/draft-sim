@@ -207,9 +207,28 @@ public class PlayerGameRepository {
     /**
      * One player-game with only the columns the trends read needs. {@code week} is the fantasy week
      * (the one-game-credit measure groups a player's games by it); trends itself never reads it.
+     * {@code isAway} is {@code player_game.is_away}, nullable (the All-Star game's bare row has none;
+     * spec 022 F7): read with {@code getObject}, never {@code getBoolean}, which would turn null into home.
      */
     public record SeasonGame(String sleeperPlayerId, String gameId, LocalDate gameDate, String opponent,
-                             Map<String, Object> stats, int week) {}
+                             Map<String, Object> stats, int week, Boolean isAway) {}
+
+    /**
+     * The validity token of one sport-season's rows: how many there are and when the newest was
+     * fetched. {@code maxFetchedAt} is null when there are no rows.
+     */
+    public record SeasonToken(long count, java.time.OffsetDateTime maxFetchedAt) {}
+
+    /**
+     * {@code count(*), max(fetched_at)} for a sport-season (spec 022 T012). {@code .single()}, not
+     * {@code .stream()}: a stream holds its connection until closed (see {@link #playersWithGames}).
+     */
+    public SeasonToken seasonToken(Sport sport, int season) {
+        return db.sql("select count(*), max(fetched_at) from player_game where sport = ? and season = ?")
+                .params(sport.code(), season)
+                .query((rs, n) -> new SeasonToken(rs.getLong(1), rs.getObject(2, java.time.OffsetDateTime.class)))
+                .single();
+    }
 
     /**
      * One team's box-score total for one game. {@code code} is the id's suffix and may be empty (the
@@ -225,13 +244,14 @@ public class PlayerGameRepository {
      */
     public List<SeasonGame> seasonPlayerGames(Sport sport, int season) {
         return db.sql("""
-                select sleeper_player_id, game_id, game_date, opponent, stats::text, week
+                select sleeper_player_id, game_id, game_date, opponent, stats::text, week, is_away
                 from player_game
                 where sport = ? and season = ? and left(sleeper_player_id, %d) <> '%s'
                 """.formatted(PREFIX_LEN, TEAM_ID_PREFIX))
                 .params(sport.code(), season)
                 .query((rs, n) -> new SeasonGame(rs.getString(1), rs.getString(2),
-                        rs.getDate(3).toLocalDate(), rs.getString(4), JsonUtil.readMap(rs.getString(5)), rs.getInt(6)))
+                        rs.getDate(3).toLocalDate(), rs.getString(4), JsonUtil.readMap(rs.getString(5)), rs.getInt(6),
+                        (Boolean) rs.getObject(7)))
                 .list();
     }
 

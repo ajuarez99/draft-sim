@@ -11,6 +11,7 @@ import type {
 import type { Block } from '../useBlock'
 import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
+import PlayerLink from './PlayerLink'
 import { SkeletonRows } from './Skeleton'
 
 /*
@@ -25,6 +26,8 @@ import { SkeletonRows } from './Skeleton'
  */
 
 type Props = {
+  /** Where a player's name links. Required: the spotlight is a view of one league. */
+  sleeperLeagueId: string
   spotlight: PlayerSpotlightData
   /** The page's existing weekly-report block; football's top list is read from it (research R9). */
   weekly: Block<WeeklyReport>
@@ -73,14 +76,14 @@ function readTab(): TabKey {
   return 'trending'
 }
 
-export default function PlayerSpotlight({ spotlight, weekly }: Props) {
+export default function PlayerSpotlight({ sleeperLeagueId, spotlight, weekly }: Props) {
   if (!spotlight.applies) return null
   return (
     <section className="section lh-spotlight" aria-labelledby="lh-spotlight-h">
       <h2 className="section-title" id="lh-spotlight-h">
         Player spotlight
       </h2>
-      <SpotlightLists spotlight={spotlight} weekly={weekly} idPrefix="lh" />
+      <SpotlightLists sleeperLeagueId={sleeperLeagueId} spotlight={spotlight} weekly={weekly} idPrefix="lh" />
     </section>
   )
 }
@@ -92,10 +95,12 @@ export default function PlayerSpotlight({ spotlight, weekly }: Props) {
  * its ids exactly as they were. The chosen list is shared across both pages through TAB_KEY.
  */
 export function SpotlightLists({
+  sleeperLeagueId,
   spotlight,
   weekly,
   idPrefix,
 }: {
+  sleeperLeagueId: string
   spotlight: PlayerSpotlightApplicable
   weekly: Block<WeeklyReport>
   idPrefix: string
@@ -148,12 +153,12 @@ export function SpotlightLists({
       <div className="lh-spot-cols">
         {/* Present only when the sport has a per-night list; football uses the weekly report. */}
         {spotlight.topOfNight ? (
-          <TopOfNight spotlight={spotlight} active={tab === 'top'} idPrefix={idPrefix} />
+          <TopOfNight sleeperLeagueId={sleeperLeagueId} spotlight={spotlight} active={tab === 'top'} idPrefix={idPrefix} />
         ) : (
-          <TopOfWeek spotlight={spotlight} weekly={weekly} active={tab === 'top'} idPrefix={idPrefix} />
+          <TopOfWeek sleeperLeagueId={sleeperLeagueId} spotlight={spotlight} weekly={weekly} active={tab === 'top'} idPrefix={idPrefix} />
         )}
-        <Trending spotlight={spotlight} active={tab === 'trending'} idPrefix={idPrefix} />
-        <RookieWatch spotlight={spotlight} active={tab === 'rookies'} idPrefix={idPrefix} />
+        <Trending sleeperLeagueId={sleeperLeagueId} spotlight={spotlight} active={tab === 'trending'} idPrefix={idPrefix} />
+        <RookieWatch sleeperLeagueId={sleeperLeagueId} spotlight={spotlight} active={tab === 'rookies'} idPrefix={idPrefix} />
       </div>
     </>
   )
@@ -232,7 +237,7 @@ function emptyText(s: PlayerSpotlightApplicable, unavailable: string | null): st
   return 'Nothing to show yet.'
 }
 
-function TopOfNight({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
+function TopOfNight({ sleeperLeagueId, spotlight, active, idPrefix }: { sleeperLeagueId: string; spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const section = spotlight.topOfNight
   if (!section) return null
   const period = spotlight.period
@@ -254,6 +259,7 @@ function TopOfNight({ spotlight, active, idPrefix }: { spotlight: PlayerSpotligh
         <Rows
           rows={section.entries.map((e, i) => (
             <PlayerRow
+              sleeperLeagueId={sleeperLeagueId}
               key={e.playerId}
               rank={i + 1}
               sport={spotlight.sport}
@@ -276,11 +282,13 @@ function TopOfNight({ spotlight, active, idPrefix }: { spotlight: PlayerSpotligh
 }
 
 function TopOfWeek({
+  sleeperLeagueId,
   spotlight,
   weekly,
   active,
   idPrefix,
 }: {
+  sleeperLeagueId: string
   spotlight: PlayerSpotlightApplicable
   weekly: Block<WeeklyReport>
   active: boolean
@@ -309,6 +317,7 @@ function TopOfWeek({
         <Rows
           rows={performers.map((p, i) => (
             <PlayerRow
+              sleeperLeagueId={sleeperLeagueId}
               key={p.playerId}
               rank={i + 1}
               sport={spotlight.sport}
@@ -365,7 +374,7 @@ function periodPrefix(period: SpotlightPeriod | null): string | undefined {
   return period.kind === 'NIGHT' ? shortDate(period.date) : `Wk ${period.week}`
 }
 
-function Trending({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
+function Trending({ sleeperLeagueId, spotlight, active, idPrefix }: { sleeperLeagueId: string; spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const t = spotlight.trending
   return (
     <Section tabKey="trending" idPrefix={idPrefix} active={active} title={`Trending · last ${t.lookbackHours}h`}>
@@ -385,6 +394,7 @@ function Trending({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightA
             const note = outcomeText(e, spotlight.period)
             return (
               <PlayerRow
+              sleeperLeagueId={sleeperLeagueId}
                 key={e.playerId}
                 rank={e.rank}
                 sport={spotlight.sport}
@@ -413,7 +423,7 @@ function Trending({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightA
   )
 }
 
-function RookieWatch({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
+function RookieWatch({ sleeperLeagueId, spotlight, active, idPrefix }: { sleeperLeagueId: string; spotlight: PlayerSpotlightApplicable; active: boolean; idPrefix: string }) {
   const section = spotlight.rookieWatch
   const period = spotlight.period
   return (
@@ -434,6 +444,7 @@ function RookieWatch({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlig
         <Rows
           rows={section.entries.map((e, i) => (
             <PlayerRow
+              sleeperLeagueId={sleeperLeagueId}
               key={e.playerId}
               rank={i + 1}
               sport={spotlight.sport}
@@ -455,6 +466,8 @@ function RookieWatch({ spotlight, active, idPrefix }: { spotlight: PlayerSpotlig
 // --- shared row ---------------------------------------------------------------
 
 export type PlayerRowProps = {
+  /** Where the name links (a league, never defaulted). */
+  sleeperLeagueId: string
   rank: number
   sport: Sport
   playerId: string
@@ -479,7 +492,7 @@ export function opponentText(opponent: string | null | undefined, isAway: boolea
   return isAway ? `@ ${opponent}` : `vs ${opponent}`
 }
 
-export function PlayerRow({ rank, sport, playerId, name, position, team, points, pointsPrefix, game, ownership, metaExtra, note }: PlayerRowProps) {
+export function PlayerRow({ sleeperLeagueId, rank, sport, playerId, name, position, team, points, pointsPrefix, game, ownership, metaExtra, note }: PlayerRowProps) {
   const meta = [position, team, game ? opponentText(game.opponent, game.isAway) : null, metaExtra].filter(Boolean).join(' · ')
   const owner = ownership.teamName ?? 'a team in this league'
   return (
@@ -489,7 +502,9 @@ export function PlayerRow({ rank, sport, playerId, name, position, team, points,
       <span className="lh-spot-main">
         <span className="lh-spot-line">
           <span className="lh-name" title={name}>
-            {name}
+            <PlayerLink sleeperLeagueId={sleeperLeagueId} sleeperPlayerId={playerId} sport={sport}>
+              {name}
+            </PlayerLink>
           </span>
           {points != null && (
             <span className="lh-pts">

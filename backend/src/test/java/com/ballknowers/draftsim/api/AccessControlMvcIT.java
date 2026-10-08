@@ -129,7 +129,7 @@ class AccessControlMvcIT {
     void leagueRoutesAre404WithNoIdentityAndForAStranger() throws Exception {
         for (String path : List.of("analysis", "history", "power", "ballot", "superlatives", "conduct-list",
                 "roster-management", "transactions", "expected-wins", "forecast", "weekly-report/1",
-                "player-trends", "recap/1")) {
+                "player-trends", "recap/1", "players/4046", "stats?window=SEASON", "stats")) {
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path)).andExpect(status().isNotFound());
             mvc.perform(get("/api/leagues/" + LEAGUE + "/" + path).header("X-Sleeper-User", ""))
                     .andExpect(status().isNotFound());
@@ -146,6 +146,21 @@ class AccessControlMvcIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.available").value(false))
                 .andExpect(jsonPath("$.reason").value("NOT_BASKETBALL"));
+        // Spec 022: the player page is gated the same way for a member of the NFL fixture league.
+        mvc.perform(get("/api/leagues/" + LEAGUE + "/players/4046").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("NOT_BASKETBALL"));
+        // Spec 022 T044: the leaderboard is gated the same way, and its window is required for a member.
+        mvc.perform(get("/api/leagues/" + LEAGUE + "/stats?window=SEASON").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.available").value(false))
+                .andExpect(jsonPath("$.reason").value("NOT_BASKETBALL"))
+                .andExpect(jsonPath("$.window").value("SEASON"));
+        mvc.perform(get("/api/leagues/" + LEAGUE + "/stats").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/leagues/" + LEAGUE + "/stats?window=LAST_7").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

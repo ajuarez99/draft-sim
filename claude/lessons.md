@@ -725,3 +725,25 @@ All-Star final (CHK vs SHQ) `complete`, and the grid showed 32 teams.
 another one that happens to cover it, e.g. by switching the rule off and watching the test fail.**
 One real season is one sample of how the source encodes an edge case; a second season can
 encode it differently.
+
+## 34. A source that encodes an edge case as ordinary data can only be caught against an outside count
+
+Spec 022's hand check against Basketball Reference was meant to test formulas. It also found
+that Jalen Brunson had 75 games where the NBA counts 74. Sleeper stores the NBA Cup final as an
+ordinary regular-season game, with two real team codes and status `complete`, so no rule built
+from Sleeper's own fields could flag it.
+
+The data was internally consistent: NYK and SAS had 83 games, and every other team had 82. It took
+an independent source's count to make 83 look wrong. It had already been feeding Trends (spec 019)
+since that shipped. 2024's final (OKC vs MIL) was encoded the same way.
+
+**When a feature counts things such as games, rows or players, compare a sample against an
+outside source's count at least once, even if the outside source is only read by hand.** Then put
+the result into the data rule explicitly. The fix here was a hand-maintained, labelled exclusion
+list, because the source gives nothing to detect it from.
+
+A related pattern from the same spec: a live check in the browser found six display defects that
+1,123 passing unit tests had all asserted around. Examples were a percentage without makes and
+attempts, and a rank described as "season total" when it was per game. Two of our own design docs
+were also wrong, and a builder or reviewer caught each one: a percentile formula that could exceed
+100, and a value labelled "per week" that was a season sum. Each correction is dated in place.

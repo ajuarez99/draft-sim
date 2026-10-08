@@ -138,4 +138,37 @@ class PlayerGameRepositoryIT {
         assertTrue(games.forWeek(Sport.NBA, 2025, 99).stream()
                 .noneMatch(r -> PLAYER.equals(r.sleeperPlayerId())));
     }
+
+    /**
+     * Spec 022 T012: the season validity token round-trips through real SQL (count, max(fetched_at)),
+     * and the season read carries the nullable {@code is_away} through as null, not false (F7).
+     */
+    @Test
+    void seasonTokenCountsRowsAndSeasonReadKeepsIsAwayNullable() {
+        int season = 1999;     // no real data lives here
+        PlayerGameRepository.SeasonToken empty = games.seasonToken(Sport.NBA, season);
+        assertEquals(0, empty.count());
+        assertNull(empty.maxFetchedAt());
+
+        games.upsert(new PlayerGameRepository.Row(Sport.NBA, season, 1, PLAYER, GAME, LocalDate.parse("1999-11-17"),
+                "CHI", true, "{\"pts\":10.0,\"sp\":600}"));
+        PlayerGameRepository.SeasonToken one = games.seasonToken(Sport.NBA, season);
+        assertEquals(1, one.count());
+        assertNotNull(one.maxFetchedAt());
+
+        games.upsert(new PlayerGameRepository.Row(Sport.NBA, season, 1, PLAYER, GAME + "-b", LocalDate.parse("1999-11-19"),
+                null, null, "{\"pts\":12.0}"));
+        PlayerGameRepository.SeasonToken two = games.seasonToken(Sport.NBA, season);
+        assertEquals(2, two.count());
+        assertFalse(two.maxFetchedAt().isBefore(one.maxFetchedAt()));
+        assertEquals(0, games.seasonToken(Sport.NFL, season).count(), "the token is per sport");
+
+        List<PlayerGameRepository.SeasonGame> read = games.seasonPlayerGames(Sport.NBA, season).stream()
+                .filter(g -> PLAYER.equals(g.sleeperPlayerId())).toList();
+        assertEquals(2, read.size());
+        for (PlayerGameRepository.SeasonGame g : read) {
+            if (g.gameId().equals(GAME)) assertEquals(Boolean.TRUE, g.isAway());
+            else assertNull(g.isAway(), "a null is_away must stay null, not become home");
+        }
+    }
 }

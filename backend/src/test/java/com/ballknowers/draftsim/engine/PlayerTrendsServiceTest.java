@@ -92,7 +92,7 @@ class PlayerTrendsServiceTest {
         S raw(String pid, String team, String opp, int day, Map<String, Object> stats, boolean withTeamRows) {
             String gid = gid(team, day);
             if (withTeamRows) game(gid, day, team, opp);
-            games.add(new SeasonGame(pid, gid, base.plusDays(day), opp, stats, 1));
+            games.add(new SeasonGame(pid, gid, base.plusDays(day), opp, stats, 1, true));
             return this;
         }
 
@@ -194,7 +194,7 @@ class PlayerTrendsServiceTest {
         Map<String, Object> st = new HashMap<>();
         st.put("sp", 14400);
         st.put("pts", 120);
-        b.previous.games.add(new SeasonGame("TEAM_AAA", "AAA-0", BASE, "OPP", st, 1));
+        b.previous.games.add(new SeasonGame("TEAM_AAA", "AAA-0", BASE, "OPP", st, 1, true));
         b.previous.raw("p1", "STP", "STR", 7, Map.of("sp", 3000, "pts", 50), false);
         b.previous.game("ALLSTAR-1", 7, "", "");   // the bare TEAM_ row of the All-Star game (empty suffix)
         PlayerTrends t = b.run();
@@ -706,6 +706,6 @@ class PlayerTrendsServiceTest {
     }
 
     private static SeasonGame g(String pid, String gid, int week, double pts) {
-        return new SeasonGame(pid, gid, BASE.plusDays(week), "OPP", Map.of("sp", 1800, "pts", pts), week);
+        return new SeasonGame(pid, gid, BASE.plusDays(week), "OPP", Map.of("sp", 1800, "pts", pts), week, true);
     }
 }

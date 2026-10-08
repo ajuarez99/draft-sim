@@ -24,6 +24,11 @@ spring:
 
 server:
   port: ${PORT:8080}
+  # The stat leaderboard is ~1.4 MB of JSON per window (spec 022 live check); gzip makes it ~0.3 MB.
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 2KB
 
 draftsim:
   security:

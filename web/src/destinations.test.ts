@@ -9,6 +9,8 @@ import {
   destinationsFor,
   labelOf,
   leagueIdFromPath,
+  playerIdFromPath,
+  playerPagesFor,
   type LeagueContext,
 } from './destinations'
 import type { DraftSummary, Sport } from './api'
@@ -66,7 +68,8 @@ describe('the destination table', () => {
     for (const d of LEAGUE_DESTINATIONS) {
       if (d.isAction) continue
       expect(d.match, `${d.key} has no match`).not.toBeNull()
-      const href = d.href(ctx({ status: d.key === 'live' ? 'drafting' : 'complete' }))
+      // playerId: only the player page reads it, and it has no URL without one.
+      const href = d.href({ ...ctx({ status: d.key === 'live' ? 'drafting' : 'complete' }), playerId: 'P1' })
       expect(destinationFromPath(href), `${d.key} built ${href}, which no row matches`).toBe(d.key)
     }
   })
@@ -310,5 +313,64 @@ describe('trends destination', () => {
 
   it('is recognised from its own path', () => {
     expect(destinationFromPath('/leagues/x/trends')).toBe('trends')
+  })
+})
+
+// specs/022-player-stat-analysis T055: the stats leaderboard, a basketball rail page, season-scoped.
+describe('stats destination', () => {
+  const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'stats')!
+
+  it('is offered to basketball and not football, and sits in the rail', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('stats')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('stats')
+    expect(row().inRail).toBe(true)
+  })
+
+  it('is recognised from its own path and carries the league id', () => {
+    expect(destinationFromPath('/leagues/x/stats')).toBe('stats')
+    expect(destinationFromPath('/leagues/x/stats/')).toBe('stats')
+    expect(leagueIdFromPath('/leagues/x/stats')).toEqual({ idKind: 'league', id: 'x' })
+  })
+
+  it('links the season being viewed, not the newest', () => {
+    const older = draft({ sleeperLeagueId: 'L_OLD', season: 2025 })
+    const current = draft({ sleeperLeagueId: 'L_NEW', season: 2026 })
+    expect(row().href({ lineage: { current, seasons: [current, older] }, season: older })).toBe('/leagues/L_OLD/stats')
+  })
+})
+
+// specs/022-player-stat-analysis T027: the player page is reached from a name,
+// never from the rail, and its sport gate is the only one PlayerLink consults.
+describe('players destination', () => {
+  const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'players')!
+
+  it('is hidden from the rail: the only row with inRail false', () => {
+    expect(row().inRail).toBe(false)
+    expect(LEAGUE_DESTINATIONS.filter((d) => !d.inRail).map((d) => d.key)).toEqual(['players'])
+  })
+
+  it('is matched on its route and carries the league id', () => {
+    expect(destinationFromPath('/leagues/L7/players/1350')).toBe('players')
+    expect(destinationFromPath('/leagues/L7/players/1350/')).toBe('players')
+    expect(leagueIdFromPath('/leagues/L7/players/1350')).toEqual({ idKind: 'league', id: 'L7' })
+    expect(destinationFromPath('/leagues/L7/players')).toBeNull()
+  })
+
+  it('builds a one-season URL from the context player id, and falls back to league home without one', () => {
+    const older = draft({ sleeperLeagueId: 'L_OLD', season: 2025 })
+    const current = draft({ sleeperLeagueId: 'L_NEW', season: 2026 })
+    const c: LeagueContext = { lineage: { current, seasons: [current, older] }, season: older }
+    expect(row().href({ ...c, playerId: '1350' })).toBe('/leagues/L_OLD/players/1350')
+    expect(row().href(c)).toBe('/leagues/L_OLD')
+  })
+
+  it('reads the player id back off a pathname', () => {
+    expect(playerIdFromPath('/leagues/L7/players/1350')).toBe('1350')
+    expect(playerIdFromPath('/leagues/L7/trends')).toBeNull()
+  })
+
+  it('derives playerPagesFor from the row: basketball yes, football no', () => {
+    expect(playerPagesFor('nba')).toBe(true)
+    expect(playerPagesFor('nfl')).toBe(false)
   })
 })

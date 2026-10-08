@@ -1,7 +1,8 @@
 import { useId } from 'react'
 import Avatar from './Avatar'
 import PersonName from './PersonName'
-import type { Superlative, SuperlativePlayerStanding } from '../api'
+import PlayerLink from './PlayerLink'
+import type { Sport, Superlative, SuperlativePlayerStanding } from '../api'
 
 const MAX_PLAYER_ROWS = 10
 
@@ -26,6 +27,9 @@ type Props = {
   s: Superlative
   title: string
   hue: number
+  /** Where a player's name links: the league season the card resolved to. */
+  leagueId: string
+  sport: Sport
   /** Built by the card from `standingFigure`, so this list and the card can't disagree on a figure (amendment 10). */
   figure: (v: number) => string
 }
@@ -42,7 +46,7 @@ type Props = {
  * A row with no value says why (`missingReason`) instead of showing a 0 that
  * would read as a measured result.
  */
-export default function SuperlativeStandings({ s, title, hue, figure }: Props) {
+export default function SuperlativeStandings({ s, title, hue, leagueId, sport, figure }: Props) {
   const titleId = useId()
   const isPlayers = s.kind === 'JABARI_SMITH_JR'
 
@@ -65,7 +69,9 @@ export default function SuperlativeStandings({ s, title, hue, figure }: Props) {
         <span className="sl-standing-rank">{p.rank}</span>
         <span className="sl-standing-who">
           <span className="sl-standing-name">
-            {p.playerName}
+            <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={sport}>
+              {p.playerName}
+            </PlayerLink>
             {p.position ? ` (${p.position})` : ''}
           </span>
           {p.team && <span className="muted small sl-standing-note">{p.team}</span>}

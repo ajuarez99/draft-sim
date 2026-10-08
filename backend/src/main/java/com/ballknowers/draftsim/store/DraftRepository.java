@@ -159,6 +159,9 @@ public class DraftRepository {
      *                      column existed, and for every NFL draft in the
      *                      database, since Sleeper's own default is 0 and
      *                      football never reverses.
+     * @param startTime     {@code draft.start_time}: Sleeper's <em>scheduled</em> start (timestamptz), nullable.
+     *                      Null for a draft that was never scheduled; it is not the time the draft actually began
+     *                      (spec 022 F12: the leaderboard's ADP is the board as of this date).
      *                      <p>
      *                      The coalesce happens in the query rather than at the
      *                      three call sites that read this field, so there is no
@@ -169,25 +172,37 @@ public class DraftRepository {
      */
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,
                            int rounds, int teams, String status, Map<String, Object> slotToManager,
-                           int reversalRound) {
+                           int reversalRound, Instant startTime) {
 
         /** Back-compat for callers/tests built before {@link #reversalRound} existed -- plain snake. */
         public DraftRow(long id, long leagueId, String sleeperDraftId, int season,
                         int rounds, int teams, String status, Map<String, Object> slotToManager) {
-            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, 0);
+            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, 0, null);
         }
+
+        /** Back-compat for callers built before {@link #startTime} existed -- no scheduled start. */
+        public DraftRow(long id, long leagueId, String sleeperDraftId, int season,
+                        int rounds, int teams, String status, Map<String, Object> slotToManager,
+                        int reversalRound) {
+            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, reversalRound, null);
+        }
+    }
+
+    private static Instant startTimeOf(java.sql.ResultSet rs, int column) throws java.sql.SQLException {
+        OffsetDateTime t = rs.getObject(column, OffsetDateTime.class);
+        return t == null ? null : t.toInstant();
     }
 
     public Optional<DraftRow> bySleeperId(String sleeperDraftId) {
         return db.sql("""
                 select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
-                       coalesce(reversal_round_override, reversal_round)
+                       coalesce(reversal_round_override, reversal_round), start_time
                 from draft where sleeper_draft_id = ?
                 """)
                 .param(sleeperDraftId)
                 .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
-                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9)))
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10)))
                 .optional();
     }
 
@@ -207,13 +222,13 @@ public class DraftRepository {
     public Optional<DraftRow> forLeague(long leagueId) {
         return db.sql("""
                 select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
-                       coalesce(reversal_round_override, reversal_round)
+                       coalesce(reversal_round_override, reversal_round), start_time
                 from draft where league_id = ? order by season desc limit 1
                 """)
                 .param(leagueId)
                 .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
-                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9)))
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10)))
                 .optional();
     }
 

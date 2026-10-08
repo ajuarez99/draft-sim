@@ -2549,6 +2549,278 @@ export type PlayerTrends = {
 export const getPlayerTrends = (id: string) =>
   apiFetch(`/api/leagues/${id}/player-trends`).then(json<PlayerTrends>)
 
+// --- specs/022-player-stat-analysis: the player page (contracts/api.md C1) ---
+// Mirrors PlayerStatsPage and its nested Java records field for field. Jackson
+// serialises EnumMap keys as the enum names and OffsetDateTime/LocalDate as ISO
+// strings. Shooting percentages are percent points (47.3, not 0.473). Every
+// number except Fantasy.fpPerGame (rounded to 2 dp) is a raw double: format it
+// where it is shown.
+
+export type PlayerStatsReason = 'NOT_CONFIGURED' | 'NOT_BASKETBALL' | 'NO_GAMES' | 'NO_PLAYER_GAMES'
+export type PlayerWindowKind = 'SEASON' | 'LAST_10' | 'LAST_5'
+/** Why a Rate has no value; exactly one of `value` / `reason` is non-null. */
+export type RateReason = 'NO_ATTEMPTS' | 'NO_MINUTES' | 'NO_TEAM_ROW'
+export type Rate = { value: number | null; reason: RateReason | null }
+export type PlayerShooting = { fgPct: Rate; tpPct: Rate; ftPct: Rate }
+/**
+ * Pooled advanced rates over the window, all in percent points (61.6; ftr and tpar
+ * too: FTA/FGA x 100). `tovPct` is the one where lower is better. Reasons: shot-based
+ * rates NO_ATTEMPTS; team-relative ones NO_TEAM_ROW / NO_MINUTES / NO_ATTEMPTS.
+ */
+export type PlayerAdvanced = {
+  ts: Rate
+  efg: Rate
+  ftr: Rate
+  tpar: Rate
+  usg: Rate
+  minutesShare: Rate
+  astPct: Rate
+  orbPct: Rate
+  drbPct: Rate
+  trbPct: Rate
+  stlPct: Rate
+  blkPct: Rate
+  tovPct: Rate
+}
+export type PlayerAdvancedKey = keyof PlayerAdvanced
+export type PlayerCounting = {
+  pts: number
+  reb: number
+  oreb: number
+  dreb: number
+  ast: number
+  stl: number
+  blk: number
+  tov: number
+  pf: number
+  fgm: number
+  fga: number
+  tpm: number
+  tpa: number
+  ftm: number
+  fta: number
+}
+export type PlayerWindow = {
+  games: number
+  firstGameDate: string | null
+  lastGameDate: string | null
+  minutes: number
+  minutesPerGame: number
+  /** Null when the player has no games in the window. */
+  perGame: PlayerCounting | null
+  totals: PlayerCounting
+  /** Null when he has no minutes. */
+  per36: PlayerCounting | null
+  shooting: PlayerShooting
+  gameScorePerGame: number | null
+  plusMinusPerGame: number | null
+  smallSample: boolean
+  advanced: PlayerAdvanced
+}
+export type PlayerRanksReason = 'NOT_QUALIFIED' | 'NOT_QUALIFIED_STALE'
+export type PlayerRanks = {
+  leagueRank: number | null
+  positionRank: number | null
+  pointsRank: number | null
+  rankMove: number | null
+  groupSize: number | null
+  positionGroupSize: number | null
+  position: string | null
+  reason: PlayerRanksReason | null
+}
+export type PlayerBreakdownRow = {
+  /** The league's scoring key (pts, reb, to, dd, bonus_pt_40p ...). */
+  key: string
+  /** Negative for a category that costs points (turnovers). */
+  points: number
+  /** Null when the season total is not positive. */
+  share: number | null
+}
+export type PlayerFantasy = {
+  /** Null per window when he has no games in it. */
+  fpPerGame: Partial<Record<PlayerWindowKind, number | null>>
+  ranks: PlayerRanks
+  breakdown: PlayerBreakdownRow[]
+  seasonTotal: number
+}
+export type PlayerGameLogRow = {
+  gameId: string
+  date: string
+  week: number
+  /** The team he played for that night; null if unknown. */
+  team: string | null
+  opponent: string
+  isHome: boolean | null
+  minutes: number
+  line: PlayerCounting
+  plusMinus: number
+  gameScore: number
+  fantasyPoints: number
+}
+export type PctGroup = 'NBA_POSITION' | 'LEAGUE_ROSTERED'
+/** NO_ATTEMPTS / NO_MINUTES / NO_TEAM_ROW appear when his own rate has no value. */
+export type PctReason =
+  | 'NOT_QUALIFIED'
+  | 'NOT_QUALIFIED_STALE'
+  | 'GROUP_TOO_SMALL'
+  | 'OWNERSHIP_UNAVAILABLE'
+  | RateReason
+/**
+ * A percentile (0..100) of one advanced rate against one group; exactly one of
+ * `value` / `reason` is non-null. `n` is the group's size excluding the player.
+ * For `tovPct` a lower rate gives a higher percentile.
+ */
+export type Pct = { value: number | null; group: PctGroup; n: number; reason: PctReason | null }
+/** Window, then advanced key, then [NBA_POSITION, LEAGUE_ROSTERED] in that order. */
+export type PlayerPercentiles = Partial<Record<PlayerWindowKind, Partial<Record<PlayerAdvancedKey, Pct[]>>>>
+export type PlayerSeasonOption = { season: number; sleeperLeagueId: string; hasGames: boolean }
+export type OwnershipState = 'ROSTERED' | 'FREE_AGENT' | 'NOT_DRAFTED' | 'UNAVAILABLE'
+export type OwnershipAsOf =
+  | { kind: 'CURRENT'; fetchedAt: string; week: null }
+  | { kind: 'WEEK'; fetchedAt: null; week: number }
+export type PlayerOwnership = {
+  state: OwnershipState
+  /** ROSTERED only. */
+  rosterId: number | null
+  ownerName: string | null
+  avatarId: string | null
+  isMe: boolean
+  /** Null for NOT_DRAFTED and some UNAVAILABLE. */
+  asOf: OwnershipAsOf | null
+}
+export type PlayerStatsPlayer = {
+  sleeperPlayerId: string
+  /** Null when `known` is false: stored games but no player row. */
+  name: string | null
+  positions: string[]
+  team: string | null
+  known: boolean
+}
+export type PlayerStatsPage = {
+  sport: Sport
+  /** The season whose numbers are shown (can differ from the one asked for). */
+  season: number
+  /** Set (to the league's own season) only when `season` is a fallback. */
+  requestedSeason: number | null
+  available: boolean
+  reason: PlayerStatsReason | null
+  dataAsOf: string | null
+  seasons: PlayerSeasonOption[]
+  /** Present only when requestedSeason is: who owns him now, labelled apart from `ownership`. */
+  currentOwnership: PlayerOwnership | null
+  player: PlayerStatsPlayer
+  teamsThisSeason: string[]
+  teamGamesMissed: number
+  ownership: PlayerOwnership | null
+  windows: Partial<Record<PlayerWindowKind, PlayerWindow>>
+  fantasy: PlayerFantasy | null
+  /** Empty when `available` is false. */
+  percentiles: PlayerPercentiles
+  gameLog: PlayerGameLogRow[]
+  /** The ranking rule the server applied; null when `available` is false. */
+  qualification: PlayerQualificationRule | null
+}
+export type PlayerQualificationRule = {
+  minGamesShare: number
+  /** ceil(minGamesShare x maxTeamGames). */
+  minGames: number
+  /** The most games any team has played in the stored data. */
+  maxTeamGames: number
+  minMinutesPerGame: number
+  recencyDays: number
+}
+export const getPlayerStats = (leagueId: string, playerId: string) =>
+  apiFetch(`/api/leagues/${leagueId}/players/${encodeURIComponent(playerId)}`).then(json<PlayerStatsPage>)
+
+// --- specs/022-player-stat-analysis: the stats leaderboard (contracts/api.md C2) ---
+// Mirrors PlayerStatsService.StatLeaderboard / LeaderboardRow, ReplacementLevel.Replacement and
+// DraftAndAdpJoin's records field for field. `window` is required by the route (a missing or unknown
+// value is a 400). A row's `stats`, `fpPerGame` and ranks are the player page's for the same window.
+
+export type DraftStateKind = 'COMPLETE' | 'NOT_HAPPENED' | 'NONE'
+/**
+ * `draftId` is the Sleeper draft id; null when the state is NONE. `draftSeason` is the season of the league the
+ * draft columns and ADP were read from: the REQUESTED season even when the stats fell back to an earlier one
+ * (amended 2026-10-08), so it can differ from the board's `season`.
+ */
+export type DraftState = { state: DraftStateKind; draftId: string | null; draftSeason: number }
+export type AdpReason = 'NO_ADP_STORED' | 'NO_DRAFT_DATE'
+/**
+ * Blend ADP provenance. `source` is always "blend" (a blend of Sleeper search rank and observed mock drafts,
+ * never the raw search rank). Exactly one of `capturedOn` (a date, YYYY-MM-DD) and `reason` is non-null.
+ */
+export type AdpState = { source: string; capturedOn: string | null; reason: AdpReason | null }
+/**
+ * What Draft Grades said about this draft, so a null `draftValue` is never ambiguous. `reason` is one of
+ * NOT_CONFIGURED, DRAFT_NOT_COMPLETE, NO_SCORED_WEEKS or NO_DRAFT (the league has no draft row).
+ */
+export type DraftGradesState = {
+  available: boolean
+  reason: string | null
+  gradesEarly: boolean
+  weeksCounted: number
+}
+/** Per NBA position (PG, SG, SF, PF, C); a null level means no eligible player is left unplaced. */
+export type Replacement = {
+  byPosition: Record<string, number | null>
+  /** "GREEDY_SLOT_FILL". */
+  rule: string
+  teams: number
+  /** The starting slots in fill order (BN, IR, TAXI removed; singles, then G/F, then UTIL). */
+  slots: string[]
+}
+export type LeaderboardDraftPick = { pickNo: number; round: number; managerName: string | null }
+export type LeaderboardRow = {
+  sleeperPlayerId: string
+  /** Null when there are games but no player row. */
+  name: string | null
+  positions: string[]
+  team: string | null
+  ownership: PlayerOwnership
+  /** Present only when the board's `requestedSeason` is set (the requested season's current owner). */
+  currentOwnership: PlayerOwnership | null
+  qualified: boolean
+  /** NOT_QUALIFIED or NOT_QUALIFIED_STALE when `qualified` is false, else null. */
+  reason: PlayerRanksReason | null
+  stats: PlayerWindow
+  fpPerGame: number | null
+  /** Ranks, and the two replacement fields, are null unless `qualified`. */
+  leagueRank: number | null
+  positionRank: number | null
+  pointsRank: number | null
+  rankMove: number | null
+  valueOverReplacement: number | null
+  vorPosition: string | null
+  /** Null for a player with no pick, and unless `draft.state` is COMPLETE. */
+  draft: LeaderboardDraftPick | null
+  /** Draft Grades' valueOverSlot for that pick, or null (see `draftGrades`). */
+  draftValue: number | null
+  /** The blend ADP at the draft's scheduled date, or null. */
+  adp: number | null
+}
+export type StatLeaderboard = {
+  sport: Sport
+  season: number
+  requestedSeason: number | null
+  available: boolean
+  reason: PlayerStatsReason | null
+  dataAsOf: string | null
+  seasons: PlayerSeasonOption[]
+  window: PlayerWindowKind
+  /** The rule behind `qualified`; null when `available` is false. */
+  qualification: PlayerQualificationRule | null
+  /** The point in time every row's ownership is read at; null when unknown. */
+  ownershipAsOf: OwnershipAsOf | null
+  draft: DraftState | null
+  adp: AdpState | null
+  draftGrades: DraftGradesState | null
+  replacement: Replacement | null
+  /** Every player with a game in the window, qualified or not; empty when `available` is false. */
+  rows: LeaderboardRow[]
+}
+export const getStatLeaderboard = (leagueId: string, window: PlayerWindowKind) =>
+  apiFetch(`/api/leagues/${leagueId}/stats?window=${encodeURIComponent(window)}`).then(json<StatLeaderboard>)
+
 export type MatchupSide = {
   rosterId: number
   teamName: string | null

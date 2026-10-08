@@ -5543,3 +5543,117 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .pt-down { background: color-mix(in oklab, var(--down) 18%, transparent); color: var(--down); }
 .pt-flat { background: color-mix(in oklab, var(--muted) 18%, transparent); color: var(--muted); }
 .pt-missed { color: var(--down); }
+
+/* --- Player page (specs/022-player-stat-analysis) --------------------------
+   Cards for the header, ranks and breakdown; tables for the season line and the
+   game log. Every table scrolls inside .pp-wrap so the page never scrolls
+   sideways at 375px. Real-stat columns are plain; fantasy columns take --teal. */
+.pp-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 16px; min-width: 0; }
+.pp-head { display: flex; gap: 16px; align-items: flex-start; }
+.pp-head .pface { margin: 0; }
+.pp-head-main { min-width: 0; flex: 1; }
+.pp-name { margin: 0; font-size: 22px; line-height: 1.2; overflow-wrap: anywhere; }
+.pp-id { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; }
+.pp-pos { padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--teal); background: color-mix(in oklab, var(--teal) 16%, transparent); }
+.pp-team { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
+.pp-line { margin: 6px 0 0; }
+.pp-own-list { display: grid; gap: 6px; margin-top: 12px; }
+.pp-own { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pp-own-now { padding-top: 6px; border-top: 1px dashed var(--line); }
+.pp-own-label { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.pp-owner { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.pp-owner-name { font-weight: 600; overflow-wrap: anywhere; }
+.pp-seasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.pp-season { display: inline-flex; flex-direction: column; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.pp-season:hover { background: var(--row-hover); }
+.pp-season.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.pp-season.empty { color: var(--muted); }
+.pp-season-note { font-size: 10px; font-weight: 500; color: var(--muted); }
+.pp-h { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.04em; }
+.pp-cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); min-width: 0; align-items: start; }
+.pp-wrap { max-width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.pp-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.pp-table th, .pp-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-size: 13px; }
+.pp-table thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.pp-table th:first-child, .pp-table tbody th { text-align: left; font-weight: 600; }
+.pp-table tbody tr:last-child > * { border-bottom: 0; }
+.pp-table tbody tr:hover > * { background: var(--row-hover); }
+.pp-group th { text-align: center; }
+.pp-real { color: var(--text); border-bottom: 2px solid var(--line); }
+.pp-fant { color: var(--teal); }
+.pp-table thead th.pp-fant { border-bottom: 2px solid var(--teal); }
+.pp-strong { font-weight: 700; }
+.pp-shot > span { display: block; line-height: 1.25; }
+.pp-made { font-size: 11px; }
+.pp-rate-none { color: var(--muted); font-size: 12px; cursor: help; }
+.pp-small { margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; color: var(--muted); background: color-mix(in oklab, var(--muted) 18%, transparent); }
+.pp-notes { margin: 8px 0 0; padding-left: 0; list-style: none; }
+.pp-rank { display: grid; grid-template-columns: minmax(64px, auto) auto 1fr auto; align-items: center; gap: 10px; margin-top: 10px; }
+.pp-rank-label { font-size: 12px; color: var(--muted); }
+.pp-rank-num { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pp-meter { display: block; height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--muted) 20%, transparent); overflow: hidden; min-width: 40px; }
+.pp-meter-fill { display: block; height: 100%; border-radius: 999px; background: var(--teal); }
+.pp-meter-fill.down { background: var(--down); }
+.pp-meter-fill.neutral { background: var(--muted); }
+.pp-adv-sep td { font-size: 11px; color: var(--muted); padding-top: 14px; text-align: left; }
+.pp-move { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 0; }
+.pp-move .pt-pill { margin-left: 0; }
+.pp-break { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.pp-break li { display: grid; grid-template-columns: minmax(96px, 1.1fr) minmax(40px, 1.4fr) 56px 52px; align-items: center; gap: 10px; }
+.pp-break-label { font-size: 13px; overflow-wrap: anywhere; }
+.pp-break-pts { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pp-break-pts.neg { color: var(--down); }
+.pp-break-share { text-align: right; font-variant-numeric: tabular-nums; }
+.pp-reason { margin: 0 0 16px; }
+.pp-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
+.pp-tog { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pp-tog:hover { background: var(--row-hover); }
+.pp-tog.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.pp-adv th, .pp-adv td { white-space: normal; vertical-align: top; text-align: left; }
+.pp-adv-head { min-width: 150px; }
+.pp-adv-win { display: block; font-size: 13px; color: var(--text); letter-spacing: 0; }
+.pp-adv-sub { display: block; font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.pp-adv-stat { min-width: 170px; }
+.pp-def summary { cursor: pointer; font-weight: 600; }
+.pp-def p { margin: 4px 0 0; max-width: 260px; font-weight: 400; }
+.pp-adv-cell > * { display: block; }
+.pp-pct { display: grid; gap: 2px; margin-top: 4px; }
+.pp-pct .pp-meter { min-width: 60px; max-width: 120px; }
+.pp-pct-text { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .pp-head { flex-direction: column; }
+  .pp-break li { grid-template-columns: minmax(80px, 1fr) minmax(32px, 1fr) 52px 48px; gap: 6px; }
+  .pp-rank { grid-template-columns: auto auto 1fr auto; }
+}
+
+/* --- Stats leaderboard (specs/022 US4) --------------------------------------
+   The table scrolls inside .sl-wrap; the player column is pinned (sticky) so the
+   name stays visible while the numbers scroll. The page never scrolls sideways. */
+.sl-controls .segment { transition: none; } /* the clicked View segment froze mid-transition (muted text on a half-teal fill) when the table/leaders subtree swapped; instant is enough (live #3) */
+.sl-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; min-width: 0; }
+.sl-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
+.sl-field { display: grid; gap: 2px; }
+.sl-field select { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; }
+.sl-qual { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin: 0 0 6px; }
+.sl-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.sl-wrap { max-width: 100%; overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sl-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.sl-table th, .sl-table td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; font-size: 13px; background: var(--panel); }
+.sl-table thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+.sl-table th.sl-pin { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 150px; max-width: 190px; box-shadow: 1px 0 0 var(--line); }
+.sl-table tbody th.sl-pin { font-weight: 600; white-space: normal; }
+.sl-table td.sl-owner { text-align: left; }
+.sl-table tbody tr:hover > * { background: var(--row-hover); }
+.sl-table tbody tr:last-child > * { border-bottom: 0; }
+.sl-sub { display: block; font-weight: 400; line-height: 1.3; }
+.sl-unranked { color: var(--muted); font-style: italic; white-space: normal; }
+.sl-sort { appearance: none; background: transparent; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; cursor: pointer; letter-spacing: inherit; font-weight: inherit; }
+.sl-sort:hover, .sl-sort.on { color: var(--text); }
+.sl-arrow { display: inline-block; min-width: 10px; margin-left: 3px; font-size: 9px; }
+.sl-move { margin-left: 0; }
+.sl-notes { margin: 8px 0 0; }
+.sl-leaders { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); min-width: 0; }
+.sl-leader { min-width: 0; border-top: 2px solid var(--line); padding-top: 8px; }
+.sl-leader-list { list-style: decimal inside; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.sl-leader-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 13px; }
+.sl-leader-val { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }

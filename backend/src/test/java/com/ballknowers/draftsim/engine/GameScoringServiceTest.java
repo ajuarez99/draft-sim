@@ -151,4 +151,35 @@ class GameScoringServiceTest {
         Map<String, Object> s = stats("pts", 20.0, "reb", "not a number");
         assertEquals(10.0, service.score(scoring2025(), s), 0.001);
     }
+
+    /** Spec 022 I1: one entry per scoring key whose stat is a Number, weight x stat, in scoring-key order. */
+    @Test
+    void contributionsAreWeightTimesStatPerScoringKeyInOrder() {
+        Map<String, Double> scoring = new java.util.LinkedHashMap<>();
+        scoring.put("pts", 0.5); scoring.put("reb", 1.0); scoring.put("to", -1.0);
+        scoring.put("blk", 2.0); scoring.put("dd", 2.0);
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("dd", 1); stats.put("pts", 30.0); stats.put("to", 4);
+        stats.put("reb", "n/a");      // non-Number: skipped
+        stats.put("ast", 12.0);       // not scored: ignored
+        // blk absent: skipped (no entry)
+        Map<String, Double> c = service.contributions(scoring, stats);
+        assertEquals(java.util.List.of("pts", "to", "dd"), new java.util.ArrayList<>(c.keySet()));
+        assertEquals(15.0, c.get("pts"), 0.0);
+        assertEquals(-4.0, c.get("to"), 0.0);
+        assertEquals(2.0, c.get("dd"), 0.0);
+        assertTrue(service.contributions(null, stats).isEmpty());
+        assertTrue(service.contributions(scoring, null).isEmpty());
+    }
+
+    /** Spec 022 N3: score is the rounded NAIVE left-to-right sum of contributions in scoring-key order. */
+    @Test
+    void scoreIsTheRoundedNaiveSumOfContributions() {
+        Map<String, Double> scoring = scoring2025();
+        Map<String, Object> stats = stats("pts", 31.0, "reb", 13.0, "ast", 9.0, "stl", 1.0, "blk", 2.0,
+                "tpm", 3.0, "to", 4.0, "dd", 1.0);
+        double sum = 0.0;
+        for (double v : service.contributions(scoring, stats).values()) sum += v;
+        assertEquals(Math.round(sum * 100.0) / 100.0, service.score(scoring, stats), 0.0);
+    }
 }

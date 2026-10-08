@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import PlayerLink from '../components/PlayerLink'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
@@ -18,6 +19,7 @@ import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { useSeasonLeagueIds } from '../railLeague'
 
 /**
  * specs/004-ffwrapped-feature-parity US2: what each team scored, what it could
@@ -41,6 +43,7 @@ export default function RosterManagement() {
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
+  const leagueIdForSeason = useSeasonLeagueIds(sleeperLeagueId)
 
   useEffect(() => {
     if (!sleeperLeagueId) return
@@ -172,7 +175,7 @@ export default function RosterManagement() {
         </section>
       )}
 
-      {tx && tx.available && <Transactions tx={tx} />}
+      {tx && tx.available && <Transactions tx={tx} leagueId={leagueIdForSeason(tx.season)} />}
     </div>
   )
 }
@@ -182,7 +185,7 @@ export default function RosterManagement() {
  * and how it worked out. Sections of this page rather than a route of their
  * own, matching where ffwrapped puts them.
  */
-function Transactions({ tx }: { tx: LeagueTransactions }) {
+function Transactions({ tx, leagueId }: { tx: LeagueTransactions; leagueId: string }) {
   const types = ['WAIVER', 'FREE_AGENT', 'TRADE', 'COMMISSIONER']
   const widest = Math.max(1, ...tx.byManager.map((m) => m.total))
   return (
@@ -231,7 +234,14 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
                 {t.sides.map((side) => (
                   <span key={side.teamName} className="tx-side">
                     <strong>{side.teamName}</strong> received{' '}
-                    {side.received.map((p) => p.playerName).join(', ')}
+                    {side.received.map((p, k) => (
+                      <Fragment key={p.playerId}>
+                        {k > 0 && ', '}
+                        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={tx.sport}>
+                          {p.playerName}
+                        </PlayerLink>
+                      </Fragment>
+                    ))}
                   </span>
                 ))}
               </li>
@@ -248,10 +258,18 @@ function Transactions({ tx }: { tx: LeagueTransactions }) {
               <span className="tx-week">Wk {a.week}</span>
               <span className="tx-added">
                 {a.added.position && <em className="tx-pos">{a.added.position}</em>}
-                {a.added.playerName}
+                <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={a.added.playerId} sport={tx.sport}>
+                  {a.added.playerName}
+                </PlayerLink>
               </span>
               <Rank player={a.added} />
-              {a.dropped && <span className="muted small tx-dropped">for {a.dropped.playerName}</span>}
+              {a.dropped && (
+                <span className="muted small tx-dropped">for{' '}
+                  <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={a.dropped.playerId} sport={tx.sport}>
+                    {a.dropped.playerName}
+                  </PlayerLink>
+                </span>
+              )}
               <span className="tx-team muted">{a.teamName}</span>
               {a.faabBid != null && <span className="tx-faab">${a.faabBid} FAAB</span>}
             </li>

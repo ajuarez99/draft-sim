@@ -1,0 +1,205 @@
+# Contract: player stat analysis (spec 022)
+
+> **Amended after review, 2026-10-07** ([plan-review.md](../plan-review.md)). Changed fields:
+>
+> - **`seasons`**: entries gain `hasGames`, and the list is built from the chain head, so a past season reaches newer ones (F4).
+> - **`currentOwnership`** is added to C1 and C2, only when `requestedSeason` is set (F6).
+> - **`Ownership`** carries `rosterId` (F13).
+> - **`missedTeamGames`** is renamed `teamGamesMissed` (F10).
+> - **C1 `percentiles`** is keyed by window, then rate (F13).
+> - **Window dates**: `WindowStats` gains `firstGameDate` and `lastGameDate` (F9).
+> - **New reason codes**: `NOT_QUALIFIED_STALE` (F9) and `NO_PLAYER_GAMES` (N9).
+> - **C2 draft**: `draft.state` reads `draft.status` (F1). C2 gains `draftGrades`, and `adp` gains `NO_DRAFT_DATE` (F12).
+> - **C3 games**: `games` come from stored team rows, `complete` follows Spotlight's shared rule, and `missingGames` can be null with `NO_SCHEDULE` (F3).
+> - **C3 ownership**: `mine.ownership` can be `CURRENT` for the unscored week (F2).
+
+All three routes are league routes. They take `X-Sleeper-User` and are scoped by
+`LeagueMembership.visibleLeague`: a caller who can't see the league gets the same 404 as a league
+that doesn't exist. Each route is added to `AccessControlMvcIT`'s hand-listed league routes.
+
+The `{sleeperLeagueId}` in the path names the **season**, as the chain does (research R7). The
+season picker in the web client switches it.
+
+## Fields shared by all three responses
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sport`, `season` | `"nba"`, int | The season answered about |
+| `requestedSeason` | int, nullable | Set when the resolver moved to an earlier season (R7) |
+| `available` | bool | |
+| `reason` | string, nullable | `NOT_BASKETBALL`, `NOT_CONFIGURED` or `NO_GAMES` (this season has no stored games) |
+| `dataAsOf` | timestamp, nullable | `max(player_game.fetched_at)` for the season (FR-008) |
+| `seasons` | `[{season, sleeperLeagueId, hasGames}]` | The picker's options: **every** season in the chain, newest first, walked from the chain head (F4). `hasGames: false` is shown as "no games yet" |
+| `currentOwnership` | `Ownership`, nullable | C1 and C2 only, present only when `requestedSeason` is set: the requested season's current ownership, labelled separately (F6) |
+
+`Rate` is `{ "value": 61.6, "reason": null }`. Exactly one of the two is non-null. `reason` is one
+of `NO_ATTEMPTS`, `NO_MINUTES` or `NO_TEAM_ROW`.
+
+`Pct` is `{ "value": 88.0, "group": "NBA_POSITION" | "LEAGUE_ROSTERED", "n": 97, "reason": null }`.
+`reason` is one of `NOT_QUALIFIED`, `NOT_QUALIFIED_STALE`, `GROUP_TOO_SMALL`, `OWNERSHIP_UNAVAILABLE`, or, when his own rate has no value, that rate's reason (`NO_ATTEMPTS`, `NO_MINUTES`, `NO_TEAM_ROW`). `GROUP_TOO_SMALL` is also sent when he has no position on file (`n` is 0). *(Amended 2026-10-08 after the US2 review, U7: the list had only the first four.)* A free agent's `LEAGUE_ROSTERED` value is his percentile **against** the rostered group (F13).
+
+`Ownership` is:
+
+```json
+{ "state": "ROSTERED", "rosterId": 4, "ownerName": "…", "avatarId": "…", "isMe": false,
+  "asOf": { "kind": "CURRENT", "fetchedAt": "…" } }
+```
+
+- `state` is one of `ROSTERED`, `FREE_AGENT`, `NOT_DRAFTED` or `UNAVAILABLE`.
+- `asOf.kind` is `CURRENT` (with `fetchedAt`) or `WEEK` (with `week`).
+
+## C1. `GET /api/leagues/{sleeperLeagueId}/players/{sleeperPlayerId}`
+
+The player page (US1 and US2).
+
+```json
+{
+  "sport": "nba", "season": 2025, "requestedSeason": 2026, "available": true, "reason": null,
+  "dataAsOf": "2026-04-13T11:04:00Z", "seasons": [{ "season": 2026, "sleeperLeagueId": "…" }],
+  "player": { "sleeperPlayerId": "4046", "name": "Nikola Jokić", "positions": ["C"],
+              "team": "DEN", "known": true },
+  "teamsThisSeason": ["DEN"],
+  "teamGamesMissed": 17,
+  "ownership": { "…": "Ownership" },
+  "windows": {
+    "SEASON":  { "WindowStats": "…" },
+    "LAST_10": { "WindowStats": "…" },
+    "LAST_5":  { "WindowStats": "…" }
+  },
+  "fantasy": {
+    "fpPerGame": { "SEASON": 61.2, "LAST_10": 58.0, "LAST_5": 66.1 },
+    "ranks": { "leagueRank": 1, "positionRank": 1, "pointsRank": 8, "rankMove": 7,
+               "groupSize": 214, "positionGroupSize": 41, "position": "C", "reason": null },
+    "breakdown": [ { "key": "reb", "points": 820.0, "share": 0.21 } ],
+    "seasonTotal": 3978.5
+  },
+  "percentiles": { "SEASON": { "ts": ["Pct", "Pct"], "usg": ["Pct", "Pct"] }, "LAST_10": {}, "LAST_5": {} },
+  "gameLog": [ { "GameLogRow": "…" } ],
+  "qualification": { "minGamesShare": 0.5, "minGames": 42, "maxTeamGames": 83,
+                     "minMinutesPerGame": 15, "recencyDays": 14 }
+}
+```
+
+**`qualification`** (amended 2026-10-08): the ranking rule the server applied, so the client never
+restates it. `minGames` is `ceil(minGamesShare x maxTeamGames)`; `maxTeamGames` is the most games any
+team has played in the season's stored data (83 for 2025, since NYK and SAS include the NBA Cup final;
+reported as computed). Null when `available` is false.
+
+`WindowStats` holds:
+
+- `games` (the games the window actually covers), `firstGameDate`, `lastGameDate`, `minutes`, `minutesPerGame`, `smallSample`;
+- `perGame`, `totals` and `per36`, each `{pts, reb, oreb, dreb, ast, stl, blk, tov, pf, fgm, fga,
+  tpm, tpa, ftm, fta}`;
+- `shooting`: `{fgPct, tpPct, ftPct}`, each a `Rate`;
+- `advanced`: `{ts, efg, ftr, tpar, usg, minutesShare, astPct, orbPct, drbPct, trbPct, stlPct,
+  blkPct, tovPct}`, each a `Rate`;
+- `gameScorePerGame` and `plusMinusPerGame`.
+
+`GameLogRow` holds `gameId`, `date`, `week`, `team`, `opponent`, `isHome` (nullable), `minutes`,
+the full counting line, `plusMinus`, `gameScore` and `fantasyPoints`. Rows are newest first.
+
+**Rules:**
+
+- **Unknown player**: a player id with stored games but no `player` row is
+  `player.known: false`, `name: null`, `positions: []`, `team: null`.
+- **No games**: a player id with no stored games and no player row gives 404.
+- **No games this season**: `available` is true and `reason` is `NO_PLAYER_GAMES` (N9; `NO_GAMES` means the season itself has no stored games). The windows are empty
+  and the game log is `[]`.
+- **Unqualified player**: `fantasy.ranks.reason` is `NOT_QUALIFIED`, and the rank numbers are null.
+
+## C2. `GET /api/leagues/{sleeperLeagueId}/stats?window=SEASON|LAST_10|LAST_5`
+
+The leaderboard (US4). `window` is **required**: a missing or unknown value gives 400, because the
+window is a rule and is never defaulted.
+
+```json
+{
+  "sport": "nba", "season": 2025, "requestedSeason": null, "available": true, "reason": null,
+  "dataAsOf": "…", "seasons": [], "window": "SEASON",
+  "qualification": { "minGames": 41, "minMinutesPerGame": 15, "maxTeamGames": 82 },
+  "ownershipAsOf": { "kind": "WEEK", "week": 21 },
+  "draft": { "state": "COMPLETE", "draftId": "…", "draftSeason": 2025 },
+  "adp": { "source": "blend", "capturedOn": null, "reason": "NO_ADP_STORED" },
+  "draftGrades": { "available": true, "reason": null, "gradesEarly": false, "weeksCounted": 18 },
+  "replacement": { "byPosition": { "PG": 31.2, "SG": 27.0, "SF": 28.4, "PF": 29.1, "C": 33.5 },
+                   "rule": "GREEDY_SLOT_FILL", "teams": 12,
+                   "slots": ["PG","SG","SF","PF","C","G","F","UTIL","UTIL"] },
+  "rows": [ { "LeaderboardRow": "…" } ]
+}
+```
+
+- `draft.state` is `COMPLETE`, `NOT_HAPPENED` or `NONE`, read from **`draft.status`**, never `league.status` (F1).
+- `draft.draftSeason` (int) is the season of the league the draft columns and ADP were read from: the
+  **requested** season, even when `season` (the stats) fell back to an earlier one. *Amended 2026-10-08
+  (code-review V2); before, the draft was read from the answered season.* Mirrored in `web/src/api.ts`.
+- `adp.reason` is `NO_ADP_STORED` or `NO_DRAFT_DATE` (F12).
+- `draftGrades` is copied from that draft's Draft Grades result, so a null `draftValue` is never ambiguous (F12).
+- `adp` is `{source, capturedOn}` when ADP is stored, or carries `reason: NO_ADP_STORED`.
+
+`LeaderboardRow` holds:
+
+- **Identity**: `sleeperPlayerId`, `name`, `positions`, `team`.
+- **Ownership**: an `Ownership` value.
+- **Stats**: `qualified`, and the `WindowStats` for the requested window.
+- **Fantasy and ranks**: `fpPerGame`, plus `leagueRank`, `positionRank`, `pointsRank` and
+  `rankMove`, all null if the player is unqualified.
+- **Replacement**: `valueOverReplacement`, and `vorPosition` (the position it used).
+- **Draft**: `{pickNo, round, managerName}` or null; null means undrafted when `draft.state` is
+  `COMPLETE`.
+- **Draft value**: `draftValue`, Draft Grades' `valueOverSlot`, or null. It is a **season total over the league's counted weeks** (`draftGrades.weeksCounted`), not per week. *Amended 2026-10-08: it was labelled per counted week.*
+- **ADP**: `adp`, a number or null.
+
+**Rules:**
+
+- Rows cover every player with at least one game in the window, qualified or not. Sorting,
+  filtering, column groups and the stat leaders are client-side, with one comparator
+  (research R14).
+- Ranks are computed server-side over the qualified group only. A leaderboard value equals the
+  player page's value for the same window (I6).
+
+## C3. `GET /api/leagues/{sleeperLeagueId}/nightly?date=YYYY-MM-DD`
+
+The nightly report (US3). `date` is optional, because the default is a stated rule rather than a
+value: the latest night that is complete by the rule shared with Spotlight (amended F3; this was
+"the most recent date with at least one complete game", which would have landed on tonight's
+partial slate). The response always names the date it answers about.
+
+```json
+{
+  "sport": "nba", "season": 2025, "requestedSeason": null, "available": true, "reason": null,
+  "dataAsOf": "…", "seasons": [],
+  "date": "2026-01-14", "dates": ["2025-10-21", "…"],
+  "complete": true, "missingGames": 0,
+  "games": [ { "gameId": "…", "home": "DEN", "away": "LAL", "homePts": 121, "awayPts": 114,
+               "status": "complete", "boxStored": true } ],
+  "topByGameScore": [ { "NightLine": "…" } ],
+  "topByFantasy": [ { "NightLine": "…" } ],
+  "mine": { "ownership": { "kind": "WEEK", "week": 13 }, "played": ["NightLine"],
+            "didNotPlay": [ { "sleeperPlayerId": "…", "name": "…", "team": "…" } ], "reason": null },
+  "standouts": [ { "line": "NightLine", "rule": "SEASON_HIGH_PTS", "values": { "tonight": 41, "previous": 33 } } ],
+  "standoutRules": { "minPriorGames": 5, "tsDelta": 15, "tsMinAttempts": 10, "minutesJump": 10 }
+}
+```
+
+`NightLine` holds the `GameLogRow` fields plus `sleeperPlayerId`, `name`, `positions`, `gameScore`,
+`fantasyPoints` and `ownership`.
+
+**Rules:**
+
+- `mine.reason` is `NOT_SIGNED_IN`, `NO_ROSTER` or `OWNERSHIP_UNAVAILABLE`. `mine.ownership.kind` is `CURRENT` for a night in the current, unscored week (F2).
+- `games` come from stored team rows, so 2024 works (F3). `complete` uses the rule shared with Spotlight. `missingGames` is null when the season has no schedule, and then `missingGamesReason` is `NO_SCHEDULE`.
+- The default `date` is the latest **complete** night by the shared rule (F3).
+- A date with no scheduled games gives `games: []` and `reason: "NO_GAMES_ON_DATE"`, with no empty
+  sections.
+- A date outside the season gives 400.
+
+## Health
+
+`/api/health` gains `playerStatsLoaded` (bool): true when the `draftsim.player-stats` block is
+present.
+
+## Web (`web/src/api.ts`)
+
+Types mirror these records field for field, in the same change as the Java records (the
+constitution's second rule). The sentence for every reason and rule code lives in the web client,
+not in the server.

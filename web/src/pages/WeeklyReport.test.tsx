@@ -6,6 +6,7 @@ import type { WeeklyReport as Data } from '../api'
 // Source text, the way destinations.test.ts reads App.tsx: the assertion is
 // about what the file says, so it has to read the file.
 import pageSource from './WeeklyReport.tsx?raw'
+import { invalidateRailLeagues } from '../railLeague'
 
 /** Real router, so the `?week=` round-trip is the real thing rather than a mock of it. */
 let lastSearch = ''
@@ -26,7 +27,9 @@ function renderPage(url = '/leagues/L1/weekly-report') {
 
 const getWeeklyReport = vi.fn()
 const fetchRecap = vi.fn()
+const getDrafts = vi.fn()
 vi.mock('../api', () => ({
+  getDrafts: (...args: unknown[]) => getDrafts(...args),
   getWeeklyReport: (...args: unknown[]) => getWeeklyReport(...args),
   fetchRecap: (...args: unknown[]) => fetchRecap(...args),
 }))
@@ -38,6 +41,8 @@ const recapOff = {
 
 // Every test starts with the recap switched off, which is what main's page effectively had.
 beforeEach(() => {
+  invalidateRailLeagues()
+  getDrafts.mockReset()
   fetchRecap.mockReset()
   fetchRecap.mockResolvedValue(recapOff)
 })
@@ -506,6 +511,24 @@ describe('Best nights and Best week', () => {
     expect(screen.queryByRole('heading', { name: /best week/i })).not.toBeInTheDocument()
   })
 
+  // specs/022 T033: the player's name opens his page on basketball, in both rankings.
+  it('links basketball player names in both rankings to the player page', async () => {
+    getWeeklyReport.mockResolvedValue(nba())
+    renderPage()
+
+    const links = await screen.findAllByRole('link', { name: 'Nikola Jokić' })
+    expect(links).toHaveLength(2)
+    for (const l of links) expect(l).toHaveAttribute('href', '/leagues/L1/players/1658')
+  })
+
+  it('leaves football top performers unlinked', async () => {
+    getWeeklyReport.mockResolvedValue(data())
+    renderPage()
+
+    expect(await screen.findByText('Caleb Williams')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Caleb Williams' })).not.toBeInTheDocument()
+  })
+
   /** And the converse: basketball loses the single list rather than gaining a third ranking. */
   it('replaces Top performers with the pair for basketball', async () => {
     getWeeklyReport.mockResolvedValue(nba())
@@ -588,5 +611,50 @@ describe('Weekly report with the recap feature off', () => {
     expect(container.innerHTML).toBe(before)
     expect(container.querySelector('.recap-card')).toBeNull()
     expect(container.innerHTML.toLowerCase()).not.toContain('recap')
+  })
+})
+
+/** Two seasons of one league: L0 is 2025, L1 (the route's id) is 2026. */
+const lineageDrafts = [
+  { sleeperLeagueId: 'L1', sleeperDraftId: 'd1', season: 2026, previousLeagueId: 'L0', leagueName: 'BK', sport: 'nba' },
+  { sleeperLeagueId: 'L0', sleeperDraftId: 'd0', season: 2025, previousLeagueId: null, leagueName: 'BK', sport: 'nba' },
+]
+
+describe('Weekly report player links follow the season the data came from', () => {
+  beforeEach(() => getWeeklyReport.mockReset())
+  const nbaData = (over: Partial<Data>) =>
+    data({
+      sport: 'nba',
+      playersPlayMultiplePerPeriod: true,
+      topPerformers: undefined,
+      basis: 'ALL_GAMES_PLAYED',
+      sectionsUnavailable: [],
+      bestNights: [
+        { playerId: '1658', playerName: 'Nikola Jokić', position: 'C', teamName: 'T', points: 58.5, date: '2025-11-17', opponent: 'CHI', isAway: false },
+      ],
+      bestWeek: [
+        { playerId: '1658', playerName: 'Nikola Jokić', position: 'C', teamName: 'T', totalPoints: 182.0, gamesPlayed: 4 },
+      ],
+      ...over,
+    })
+
+  it('links a fallback-season row to the league id of that season, not the route one', async () => {
+    getDrafts.mockResolvedValue(lineageDrafts)
+    getWeeklyReport.mockResolvedValue(nbaData({ season: 2025, requestedSeason: 2026 }))
+    renderPage()
+
+    const links = await screen.findAllByRole('link', { name: 'Nikola Jokić' })
+    await waitFor(() => {
+      for (const l of links) expect(l).toHaveAttribute('href', '/leagues/L0/players/1658')
+    })
+  })
+
+  it('keeps the route league id when the data is the route own season', async () => {
+    getDrafts.mockResolvedValue(lineageDrafts)
+    getWeeklyReport.mockResolvedValue(nbaData({ season: 2026 }))
+    renderPage()
+
+    const links = await screen.findAllByRole('link', { name: 'Nikola Jokić' })
+    for (const l of links) expect(l).toHaveAttribute('href', '/leagues/L1/players/1658')
   })
 })

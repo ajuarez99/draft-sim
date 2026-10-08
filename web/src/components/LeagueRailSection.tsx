@@ -6,6 +6,7 @@ import {
   destinationFromPath,
   destinationsFor,
   destinationsInGroup,
+  playerIdFromPath,
   type DestinationGroup,
   LEAGUE_DESTINATIONS,
   labelOf,
@@ -174,10 +175,16 @@ function writeGroupState(state: GroupState) {
  * second copy of "which sports have Analysis" is how the rail and the palette
  * would eventually disagree.
  */
-export function switchTarget(current: DestinationKey | null, target: LeagueContext): string {
+export function switchTarget(current: DestinationKey | null, target: LeagueContext, pathname?: string): string {
   const offered = destinationsFor(target).filter((d) => !d.isAction)
   const same = current ? offered.find((d) => d.key === current) : undefined
-  if (same) return same.href(target)
+  if (same) {
+    // The player page is addressed by a league AND a player; the league context
+    // alone cannot say which player, so it is read back off the current path.
+    // Without one (no pathname given) the row's href falls back to league home.
+    const playerId = pathname ? playerIdFromPath(pathname) : null
+    return same.href(playerId ? { ...target, playerId } : target)
+  }
   const wasDraftPage = current
     ? LEAGUE_DESTINATIONS.find((d) => d.key === current)?.idKind === 'draft'
     : true
@@ -333,7 +340,8 @@ export default function LeagueRailSection({
   const hue = hueForName(d.leagueName)
   const crest = crestLetter(d.leagueName)
 
-  const destinations = destinationsFor(league)
+  // inRail: false rows (the player page) are reached from a name, never listed here.
+  const destinations = destinationsFor(league).filter((x) => x.inRail)
   const phone = useNarrow() // the phone lane: every group expanded (spec 013)
   const [groupState, setGroupState] = useState<GroupState>(readGroupState)
   const currentGroup = destinations.find((x) => x.key === currentKey)?.group ?? null
@@ -452,7 +460,7 @@ export default function LeagueRailSection({
           {lineage.seasons.map((s) => (
             <Link
               key={s.sleeperLeagueId}
-              to={switchTarget(currentKey, { lineage, season: s })}
+              to={switchTarget(currentKey, { lineage, season: s }, pathname)}
               className={`league-season-link${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
               title={`${s.season} · ${s.teams} managers`}
             >
@@ -493,7 +501,7 @@ export default function LeagueRailSection({
                   {lineage.seasons.map((s) => (
                     <Link
                       key={s.sleeperLeagueId}
-                      to={switchTarget(currentKey, { lineage, season: s })}
+                      to={switchTarget(currentKey, { lineage, season: s }, pathname)}
                       role="menuitem"
                       className={`rail-switcher-item${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
                     >
@@ -510,7 +518,7 @@ export default function LeagueRailSection({
                   {others.map((l) => (
                     <Link
                       key={l.current.sleeperLeagueId}
-                      to={switchTarget(currentKey, { lineage: l, season: l.current })}
+                      to={switchTarget(currentKey, { lineage: l, season: l.current }, pathname)}
                       role="menuitem"
                       className="rail-switcher-item"
                     >

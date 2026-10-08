@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.config.DraftGradeProperties;
 import com.ballknowers.draftsim.config.GradeProperties;
+import com.ballknowers.draftsim.config.PlayerStatsProperties;
 import com.ballknowers.draftsim.config.PlayerTrendsProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,12 +23,15 @@ public class HealthController {
 
     private final PlayerTrendsProperties playerTrends;
 
+    private final PlayerStatsProperties playerStats;
+
     public HealthController(ScoringProperties scoring, GradeProperties grades, DraftGradeProperties draftGrades,
-                            PlayerTrendsProperties playerTrends) {
+                            PlayerTrendsProperties playerTrends, PlayerStatsProperties playerStats) {
         this.scoring = scoring;
         this.grades = grades;
         this.draftGrades = draftGrades;
         this.playerTrends = playerTrends;
+        this.playerStats = playerStats;
     }
 
     /**
@@ -49,7 +53,9 @@ public class HealthController {
                 // Spec 018: false means draft grades answer NOT_CONFIGURED.
                 "draftGradesLoaded", draftGrades.loaded(),
                 // Spec 019: false means player trends answer NOT_CONFIGURED.
-                "playerTrendsLoaded", playerTrends.loaded()
+                "playerTrendsLoaded", playerTrends.loaded(),
+                // Spec 022: false means player stat analysis answers NOT_CONFIGURED.
+                "playerStatsLoaded", playerStats.loaded()
         );
     }
 }

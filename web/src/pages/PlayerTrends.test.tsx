@@ -1,15 +1,24 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerTrends from './PlayerTrends'
 import { LeagueDataVersionProvider } from '../leagueDataVersion'
 import type { PlayerTrends as Trends, TrendRow } from '../api'
+import { invalidateRailLeagues } from '../railLeague'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
+  // PlayerLink renders a router Link; the page under test needs only its href.
+  Link: ({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) => (
+    <a href={to} className={className}>
+      {children}
+    </a>
+  ),
 }))
 
 const getPlayerTrends = vi.fn()
+const getDrafts = vi.fn()
 vi.mock('../api', () => ({
+  getDrafts: (...args: unknown[]) => getDrafts(...args),
   getPlayerTrends: (...args: unknown[]) => getPlayerTrends(...args),
 }))
 
@@ -80,9 +89,27 @@ function show(d: Trends) {
   )
 }
 
-beforeEach(() => getPlayerTrends.mockReset())
+beforeEach(() => {
+  getPlayerTrends.mockReset()
+  getDrafts.mockReset()
+  invalidateRailLeagues()
+})
 
 describe('PlayerTrends', () => {
+  // specs/022 T033
+  it('links every player name to the player page on basketball', async () => {
+    show(data())
+    expect(await screen.findByRole('link', { name: 'Stream Guy' })).toHaveAttribute('href', '/leagues/L1/players/9')
+    expect(screen.getByRole('link', { name: 'Ann Guard' })).toHaveAttribute('href', '/leagues/L1/players/1')
+    expect(screen.getByRole('link', { name: 'Cy Big' })).toHaveAttribute('href', '/leagues/L1/players/3')
+  })
+
+  it('leaves names unlinked for a sport without player pages', async () => {
+    show(data({ sport: 'nfl' }))
+    expect(await screen.findByText('Stream Guy')).toBeInTheDocument()
+    expect(screen.queryByRole('link')).toBeNull()
+  })
+
   it('leads a fallen-back list with the earlier season and why', async () => {
     show(data())
     expect(
@@ -183,5 +210,34 @@ describe('PlayerTrends', () => {
   it('explains an unavailable page', async () => {
     show(data({ available: false, reason: 'NO_GAMES' }))
     expect(await screen.findByText(/No games have been played yet/)).toBeInTheDocument()
+  })
+})
+
+/** Two seasons of one league: L0 is 2025, L1 (the route's id) is 2026. */
+const lineageDrafts = [
+  { sleeperLeagueId: 'L1', sleeperDraftId: 'd1', season: 2026, previousLeagueId: 'L0', leagueName: 'BK', sport: 'nba' },
+  { sleeperLeagueId: 'L0', sleeperDraftId: 'd0', season: 2025, previousLeagueId: null, leagueName: 'BK', sport: 'nba' },
+]
+
+describe('PlayerTrends links follow the season each table was measured in', () => {
+  beforeEach(() => getDrafts.mockResolvedValue(lineageDrafts))
+
+  it('links fallback-season rows to the earlier season league id', async () => {
+    show(data())      // season 2026, roles and streaming both fell back to 2025
+    await screen.findByRole('link', { name: 'Stream Guy' })
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Stream Guy' })).toHaveAttribute('href', '/leagues/L0/players/9')
+      expect(screen.getByRole('link', { name: 'Ann Guard' })).toHaveAttribute('href', '/leagues/L0/players/1')
+      expect(screen.getByRole('link', { name: 'Cy Big' })).toHaveAttribute('href', '/leagues/L0/players/3')
+    })
+  })
+
+  it('uses each table own season when only one fell back', async () => {
+    show(data({ streamingSeason: 2026, streamingFallback: false }))
+    await screen.findByRole('link', { name: 'Stream Guy' })
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Ann Guard' })).toHaveAttribute('href', '/leagues/L0/players/1')
+    })
+    expect(screen.getByRole('link', { name: 'Stream Guy' })).toHaveAttribute('href', '/leagues/L1/players/9')
   })
 })

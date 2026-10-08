@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getDrafts, type DraftSummary } from './api'
-import { leagueLineages, type LeagueLineage } from './leagueLineage'
+import { leagueIdForSeason, leagueLineages, type LeagueLineage } from './leagueLineage'
 import { leagueIdFromPath } from './destinations'
 
 /**
@@ -153,6 +153,32 @@ export function useAllLeagues(enabled: boolean): LeagueLineage[] {
   }, [enabled])
 
   return value
+}
+
+/**
+ * Maps a season to the Sleeper league id of that season in the route league's lineage, for links out
+ * of a page that can show an earlier season than the route's (a fallback). Off the same draft cache as
+ * the rail. Until the drafts resolve (or if they cannot), every season maps to the route's own id.
+ */
+export function useSeasonLeagueIds(routeLeagueId: string | undefined): (season: number | null | undefined) => string {
+  const [drafts, setDrafts] = useState<DraftSummary[] | null>(null)
+
+  useEffect(() => {
+    if (!routeLeagueId) return
+    let live = true
+    async function resolve() {
+      const d = await cachedDrafts()
+      if (live) setDrafts(d)
+    }
+    resolve().catch(() => {
+      if (live) setDrafts(null)
+    })
+    return () => {
+      live = false
+    }
+  }, [routeLeagueId])
+
+  return (season) => (drafts && routeLeagueId ? leagueIdForSeason(drafts, routeLeagueId, season) : (routeLeagueId ?? ''))
 }
 
 function findLineage(lineages: LeagueLineage[], ref: NonNullable<RailLeagueRef>): LeagueLineage | null {

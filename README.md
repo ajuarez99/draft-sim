@@ -44,6 +44,16 @@ Built so far:
   (matchups, top performers, and the awards nobody wants).
   All four work for **basketball as well as football**, because none of them is a
   projection -- they read points already scored, which Sleeper reports for both.
+- **Player stat analysis** (specs/022-player-stat-analysis). Basketball only, inside each
+  league, built from the Sleeper box scores already stored (no new data source).
+  - **Player page:** season line, game log and this league's fantasy points. It also shows his
+    league rank against his rank by real points, and where his fantasy points come from.
+  - **Advanced stats:** pooled, in Basketball Reference's definitions and cross-checked against
+    it by hand. Percentiles compare him with NBA position peers and with this league's rostered
+    players.
+  - **Player stats leaderboard:** stat leaders, value over a replacement player, and draft cost
+    against Draft Grades.
+  - **Nightly report:** still to come, after opening night.
 - **Best nights, beside best weeks** (specs/005-daily-weekly-top-players).
   Basketball only, and deliberately: an NBA player plays three or four games a
   fantasy week, so the Weekly Report splits its single list into two. **Best

@@ -3,13 +3,13 @@ package com.ballknowers.draftsim.engine;
 import com.ballknowers.draftsim.config.PlayerTrendsProperties;
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.NbaGameLines.Line;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.LeagueRepository.LeagueRow;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
-import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository.SeasonGame;
 import com.ballknowers.draftsim.store.PlayerGameRepository.TeamGame;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -82,9 +82,18 @@ public class PlayerTrendsService {
 
     // ------------------------------------------------------------------ pure core types
 
-    /** One season's raw rows. {@code absences} are that season's stored absences. */
+    /**
+     * One season's raw rows. {@code absences} are that season's stored absences. {@code lines} is the
+     * {@link NbaGameLines} over {@code games} and {@code teamGames} when the caller already has it (the
+     * {@link SeasonBoxCache} computes it once per load); null means {@code prepare} builds it.
+     */
     public record SeasonData(int season, List<SeasonGame> games, List<TeamGame> teamGames,
-                             List<PlayerAbsenceRepository.Row> absences) {
+                             List<PlayerAbsenceRepository.Row> absences, NbaGameLines lines) {
+        public SeasonData(int season, List<SeasonGame> games, List<TeamGame> teamGames,
+                          List<PlayerAbsenceRepository.Row> absences) {
+            this(season, games, teamGames, absences, null);
+        }
+
         public static SeasonData empty(int season) {
             return new SeasonData(season, List.of(), List.of(), List.of());
         }
@@ -112,7 +121,7 @@ public class PlayerTrendsService {
     // ------------------------------------------------------------------ wiring
 
     private final PlayerTrendsProperties props;
-    private final PlayerGameRepository playerGames;
+    private final SeasonBoxCache boxCache;
     private final PlayerAbsenceRepository absences;
     private final PlayerRepository players;
     private final LeagueRepository leagues;
@@ -123,13 +132,13 @@ public class PlayerTrendsService {
     private final RosterWeekPointsRepository weekPoints;
     private final SportRulesRegistry rules;
 
-    public PlayerTrendsService(PlayerTrendsProperties props, PlayerGameRepository playerGames,
+    public PlayerTrendsService(PlayerTrendsProperties props, SeasonBoxCache boxCache,
                                PlayerAbsenceRepository absences, PlayerRepository players, LeagueRepository leagues,
                                ScheduleGridService grid, RosterSeasonRepository rosterSeasons,
                                LeagueMemberRepository members, ManagerRepository managers,
                                RosterWeekPointsRepository weekPoints, SportRulesRegistry rules) {
         this.props = props;
-        this.playerGames = playerGames;
+        this.boxCache = boxCache;
         this.absences = absences;
         this.players = players;
         this.leagues = leagues;
@@ -201,7 +210,7 @@ public class PlayerTrendsService {
         Double share = null;
         if (!weeks.isEmpty()) {
             List<SeasonGame> measuredGames = measured == cur.season() ? cur.games()
-                    : measured == prev.season() ? prev.games() : playerGames.seasonPlayerGames(sport, measured);
+                    : measured == prev.season() ? prev.games() : boxCache.get(sport, measured).games();
             share = oneGameShare(weeks, measuredGames, measuredScoring);
         }
 
@@ -210,8 +219,8 @@ public class PlayerTrendsService {
     }
 
     private SeasonData load(Sport sport, int season) {
-        return new SeasonData(season, playerGames.seasonPlayerGames(sport, season),
-                playerGames.seasonTeamGames(sport, season), absences.forSeason(sport, season));
+        SeasonBoxCache.Season box = boxCache.get(sport, season);
+        return new SeasonData(season, box.games(), box.teamGames(), absences.forSeason(sport, season), box.lines());
     }
 
     private static PlayerTrends unavailable(String sport, int season, String reason, PlayerTrendsProperties p,
@@ -230,17 +239,13 @@ public class PlayerTrendsService {
 
     private static final GameScoringService SCORER = new GameScoringService();
 
-    /** One played, non-All-Star game of one player. {@code teamRow} is his team's box-score total, nullable. */
-    private record G(String gameId, LocalDate date, double min, Map<String, Object> stats,
-                     TeamGame teamRow, String teamCode) {}
-
     /** The per-player numbers of data-model "Derived values". */
     private record Stat(int games, LocalDate lastGame, Double recentMin, Double seasonMin, Double minDelta,
                         String role, Double recentUsg, Double seasonUsg, Double ptsPerMin, Double seasonPts,
                         Double formPts, int missedTeamGames) {}
 
     /** One season's rows, cleaned and indexed. */
-    private record Prepared(int season, Map<String, List<G>> byPlayer, Map<String, Stat> stats,
+    private record Prepared(int season, Map<String, List<Line>> byPlayer, Map<String, Stat> stats,
                             Set<String> teamCodes, Map<String, Integer> teamGameCount, LocalDate latest) {}
 
     public static PlayerTrends compute(Input in) {
@@ -347,9 +352,9 @@ public class PlayerTrendsService {
     }
 
     /** The team of his last game that season (from the team-row pairing), nullable. */
-    private static String lastTeam(List<G> games) {
+    private static String lastTeam(List<Line> games) {
         if (games == null) return null;
-        for (int i = games.size() - 1; i >= 0; i--) if (games.get(i).teamCode() != null) return games.get(i).teamCode();
+        for (int i = games.size() - 1; i >= 0; i--) if (games.get(i).team() != null) return games.get(i).team();
         return null;
     }
 
@@ -413,47 +418,25 @@ public class PlayerTrendsService {
 
     private static Prepared prepare(SeasonData d, Input in) {
         PlayerTrendsProperties p = in.props();
-        Map<String, List<TeamGame>> teamRowsByGame = new HashMap<>();
-        Set<String> codes = new HashSet<>();
-        Map<String, Set<String>> teamGameIds = new HashMap<>();
-        for (TeamGame t : d.teamGames()) {
-            if (t.code() == null || t.code().isEmpty()) continue;       // the All-Star game's bare TEAM_ row
-            codes.add(t.code());
-            teamRowsByGame.computeIfAbsent(t.gameId(), k -> new ArrayList<>()).add(t);
-            teamGameIds.computeIfAbsent(t.code(), k -> new HashSet<>()).add(t.gameId());
-        }
+        NbaGameLines lines = d.lines() != null ? d.lines() : NbaGameLines.of(d.games(), d.teamGames(), Set.of());   // only reached by tests that build SeasonData by hand
+        Set<String> codes = lines.teamCodes();
         Map<String, Integer> teamGameCount = new HashMap<>();
-        teamGameIds.forEach((c, ids) -> teamGameCount.put(c, ids.size()));
+        lines.teamGames().forEach((c, rows) ->
+                teamGameCount.put(c, (int) rows.stream().map(TeamGame::gameId).distinct().count()));
 
-        Map<String, List<G>> byPlayer = new HashMap<>();
+        Map<String, List<Line>> byPlayer = lines.byPlayer();
         LocalDate latest = null;
-        for (SeasonGame g : d.games()) {
-            if (g.sleeperPlayerId() == null
-                    || g.sleeperPlayerId().startsWith(com.ballknowers.draftsim.store.PlayerGameRepository.TEAM_ID_PREFIX)) continue;
-            if (g.opponent() == null || !codes.contains(g.opponent())) continue;   // All-Star: not a team's game
-            double sp = num(g.stats(), "sp");
-            if (sp <= 0) continue;
-            TeamGame teamRow = null;
-            for (TeamGame t : teamRowsByGame.getOrDefault(g.gameId(), List.of())) {
-                if (!t.code().equals(g.opponent())) teamRow = t;
-            }
-            byPlayer.computeIfAbsent(g.sleeperPlayerId(), k -> new ArrayList<>())
-                    .add(new G(g.gameId(), g.gameDate(), sp / 60.0, g.stats(), teamRow,
-                            teamRow == null ? null : teamRow.code()));
-            if (latest == null || g.gameDate().isAfter(latest)) latest = g.gameDate();
+        for (List<Line> l : byPlayer.values()) {
+            for (Line g : l) if (latest == null || g.date().isAfter(latest)) latest = g.date();
         }
-        Comparator<G> chrono = Comparator.comparing(G::date).thenComparing(G::gameId);
-        for (List<G> l : byPlayer.values()) l.sort(chrono);
 
         // each team's games, newest first, for the missed-team-games run
         Map<String, List<TeamGame>> scheduleByTeam = new HashMap<>();
-        for (TeamGame t : d.teamGames()) {
-            if (t.code() == null || t.code().isEmpty()) continue;
-            scheduleByTeam.computeIfAbsent(t.code(), k -> new ArrayList<>()).add(t);
-        }
-        for (List<TeamGame> l : scheduleByTeam.values()) {
-            l.sort(Comparator.comparing(TeamGame::date).thenComparing(TeamGame::gameId).reversed());
-        }
+        lines.teamGames().forEach((c, rows) -> {
+            List<TeamGame> copy = new ArrayList<>(rows);     // the cached list is unmodifiable
+            copy.sort(Comparator.comparing(TeamGame::date).thenComparing(TeamGame::gameId).reversed());
+            scheduleByTeam.put(c, copy);
+        });
         Map<String, Set<String>> missedByPlayer = new HashMap<>();
         for (PlayerAbsenceRepository.Row a : d.absences()) {
             // B1: a basketball missed game is ENTRY_WITHOUT_PLAY with a game id; week-level rows have none
@@ -462,7 +445,7 @@ public class PlayerTrendsService {
         }
 
         Map<String, Stat> stats = new HashMap<>();
-        for (Map.Entry<String, List<G>> e : byPlayer.entrySet()) {
+        for (Map.Entry<String, List<Line>> e : byPlayer.entrySet()) {
             stats.put(e.getKey(), stat(e.getValue(), p, in.scoring(),
                     missedRun(e.getValue(), scheduleByTeam, missedByPlayer.getOrDefault(e.getKey(), Set.of()))));
         }
@@ -470,10 +453,10 @@ public class PlayerTrendsService {
     }
 
     /** How many of his team's most recent consecutive games he has a game-level absence row for (either basis). */
-    private static int missedRun(List<G> games, Map<String, List<TeamGame>> scheduleByTeam, Set<String> missed) {
+    private static int missedRun(List<Line> games, Map<String, List<TeamGame>> scheduleByTeam, Set<String> missed) {
         if (missed.isEmpty()) return 0;
         String team = null;
-        for (int i = games.size() - 1; i >= 0 && team == null; i--) team = games.get(i).teamCode();
+        for (int i = games.size() - 1; i >= 0 && team == null; i--) team = games.get(i).team();
         if (team == null) return 0;
         int n = 0;
         for (TeamGame t : scheduleByTeam.getOrDefault(team, List.of())) {
@@ -483,11 +466,11 @@ public class PlayerTrendsService {
         return n;
     }
 
-    private static Stat stat(List<G> games, PlayerTrendsProperties p, Map<String, Double> scoring, int missed) {
+    private static Stat stat(List<Line> games, PlayerTrendsProperties p, Map<String, Double> scoring, int missed) {
         int n = games.size();
-        List<G> recent = games.subList(Math.max(0, n - RECENT_GAMES), n);
-        Double recentMin = n >= RECENT_GAMES ? median(recent.stream().mapToDouble(G::min).toArray()) : null;
-        double minSum = games.stream().mapToDouble(G::min).sum();
+        List<Line> recent = games.subList(Math.max(0, n - RECENT_GAMES), n);
+        Double recentMin = n >= RECENT_GAMES ? median(recent.stream().mapToDouble(Line::minutes).toArray()) : null;
+        double minSum = games.stream().mapToDouble(Line::minutes).sum();
         Double seasonMin = n >= p.minSeasonGames() ? minSum / n : null;
         Double delta = recentMin != null && seasonMin != null ? recentMin - seasonMin : null;
         String role = delta == null ? null
@@ -503,31 +486,14 @@ public class PlayerTrendsService {
         Double ptsPerMin = minSum > 0 ? java.util.Arrays.stream(pts).sum() / minSum : null;
 
         return new Stat(n, games.getLast().date(), r2(recentMin), r2(seasonMin), r2(delta), role,
-                n >= RECENT_GAMES ? r2(usage(recent)) : null,
-                n >= p.minSeasonGames() ? r2(usage(games)) : null,
+                n >= RECENT_GAMES ? r2(AdvancedStats.usage(recent).value()) : null,
+                n >= p.minSeasonGames() ? r2(AdvancedStats.usage(games).value()) : null,
                 r2(ptsPerMin), r2(seasonPts), r2(formPts), missed);
-    }
-
-    /**
-     * 100 * sum((FGA + 0.44 FTA + TO) * (TmMIN / 5)) / sum(MIN * (TmFGA + 0.44 TmFTA + TmTO)), pooled over
-     * the games that have a team row (F12). Null when none do.
-     */
-    private static Double usage(List<G> games) {
-        double num = 0;
-        double den = 0;
-        for (G g : games) {
-            if (g.teamRow() == null) continue;
-            Map<String, Object> t = g.teamRow().stats();
-            double tmMin = num(t, "sp") / 60.0;
-            num += (num(g.stats(), "fga") + 0.44 * num(g.stats(), "fta") + num(g.stats(), "to")) * (tmMin / 5.0);
-            den += g.min() * (num(t, "fga") + 0.44 * num(t, "fta") + num(t, "to"));
-        }
-        return den > 0 ? 100.0 * num / den : null;
     }
 
     /** A missing or non-numeric stat key is 0 (F12). */
     private static double num(Map<String, Object> m, String key) {
-        return m != null && m.get(key) instanceof Number n ? n.doubleValue() : 0.0;
+        return AdvancedStats.num(m, key);
     }
 
     private static double mean(double[] v, int from, int to) {

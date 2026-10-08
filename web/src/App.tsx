@@ -15,7 +15,9 @@ import LeagueAnalysis from './pages/LeagueAnalysis'
 import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
 import ScheduleGrid from './pages/ScheduleGrid'
+import StatLeaderboard from './pages/StatLeaderboard'
 import PlayerTrends from './pages/PlayerTrends'
+import PlayerPage from './pages/PlayerPage'
 import SeasonForecast from './pages/SeasonForecast'
 import WeeklyReport from './pages/WeeklyReport'
 import Superlatives from './pages/Superlatives'
@@ -73,6 +75,12 @@ function KeyedByLeague({ page: Page }: { page: ComponentType }) {
   return <Page key={sleeperLeagueId} />
 }
 
+// The player page is addressed by a league AND a player, so it is keyed on both (N4).
+function KeyedByLeagueAndPlayer({ page: Page }: { page: ComponentType }) {
+  const { sleeperLeagueId, sleeperPlayerId } = useParams<{ sleeperLeagueId: string; sleeperPlayerId: string }>()
+  return <Page key={`${sleeperLeagueId}:${sleeperPlayerId}`} />
+}
+
 export default function App() {
   const user = useUser()
 
@@ -122,6 +130,14 @@ export default function App() {
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} />} />
               <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} />} />
               <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} />} />
+              <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} />} />
+              {/* specs/022: addressed by a league AND a player, so it is keyed on both (N4):
+                  moving from one player to another is a fresh page, not a re-render that
+                  leaves the last player's numbers up while the next one loads. */}
+              <Route
+                path="/leagues/:sleeperLeagueId/players/:sleeperPlayerId"
+                element={<KeyedByLeagueAndPlayer page={PlayerPage} />}
+              />
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
                 element={<KeyedByLeague page={RosterManagement} />}

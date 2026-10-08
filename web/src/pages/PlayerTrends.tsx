@@ -1,8 +1,10 @@
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import NotFound from '../components/NotFound'
+import PlayerLink from '../components/PlayerLink'
 import { getPlayerTrends, type PlayerTrends as Trends, type PlayerTrendsReason, type TrendRow } from '../api'
 import { useLeagueDataVersion } from '../leagueDataVersion'
+import { useSeasonLeagueIds } from '../railLeague'
 import { useBlock } from '../useBlock'
 import { fallbackLabel, oneGameNote, rolesWindowLabel, streamingReasonSentence } from '../playerTrends'
 
@@ -28,10 +30,14 @@ function DeltaPill({ delta }: { delta: number | null }) {
   return <span className={`pt-pill ${cls}`}>{`${sign}${Math.abs(delta).toFixed(1)} min`}</span>
 }
 
-function PlayerCell({ row }: { row: TrendRow }) {
+function PlayerCell({ row, d, leagueId }: { row: TrendRow; d: Trends; leagueId: string }) {
   return (
     <td>
-      <span className="pt-name">{row.name}</span> <span className="muted small">{row.team ?? ''}</span>
+      <span className="pt-name">
+        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={row.sleeperPlayerId} sport={d.sport}>
+          {row.name}
+        </PlayerLink>
+      </span> <span className="muted small">{row.team ?? ''}</span>
       <span className="pt-meta">{row.positions.join('/')}</span>
     </td>
   )
@@ -47,7 +53,7 @@ function MinutesCell({ row }: { row: TrendRow }) {
   )
 }
 
-function StreamingTable({ rows, d }: { rows: TrendRow[]; d: Trends }) {
+function StreamingTable({ rows, d, leagueId }: { rows: TrendRow[]; d: Trends; leagueId: string }) {
   return (
     <div className="pt-wrap">
       <table className="pt-table">
@@ -63,7 +69,7 @@ function StreamingTable({ rows, d }: { rows: TrendRow[]; d: Trends }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.sleeperPlayerId}>
-              <PlayerCell row={r} />
+              <PlayerCell row={r} d={d} leagueId={leagueId} />
               <td className="pt-num">{fmt(r.seasonPts)}</td>
               <td>{fmt(r.formPts)}</td>
               <MinutesCell row={r} />
@@ -81,7 +87,7 @@ function StreamingTable({ rows, d }: { rows: TrendRow[]; d: Trends }) {
   )
 }
 
-function RoleTable({ rows, d, showOwner }: { rows: TrendRow[]; d: Trends; showOwner: boolean }) {
+function RoleTable({ rows, d, showOwner, leagueId }: { rows: TrendRow[]; d: Trends; showOwner: boolean; leagueId: string }) {
   return (
     <div className="pt-wrap">
       <table className="pt-table">
@@ -96,7 +102,7 @@ function RoleTable({ rows, d, showOwner }: { rows: TrendRow[]; d: Trends; showOw
         <tbody>
           {rows.map((r) => (
             <tr key={r.sleeperPlayerId}>
-              <PlayerCell row={r} />
+              <PlayerCell row={r} d={d} leagueId={leagueId} />
               <MinutesCell row={r} />
               <td>
                 {r.recentUsg == null ? '–' : `${fmt(r.recentUsg)}%`} recent ·{' '}
@@ -118,7 +124,7 @@ function MoreLine({ shown, total }: { shown: number; total: number }) {
 type RoleTotals = { total: number; freeAgents: number; rostered: number }
 
 /** One direction (risers or fallers), split by ownership only when it is known. */
-function RoleList({ title, rows, totals, split, d }: { title: string; rows: TrendRow[]; totals: RoleTotals; split: boolean; d: Trends }) {
+function RoleList({ title, rows, totals, split, d, leagueId }: { title: string; rows: TrendRow[]; totals: RoleTotals; split: boolean; d: Trends; leagueId: string }) {
   const parts = [
     { label: 'Free agents', rows: rows.filter((r) => r.rostered === false), owner: false, total: totals.freeAgents },
     { label: 'Rostered', rows: rows.filter((r) => r.rostered === true), owner: true, total: totals.rostered },
@@ -134,14 +140,14 @@ function RoleList({ title, rows, totals, split, d }: { title: string; rows: Tren
             {p.rows.length === 0 ? (
               <p className="muted small">None.</p>
             ) : (
-              <RoleTable rows={p.rows} d={d} showOwner={p.owner} />
+              <RoleTable rows={p.rows} d={d} showOwner={p.owner} leagueId={leagueId} />
             )}
             <MoreLine shown={p.rows.length} total={p.total} />
           </div>
         ))
       ) : (
         <>
-          {rows.length > 0 && <RoleTable rows={rows} d={d} showOwner={false} />}
+          {rows.length > 0 && <RoleTable rows={rows} d={d} showOwner={false} leagueId={leagueId} />}
           <MoreLine shown={rows.length} total={totals.total} />
         </>
       )}
@@ -160,12 +166,17 @@ export default function PlayerTrends() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const id = sleeperLeagueId ?? ''
   const version = useLeagueDataVersion(sleeperLeagueId)
+  const leagueIdForSeason = useSeasonLeagueIds(sleeperLeagueId)
   const block = useBlock(id ? () => getPlayerTrends(id) : null, [id, version])
 
   if (block.status === 'error' && block.notFound) return <NotFound what="league" />
 
   const d = block.status === 'ok' ? block.data : null
   const note = d ? oneGameNote(d.oneGameCredit) : null
+  // The streaming and the risers/fallers tables can come from different seasons (each has its own
+  // fallback), so each links to the league of the season its rows were measured in.
+  const streamingLeagueId = leagueIdForSeason(d?.streamingSeason ?? d?.season)
+  const rolesLeagueId = leagueIdForSeason(d?.rolesSeason ?? d?.season)
   const ownershipKnown = d != null && d.streamingReason == null
   const endOfSeason = d != null && (d.rolesFallback || d.streamingReason === 'SEASON_COMPLETE')
 
@@ -209,7 +220,7 @@ export default function PlayerTrends() {
                 {d.streaming.length === 0 ? (
                   <p className="muted small">No unrostered players qualify.</p>
                 ) : (
-                  <StreamingTable rows={d.streaming} d={d} />
+                  <StreamingTable rows={d.streaming} d={d} leagueId={streamingLeagueId} />
                 )}
               </>
             )}
@@ -237,6 +248,7 @@ export default function PlayerTrends() {
                 totals={{ total: d.risersTotal, freeAgents: d.risersFreeAgentTotal, rostered: d.risersRosteredTotal }}
                 split={ownershipKnown}
                 d={d}
+                leagueId={rolesLeagueId}
               />
               <RoleList
                 title="Fallers"
@@ -244,6 +256,7 @@ export default function PlayerTrends() {
                 totals={{ total: d.fallersTotal, freeAgents: d.fallersFreeAgentTotal, rostered: d.fallersRosteredTotal }}
                 split={ownershipKnown}
                 d={d}
+                leagueId={rolesLeagueId}
               />
             </div>
             <p className="muted small">
