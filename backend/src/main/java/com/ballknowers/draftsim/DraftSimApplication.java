@@ -23,6 +23,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         DraftGradeProperties.class,
         PlayerTrendsProperties.class,
         PlayerStatsProperties.class,
+        NbaGameProperties.class,
         RecapProperties.class
 })
 public class DraftSimApplication {

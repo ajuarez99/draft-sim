@@ -23,7 +23,10 @@ import java.util.Set;
  * <p>Rules: {@code TEAM_} rows are never lines; the bare {@code TEAM_} row and any game whose
  * opponent is not a season team code (the All-Star game) are dropped; {@code sp <= 0} is not a game;
  * a game's team row is the same-game row whose code is not the opponent, the opponent row the one
- * whose code is. Lines are ordered by {@code (date, gameId)}.
+ * whose code is. Lines are ordered by {@code (date, gameId)}. A game whose id is in
+ * {@code excludedGameIds} (NBA Cup finals, which Sleeper stores as ordinary regular-season games and
+ * the NBA does not count) is dropped entirely: its player lines and both team rows, so a team's game
+ * count and the season's maximum return to the official figure.
  *
  * <p>Pure and immutable: every list, map and set is unmodifiable, because the result is shared by
  * {@code SeasonBoxCache}. A caller that needs another order sorts a copy.
@@ -44,12 +47,13 @@ public record NbaGameLines(Map<String, List<Line>> byPlayer, Map<String, List<Te
     public record Line(String gameId, LocalDate date, int week, String team, String opponent, Boolean isHome,
                        double minutes, Map<String, Object> stats, TeamGame teamRow, TeamGame oppRow) {}
 
-    public static NbaGameLines of(List<SeasonGame> games, List<TeamGame> teamRows) {
+    public static NbaGameLines of(List<SeasonGame> games, List<TeamGame> teamRows, Set<String> excludedGameIds) {
         Map<String, List<TeamGame>> rowsByGame = new HashMap<>();
         Map<String, List<TeamGame>> byTeam = new HashMap<>();
         Set<String> codes = new HashSet<>();
         for (TeamGame t : teamRows) {
             if (t.code() == null || t.code().isEmpty()) continue;       // the All-Star game's bare TEAM_ row
+            if (excludedGameIds.contains(t.gameId())) continue;         // a configured Cup final
             codes.add(t.code());
             rowsByGame.computeIfAbsent(t.gameId(), k -> new ArrayList<>()).add(t);
             byTeam.computeIfAbsent(t.code(), k -> new ArrayList<>()).add(t);
@@ -59,6 +63,7 @@ public record NbaGameLines(Map<String, List<Line>> byPlayer, Map<String, List<Te
         for (SeasonGame g : games) {
             if (g.sleeperPlayerId() == null
                     || g.sleeperPlayerId().startsWith(PlayerGameRepository.TEAM_ID_PREFIX)) continue;
+            if (excludedGameIds.contains(g.gameId())) continue;                    // a configured Cup final
             if (g.opponent() == null || !codes.contains(g.opponent())) continue;   // All-Star: not a team's game
             double sp = AdvancedStats.num(g.stats(), "sp");
             if (sp <= 0) continue;
@@ -86,6 +91,6 @@ public record NbaGameLines(Map<String, List<Line>> byPlayer, Map<String, List<Te
     }
 
     public static NbaGameLines empty() {
-        return of(List.of(), List.of());
+        return of(List.of(), List.of(), Set.of());
     }
 }

@@ -66,6 +66,11 @@ Rules, moved verbatim from Trends:
 - The team row is the one in the same game whose code ≠ the opponent. The opponent row is the one
   whose code = the opponent.
 - Ordering is by `(date, gameId)`.
+- Amended 2026-10-08 (Cup final decision): a game whose id is in the configured
+  `excludedGameIds` (`draftsim.nba-games.excluded-game-ids`; NBA Cup finals, which Sleeper stores as
+  regular-season games) is dropped entirely: its player lines and both of its team rows. The list is an
+  explicit argument, `NbaGameLines.of(games, teamGames, excludedGameIds)`. `SeasonBoxCache` still
+  exposes the raw lists.
 
 It also outputs `teamGames: Map<teamCode, List<TeamGame>>` and the season's team codes.
 

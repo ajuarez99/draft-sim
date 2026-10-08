@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.config.NbaGameProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository.SeasonGame;
@@ -74,6 +75,7 @@ public class SeasonBoxCache {
     private record Stored(Season season, long generation) {}
 
     private final Source source;
+    private final Set<String> excludedGameIds;
     private final ConcurrentHashMap<Key, Stored> entries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Key, AtomicLong> generations = new ConcurrentHashMap<>();
     /** Overlapping refreshes of one season each hold a count; "refreshing" is a count above 0. */
@@ -81,7 +83,7 @@ public class SeasonBoxCache {
     private final ConcurrentHashMap<Key, CompletableFuture<Stored>> inFlight = new ConcurrentHashMap<>();
 
     @Autowired
-    public SeasonBoxCache(PlayerGameRepository repo) {
+    public SeasonBoxCache(PlayerGameRepository repo, NbaGameProperties nbaGames) {
         this(new Source() {
             @Override public SeasonToken token(Sport sport, int season) {
                 return repo.seasonToken(sport, season);
@@ -92,11 +94,16 @@ public class SeasonBoxCache {
             @Override public List<TeamGame> teamGames(Sport sport, int season) {
                 return repo.seasonTeamGames(sport, season);
             }
-        });
+        }, nbaGames);
     }
 
     SeasonBoxCache(Source source) {
+        this(source, NbaGameProperties.none());
+    }
+
+    SeasonBoxCache(Source source, NbaGameProperties nbaGames) {
         this.source = source;
+        this.excludedGameIds = nbaGames.excludedGameIdSet();
     }
 
     /**
@@ -207,7 +214,10 @@ public class SeasonBoxCache {
         }
         List<SeasonGame> frozenGames = Collections.unmodifiableList(games);
         List<TeamGame> frozenTeams = Collections.unmodifiableList(teams);
-        return new Season(token, frozenGames, frozenTeams, NbaGameLines.of(frozenGames, frozenTeams));
+        // games/teamGames stay RAW on purpose: Trends' oneGameShare reads them (a documented
+        // earlier decision), so the configured Cup-final exclusion is applied only to lines.
+        return new Season(token, frozenGames, frozenTeams,
+                NbaGameLines.of(frozenGames, frozenTeams, excludedGameIds));
     }
 
     // ------------------------------------------------------------------ compact stats

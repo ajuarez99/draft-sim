@@ -190,3 +190,21 @@ Two differences to note:
   can't tell whether Sleeper treats the final as fantasy-eligible.
 - **Status**: not fixed. It is a decision for Allan, because the fix changes Trends output, an
   existing feature, and needs an identification rule Sleeper doesn't supply.
+
+### Cup final decision (2026-10-08): **exclude everywhere** (Allan's choice)
+
+- **The rule**: NBA Cup championship games are dropped in the shared game-lines rule, so the
+  player page, leaderboard, nightly report and Trends all match official regular-season stats.
+  - The games are identified by a hand-maintained, labelled list,
+    `draftsim.nba-games.excluded-game-ids` in `weights.yml`, because Sleeper doesn't flag them.
+  - Measured ids: 2024 `20241217_OKC_MIL` (MIL and OKC had 83 games) and 2025
+    `1305814461864501248` (NYK and SAS had 83).
+  - Trends' `oneGameShare` still reads raw rows, per the earlier F7 decision.
+- **Live (measured)**:
+  - Brunson shows **74 GP**, matching Basketball Reference.
+  - The Cup final is gone from his game log.
+  - `qualification` reads `maxTeamGames` 82 and `minGames` 41.
+- **Trends**: both leagues' `player-trends` JSON is still **byte-identical** to the T005 baselines.
+  None of the listed risers, fallers or streaming players is affected, so the baselines stay valid.
+  This is a property of today's lists, not a guarantee that Trends can never change.
+- **Backend**: 1,477 tests, 0 skipped.

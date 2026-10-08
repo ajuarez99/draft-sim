@@ -49,6 +49,18 @@ The opponent's team row is also needed, for the rebound, steal and block rates a
 possessions. It is the row whose code **equals** the player's opponent. `NbaGameLines` exposes
 both rows.
 
+**Amended 2026-10-08 (Cup final decision)**: the shared rule now also drops configured NBA Cup
+championship games. Sleeper stores them as ordinary regular-season games with real team codes, so the
+All-Star rule cannot see them, and the NBA does not count them in regular-season stats. Measured in the
+local DB: `20241217_OKC_MIL` (2024) and `1305814461864501248` (2025, NYK v SAS) each give their two
+teams 83 games; every other team has 82. The user decided every real-basketball figure (player page,
+leaderboard, nightly report, Player Trends) excludes them. The ids are a hand-maintained list,
+`draftsim.nba-games.excluded-game-ids` in `config/weights.yml` (`NbaGameProperties`), passed to
+`NbaGameLines.of(games, teamGames, excludedGameIds)`. Player lines and both team rows of an excluded
+game are dropped, so team game counts and `maxTeamGames` return to 82. `SeasonBoxCache`'s raw
+`games`/`teamGames` stay untouched, because Trends' `oneGameShare` reads raw rows (earlier decision).
+Verified: Jalen Brunson 2025 = 74 games (matches Basketball Reference), `maxTeamGames` 82, `minGames` 41.
+
 ## R3. Usage rate already exists. Extract it, don't copy it
 
 **Measured**: `PlayerTrendsService.usage` (`:515`) is the Basketball Reference formula, pooled over

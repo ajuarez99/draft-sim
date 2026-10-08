@@ -217,3 +217,13 @@ draftsim:
     standout-ts-min-attempts: 10
     standout-minutes-jump: 10
     leaders-size: 5
+
+  # Spec 022 (Cup-final decision, 2026-10-08). Hand-maintained, not fitted. Sleeper stores NBA Cup
+  # championship games as ordinary regular-season games with real team codes; the NBA does not count
+  # them in regular-season stats, so every real-basketball figure drops them (NbaGameLines). One id per
+  # season, added by hand (Sleeper does not flag them). Quote the ids: a numeric-looking one must stay
+  # a string. An empty or missing list means "exclude nothing".
+  nba-games:
+    excluded-game-ids:
+      - "20241217_OKC_MIL"       # 2024-25 Cup final, OKC v MIL (2024-12-17)
+      - "1305814461864501248"    # 2025-26 Cup final, NYK v SAS (2025-12-16)

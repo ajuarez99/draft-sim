@@ -121,7 +121,7 @@ class PlayerStatsReadIT {
                       sum(coalesce((stats->>'tpm')::float, 0)) stpm, sum(coalesce((stats->>'tpa')::float, 0)) stpa,
                       sum(coalesce((stats->>'ftm')::float, 0)) sftm, sum(coalesce((stats->>'fta')::float, 0)) sfta
                     from player_game
-                    where sport = 'nba' and season = 2025 and sleeper_player_id = ?
+                    where sport = 'nba' and season = 2025 and sleeper_player_id = ? and game_id <> '1305814461864501248'
                       and (stats->>'sp')::float > 0 and opponent in (select * from codes)
                     """.formatted(SEASON_CODES), id);
 
@@ -201,7 +201,7 @@ class PlayerStatsReadIT {
         for (String[] w : who) {
             List<String> found = jdbc.queryForList("""
                     select p.sleeper_id from player p
-                    join player_game g on g.sport = p.sport and g.sleeper_player_id = p.sleeper_id and g.season = 2025
+                    join player_game g on g.sport = p.sport and g.sleeper_player_id = p.sleeper_id and g.season = 2025 and g.game_id <> '1305814461864501248'
                     where p.sport = 'nba' and p.name like ? group by p.sleeper_id order by count(*) desc limit 1
                     """, String.class, w[0]);
             Assumptions.assumeFalse(found.isEmpty(), "no 2025 rows for " + w[0]);
@@ -221,7 +221,7 @@ class PlayerStatsReadIT {
                     join player_game o on o.sport = p.sport and o.season = p.season and o.game_id = p.game_id
                          and o.sleeper_player_id like 'TEAM\\_%%' and length(o.sleeper_player_id) > 5
                          and substr(o.sleeper_player_id, 6) = p.opponent
-                    where p.sport = 'nba' and p.season = 2025 and p.sleeper_player_id = ?
+                    where p.sport = 'nba' and p.season = 2025 and p.sleeper_player_id = ? and p.game_id <> '1305814461864501248'
                       and (p.stats->>'sp')::float > 0 and p.opponent in (select * from codes)
                     """.formatted(SEASON_CODES,
                     f("p", "pts"), f("p", "fga"), f("p", "fta"),
@@ -281,6 +281,22 @@ class PlayerStatsReadIT {
         PlayerStatsPage page = service.read(l2025, "1000", MEMBER).orElseThrow();
         assertEquals(38, page.windows().get(WindowKind.SEASON).games());
         assertEquals(44, page.teamGamesMissed());
+    }
+
+    /**
+     * The Cup-final decision (2026-10-08): the 2025-26 Cup final (game 1305814461864501248, NYK v SAS) is
+     * not a regular-season game, so Jalen Brunson (NYK) has 74 games, matching Basketball Reference, and no
+     * team has more than 82.
+     */
+    @Test
+    void theCupFinalIsNotCountedBrunsonHas74GamesAndTheMaxTeamGamesIs82() {
+        var l2025 = league(NBA_2025);
+        PlayerStatsPage page = service.read(l2025, "1967", MEMBER).orElseThrow();
+        System.out.println("REPORT-CUP Brunson games=" + page.windows().get(WindowKind.SEASON).games()
+                + " maxTeamGames=" + page.qualification().maxTeamGames() + " minGames=" + page.qualification().minGames());
+        assertEquals(74, page.windows().get(WindowKind.SEASON).games());
+        assertEquals(82, page.qualification().maxTeamGames());
+        assertEquals(41, page.qualification().minGames());
     }
 
     @Test

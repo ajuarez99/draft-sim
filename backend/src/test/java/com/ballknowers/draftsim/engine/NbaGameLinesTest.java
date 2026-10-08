@@ -31,7 +31,7 @@ class NbaGameLinesTest {
     }
 
     private NbaGameLines lines() {
-        return NbaGameLines.of(games, teams);
+        return NbaGameLines.of(games, teams, java.util.Set.of());
     }
 
     @Test
@@ -135,5 +135,34 @@ class NbaGameLinesTest {
         assertThrows(UnsupportedOperationException.class, () -> l.teamGames().put("x", List.of()));
         assertThrows(UnsupportedOperationException.class, () -> l.teamGames().get("AAA").clear());
         assertThrows(UnsupportedOperationException.class, () -> l.teamCodes().add("x"));
+    }
+
+    @Test
+    void anExcludedGameDropsTheLineAndBothTeamRowsAndNothingElse() {
+        game("cup", 0, "AAA", "BBB");
+        game("reg", 1, "AAA", "BBB");
+        play("p1", "cup", 0, "BBB", false, 14400);
+        play("p1", "reg", 1, "BBB", false, 14400);
+        play("p2", "cup", 0, "AAA", true, 14400);
+        NbaGameLines l = NbaGameLines.of(games, teams, Set.of("cup"));
+        assertEquals(List.of("reg"), l.byPlayer().get("p1").stream().map(Line::gameId).toList());
+        assertNull(l.byPlayer().get("p2"), "his only game was the excluded one");
+        assertEquals(1, l.teamGames().get("AAA").size(), "team game count returns to the official figure");
+        assertEquals(1, l.teamGames().get("BBB").size());
+        assertEquals("reg", l.teamGames().get("AAA").get(0).gameId());
+        // the same rows with nothing excluded keep everything
+        NbaGameLines all = NbaGameLines.of(games, teams, Set.of());
+        assertEquals(2, all.byPlayer().get("p1").size());
+        assertEquals(2, all.teamGames().get("AAA").size());
+        assertNotNull(all.byPlayer().get("p2"));
+    }
+
+    @Test
+    void anExcludedIdThatMatchesNoGameChangesNothing() {
+        game("g1", 0, "AAA", "BBB");
+        play("p1", "g1", 0, "BBB", false, 14400);
+        NbaGameLines l = NbaGameLines.of(games, teams, Set.of("no-such-game"));
+        assertEquals(1, l.byPlayer().get("p1").size());
+        assertEquals(1, l.teamGames().get("AAA").size());
     }
 }

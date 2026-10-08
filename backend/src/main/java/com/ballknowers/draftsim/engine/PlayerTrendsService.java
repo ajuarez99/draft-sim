@@ -418,7 +418,7 @@ public class PlayerTrendsService {
 
     private static Prepared prepare(SeasonData d, Input in) {
         PlayerTrendsProperties p = in.props();
-        NbaGameLines lines = d.lines() != null ? d.lines() : NbaGameLines.of(d.games(), d.teamGames());
+        NbaGameLines lines = d.lines() != null ? d.lines() : NbaGameLines.of(d.games(), d.teamGames(), Set.of());   // only reached by tests that build SeasonData by hand
         Set<String> codes = lines.teamCodes();
         Map<String, Integer> teamGameCount = new HashMap<>();
         lines.teamGames().forEach((c, rows) ->
