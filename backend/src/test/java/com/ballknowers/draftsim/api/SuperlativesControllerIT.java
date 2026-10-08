@@ -136,7 +136,7 @@ class SuperlativesControllerIT {
 
         assertEquals(403, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> body = GoldenJson.wire(response.getBody());
         assertNotNull(body);
         assertNotNull(body.get("message"));
         assertEquals(true, body.get("commissionerKnown"));
@@ -157,7 +157,7 @@ class SuperlativesControllerIT {
                 new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "conduct reason", 3), COMMISSIONER_USER);
         assertEquals(200, saved.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> savedBody = (Map<String, Object>) saved.getBody();
+        Map<String, Object> savedBody = GoldenJson.wire(saved.getBody());
         assertNotNull(savedBody);
         long entryId = ((Number) savedBody.get("id")).longValue();
 
@@ -176,7 +176,7 @@ class SuperlativesControllerIT {
                 COMMISSIONER_USER);
         assertEquals(200, saved.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> savedBody = (Map<String, Object>) saved.getBody();
+        Map<String, Object> savedBody = GoldenJson.wire(saved.getBody());
         assertNotNull(savedBody);
         assertEquals(PLAYER_SLEEPER_ID, savedBody.get("playerId"));
         assertEquals("conduct reason", savedBody.get("reason"), "reason is trimmed");
@@ -186,7 +186,7 @@ class SuperlativesControllerIT {
         ResponseEntity<?> list = controller.conductList(LEAGUE_SLEEPER_ID, COMMISSIONER_USER);
         assertEquals(200, list.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> listBody = (Map<String, Object>) list.getBody();
+        Map<String, Object> listBody = GoldenJson.wire(list.getBody());
         assertNotNull(listBody);
         assertEquals(true, listBody.get("canEdit"));
         assertEquals(true, listBody.get("commissionerKnown"));
@@ -199,7 +199,7 @@ class SuperlativesControllerIT {
         // A non-commissioner member sees the same list but canEdit is false.
         ResponseEntity<?> memberList = controller.conductList(LEAGUE_SLEEPER_ID, MEMBER_USER);
         @SuppressWarnings("unchecked")
-        Map<String, Object> memberBody = (Map<String, Object>) memberList.getBody();
+        Map<String, Object> memberBody = GoldenJson.wire(memberList.getBody());
         assertNotNull(memberBody);
         assertEquals(false, memberBody.get("canEdit"));
     }
@@ -218,7 +218,7 @@ class SuperlativesControllerIT {
                     new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "no token", 1), COMMISSIONER_USER);
             assertEquals(200, post.getStatusCode().value());
             @SuppressWarnings("unchecked")
-            long entryId = ((Number) ((Map<String, Object>) post.getBody()).get("id")).longValue();
+            long entryId = ((Number) (GoldenJson.wire(post.getBody())).get("id")).longValue();
 
             assertEquals(204, controller.deleteConductEntry(LEAGUE_SLEEPER_ID, entryId, COMMISSIONER_USER)
                     .getStatusCode().value());
@@ -233,7 +233,7 @@ class SuperlativesControllerIT {
                     new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), MEMBER_USER);
             assertEquals(403, response.getStatusCode().value());
             @SuppressWarnings("unchecked")
-            Map<String, Object> body = (Map<String, Object>) response.getBody();
+            Map<String, Object> body = GoldenJson.wire(response.getBody());
             assertNotEquals(AdminGateInterceptor.REFUSAL_CODE, body.get("code"));
         }
     }

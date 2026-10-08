@@ -1,0 +1,16 @@
+{
+  "available" : false,
+  "season" : 2025,
+  "requestedSeason" : null,
+  "week" : 9,
+  "latestScoredWeek" : 0,
+  "latestFinalWeek" : 0,
+  "weekFinal" : false,
+  "sport" : "nba",
+  "playersPlayMultiplePerPeriod" : false,
+  "reason" : "week 9 has not been scored",
+  "matchups" : [ ],
+  "topPerformers" : [ ],
+  "awards" : [ ],
+  "awardsOmitted" : [ ]
+}

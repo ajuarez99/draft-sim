@@ -67,7 +67,7 @@ class SuperlativesControllerConductListBatchTest {
         verify(players, never()).bySleeperId(any(), any());
 
         @SuppressWarnings("unchecked")
-        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        Map<String, Object> body = GoldenJson.wire(response.getBody());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> entryRows = (List<Map<String, Object>>) body.get("entries");
         assertEquals(3, entryRows.size());

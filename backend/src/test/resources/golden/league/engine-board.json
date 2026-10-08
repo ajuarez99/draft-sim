@@ -1,0 +1,17 @@
+{
+  "capturedOn" : "2026-09-01",
+  "picksWithContemporaneousBoard" : 42,
+  "entries" : [ {
+    "adp" : 1.5,
+    "name" : "Bijan Robinson",
+    "position" : "RB",
+    "team" : "ATL",
+    "positionalRank" : 1
+  }, {
+    "adp" : 140.25,
+    "name" : "Free Agent RB",
+    "position" : "RB",
+    "team" : null,
+    "positionalRank" : 44
+  } ]
+}

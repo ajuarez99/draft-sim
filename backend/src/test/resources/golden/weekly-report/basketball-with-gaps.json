@@ -1,0 +1,47 @@
+{
+  "available" : true,
+  "season" : 2025,
+  "requestedSeason" : 2024,
+  "week" : 5,
+  "latestScoredWeek" : 5,
+  "latestFinalWeek" : 4,
+  "weekFinal" : false,
+  "sport" : "nba",
+  "playersPlayMultiplePerPeriod" : true,
+  "matchups" : [ {
+    "home" : {
+      "rosterId" : 1,
+      "teamName" : "Home",
+      "username" : "home",
+      "avatarId" : "av1",
+      "record" : "3-2",
+      "points" : 101.5,
+      "isMe" : true
+    },
+    "away" : {
+      "rosterId" : 2,
+      "teamName" : "Away",
+      "username" : null,
+      "avatarId" : null,
+      "record" : null,
+      "points" : 0.0,
+      "isMe" : false
+    }
+  } ],
+  "bestNights" : [ ],
+  "bestWeek" : [ ],
+  "basis" : "ALL_GAMES_PLAYED",
+  "sectionsUnavailable" : [ {
+    "section" : "BEST_WEEK",
+    "reason" : "PER_GAME_DETAIL_MISSING"
+  } ],
+  "awards" : [ {
+    "kind" : "HIGH_SCORE",
+    "teamName" : "Home",
+    "detail" : "101.5"
+  } ],
+  "awardsOmitted" : [ {
+    "kind" : "LUCKIEST",
+    "reason" : "needs every matchup scored"
+  } ]
+}

@@ -14,8 +14,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -75,26 +77,27 @@ class LeagueHistoryCanCommissionIT {
                 Long.class, sleeperUserId, name);
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> body(String user) {
+    /** The body as JSON, so this holds whether the controller builds a map or a response
+     *  record (spec 021 moved off the cast to Map). */
+    private JsonNode body(String user) {
         ResponseEntity<?> r = controller.history(SLEEPER_ID, user);
         assertTrue(r.getStatusCode().is2xxSuccessful(), "status for " + user);
-        return (Map<String, Object>) r.getBody();
+        return GoldenJson.MAPPER.valueToTree(r.getBody());
     }
 
-    @SuppressWarnings("unchecked")
-    private List<String> meManagers(Map<String, Object> body) {
-        List<Map<String, Object>> seasons = (List<Map<String, Object>>) body.get("seasons");
-        return ((List<Map<String, Object>>) seasons.get(0).get("standings")).stream()
-                .filter(r -> Boolean.TRUE.equals(r.get("isMe")))
-                .map(r -> (String) r.get("manager")).toList();
+    private List<String> meManagers(JsonNode body) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode row : body.get("seasons").get(0).get("standings")) {
+            if (row.get("isMe").asBoolean()) out.add(row.get("manager").asText());
+        }
+        return out;
     }
 
     @Test
     void canCommissionIsTrueForSleeperCommissionerAndConfiguredOwnerOnly() {
-        assertEquals(true, body("it-user-hist-commish").get("canCommission"));
-        assertEquals(true, body("it-user-hist-owner").get("canCommission"));
-        assertEquals(false, body("it-user-hist-member").get("canCommission"));
+        assertTrue(body("it-user-hist-commish").get("canCommission").booleanValue());
+        assertTrue(body("it-user-hist-owner").get("canCommission").booleanValue());
+        assertFalse(body("it-user-hist-member").get("canCommission").booleanValue());
     }
 
     @Test

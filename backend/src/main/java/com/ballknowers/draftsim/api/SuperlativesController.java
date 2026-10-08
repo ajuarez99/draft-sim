@@ -9,6 +9,9 @@ import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
+import com.ballknowers.draftsim.api.dto.SuperlativeResponses.ConductEntryRow;
+import com.ballknowers.draftsim.api.dto.SuperlativeResponses.ConductListResponse;
+import com.ballknowers.draftsim.api.dto.SuperlativeResponses.SuperlativesResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,10 +27,9 @@ import java.util.stream.Collectors;
  *
  * <p>No {@code ?season=} parameter: {@link SeasonSuperlativesService#forLeague}
  * resolves the season through {@link com.ballknowers.draftsim.engine.LeagueSeasonResolver},
- * the same way {@code ExpectedWinsController} does. Every response is built with
- * a mutable {@link LinkedHashMap}, never {@code Map.of}, because several fields
- * here (reason, coverage, emptyReason, value, unit, regularSeasonEnd,
- * managerId, avatarId) are legitimately null (AGENTS.md hard rule).
+ * the same way {@code ExpectedWinsController} does. Success bodies are the records in
+ * {@link com.ballknowers.draftsim.api.dto.SuperlativeResponses} (specs/021-codebase-cleanup);
+ * the error bodies stay maps.
  */
 @RestController
 @RequestMapping("/api")
@@ -56,7 +58,7 @@ public class SuperlativesController {
                                           @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
         return superlatives.forLeague(sleeperId)
-                .map(r -> ResponseEntity.ok(body(r)))
+                .map(r -> ResponseEntity.ok(SuperlativesResponse.of(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
@@ -139,238 +141,33 @@ public class SuperlativesController {
         return ResponseEntity.status(403).body(response);
     }
 
-    private Map<String, Object> conductListBody(LeagueRepository.LeagueRow row, String sleeperUserId) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("canEdit", membership.canCommission(row.id(), sleeperUserId));
-        out.put("commissionerKnown", leagueMembers.anyCommissioner(row.id()));
+    private ConductListResponse conductListBody(LeagueRepository.LeagueRow row, String sleeperUserId) {
+        boolean canEdit = membership.canCommission(row.id(), sleeperUserId);
+        boolean commissionerKnown = leagueMembers.anyCommissioner(row.id());
         List<LeagueConductRepository.Entry> conductEntries = conduct.forLeague(row.id());
         // Coordinator follow-up 2026-09-23, item 7: one batched lookup for
         // every entry's player name, not one bySleeperId call per entry --
         // the N+1 that grows with the conduct list's own length.
         Map<String, Player> playersById = players.byIds(row.sport(),
                 conductEntries.stream().map(LeagueConductRepository.Entry::playerId).collect(Collectors.toSet()));
-        List<Map<String, Object>> entries = new ArrayList<>();
+        List<ConductEntryRow> entries = new ArrayList<>();
         for (LeagueConductRepository.Entry e : conductEntries) {
             entries.add(conductEntryRow(e, playersById));
         }
-        out.put("entries", entries);
-        return out;
+        return new ConductListResponse(canEdit, commissionerKnown, entries);
     }
 
     /** Single-entry form for the POST response, where one lookup is already the minimum. */
-    private Map<String, Object> conductEntryRow(LeagueConductRepository.Entry e, Sport sport) {
+    private ConductEntryRow conductEntryRow(LeagueConductRepository.Entry e, Sport sport) {
         return conductEntryRow(e, players.bySleeperId(sport, e.playerId())
                 .map(p -> Map.of(e.playerId(), p)).orElse(Map.of()));
     }
 
-    private Map<String, Object> conductEntryRow(LeagueConductRepository.Entry e, Map<String, Player> playersById) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", e.id());
-        m.put("playerId", e.playerId());
+    private ConductEntryRow conductEntryRow(LeagueConductRepository.Entry e, Map<String, Player> playersById) {
         Player p = playersById.get(e.playerId());
-        m.put("playerName", p == null ? "Unknown player" : p.name());
-        m.put("reason", e.reason());
-        m.put("appliesFromWeek", e.appliesFromWeek());
-        m.put("addedBy", e.addedByManagerId() == null ? null : managers.displayName(e.addedByManagerId()).orElse(null));
-        m.put("createdAt", e.createdAt().toString());
-        return m;
-    }
-
-    private static Map<String, Object> body(SeasonSuperlativesService.Result r) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("available", r.available());
-        out.put("reason", r.reason());
-        out.put("season", r.season());
-        out.put("requestedSeason", r.requestedSeason());
-        out.put("sport", r.sport().code());
-        out.put("throughWeek", r.throughWeek());
-        out.put("weeksScored", r.weeksScored());
-        out.put("regularSeasonEnd", r.regularSeasonEnd());
-        out.put("early", r.early());
-        out.put("earlyThresholdWeeks", r.earlyThresholdWeeks());
-        out.put("closeGameMargin", r.closeGameMargin());
-        out.put("suspensionWeeksObserved", r.suspensionWeeksObserved());
-        out.put("commissionerListAvailable", r.commissionerListAvailable());
-        out.put("leagueSleeperId", r.leagueSleeperId());
-        List<Map<String, Object>> superlatives = new ArrayList<>();
-        for (SeasonSuperlativesService.Superlative s : r.superlatives()) {
-            superlatives.add(superlativeRow(s));
-        }
-        out.put("superlatives", superlatives);
-        return out;
-    }
-
-    private static Map<String, Object> superlativeRow(SeasonSuperlativesService.Superlative s) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("kind", s.kind().name());
-        m.put("available", s.available());
-        m.put("reason", s.reason());
-        m.put("early", s.early());
-        m.put("value", s.value());
-        m.put("unit", s.unit());
-        List<Map<String, Object>> holders = new ArrayList<>();
-        for (SeasonSuperlativesService.Holder h : s.holders()) holders.add(holderRow(h));
-        m.put("holders", holders);
-        m.put("emptyReason", s.emptyReason());
-        List<Map<String, Object>> detail = new ArrayList<>();
-        for (SeasonSuperlativesService.DetailRow d : s.detail()) detail.add(detailRow(d));
-        m.put("detail", detail);
-        m.put("coverage", s.coverage() == null ? null : coverageRow(s.coverage()));
-        List<Map<String, Object>> playerHolders = new ArrayList<>();
-        for (SeasonSuperlativesService.PlayerHolder ph : s.playerHolders()) playerHolders.add(playerHolderRow(ph));
-        m.put("playerHolders", playerHolders);
-        // Spec 010 (plan amendment 6 / R1): this controller copies fields by hand, so a new record field
-        // is silently absent from the wire until it is added here.
-        List<Map<String, Object>> standings = new ArrayList<>();
-        for (SeasonSuperlativesService.Standing st : s.standings()) standings.add(standingRow(st));
-        m.put("standings", standings);
-        List<Map<String, Object>> playerStandings = new ArrayList<>();
-        for (SeasonSuperlativesService.PlayerStanding ps : s.playerStandings()) playerStandings.add(playerStandingRow(ps));
-        m.put("playerStandings", playerStandings);
-        return m;
-    }
-
-    /** LinkedHashMap, not Map.of: rank, value, note and missingReason are legitimately null on some rows. */
-    private static Map<String, Object> standingRow(SeasonSuperlativesService.Standing st) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rank", st.rank());
-        m.put("team", holderRow(st.team()));
-        m.put("value", st.value());
-        m.put("note", st.note());
-        m.put("hasValue", st.hasValue());
-        m.put("missingReason", st.missingReason());
-        return m;
-    }
-
-    /** JABARI_SMITH_JR only; {@code position} and {@code team} are nullable (a free agent has no team). */
-    private static Map<String, Object> playerStandingRow(SeasonSuperlativesService.PlayerStanding ps) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rank", ps.rank());
-        m.put("playerId", ps.playerId());
-        m.put("playerName", ps.playerName());
-        m.put("position", ps.position());
-        m.put("team", ps.team());
-        m.put("adds", ps.adds());
-        m.put("distinctTeams", ps.distinctTeams());
-        return m;
-    }
-
-    /** JABARI_SMITH_JR only (US7); {@code []} for every other kind. {@code team} is nullable: a free agent has none. */
-    private static Map<String, Object> playerHolderRow(SeasonSuperlativesService.PlayerHolder ph) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("playerId", ph.playerId());
-        m.put("playerName", ph.playerName());
-        m.put("position", ph.position());
-        m.put("team", ph.team());
-        m.put("adds", ph.adds());
-        m.put("distinctTeams", ph.distinctTeams());
-        return m;
-    }
-
-    private static Map<String, Object> holderRow(SeasonSuperlativesService.Holder h) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("rosterId", h.rosterId());
-        m.put("managerId", h.managerId());
-        m.put("teamName", h.teamName());
-        m.put("username", h.username());
-        m.put("avatarId", h.avatarId());
-        return m;
-    }
-
-    private static Map<String, Object> coverageRow(SeasonSuperlativesService.Coverage c) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("weeksCovered", c.weeksCovered());
-        m.put("weeksExcluded", c.weeksExcluded());
-        m.put("reasons", c.reasons());
-        return m;
-    }
-
-    /**
-     * One shape per {@code type} discriminator (contracts/superlatives-api.md's
-     * detail table). Only {@code WEEK_SCORE} and {@code GAME} are ever produced
-     * by this pass (US1); the other branches exist so the shape is ready for
-     * the phases that wire {@code LUCK}/{@code BENCH_TOTAL}/{@code PICKUP}/
-     * {@code ABSENCE}/{@code CONDUCT} in.
-     */
-    private static Map<String, Object> detailRow(SeasonSuperlativesService.DetailRow d) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        if (d instanceof SeasonSuperlativesService.WeekScoreDetail w) {
-            m.put("type", "WEEK_SCORE");
-            m.put("week", w.week());
-            m.put("rosterId", w.rosterId());
-            m.put("points", w.points());
-        } else if (d instanceof SeasonSuperlativesService.GameDetail g) {
-            m.put("type", "GAME");
-            m.put("week", g.week());
-            m.put("rosterId", g.rosterId());
-            m.put("opponentRosterId", g.opponentRosterId());
-            m.put("opponentTeamName", g.opponentTeamName());
-            m.put("points", g.points());
-            m.put("opponentPoints", g.opponentPoints());
-            m.put("margin", g.margin());
-        } else if (d instanceof SeasonSuperlativesService.LuckDetail l) {
-            m.put("type", "LUCK");
-            m.put("rosterId", l.rosterId());
-            m.put("actualWins", l.actualWins());
-            m.put("expectedWins", l.expectedWins());
-            m.put("winsAboveExpected", l.winsAboveExpected());
-            m.put("swingWeeks", l.swingWeeks());
-            m.put("fromWeek", l.fromWeek());
-            m.put("throughWeek", l.throughWeek());
-            m.put("reading", l.reading());
-        } else if (d instanceof SeasonSuperlativesService.BenchTotalDetail b) {
-            m.put("type", "BENCH_TOTAL");
-            m.put("rosterId", b.rosterId());
-            m.put("pointsLeft", b.pointsLeft());
-            m.put("weeksCounted", b.weeksCounted());
-            m.put("fromWeek", b.fromWeek());
-            m.put("throughWeek", b.throughWeek());
-            Map<String, Object> biggest = null;
-            if (b.biggestWeek() != null) {
-                biggest = new LinkedHashMap<>();
-                biggest.put("week", b.biggestWeek().week());
-                biggest.put("pointsLeft", b.biggestWeek().pointsLeft());
-            }
-            m.put("biggestWeek", biggest);
-        } else if (d instanceof SeasonSuperlativesService.PickupDetail p) {
-            m.put("type", "PICKUP");
-            m.put("playerId", p.playerId());
-            m.put("playerName", p.playerName());
-            m.put("position", p.position());
-            m.put("rosterId", p.rosterId());
-            m.put("addedWeek", p.addedWeek());
-            m.put("addType", p.addType());
-            m.put("startedWeeks", p.startedWeeks());
-            m.put("points", p.points());
-        } else if (d instanceof SeasonSuperlativesService.AbsenceDetail a) {
-            m.put("type", "ABSENCE");
-            m.put("playerId", a.playerId());
-            m.put("playerName", a.playerName());
-            m.put("position", a.position());
-            m.put("rosterId", a.rosterId());
-            m.put("gamesMissed", a.gamesMissed());
-            m.put("weeksAffected", a.weeksAffected());
-            m.put("pointsPerGame", a.pointsPerGame());
-            m.put("estimatedPointsLost", a.estimatedPointsLost());
-            m.put("estimated", a.estimated());
-        } else if (d instanceof SeasonSuperlativesService.ConductDetail c) {
-            m.put("type", "CONDUCT");
-            m.put("playerId", c.playerId());
-            m.put("playerName", c.playerName());
-            m.put("rosterId", c.rosterId());
-            m.put("source", c.source());
-            m.put("weeks", c.weeks());
-            m.put("reason", c.reason());
-        } else if (d instanceof SeasonSuperlativesService.AddDetail a) {
-            m.put("type", "ADD");
-            m.put("playerId", a.playerId());
-            m.put("week", a.week());
-            m.put("rosterId", a.rosterId());
-            m.put("teamName", a.teamName());
-            m.put("avatarId", a.avatarId());
-            m.put("addType", a.addType());
-            m.put("faabBid", a.faabBid());
-        }
-        return m;
+        return new ConductEntryRow(e.id(), e.playerId(), p == null ? "Unknown player" : p.name(), e.reason(),
+                e.appliesFromWeek(),
+                e.addedByManagerId() == null ? null : managers.displayName(e.addedByManagerId()).orElse(null),
+                e.createdAt().toString());
     }
 }

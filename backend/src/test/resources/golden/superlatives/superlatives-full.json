@@ -1,0 +1,214 @@
+{
+  "available" : true,
+  "reason" : null,
+  "season" : 2026,
+  "requestedSeason" : 2025,
+  "sport" : "nba",
+  "throughWeek" : 9,
+  "weeksScored" : 9,
+  "regularSeasonEnd" : 18,
+  "early" : false,
+  "earlyThresholdWeeks" : 4,
+  "closeGameMargin" : 5.0,
+  "suspensionWeeksObserved" : [ 3, 4 ],
+  "commissionerListAvailable" : true,
+  "leagueSleeperId" : "L-2026",
+  "superlatives" : [ {
+    "kind" : "HIGHEST_WEEK",
+    "available" : true,
+    "reason" : null,
+    "early" : false,
+    "value" : 205.04,
+    "unit" : "points",
+    "holders" : [ {
+      "rosterId" : 1,
+      "managerId" : 11,
+      "teamName" : "Sharks",
+      "username" : "popsharky",
+      "avatarId" : "av11"
+    } ],
+    "emptyReason" : null,
+    "detail" : [ {
+      "type" : "WEEK_SCORE",
+      "week" : 3,
+      "rosterId" : 1,
+      "points" : 205.04
+    }, {
+      "type" : "GAME",
+      "week" : 5,
+      "rosterId" : 1,
+      "opponentRosterId" : 2,
+      "opponentTeamName" : "Comets",
+      "points" : 150.1,
+      "opponentPoints" : 150.0,
+      "margin" : 0.1
+    }, {
+      "type" : "LUCK",
+      "rosterId" : 1,
+      "actualWins" : 7.0,
+      "expectedWins" : 5.5,
+      "winsAboveExpected" : 1.5,
+      "swingWeeks" : [ {
+        "week" : 4,
+        "won" : true,
+        "points" : 98.2,
+        "weeklyRank" : 9,
+        "opponent" : "Comets"
+      } ],
+      "fromWeek" : 1,
+      "throughWeek" : 9,
+      "reading" : "lucky"
+    }, {
+      "type" : "BENCH_TOTAL",
+      "rosterId" : 1,
+      "pointsLeft" : 210.5,
+      "weeksCounted" : 9,
+      "fromWeek" : 1,
+      "throughWeek" : 9,
+      "biggestWeek" : {
+        "week" : 6,
+        "pointsLeft" : 44.25
+      }
+    }, {
+      "type" : "BENCH_TOTAL",
+      "rosterId" : 2,
+      "pointsLeft" : 0.0,
+      "weeksCounted" : 0,
+      "fromWeek" : 1,
+      "throughWeek" : 9,
+      "biggestWeek" : null
+    }, {
+      "type" : "PICKUP",
+      "playerId" : "p1",
+      "playerName" : "Waiver Hero",
+      "position" : "SF",
+      "rosterId" : 1,
+      "addedWeek" : 4,
+      "addType" : "waiver",
+      "startedWeeks" : [ 5, 6 ],
+      "points" : 88.5
+    }, {
+      "type" : "ABSENCE",
+      "playerId" : "p2",
+      "playerName" : "Joel Embiid",
+      "position" : "C",
+      "rosterId" : 2,
+      "gamesMissed" : 6,
+      "weeksAffected" : 3,
+      "pointsPerGame" : 52.0,
+      "estimatedPointsLost" : 312.0,
+      "estimated" : true
+    }, {
+      "type" : "CONDUCT",
+      "playerId" : "p3",
+      "playerName" : "Bad Actor",
+      "rosterId" : 3,
+      "source" : "COMMISSIONER",
+      "weeks" : [ 2, 3 ],
+      "reason" : "fined"
+    }, {
+      "type" : "ADD",
+      "playerId" : "p4",
+      "week" : 7,
+      "rosterId" : 1,
+      "teamName" : "Sharks",
+      "avatarId" : "av11",
+      "addType" : "free_agent",
+      "faabBid" : null
+    }, {
+      "type" : "ADD",
+      "playerId" : "p4",
+      "week" : 8,
+      "rosterId" : 2,
+      "teamName" : "Comets",
+      "avatarId" : null,
+      "addType" : "waiver",
+      "faabBid" : 17
+    } ],
+    "coverage" : {
+      "weeksCovered" : 9,
+      "weeksExcluded" : 1,
+      "reasons" : [ "week 4 unscored" ]
+    },
+    "playerHolders" : [ ],
+    "standings" : [ {
+      "rank" : 1,
+      "team" : {
+        "rosterId" : 1,
+        "managerId" : 11,
+        "teamName" : "Sharks",
+        "username" : "popsharky",
+        "avatarId" : "av11"
+      },
+      "value" : 205.04,
+      "note" : "week 3",
+      "hasValue" : true,
+      "missingReason" : null
+    }, {
+      "rank" : null,
+      "team" : {
+        "rosterId" : 4,
+        "managerId" : null,
+        "teamName" : null,
+        "username" : null,
+        "avatarId" : null
+      },
+      "value" : null,
+      "note" : null,
+      "hasValue" : false,
+      "missingReason" : "no games played"
+    } ],
+    "playerStandings" : [ ]
+  }, {
+    "kind" : "JABARI_SMITH_JR",
+    "available" : true,
+    "reason" : null,
+    "early" : true,
+    "value" : 3.0,
+    "unit" : "adds",
+    "holders" : [ ],
+    "emptyReason" : null,
+    "detail" : [ ],
+    "coverage" : null,
+    "playerHolders" : [ {
+      "playerId" : "p4",
+      "playerName" : "Journeyman",
+      "position" : null,
+      "team" : null,
+      "adds" : 3,
+      "distinctTeams" : 2
+    } ],
+    "standings" : [ ],
+    "playerStandings" : [ {
+      "rank" : 1,
+      "playerId" : "p4",
+      "playerName" : "Journeyman",
+      "position" : "PF",
+      "team" : "BOS",
+      "adds" : 3,
+      "distinctTeams" : 2
+    }, {
+      "rank" : 2,
+      "playerId" : "p5",
+      "playerName" : "Free Agent",
+      "position" : null,
+      "team" : null,
+      "adds" : 2,
+      "distinctTeams" : 1
+    } ]
+  }, {
+    "kind" : "UNETHICAL",
+    "available" : false,
+    "reason" : "no conduct list yet",
+    "early" : false,
+    "value" : null,
+    "unit" : null,
+    "holders" : [ ],
+    "emptyReason" : "nobody has been listed",
+    "detail" : [ ],
+    "coverage" : null,
+    "playerHolders" : [ ],
+    "standings" : [ ],
+    "playerStandings" : [ ]
+  } ]
+}

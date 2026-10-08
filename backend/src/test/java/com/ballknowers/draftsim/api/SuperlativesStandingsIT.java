@@ -137,7 +137,7 @@ class SuperlativesStandingsIT {
     private Map<String, Object> body() {
         ResponseEntity<?> res = controller.superlatives(LEAGUE_SLEEPER_ID, null);
         assertEquals(200, res.getStatusCode().value());
-        return (Map<String, Object>) res.getBody();
+        return GoldenJson.wire(res.getBody());
     }
 
     @SuppressWarnings("unchecked")

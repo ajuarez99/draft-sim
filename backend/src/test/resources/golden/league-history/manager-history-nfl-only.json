@@ -1,0 +1,123 @@
+{
+  "managerId" : 11,
+  "manager" : "popsharky",
+  "avatarId" : "av11",
+  "draftHistory" : [ {
+    "sport" : "nfl",
+    "reachBias" : -3.46,
+    "relativeReachBias" : -1.23,
+    "relativeReachStdErr" : 0.46,
+    "positionalTilt" : {
+      "RB" : 1.31,
+      "QB" : 0.62,
+      "WR" : 1.0
+    },
+    "draftsObserved" : 2,
+    "picksScored" : 30,
+    "provenance" : "FITTED"
+  } ],
+  "careers" : [ {
+    "sport" : "nfl",
+    "seasonsCounted" : 2,
+    "seasons" : [ {
+      "leagueId" : 99,
+      "rosterId" : 1,
+      "managerId" : 11,
+      "manager" : "popsharky",
+      "avatarId" : "av11",
+      "wins" : 7,
+      "losses" : 6,
+      "ties" : 0,
+      "pointsFor" : 1451.25,
+      "pointsAgainst" : 1399.5,
+      "champion" : true,
+      "season" : 2025,
+      "sleeperLeagueId" : "L-2025",
+      "sport" : "nfl",
+      "leagueName" : "Ball Knowers",
+      "complete" : true,
+      "counted" : true
+    }, {
+      "leagueId" : 100,
+      "rosterId" : 1,
+      "managerId" : 11,
+      "manager" : "popsharky",
+      "avatarId" : "av11",
+      "wins" : 7,
+      "losses" : 6,
+      "ties" : 0,
+      "pointsFor" : 1451.25,
+      "pointsAgainst" : 1399.5,
+      "champion" : false,
+      "season" : 2026,
+      "sleeperLeagueId" : "L-2026",
+      "sport" : "nfl",
+      "leagueName" : "Ball Knowers",
+      "complete" : null,
+      "counted" : false
+    } ],
+    "wins" : 14,
+    "losses" : 12,
+    "ties" : 1,
+    "winRate" : 0.537,
+    "pointsFor" : 2900.5,
+    "pointsAgainst" : 2799.25,
+    "pointsPerSeason" : 1450.25,
+    "averageEfficiency" : 0.9123,
+    "weeksCounted" : 26,
+    "weeksExcluded" : 1,
+    "winsAboveExpected" : 1.5,
+    "titles" : 1,
+    "unavailable" : [ {
+      "figure" : "winsAboveExpected",
+      "reason" : "one season unscored"
+    } ],
+    "ranks" : [ {
+      "figure" : "pointsFor",
+      "position" : 1,
+      "population" : 12,
+      "leagueName" : "Ball Knowers",
+      "sleeperLeagueId" : "L-2025"
+    } ],
+    "waivers" : {
+      "movesPerSeason" : 12.5,
+      "seasonsCounted" : 2,
+      "faab" : {
+        "typicalBidPct" : 0.0412,
+        "largestBidPct" : 0.31,
+        "spentPerSeasonPct" : 0.88,
+        "claimsPerSeason" : 7.5,
+        "bidSuccessRate" : 0.6667
+      },
+      "faabExcludedSeasons" : [ {
+        "season" : 2024,
+        "leagueName" : "Old League",
+        "reason" : "no FAAB that season"
+      } ]
+    }
+  }, {
+    "sport" : "nba",
+    "seasonsCounted" : 0,
+    "seasons" : [ ],
+    "wins" : 0,
+    "losses" : 0,
+    "ties" : 0,
+    "winRate" : null,
+    "pointsFor" : 0.0,
+    "pointsAgainst" : 0.0,
+    "pointsPerSeason" : null,
+    "averageEfficiency" : null,
+    "weeksCounted" : 0,
+    "weeksExcluded" : 0,
+    "winsAboveExpected" : null,
+    "titles" : 0,
+    "unavailable" : [ ],
+    "ranks" : [ ],
+    "waivers" : {
+      "movesPerSeason" : 0.0,
+      "seasonsCounted" : 0,
+      "faab" : null,
+      "faabExcludedSeasons" : [ ]
+    }
+  } ]
+}

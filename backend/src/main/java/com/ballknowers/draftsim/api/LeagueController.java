@@ -19,6 +19,15 @@ import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.EngineBoardResponse;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.EngineBoardRow;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.ManualPickResponse;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.RealBoardResponse;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.RealPick;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.ReversalRoundResponse;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.SeatRow;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.SeatsResponse;
+import com.ballknowers.draftsim.api.dto.LeagueResponses.TrackResponse;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -135,7 +144,7 @@ public class LeagueController {
         Sport sport = league.map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
 
         ProfileService.Fit fit = profiles.fit(sport);
-        List<Map<String, Object>> seats = new ArrayList<>();
+        List<SeatRow> seats = new ArrayList<>();
 
         // Extracted to OwnerSlot.resolve so the mock room's "fork a live draft"
         // path can resolve the same default seat without a second copy of this
@@ -146,26 +155,15 @@ public class LeagueController {
         draft.get().slotToManager().forEach((slot, managerId) -> {
             long id = ((Number) managerId).longValue();
             ManagerProfile p = fit.profiles().getOrDefault(id, ManagerProfile.neutral(id, "seat " + slot));
-            Map<String, Object> seat = new LinkedHashMap<>();
-            seat.put("slot", Integer.parseInt(slot));
-            seat.put("managerId", p.managerId());
-            seat.put("manager", p.displayName());
-            seat.put("avatarId", p.avatarId());
-            seat.put("provenance", p.provenance().name());
-            seat.put("reachBias", round2(p.reachBias()));
             // Display-only room-relative reach and its standard error (audit 11).
             Double rel = fit.relativeReachBias().get(id);
             Double se = fit.relativeReachStdErr().get(id);
-            seat.put("relativeReachBias", rel == null ? null : round2(rel));
-            seat.put("relativeReachStdErr", se == null ? null : round2(se));
-            seat.put("unpredictability", p.unpredictability());
-            seat.put("positionalTilt", p.positionalTilt());
-            seat.put("note", p.note());
-            seat.put("draftsObserved", p.draftsObserved());
-            seat.put("picksScored", p.picksScored());
-            seats.add(seat);
+            seats.add(new SeatRow(Integer.parseInt(slot), p.managerId(), p.displayName(), p.avatarId(),
+                    p.provenance().name(), round2(p.reachBias()),
+                    rel == null ? null : round2(rel), se == null ? null : round2(se),
+                    p.unpredictability(), p.positionalTilt(), p.note(), p.draftsObserved(), p.picksScored()));
         });
-        seats.sort(Comparator.comparingInt(s -> (Integer) s.get("slot")));
+        seats.sort(Comparator.comparingInt(SeatRow::slot));
 
         // rosterPositions is always a non-null List (roster_positions is `text[]
         // not null default '{}'`), including legitimately empty when a league's
@@ -175,32 +173,6 @@ public class LeagueController {
                 .map(LeagueRepository.LeagueRow::rosterPositions)
                 .orElseGet(List::of);
 
-        // Map.of rejects null values, and mySlot is null in the default case --
-        // unset config, or a configured owner who isn't a manager in this
-        // particular league -- i.e. the state every fresh checkout starts in.
-        // LinkedHashMap tolerates the null directly, same fix board() below
-        // already applies for its own nullable field.
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("draftId", sleeperDraftId);
-        response.put("teams", draft.get().teams());
-        response.put("rounds", draft.get().rounds());
-        // The real value, nullable. String.valueOf() here produced the literal
-        // four-character string "null" for a draft whose status column is null,
-        // which is valid JSON and indistinguishable from a real status to the
-        // frontend -- claude/lessons.md #12, in the one place the fix hadn't
-        // landed. The LinkedHashMap above already tolerates a null value, so the
-        // workaround wasn't even buying anything.
-        response.put("status", draft.get().status());
-        response.put("seats", seats);
-        response.put("mySlot", mySlot);
-        response.put("rosterPositions", rosterPositions);
-        // Added for multi-sport-and-rebrand.md Phase 6: the frontend's position
-        // lists, slot-eligibility model, and position-run detector all need to
-        // know which sport they're rendering rather than assuming football.
-        // `sport` above is already resolved (league lookup, defaulting to NFL)
-        // for fit(); this just also puts it on the wire. Sport's @JsonValue
-        // serializes it as the same lowercase code DraftSummary already uses.
-        response.put("sport", sport);
         // Phase 6b. The round from which snake parity flips is the one piece of
         // this project's behaviour that ships as an assumption -- no completed
         // draft in reach uses a nonzero reversal_round, so the semantics were
@@ -211,13 +183,15 @@ public class LeagueController {
         // someone has overridden.
         DraftRepository.ReversalRound reversal = drafts.reversalRound(draft.get().id())
                 .orElse(new DraftRepository.ReversalRound(draft.get().reversalRound(), null));
-        response.put("reversalRound", reversal.effective());
-        response.put("reversalRoundFromSleeper", reversal.fromSleeper());
-        response.put("reversalRoundOverridden", reversal.override() != null);
-        // Whether this caller may change it (2026-10-02): the override re-lays the board
-        // for every viewer, so it is a commissioner action like /power/compute.
-        response.put("canCommission", membership.canCommission(draft.get().leagueId(), sleeperUserId));
-        return ResponseEntity.ok(response);
+        // `sport` (multi-sport-and-rebrand.md Phase 6) is already resolved for fit(); the
+        // frontend's position lists and slot-eligibility model need it too. Sport's
+        // @JsonValue serializes it as the same lowercase code DraftSummary uses.
+        return ResponseEntity.ok(new SeatsResponse(sleeperDraftId, draft.get().teams(), draft.get().rounds(),
+                draft.get().status(), seats, mySlot, rosterPositions, sport,
+                reversal.effective(), reversal.fromSleeper(), reversal.override() != null,
+                // Whether this caller may change it (2026-10-02): the override re-lays the board
+                // for every viewer, so it is a commissioner action like /power/compute.
+                membership.canCommission(draft.get().leagueId(), sleeperUserId)));
     }
 
     /**
@@ -272,12 +246,8 @@ public class LeagueController {
 
         DraftRepository.ReversalRound after = drafts.reversalRound(draft.id())
                 .orElse(new DraftRepository.ReversalRound(draft.reversalRound(), override));
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("draftId", sleeperDraftId);
-        response.put("reversalRound", after.effective());
-        response.put("reversalRoundFromSleeper", after.fromSleeper());
-        response.put("reversalRoundOverridden", after.override() != null);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new ReversalRoundResponse(sleeperDraftId, after.effective(), after.fromSleeper(),
+                after.override() != null));
     }
 
     /** Body of PUT /api/drafts/{id}/reversal-round. Null field = clear the override. */
@@ -305,15 +275,8 @@ public class LeagueController {
         DraftRepository.DraftRow draft = found.get();
         Sport sport = leagues.byId(draft.leagueId()).map(LeagueRepository.LeagueRow::sport).orElse(Sport.NFL);
 
-        List<Map<String, Object>> picks = pickNaming(sport).rows(drafts.picks(draft.id()));
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("draftId", sleeperDraftId);
-        response.put("teams", draft.teams());
-        response.put("rounds", draft.rounds());
-        response.put("status", draft.status());
-        response.put("picks", picks);
-        return ResponseEntity.ok(response);
+        List<RealPick> picks = pickNaming(sport).rows(drafts.picks(draft.id()));
+        return ResponseEntity.ok(new RealBoardResponse(sleeperDraftId, draft.teams(), draft.rounds(), draft.status(), picks));
     }
 
     /**
@@ -346,7 +309,7 @@ public class LeagueController {
                               Map<Long, String> managerNames, Map<Long, String> managerAvatars) {
 
         /** Null for a pick with no resolvable player -- an unfilled slot, or a player row that is gone. */
-        Map<String, Object> row(DraftRepository.PickRow p) {
+        RealPick row(DraftRepository.PickRow p) {
             if (p.playerId() == null) return null; // pick slot with no resolved player -- nothing to show yet
             BoardEntry entry = board.get(p.playerId());
             SimulationResult.PlayerRef player = entry != null
@@ -354,26 +317,22 @@ public class LeagueController {
                     : fallbackPlayerRef(players.get(p.playerId()));
             if (player == null) return null; // player row itself is gone; nothing left to render
 
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("pickNo", p.pickNo());
-            row.put("round", p.round());
-            row.put("slot", p.draftSlot());
-            row.put("manager", p.managerId() != null
-                    ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
-                    : "Slot " + p.draftSlot());
-            row.put("avatarId", p.managerId() != null ? managerAvatars.get(p.managerId()) : null);
-            row.put("player", player);
-            // Spec 013 T077: the board as it stood when this pick was made (draft_pick.adp_at_time),
-            // NOT today's board. Null (key present) when it was never captured; the page then
-            // shows no steal/reach tint rather than comparing against the wrong board.
-            row.put("adpAtDraft", p.adpAtTime());
-            return row;
+            return new RealPick(p.pickNo(), p.round(), p.draftSlot(),
+                    p.managerId() != null
+                            ? managerNames.getOrDefault(p.managerId(), "Slot " + p.draftSlot())
+                            : "Slot " + p.draftSlot(),
+                    p.managerId() != null ? managerAvatars.get(p.managerId()) : null,
+                    player,
+                    // Spec 013 T077: the board as it stood when this pick was made (draft_pick.adp_at_time),
+                    // NOT today's board. Null (key present) when it was never captured; the page then
+                    // shows no steal/reach tint rather than comparing against the wrong board.
+                    p.adpAtTime());
         }
 
-        List<Map<String, Object>> rows(List<DraftRepository.PickRow> picks) {
-            List<Map<String, Object>> out = new ArrayList<>(picks.size());
+        List<RealPick> rows(List<DraftRepository.PickRow> picks) {
+            List<RealPick> out = new ArrayList<>(picks.size());
             for (DraftRepository.PickRow p : picks) {
-                Map<String, Object> row = row(p);
+                RealPick row = row(p);
                 if (row != null) out.add(row);
             }
             return out;
@@ -383,7 +342,7 @@ public class LeagueController {
          * The last {@code limit} picks, oldest first -- the order PickFeed and
          * its position-run detector both read in.
          */
-        List<Map<String, Object>> tail(List<DraftRepository.PickRow> picks, int limit) {
+        List<RealPick> tail(List<DraftRepository.PickRow> picks, int limit) {
             return rows(picks.size() > limit ? picks.subList(picks.size() - limit, picks.size()) : picks);
         }
     }
@@ -410,33 +369,25 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> draft = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (draft.isEmpty()) return ResponseEntity.notFound().build();
         LiveDraftPoller.TrackResult r = poller.track(draft.get());
-        // Map.of throws NullPointerException on a null value, and status is
-        // genuinely nullable (the column is, and track() now reports what Sleeper
-        // returned on a live tick rather than the stale DB value). An NPE isn't
-        // handled by ErrorHandler either, so this endpoint -- the draft-night
-        // diagnostic -- would have come back as a bare 500.
-        // LinkedHashMap tolerates the null, same fix as seats()/board().
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("draftId", sleeperDraftId);
-        // Both of these used to be hardcoded optimism. track() deliberately spawns
-        // nothing for a `complete` draft, so started=false there -- and the
-        // response said "tracking": true, "alreadyTracking": true, neither of which
-        // was so, on the one endpoint whose job is telling you what is actually
-        // happening.
-        response.put("tracking", r.pollerRunning());
-        response.put("alreadyTracking", !r.started() && r.pollerRunning());
-        response.put("status", r.status());
-        // False means status is the stored DB value, not something Sleeper just
-        // told us -- i.e. the synchronous tick threw. Without this a Sleeper hiccup
-        // silently reintroduces the exact bug the synchronous tick was added to
-        // fix: "pre_draft" reported for a draft that has been live for an hour.
-        response.put("observed", r.observed());
-        // How many of this draft's seats the poller could resolve to a real
-        // manager. Zero means every seat is a league-average bot -- the failure
-        // this endpoint most needs to be able to report before 8:15 PM.
-        response.put("seatsMapped", r.seatsMapped());
-        response.put("teams", draft.get().teams());
-        return ResponseEntity.ok(response);
+        // status is genuinely nullable (the column is, and track() reports what Sleeper
+        // returned on a live tick rather than the stale DB value) -- the draft-night
+        // diagnostic must never 500 on it.
+        return ResponseEntity.ok(new TrackResponse(sleeperDraftId,
+                // Both of these used to be hardcoded optimism. track() deliberately spawns
+                // nothing for a `complete` draft, so started=false there -- and the
+                // response said "tracking": true, "alreadyTracking": true, neither of which
+                // was so, on the one endpoint whose job is telling you what is actually
+                // happening.
+                r.pollerRunning(), !r.started() && r.pollerRunning(), r.status(),
+                // False means status is the stored DB value, not something Sleeper just
+                // told us -- i.e. the synchronous tick threw. Without this a Sleeper hiccup
+                // silently reintroduces the exact bug the synchronous tick was added to
+                // fix: "pre_draft" reported for a draft that has been live for an hour.
+                r.observed(),
+                // How many of this draft's seats the poller could resolve to a real
+                // manager. Zero means every seat is a league-average bot -- the failure
+                // this endpoint most needs to be able to report before 8:15 PM.
+                r.seatsMapped(), draft.get().teams()));
     }
 
     /**
@@ -679,16 +630,9 @@ public class LeagueController {
         drafts.upsertPicks(draft.id(), List.of(new DraftRepository.PickRow(
                 draft.id(), pickNo, round, slot, managerId, playerId, null)));
 
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("draftId", sleeperDraftId);
-        response.put("pickNo", pickNo);
-        response.put("round", round);
-        response.put("draftSlot", slot);
-        // Nullable, and honestly so: an unset draft_order means this pick lands
-        // unattributed, exactly like an autopick would.
-        response.put("managerId", managerId);
-        response.put("playerId", playerId);
-        return ResponseEntity.ok(response);
+        // managerId is nullable, and honestly so: an unset draft_order means this pick
+        // lands unattributed, exactly like an autopick would.
+        return ResponseEntity.ok(new ManualPickResponse(sleeperDraftId, pickNo, round, slot, managerId, playerId));
     }
 
     /**
@@ -776,28 +720,17 @@ public class LeagueController {
 
     /** What the engine is valuing against, so it can be eyeballed before trusting a sim. */
     @GetMapping("/board")
-    public Map<String, Object> board(@RequestParam(defaultValue = "60") int limit,
+    public EngineBoardResponse board(@RequestParam(defaultValue = "60") int limit,
                                      @RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
+        // A free agent / retired player has a null team -- sent as null, never the
+        // string "null" a client can't tell apart from a real team code.
         var entries = boards.currentBoard(s).stream()
                 .limit(limit)
-                .map(e -> {
-                    // Map.of rejects null values, and a free agent / retired player can have
-                    // a null team — String.valueOf(null) used to paper over that by producing
-                    // the literal string "null", which a client can't tell apart from a real
-                    // team code. LinkedHashMap tolerates the null directly.
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("adp", e.adp());
-                    row.put("name", e.player().name());
-                    row.put("position", e.position().name());
-                    row.put("team", e.player().team());
-                    row.put("positionalRank", e.positionalRank());
-                    return row;
-                })
+                .map(e -> new EngineBoardRow(e.adp(), e.player().name(), e.position().name(), e.player().team(),
+                        e.positionalRank()))
                 .toList();
-        return Map.of(
-                "capturedOn", boards.currentBoardDate(s).map(Object::toString).orElse("none"),
-                "picksWithContemporaneousBoard", boards.picksWithAdpAtTime(),
-                "entries", entries);
+        return new EngineBoardResponse(boards.currentBoardDate(s).map(Object::toString).orElse("none"),
+                boards.picksWithAdpAtTime(), entries);
     }
 }

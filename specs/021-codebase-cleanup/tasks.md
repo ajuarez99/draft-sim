@@ -201,7 +201,7 @@ maps (spec SC-004, amended).
 
 ### LeagueHistoryController (43 map builds; 11 are error bodies, which stay)
 
-- [ ] T027 [US3] **Characterization commit.** Create `backend/src/test/java/com/ballknowers/draftsim/api/LeagueHistoryControllerCharacterizationIT.java`: a `@SpringBootTest` with MockMvc and `@MockitoBean` services, following `ManagerControllerMvcIT.java`. Cover:
+- [X] T027 [US3] **Characterization commit.** Create `backend/src/test/java/com/ballknowers/draftsim/api/LeagueHistoryControllerCharacterizationIT.java`: a `@SpringBootTest` with MockMvc and `@MockitoBean` services, following `ManagerControllerMvcIT.java`. Cover:
   - **endpoints**: `history`, `managerHistory`, `powerRankings`, `ballot` and the record book;
   - **sports**: NFL and NBA;
   - **`makesPlayoffsPct`**: null on an entry without odds, and present;
@@ -210,8 +210,8 @@ maps (spec SC-004, amended).
   - **`positionalTilt`**: order-sensitive, passed to `GoldenJson` as an order-sensitive path.
 
   Write the goldens under `backend/src/test/resources/golden/league-history/` with `-Dgolden.write=true`, then run it without the flag. In the **same** commit, rewrite the `(Map<String,Object>)` casts in `LeagueHistoryCanCommissionIT.java` and `PowerComputeFinalityTest.java` as `JsonNode` assertions.
-- [ ] T028 [US3] **Conversion commit.** Create `api/dto/StandingsResponses.java` (the history-row and career-row records, kept separate), `api/dto/ManagerHistoryResponses.java`, `api/dto/PowerRankingResponses.java` (the entry, the snapshot, the member row, and the ballot with its members) and `api/dto/RecordBookResponses.java`, all under `backend/src/main/java/com/ballknowers/draftsim/`. Convert `standingRow`, `withFinalRank`, `recordBook`, `careerRow`, `entryRow`, `memberRow`, `snapshotRow`, `ballotMemberRow` and friends in `api/LeagueHistoryController.java`. Turn the read-backs (`(Long) e.get("managerId")` at :559-561 and `(Integer) entry.get("week")` at :593) into typed fields. `attachPlayoffOdds` produces a new record value with the odds set. The `body(Map.of("message", …))` error bodies stay. Check `web/src/api.ts` for history, power rankings and ballot.
-- [ ] T029 [US3] Gate the controller:
+- [X] T028 [US3] **Conversion commit.** Create `api/dto/StandingsResponses.java` (the history-row and career-row records, kept separate), `api/dto/ManagerHistoryResponses.java`, `api/dto/PowerRankingResponses.java` (the entry, the snapshot, the member row, and the ballot with its members) and `api/dto/RecordBookResponses.java`, all under `backend/src/main/java/com/ballknowers/draftsim/`. Convert `standingRow`, `withFinalRank`, `recordBook`, `careerRow`, `entryRow`, `memberRow`, `snapshotRow`, `ballotMemberRow` and friends in `api/LeagueHistoryController.java`. Turn the read-backs (`(Long) e.get("managerId")` at :559-561 and `(Integer) entry.get("week")` at :593) into typed fields. `attachPlayoffOdds` produces a new record value with the odds set. The `body(Map.of("message", …))` error bodies stay. Check `web/src/api.ts` for history, power rankings and ballot.
+- [X] T029 [US3] Gate the controller:
   - T027's test is green;
   - `git show --stat HEAD` lists nothing under `golden/` or `*Characterization*`;
   - the full backend suite has **0 skipped**;
@@ -220,15 +220,15 @@ maps (spec SC-004, amended).
 
 ### SuperlativesController (17 map builds; 4 are error bodies)
 
-- [ ] T030 [US3] **Characterization commit.** Create `.../api/SuperlativesControllerCharacterizationIT.java` (MockMvc with stubbed `SeasonSuperlativesService` and repositories). Cover each of the 8 `detailRow` subtypes with its `"type"` value, the full-standings body and the conduct-list body, plus empty cases. Write the goldens to `golden/superlatives/`. In the same commit, rewrite the casts in `SuperlativesControllerIT.java`, `SuperlativesStandingsIT.java` and `SuperlativesControllerConductListBatchTest.java` as `JsonNode` assertions.
-- [ ] T031 [US3] **Conversion commit.** Create `api/dto/SuperlativeResponses.java` with one record per detail subtype, each carrying an explicit `String type` component (use `@JsonTypeInfo` only if T030's goldens pass unchanged). Convert `body`, `detailRow` and `conductListBody` in `api/SuperlativesController.java`. Error bodies stay. Check the `SuperlativeDetail` union in `web/src/api.ts`, including `'rosterId' in d` at `Superlatives.tsx:433`: its presence or absence must be preserved.
-- [ ] T032 [US3] Gate as in T029: the map count must be ≤ 4.
+- [X] T030 [US3] **Characterization commit.** Create `.../api/SuperlativesControllerCharacterizationIT.java` (MockMvc with stubbed `SeasonSuperlativesService` and repositories). Cover each of the 8 `detailRow` subtypes with its `"type"` value, the full-standings body and the conduct-list body, plus empty cases. Write the goldens to `golden/superlatives/`. In the same commit, rewrite the casts in `SuperlativesControllerIT.java`, `SuperlativesStandingsIT.java` and `SuperlativesControllerConductListBatchTest.java` as `JsonNode` assertions.
+- [X] T031 [US3] **Conversion commit.** Create `api/dto/SuperlativeResponses.java` with one record per detail subtype, each carrying an explicit `String type` component (use `@JsonTypeInfo` only if T030's goldens pass unchanged). Convert `body`, `detailRow` and `conductListBody` in `api/SuperlativesController.java`. Error bodies stay. Check the `SuperlativeDetail` union in `web/src/api.ts`, including `'rosterId' in d` at `Superlatives.tsx:433`: its presence or absence must be preserved.
+- [X] T032 [US3] Gate as in T029: the map count must be ≤ 4.
 
 ### LeagueController (17 map builds; 6 are error bodies; the SSE heartbeat stays)
 
-- [ ] T033 [US3] **Characterization commit.** Create `.../api/LeagueControllerCharacterizationIT.java` (MockMvc with stubbed `profiles`, membership and reversal lookups). Cover `seats()` (owner configured and owner unset), the real board, track and the pool endpoints, plus empty cases. Write the goldens to `golden/league/`. In the same commit, rewrite the casts in `LeagueControllerSeatsOwnerConfiguredIT.java`, `LeagueControllerSeatsUnsetOwnerIT.java`, `LeagueControllerRealBoardTest.java`, `LeagueControllerTrackTest.java` and `LeagueAnalyticsContractTest.java` (if it touches this controller's body) as `JsonNode` assertions.
-- [ ] T034 [US3] **Conversion commit.** Create `api/dto/LeagueResponses.java` (seats, board, track, pool). Convert the success bodies in `api/LeagueController.java`. The heartbeat at :565 and the error bodies stay as maps. Check the corresponding `web/src/api.ts` types.
-- [ ] T035 [US3] Gate as in T029: the map count must be ≤ 6 error bodies, plus 1 SSE heartbeat.
+- [X] T033 [US3] **Characterization commit.** Create `.../api/LeagueControllerCharacterizationIT.java` (MockMvc with stubbed `profiles`, membership and reversal lookups). Cover `seats()` (owner configured and owner unset), the real board, track and the pool endpoints, plus empty cases. Write the goldens to `golden/league/`. In the same commit, rewrite the casts in `LeagueControllerSeatsOwnerConfiguredIT.java`, `LeagueControllerSeatsUnsetOwnerIT.java`, `LeagueControllerRealBoardTest.java`, `LeagueControllerTrackTest.java` and `LeagueAnalyticsContractTest.java` (if it touches this controller's body) as `JsonNode` assertions.
+- [X] T034 [US3] **Conversion commit.** Create `api/dto/LeagueResponses.java` (seats, board, track, pool). Convert the success bodies in `api/LeagueController.java`. The heartbeat at :565 and the error bodies stay as maps. Check the corresponding `web/src/api.ts` types.
+- [X] T035 [US3] Gate as in T029: the map count must be ≤ 6 error bodies, plus 1 SSE heartbeat.
 
 **Checkpoint — SC-004**: **55 of 108** in-scope success-body map builds are gone
 (50.9%; the denominator is from T003), and the three worst controllers' success bodies
@@ -242,7 +242,7 @@ stopping. P2b can stop here.
 These already expose a static seam, so a unit-level characterization test is enough.
 It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportShapeTest`.
 
-- [ ] T036 [P] [US3] `WeeklyReportController` (9): first rewrite the `.get()`/`.containsKey()` assertions in `WeeklyReportShapeTest.java` as `GoldenJson` goldens in `golden/weekly-report/`, then convert to `api/dto/WeeklyReportResponses.java`. The record **must not** rely on `@JsonInclude` on the service record; the shape test's header documents why.
+- [X] T036 [P] [US3] `WeeklyReportController` (9): first rewrite the `.get()`/`.containsKey()` assertions in `WeeklyReportShapeTest.java` as `GoldenJson` goldens in `golden/weekly-report/`, then convert to `api/dto/WeeklyReportResponses.java`. The record **must not** rely on `@JsonInclude` on the service record; the shape test's header documents why.
 - [ ] T037 [P] [US3] `PlayerSpotlightController` (7): rewrite `PlayerSpotlightShapeTest.java`, and the casts in `PlayerSpotlightTopOfNightIT.java` and `PlayerSpotlightWeekIT.java`, as goldens; then convert to `api/dto/PlayerSpotlightResponses.java`.
 - [ ] T038 [P] [US3] `SeasonForecastController` (4): rewrite `SeasonForecastShapeTest.java` as goldens, with `seedOdds` as an **order-sensitive** path; then convert to `api/dto/SeasonForecastResponses.java`, keeping `seedOdds` a `LinkedHashMap`.
 - [ ] T039 [P] [US3] `RosterManagementController` (8): char → conv commit pair following C2; dto `api/dto/RosterManagementResponses.java`.

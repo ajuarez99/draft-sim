@@ -122,7 +122,7 @@ class LeagueControllerSeatsOwnerConfiguredIT {
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> map = (Map<String, Object>) response.getBody();
+        Map<String, Object> map = GoldenJson.wire(response.getBody());
         assertNotNull(map);
         assertEquals(7, map.get("mySlot"), "configured owner sits in slot 7 of this draft");
     }
@@ -136,7 +136,7 @@ class LeagueControllerSeatsOwnerConfiguredIT {
 
         assertEquals(200, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
-        Map<String, Object> map = (Map<String, Object>) response.getBody();
+        Map<String, Object> map = GoldenJson.wire(response.getBody());
         assertNotNull(map);
         assertNull(map.get("mySlot"), "configured owner isn't a manager in this league -- must be null, not throw");
     }

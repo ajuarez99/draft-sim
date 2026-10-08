@@ -111,7 +111,8 @@ export type SeatsResponse = {
   draftId: string
   teams: number
   rounds: number
-  status: string
+  /** Null for a draft whose status column is null -- never the string "null" (lessons #12). */
+  status: string | null
   seats: Seat[]
   /** Auto-detected slot for the configured app owner, or null if unconfigured/not in this league. */
   mySlot: number | null
@@ -439,6 +440,7 @@ export type LiveState = {
  * contract and nothing reads it, so it isn't mirrored here.)
  */
 export type TrackResponse = {
+  draftId: string
   status: string | null
   observed: boolean
   tracking: boolean
@@ -1552,11 +1554,17 @@ export const computePowerRankings = (sleeperLeagueId: string, season: number, we
     json<{
       week0: number
       realized: number
-      realizedSkipped?: string
+      /** How many playoff-odds rows were written. */
+      playoffOdds: number
+      /** Absent when the week's ranking was written. Null (present) when a final week
+       *  wrote nothing and the server has no reason to give; see ComputeResponse. */
+      realizedSkipped?: string | null
       /** The week the odds were computed through: the requested week only when it is final. */
       playoffOddsThroughWeek?: number
       /** Present instead of `playoffOddsThroughWeek` when no week is final yet. */
       playoffOddsSkipped?: string
+      /** Present only for a league that hasn't drafted. */
+      week0Skipped?: string
     }>,
   )
 
@@ -1712,7 +1720,9 @@ export const submitBallot = (sleeperLeagueId: string, week: number, rosterIds: n
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ week, rosterIds }),
-  }).then(json<{ saved: number }>)
+    // Was typed { saved: number }; the server has always sent { saved: true, season, week }.
+    // Corrected in spec 021 when the response became a record. No caller reads it yet.
+  }).then(json<{ saved: boolean; season: number; week: number }>)
 
 // --- specs/004-ffwrapped-feature-parity US2: the Roster management page ---
 

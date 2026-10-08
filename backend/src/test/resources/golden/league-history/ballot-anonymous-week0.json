@@ -1,0 +1,25 @@
+{
+  "season" : 2026,
+  "week" : 0,
+  "canSubmit" : false,
+  "canCommission" : false,
+  "commissionerKnown" : true,
+  "memberCount" : 2,
+  "ballotCount" : 0,
+  "members" : [ {
+    "rosterId" : 1,
+    "managerId" : 11,
+    "manager" : "popsharky",
+    "avatarId" : "av-me",
+    "teamName" : "Sharks",
+    "isMe" : true
+  }, {
+    "rosterId" : 4,
+    "managerId" : null,
+    "manager" : null,
+    "avatarId" : null,
+    "teamName" : null,
+    "isMe" : false
+  } ],
+  "mine" : null
+}

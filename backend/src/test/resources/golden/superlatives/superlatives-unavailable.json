@@ -1,0 +1,17 @@
+{
+  "available" : false,
+  "reason" : "the season has not started",
+  "season" : 2026,
+  "requestedSeason" : null,
+  "sport" : "nfl",
+  "throughWeek" : null,
+  "weeksScored" : 0,
+  "regularSeasonEnd" : null,
+  "early" : true,
+  "earlyThresholdWeeks" : 4,
+  "closeGameMargin" : null,
+  "suspensionWeeksObserved" : [ ],
+  "commissionerListAvailable" : false,
+  "leagueSleeperId" : "L-2026",
+  "superlatives" : [ ]
+}

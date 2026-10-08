@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  * using it.
  *
  * <p>Golden files live under {@code src/test/resources/golden/}. Running with
- * {@code -Dgolden.write=true} writes them instead of asserting. That is only for the
+ * {@code -Dgolden.write=true} (or {@code GOLDEN_WRITE=true} in the environment) writes them instead of asserting. That is only for the
  * characterization commit. A conversion commit that rewrites a golden file has
  * changed the oracle and proves nothing.
  */
@@ -56,6 +56,19 @@ public final class GoldenJson {
         assertTreeMatchesGolden(actual, resourcePath, orderSensitivePaths);
     }
 
+    /**
+     * A response body as the client receives it: serialized to JSON and read back as a
+     * plain map. Tests that used to cast {@code getBody()} to {@code Map<String,Object>}
+     * call this instead. It gives the same map whether the controller built a map or a
+     * response record, so converting a controller to records never breaks them
+     * (plan-review finding 3). Numbers come back as JSON reads them: a small long id
+     * becomes an Integer.
+     */
+    @SuppressWarnings("unchecked")
+    public static java.util.Map<String, Object> wire(Object body) {
+        return MAPPER.convertValue(body, java.util.Map.class);
+    }
+
     /** As {@link #assertMatchesGolden} but for a raw JSON string, such as a MockMvc response body. */
     public static void assertJsonMatchesGolden(String json, String resourcePath, String... orderSensitivePaths) {
         try {
@@ -68,20 +81,45 @@ public final class GoldenJson {
     static void assertTreeMatchesGolden(JsonNode actual, String resourcePath, String... orderSensitivePaths) {
         Path file = ROOT.resolve(resourcePath + ".json");
         try {
-            if (Boolean.getBoolean("golden.write")) {
+            if (writeMode()) {
                 Files.createDirectories(file.getParent());
                 Files.writeString(file, MAPPER.writeValueAsString(actual) + "\n");
-                return;
+                // Never green in write mode. A run that rewrote its own oracle has
+                // checked nothing, and a GOLDEN_WRITE left exported in a terminal
+                // would otherwise turn every characterization test into a pass.
+                fail("golden written to " + file + " -- rerun without GOLDEN_WRITE / -Dgolden.write to check it");
             }
             if (!Files.exists(file)) {
                 fail("No golden file at " + file.toAbsolutePath()
                         + "; run once with -Dgolden.write=true in the characterization commit");
             }
             JsonNode expected = MAPPER.readTree(Files.readString(file));
-            assertTreesMatch(expected, actual, orderSensitivePaths);
+            assertTreesMatch(expected, onTheWire(actual), orderSensitivePaths);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * The tree a client would parse: written to JSON text and read back. A tree from
+     * {@code valueToTree} keeps Java's numeric types, so a {@code long} id is a
+     * {@code LongNode}, but the golden file is parsed text, where the same {@code 11}
+     * is an {@code IntNode}, and {@link JsonNode#equals} calls those different. The
+     * wire can't tell a long from an int, so neither should this. It still tells
+     * {@code 1} from {@code 1.0}, because that difference is on the wire. Found when the
+     * live-state-frame case failed against the very code its golden was written from.
+     */
+    static JsonNode onTheWire(JsonNode tree) throws IOException {
+        return MAPPER.readTree(MAPPER.writeValueAsString(tree));
+    }
+
+    /**
+     * {@code -Dgolden.write=true}, or the environment variable {@code GOLDEN_WRITE=true}.
+     * Gradle forks the test JVM without forwarding {@code -D} flags, but the fork does
+     * inherit the environment.
+     */
+    private static boolean writeMode() {
+        return Boolean.getBoolean("golden.write") || "true".equalsIgnoreCase(System.getenv("GOLDEN_WRITE"));
     }
 
     /** The comparison itself, separated from file I/O so {@code GoldenJsonTest} can exercise it. */
