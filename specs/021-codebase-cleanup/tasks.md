@@ -305,6 +305,10 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 
 - [ ] T054 [US4] Add a route-table test, `.../api/RouteTableTest.java`. It lists `RequestMappingHandlerMapping.getHandlerMethods()` paths and methods into `golden/route-table.json`, commits them **before** the split, and must stay unedited.
 - [ ] T055 [US4] Split it into `LeagueHistoryController` (history and record book), `ManagerHistoryController` (manager history and career) and `PowerRankingsController` (power, ballot, submit, compute, commissioner, backfill), using T028's response-family dtos, so no record is duplicated. Gate: T054 and T027 are green and unedited, with 0 IT skips.
+  - *Not done, by decision at build time (2026-10-07, measured): T028's record conversion already
+    took LeagueHistoryController from 1,022 to **713 lines**, below SC-005's 1,000. A three-controller
+    split would now be churn in a file concurrent sessions touch, with no criterion to meet, so
+    T054/T055 are left undone. The owner can reverse this.*
 
 ---
 
