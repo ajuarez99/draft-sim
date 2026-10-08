@@ -249,7 +249,7 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
 - [ ] T040 [P] [US3] `ManagerComparisonController` (7): char → conv commit pair following C2; dto `api/dto/ManagerComparisonResponses.java`.
 - [ ] T041 [P] [US3] `ManagerController` (6): char → conv commit pair following C2, with `positionalTilt` passed to `GoldenJson` as an **order-sensitive** path (it renders unsorted at `ManagerHistory.tsx:292`); dto `api/dto/ManagerResponses.java`.
 - [ ] T042 [P] [US3] `ExpectedWinsController` (4): char → conv commit pair following C2; dto `api/dto/ExpectedWinsResponses.java`.
-- [ ] T043 [US3] Out of scope, and **do not convert**: `ErrorHandler`, `MemberSetupController` (3 of 4 are error bodies), `MockDraftController`, `SimulationController` (SSE), `IngestController`, `SleeperUserController`, `HealthController`, and everything in `recap/` and `refresh/`. Record this list in the US3 PR description. **Also not planned:** the `engine/` package split listed in the spec's Split table. It was only ever "opportunistic", and the review moved the superlatives units into `engine` itself (T051), which leaves it nothing to piggyback on.
+- [X] T043 [US3] Out of scope, and **do not convert**: `ErrorHandler`, `MemberSetupController` (3 of 4 are error bodies), `MockDraftController`, `SimulationController` (SSE), `IngestController`, `SleeperUserController`, `HealthController`, and everything in `recap/` and `refresh/`. Record this list in the US3 PR description. **Also not planned:** the `engine/` package split listed in the spec's Split table. It was only ever "opportunistic", and the review moved the superlatives units into `engine` itself (T051), which leaves it nothing to piggyback on.
 
 ---
 
@@ -318,7 +318,7 @@ It uses `GoldenJson.MAPPER`, has no Spring context, and follows `WeeklyReportSha
   - *Done: a status index covering all 53 `claude/*.md` docs (checked by script), which also corrects 6 docs whose own status line went stale when they later shipped as specs 010/013/017/018/019/020 (each checked against `specs/` on main). All 3 `scripts/` files already had purpose headers, so they needed no change.*
 - [X] T057 Run [quickstart.md](quickstart.md) end to end against the final tree: the baseline commands, the zero-skip check, the CSS hash and the T016 production check. This counts as live verification only if a real `bootRun` and `vite dev` are clicked through in the browser pane: league home, power rankings, superlatives, manager history and draft board. That's this repo's bar; a green suite alone is not.
 - [X] T058 Update `HANDOFF.md` with what spec 021 shipped, what was scoped out (error bodies, SSE, `PlayoffOddsService:422`, `recap/` and `refresh/`) and what is **verified vs assumed**. Update the matching memory file.
-- [ ] T059 Write `specs/021-codebase-cleanup/pr-description.md` per PR (US1, US2, US3 batches, and each US4 split). Each one lists the C1, C2 or C3 evidence and ends with the attribution line.
+- [X] T059 Write `specs/021-codebase-cleanup/pr-description.md` per PR (US1, US2, US3 batches, and each US4 split). Each one lists the C1, C2 or C3 evidence and ends with the attribution line.
 
 ---
 
