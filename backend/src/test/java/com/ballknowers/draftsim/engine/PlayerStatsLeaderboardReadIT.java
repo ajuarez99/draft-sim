@@ -358,6 +358,58 @@ class PlayerStatsLeaderboardReadIT {
         }
     }
 
+    /**
+     * Measured on prod "Test" league (2026-10-09): a new league has no previous_league_id chain, so the
+     * resolver answered its own game-less season. Box scores are league-independent, so the board and the
+     * player page fall back to the newest earlier season with games, scored by the requested league.
+     */
+    @Test
+    void aLeagueWithNoChainFallsBackToTheNewestDataSeasonAndUsesItsOwnScoring() {
+        var established = league(NBA_2026);
+        StatLeaderboard ref = service.readLeaderboard(established, WindowKind.SEASON, MEMBER);
+        Assumptions.assumeTrue(ref.requestedSeason() != null && ref.season() == 2025,
+                "2026 has stored games now, so the established league did not fall back");
+        String sleeperId = "it-spec023-newleague";
+        jdbc.update("delete from league where sleeper_id = ?", sleeperId);
+        jdbc.update("""
+                insert into league (sport, season, sleeper_id, previous_league_id, name, total_rosters, settings_json,
+                                    scoring_json, roster_positions, status)
+                select sport, season, ?, null, 'it-spec023 new league', total_rosters, settings_json,
+                       scoring_json, roster_positions, status
+                from league where id = ?""", sleeperId, established.id());
+        try {
+            var fresh = league(sleeperId);
+            assertEquals(2026, fresh.season());
+            StatLeaderboard b = service.readLeaderboard(fresh, WindowKind.SEASON, MEMBER);
+            assertTrue(b.available(), "reason=" + b.reason());
+            assertEquals(2025, b.season());
+            assertEquals(2026, b.requestedSeason());
+            assertEquals(2026, b.scoringSeason());
+            assertNull(b.scoringMatchesRequested());
+            assertFalse(b.rows().isEmpty());
+            assertEquals(ref.rows().size(), b.rows().size());
+
+            Map<String, LeaderboardRow> refById = ref.rows().stream()
+                    .collect(Collectors.toMap(LeaderboardRow::sleeperPlayerId, r -> r));
+            LeaderboardRow top = b.rows().stream().filter(LeaderboardRow::qualified).findFirst().orElseThrow();
+            assertEquals(refById.get(top.sleeperPlayerId()).fpPerGame(), top.fpPerGame(),
+                    "identical scoring gives identical fantasy points per game");
+            for (LeaderboardRow r : b.rows()) {
+                assertEquals(refById.get(r.sleeperPlayerId()).fpPerGame(), r.fpPerGame(), r.sleeperPlayerId());
+            }
+
+            PlayerStatsPage page = service.read(fresh, top.sleeperPlayerId(), MEMBER).orElseThrow();
+            assertTrue(page.available(), "reason=" + page.reason());
+            assertEquals(2025, page.season());
+            assertEquals(2026, page.requestedSeason());
+            assertEquals(top.fpPerGame(), page.fantasy().fpPerGame().get(WindowKind.SEASON));
+            System.out.println("REPORT no-chain league: season=" + b.season() + " requested=" + b.requestedSeason()
+                    + " rows=" + b.rows().size() + " top=" + top.sleeperPlayerId() + " fp/g=" + top.fpPerGame());
+        } finally {
+            jdbc.update("delete from league where sleeper_id = ?", sleeperId);
+        }
+    }
+
     /** The wire shape: serialises with the app mapper (null levels and all) and carries the contract keys. */
     @Test
     void theBoardSerialisesToTheContractShape() throws Exception {

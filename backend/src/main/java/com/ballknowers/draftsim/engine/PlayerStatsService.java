@@ -265,6 +265,20 @@ public class PlayerStatsService {
         LeagueRow league = resolved.league();
         List<SeasonOption> seasons = resolver.seasons(requested.sleeperId());
         SeasonBoxCache.Season box = boxCache.get(sport, league.season());
+        // Box scores are league-independent, but a brand-new league has no previous_league_id chain for the
+        // resolver to walk, so it answers the requested (still game-less) season. Fall back to the newest
+        // earlier season that has box scores; league-specific reads below stay on the requested league.
+        // Measured on prod "Test" league 1414306784801239040 (season 2026, pre_draft), 2026-10-09.
+        int dataSeason = league.season();
+        Integer requestedSeason = resolved.requestedSeason();
+        if (box.games().isEmpty() && resolved.requestedSeason() == null) {
+            OptionalInt ds = dataSeasonBefore(sport, requested.season());
+            if (ds.isPresent()) {
+                dataSeason = ds.getAsInt();
+                box = boxCache.get(sport, dataSeason);
+                requestedSeason = requested.season();
+            }
+        }
         OffsetDateTime dataAsOf = box.token().maxFetchedAt();
 
         Map<String, PlayerInfo> infos = new HashMap<>();
@@ -284,7 +298,7 @@ public class PlayerStatsService {
                 : new PlayerRef(sleeperPlayerId, targetInfo.name(), targetInfo.positions(), targetInfo.team(), true);
 
         if (box.games().isEmpty()) {
-            return Optional.of(unavailable(sport, league.season(), resolved.requestedSeason(), NO_GAMES, dataAsOf,
+            return Optional.of(unavailable(sport, dataSeason, requestedSeason, NO_GAMES, dataAsOf,
                     seasons, ref));
         }
         List<Line> mine = box.lines().byPlayer().get(sleeperPlayerId);
@@ -293,7 +307,7 @@ public class PlayerStatsService {
 
         Map<String, Double> scoring = leagues.scoringOf(league.id());
         Computed c = compute(new Input(props, scoring, box.lines(), infos, sleeperPlayerId,
-                absences.forPlayers(sport, league.season(), List.of(sleeperPlayerId))), scorer);
+                absences.forPlayers(sport, dataSeason, List.of(sleeperPlayerId))), scorer);
 
         Long callerManagerId = requester == null || requester.isBlank() ? null
                 : managers.idsBySleeperUserId().get(requester);
@@ -308,13 +322,13 @@ public class PlayerStatsService {
                 PlayerPercentiles.population(box.lines(), infos, props), sleeperPlayerId, firstPosition, c.windows(),
                 c.qualification(), rostered);
         Ownership currentOwnership = null;
-        if (resolved.requestedSeason() != null) {
+        if (requestedSeason != null) {
             Map<Integer, RosterOwners.RosterOwner> requestedOwners = RosterOwners.ownerNames(
                     rosterSeasons.forLeague(requested.id()), members.forLeague(requested.id()), callerManagerId);
             currentOwnership = PlayerOwnership.currentOf(sleeperPlayerId, facts(requested, requestedOwners));
         }
 
-        return Optional.of(new PlayerStatsPage(sport.code(), league.season(), resolved.requestedSeason(), true,
+        return Optional.of(new PlayerStatsPage(sport.code(), dataSeason, requestedSeason, true,
                 hasGames ? null : NO_PLAYER_GAMES, dataAsOf, seasons, currentOwnership, ref, c.teams(),
                 c.teamGamesMissed(), ownership, c.windows(), c.fantasy(), percentiles, c.gameLog(),
                 new QualificationRule(props.rankMinGamesShare(), minGames(box.lines(), props),
@@ -372,9 +386,22 @@ public class PlayerStatsService {
         LeagueRow league = resolved.league();
         List<SeasonOption> seasons = resolver.seasons(requested.sleeperId());
         SeasonBoxCache.Season box = boxCache.get(sport, league.season());
+        // Same league-independent-box-scores fallback as read(): see the note there.
+        int dataSeason = league.season();
+        Integer requestedSeason = resolved.requestedSeason();
+        boolean dataFallback = false;
+        if (box.games().isEmpty() && resolved.requestedSeason() == null) {
+            OptionalInt ds = dataSeasonBefore(sport, requested.season());
+            if (ds.isPresent()) {
+                dataSeason = ds.getAsInt();
+                box = boxCache.get(sport, dataSeason);
+                requestedSeason = requested.season();
+                dataFallback = true;
+            }
+        }
         OffsetDateTime dataAsOf = box.token().maxFetchedAt();
         if (box.games().isEmpty()) {
-            return unavailableBoard(sport, league.season(), resolved.requestedSeason(), NO_GAMES, dataAsOf, seasons, window);
+            return unavailableBoard(sport, dataSeason, requestedSeason, NO_GAMES, dataAsOf, seasons, window);
         }
 
         NbaGameLines lines = box.lines();
@@ -426,7 +453,7 @@ public class PlayerStatsService {
                 members.forLeague(league.id()), callerManagerId);
         Facts seasonFacts = facts(league, owners);
         Facts requestedFacts = null;
-        if (resolved.requestedSeason() != null) {
+        if (requestedSeason != null) {
             requestedFacts = facts(requested, RosterOwners.ownerNames(rosterSeasons.forLeague(requested.id()),
                     members.forLeague(requested.id()), callerManagerId));
         }
@@ -452,14 +479,26 @@ public class PlayerStatsService {
                     vor == null ? null : vor.value(), vor == null ? null : vor.position(),
                     joined.picks().get(id), joined.draftValue().get(id), joined.adpOf(id)));
         }
-        Boolean scoringMatchesRequested = resolved.requestedSeason() == null ? null
+        // On the data-season fallback the requested league's own scoring is used: no second league to compare.
+        Boolean scoringMatchesRequested = requestedSeason == null || dataFallback ? null
                 : sameScoring(scoring, leagues.scoringOf(requested.id()));
-        return new StatLeaderboard(sport.code(), league.season(), resolved.requestedSeason(), league.season(),
+        return new StatLeaderboard(sport.code(), dataSeason, requestedSeason, league.season(),
                 scoringMatchesRequested, true, null, dataAsOf,
                 seasons, window,
                 new QualificationRule(props.rankMinGamesShare(), minGames, maxTeamGames(lines),
                         props.rankMinMinutesPerGame(), props.recencyDays()),
                 ownershipAsOf, joined.draft(), joined.adp(), joined.draftGrades(), replacement.replacement(), rows);
+    }
+
+    /** How many earlier seasons {@link #dataSeasonBefore} looks back. */
+    private static final int DATA_SEASON_LOOKBACK = 3;
+
+    /** The newest season before {@code season} (at most {@value #DATA_SEASON_LOOKBACK} back) with stored box scores. */
+    private OptionalInt dataSeasonBefore(Sport sport, int season) {
+        for (int s = season - 1; s >= season - DATA_SEASON_LOOKBACK; s--) {
+            if (boxCache.token(sport, s).count() > 0) return OptionalInt.of(s);
+        }
+        return OptionalInt.empty();
     }
 
     /**

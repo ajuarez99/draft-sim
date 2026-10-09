@@ -412,6 +412,9 @@ class PlayerStatsServiceTest {
         when(w.resolver.resolve("L26", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(league, null)));
         when(w.resolver.seasons("L26")).thenReturn(List.of(new SeasonOption(2026, "L26", false)));
         when(w.box.get(Sport.NBA, 2026)).thenReturn(season(Map.of(), 0, false));
+        for (int y = 2023; y <= 2025; y++) {
+            when(w.box.token(Sport.NBA, y)).thenReturn(new SeasonToken(0, null));   // no data season to fall back to
+        }
         when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of());
         PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
         assertFalse(page.available());
@@ -439,6 +442,9 @@ class PlayerStatsServiceTest {
         when(w.resolver.resolve("L26", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(l26, null)));
         when(w.resolver.seasons("L26")).thenReturn(List.of(new SeasonOption(2026, "L26", false)));
         when(w.box.get(Sport.NBA, 2026)).thenReturn(season(Map.of(), 0, false));
+        for (int y = 2023; y <= 2025; y++) {
+            when(w.box.token(Sport.NBA, y)).thenReturn(new SeasonToken(0, null));   // no data season to fall back to
+        }
         var none = w.service(PROPS).readLeaderboard(l26, WindowKind.SEASON, null);
         assertEquals("NO_GAMES", none.reason());
         assertEquals(List.of(new SeasonOption(2026, "L26", false)), none.seasons());

@@ -172,3 +172,20 @@ machine) and pushed. Both Railway services auto-deployed.
   34.8 MIN, 42.73 FP/G …). ✅
 - Still unverified in production: real Sleeper picks (the draft is 2026-10-10 19:15 UTC), and
   new-tab behaviour of player links in a real browser.
+
+## Post-deploy bug: a new league showed "No games have been played this season yet" (2026-10-09)
+
+Allan reported it from "Follow live". Production showed two pre-draft NBA leagues for his account.
+"Ball Knowers" (2026) returned 2025 stats, which was correct. **"Test"**
+(`1414306784801239040`, 2026, no previous season) returned `available:false, reason:NO_GAMES`.
+That's because 022's fallback walks only the league's own `previous_league_id` chain, and a
+brand-new league has none. NBA box scores aren't league-specific, so that was the wrong
+behaviour.
+
+**Fix** (`PlayerStatsService.read` and `readLeaderboard`): when the chain walk finds nothing, use
+the newest season with stored box scores, looking back up to 3 seasons. Scoring, roster shape and
+ownership stay on the requested league. `scoringSeason` is the requested season, and
+`scoringMatchesRequested` is null. The established-league paths are unchanged. The new IT
+inserts a league with no chain and asserts season 2025, requestedSeason 2026, 582 rows, and
+every row's FP/G equal to the established 2026 league's (Jokić 42.73 on both). It then deletes
+the league. Backend full suite: **1523 tests, 0 skipped, 0 failures**.
