@@ -199,7 +199,7 @@ task done.
 
   Write the findings and their fixes to `specs/023-draft-room-player-stats/code-review.md`.
 - [X] T031 Update docs: `HANDOFF.md` (023 state, what's verified and what's assumed, the 10-10 outcome to be filled in after the draft) and `README.md` (a mention under the live room). If a durable lesson came up, add it to `claude/lessons.md`. Record the FR-006 amendment's measured fact (2025 and 2026 scoring identical) in HANDOFF too, so a later season whose scoring changes isn't misread.
-- [ ] T032 **Ask Allan before committing**, then commit per story. Before 2026-10-10 19:15 UTC, and **only with explicit confirmation**: merge `022-player-stat-analysis`, then `023-draft-room-player-stats`, into `main`, push, and deploy **both** Railway services (backend first, then frontend, since the two services deploy separately). Prod-check `/api/drafts/1339351318128517120/seats` for `sleeperLeagueId` and the room's Stats view. Ship only the stories whose live check passed. Anything unverified stays on the branch (spec Clarifications 2026-10-08).
+- [X] T032 **Ask Allan before committing**, then commit per story. Before 2026-10-10 19:15 UTC, and **only with explicit confirmation**: merge `022-player-stat-analysis`, then `023-draft-room-player-stats`, into `main`, push, and deploy **both** Railway services (backend first, then frontend, since the two services deploy separately). Prod-check `/api/drafts/1339351318128517120/seats` for `sleeperLeagueId` and the room's Stats view. Ship only the stories whose live check passed. Anything unverified stays on the branch (spec Clarifications 2026-10-08).
 
 ---
 

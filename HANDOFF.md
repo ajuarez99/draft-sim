@@ -3,9 +3,9 @@
 **2026-10-09, branch `023-draft-room-player-stats` (worktree `../draft-sim-023`, branched from
 `022-player-stat-analysis` at `555592e`, so it carries 022): spec 023 (player stats in the draft
 room, with stats you choose) US1, US2 and US3 built and verified live against a real backend and a
-synthetic live draft. Not committed, not merged, not deployed. The target is the "Ball Knowers"
-NBA draft, 2026-10-10 19:15 UTC. Allan's rule (spec Clarifications): merge 022+023 and deploy
-before the draft only if verified, and ask before committing or deploying.**
+synthetic live draft. **Merged to `main` (`fb84885`) and DEPLOYED 2026-10-09**, and checked in
+production. That covers both services, the new fields and the Stats view in the 2026 draft's live
+room. It's for the "Ball Knowers" NBA draft, 2026-10-10 19:15 UTC.**
 
 - **What it is.** The live room's available-players sheet gets a **Tiers | Stats** switch,
   basketball only.

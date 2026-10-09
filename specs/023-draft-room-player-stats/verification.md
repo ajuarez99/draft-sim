@@ -156,3 +156,19 @@ is gone.
 
 **Final suites**: backend `./gradlew test` **1522 tests, 0 skipped, 0 failures** (1515 baseline + 7
 new); web `tsc -b` clean, vitest **94 files, 1305 tests**, `npm run build` OK.
+
+## Production (T032, 2026-10-09)
+
+Merged to `main` as `fb84885` (a local `--no-ff` merge, because `gh` isn't signed in on this
+machine) and pushed. Both Railway services auto-deployed.
+
+- `api.ballknowers.co`: `seats` for `1339351318128517120` returns
+  `sleeperLeagueId: "1339351318115946496"` (first seen 10:12:49 CDT). The stats endpoint returns
+  `season 2025`, `requestedSeason 2026`, `scoringSeason 2025`, `scoringMatchesRequested true`
+  and 582 rows, in 1.9 s (production scoring for 2025 and 2026 is identical too). ✅
+- `www.ballknowers.co`: the bundle `index-7MJYA1ze.js` carries the new UI (10:13:04). In the live
+  room for the 2026 draft (as popsharky), Stats shows 400 rows, the "Last season's play, not a
+  projection" header and Choose stats. **Jokić's line is identical to the local one** (65 GP,
+  34.8 MIN, 42.73 FP/G …). ✅
+- Still unverified in production: real Sleeper picks (the draft is 2026-10-10 19:15 UTC), and
+  new-tab behaviour of player links in a real browser.
