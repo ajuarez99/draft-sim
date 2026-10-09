@@ -34,6 +34,13 @@ Built so far:
   and their likely next pick, re-projected in the background after every pick. A position
   scarcity meter (starter pool = the board's top teams × starters) and a per-manager
   "Room read" sit beside it.
+- **Player stats while you draft** (specs/023-draft-room-player-stats). Basketball only. The
+  live room's player sheet switches between **Tiers** and **Stats**. Stats is a table of the
+  undrafted pool (the board's top 400) with last season's real numbers from the Player stats
+  page. It's labelled as past play, not a projection. **Choose stats** lets you pick and order
+  any of 32 stats, usage rate included, and the choice is remembered on the device. There's an
+  optional filter to players likely still there at your next pick. Mock drafts started from a
+  league get the same view.
 - **League analysis, in both sports** (specs/004-ffwrapped-feature-parity). Four
   pages built on weekly results Sleeper has always reported and this app has
   always stored: **Roster management** (points scored against the most a perfect

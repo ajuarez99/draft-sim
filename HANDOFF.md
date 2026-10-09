@@ -1,5 +1,60 @@
 # Ball Knowers — handoff
 
+**2026-10-09, branch `023-draft-room-player-stats` (worktree `../draft-sim-023`, branched from
+`022-player-stat-analysis` at `555592e`, so it carries 022): spec 023 (player stats in the draft
+room, with stats you choose) US1, US2 and US3 built and verified live against a real backend and a
+synthetic live draft. Not committed, not merged, not deployed. The target is the "Ball Knowers"
+NBA draft, 2026-10-10 19:15 UTC. Allan's rule (spec Clarifications): merge 022+023 and deploy
+before the draft only if verified, and ask before committing or deploying.**
+
+- **What it is.** The live room's available-players sheet gets a **Tiers | Stats** switch,
+  basketball only.
+  - **Stats** is a table of every undrafted player in the board's top 400 (a mock lists its own
+    full pool). The name column is pinned. Values come straight from 022's leaderboard (one
+    request per window, none per pick), rendered by the leaderboard's own `Cell`
+    (`web/src/statCells.tsx`).
+  - It names the season and window, and says "Last season's play, not a projection".
+  - **Choose stats** is a modal over any of 32 stats (Basic, Shooting, Advanced including USG, and
+    Fantasy) with order. It's remembered per device (`bk.draftStats.v1`). The window and mode
+    controls match the leaderboard's. There's an optional "likely there at my next pick" filter
+    that uses the sheet's existing 35% boundary (`web/src/survivalBands.ts`).
+  - Mock rooms started from a league get the same view.
+  - Backend: `seats` gains `sleeperLeagueId`; the leaderboard gains `scoringSeason` and
+    `scoringMatchesRequested`. There's no migration.
+- **Measured facts that shaped it:**
+  - 2025 and 2026 "Ball Knowers" NBA scoring are **identical** (15 keys, 0 differences), so
+    "last season's games under 2025–26 scoring" is also this season's scoring. The view says
+    which scoring it used, and warns if a league's scoring changed (FR-006 amended).
+  - The room's survival list is **not** the undrafted pool. It only holds players the simulation
+    surfaced near your picks (FR-005 amended; the view reads `/pool?limit=400`).
+- **Fixed in passing, already broken in production:** at phone width (≤700 px) the
+  available-players sheet measured **0 px tall** and the board painted over it, so taps hit board
+  cells. This was measured on 022 too, and `main` has the same CSS. The sheet is now
+  viewport-fixed at layer 43, the same fix the pick card got in spec 012 (T042).
+- **Verified** (details in `specs/023-draft-room-player-stats/verification.md`):
+  - backend **1,522 / 0 skipped** (7 new); web **1,305**, `tsc` and build clean;
+  - **10 players × 12 stats = 120/120 cells identical** to the stats page;
+  - 20-pick synthetic live draft (fake Sleeper, real poller and SSE): the table never lagged the
+    board for even one frame (28 picks frame-checked across two runs);
+  - sort and scroll survive picks; the modal stays open with its toggles intact while picks land;
+  - persistence across rooms; 375 px for both sheet and modal; old-backend degrade; football
+    unchanged.
+- **A bug-hunting review** (`code-review.md`): 0 blockers, 8 should-fix, all fixed and re-checked
+  live. The two that mattered most: a window switch mid-load could leave Stats stuck loading, and
+  on phones the jump-to button covered the sheet.
+- **Bugs caught by live verification, now fixed:**
+  - The pool was capped at 60 tier rows.
+  - The 400-row table re-rendered on the room's 1 s clock: **18 long tasks (65–147 ms) per 10 s →
+    0**.
+  - Rapid clicks in the modal undid each other (stale closure). There's a regression test, proven
+    to fail on the old code.
+- **Not verified / owed:**
+  - A player name opens the player page with `target="_blank"`, but the in-app browser pane
+    opened it in the same tab. **Check in a real browser** that the live room stays open.
+  - The per-pick cost of the Stats view versus Tiers (resimulation and pick-card bursts) was not
+    separately measured. Idle cost is 0 for both.
+  - The 2026 draft itself: nothing here has seen real Sleeper picks, only the fake.
+
 **2026-10-08, branch `022-player-stat-analysis` (worktree `../draft-sim-022`, off `origin/main`
 `2c72ead`): spec 022 (player stat analysis) US1, US2 and US4 built, reviewed and verified locally.
 They are committed on the branch, but not pushed, not merged and not deployed. US3 (the nightly
