@@ -127,6 +127,12 @@ export type SeatsResponse = {
   // showing without a second fetch; see positions.ts.
   sport: Sport
   /**
+   * The Sleeper id of the draft's league (spec 023: the draft room links into
+   * /leagues/{id}/players/...). Optional because the frontend can deploy ahead
+   * of the backend (the 2026-09-14 white-page incident); undefined = unknown.
+   */
+  sleeperLeagueId?: string | null
+  /**
    * The round from which snake parity flips; 0 means the draft never reverses.
    * `reversalRound` is what the engine actually uses -- the user's override if
    * they set one, otherwise `reversalRoundFromSleeper`. The two are shown side
@@ -2802,6 +2808,17 @@ export type StatLeaderboard = {
   sport: Sport
   season: number
   requestedSeason: number | null
+  /**
+   * The season whose league scoring scored every fantasy figure (spec 023). Optional
+   * because the frontend can deploy ahead of the backend; undefined = unknown.
+   */
+  scoringSeason?: number | null
+  /**
+   * Null when there was no fallback; otherwise whether the requested season's league
+   * scoring is identical to scoringSeason's. Optional for the same deploy-order reason;
+   * undefined = unknown.
+   */
+  scoringMatchesRequested?: boolean | null
   available: boolean
   reason: PlayerStatsReason | null
   dataAsOf: string | null

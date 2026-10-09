@@ -125,6 +125,8 @@ class LeagueControllerSeatsOwnerConfiguredIT {
         Map<String, Object> map = (Map<String, Object>) response.getBody();
         assertNotNull(map);
         assertEquals(7, map.get("mySlot"), "configured owner sits in slot 7 of this draft");
+        assertEquals("it-league-seats-owner-configured", map.get("sleeperLeagueId"),
+                "spec 023: the seats payload names the league the draft room links into");
     }
 
     @Test

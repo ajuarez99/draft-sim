@@ -169,10 +169,14 @@ public class PlayerStatsService {
      * Contract C2. When {@code available} is false only {@code sport}, {@code season}, {@code requestedSeason},
      * {@code reason}, {@code window} and {@code seasons} are meaningful; the rest is null and {@code rows} empty.
      * {@code ownershipAsOf} is the point in time every row's ownership is read at (null when unknown).
+     * {@code scoringSeason} is the season whose league scoring scored every fantasy figure;
+     * {@code scoringMatchesRequested} is null when there was no fallback (or when either league's scoring is
+     * not stored), else whether the requested season's league scoring is identical to it, ignoring entries
+     * weighted 0 (see {@code sameScoring}). Both are null when unavailable.
      * Ranks, replacement and the qualification rule are over the qualified, non-stale group of this window only.
      */
-    public record StatLeaderboard(String sport, int season, Integer requestedSeason, boolean available,
-                                  String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
+    public record StatLeaderboard(String sport, int season, Integer requestedSeason, Integer scoringSeason,
+                                  Boolean scoringMatchesRequested, boolean available, String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
                                   WindowKind window, QualificationRule qualification, AsOf ownershipAsOf,
                                   DraftState draft, AdpState adp, DraftGradesState draftGrades,
                                   ReplacementLevel.Replacement replacement, List<LeaderboardRow> rows) {}
@@ -448,11 +452,34 @@ public class PlayerStatsService {
                     vor == null ? null : vor.value(), vor == null ? null : vor.position(),
                     joined.picks().get(id), joined.draftValue().get(id), joined.adpOf(id)));
         }
-        return new StatLeaderboard(sport.code(), league.season(), resolved.requestedSeason(), true, null, dataAsOf,
+        Boolean scoringMatchesRequested = resolved.requestedSeason() == null ? null
+                : sameScoring(scoring, leagues.scoringOf(requested.id()));
+        return new StatLeaderboard(sport.code(), league.season(), resolved.requestedSeason(), league.season(),
+                scoringMatchesRequested, true, null, dataAsOf,
                 seasons, window,
                 new QualificationRule(props.rankMinGamesShare(), minGames, maxTeamGames(lines),
                         props.rankMinMinutesPerGame(), props.recencyDays()),
                 ownershipAsOf, joined.draft(), joined.adp(), joined.draftGrades(), replacement.replacement(), rows);
+    }
+
+    /**
+     * Whether two leagues score identically, or null when that can't be said. An entry weighted
+     * 0.0 contributes nothing (the scorer treats it exactly like an absent key), so zero entries
+     * are dropped before comparing: a season that merely adds a zero-weight stat key is not a
+     * scoring change. An empty map means the scoring isn't stored (not yet ingested), which is
+     * "unknown", not "changed". Amended after code review (spec 023 N1, N2).
+     */
+    static Boolean sameScoring(Map<String, Double> a, Map<String, Double> b) {
+        if (a.isEmpty() || b.isEmpty()) return null;
+        return nonZero(a).equals(nonZero(b));
+    }
+
+    private static Map<String, Double> nonZero(Map<String, Double> m) {
+        Map<String, Double> out = new HashMap<>();
+        m.forEach((k, v) -> {
+            if (v != null && v != 0.0) out.put(k, v);
+        });
+        return out;
     }
 
     private static Map<String, Integer> ranks(List<Candidate> group) {
@@ -464,7 +491,7 @@ public class PlayerStatsService {
     private static StatLeaderboard unavailableBoard(Sport sport, int season, Integer requestedSeason, String reason,
                                                     OffsetDateTime dataAsOf, List<SeasonOption> seasons,
                                                     WindowKind window) {
-        return new StatLeaderboard(sport.code(), season, requestedSeason, false, reason, dataAsOf, seasons, window,
+        return new StatLeaderboard(sport.code(), season, requestedSeason, null, null, false, reason, dataAsOf, seasons, window,
                 null, null, null, null, null, null, List.of());
     }
 

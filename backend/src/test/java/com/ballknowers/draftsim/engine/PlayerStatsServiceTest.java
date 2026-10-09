@@ -543,4 +543,26 @@ class PlayerStatsServiceTest {
         assertNull(page.requestedSeason());
         assertNull(page.currentOwnership());
     }
+
+    // ---- spec 023 code review N1, N2: the scoring-changed flag
+
+    @Test
+    void sameScoringIgnoresZeroWeightEntriesAndOrder() {
+        assertEquals(Boolean.TRUE, PlayerStatsService.sameScoring(scoring("pts", 1, "ast", 1.5), scoring("ast", 1.5, "pts", 1)));
+        assertEquals(Boolean.TRUE, PlayerStatsService.sameScoring(scoring("pts", 1), scoring("pts", 1, "new_stat", 0)));
+        assertEquals(Boolean.TRUE, PlayerStatsService.sameScoring(scoring("pts", 1, "new_stat", 0), scoring("pts", 1)));
+    }
+
+    @Test
+    void sameScoringSeesARealDifference() {
+        assertEquals(Boolean.FALSE, PlayerStatsService.sameScoring(scoring("pts", 1), scoring("pts", 1, "blk", 2)));
+        assertEquals(Boolean.FALSE, PlayerStatsService.sameScoring(scoring("pts", 1), scoring("pts", 2)));
+    }
+
+    @Test
+    void sameScoringIsUnknownWhenEitherSideIsNotStored() {
+        assertNull(PlayerStatsService.sameScoring(Map.of(), scoring("pts", 1)));
+        assertNull(PlayerStatsService.sameScoring(scoring("pts", 1), Map.of()));
+        assertNull(PlayerStatsService.sameScoring(Map.of(), Map.of()));
+    }
 }
