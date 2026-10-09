@@ -111,6 +111,9 @@
  *    44  `.pick-card` at phone width only (≤700px), where it leaves the
  *         board stage and pins to the viewport bottom. Just below the
  *         jump-to FAB so that control is never covered.
+ *    43  `.avail-sheet` at phone width only (≤700px), for the same reason
+ *         as the pick card (spec 023). Below it, so a landed pick's card
+ *         still shows over the open player list.
  *   Add the next page-level fixed layer here, not inline.
  *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
@@ -1525,6 +1528,22 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     position: fixed; top: auto; bottom: 12px; left: 12px; right: 12px;
     width: auto; max-height: 60vh; overflow-y: auto; z-index: 44;
   }
+  /* The available-players sheet had the same 0px-stage problem and nobody had
+     caught it: its `max-height: 46%` resolved against a 0px stage, so the box
+     measured 0px tall, its content spilled out below, and the board painted
+     over it -- a tap on a chip or row landed on a board cell instead (measured
+     at 375px on 022 and main, 2026-10-09, spec 023 live verification). Pinned
+     to the viewport like the pick card, a layer below it (43). */
+  .avail-sheet {
+    position: fixed; top: auto; bottom: 12px; left: 8px; right: 8px;
+    max-height: 55vh; z-index: 43;
+    /* Clear of the jump-to FAB (.jumpto-fab, fixed bottom-right, z 45, 44px tall at bottom
+       16px): 44 + 2 * 16 = 76px, so the sheet's last row and scrollbar aren't under it. */
+    bottom: 76px;
+  }
+  /* The collapsed pill sits bottom-LEFT instead, so the FAB doesn't cover its only button
+     (code review S7). Same specificity as the base collapsed rule, and later, so it wins. */
+  .avail-sheet.collapsed { left: 8px; right: auto; bottom: 12px; }
 }
 
 /* "Simulate again", moved out of the board header into the settings modal. */
@@ -5657,3 +5676,52 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .sl-leader-list { list-style: decimal inside; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
 .sl-leader-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: baseline; font-size: 13px; }
 .sl-leader-val { font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
+
+/* --- Draft room Stats view (specs/023 US1) ------------------------------------
+   Reuses .sl-wrap / .sl-table / .sl-pin from the leaderboard above; only what the
+   sheet needs on top is here. The wrapper scrolls sideways itself, so the sheet and
+   the page never do. The name column's cells already carry --panel (.sl-table th),
+   so rows don't show through it while the numbers scroll. */
+.ds-head { margin: 0 0 6px; }
+.ds-head p { margin: 0 0 2px; }
+.ds-controls { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 6px; }
+.ds-likely { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.ds-wrap { margin-top: 6px; }
+/* .avail-scroll pins every <thead th> to the top of the sheet; inside a sideways-scrolling
+   wrapper that pin has nothing to stick to, so only the name column stays pinned (to the left). */
+.avail-scroll .ds-table thead th { position: static; }
+.avail-scroll .ds-table thead th.sl-pin,
+.ds-table tbody th.sl-pin { position: sticky; left: 0; z-index: 1; }
+.ds-table th, .ds-table td { padding: 5px 9px; }
+.ds-table tbody th.sl-pin { min-width: 170px; max-width: 220px; font-weight: 400; }
+.ds-name { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 0; }
+.ds-name .pface { margin-right: 6px; flex: none; }
+.ds-name a { font-weight: 600; color: var(--text); text-decoration: none; }
+.ds-name a:hover { text-decoration: underline; }
+.ds-name .pos { margin: 0 6px 0 0; }
+.ds-sub { flex-basis: 100%; padding-left: 26px; font-size: 11px; color: var(--muted); }
+.ds-table td.ds-none { text-align: left; color: var(--muted); font-size: 12px; white-space: normal; }
+@media (max-width: 640px) {
+  .ds-table tbody th.sl-pin { min-width: 150px; }
+}
+.ds-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+
+/* The live room's stat picker (specs/023 US2). Uses .modal-backdrop (layer 100) as is; the card
+   scrolls its own body so it fits a 375px screen. */
+.modal-card.stat-picker { max-width: 520px; max-height: 85vh; display: flex; flex-direction: column; }
+.stat-picker-title { font-size: 20px; margin: 0 28px 8px 0; }
+.stat-picker-body { overflow-y: auto; min-height: 0; flex: 1; }
+.stat-picker-h { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; margin: 12px 0 6px; padding: 0; }
+.stat-picker-shown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.stat-picker-shown li { display: flex; align-items: center; gap: 6px; }
+.stat-picker-shown .stat-picker-name { flex: 1; }
+.stat-picker-shown button { min-width: 32px; min-height: 32px; }
+.stat-picker-group { border: 0; margin: 0; padding: 0; min-width: 0; }
+.stat-picker-opt { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; }
+.stat-picker-opt .stat-picker-name { font-weight: 600; min-width: 56px; }
+.stat-picker-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.ds-pickers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 6px; }
+.ds-empty { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
+@media (max-width: 480px) {
+  .modal-backdrop:has(.stat-picker) { padding: 12px; }
+}

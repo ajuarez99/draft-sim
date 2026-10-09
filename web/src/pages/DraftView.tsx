@@ -15,6 +15,7 @@ import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { useStatsPool } from '../useStatsPool'
 import { SkeletonBoard } from '../components/Skeleton'
 import SeatPopover from '../components/SeatPopover'
 import OnTheClock from '../components/OnTheClock'
@@ -433,6 +434,8 @@ export default function DraftView() {
   }
 
   const sport = seats?.sport ?? 'nfl'
+  // The NBA Stats view's player universe (spec 023); a no-op for football.
+  const { pool: statsPool, loading: statsPoolLoading, error: statsPoolFailed } = useStatsPool(draftId, seats != null, sport)
 
   // Whether the board headers have anything real to show as "you" yet. An
   // explicit ?slot= is known immediately (nothing to wait for). Otherwise,
@@ -590,6 +593,10 @@ export default function DraftView() {
                   started={started}
                   sport={sport}
                   recentPicks={feedPicks.map((p) => p.player)}
+                  sleeperLeagueId={seats.sleeperLeagueId}
+                  statsPool={statsPool ?? undefined}
+                  statsPoolLoading={statsPoolLoading}
+                  statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
                 />
                 {!started && (
                   <div className="start-overlay">

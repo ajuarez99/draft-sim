@@ -294,13 +294,77 @@ class PlayerStatsLeaderboardReadIT {
         System.out.println("REPORT 2026 fallback draft=" + b.draft() + " adp=" + b.adp() + " grades=" + b.draftGrades());
     }
 
+    /** Spec 023 C2: the season that scored the figures is always named; the match flag exists only on a fallback. */
+    @Test
+    void aBoardThatDidNotFallBackNamesItsScoringSeasonAndHasNoMatchFlag() {
+        StatLeaderboard b = service.readLeaderboard(league(NBA_2025), WindowKind.SEASON, MEMBER);
+        assertNull(b.requestedSeason());
+        assertEquals(b.season(), b.scoringSeason());
+        assertEquals(2025, b.scoringSeason());
+        assertNull(b.scoringMatchesRequested(), "no fallback, so there is nothing to match against");
+    }
+
+    @Test
+    void aFallbackWithIdenticalScoringSaysSo() {
+        var l = league(NBA_2026);
+        // Temporarily give the 2026 league exactly the 2025 league's scoring (restored in finally).
+        withRequestedScoring(l, jdbc.queryForObject("select scoring_json::text from league where id = ?", String.class,
+                league(NBA_2025).id()), () -> {
+            StatLeaderboard b = service.readLeaderboard(l, WindowKind.SEASON, MEMBER);
+            Assumptions.assumeTrue(b.requestedSeason() != null, "2026 has stored games now, so it did not fall back");
+            assertEquals(2025, b.scoringSeason());
+            assertEquals(Boolean.TRUE, b.scoringMatchesRequested());
+        });
+    }
+
+    @Test
+    void aFallbackWhoseRequestedScoringDiffersInOneKeySaysSo() {
+        var l = league(NBA_2026);
+        // The 2025 league's scoring plus one extra key: differs in exactly one key (restored in finally).
+        String differing = jdbc.queryForObject(
+                "select (scoring_json || '{\"it_spec023_extra\": 1.5}'::jsonb)::text from league where id = ?",
+                String.class, league(NBA_2025).id());
+        withRequestedScoring(l, differing, () -> {
+            StatLeaderboard b = service.readLeaderboard(l, WindowKind.SEASON, MEMBER);
+            Assumptions.assumeTrue(b.requestedSeason() != null, "2026 has stored games now, so it did not fall back");
+            assertEquals(2025, b.scoringSeason());
+            assertEquals(Boolean.FALSE, b.scoringMatchesRequested());
+        });
+    }
+
+    @Test
+    void aFallbackWhoseRequestedScoringOnlyAddsAZeroWeightKeyStillMatches() {
+        var l = league(NBA_2026);
+        // The 2025 scoring plus a key weighted 0: the scorer treats it like an absent key, so no change.
+        String zeroExtra = jdbc.queryForObject(
+                "select (scoring_json || '{\"it_spec023_zero\": 0}'::jsonb)::text from league where id = ?",
+                String.class, league(NBA_2025).id());
+        withRequestedScoring(l, zeroExtra, () -> {
+            StatLeaderboard b = service.readLeaderboard(l, WindowKind.SEASON, MEMBER);
+            Assumptions.assumeTrue(b.requestedSeason() != null, "2026 has stored games now, so it did not fall back");
+            assertEquals(Boolean.TRUE, b.scoringMatchesRequested());
+        });
+    }
+
+    /** Runs {@code body} with the requested league's scoring_json swapped, then puts the original back. */
+    private void withRequestedScoring(LeagueRepository.LeagueRow requested, String scoringJson, Runnable body) {
+        String original = jdbc.queryForObject("select scoring_json::text from league where id = ?", String.class,
+                requested.id());
+        jdbc.update("update league set scoring_json = ?::jsonb where id = ?", scoringJson, requested.id());
+        try {
+            body.run();
+        } finally {
+            jdbc.update("update league set scoring_json = ?::jsonb where id = ?", original, requested.id());
+        }
+    }
+
     /** The wire shape: serialises with the app mapper (null levels and all) and carries the contract keys. */
     @Test
     void theBoardSerialisesToTheContractShape() throws Exception {
         var l = league(NBA_2025);
         StatLeaderboard b = service.readLeaderboard(l, WindowKind.SEASON, MEMBER);
         var json = mapper.readTree(mapper.writeValueAsString(b));
-        for (String k : List.of("sport", "season", "requestedSeason", "available", "reason", "dataAsOf", "seasons", "window",
+        for (String k : List.of("sport", "season", "requestedSeason", "scoringSeason", "scoringMatchesRequested", "available", "reason", "dataAsOf", "seasons", "window",
                 "qualification", "ownershipAsOf", "draft", "adp", "draftGrades", "replacement", "rows")) {
             assertTrue(json.has(k), k);
         }

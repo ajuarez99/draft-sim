@@ -747,3 +747,33 @@ A related pattern from the same spec: a live check in the browser found six disp
 attempts, and a rank described as "season total" when it was per game. Two of our own design docs
 were also wrong, and a builder or reviewer caught each one: a percentile formula that could exceed
 100, and a value labelled "per week" that was a season sum. Each correction is dated in place.
+
+## 35. A fix for one component on a 0px container doesn't fix its siblings on the same container
+
+Spec 012 (T042) found that at phone width `.board-stage` measures 0 px tall, so the pick card,
+hung off the stage, landed below the fold. It was fixed by pinning the pick card to the viewport.
+The **available-players sheet** was positioned against the same stage with `max-height: 46%`.
+That resolved to 0 px, its content spilled out, and the board painted over it: every tap on a
+chip or a player row hit a board cell instead. It had been like this in production since then.
+Spec 023 found it only because its new Stats switch lived in that sheet and the 375 px check
+tried to tap it. `elementFromPoint` at the button's centre returned a board cell.
+
+**When a layout root cause is found and fixed for one component, list every other component
+positioned against the same container and check each one at the same width.** The fix is one
+line per component. The check is `elementFromPoint` at the control's centre, because a
+screenshot of an overlapped control can look perfectly fine.
+
+Two more from the same verification, both found by driving the real room and not by the 1,290
+tests that passed before it:
+
+- **A memoized-looking table can still re-render on every tick.** The room re-renders once a
+  second for its "Live · Ns" clock. A 400-row table with no `memo` and with inline callbacks
+  cost 18 long tasks (65–147 ms) per 10 seconds, against 0 for the view beside it. A
+  `PerformanceObserver({type: 'longtask'})` sample, taken with the view open and then closed,
+  is the check. Make sure the view really did switch before trusting the "closed" sample: the
+  first one here was taken with a pick card covering the switch, so the click never landed.
+- **A test harness that writes to the shared dev database changes other features' tests.** A
+  synthetic `drafting` copy of the 2026 NBA draft made spec 022's IT skip ("the 2026 draft has
+  been held"). The skip count went from 0 to 1 with no failure, which is exactly the signal
+  that's easy to read past (memory: "Backend suite skips ITs silently"). Delete harness rows when
+  the check is done, and re-run whatever skipped.

@@ -199,6 +199,9 @@ public class LeagueController {
         // for fit(); this just also puts it on the wire. Sport's @JsonValue
         // serializes it as the same lowercase code DraftSummary already uses.
         response.put("sport", sport);
+        // Spec 023: the draft room links to /leagues/{id}/players/... and needs the
+        // Sleeper id for that. Nullable (league row can be missing), so no Map.of.
+        response.put("sleeperLeagueId", league.map(LeagueRepository.LeagueRow::sleeperId).orElse(null));
         // Phase 6b. The round from which snake parity flips is the one piece of
         // this project's behaviour that ships as an assumption -- no completed
         // draft in reach uses a nonzero reversal_round, so the semantics were

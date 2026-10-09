@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   COLUMNS,
+  DEFAULT_COLUMNS,
   GROUPS,
+  PICKABLE,
+  PICKABLE_IDS,
   LEADER_CATEGORIES,
   NO_FILTERS,
   applyFilters,
@@ -235,5 +238,37 @@ describe('rank and move formatting', () => {
   it('the draft value tooltip says season total, not per week', () => {
     expect(COLUMNS.draftValue.title).toMatch(/summed over the league’s counted weeks/)
     expect(COLUMNS.draftValue.title).not.toMatch(/per counted week/)
+  })
+})
+
+describe('DEFAULT_COLUMNS', () => {
+  it('names only columns that exist, so the draft room never renders a hole', () => {
+    for (const id of DEFAULT_COLUMNS) expect(COLUMNS[id], id).toBeDefined()
+  })
+})
+
+describe('PICKABLE (spec 023 US2)', () => {
+  const ids = PICKABLE.flatMap((g) => g.columns.map((c) => c.id))
+
+  it('offers Basic, Shooting, Advanced and Fantasy, and no Draft value group', () => {
+    expect(PICKABLE.map((g) => g.id)).toEqual(['basic', 'shooting', 'advanced', 'fantasy'])
+    for (const id of ['pick', 'round', 'manager', 'adp', 'draftValue']) expect(ids).not.toContain(id)
+  })
+
+  it('offers no stat twice: the makes-attempts shooting columns replace plain FG% and FT%', () => {
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids).not.toContain('fgPct')
+    expect(ids).not.toContain('ftPct')
+    expect(ids).toContain('fgPctMA')
+    expect(ids).toContain('ftPctMA')
+    expect(ids.filter((i) => i === 'leagueRank')).toHaveLength(1)
+  })
+
+  it('includes usage rate', () => {
+    expect(ids).toContain('usg')
+  })
+
+  it('contains every default column', () => {
+    for (const id of DEFAULT_COLUMNS) expect(PICKABLE_IDS.has(id), id).toBe(true)
   })
 })
