@@ -185,6 +185,9 @@ export default function MockDraftView() {
                 teams={state.teams}
                 started
                 sport={state.sport}
+                // Spec 023 US3: the league the mock borrowed its settings from, for the Stats
+                // view. Null for a mock started with no league, which the sheet explains.
+                sleeperLeagueId={state.sourceSleeperLeagueId ?? null}
               />
             )}
           </div>

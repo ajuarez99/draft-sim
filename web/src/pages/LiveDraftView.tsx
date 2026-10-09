@@ -7,6 +7,7 @@ import {
   getRealDraftBoard,
   getSeats,
   streamSimulationQuietly,
+  type AvailabilityRow,
   type PlayerRef,
   type PredictedPick,
   type RealPick,
@@ -17,6 +18,7 @@ import { ApiError } from '../apiError'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { useStatsPool } from '../useStatsPool'
 import DraftBoard from '../components/DraftBoard'
 import LiveStatusBar from '../components/LiveStatusBar'
 import OnBrandPanel, { OnBrandLine } from '../components/OnBrandPanel'
@@ -108,6 +110,9 @@ function mergeByPickNo(base: RealPick[], over: RealPick[]): RealPick[] {
  * back at ~100% and render as landed cells with no client-supplied startState
  * and no backend change.
  */
+/** One shared empty list, so a pre-projection render hands the panel the same reference each time. */
+const NO_AVAILABILITY: AvailabilityRow[] = []
+
 export default function LiveDraftView() {
   const { draftId = '' } = useParams<{ draftId: string }>()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -592,6 +597,9 @@ export default function LiveDraftView() {
     }
   }, [draftId, poolSize, seatsLoaded])
 
+  // The NBA Stats view's candidate universe (spec 023); see useStatsPool.
+  const { pool: statsPool, loading: statsPoolLoading, error: statsPoolFailed } = useStatsPool(draftId, seatsLoaded, sport)
+
   // Only a projection pinned to EXACTLY the current landed state: the newest
   // non-busy stamp, and only when it was conditioned on the highest landed pick.
   // Anything older gives null, so expectedAtNext is absent rather than stale.
@@ -888,7 +896,7 @@ export default function LiveDraftView() {
                     a projection to read options out of", which is what the old
                     `result &&` gate below the board was saying too. */}
                 <AvailabilityPanel
-                  availability={result?.availability ?? []}
+                  availability={result?.availability ?? NO_AVAILABILITY}
                   myPicks={upcomingMyPicks}
                   teams={result?.teams ?? seats.teams}
                   pickedPlayerIds={takenPlayerIds}
@@ -902,6 +910,10 @@ export default function LiveDraftView() {
                   // picks. Hold them back; the tiered list still shows.
                   noAvailabilityReason={slotKnown ? undefined : 'Availability appears once your seat is known.'}
                   recentPicks={landedPicks.map((p) => p.player)}
+                  sleeperLeagueId={seats.sleeperLeagueId}
+                  statsPool={statsPool ?? undefined}
+                  statsPoolLoading={statsPoolLoading}
+                  statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
                 />
                 {waiting && !result && (
                   <div className="start-overlay">

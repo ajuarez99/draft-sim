@@ -146,6 +146,14 @@ const DRAFT = [
   LEAGUE_RANK,
 ].map(reg)
 
+/**
+ * The draft room's starting stat columns (spec 023 R6, FR-009): a starting point for a points
+ * league, not a recommendation. The room's stat choice (US2) replaces it once the member picks.
+ */
+export const DEFAULT_COLUMNS: readonly string[] = [
+  'gp', 'min', 'fp', 'pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'tov', 'fgPctMA', 'ftPctMA',
+]
+
 export type GroupDef = { id: ColumnGroup; label: string; columns: StatColumn[]; defaultSort: string }
 export const GROUPS: readonly GroupDef[] = [
   { id: 'basic', label: 'Basic', columns: BASIC, defaultSort: 'pts' },
@@ -154,6 +162,19 @@ export const GROUPS: readonly GroupDef[] = [
   { id: 'fantasy', label: 'Fantasy', columns: FANTASY, defaultSort: 'fp' },
   { id: 'draft', label: 'Draft value', columns: DRAFT, defaultSort: 'pick' },
 ]
+/**
+ * What the draft room's stat picker offers (spec 023 R6, FR-008): the leaderboard's groups minus
+ * Draft value (those columns describe a draft that already happened), with Basic's plain FG%/FT%
+ * dropped for Shooting's FG%/FT% that carry makes-attempts, so no label is offered twice.
+ * `leagueRank` is in Fantasy only, once the Draft group is gone.
+ */
+export const PICKABLE: { id: ColumnGroup; label: string; columns: StatColumn[] }[] = GROUPS.filter((g) => g.id !== 'draft').map((g) => ({
+  id: g.id,
+  label: g.label,
+  columns: g.id === 'basic' ? g.columns.filter((c) => c.id !== 'fgPct' && c.id !== 'ftPct') : g.columns,
+}))
+export const PICKABLE_IDS: ReadonlySet<string> = new Set(PICKABLE.flatMap((g) => g.columns.map((c) => c.id)))
+
 export const groupDef = (g: ColumnGroup): GroupDef => GROUPS.find((x) => x.id === g) ?? GROUPS[0]
 
 // --- sorting ---------------------------------------------------------------------------------
