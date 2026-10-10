@@ -1,5 +1,89 @@
 # Ball Knowers — handoff
 
+**2026-10-10, branch `025-multi-position-eligibility` (worktree `../draft-sim-025`, built on
+`024-draft-room-ux`): spec 025, multi-position eligibility for NBA players. All 29 tasks are built and
+live-verified locally. NOT committed, NOT merged, NOT deployed.** Merge it with or after 024, and
+only after the 2026-10-10 NBA draft.
+
+- **Why.** Sleeper lists NBA `fantasy_positions` **alphabetically** (1478 of 1478 players), so the
+  app's single "primary" position was alphabetical-first. It was wrong for 48% of multi-position
+  players: Edwards and Booker show as PG but are SG; Tatum and Durant show as PF but are SF. The
+  12-team room hid SG, the SG filter found 0 of 42 SG-eligible players, and auto-drafted rosters
+  read 7–8 of 9 starters where the backend counts 9.
+- **What changed.**
+  - **Data:** every `PlayerRef` carries `positions` (a wire-only change; no migration).
+  - **Scarcity:** counted by eligibility (PG 38 · SG 41 · SF 37 · PF 45 · C 31 on the 2026 draft's
+    top 108).
+  - **Filters and labels:** filters by eligibility; labels show "PG/SG", with no rank on any NBA
+    badge.
+  - **Board cells:** compact cells use family codes (G/F/C).
+  - **Runs:** counted by family, 26 of 163 windows on the 2025 draft.
+  - **"Your team" and "Fills X":** a TypeScript port of `BasketballRules`' seating, pinned by a
+    37-case parity fixture that the backend test regenerates and checks. "Fills X" names the slot
+    that actually fills.
+- **Simulation unchanged (SC-004):** checked by a new 168-pick fixed-seed replay test, the existing
+  frozen-output golden hash, and a diff showing only the wire record changed.
+- **Found by driving it** (unit tests passed every time):
+  - Football scarcity chips said "eligible". Fixed.
+  - **A spec 024 defect:** compact board cells left names 2–3 characters wide. Fixed here (≥ 57 px,
+    142 of 168 fully visible), and the same CSS is applied *uncommitted* in the 024 worktree.
+- **Found by review:** "Fills X" contradicted the strip in 9 of 32 real picks. Fixed by definition.
+- **Owed:**
+  - The follow-up "Use Sleeper's real primary position in the NBA sim" (it changes simulation
+    numbers, so it needs measuring).
+  - Review risks R2–R3 (see `code-review.md`); R1 (steal/reach tint over split cells) is fixed.
+  - Never run against a draft in progress.
+  - Commit: ask Allan.
+
+**2026-10-09, branch `024-draft-room-ux` (worktree `../draft-sim-024`, from `main` at `d145f38`):
+spec 024, the draft room UI/UX redesign borrowed from Sleeper and FantasyAlarm. All five user
+stories are built and live-verified locally. NOT committed, NOT merged, NOT deployed.** Don't merge
+or deploy it before the "Ball Knowers" NBA draft (2026-10-10 19:15 UTC): it reworks the live room
+that draft night uses.
+
+- **What it is.** One `DraftRoomLayout` shared by the live, projection and mock rooms. The user's
+  rule: "this should also look the same for actual draft".
+  - **Layout.** The board sits above the player list, with a draggable, keyboard-operable divider
+    remembered per device. It replaces the floating sheet that covered rounds 3–14. Below 1280 px,
+    a Board | Players toggle.
+  - **Compact cells and compact row.** In the split, cells are compact one-liners. The live room's
+    feed, team and scarcity collapse into one compact row of 64 px.
+  - **Board.** Cells say "2.03", with a snake arrow per round. Unclaimed seats get a Claim header.
+    Your column is marked only from your slot; an assumed slot is labelled "assumed". The pick on the
+    clock is marked in its cell.
+  - **Header.** One status statement, plus "4 teams · 14 rounds · 2 min · snake". No "0/0"
+    scarcity chips.
+  - **Player list.** Accent-insensitive search, Hide drafted, and a target strip saved to the
+    account per draft (V30 `draft_target`).
+  - **Mocks.** Auto-pick and atomic auto-finish (`POST /api/mocks/{id}/auto`, source `AUTO`).
+- **Verified live.** Everything is in `specs/024-draft-room-ux/verification.md`, with measured
+  numbers. Highlights:
+  - **SC-001 met** at 1440×900: mock 7 rounds / 8 rows; live pre-draft 8 / 8; live mid-draft
+    8 rows by arithmetic.
+  - Auto-finish takes **0.20 s** for a 12-team mock.
+  - Targets survive a reload; a non-member gets 404 and an anonymous save 401.
+  - The real league draft `1414306786223153152` shows the timer from the stored column.
+- **Found by driving it** (unit tests passed every time):
+  - a claimed seat still read "assumed";
+  - a stale split measurement starved the list;
+  - the pick card at 1024 px could be seen but not clicked.
+
+  All three are fixed.
+- **Owed:**
+  - **Multi-position NBA.** The frontend reads only a player's first position (A11). One visible
+    symptom: "8 of 9 starters" after a full auto-draft. Fixing it means `positions[]` on
+    `PlayerRef`; it's a separate task.
+  - **The Sleeper reset edge case is not met.** It depends on the open stale-picks bug.
+  - **Review risks R7–R8,** recorded in `code-review-frontend.md`: a "linear" label over a snake
+    board, and stars without an identity. R6 (a save in flight when you switch rooms) is fixed in
+    `c26a3ec`. The projection room now fits 8 rounds / 8 rows too, measured.
+  - **Never run against a draft in progress.** No drafting draft exists locally, so live mid-draft
+    list rows are arithmetic (8).
+  - **Commit and PR.** Ask Allan first.
+- **Suites at the end:** web 1414/1414 (tsc and build clean); backend 1547 tests, 0 failures,
+  0 skipped. Two bug-hunt reviews: backend found 0 bugs; frontend found 4 bugs, all fixed and
+  re-checked live.
+
 **2026-10-09, branch `023-draft-room-player-stats` (worktree `../draft-sim-023`, branched from
 `022-player-stat-analysis` at `555592e`, so it carries 022): spec 023 (player stats in the draft
 room, with stats you choose) US1, US2 and US3 built and verified live against a real backend and a

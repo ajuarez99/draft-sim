@@ -5,7 +5,8 @@
 // amendments.
 
 import type { PlayerRef, PredictedPick, Sport } from './api'
-import { POSITIONS_BY_SPORT } from './positions'
+import { canJoin, lineupFromSeats, NBA_SLOT_ELIGIBILITY, seatLineup } from './lineup'
+import { eligiblePositions, POSITIONS_BY_SPORT } from './positions'
 
 /**
  * Which roster slots each sport recognizes, and which positions each slot
@@ -36,24 +37,14 @@ const SLOT_ELIGIBILITY: Record<Sport, Record<string, Set<string>>> = {
     DEF: new Set(['DEF']),
     FLEX: new Set(['RB', 'WR', 'TE']),
   },
-  nba: {
-    PG: new Set(['PG']),
-    SG: new Set(['SG']),
-    SF: new Set(['SF']),
-    PF: new Set(['PF']),
-    C: new Set(['C']),
-    G: new Set(['PG', 'SG']),
-    F: new Set(['SF', 'PF']),
-    UTIL: new Set(['PG', 'SG', 'SF', 'PF', 'C']),
-  },
+  // The one shared copy lives in lineup.ts (spec 025 US3), next to the matcher that uses it.
+  nba: NBA_SLOT_ELIGIBILITY,
 }
 
 /**
- * Pooled slots, per sport, in "most specific first" order -- the order
- * needLabel walks when a position matches more than one open pooled slot
- * (a basketball PG matches both G and UTIL; report the more specific one).
- * Everything not listed here for a sport is a dedicated slot (one of that
- * sport's own Position codes, from positions.ts).
+ * Football's pooled slots in "most specific first" order. Basketball no longer
+ * walks a list: lineup.canJoin orders open slots by how few positions they
+ * accept (spec 025 A1), which gives G/F before UTIL for the real template.
  */
 const POOLED_SLOTS: Record<Sport, readonly string[]> = {
   nfl: ['FLEX'],
@@ -81,6 +72,14 @@ export type SlotStatus = { slot: string; player: PlayerRef | null }
  * informational only, never fillable, per the same gap's resolution.
  */
 export function computeTeamNeeds(sport: Sport, rosterPositions: string[], drafted: PlayerRef[]): SlotStatus[] {
+  // Basketball: the backend's matroid lineup (lineup.ts, pinned by the parity
+  // fixture). The two-pass greedy below is football-only now -- its single
+  // position per player is exactly right there, and it cannot seat a PG/SG at
+  // SG so that a later pure PG can take PG.
+  if (sport === 'nba') {
+    const lineup = seatLineup(rosterPositions, drafted)
+    return lineup.slots.map((slot, i) => ({ slot, player: lineup.seats[i] }))
+  }
   const eligibility = SLOT_ELIGIBILITY[sport]
   const dedicatedPositions = new Set<string>(POSITIONS_BY_SPORT[sport])
   const starterSlots = rosterPositions.filter((s) => s !== 'BN' && s !== 'IR')
@@ -148,34 +147,80 @@ export function openPositions(sport: Sport, needs: SlotStatus[]): Set<string> {
   return open
 }
 
+/** A player's fit: the open slot's name and its index in the needs list. */
+type Fit = { slot: string; index: number }
+
 /**
- * The open starting slot a player of `position` would fill, or null when
- * drafting them wouldn't fill one. Checks the dedicated slot first, then this
- * sport's pooled slots in "most specific" order (POOLED_SLOTS) -- a basketball
- * PG matching both an open G and an open UTIL reports G, the more informative
- * of the two.
+ * Builds the "which open starting slot would this player fill" function for one
+ * roster (`needs`), so a list of hundreds of rows reuses one lineup.
+ *
+ * Football: the player's first position -- checks the dedicated slot, then the
+ * pooled slots in POOLED_SLOTS order (today's behaviour, unchanged).
+ * Basketball: lineup.canJoin -- he fills a need if he can be seated by shifting
+ * seated players around, and the slot named is the one that goes from open to
+ * filled when the lineup is re-seated with him (code-review B1), so it always
+ * agrees with the team strip after the pick.
+ */
+function fitterFor(sport: Sport, needs: SlotStatus[]): (player: PlayerRef) => Fit | null {
+  if (sport === 'nba') {
+    const lineup = lineupFromSeats(needs.map((n) => n.slot), needs.map((n) => n.player))
+    return (player) => {
+      const r = canJoin(lineup, player)
+      return r.ok && r.slot != null ? { slot: r.slot, index: r.index } : null
+    }
+  }
+  const open = openPositions(sport, needs)
+  const eligibility = SLOT_ELIGIBILITY[sport]
+  const firstOpen = (slot: string) => needs.findIndex((n) => n.slot === slot && n.player == null)
+  return (player) => {
+    const position = eligiblePositions(player, sport)[0]
+    if (position == null) return null
+    if (open.has(position)) return { slot: position, index: firstOpen(position) }
+    for (const slot of POOLED_SLOTS[sport]) {
+      if (open.has(slot) && eligibility[slot]?.has(position)) return { slot, index: firstOpen(slot) }
+    }
+    return null
+  }
+}
+
+/**
+ * The open starting slot this player would fill, or null when drafting him
+ * wouldn't fill one.
  *
  * The one definition of "does this player fill a need": `needLabel` below and
  * `fitSlot` further down are both wording over this, so the row tag in the
  * picker and the fit clause on a live pick announcement can never disagree
  * about whether a pick filled anything.
  */
-export function openSlotFor(sport: Sport, position: string, open: Set<string>): string | null {
-  if (open.has(position)) return position
-  const eligibility = SLOT_ELIGIBILITY[sport]
-  for (const slot of POOLED_SLOTS[sport]) {
-    if (open.has(slot) && eligibility[slot]?.has(position)) return slot
-  }
-  return null
+export function openSlotFor(sport: Sport, player: PlayerRef, needs: SlotStatus[]): string | null {
+  return fitterFor(sport, needs)(player)?.slot ?? null
 }
 
 /**
  * "Fills {slot}" tag text, or null. Slot-named throughout, so basketball says
  * "Fills G"/"Fills UTIL" rather than football's "Fills FLEX" leaking in.
  */
-export function needLabel(sport: Sport, position: string, open: Set<string>): string | null {
-  const slot = openSlotFor(sport, position, open)
+export function needLabel(sport: Sport, player: PlayerRef, needs: SlotStatus[]): string | null {
+  const slot = openSlotFor(sport, player, needs)
   return slot == null ? null : `Fills ${slot}`
+}
+
+/**
+ * `needLabel` for one roster as a function of the player alone -- what the
+ * draft-room lists take (AvailabilityPanel's `fitFor`, PlayerPicker,
+ * OnTheClockPickInput). One lineup per roster and one answer per player: the
+ * live room re-renders every second, so callers memoize this on `needs`.
+ */
+export function makeFitFor(sport: Sport, needs: SlotStatus[]): (player: PlayerRef) => string | null {
+  const fit = fitterFor(sport, needs)
+  const cache = new Map<number, string | null>()
+  return (player) => {
+    if (cache.has(player.id)) return cache.get(player.id) ?? null
+    const f = fit(player)
+    const label = f == null ? null : `Fills ${f.slot}`
+    cache.set(player.id, label)
+    return label
+  }
 }
 
 /**
@@ -194,12 +239,12 @@ export function needLabel(sport: Sport, position: string, open: Set<string>): st
  * render as depth rather than as a need -- saying "fills nothing" is louder
  * than it deserves to be.
  */
-export function fitSlot(sport: Sport, position: string, needs: SlotStatus[]): string | null {
-  const slot = openSlotFor(sport, position, openPositions(sport, needs))
-  if (slot == null) return null
-  const sameName = needs.filter((n) => n.slot === slot)
-  if (sameName.length <= 1) return slot
-  return `${slot}${sameName.findIndex((n) => n.player == null) + 1}`
+export function fitSlot(sport: Sport, player: PlayerRef, needs: SlotStatus[]): string | null {
+  const fit = fitterFor(sport, needs)(player)
+  if (fit == null) return null
+  const sameName = needs.map((n, i) => ({ n, i })).filter(({ n }) => n.slot === fit.slot)
+  if (sameName.length <= 1) return fit.slot
+  return `${fit.slot}${sameName.findIndex(({ i }) => i === fit.index) + 1}`
 }
 
 /**

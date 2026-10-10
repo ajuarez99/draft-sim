@@ -40,7 +40,10 @@ export function OnBrandLine({ read }: { read: OnBrandRead }) {
       <span className={`onbrand-verdict ${read.reachVerdict ?? 'none'}`} title={REACH_TITLE}>
         {verdictText(read.reachVerdict, read.reachReason)}
       </span>
-      <span className="onbrand-lean">
+      <span
+        className="onbrand-lean"
+        title="By each player's first listed position, the same way the manager's lean was fitted (Sleeper lists positions alphabetically, so for multi-position players this is not necessarily their main position)."
+      >
         {read.lean
           ? `leans ${read.lean.position} (${pct(read.leanShare)} of picks vs room ${pct(read.roomShare)})`
           : 'no positional lean'}
@@ -52,22 +55,31 @@ export function OnBrandLine({ read }: { read: OnBrandRead }) {
   )
 }
 
-type Props = { reads: OnBrandRead[]; myManager?: string | null }
+type Props = {
+  reads: OnBrandRead[]
+  myManager?: string | null
+  /** Just the rows, no <details>/summary: for a host that supplies its own toggle (CompactRow's popover). */
+  bare?: boolean
+}
 
 /** "Room read": collapsed by default; one row per seat. */
-export default function OnBrandPanel({ reads, myManager }: Props) {
+export default function OnBrandPanel({ reads, myManager, bare }: Props) {
+  const rows = (
+    <ul className="onbrand-rows">
+      {reads.map((r) => (
+        <li key={r.slot} className="onbrand-row">
+          <Avatar avatarId={r.avatarId} seed={String(r.slot)} label={r.manager} isMe={myManager === r.manager} />
+          <span className="onbrand-name">{r.manager}</span>
+          <OnBrandLine read={r} />
+        </li>
+      ))}
+    </ul>
+  )
+  if (bare) return <div className="onbrand-panel bare">{rows}</div>
   return (
     <details className="onbrand-panel">
       <summary className="onbrand-summary">Room read</summary>
-      <ul className="onbrand-rows">
-        {reads.map((r) => (
-          <li key={r.slot} className="onbrand-row">
-            <Avatar avatarId={r.avatarId} seed={String(r.slot)} label={r.manager} isMe={myManager === r.manager} />
-            <span className="onbrand-name">{r.manager}</span>
-            <OnBrandLine read={r} />
-          </li>
-        ))}
-      </ul>
+      {rows}
     </details>
   )
 }

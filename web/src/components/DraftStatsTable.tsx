@@ -1,7 +1,8 @@
 import { memo } from 'react'
-import type { StatLeaderboard } from '../api'
+import type { PlayerRef, StatLeaderboard } from '../api'
 import { likelyRule, shownSeason, type DraftStatRow } from '../draftRoomStats'
 import { posRank } from '../posRank'
+import { posPill } from '../positions'
 import { Cell } from '../statCells'
 import { COLUMNS, columnLabel, type SortState, type StatColumn, type StatMode } from '../statLeaderboard'
 import PlayerFace from './PlayerFace'
@@ -23,6 +24,11 @@ type Props = {
   likelyUnavailableReason: string | null
   /** Puts the default columns back; offered when none are chosen. */
   onResetColumns: () => void
+  /** Drafted players in `rows` (only present when the list's "Hide drafted" is off): marked "taken". */
+  takenIds?: Set<number>
+  /** Sleeper ids of the user's targets, and the star handler. Without the handler no star is drawn. */
+  targetIds?: Set<string>
+  onToggleTarget?: (p: PlayerRef) => void
 }
 
 const WINDOW_NAMES: Record<StatLeaderboard['window'], string> = {
@@ -54,6 +60,9 @@ type RowProps = {
   sleeperLeagueId: string
   mode: StatMode
   seasonLabel: string
+  taken: boolean
+  starred: boolean
+  onToggleTarget?: (p: PlayerRef) => void
 }
 
 /**
@@ -73,21 +82,37 @@ const sameRow = (a: RowProps, b: RowProps) =>
   a.board === b.board &&
   a.sleeperLeagueId === b.sleeperLeagueId &&
   a.mode === b.mode &&
-  a.seasonLabel === b.seasonLabel
+  a.seasonLabel === b.seasonLabel &&
+  a.taken === b.taken &&
+  a.starred === b.starred &&
+  a.onToggleTarget === b.onToggleTarget
 
-const StatRow = memo(function StatRow({ r, columns, board, sleeperLeagueId, mode, seasonLabel }: RowProps) {
+const StatRow = memo(function StatRow({ r, columns, board, sleeperLeagueId, mode, seasonLabel, taken, starred, onToggleTarget }: RowProps) {
   const p = r.player
   const fills = r.fillsSlot
   return (
-    <tr>
+    <tr className={taken ? 'taken' : undefined}>
       <th scope="row" className="sl-pin">
         <span className="ds-name">
+          {onToggleTarget && !taken && (
+            <button
+              type="button"
+              className={`star-btn${starred ? ' on' : ''}`}
+              aria-pressed={starred}
+              aria-label={starred ? `Remove ${p.name} from targets` : `Add ${p.name} to targets`}
+              title={starred ? 'Remove from targets' : 'Add to targets'}
+              onClick={() => onToggleTarget(p)}
+            >
+              {starred ? '★' : '☆'}
+            </button>
+          )}
           <PlayerFace sport="nba" sleeperId={p.sleeperId} team={p.team} position={p.position} name={p.name} size={20} />
-          <span className={`pos ${p.position}`}>{posRank(p)}</span>
+          <span {...posPill(p, 'nba')}>{posRank(p, 'nba')}</span>
           <a href={`/leagues/${sleeperLeagueId}/players/${p.sleeperId}`} target="_blank" rel="noopener">
             {p.name}
           </a>
-          {fills && <span className="need-tag">{fills}</span>}
+          {taken && <span className="taken-tag">taken</span>}
+          {fills && !taken && <span className="need-tag">{fills}</span>}
           <span className="ds-sub">
             {`ADP ${Math.round(p.adp)}`}
             {r.survivalNext != null && ` · ${Math.round(r.survivalNext * 100)}% there at your next pick`}
@@ -131,6 +156,9 @@ function DraftStatsTable({
   nextPickLabel,
   likelyUnavailableReason,
   onResetColumns,
+  takenIds,
+  targetIds,
+  onToggleTarget,
 }: Props) {
   const season = shownSeason(board)
   const windowLabel = board.window === 'SEASON' ? null : WINDOW_NAMES[board.window].toLowerCase()
@@ -182,7 +210,11 @@ function DraftStatsTable({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <StatRow key={r.player.id} r={r} columns={columns} board={board} sleeperLeagueId={sleeperLeagueId} mode={mode} seasonLabel={season.seasonLabel} />
+              <StatRow key={r.player.id} r={r} columns={columns} board={board} sleeperLeagueId={sleeperLeagueId} mode={mode} seasonLabel={season.seasonLabel}
+                taken={takenIds?.has(r.player.id) ?? false}
+                starred={targetIds?.has(r.player.sleeperId) ?? false}
+                onToggleTarget={onToggleTarget}
+              />
             ))}
           </tbody>
         </table>

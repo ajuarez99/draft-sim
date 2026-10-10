@@ -185,6 +185,39 @@ class LiveDraftPollerTest {
         assertNull(LiveDraftPoller.onTheClockSlot(168, 12, 14, 3));
     }
 
+    private void pollPreDraftWith(Map<String, Object> raw) {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players);
+        when(sleeper.draft("sleeper-draft-123")).thenReturn(raw);
+        when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+        poller.pollOnce(draftRow("pre_draft"));
+    }
+
+    @Test
+    void pollOnceWithNoSettingsObjectDoesNotTouchThePickTimer() {
+        Map<String, Object> raw = new HashMap<>();
+        raw.put("status", "pre_draft");
+        pollPreDraftWith(raw);
+        verify(drafts, never()).updatePickTimer(anyLong(), any());
+    }
+
+    @Test
+    void pollOnceWithSettingsLackingPickTimerWritesNull() {
+        Map<String, Object> raw = new HashMap<>();
+        raw.put("status", "pre_draft");
+        raw.put("settings", new HashMap<String, Object>());
+        pollPreDraftWith(raw);
+        verify(drafts).updatePickTimer(1L, null);
+    }
+
+    @Test
+    void pollOnceWithPickTimerWritesIt() {
+        Map<String, Object> raw = new HashMap<>();
+        raw.put("status", "pre_draft");
+        raw.put("settings", Map.of("pick_timer", 120));
+        pollPreDraftWith(raw);
+        verify(drafts).updatePickTimer(1L, 120);
+    }
+
     @Test
     void pollOnceWithPreDraftStatusSkipsPicksButUpdatesStatus() {
         poller = new LiveDraftPoller(sleeper, drafts, managers, players);

@@ -24,6 +24,9 @@ vi.mock('../api', () => ({
   getManagers: () => Promise.resolve([]),
   streamSimulationQuietly: (...a: unknown[]) => streamSimulationQuietly(...a),
   createMockSessionFromDraft: vi.fn(),
+  // Spec 024: the room loads the user's targets; these tests have none.
+  getTargets: () => Promise.resolve({ players: [], missing: [] }),
+  putTargets: () => Promise.resolve({ players: [], missing: [] }),
 }))
 
 const store = vi.hoisted(() => ({
@@ -182,8 +185,10 @@ describe('scarcity meter on the live page', () => {
 describe('room read and card extras', () => {
   it('renders the collapsed Room read panel', async () => {
     await renderRoom(3)
-    const summary = screen.getByText('Room read')
-    expect(summary.closest('details')).not.toHaveAttribute('open')
+    // Spec 024 FR-001c: Room read is a toggle in the compact row that opens a popover.
+    const toggle = screen.getByRole('button', { name: 'Room read' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(document.querySelector('.compact-popover')).toBeNull()
   })
 
   it('the pick card shows the drafting manager on-brand line and the scarcity line', async () => {

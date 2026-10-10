@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
-import type { DraftGrades, PlayerRef, PredictedPick } from '../api'
+import type { DraftGrades, PlayerRef, PredictedPick, Sport } from '../api'
+import { posPill } from '../positions'
 import { ordinal, productionLabel, signedPoints, weekWord } from '../draftGrades'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
@@ -7,13 +8,15 @@ import { roundPickLabel } from '../roundPickLabel'
 type Props = {
   pick: PredictedPick
   teams: number
+  /** Required: it decides how position labels read (basketball has no positional rank number). */
+  sport: Sport
   yourPick?: PlayerRef
   /** A completed draft's grades (spec 018). Only passed by CompletedDraftBoard once they are on and available. */
   grades?: DraftGrades | null
   onClose: () => void
 }
 
-export default function PlayerCard({ pick, teams, yourPick, grades, onClose }: Props) {
+export default function PlayerCard({ pick, teams, sport, yourPick, grades, onClose }: Props) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -45,7 +48,7 @@ export default function PlayerCard({ pick, teams, yourPick, grades, onClose }: P
           <div className="modal-your-pick">
             <h3 className="section-title tiny muted">You picked</h3>
             <div className="modal-head">
-              <span className={`pos ${yourPick.position}`}>{posRank(yourPick)}</span>
+              <span {...posPill(yourPick, sport)}>{posRank(yourPick, sport)}</span>
               <h2 className="modal-name">{yourPick.name}</h2>
             </div>
             <p className="muted small">{yourPick.team ?? '—'}</p>
@@ -55,7 +58,7 @@ export default function PlayerCard({ pick, teams, yourPick, grades, onClose }: P
         <div className={yourPick ? 'modal-model-pick' : undefined}>
           {yourPick && <h3 className="section-title tiny muted">Model's own pick here</h3>}
           <div className="modal-head">
-            <span className={`pos ${pick.player.position}`}>{posRank(pick.player)}</span>
+            <span {...posPill(pick.player, sport)}>{posRank(pick.player, sport)}</span>
             <h2 className="modal-name">{pick.player.name}</h2>
           </div>
           <p className="muted small">{pick.player.team ?? '—'}</p>
@@ -126,7 +129,7 @@ export default function PlayerCard({ pick, teams, yourPick, grades, onClose }: P
             <h3 className="section-title">Alternatives</h3>
             {pick.alternatives.map((a) => (
               <div key={a.player.id} className="modal-alt-row">
-                <span className={`pos ${a.player.position}`}>{posRank(a.player)}</span>
+                <span {...posPill(a.player, sport)}>{posRank(a.player, sport)}</span>
                 <span className="name">{a.player.name}</span>
                 <span className="mono muted">{Math.round(a.probability * 100)}%</span>
               </div>

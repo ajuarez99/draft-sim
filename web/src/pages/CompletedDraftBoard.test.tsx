@@ -60,7 +60,7 @@ describe('CompletedDraftBoard steals & reaches', () => {
     await waitFor(() => expect(container.querySelector('.board.value-view')).not.toBeNull())
 
     const cellOf = (n: number) =>
-      [...container.querySelectorAll('.board .cell')].find((c) => c.querySelector('.pickno')?.textContent === String(n)) as HTMLElement
+      [...container.querySelectorAll('.board .cell')].find((c) => c.getAttribute('data-pickno') === String(n)) as HTMLElement
     expect(cellOf(1).className).toContain('value-reach')
     expect(cellOf(1).textContent).toContain('−20')
     expect(cellOf(2).className).toContain('value-steal')
@@ -81,7 +81,7 @@ describe('CompletedDraftBoard steals & reaches', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Steals & reaches/ }))
     await waitFor(() => expect(container.querySelector('.board.value-view')).not.toBeNull())
     const cell = [...container.querySelectorAll('.board .cell')].find(
-      (c) => c.querySelector('.pickno')?.textContent === '4',
+      (c) => c.getAttribute('data-pickno') === '4',
     ) as HTMLElement
     expect(cell.className).toContain('value-steal')
     expect(cell.className).not.toContain('value-reach')
@@ -96,7 +96,7 @@ const gradesPayload = () =>
   })
 
 const cellOf = (container: HTMLElement, n: number) =>
-  [...container.querySelectorAll('.board .cell')].find((c) => c.querySelector('.pickno')?.textContent === String(n)) as HTMLElement
+  [...container.querySelectorAll('.board .cell')].find((c) => c.getAttribute('data-pickno') === String(n)) as HTMLElement
 
 describe('CompletedDraftBoard how it played out', () => {
   it('has no grades control for an incomplete draft', async () => {

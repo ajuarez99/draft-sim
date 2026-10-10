@@ -1,5 +1,6 @@
 import type { SlotStatus } from '../teamNeeds'
 import type { Sport } from '../api'
+import { positionLabel, posPill } from '../positions'
 import PlayerFace from './PlayerFace'
 
 type Props = {
@@ -31,7 +32,7 @@ export default function TeamStrip({ needs, sport }: Props) {
         <div key={i} className={n.player ? 'team-slot filled' : 'team-slot open'}>
           {n.player ? (
             <>
-              <span className={`pos ${n.player.position}`}>{n.player.position}</span>
+              <span {...posPill(n.player, sport)}>{positionLabel(n.player, sport)}</span>
               <PlayerFace sport={sport} sleeperId={n.player.sleeperId} team={n.player.team} position={n.player.position} name={n.player.name} size={16} />
               <span className="team-slot-name">{n.player.name}</span>
             </>

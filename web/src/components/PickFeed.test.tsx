@@ -87,6 +87,20 @@ describe('the announcement row', () => {
     expect(screen.getByText('Allan')).toBeTruthy()
   })
 
+  it('words a basketball run by family ("guards"), not by the raw family code', () => {
+    const picks = [
+      pick(1, 'C', 'Player One', 'Sam'),
+      pick(2, 'PG', 'Player Two', 'Kim'),
+      pick(3, 'SG', 'Player Three', 'Lee'),
+      pick(4, 'PG', 'Player Four', 'Ray'),
+      pick(5, 'SF', 'Player Five', 'Jo'),
+      pick(6, 'SG', 'Player Six', 'Allan'),
+    ]
+    render(<PickFeed sport="nba" teams={TEAMS} picks={picks} />)
+
+    expect(screen.getByText('4 of the last 6 were guards')).toBeTruthy()
+  })
+
   it('is inert without onPickClick: no buttons at all', () => {
     const { container } = render(
       <PickFeed sport="nfl" teams={TEAMS} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]} />,
@@ -117,5 +131,16 @@ describe('the announcement row', () => {
   it('renders nothing at all before the first pick', () => {
     const { container } = render(<PickFeed sport="nfl" teams={TEAMS} picks={[]} />)
     expect(container.firstChild).toBeNull()
+  })
+
+  it('tags an auto-picked row "auto" and leaves other rows untagged (FR-022)', () => {
+    const auto = { ...pick(2, 'WR', "Ja'Marr Chase", 'Allan'), auto: true }
+    const { container } = render(
+      <PickFeed sport="nfl" teams={TEAMS} limit={2} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), auto]} />,
+    )
+    const tags = container.querySelectorAll('.pick-feed-auto')
+    expect(tags).toHaveLength(1)
+    expect(tags[0].textContent).toBe('auto')
+    expect(tags[0].closest('li')!.textContent).toContain("Ja'Marr Chase")
   })
 })

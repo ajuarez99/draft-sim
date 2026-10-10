@@ -63,6 +63,11 @@ public record MockSessionState(
 ) {
     public record SeatView(int slot, SeatSpec.Type type, Long managerId, String manager, String avatarId) {}
 
+    /**
+     * @param source USER = the user's own seat, picked by the user; BOT = a bot seat; LIVE = a pick
+     *               carried over from a real draft; AUTO = the user's own seat, decided by auto-pick
+     *               (spec 024).
+     */
     public record PickView(int pickNo, int round, int draftSlot, SeatSpec.Type seatType,
                            String source, SimulationResult.PlayerRef player) {}
 }

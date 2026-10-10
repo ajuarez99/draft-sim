@@ -23,9 +23,12 @@ public record SimulationResult(
      * player (BoardService's own sentinel, never null) -- a UI that renders
      * "{position}{positionalRank}" must special-case 999 rather than showing
      * "RB999".
+     * <p>{@code position} keeps its alphabetical-first meaning (BoardEntry.position()).
+     * {@code positions} is the full eligible list in stored (Sleeper, alphabetical)
+     * order; never null, empty when the player has no stored positions.
      */
-    public record PlayerRef(long id, String sleeperId, String name, String position, String team, double adp,
-                            int positionalRank) {
+    public record PlayerRef(long id, String sleeperId, String name, String position, List<String> positions,
+                            String team, double adp, int positionalRank) {
 
         /**
          * Reused by {@link MonteCarloRunner} and the mock draft room
@@ -34,7 +37,10 @@ public record SimulationResult(
          */
         public static PlayerRef from(BoardEntry e) {
             return new PlayerRef(e.player().id(), e.player().sleeperId(), e.player().name(),
-                    e.position().name(), e.player().team(), e.adp(), e.positionalRank());
+                    e.position().name(),
+                    e.player().positions() == null ? List.of()
+                            : e.player().positions().stream().map(Enum::name).toList(),
+                    e.player().team(), e.adp(), e.positionalRank());
         }
     }
 

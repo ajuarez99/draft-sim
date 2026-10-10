@@ -42,6 +42,14 @@ function leanFor(seat: Seat): { position: string; tilt: number } | null {
 
 const sign = (n: number) => (n > 0 ? 1 : n < 0 ? -1 : 0)
 
+/**
+ * Deliberately counts by `player.position` -- the first listed position, which for NBA is
+ * the alphabetical first (Sleeper sorts `fantasy_positions`) -- and NOT by eligibility like
+ * the rest of the draft room (spec 025). The lean it is compared against is the manager's
+ * fitted positional tilt, which ProfileService fits from that same first position, so
+ * switching only this side to eligibility would compare two different definitions. Both
+ * move together in the follow-up "Use Sleeper's real primary position in the NBA sim".
+ */
 export function onBrandReads(seats: Seat[], landed: RealPick[]): OnBrandRead[] {
   const roomCounts = new Map<string, number>()
   for (const p of landed) roomCounts.set(p.player.position, (roomCounts.get(p.player.position) ?? 0) + 1)

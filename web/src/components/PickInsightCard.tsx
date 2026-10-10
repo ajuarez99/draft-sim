@@ -1,4 +1,6 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import type { Sport } from '../api'
+import { leadHueStyle, positionLabel, posPill } from '../positions'
 import { adpLabel, asOfLabel, NO_PICKS_LEFT, type PickInsight } from '../pickInsight'
 import { roundPickLabel } from '../roundPickLabel'
 import Avatar from './Avatar'
@@ -23,6 +25,8 @@ function pct(share: number): string {
 
 type Props = {
   insight: PickInsight
+  /** Required: decides pill labels and the accent colour for multi-position players. */
+  sport: Sport
   teams: number
   /**
    * Move focus into the card. False on auto-open -- a card that appears
@@ -41,7 +45,7 @@ type Props = {
  * from picks that have already landed (see pickInsight.buildFactInsight), so
  * it is true the moment the pick is -- no projection is waited on.
  */
-export default function PickInsightCard({ insight, teams, autoFocus, onClose, onPauseChange, extras }: Props) {
+export default function PickInsightCard({ insight, sport, teams, autoFocus, onClose, onPauseChange, extras }: Props) {
   const { pick, seat } = insight
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -65,7 +69,6 @@ export default function PickInsightCard({ insight, teams, autoFocus, onClose, on
   const hasTags = adp != null || ms != null
   const ln = insight.likelyNext
   const showLikely = insight.nextPickNo != null || (ln.state === 'none' && ln.reason === NO_PICKS_LEFT)
-  const position = pick.player.position
 
   return (
     <div
@@ -78,7 +81,8 @@ export default function PickInsightCard({ insight, teams, autoFocus, onClose, on
       tabIndex={-1}
       // Same device as PickFeed's newest row: the position's own colour, set
       // from the code because --qb/--pg/... are already named after it.
-      style={{ '--lead-hue': `var(--${position.toLowerCase()})` } as CSSProperties}
+      // A multi-position player gets no accent hue (neutral fallback), never his first position's.
+      style={leadHueStyle(pick.player, sport)}
       onMouseEnter={() => onPauseChange?.(true)}
       onMouseLeave={() => onPauseChange?.(false)}
       onFocus={() => onPauseChange?.(true)}
@@ -94,7 +98,7 @@ export default function PickInsightCard({ insight, teams, autoFocus, onClose, on
       </div>
 
       <div className="pick-card-player">
-        <span className={`pos ${position}`}>{position}</span>
+        <span {...posPill(pick.player, sport)}>{positionLabel(pick.player, sport)}</span>
         <strong className="pick-card-name">{pick.player.name}</strong>
         {pick.player.team && <span className="muted tiny">{pick.player.team}</span>}
       </div>
@@ -136,7 +140,7 @@ export default function PickInsightCard({ insight, teams, autoFocus, onClose, on
           {ln.state === 'ready' && (
             <>
               <div className="pick-card-likely-top">
-                <span className={`pos ${ln.top.player.position}`}>{ln.top.player.position}</span>
+                <span {...posPill(ln.top.player, sport)}>{positionLabel(ln.top.player, sport)}</span>
                 <strong>{ln.top.player.name}</strong>
                 <span className="mono">{pct(ln.top.probability)}</span>
                 {ln.wideOpen && <span className="pick-card-tag">Wide open</span>}

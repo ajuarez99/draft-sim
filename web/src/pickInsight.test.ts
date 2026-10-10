@@ -86,6 +86,21 @@ describe('summarize', () => {
     expect(s).toContain('C')
     expect(s).not.toMatch(/\b(QB|TE|FLEX|RB|WR)\b/)
   })
+
+  it('a PG/SG on the roster counts as having both: "No SG yet" is never said (spec 025 T020)', () => {
+    const pgsg = { ...player('PG'), positions: ['PG', 'SG'] as PlayerRef['positions'] }
+    const s = summarize('nba', 'G', ['UTIL'], [pgsg])
+    expect(s).not.toMatch(/\bSG\b/)
+    expect(s).toContain('No SF, PF, C yet.')
+  })
+
+  it('a multi-position pick is seated by the lineup rule, not by his first position', () => {
+    const pgsg = { ...player('PG', 5), positions: ['PG', 'SG'] as PlayerRef['positions'] }
+    // PG/SG sits at PG, SG is open. A pure PG still fits (the PG/SG slides to SG), and the
+    // slot named is the OPEN one, SG. The old position-keyed rule said "depth" here.
+    expect(fillsFor('nba', ['PG', 'SG'], [pgsg], player('SG', 20))).toBe('SG')
+    expect(fillsFor('nba', ['PG', 'SG'], [pgsg], player('PG', 20))).toBe('SG')
+  })
 })
 
 function seatOf(provenance: Seat['provenance'], draftsObserved: number): Seat {

@@ -15,18 +15,28 @@ import { useEffect, useState } from 'react'
  */
 export const NARROW = '(max-width: 860px)'
 
-export function useNarrow(): boolean {
+/**
+ * Below this the draft room stops stacking board over list and offers a
+ * Board | Players toggle instead (spec 024 FR-001/FR-002). ARBITRARY: 1280 is
+ * the width the spec names, not one derived from a measurement. The room
+ * (DraftRoomLayout) is the only caller; styles.css repeats it in its own
+ * `@media (max-width: 1279px)` block and DraftRoomLayout.test.tsx checks both.
+ */
+export const ROOM_STACKED = '(max-width: 1279px)'
+
+/** `query` defaults to the phone breakpoint; the draft room passes ROOM_STACKED. */
+export function useNarrow(query: string = NARROW): boolean {
   const supported = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-  const [narrow, setNarrow] = useState(() => (supported ? window.matchMedia(NARROW).matches : false))
+  const [narrow, setNarrow] = useState(() => (supported ? window.matchMedia(query).matches : false))
 
   useEffect(() => {
     if (!supported) return
-    const mq = window.matchMedia(NARROW)
+    const mq = window.matchMedia(query)
     const sync = () => setNarrow(mq.matches)
     sync()
     mq.addEventListener('change', sync)
     return () => mq.removeEventListener('change', sync)
-  }, [supported])
+  }, [supported, query])
 
   return narrow
 }

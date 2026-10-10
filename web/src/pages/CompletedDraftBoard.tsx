@@ -217,6 +217,8 @@ export default function CompletedDraftBoard() {
               mySlot={seats.mySlot ?? undefined}
               sport={seats.sport}
               reversalRound={seats.reversalRound}
+              room="real"
+              density="full"
               onCellClick={setOpenPick}
               valueView={showAdp}
               adpAtDraft={adpAtDraft}
@@ -227,7 +229,7 @@ export default function CompletedDraftBoard() {
         </section>
       </div>
 
-      {openPick && <PlayerCard pick={openPick} teams={board.teams} grades={showPlayed ? grades : null} onClose={() => setOpenPick(null)} />}
+      {openPick && <PlayerCard pick={openPick} teams={board.teams} sport={seats.sport} grades={showPlayed ? grades : null} onClose={() => setOpenPick(null)} />}
     </div>
   )
 }

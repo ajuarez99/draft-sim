@@ -111,4 +111,47 @@ describe('LiveStatusBar', () => {
     render(<LiveStatusBar {...base} live={live()} secondsSinceContact={null} />)
     expect(screen.getByText('No contact')).toBeInTheDocument()
   })
+
+  // Spec 024 FR-016: the bar is the ONLY statement of draft status.
+  it('states "not started" exactly once, with the waiting detail beside it', () => {
+    const { container } = render(
+      <LiveStatusBar {...base} live={live({ status: 'pre_draft', onTheClockSlot: null, seatsMapped: 14 })} />,
+    )
+    expect(screen.getAllByText('Draft has not started')).toHaveLength(1)
+    expect(screen.getByText(/14 seats mapped/)).toBeInTheDocument()
+    expect(container.textContent!.match(/not started/gi)).toHaveLength(1)
+  })
+
+  it.each([
+    ['no state, connected', null, true, /waiting for the first state frame/],
+    ['no state, disconnected', null, false, /isn't answering/],
+    ['no seat map', live({ status: 'pre_draft', onTheClockSlot: null, seatsMapped: 0 }), true, /commissioner to set the draft order/],
+  ])('carries the waiting detail: %s', (_n, state, connected, re) => {
+    render(<LiveStatusBar {...base} live={state} connected={connected} />)
+    expect(screen.getByText(re)).toBeInTheDocument()
+  })
+
+  it.each(['drafting', 'complete'] as const)(
+    'shows no pre-draft waiting detail when the draft is %s with nobody mapped on the clock',
+    (status) => {
+      const { rerender } = render(
+        <LiveStatusBar {...base} seats={[]} live={live({ status, onTheClockSlot: 9, seatsMapped: 8 })} />,
+      )
+      expect(screen.queryByText(/seats mapped/)).toBeNull()
+      rerender(<LiveStatusBar {...base} seats={[]} live={live({ status, onTheClockSlot: null, seatsMapped: 0 })} />)
+      expect(screen.queryByText(/commissioner to set the draft order/)).toBeNull()
+      expect(screen.queryByText(/seats mapped/)).toBeNull()
+    },
+  )
+
+  it('still shows the seats-mapped detail pre-draft', () => {
+    render(<LiveStatusBar {...base} live={live({ status: 'pre_draft', onTheClockSlot: null, seatsMapped: 8 })} />)
+    expect(screen.getByText(/8 seats mapped/)).toBeInTheDocument()
+  })
+
+  it('shows no waiting detail while someone is on the clock', () => {
+    render(<LiveStatusBar {...base} live={live()} formatSummary={<span>4 teams</span>} />)
+    expect(screen.queryByText(/seats mapped/)).toBeNull()
+    expect(screen.getByText('4 teams')).toBeInTheDocument()
+  })
 })

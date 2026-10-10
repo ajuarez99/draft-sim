@@ -5,6 +5,7 @@ import type { ScarcityResult } from '../scarcity'
 
 function result(over: Partial<ScarcityResult> = {}): ScarcityResult {
   return {
+    sport: 'nfl',
     S: 120,
     teams: 12,
     startersPerTeam: 10,
@@ -65,5 +66,67 @@ describe('ScarcityMeter', () => {
     expect(screen.getByText('no board built yet')).toBeInTheDocument()
     rerender(<ScarcityMeter scarcity={null} failed={false} />)
     expect(screen.getByText('no board built yet')).toBeInTheDocument()
+  })
+
+  // Spec 024 FR-018: a position with an empty pool is "no data", not a measurement, so it
+  // gets no chip. Spec 025 reworded it: eligibility, not first-listed position.
+  const nba = () =>
+    result({
+      sport: 'nba',
+      rows: [
+        { position: 'PG', poolSize: 17, leftNow: 15, expectedAtNext: null, running: false },
+        { position: 'SG', poolSize: 0, leftNow: 0, expectedAtNext: null, running: false },
+        { position: 'SF', poolSize: 0, leftNow: 0, expectedAtNext: null, running: false },
+        { position: 'PF', poolSize: 8, leftNow: 8, expectedAtNext: null, running: false },
+        { position: 'C', poolSize: 11, leftNow: 9, expectedAtNext: null, running: false },
+      ],
+    })
+
+  it('does not draw a chip for a position with no starter-pool players, and names them once', () => {
+    render(<ScarcityMeter scarcity={nba()} failed={false} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.queryByText('0 / 0')).toBeNull()
+    expect(screen.getByText('SG, SF: no starter-pool players are eligible here')).toBeInTheDocument()
+  })
+
+  it('NBA: says "eligible" in each chip, with the full sentence in the title', () => {
+    render(<ScarcityMeter scarcity={nba()} failed={false} />)
+    const chip = screen.getByText('15 / 17').closest('li')!
+    expect(chip).toHaveTextContent(/PG\s*15 \/ 17\s*eligible/)
+    expect(chip.getAttribute('title')).toBe(
+      'PG: 15 of the 17 starter-pool players eligible at PG are still on the board (a player can count at more than one position)',
+    )
+  })
+
+  it('NBA: tells the reader a player can count at more than one position', () => {
+    render(<ScarcityMeter scarcity={nba()} failed={false} />)
+    const note = screen.getByText(/Starter pool: the board's top 120/)
+    expect(note).toHaveTextContent('a player can count at more than one position')
+  })
+
+  // SC-005: football players have one position, so the eligibility wording would be noise
+  // there. Found in live verification (T024): football chips read "RB 1 / 37 eligible".
+  it('football: no "eligible" wording and no multi-position note', () => {
+    render(<ScarcityMeter scarcity={result()} failed={false} />)
+    const chip = screen.getByText('9 / 34').closest('li')!
+    expect(chip).not.toHaveTextContent(/eligible/)
+    expect(chip.getAttribute('title')).toBeNull()
+    expect(screen.queryByText(/more than one position/)).toBeNull()
+  })
+
+  it('words an NBA run by family ("guards") once, even though both guard chips are running', () => {
+    const r = nba()
+    r.rows[0] = { ...r.rows[0], running: true }
+    r.rows[1] = { ...r.rows[1], poolSize: 4, leftNow: 4, running: true }
+    r.run = { position: 'G', count: 4, window: 6 }
+    render(<ScarcityMeter scarcity={r} failed={false} />)
+    expect(screen.getAllByText('4 of the last 6 were guards')).toHaveLength(1)
+    // ...and on the first running chip (PG), where the eye lands first.
+    expect(screen.getByText('4 of the last 6 were guards').closest('li')).toHaveTextContent(/^PG/)
+  })
+
+  it('adds no note when nothing is hidden', () => {
+    render(<ScarcityMeter scarcity={result()} failed={false} />)
+    expect(screen.queryByText(/are eligible here/)).toBeNull()
   })
 })

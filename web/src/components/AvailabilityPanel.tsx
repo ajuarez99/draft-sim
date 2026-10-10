@@ -8,13 +8,13 @@ import { reasonSentence } from '../statCopy'
 import DraftStatsTable from './DraftStatsTable'
 import StatPickerModal from './StatPickerModal'
 import { readStatChoice, resetStatChoice, writeStatChoice } from '../statChoice'
-import { filterPositions } from '../positions'
-import { positionRun } from '../pickRun'
+import { eligiblePositions, filterPositions, posPill } from '../positions'
+import { positionRun, runLabel } from '../pickRun'
 import { tierPlayers } from '../tiers'
 import PlayerFace from './PlayerFace'
-import { needLabel } from '../teamNeeds'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
+import { matchesSearch } from '../targets'
 
 const STAT_WINDOWS: { kind: PlayerWindowKind; label: string }[] = [
   { kind: 'SEASON', label: 'Season' },
@@ -26,6 +26,57 @@ const STAT_MODES: { kind: StatMode; label: string }[] = [
   { kind: 'totals', label: 'Totals' },
   { kind: 'per36', label: 'Per 36' },
 ]
+
+/** The per-row target star. A taken player can't be targeted, so he gets no star. */
+function StarButton({ player, on, hidden, onToggle }: { player: PlayerRef; on: boolean; hidden: boolean; onToggle: (p: PlayerRef) => void }) {
+  if (hidden) return <span className="star-btn star-gap" aria-hidden="true" />
+  return (
+    <button
+      type="button"
+      className={`star-btn${on ? ' on' : ''}`}
+      aria-pressed={on}
+      aria-label={on ? `Remove ${player.name} from targets` : `Add ${player.name} to targets`}
+      title={on ? 'Remove from targets' : 'Add to targets'}
+      onClick={() => onToggle(player)}
+    >
+      {on ? '★' : '☆'}
+    </button>
+  )
+}
+
+/**
+ * An honesty caveat as a small "ⓘ" beside the control it explains, so it costs no line of its
+ * own. The full text is both the hover title and the accessible name; it is never dropped.
+ */
+function InfoMark({ text }: { text: string }) {
+  // Touch has no hover, so `title` alone hides the caveat from sighted phone users. A tap, click,
+  // Enter or Space (native button) toggles a small visible popover with the full text; Escape or
+  // a blur closes it. title/aria-label stay, so hover and screen readers are unchanged.
+  const [open, setOpen] = useState(false)
+  return (
+    <span className="info-mark-wrap">
+      <button
+        type="button"
+        className="info-mark"
+        title={text}
+        aria-label={text}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        onBlur={() => setOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setOpen(false)
+        }}
+      >
+        ⓘ
+      </button>
+      {open && (
+        <span className="info-pop" aria-hidden="true">
+          {text}
+        </span>
+      )}
+    </span>
+  )
+}
 
 function Segmented<T extends string>({
   label, value, options, onChange,
@@ -69,23 +120,24 @@ type Props = {
   myPicks: number[]
   teams: number
   pickedPlayerIds?: Set<number>
-  // Whether there is a draft to have options in yet. Drives both the empty
-  // copy and whether the sheet opens itself -- see the collapse note below.
+  // Whether there is a draft to have options in yet. Drives the empty copy.
   started: boolean
   // Which sport's positions to filter by (multi-sport-and-rebrand.md Phase 6)
   // -- the caller's own board, never a union of both sports'.
   sport: Sport
   /**
-   * The user's own open starting slots, from teamNeeds.openPositions. When
-   * given, each row picks up the same "Fills RB" tag PlayerPicker already puts
-   * on its rows -- the two answers come from one function (openSlotFor), so
-   * the sheet and the picker cannot disagree about what you need.
+   * "Fills X" for a player against the user's own roster, or null -- built in
+   * each room by teamNeeds.makeFitFor from the room's lineup (spec 025 A6), the
+   * same function PlayerPicker and OnTheClockPickInput use, so the sheet and the
+   * pickers cannot disagree about what you need. It takes the PLAYER, not a
+   * position: a multi-position player's fit depends on the whole lineup.
    *
    * Optional and undefined by default: the rooms that don't know whose seat is
    * whose (or aren't showing your roster) should show no tag rather than a tag
-   * computed against somebody else's team.
+   * computed against somebody else's team. Callers must keep it referentially
+   * stable per roster (useMemo) -- the live room re-renders every second.
    */
-  openSlots?: Set<string>
+  fitFor?: (p: PlayerRef) => string | null
   /**
    * The league whose stats the NBA Stats view reads (spec 023). Undefined means the server
    * didn't send it (a backend older than this frontend); either way the Stats option is
@@ -106,6 +158,19 @@ type Props = {
    * instead of quietly listing the simulation's smaller subset of players (code review S4).
    */
   statsPoolLoading?: boolean
+  /**
+   * Drafted players, for the "Hide drafted" toggle (spec 024 FR-010): with it off they are
+   * listed, marked "taken". Without it the toggle can only re-show drafted players the room's
+   * own source already carries.
+   */
+  draftedPlayers?: PlayerRef[]
+  /**
+   * The user's targets, as Sleeper ids, plus add/remove. Optional: with no handlers the
+   * rows carry no star (a room, or an older server, without target lists).
+   */
+  targetIds?: Set<string>
+  onAddTarget?: (p: PlayerRef) => void
+  onRemoveTarget?: (sleeperId: string) => void
 }
 
 // Tiers or Stats, for this browser session only (spec 023). Session, not local: the view is a
@@ -170,9 +235,11 @@ function adpSpan(adps: number[]): string {
 
 const NO_PICKED: Set<number> = new Set()
 
-function survivalAt(row: AvailabilityRow, pick: number): number {
-  return row.survivalByPick[String(pick)] ?? 0
+function survivalAt(row: AvailabilityRow | null, pick: number): number {
+  return row?.survivalByPick[String(pick)] ?? 0
 }
+
+type ListRow = { player: PlayerRef; row: AvailabilityRow | null; taken: boolean }
 
 function verdict(survivalAtNextPick: number): { label: string; cls: 'risk' | 'even' | 'safe' } {
   if (survivalAtNextPick < RISK_MAX) return { label: 'Act now', cls: 'risk' }
@@ -184,11 +251,10 @@ function verdict(survivalAtNextPick: number): { label: string; cls: 'risk' | 'ev
  * The headline output. For each player, the probability he is still on the
  * board when each of your picks comes up.
  *
- * Renders as a sheet floating over the board (`.avail-sheet`, positioned by
- * `.board-stage`) rather than as a band below it: the board gets the whole
- * page, and this lies over its deepest rounds -- the ones still empty for
- * almost the whole draft. Collapsing it puts the whole board back. See
- * claude/pill-board-and-player-list-on-top.md section E.
+ * Renders as the player-list region of DraftRoomLayout (`.avail-region`), under
+ * the board and its divider; it scrolls inside itself. It used to float over the
+ * board as a collapsible sheet and covered the deep rounds; spec 024 US1 put it
+ * in its own region instead, so there is no collapsed state any more.
  *
  * Only your first few picks are shown by default -- past about four picks out
  * the numbers are compounding a lot of model uncertainty and are worth much
@@ -204,66 +270,24 @@ export default function AvailabilityPanel({
   pickedPlayerIds = NO_PICKED,
   started,
   sport,
-  openSlots,
+  fitFor,
   sleeperLeagueId,
   statsPool,
   statsPoolError,
   statsPoolLoading,
+  draftedPlayers,
+  targetIds,
+  onAddTarget,
+  onRemoveTarget,
 }: Props) {
   const POSITIONS = useMemo(() => filterPositions(sport), [sport])
-  // Undefined openSlots means "don't tag", not "nothing is open" -- an empty
-  // set is the legitimate reading for a team whose starters are all filled,
-  // and the two must not collapse into the same render.
-  const need = (position: string) => (openSlots ? needLabel(sport, position, openSlots) : null)
+  // Undefined fitFor means "don't tag", not "nothing is open" -- a function that
+  // returns null is the legitimate reading for a team whose starters are all
+  // filled, and the two must not collapse into the same render.
+  const need = (p: PlayerRef) => (fitFor ? fitFor(p) : null)
   const [saved] = useState(readStatsState)
   const [filter, setFilter] = useState<string>(() => (POSITIONS.includes(saved.filter) ? saved.filter : 'ALL'))
   const [depth, setDepth] = useState(4)
-  // Collapsed until there is something to look at, so the sheet never covers
-  // the "Ready when you are" CTA that `.start-overlay` puts in the middle of
-  // the same stage. It opens itself once -- on the transition into `started`,
-  // not on every render while started -- so a deliberate collapse mid-draft
-  // stays collapsed.
-  const [collapsed, setCollapsed] = useState(!started)
-  const wasStarted = useRef(started)
-  useEffect(() => {
-    if (started && !wasStarted.current) setCollapsed(false)
-    wasStarted.current = started
-  }, [started])
-
-  // The board scrolls *behind* this sheet, which means at maximum scroll the
-  // deepest rounds sit underneath it and cannot be brought into the clear at
-  // all -- by round 7 that is the half of the board you actually care about.
-  // Publishing our own height to the stage lets the grid reserve that much
-  // space after its last row (`.board { padding-bottom }`), so every round can
-  // be scrolled up above the sheet. Measured rather than assumed: the sheet is
-  // capped at a share of the stage but is shorter when the table is short, and
-  // both change with the window.
-  //
-  // Writing to `parentElement` is the ugly part. The alternative is lifting
-  // this to both pages and duplicating the observer in each; the sheet is the
-  // thing that knows its own height, so it publishes it.
-  const sheetRef = useRef<HTMLElement>(null)
-  useEffect(() => {
-    const el = sheetRef.current
-    const stage = el?.parentElement
-    if (!el || !stage) return
-    // Collapsed, the sheet is a small corner pill -- it occludes one cell, not
-    // a band, and reserving a row of empty space for it would be worse.
-    if (collapsed) {
-      stage.style.removeProperty('--avail-sheet-reserve')
-      return
-    }
-    const publish = () =>
-      stage.style.setProperty('--avail-sheet-reserve', `${Math.round(el.getBoundingClientRect().height) + 26}px`)
-    publish()
-    const ro = new ResizeObserver(publish)
-    ro.observe(el)
-    return () => {
-      ro.disconnect()
-      stage.style.removeProperty('--avail-sheet-reserve')
-    }
-  }, [collapsed])
-
   // myPicks now shrinks as reactive resimulation locks in each of your picks
   // (DraftView passes only undecided ones), so `depth`'s own state can end up
   // larger than the range input's current max -- clamp what's actually shown/
@@ -275,6 +299,21 @@ export default function AvailabilityPanel({
   // compounding enough model uncertainty to be worth less than they look
   // (the panel's own doc comment above). Six columns is also about what the
   // table has room for before the names start clipping.
+  // Search and "Hide drafted" apply to both views (spec 024 FR-009, FR-010). Hide is on by
+  // default: the list's job is who is still there.
+  const [search, setSearch] = useState('')
+  const [hideDrafted, setHideDrafted] = useState(true)
+  const starred = targetIds
+  const starredRef = useRef(starred)
+  starredRef.current = starred
+  const toggleTarget = useCallback(
+    (p: PlayerRef) => {
+      if (starredRef.current?.has(p.sleeperId)) onRemoveTarget?.(p.sleeperId)
+      else onAddTarget?.(p)
+    },
+    [onAddTarget, onRemoveTarget],
+  )
+  const canStar = onAddTarget != null && onRemoveTarget != null
   const maxDepth = Math.max(1, Math.min(6, myPicks.length))
   const shownDepth = Math.min(depth, maxDepth)
 
@@ -287,18 +326,35 @@ export default function AvailabilityPanel({
   // them back. Everything survival-shaped below keys off this one flag.
   const showSurvival = availability != null && !noAvailabilityReason
   const rows = useMemo(() => {
-    const source: { player: PlayerRef; row: AvailabilityRow | null }[] = availability
-      ? availability.map((row) => ({ player: row.player, row }))
-      : (players ?? []).map((player) => ({ player, row: null }))
-    const candidates = source
-      .filter((r) => filter === 'ALL' || r.player.position === filter)
-      .filter((r) => !pickedPlayerIds.has(r.player.id))
-      .filter((r) => !showSurvival || picks.some((p) => survivalAt(r.row!, p) > 0.01))
+    const source: ListRow[] = availability
+      ? availability.map((row) => ({ player: row.player, row, taken: pickedPlayerIds.has(row.player.id) }))
+      : (players ?? []).map((player) => ({ player, row: null, taken: pickedPlayerIds.has(player.id) }))
+    // Drafted players the source doesn't carry, only when the toggle asks for them.
+    let merged = source
+    if (!hideDrafted && draftedPlayers?.length) {
+      const have = new Set(source.map((r) => r.player.id))
+      const extra: ListRow[] = draftedPlayers.filter((p) => !have.has(p.id)).map((player) => ({ player, row: null, taken: true }))
+      if (extra.length) merged = [...source, ...extra].sort((x, y) => x.player.adp - y.player.adp)
+    }
+    let live = 0
+    const candidates: ListRow[] = []
+    for (const r of merged) {
+      if (filter !== 'ALL' && !eligiblePositions(r.player, sport).includes(filter)) continue
+      if (!matchesSearch(search, r.player.name)) continue
+      if (r.taken) {
+        if (hideDrafted) continue
+        candidates.push(r) // a taken player has no survival to filter on
+        continue
+      }
+      if (showSurvival && !picks.some((p) => survivalAt(r.row, p) > 0.01)) continue
       // Board rank still caps *which* players are worth showing at all --
-      // top 60 by consensus is a reasonable "in range" pool.
-      .slice(0, 60)
+      // top 60 by consensus is a reasonable "in range" pool. Taken rows don't count toward it.
+      if (live >= 60) continue
+      live++
+      candidates.push(r)
+    }
     return candidates
-  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival])
+  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival, search, hideDrafted, draftedPlayers, sport])
 
   // Tiers group by consensus ADP (tiers.ts). Inside a tier the sheet's old
   // job survives: when there are survival numbers, the player you are most at
@@ -309,7 +365,7 @@ export default function AvailabilityPanel({
     const nextPick = picks[0]
     return t.map((tier) => ({
       ...tier,
-      players: [...tier.players].sort((a, b) => survivalAt(a.row!, nextPick) - survivalAt(b.row!, nextPick)),
+      players: [...tier.players].sort((a, b) => survivalAt(a.row, nextPick) - survivalAt(b.row, nextPick)),
     }))
   }, [rows, showSurvival, picks])
 
@@ -367,19 +423,31 @@ export default function AvailabilityPanel({
     // (never surfaced in the simulation's snapshots) has none, and the filter excludes him.
     const survival = new Map<number, number>()
     if (showSurvival && nextMyPick != null && availability) {
-      for (const r of availability) survival.set(r.player.id, survivalAt(r, nextMyPick))
+      // A taken player has no "chance he's still there": no number for him, even a stale one.
+      for (const r of availability) {
+        if (!pickedPlayerIds.has(r.player.id)) survival.set(r.player.id, survivalAt(r, nextMyPick))
+      }
     }
     // While the room's own pool is loading, show nothing rather than the simulation's subset.
     const universe = statsPool ?? (statsPoolLoading ? [] : (players ?? (availability ?? []).map((r) => r.player)))
-    const pool = universe.filter((p) => !pickedPlayerIds.has(p.id) && (filter === 'ALL' || p.position === filter))
+    const withDrafted =
+      !hideDrafted && draftedPlayers?.length
+        ? [...universe, ...draftedPlayers.filter((d) => !universe.some((u) => u.id === d.id))]
+        : universe
+    const pool = withDrafted.filter(
+      (p) =>
+        (!hideDrafted || !pickedPlayerIds.has(p.id)) &&
+        (filter === 'ALL' || eligiblePositions(p, sport).includes(filter)) &&
+        matchesSearch(search, p.name),
+    )
     const joined = joinPoolStats(
       pool,
       statsBoard.rows,
       (p) => survival.get(p.id) ?? null,
-      (p) => (openSlots ? needLabel(sport, p.position, openSlots) : null),
+      (p) => (fitFor ? fitFor(p) : null),
     )
     return sortDraftRows(filterLikely(joined, likelyOnly), statSort, statMode)
-  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, showSurvival, nextMyPick, openSlots, sport, likelyOnly, statSort, statMode])
+  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, showSurvival, nextMyPick, fitFor, sport, likelyOnly, statSort, statMode, hideDrafted, draftedPlayers, search])
   const statColumns = useMemo(() => statIds.map((id) => COLUMNS[id]).filter(Boolean), [statIds])
   // Callbacks and the label below are stable across renders so the memoized table skips the
   // live room's once-a-second re-render (SC-006).
@@ -425,22 +493,59 @@ export default function AvailabilityPanel({
   const visiblePicks = useMemo(() => {
     if (rows.length === 0 || !showSurvival) return picks
     let end = picks.length
-    while (end > 1 && rows.every((r) => survivalAt(r.row!, picks[end - 1]) < 0.005)) end--
+    while (end > 1 && rows.every((r) => survivalAt(r.row, picks[end - 1]) < 0.005)) end--
     return picks.slice(0, end)
   }, [picks, rows, showSurvival])
 
   return (
-    <section ref={sheetRef} className={`panel avail-sheet${collapsed ? ' collapsed' : ''}`}>
+    <section className="panel avail-region">
       <header className="panel-head">
-        {/* Collapsed, this is a single floating pill in the board's
-            bottom-right corner, not a full-width bar: a collapsed bar still
-            covered a whole round, which is not "giving the board back". The
-            filters and the depth slider have nothing to act on while the list
-            is hidden, so they go with it. */}
-        {!collapsed && <h2>{showSurvival ? "Who's still there when you pick" : 'Best available'}</h2>}
+        <h2>{showSurvival ? "Who's still there when you pick" : 'Best available'}</h2>
+        {!inStats && noAvailabilityReason && <InfoMark text={noAvailabilityReason} />}
         <div className="controls-inline">
-          {!collapsed &&
-            POSITIONS.map((p) => (
+          {statsOffered && (
+            <div className="ds-switch">
+              <div className="segmented sm" role="group" aria-label="Player list view">
+                <button type="button" className={`segment${!inStats ? ' on' : ''}`} aria-pressed={!inStats} onClick={() => setView('tiers')}>
+                  Tiers
+                </button>
+                <button
+                  type="button"
+                  className={`segment${inStats ? ' on' : ''}`}
+                  aria-pressed={inStats}
+                  disabled={!statsReady}
+                  onClick={() => setView('stats')}
+                >
+                  Stats
+                </button>
+              </div>
+              {/* Two different absences: undefined is an older backend that doesn't send the
+                  field (contract C1); null is a room with no league, i.e. a mock started
+                  without one (research R9). */}
+              {!statsReady && (
+                <InfoMark
+                  text={
+                    sleeperLeagueId === null
+                      ? 'Stats need a league: start the mock from a league to see them.'
+                      : 'Stats aren’t available on this server yet.'
+                  }
+                />
+              )}
+            </div>
+          )}
+          <input
+            type="search"
+            className="avail-search"
+            placeholder="Search players"
+            aria-label="Search players"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <label className="avail-hide" title="Off: drafted players stay in the list, marked taken">
+            <input type="checkbox" checked={hideDrafted} onChange={(e) => setHideDrafted(e.target.checked)} />
+            Hide drafted
+          </label>
+          {POSITIONS.map((p) => (
               <button
                 key={p}
                 // Position chips carry the same six colors as the board cells
@@ -458,7 +563,7 @@ export default function AvailabilityPanel({
               -- `input[type=range]` has no style here -- and it paired a
               tuning knob with a loose integer where the question is just "how
               many of my picks ahead". Same values, same clamping. */}
-          {!collapsed && showSurvival && !inStats && (
+          {showSurvival && !inStats && (
             <span className="depth">
               {myPicks.length === 0 ? (
                 <span className="muted">No picks left</span>
@@ -480,136 +585,109 @@ export default function AvailabilityPanel({
               )}
             </span>
           )}
-          {/* The point of the floating sheet: this puts the whole board back.
-              A button, deliberately not an Escape binding -- PlayerCard and
-              PlayerPicker already bind Escape on `window`, and a third
-              listener would fire alongside them. */}
-          <button
-            className="chip sheet-toggle"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-expanded={!collapsed}
-            title={collapsed ? 'Show the player list' : 'Hide the player list and show the whole board'}
-          >
-            {collapsed ? '▾ Players' : '▴ Hide'}
-          </button>
         </div>
       </header>
 
-      {!collapsed && (
-        <div className="avail-scroll panel-body">
-          {run && (
-            <p className="avail-run" role="note">
-              <strong>{run.position} run:</strong> {run.count} of the last {run.window} picks
-            </p>
-          )}
-          {statsOffered && (
-            <div className="ds-switch">
-              <div className="segmented sm" role="group" aria-label="Player list view">
-                <button type="button" className={`segment${!inStats ? ' on' : ''}`} aria-pressed={!inStats} onClick={() => setView('tiers')}>
-                  Tiers
-                </button>
-                <button
-                  type="button"
-                  className={`segment${inStats ? ' on' : ''}`}
-                  aria-pressed={inStats}
-                  disabled={!statsReady}
-                  onClick={() => setView('stats')}
-                >
-                  Stats
-                </button>
-              </div>
-              {/* Two different absences: undefined is an older backend that doesn't send the
-                  field (contract C1); null is a room with no league, i.e. a mock started
-                  without one (research R9). */}
-              {!statsReady && (
-                <span className="muted small">
-                  {sleeperLeagueId === null
-                    ? 'Stats need a league: start the mock from a league to see them.'
-                    : 'Stats aren’t available on this server yet.'}
-                </span>
-              )}
-            </div>
-          )}
-          {inStats && (
-            <div className="ds-pickers">
-              <Segmented label="Stats window" value={statWindow} options={STAT_WINDOWS} onChange={setStatWindow} />
-              <Segmented label="Counting stats" value={statMode} options={STAT_MODES} onChange={setStatMode} />
-              <button type="button" className="league-link" onClick={() => setPickerOpen(true)}>Choose stats</button>
-            </div>
-          )}
-          {inStats && pickerOpen && (
-            <StatPickerModal columns={statIds} onChange={chooseStats} onClose={() => setPickerOpen(false)} />
-          )}
-          {inStats && statsPoolError && <p className="muted small">{statsPoolError}</p>}
-          {inStats && !statsPoolError && statsPoolLoading && !statsPool && (
-            <p className="muted small" role="status">Loading the player list…</p>
-          )}
-          {inStats && !statsPoolError && !statsNow && <p className="muted small" role="status">Loading stats…</p>}
-          {inStats && !statsPoolError && statsNow && !statsNow.board && <p className="muted small">Couldn’t load stats.</p>}
-          {inStats && !statsPoolError && statsNow?.board && !statsBoard && (
-            <p className="muted small">
-              {statsNow.board.reason ? reasonSentence(statsNow.board.reason) : 'Player stats aren’t available.'}
-            </p>
-          )}
-          {inStats && !statsPoolError && !(statsPoolLoading && !statsPool) && statsBoard && sleeperLeagueId && (
-            <DraftStatsTable
-              rows={statRows}
-              columns={statColumns}
-              board={statsBoard}
-              sleeperLeagueId={sleeperLeagueId}
-              mode={statMode}
-              sort={statSort}
-              onSort={onStatSort}
-              likelyOnly={likelyOnly}
-              onLikelyOnly={setLikelyOnly}
-              nextPickLabel={nextPickLabel}
-              likelyUnavailableReason={likelyUnavailableReason}
-              onResetColumns={onResetColumns}
-            />
-          )}
-          {!inStats && noAvailabilityReason && <p className="muted small avail-reason">{noAvailabilityReason}</p>}
-          {!inStats && (
-            <table className="avail">
-              <thead>
-                <tr>
-                  <th className="player-col">Player</th>
-                  <th>Board</th>
-                  {/* One header for the whole decay curve, not one per pick --
-                      the individual pick labels ("2.03", "2.11", ...) that used
-                      to head their own column move onto each strip cell's own
-                      `title` instead. The header's own title lists them all, for
-                      anyone who wants the full run without hovering cell by
-                      cell. */}
-                  {showSurvival && (
-                    <th
-                      className="strip-col"
-                      title={visiblePicks.map((p) => roundPickLabel(p, teams)).join(' · ')}
-                    >
-                      Next picks
-                    </th>
-                  )}
-                  {showSurvival && <th>Verdict</th>}
+      <div className="avail-scroll panel-body">
+        {run && (
+          <p className="avail-run" role="note">
+            <strong>{runLabel(run, sport)} run:</strong> {run.count} of the last {run.window} picks
+          </p>
+        )}
+        {inStats && (
+          <div className="ds-pickers">
+            <Segmented label="Stats window" value={statWindow} options={STAT_WINDOWS} onChange={setStatWindow} />
+            <Segmented label="Counting stats" value={statMode} options={STAT_MODES} onChange={setStatMode} />
+            <button type="button" className="league-link" onClick={() => setPickerOpen(true)}>Choose stats</button>
+          </div>
+        )}
+        {inStats && pickerOpen && (
+          <StatPickerModal columns={statIds} onChange={chooseStats} onClose={() => setPickerOpen(false)} />
+        )}
+        {inStats && statsPoolError && <p className="muted small">{statsPoolError}</p>}
+        {inStats && !statsPoolError && statsPoolLoading && !statsPool && (
+          <p className="muted small" role="status">Loading the player list…</p>
+        )}
+        {inStats && !statsPoolError && !statsNow && <p className="muted small" role="status">Loading stats…</p>}
+        {inStats && !statsPoolError && statsNow && !statsNow.board && <p className="muted small">Couldn’t load stats.</p>}
+        {inStats && !statsPoolError && statsNow?.board && !statsBoard && (
+          <p className="muted small">
+            {statsNow.board.reason ? reasonSentence(statsNow.board.reason) : 'Player stats aren’t available.'}
+          </p>
+        )}
+        {inStats && !statsPoolError && !(statsPoolLoading && !statsPool) && statsBoard && sleeperLeagueId && (
+          <DraftStatsTable
+            rows={statRows}
+            columns={statColumns}
+            board={statsBoard}
+            sleeperLeagueId={sleeperLeagueId}
+            mode={statMode}
+            sort={statSort}
+            onSort={onStatSort}
+            likelyOnly={likelyOnly}
+            onLikelyOnly={setLikelyOnly}
+            nextPickLabel={nextPickLabel}
+            likelyUnavailableReason={likelyUnavailableReason}
+            onResetColumns={onResetColumns}
+            takenIds={pickedPlayerIds}
+            targetIds={canStar ? starred : undefined}
+            onToggleTarget={canStar ? toggleTarget : undefined}
+          />
+        )}
+        {!inStats && (
+          <table className="avail">
+            <thead>
+              <tr>
+                <th className="player-col">Player</th>
+                <th>Board</th>
+                {/* One header for the whole decay curve, not one per pick --
+                    the individual pick labels ("2.03", "2.11", ...) that used
+                    to head their own column move onto each strip cell's own
+                    `title` instead. The header's own title lists them all, for
+                    anyone who wants the full run without hovering cell by
+                    cell. */}
+                {showSurvival && (
+                  <th
+                    className="strip-col"
+                    title={visiblePicks.map((p) => roundPickLabel(p, teams)).join(' · ')}
+                  >
+                    Next picks
+                  </th>
+                )}
+                {showSurvival && <th className="verdict-col">Verdict</th>}
+              </tr>
+            </thead>
+            {tiers.map((tier) => (
+              <tbody key={tier.label}>
+                <tr className="tier-head">
+                  <th colSpan={showSurvival ? 4 : 2} scope="colgroup">
+                    {tier.label}
+                    {tier.tier != null && <span className="tier-range"> {adpSpan(tier.players.map((r) => r.player.adp))}</span>}
+                  </th>
                 </tr>
-              </thead>
-              {tiers.map((tier) => (
-                <tbody key={tier.label}>
-                  <tr className="tier-head">
-                    <th colSpan={showSurvival ? 4 : 2} scope="colgroup">
-                      {tier.label}
-                      {tier.tier != null && <span className="tier-range"> {adpSpan(tier.players.map((r) => r.player.adp))}</span>}
-                    </th>
-                  </tr>
-                  {tier.players.map((r) => {
-                    // "Next" always means the user's very next pick (picks[0]),
-                    // never the last *visible* column -- trimming trailing zero
-                    // columns changes what's drawn, not what "next" means, and a
-                    // verdict that silently repointed itself when a column
-                    // dropped would be a worse bug than the dead width it fixes.
-                    const v = showSurvival ? verdict(picks.length > 0 ? survivalAt(r.row!, picks[0]) : 0) : null
-                    return (
-                      <tr key={r.player.id}>
-                        <td className="player-col">
-                          <span className={`pos ${r.player.position}`}>{posRank(r.player)}</span>
+                {tier.players.map((r) => {
+                  // "Next" always means the user's very next pick (picks[0]),
+                  // never the last *visible* column -- trimming trailing zero
+                  // columns changes what's drawn, not what "next" means, and a
+                  // verdict that silently repointed itself when a column
+                  // dropped would be a worse bug than the dead width it fixes.
+                  // A taken row has neither a strip nor a verdict -- just the "taken" tag.
+                  const v = showSurvival && !r.taken ? verdict(picks.length > 0 ? survivalAt(r.row, picks[0]) : 0) : null
+                  return (
+                    <tr key={r.player.id} className={r.taken ? 'taken' : undefined}>
+                      <td className="player-col">
+                        {/* One line: the name gives way (ellipsis, full name in the title) before the
+                            tags wrap. Without this wrapper the cell wrapped to 35-55px rows. */}
+                        <div className="pc">
+                          {canStar && (
+                            <StarButton
+                              player={r.player}
+                              on={starred?.has(r.player.sleeperId) ?? false}
+                              hidden={r.taken}
+                              onToggle={toggleTarget}
+                            />
+                          )}
+                          <span {...posPill(r.player, sport)}>{posRank(r.player, sport)}</span>
                           <PlayerFace
                             sport={sport}
                             sleeperId={r.player.sleeperId}
@@ -618,59 +696,62 @@ export default function AvailabilityPanel({
                             name={r.player.name}
                             size={20}
                           />
-                          {r.player.name}
+                          <span className="pc-name" title={r.player.name}>{r.player.name}</span>
                           <span className="team">{r.player.team}</span>
-                          {need(r.player.position) && <span className="need-tag">{need(r.player.position)}</span>}
+                          {r.taken && <span className="taken-tag">taken</span>}
+                          {!r.taken && need(r.player) && <span className="need-tag">{need(r.player)}</span>}
+                        </div>
+                      </td>
+                      <td className="num">{Math.round(r.player.adp)}</td>
+                      {showSurvival && r.taken && <td className="strip-cell" />}
+                      {showSurvival && !r.taken && (
+                        <td className="strip-cell">
+                          <div className="survival-strip">
+                            {visiblePicks.map((p) => {
+                              const pv = survivalAt(r.row, p)
+                              const pct = Math.round(pv * 100)
+                              return (
+                                <span
+                                  key={p}
+                                  className="survival-block"
+                                  // Teal mixed into the panel color by survival --
+                                  // full teal at 100%, fading to plain --panel as
+                                  // a player's odds of still being there drop to
+                                  // zero. Reusing --teal (generic interaction, per
+                                  // the house style) rather than inventing a risk
+                                  // hue: this is a decay reading, not an identity
+                                  // one, and --crimson is reserved for "you"
+                                  // alone. A near-zero cell still reads as a tile
+                                  // rather than a gap because `.survival-block`
+                                  // carries its own hairline border -- the fill is
+                                  // the only thing that goes to nothing.
+                                  style={{ background: `color-mix(in oklch, var(--teal) ${Math.round(pv * 92)}%, var(--panel))` }}
+                                  title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
+                                />
+                              )
+                            })}
+                          </div>
                         </td>
-                        <td className="num">{Math.round(r.player.adp)}</td>
-                        {showSurvival && (
-                          <td className="strip-cell">
-                            <div className="survival-strip">
-                              {visiblePicks.map((p) => {
-                                const pv = survivalAt(r.row!, p)
-                                const pct = Math.round(pv * 100)
-                                return (
-                                  <span
-                                    key={p}
-                                    className="survival-block"
-                                    // Teal mixed into the panel color by survival --
-                                    // full teal at 100%, fading to plain --panel as
-                                    // a player's odds of still being there drop to
-                                    // zero. Reusing --teal (generic interaction, per
-                                    // the house style) rather than inventing a risk
-                                    // hue: this is a decay reading, not an identity
-                                    // one, and --crimson is reserved for "you"
-                                    // alone. A near-zero cell still reads as a tile
-                                    // rather than a gap because `.survival-block`
-                                    // carries its own hairline border -- the fill is
-                                    // the only thing that goes to nothing.
-                                    style={{ background: `color-mix(in oklch, var(--teal) ${Math.round(pv * 92)}%, var(--panel))` }}
-                                    title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
-                                  />
-                                )
-                              })}
-                            </div>
-                          </td>
-                        )}
-                        {v && <td className={`verdict verdict-${v.cls}`}>{v.label}</td>}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              ))}
-            </table>
-          )}
-          {!inStats && rows.length === 0 && (
-            <p className="muted">
-              {!started
-                ? 'Your realistic options show up here once the draft starts.'
-                : showSurvival
-                  ? 'No players survive to these picks in any run.'
-                  : 'No players to list.'}
-            </p>
-          )}
-        </div>
-      )}
+                      )}
+                      {v && <td className={`verdict verdict-${v.cls}`}>{v.label}</td>}
+                      {showSurvival && r.taken && <td className="verdict" />}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            ))}
+          </table>
+        )}
+        {!inStats && rows.length === 0 && (
+          <p className="muted">
+            {!started
+              ? 'Your realistic options show up here once the draft starts.'
+              : showSurvival
+                ? 'No players survive to these picks in any run.'
+                : 'No players to list.'}
+          </p>
+        )}
+      </div>
     </section>
   )
 }

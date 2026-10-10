@@ -12,7 +12,7 @@ function insight(over: Partial<PickInsight> = {}): PickInsight {
 }
 
 function show(over: Partial<PickInsight>) {
-  return render(<PickInsightCard insight={insight(over)} teams={TEAMS} autoFocus={false} onClose={() => {}} />)
+  return render(<PickInsightCard insight={insight(over)} sport="nfl" teams={TEAMS} autoFocus={false} onClose={() => {}} />)
 }
 
 const ready = (probability: number, wideOpen = false): LikelyNext => ({

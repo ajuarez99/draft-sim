@@ -15,6 +15,11 @@ export type PlayerRef = {
   // positions (a filter chip row, a slot-eligibility check, the pick-run
   // detector) needs its own sport-scoped list; see positions.ts.
   position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
+  // Full eligible list in Sleeper's alphabetical order (not a ranking). Optional
+  // only because of the split deploy (an older backend omits it). Never treat
+  // `position` as primary in draft-room labels (spec 025 FR-002); use
+  // eligiblePositions() in positions.ts.
+  positions?: PlayerRef['position'][]
   team: string | null
   adp: number
   // 999 is Sleeper's own "no rank" sentinel (BoardService's default, never
@@ -132,6 +137,10 @@ export type SeatsResponse = {
    * of the backend (the 2026-09-14 white-page incident); undefined = unknown.
    */
   sleeperLeagueId?: string | null
+  /** Sleeper draft type ("snake", "linear", ...). Optional for the same deploy-ordering reason; null = unknown. */
+  draftType?: string | null
+  /** Sleeper's per-pick timer in seconds; null = Sleeper sent none (never a default). Optional as above. */
+  pickTimerSeconds?: number | null
   /**
    * The round from which snake parity flips; 0 means the draft never reverses.
    * `reversalRound` is what the engine actually uses -- the user's override if
@@ -608,7 +617,7 @@ export type MockPick = {
   // time (createMockSessionFromDraft) -- already-decided and non-editable,
   // same as BOT, just decided by a real person in the real draft rather than
   // by this session's engine or its own USER seat.
-  source: 'USER' | 'BOT' | 'LIVE'
+  source: 'USER' | 'BOT' | 'LIVE' | 'AUTO'
   // Null only if the board changed (a re-ingest) since this pick was made and
   // the player dropped off it -- MockDraftView filters these out of the board
   // array entirely rather than rendering a broken cell.
@@ -766,6 +775,44 @@ export const submitMockPick = (id: number, sleeperPlayerId: string) =>
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ sleeperPlayerId }),
+  })
+    .then(json<MockSessionState>)
+    .then(withSportDefaults)
+
+// --- spec 024: draft targets and mock auto-pick ---
+
+// Mirrors TargetController.DraftTargets. `players` are the targets still on the sport's
+// board, in rank order; `missing` are targets whose player is no longer on it. No ADP is
+// invented for a missing one, so callers must show it without a survival number.
+export type DraftTargets = { players: PlayerRef[]; missing: { sleeperId: string; name: string }[] }
+
+// Exactly one of the two, like the endpoint: a real draft (shared by its live and
+// projection rooms) or a mock session.
+export type TargetScope = { sleeperDraftId: string } | { mockSessionId: number }
+
+export const getTargets = (scope: TargetScope) => {
+  const q =
+    'sleeperDraftId' in scope
+      ? `sleeperDraftId=${encodeURIComponent(scope.sleeperDraftId)}`
+      : `mockSessionId=${scope.mockSessionId}`
+  return apiFetch(`/api/targets?${q}`).then(json<DraftTargets>)
+}
+
+// Replaces the whole list; order is rank, [] clears it.
+export const putTargets = (scope: TargetScope, sleeperPlayerIds: string[]) =>
+  apiFetch('/api/targets', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...scope, sleeperPlayerIds }),
+  }).then(json<DraftTargets>)
+
+// PICK makes this one pick for you (it must be your turn); FINISH makes every remaining
+// pick. Targets first, then the best-ADP player who would start, then the best ADP.
+export const autoMock = (id: number, scope: 'PICK' | 'FINISH') =>
+  apiFetch(`/api/mocks/${id}/auto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope }),
   })
     .then(json<MockSessionState>)
     .then(withSportDefaults)

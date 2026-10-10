@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -15,16 +15,22 @@ import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { useTargets } from '../useTargets'
+import { markTaken, survivalFor } from '../targets'
+import TargetStrip from '../components/TargetStrip'
 import { useStatsPool } from '../useStatsPool'
 import { SkeletonBoard } from '../components/Skeleton'
 import SeatPopover from '../components/SeatPopover'
 import OnTheClock from '../components/OnTheClock'
-import PickFeed from '../components/PickFeed'
+import FormatSummary from '../components/FormatSummary'
+import RoomControls from '../components/RoomControls'
+import CompactRow from '../components/CompactRow'
+import DraftRoomLayout from '../components/DraftRoomLayout'
 import PlayerCard from '../components/PlayerCard'
 import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
 import { useRevealedBoard } from '../useRevealedBoard'
-import { draftedSoFar } from '../teamNeeds'
+import { computeTeamNeeds, draftedSoFar, makeFitFor } from '../teamNeeds'
 import { usePageActionSlot } from '../appSlots'
 
 // Every league, of any size, has a slot 1 -- unlike the single-league app's old
@@ -56,6 +62,8 @@ const RESIM_ITERATION_CAP = 500
 
 export default function DraftView() {
   const { draftId = '' } = useParams<{ draftId: string }>()
+  // The same list the live room shows: one per Sleeper draft.
+  const targets = useTargets(useMemo(() => ({ sleeperDraftId: draftId }), [draftId]))
   const [searchParams, setSearchParams] = useSearchParams()
   const slotParam = searchParams.get('slot')
   const mySlot = slotParam ? Number(slotParam) : DEFAULT_SLOT
@@ -444,6 +452,42 @@ export default function DraftView() {
   // "you" here would be exactly the flash this feature is meant to avoid, so
   // no header is marked "you" for that one short window instead of guessing.
   const slotKnown = slotParam != null || seats != null
+  // The seat is CONFIRMED only by an explicit/adopted ?slot=. Everything the
+  // board header labels "assumed" (target survival, "Your team") keys off this
+  // one flag, so the header and the numbers cannot disagree. And survival is
+  // only meaningful while the result was run for the seat shown as yours.
+  const slotConfirmed = slotParam != null
+  const resultMatchesSeat = result != null && result.mySlot === mySlot
+  const seatChangedSinceRun = result != null && !resultMatchesSeat
+  const seatedUndecidedPicks = resultMatchesSeat ? undecidedMyPicks : []
+
+  // Your roster as of the last settled pick, for the compact row's team strip.
+  // draftedSoFar takes an exclusive bound, so +1 includes pick `decidedThrough`.
+  // Shown only once the seat is known (see the `needs` prop below).
+  // Memoized per roster: the basketball lineup is a matching, and this room re-renders
+  // on every reveal tick. The fit function the panel gets is built off the same lineup.
+  const seatRosterPositions = seats?.rosterPositions
+  const myNeeds = useMemo(
+    () =>
+      computeTeamNeeds(
+        sport,
+        seatRosterPositions ?? [],
+        result ? draftedSoFar(result.myPicks, decidedThrough + 1, result.board, userPicks) : [],
+      ),
+    [sport, seatRosterPositions, result, decidedThrough, userPicks],
+  )
+  const myFitFor = useMemo(() => makeFitFor(sport, myNeeds), [sport, myNeeds])
+
+  const targetIds = new Set(targets.items.map((t) => t.sleeperId))
+  const markedTargets = markTaken(targets.items, revealedPlayerIds)
+  const formatSummary = seats ? (
+    <FormatSummary
+      teams={seats.teams}
+      rounds={seats.rounds}
+      pickTimerSeconds={seats.pickTimerSeconds}
+      draftType={seats.draftType}
+    />
+  ) : null
 
   if (notFound) return <NotFound what="draft" />
 
@@ -471,173 +515,253 @@ export default function DraftView() {
           pageActionSlot,
         )}
 
-      {error && <div className="error">{error}</div>}
-      {/* Only for a re-run once a board already exists -- the first run's
-          progress lives inside the empty board's own overlay below, so the
-          two never show at once. */}
-      {started && running && (
-        <div className="progress">
-          <div className="progress-bar" style={{ width: `${Math.round(progress * 100)}%` }} />
-        </div>
-      )}
-
-      {/* seatsDirty's own inline re-run makes the banner actionable from
-          itself, not just descriptive of an action available somewhere else
-          -- "Simulate again" otherwise lives behind the gear, which is a
-          click away from a banner that is already telling you to use it. */}
-      {seatsDirty && result && (
-        <div className="error seats-dirty">
-          <span>Seats changed since this simulation ran — the board is out of date.</span>
-          <button className="chip on" onClick={run} disabled={running || resimming}>
-            Simulate again
-          </button>
-        </div>
-      )}
-
       <div className="content">
-        <div className="board-panel">
-          <section className="panel">
-            {/* F2: no heading/explainer paragraph -- the panel opens
-                directly on the reveal scrubber and grid. The cell format
-                (modal player / share of runs / faded = already gone) is
-                explained by each cell's own `title` attribute
-                (DraftBoard.tsx) instead of a permanent paragraph. */}
-            {started && (
+        <DraftRoomLayout
+          rounds={result?.rounds ?? seats?.rounds ?? 0}
+          boardPreStart={!started}
+          status={
+            started ? (
+              /* The room's header: whose turn, how long until yours, and
+                 what just came off the board -- replacing the old
+                 `Pick 28 of 210 · skip · re-run` counter. Every value is
+                 derived from `result` and the reveal state; nothing new is
+                 fetched. `re-run` moved into the gear (it restarts the
+                 whole simulation, which is a settings-level action, not a
+                 draft action); `skip` stays on the page, in the controls
+                 region, because it acts on the reveal you are watching. */
+              <OnTheClock
+                manager={onClockPick?.manager ?? null}
+                isMine={onClockIsMine}
+                hueSeed={String(onClockSeat?.managerId ?? onClockPick?.slot ?? 0)}
+                avatarId={onClockPick?.avatarId}
+                pickNo={onClockPickNo}
+                maxPickNo={maxPickNo}
+                teams={result.teams}
+                rounds={result.rounds}
+                nextOwnPick={nextOwnPick}
+                idle={revealFinished}
+                idleLabel="Every pick simulated"
+              >
+                {formatSummary}
+              </OnTheClock>
+            ) : (
+              <p className="muted small">
+                The simulation hasn’t started yet. {formatSummary}
+              </p>
+            )
+          }
+          notices={
+            error || (started && running) || (seatsDirty && result) || seatChangedSinceRun ? (
               <>
-                {/* The room's header: whose turn, how long until yours, and
-                    what just came off the board -- replacing the old
-                    `Pick 28 of 210 · skip · re-run` counter. Every value is
-                    derived from `result` and the reveal state; nothing new is
-                    fetched. `re-run` moved into the gear (it restarts the
-                    whole simulation, which is a settings-level action, not a
-                    draft action); `skip` stays here because it acts on the
-                    reveal you are watching right now. */}
-                <OnTheClock
-                  manager={onClockPick?.manager ?? null}
-                  isMine={onClockIsMine}
-                  hueSeed={String(onClockSeat?.managerId ?? onClockPick?.slot ?? 0)}
-                  avatarId={onClockPick?.avatarId}
-                  pickNo={onClockPickNo}
-                  maxPickNo={maxPickNo}
-                  teams={result.teams}
-                  rounds={result.rounds}
-                  nextOwnPick={nextOwnPick}
-                  idle={revealFinished}
-                  idleLabel="Every pick simulated"
-                >
-                  {reveal.revealedThrough < maxPickNo && (
-                    <button className="chip" onClick={reveal.skip} disabled={resimming}>
-                      Skip to the end
+                {error && <div className="error">{error}</div>}
+                {/* Only for a re-run once a board already exists -- the first
+                    run's progress lives inside the empty board's own overlay,
+                    so the two never show at once. */}
+                {started && running && (
+                  <div className="progress">
+                    <div className="progress-bar" style={{ width: `${Math.round(progress * 100)}%` }} />
+                  </div>
+                )}
+                {/* seatsDirty's own inline re-run makes the banner actionable
+                    from itself, not just descriptive of an action available
+                    somewhere else -- "Simulate again" otherwise lives behind
+                    the gear, which is a click away from a banner that is
+                    already telling you to use it. */}
+                {/* B2's gate hides survival for a run made from another seat; without
+                    this the room said "You — 1.01" and "No picks left" after a Claim,
+                    with nothing explaining why or what to do (T045, 2026-10-09). */}
+                {seatChangedSinceRun && !seatsDirty && result && (
+                  <div className="error seats-dirty">
+                    <span>
+                      This simulation ran from slot {result.mySlot}; you’re now slot {mySlot}. Its numbers are held
+                      back until it runs from your seat.
+                    </span>
+                    <button className="chip on" onClick={run} disabled={running || resimming}>
+                      Simulate again
                     </button>
-                  )}
-                </OnTheClock>
-                <PickFeed picks={feedPicks} teams={result.teams} sport={sport} />
+                  </div>
+                )}
+                {seatsDirty && result && (
+                  <div className="error seats-dirty">
+                    <span>Seats changed since this simulation ran — the board is out of date.</span>
+                    <button className="chip on" onClick={run} disabled={running || resimming}>
+                      Simulate again
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : undefined
+          }
+          controls={
+            // The pick prompt / recalculating text lives in this row (as the mock room's
+            // does) instead of its own region, which cost the list two rows.
+            started && (reveal.revealedThrough < maxPickNo || reveal.pausedAt != null) ? (
+              <RoomControls>
                 {reveal.pausedAt != null &&
                   (resimming ? (
-                    <div className="pause-banner">
-                      <span className="muted small">
-                        Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
-                      </span>
-                    </div>
+                    <span
+                      className="muted small pick-prompt-note"
+                      title={`Recalculating the board past pick ${reveal.pausedAt}`}
+                    >
+                      Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
+                    </span>
                   ) : (
                     <PickPrompt
+                      inline
                       modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
                       bestAvailable={result.bestAvailable[String(reveal.pausedAt)]?.[0]?.player}
                       onPick={choosePick}
                       onOpenPicker={() => setPickerOpen(true)}
                     />
                   ))}
-              </>
-            )}
-
-            {/* While getSeats is in flight the board's shape is unknown, so draw
-                a placeholder board rather than an empty panel. No words about
-                running or simulating: nothing runs until Start is pressed. */}
-            {!seats && !error && <SkeletonBoard />}
-            {seats && (
+                {reveal.revealedThrough < maxPickNo && (
+                  <button className="chip" onClick={reveal.skip} disabled={resimming}>
+                    Skip to the end
+                  </button>
+                )}
+              </RoomControls>
+            ) : undefined
+          }
+          compactRow={
+            started ? (
+              <CompactRow
+                feedPicks={feedPicks}
+                teams={result.teams}
+                sport={sport}
+                needs={slotConfirmed && myNeeds.length > 0 ? myNeeds : undefined}
+              />
+            ) : undefined
+          }
+          board={(density) =>
+            seats ? (
               // teams/rounds come from `seats` (fetched independently of a
               // run) so the grid -- and its column headers -- exists before a
               // simulation ever has. Everything else defaults to "nothing
               // revealed yet": an empty board, not a placeholder screen.
-              // `pre-start` lifts the column headers above the start
+              // `boardPreStart` lifts the column headers above the start
               // overlay (styles.css). The overlay's own copy says "click your
-              // name in the board above", and until this class existed it was
+              // name in the board above", and until that class existed it was
               // covering the headers that instruction points at -- the one
               // thing on the pre-start board that is real rather than empty.
-              <div className={`board-stage${started ? '' : ' pre-start'}`}>
-                <DraftBoard
-                  board={result?.board ?? []}
-                  teams={result?.teams ?? seats.teams}
-                  rounds={result?.rounds ?? seats.rounds}
-                  myPicks={result?.myPicks ?? []}
-                  userPicks={userPicks}
-                  revealedThrough={started ? reveal.revealedThrough : 0}
-                  seats={seats.seats}
-                  mySlot={slotKnown ? mySlot : undefined}
-                  sport={sport}
-                  reversalRound={seats.reversalRound}
-                  onCellClick={started ? setOpenPick : undefined}
-                  onSeatClick={setOpenSeatSlot}
-                />
-                {/* The player list lies on top of the board's earliest rounds
-                    rather than taking a band of its own below it (§E) -- the
-                    board now gets the whole content area, and this collapses
-                    to its own header to give all of it back. Always rendered,
-                    including before a run: gating it on `started` is what used
-                    to make the layout jump the moment you pressed start. */}
-                <AvailabilityPanel
-                  availability={result?.availability ?? []}
-                  myPicks={undecidedMyPicks}
-                  teams={result?.teams ?? seats.teams}
-                  pickedPlayerIds={revealedPlayerIds}
-                  started={started}
-                  sport={sport}
-                  recentPicks={feedPicks.map((p) => p.player)}
-                  sleeperLeagueId={seats.sleeperLeagueId}
-                  statsPool={statsPool ?? undefined}
-                  statsPoolLoading={statsPoolLoading}
-                  statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
-                />
-                {!started && (
-                  <div className="start-overlay">
-                    {running ? (
-                      <div className="start-overlay-status">
-                        <span className="cond">Simulating your draft...</span>
-                        <span className="muted small">{Math.round(progress * 100)}%</span>
-                      </div>
-                    ) : (
-                      <div className="start-overlay-cta">
-                        <h2 className="cond">Ready when you are</h2>
-                        <p className="muted small">
-                          {autoAdoptedSlotRef.current && seats?.mySlot != null
-                            ? `We found your seat — you're slot ${seats.mySlot}. Start the mock draft.`
-                            : 'Click your name in the board above if you know your seat, then start the mock draft.'}
-                        </p>
-                        <button className="start-button" onClick={run}>
-                          Start the mock draft
-                        </button>
-                        {/* This used to print a raw `POST /api/ingest/all/...`
-                            for the reader to run themselves -- a curl command
-                            on the app's primary empty state. The board is
-                            loaded from the picker screen, so point there. */}
-                        <p className="muted tiny">
-                          Board looks empty? <Link to="/">Load this league's players</Link> first.
-                        </p>
-                      </div>
-                    )}
+              <DraftBoard
+                density={density}
+                mySlotAssumed={slotParam == null}
+                onClaim={makeSeatMine}
+                // Marked while the reveal is paused on your pick (the one pick the
+                // room is waiting on); nothing is on the clock before a run or after it.
+                onTheClockPickNo={started ? (reveal.pausedAt ?? undefined) : undefined}
+                board={result?.board ?? []}
+                teams={result?.teams ?? seats.teams}
+                rounds={result?.rounds ?? seats.rounds}
+                myPicks={result?.myPicks ?? []}
+                userPicks={userPicks}
+                revealedThrough={started ? reveal.revealedThrough : 0}
+                seats={seats.seats}
+                mySlot={slotKnown ? mySlot : undefined}
+                sport={sport}
+                reversalRound={seats.reversalRound}
+                onCellClick={started ? setOpenPick : undefined}
+                onSeatClick={setOpenSeatSlot}
+              />
+            ) : error ? null : (
+              // While getSeats is in flight the board's shape is unknown, so
+              // draw a placeholder board rather than an empty panel. No words
+              // about running or simulating: nothing runs until Start is pressed.
+              <SkeletonBoard />
+            )
+          }
+          boardOverlay={
+            seats && !started ? (
+              <div className="start-overlay">
+                {running ? (
+                  <div className="start-overlay-status">
+                    <span className="cond">Simulating your draft...</span>
+                    <span className="muted small">{Math.round(progress * 100)}%</span>
+                  </div>
+                ) : (
+                  <div className="start-overlay-cta">
+                    <h2 className="cond">Ready when you are</h2>
+                    <p className="muted small">
+                      {autoAdoptedSlotRef.current && seats?.mySlot != null
+                        ? `We found your seat — you're slot ${seats.mySlot}. Start the mock draft.`
+                        : 'Click your name in the board above if you know your seat, then start the mock draft.'}
+                    </p>
+                    <button className="start-button" onClick={run}>
+                      Start the mock draft
+                    </button>
+                    {/* This used to print a raw `POST /api/ingest/all/...`
+                        for the reader to run themselves -- a curl command
+                        on the app's primary empty state. The board is
+                        loaded from the picker screen, so point there. */}
+                    <p className="muted tiny">
+                      Board looks empty? <Link to="/">Load this league's players</Link> first.
+                    </p>
                   </div>
                 )}
               </div>
-            )}
-          </section>
-        </div>
-
+            ) : undefined
+          }
+          targets={
+            <TargetStrip
+              items={markedTargets}
+              status={targets.status}
+              error={targets.error}
+              sport={sport}
+              room="projection"
+              survivalOf={(t) => survivalFor(t.player, result?.availability, seatedUndecidedPicks[0], slotConfirmed)}
+              onMove={targets.move}
+              onRemove={targets.remove}
+              onRetry={targets.retry}
+            />
+          }
+          list={
+            seats ? (
+              // Always rendered, including before a run: gating it on `started`
+              // is what used to make the layout jump the moment you pressed start.
+              <AvailabilityPanel
+                availability={result?.availability ?? []}
+                myPicks={seatedUndecidedPicks}
+                teams={result?.teams ?? seats.teams}
+                pickedPlayerIds={revealedPlayerIds}
+                started={started}
+                sport={sport}
+                // Only once the seat is confirmed: a "Fills X" tag against an assumed
+                // seat's roster is worse than none.
+                fitFor={slotConfirmed ? myFitFor : undefined}
+                recentPicks={feedPicks.map((p) => p.player)}
+                sleeperLeagueId={seats.sleeperLeagueId}
+                draftedPlayers={feedPicks.map((p) => p.player)}
+                // Same rule as the live room (FR-003, FR-012): the header calls a
+                // fallback seat "assumed", so its survival numbers are held back
+                // rather than shown as "when you pick". Found in T045, 2026-10-09.
+                noAvailabilityReason={
+                  !slotConfirmed
+                    ? 'Availability appears once your seat is known. Claim your seat on the board.'
+                    : seatChangedSinceRun
+                      ? 'This simulation ran from another seat. Simulate again to see availability for yours.'
+                      : undefined
+                }
+                {...(targets.status === 'ready'
+                  ? { targetIds, onAddTarget: targets.add, onRemoveTarget: targets.remove }
+                  : {})}
+                statsPool={statsPool ?? undefined}
+                statsPoolLoading={statsPoolLoading}
+                statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
+              />
+            ) : (
+              <section className="panel avail-region">
+                <p className="muted small">The player list appears once this draft’s seats load.</p>
+              </section>
+            )
+          }
+        />
       </div>
 
       {openPick && result && (
         <PlayerCard
           pick={openPick}
           teams={result.teams}
+          sport={sport}
           yourPick={userPicks[openPick.pickNo]}
           onClose={() => setOpenPick(null)}
         />

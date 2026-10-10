@@ -418,6 +418,15 @@ public class LiveDraftPoller {
         Map<String, Object> raw = sleeper.draft(draft.sleeperDraftId());
         String status = raw.get("status") == null ? null : raw.get("status").toString();
         drafts.updateStatus(draft.id(), status);
+        // Refresh the pick timer from the draft object already in hand (spec 024 A2).
+        // Null when absent: the column says "Sleeper sent none", not a default.
+        Object rawSettings = raw.get("settings");
+        // Only when the settings object itself is present: a response without it says
+        // nothing about the timer and must not blank a stored value. An absent
+        // pick_timer INSIDE a present settings map does mean "no timer" (null).
+        if (rawSettings instanceof Map<?, ?> sm) {
+            drafts.updatePickTimer(draft.id(), LeagueIngestService.asNullableInt(sm.get("pick_timer")));
+        }
 
         // Fetched once per tick and shared by both consumers below: the seat-map
         // refresh and (further down) picked_by resolution. It is a ~14-row table.

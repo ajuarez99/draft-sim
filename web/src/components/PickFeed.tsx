@@ -1,9 +1,9 @@
-import type { CSSProperties } from 'react'
 import type { PlayerRef, Sport } from '../api'
+import { leadHueStyle, posPill } from '../positions'
 import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
-import { positionRun } from '../pickRun'
+import { positionRun, runLabel } from '../pickRun'
 import { roundPickLabel } from '../roundPickLabel'
 
 export type FeedPick = {
@@ -19,6 +19,8 @@ export type FeedPick = {
    * See LiveDraftView, which computes it from teamNeeds.fitSlot.
    */
   fit?: string | null
+  /** The user's own pick, made by auto-pick (spec 024 FR-022): shown with a small "auto" tag. */
+  auto?: boolean
 }
 
 type Props = {
@@ -35,6 +37,8 @@ type Props = {
    * rows they always had. Only the live room uses it, to open a pick's card.
    */
   onPickClick?: (pickNo: number) => void
+  /** Tighter rows, for the draft room's compact row (CompactRow). Same rows, less padding. */
+  compact?: boolean
 }
 
 /**
@@ -58,14 +62,14 @@ type Props = {
  * `revealedThrough === pausedAt`, so the board's predicted player at your own
  * still-open pick would otherwise show up here as though it had happened.
  */
-export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }: Props) {
+export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick, compact }: Props) {
   if (picks.length === 0) return null
 
   const run = positionRun(picks.map((p) => p.player), 6, 4, sport)
   const recent = picks.slice(-limit).reverse()
 
   return (
-    <ol className="pick-feed" aria-label="Recent picks">
+    <ol className={`pick-feed${compact ? ' compact' : ''}`} aria-label="Recent picks">
       {recent.map((p, i) => {
         const { lead, rest } = shortName(p.player, sport)
         // The run belongs on the newest row only -- it describes the state the
@@ -76,13 +80,13 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }
         // The run wins the trailing slot when there is one: it is the rarer
         // signal and the one you can still act on, where the fit is a fact
         // about someone else's roster that will keep until you read it.
-        const clause = showRun && run ? `${run.count} of the last ${run.window} were ${run.position}` : null
+        const clause = showRun && run ? `${run.count} of the last ${run.window} were ${runLabel(run, sport)}` : null
         const runClass = showRun && run ? ` run pos-run-${run.position}` : ''
         const fit = isLead && !clause ? p.fit : null
         const body = (
           <>
             <span className="pick-feed-no mono">{roundPickLabel(p.pickNo, teams)}</span>
-            <span className={`pos ${p.player.position}`}>{posRank(p.player)}</span>
+            <span {...posPill(p.player, sport)}>{posRank(p.player, sport)}</span>
             {/* The announcement says the whole name. Everywhere else the
                 abbreviation is right -- three rows of "Ja'Marr Chase" crowd
                 out the numbers around them -- but the pick that just landed is
@@ -104,6 +108,7 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }
             {(isLead || !clause) && <span className="pick-feed-by mono">{p.manager}</span>}
             {clause && <span className="pick-feed-run cond">{clause}</span>}
             {fit && <span className="pick-feed-fit cond">{fit}</span>}
+            {p.auto && <span className="pick-feed-auto cond" title="Made by auto-pick">auto</span>}
           </>
         )
         return (
@@ -114,7 +119,8 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }
             // Set from the position code rather than through eleven CSS rules
             // because --qb/--rb/--pg/... are already named after it in
             // styles.css, so this covers both sports for free.
-            style={isLead ? ({ '--lead-hue': `var(--${p.player.position.toLowerCase()})` } as CSSProperties) : undefined}
+            // A multi-position player gets no hue (neutral fallback), never his first position's.
+            style={isLead ? leadHueStyle(p.player, sport) : undefined}
           >
             {onPickClick ? (
               <button

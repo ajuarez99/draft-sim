@@ -14,7 +14,7 @@
  *   one-line record is a row. Section titles are headings on the surface
  *   (`.section-title`), not the header strip of a box. Unboxed regions use
  *   `.section`. Modals use `.modal-card`, not `.panel`. Elevation is a claim
- *   about layering: only `.panel` and `.avail-sheet` float and carry a shadow;
+ *   about layering: only `.panel` and the pick card float and carry a shadow;
  *   grid tiles are on the plane. Radii by role: 999px badges and chips, 10px
  *   tiles and controls, 12px floating sheets, 14px panels.
  *
@@ -92,7 +92,7 @@
  *
  * STACKING (over `.board-stage`)
  *   0 cells · 1 sticky headers (2 for the corner) · 3 a focused cell ·
- *   4 `.avail-sheet` · 5 `.start-overlay` · 7 `.pick-card` (the live room's
+ *   5 `.start-overlay` · 7 `.pick-card` (the live room's
  *   pick card; above the 6 below, which only exists pre-start when no card can).
  *   Add a layer here, not inline.
  *
@@ -108,12 +108,10 @@
  *    45  `.jumpto-fab`, the phone-only return control. Below the overlay it
  *         opens, and below a drag in progress. It was 50 first, which tied the
  *         ghost and left DOM order to decide; a tie is not a decision.
- *    44  `.pick-card` at phone width only (≤700px), where it leaves the
- *         board stage and pins to the viewport bottom. Just below the
- *         jump-to FAB so that control is never covered.
- *    43  `.avail-sheet` at phone width only (≤700px), for the same reason
- *         as the pick card (spec 023). Below it, so a landed pick's card
- *         still shows over the open player list.
+ *    44  `.pick-card` below 1280px (the draft room's stacked layout, spec 024
+ *         A12), where it leaves the board stage and pins to the viewport
+ *         bottom -- the board can be the hidden pane there, and a fixed card
+ *         shows regardless. Just below the jump-to FAB so that is never covered.
  *   Add the next page-level fixed layer here, not inline.
  *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
@@ -812,6 +810,21 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .pos.SF { background: var(--sf); color: var(--bg); }
 .pos.PF { background: var(--pf); color: var(--bg); }
 .pos.C { background: var(--c); color: var(--bg); }
+/* Multi-position pill (spec 025): a hard split across --pos-a/b/c, set inline
+   from each position's own colour variable. --pos-c falls back to --pos-b so a
+   two-position pill is a clean 50/50. Narrower type so "PG/SF/PF" fits. */
+.pos.multi {
+  background: linear-gradient(100deg,
+    var(--pos-a) 0 var(--pos-s1, 50%),
+    var(--pos-b) var(--pos-s1, 50%) var(--pos-s2, 50%),
+    var(--pos-c, var(--pos-b)) var(--pos-s2, 50%) 100%);
+  color: var(--bg);
+  letter-spacing: 0;
+  font-size: 9px;
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
 
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 8px; }
@@ -838,7 +851,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
  *   0  cells
  *   1  sticky .col-head / .rnd, 2 for .corner (sticky in both directions)
  *   3  a focused cell, so its outline is never clipped by a neighbour
- *   4  .avail-sheet, the floating player list
  *   5  .start-overlay, which covers everything by design
  *   6  .board-stage.pre-start .col-head -- the ONE exception to 5, and only
  *      before a run: the overlay says "click your name in the board above"
@@ -849,14 +861,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board {
   display: grid; gap: 4px; background: var(--bg);
   font-size: 11px;
-  /* Scrollable room after the last round equal to whatever the availability
-     sheet is currently covering (published by AvailabilityPanel, absent when
-     it is collapsed). The sheet floats over this grid, so without this the
-     deepest rounds are *permanently* unreachable: at maximum scroll they are
-     still underneath it. With it, every round can be scrolled up into the
-     clear -- which is the point of scrolling the board at all once the draft
-     is past round 6 or so. */
-  padding-bottom: var(--avail-sheet-reserve, 0px);
 }
 /* The sticky tiles each paint 4px of `--bg` around themselves. Without it the
    gaps between them are transparent and rows scrolling underneath show through
@@ -947,6 +951,25 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .cell.pos-SF:hover { background: color-mix(in oklch, var(--sf) 34%, var(--panel)); }
 .board .cell.pos-PF:hover { background: color-mix(in oklch, var(--pf) 34%, var(--panel)); }
 .board .cell.pos-C:hover  { background: color-mix(in oklch, var(--c) 34%, var(--panel)); }
+/* Multi-position cell (spec 025 A7): the tint splits across the player's
+   positions (--pos-a/b/c set inline) rather than taking the first one's colour.
+   --pos-c is optional, so it falls back to --pos-b to keep the gradient valid. */
+.board .cell.pos-multi {
+  /* Held in a variable so the steal/reach view (013 US8, below) can layer its tint over
+     the split instead of replacing it -- single-position cells keep their colour there
+     because theirs is a background-color; this one is an image (code review R1). */
+  --pos-split: linear-gradient(100deg,
+    color-mix(in oklch, var(--pos-a) 22%, var(--panel)) 0%,
+    color-mix(in oklch, var(--pos-b) 22%, var(--panel)) 50%,
+    color-mix(in oklch, var(--pos-c, var(--pos-b)) 22%, var(--panel)) 100%);
+  background: var(--pos-split);
+}
+.board .cell.pos-multi:hover {
+  background: linear-gradient(100deg,
+    color-mix(in oklch, var(--pos-a) 34%, var(--panel)) 0%,
+    color-mix(in oklch, var(--pos-b) 34%, var(--panel)) 50%,
+    color-mix(in oklch, var(--pos-c, var(--pos-b)) 34%, var(--panel)) 100%);
+}
 /* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
    this strips the browser's default button chrome so they still read as
    plain grid cells, not form controls. */
@@ -988,7 +1011,9 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    the position fills and sets no background of its own, so an empty seat of
    yours still reads crimson-on-panel and a filled one reads crimson-on-
    position. */
-.board .cell.mine { box-shadow: inset 0 0 0 1.5px var(--crimson); }
+/* Spec 024 A6: there is no per-cell `.mine` ring any more. It was derived from
+   myPicks (slot-based, so every cell in an ASSUMED seat got one: 14 red
+   outlines). Your seat is marked on its column header only (.col-head.mine). */
 /* chosen is always also mine -- an addition to that crimson ring (a second,
    thicker inset ring), not a full recolor, so the far more common
    mine-but-not-yet-chosen cell doesn't get harder to spot.
@@ -1049,8 +1074,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    internally. Confirmed live: at a 900px window this pushed the entire page
    into horizontal scroll (documentElement.scrollWidth > innerWidth) rather
    than staying contained to the board's own scroller. */
-/* The whole content area: the availability panel no longer takes a band of
-   its own, it floats over this one (`.avail-sheet`). */
 .board-panel { flex: 1 1 0; min-height: 0; min-width: 0; display: flex; }
 .board-panel > .panel { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 
@@ -1082,52 +1105,6 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   margin: 14px 0 10px; transition: filter 120ms ease, transform 120ms ease;
 }
 .start-button:hover { filter: brightness(1.08); transform: translateY(-1px); }
-
-/*
- * The player list, floating over the board instead of splitting the page with
- * it (claude/pill-board-and-player-list-on-top.md section E).
- *
- * Anchored to the BOTTOM of the stage. It was anchored to the top first, on the
- * reasoning that the rows up there are already resolved -- which is exactly
- * backwards for most of a draft: at pick 18 the only rows with anything in them
- * *are* the top ones, and the sheet covered every pick that had happened while
- * leaving seven empty rounds on show. The deep rounds are the ones that stay
- * empty almost the whole session, so they are what the sheet should lie on.
- * `bottom` clears the board's own horizontal scrollbar rather than sitting on
- * top of it.
- *
- * It is a layer, not a modal: no backdrop, no dimming, no focus trap. The
- * board stays live everywhere this doesn't cover, and the header's own
- * show/hide gives all of it back.
- */
-.avail-sheet {
-  position: absolute; z-index: 4;
-  bottom: 18px; left: 8px; right: 8px; max-height: 46%;
-  display: flex; flex-direction: column; min-height: 0;
-  padding: 10px 14px 12px; border-radius: 12px;
-  /* Near-opaque, unlike `.start-overlay`'s 72%: that recipe is for a centred
-     CTA, and under 60 rows of small text the board's position colors bleed
-     straight through the `.pos` pills. The shadow is the one in this file that
-     is earned -- section D bans them on cells because cells don't float; this
-     genuinely lies above the board. */
-  background: color-mix(in oklch, var(--panel) 95%, transparent);
-  backdrop-filter: blur(3px);
-  box-shadow: 0 0 0 1px var(--line), 0 14px 34px rgba(0,0,0,0.5);
-}
- /* Collapsed: a single pill in the board's bottom-right corner. A full-width
-    collapsed bar still covered a whole round, which is not what "show the whole
-    board" means. */
-.avail-sheet.collapsed {
-  max-height: none; left: auto; padding: 5px 7px;
-  background: color-mix(in oklch, var(--panel) 92%, transparent);
-}
-.avail-sheet h2 { margin: 0; }
-.avail-sheet .panel-head { margin-bottom: 8px; }
-.avail-sheet.collapsed .panel-head { margin-bottom: 0; }
-.sheet-toggle { margin-left: 10px; }
-/* Reaching the end of the player list must not start scrolling the board
-   underneath it. */
-.avail-sheet .avail-scroll { overscroll-behavior: contain; }
 
 .avail-scroll thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
 
@@ -1528,22 +1505,19 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     position: fixed; top: auto; bottom: 12px; left: 12px; right: 12px;
     width: auto; max-height: 60vh; overflow-y: auto; z-index: 44;
   }
-  /* The available-players sheet had the same 0px-stage problem and nobody had
-     caught it: its `max-height: 46%` resolved against a 0px stage, so the box
-     measured 0px tall, its content spilled out below, and the board painted
-     over it -- a tap on a chip or row landed on a board cell instead (measured
-     at 375px on 022 and main, 2026-10-09, spec 023 live verification). Pinned
-     to the viewport like the pick card, a layer below it (43). */
-  .avail-sheet {
-    position: fixed; top: auto; bottom: 12px; left: 8px; right: 8px;
-    max-height: 55vh; z-index: 43;
-    /* Clear of the jump-to FAB (.jumpto-fab, fixed bottom-right, z 45, 44px tall at bottom
-       16px): 44 + 2 * 16 = 76px, so the sheet's last row and scrollbar aren't under it. */
-    bottom: 76px;
+}
+/* Spec 024 A12: the whole stacked layout (below 1280px, see ROOM_STACKED) pins
+   the card to the viewport too, not just the phone. With the Players tab chosen
+   the board pane is clipped to nothing, and an absolute card inside it would go
+   with it. Width is capped so it doesn't span a tablet. */
+@media (max-width: 1279px) {
+  .pick-card {
+    position: fixed; top: auto; bottom: 76px; left: 12px; right: auto;
+    width: min(440px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; z-index: 44;
   }
-  /* The collapsed pill sits bottom-LEFT instead, so the FAB doesn't cover its only button
-     (code review S7). Same specificity as the base collapsed rule, and later, so it wins. */
-  .avail-sheet.collapsed { left: 8px; right: auto; bottom: 12px; }
+}
+@media (max-width: 700px) {
+  .pick-card { left: 12px; right: 12px; width: auto; bottom: 12px; }
 }
 
 /* "Simulate again", moved out of the board header into the settings modal. */
@@ -1668,20 +1642,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 .live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .live-resim-progress { margin-bottom: 10px; }
-/* Once a projection exists, the pre-draft waiting copy shrinks to this line
-   instead of covering the board it is worth looking at. */
-.live-waiting {
-  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
-  margin-top: 10px; padding: 8px 12px; border-radius: 8px;
-  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.live-waiting strong { font-size: 13px; letter-spacing: 0.03em; }
-/* Waiting for a draft to start is a teal (nothing wrong) state; waiting
-   because the backend isn't answering is not, and shouldn't wear the same
-   color as a healthy one. */
-.live-waiting.offline { background: color-mix(in oklch, var(--crimson) 14%, var(--panel)); }
-.live-waiting.offline strong { color: var(--crimson); }
+/* The waiting detail and the format line live inside the status bar (spec 024 FR-016):
+   the bar is the only statement of draft status, so the old .live-waiting line is gone. */
+.live-status-detail { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.live-status-detail .offline { color: var(--crimson); }
 
 /* Breathing room only, not a restyle -- same tokens, larger at the width
    the 1400px cap used to keep this app from ever reaching. */
@@ -2408,44 +2372,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .verdict-even { color: var(--muted); font-weight: 600; }
 .verdict-safe { color: var(--muted); font-weight: 400; }
 
-/*
- * B5 -- `.avail-sheet` is absolutely positioned against `.board-stage` with
- * `left` and `right` both set, which fixes the *box's* width to the stage's,
- * exactly as intended. Nothing, though, bounded the width of what's inside
- * it: `.controls-inline` (position chips + depth chips + the collapse
- * toggle) is a plain flex row with no wrap, sized to its own min-content.
- * Once that min-content exceeds the box -- five position chips and up to six
- * depth chips easily do, well before 700px -- a non-wrapping flex row does
- * not shrink to fit, it overflows the box outward. That overflow is what
- * verified as "renders outside the panel, over the board and off-screen" at
- * 375px: the chips don't clip, they spill past `.board-stage`'s right edge
- * and off the visible page.
- *
- * The fix is the same one the house-style LAYOUT rule already prescribes for
- * this kind of overflow elsewhere in the file (`.panel-head` already wraps) --
- * let the row wrap rather than adding a hard floor under the stage's width,
- * because a floor would just move the failure to whatever gets squeezed
- * below it. Applied unconditionally, not inside the 700px media query below:
- * a 14-column board is one browser-zoom step from the same min-content
- * overflow at 1280px, and wrapping costs nothing on a row that already fits
- * on one line -- it only ever activates when there's no room, which is
- * exactly the laptop case too.
- */
-.avail-sheet .controls-inline { flex-wrap: wrap; row-gap: 6px; }
-
-@media (max-width: 700px) {
-  /* Tuned to sit inline after the position chips on one row; once the row
-     wraps, that left margin reads as a stray gap in front of "Next" instead
-     of a separation from what's beside it. */
-  .avail-sheet .depth { margin-left: 0; }
-  /* `.avail .player-col`'s 260px was sized for the sheet at its normal
-     width, most of a phone-width stage on its own. Narrowed here, scoped to
-     `.avail-sheet`, rather than in the shared rule near the top of this file
-     that `PlayerPicker` and `OnTheClockPickInput` also use unmodified --
-     they don't get squeezed into a `position: absolute` sheet and don't
-     need this. */
-  .avail-sheet .avail .player-col { width: 150px; }
-}
 /* ===== A3: shared tendencies form ===== */
 
 /* TendenciesForm.tsx's per-field caption (e.g. "Reads as ~4.8 picks early.",
@@ -3643,7 +3569,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    by a fourth recipe: the palette is a modal in every other respect -- dialog,
    aria-modal, focus trap, Escape -- and this file already carries three
    deliberately different dimmings (.modal-backdrop 55%, .start-overlay 72%,
-   .avail-sheet near-opaque), each with a reason. "It looked nice" is not a
+   the pick card's own), each with a reason. "It looked nice" is not a
    fourth reason. Only the anchoring differs, and that has one: a centred card
    whose height tracks the result count moves under the reader's eye on every
    keystroke, so the input is the fixed point and results grow downward. */
@@ -5234,9 +5160,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .wr-review > li { padding: 10px 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; min-width: 0; }
 .wr-review-kind { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; flex: 0 0 100%; }
 
-/* --- 013 US6: tiers, faces and the run callout inside the availability sheet ---
-   Stays inside `.avail-sheet` (layer 4); nothing here adds a layer or a surface.
-   Tier headings are rows on the sheet's own surface, not boxes. */
+/* --- 013 US6: tiers, faces and the run callout inside the player list ---
+   Stays inside `.avail-region`; nothing here adds a layer or a surface.
+   Tier headings are rows on the list's own surface, not boxes. */
 .avail tbody + tbody .tier-head th { border-top: 1px solid var(--line); }
 .avail .tier-head th {
   position: static; background: transparent; text-align: left;
@@ -5280,6 +5206,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .board.value-view .cell.value-reach {
   background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
+}
+/* Spec 025 R1: a multi-position cell's position colour is itself an image, so the two
+   rules above would replace it. Layer the value tint over the split instead. */
+.board.value-view .cell.pos-multi.value-steal {
+  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent)), var(--pos-split);
+}
+.board.value-view .cell.pos-multi.value-reach {
+  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent)), var(--pos-split);
 }
 .value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
 .value-delta.steal { color: var(--up); }
@@ -5725,3 +5659,300 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 @media (max-width: 480px) {
   .modal-backdrop:has(.stat-picker) { padding: 12px; }
 }
+
+/* ===== Spec 024 US1: the draft room layout (DraftRoomLayout) =====
+   One layout for the live, projection and mock rooms. At 1280px and up it fills
+   the pane: fixed regions on top, then board / divider / targets / list, each of
+   board and list scrolling inside itself. Below 1280px (ROOM_STACKED in
+   useNarrow.ts -- keep the two numbers equal) it is one column with a Board |
+   Players toggle. */
+.room { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.room-status, .room-notices, .room-controls, .room-prompt, .room-compact { min-width: 0; }
+.room-notices { display: flex; flex-direction: column; gap: 8px; }
+.room-notices > * { margin: 0; }
+.room-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.room-controls:empty, .room-compact:empty { display: none; }
+.room-prompt > * { margin: 0; }
+.room-status > .pick-feed, .room-compact .pick-feed { margin: 0; }
+
+.room-split { flex: 1 1 auto; min-height: 0; min-width: 0; display: grid; grid-template-rows: minmax(0, 1fr) 8px auto minmax(0, 1fr); }
+/* Explicit rows, so a room with no target strip doesn't slide the list up into its row. */
+.room-board { grid-row: 1; min-height: 0; min-width: 0; position: relative; overflow: hidden; }
+.room-divider { grid-row: 2; }
+.room-targets { grid-row: 3; min-width: 0; }
+.room-list { grid-row: 4; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.room-list > .avail-region { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.room-list > .avail-region .avail-scroll { overscroll-behavior: contain; }
+.avail-region .controls-inline { flex-wrap: wrap; row-gap: 6px; }
+.avail-region h2 { margin: 0; }
+.avail-region .panel-head { margin-bottom: 8px; }
+/* The board's own scroller (DraftBoard's `.board-scroll`) fills the wrapper. */
+.room-board > .board-scroll { height: 100%; min-height: 0; }
+
+.room-divider {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  cursor: row-resize; touch-action: none; outline: none; border-radius: 4px;
+}
+.room-divider-grip { width: 56px; height: 3px; border-radius: 999px; background: var(--line); transition: background 120ms ease; }
+.room-divider:hover .room-divider-grip, .room-divider:focus-visible .room-divider-grip { background: var(--teal); }
+.room-divider:focus-visible { box-shadow: 0 0 0 2px var(--teal); }
+
+.room-toggle { align-self: flex-start; }
+
+.compact-row { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; min-width: 0; }
+/* Height budget (spec 024 SC-001, measured 126px before): the ticker and your team
+   share line one and never wrap; scarcity is line two, chips with their two notes
+   inline and each note ellipsized (the full text is its title). */
+.compact-row .compact-ticker { flex: 1 1 340px; align-items: center; }
+.compact-row .compact-team { flex: 2 1 380px; flex-wrap: nowrap; overflow: hidden; }
+.compact-row .compact-team .team-strip { flex-wrap: nowrap; overflow-x: auto; gap: 4px; }
+.compact-row .compact-scarcity { flex: 1 1 100%; order: 3; }
+.compact-row .compact-read { order: 2; }
+.compact-scarcity .scarcity-meter { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.compact-scarcity .scarcity-meter .scarcity-note { flex: 0 1 auto; max-width: 34ch; }
+.compact-scarcity .scarcity-chips { gap: 4px; }
+.compact-ticker { display: flex; align-items: flex-start; gap: 8px; flex: 1 1 280px; min-width: 0; }
+.compact-ticker .pick-feed { flex: 1 1 auto; min-width: 0; }
+.compact-ticker-toggle { flex: 0 0 auto; white-space: nowrap; }
+.pick-feed.compact .pick-feed-row { padding-top: 3px; padding-bottom: 3px; }
+.pick-feed.compact .pick-feed-btn, .pick-feed.compact .pick-feed-row.lead .pick-feed-btn { padding-top: 4px; padding-bottom: 4px; }
+.compact-team { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 2 1 320px; min-width: 0; }
+.compact-team .team-strip { margin: 0; flex: 1 1 auto; }
+.compact-scarcity { flex: 1 1 260px; min-width: 0; }
+.compact-scarcity .scarcity-meter { margin-top: 0; }
+.compact-read { position: relative; flex: 0 0 auto; }
+.compact-popover {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 8;
+  width: min(640px, calc(100vw - 32px)); max-height: 60vh; overflow: auto;
+  padding: 10px 12px; border-radius: 12px; background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line), 0 14px 34px rgba(0,0,0,0.5);
+}
+.compact-popover .onbrand-panel { margin-top: 0; border: 0; background: transparent; }
+
+@media (min-width: 1280px) {
+  /* The room, not the page, scrolls internally here. */
+  .room-grid { height: 100%; }
+}
+@media (max-width: 1279px) {
+  /* One column, the pane scrolls. Each pane needs a definite height for its
+     own inner scroller; these are ARBITRARY, picked to leave the other regions
+     on screen, and are not measured. */
+  .room-stacked { flex: 0 0 auto; }
+  .room-split { display: flex; flex-direction: column; gap: 10px; }
+  .room-board { height: clamp(320px, 65vh, 720px); flex: 0 0 auto; }
+  .room-list { height: clamp(320px, 65vh, 720px); flex: 0 0 auto; }
+  /* Clipped, not display:none: the pick card is a fixed child of the board
+     pane and must stay visible on the Players tab (A12). */
+  .room-pane-hidden { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+  /* ...and it must stay usable, not just visible: pointer-events inherits, so
+     without this the card painted over the list but every click (close, pause)
+     fell through to the list underneath. Found by elementFromPoint at 1024px
+     with Players selected, 2026-10-09 (lessons #35's check). */
+  .room-pane-hidden .pick-card { pointer-events: auto; }
+  .room-pane-off { display: none; }
+}
+
+
+/* --- 024 US2: board legibility ------------------------------------------------
+   Column marking comes from mySlot only. A confirmed seat is the crimson header
+   (.col-head.mine, above); an assumed one is the same colour dashed and
+   low-alpha with the word "assumed", so the two cannot be mistaken. */
+.board .col-head.assumed {
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--crimson) 45%, transparent), 0 0 0 4px var(--bg);
+  border-style: dashed;
+  background: color-mix(in oklch, var(--crimson-fill) 7%, var(--panel));
+}
+.board .col-head-you.assumed { color: var(--muted); font-style: italic; }
+.board .col-head.unclaimed .col-head-name { color: var(--teal); }
+.board .col-head.unclaimed { border: 1px dashed var(--line); }
+.board .rnd { flex-direction: column; gap: 0; line-height: 1.1; }
+.board .rnd-arrow { font-size: 11px; font-weight: 400; opacity: 0.8; }
+/* Room cell kinds (FR-008). Projected cells keep today's look; a live landed
+   cell and a real one are facts, so they carry no "second choice" fading. */
+.board .cell.kind-landed .name, .board .cell.kind-real .name { opacity: 1; border-bottom: 0; }
+.board .cell.kind-empty { opacity: 0.85; }
+.board .cell.on-the-clock {
+  box-shadow: inset 0 0 0 2px var(--volt, var(--teal));
+  background: color-mix(in oklch, var(--volt, var(--teal)) 12%, var(--panel));
+}
+.board .otc-tag {
+  display: inline-block; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--volt, var(--teal)); font-weight: 700; white-space: nowrap;
+}
+.board .cell.on-the-clock .pickno-open { display: inline-block; margin-right: 6px; }
+
+/* FR-001b: compact density. A filled cell is one line -- badge, short name,
+   round.pick -- about 32px plus the 4px gap. */
+/* Measured 2026-10-09 (spec 025 T024) at 1440 / 12 teams: a 92px compact cell left the
+   NAME 15-19px -- about 2-3 characters for every player, single-position included --
+   because padding 14 + a 30px min-width pill + two 6px gaps + the 17px round.pick ate
+   the rest. Tighter padding/gaps and a pill sized to its text give the name ~2x room.
+   (A spec 024 layout defect, found here; the same lines apply to 024's branch.) */
+/* Still 0/168 names fully visible with the round.pick inline (it took 17px + a gap), so
+   round.pick moves to the cell's top-right corner -- Sleeper's own placement -- and the
+   badge + name sit on the lower line, so the two never overlap. */
+.board.compact .cell { padding: 0 5px 3px; height: 32px; display: flex; align-items: flex-end; gap: 4px; position: relative; }
+.board.compact .cell .pos { flex: 0 0 auto; min-width: 0; padding: 1px 4px; }
+.board.compact .cell .name { margin-top: 0; flex: 1 1 auto; min-width: 0; line-height: 15px; }
+.board.compact .cell .pickno { position: absolute; top: 1px; right: 4px; font-size: 8px; line-height: 10px; }
+.board.compact .cell .otc-tag { position: absolute; top: 1px; left: 5px; right: auto; font-size: 8px; line-height: 10px; }
+.board.compact .cell.kind-empty { height: 28px; padding: 0 7px; justify-content: flex-end; }
+
+/* --- 024 US4: one compact controls group, one primary ------------------------ */
+.room-controls-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; min-width: 0; }
+.room-controls-group .room-primary { margin-left: auto; font-weight: 700; }
+.room-controls-group .room-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+/* PickPrompt inline in the controls row (projection room): the note gives way first. */
+.room-controls-group .pick-prompt-note { flex: 1 1 80px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-controls-group .pick-prompt-take { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
+.room-controls-group .chip { flex-shrink: 0; }
+.format-summary { white-space: nowrap; }
+.scarcity-meter .scarcity-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* List head budget (SC-001): the title, view toggle, position chips and depth chips
+   share the header instead of stacking over a second row. Measured 119px to the first
+   row before; US3 puts the search box in this same row. */
+.avail-region .panel-head { margin-bottom: 4px; gap: 6px 12px; align-items: center; flex-wrap: wrap; }
+.avail-region .panel-head h2 { font-size: 14px; white-space: nowrap; }
+.avail-region .panel-head .controls-inline { flex: 1 1 auto; flex-wrap: wrap; row-gap: 4px; }
+.avail-region .panel-head .ds-switch { margin: 0 6px 0 0; flex-wrap: nowrap; }
+.avail-region .panel-head .depth { margin-left: 4px; }
+
+/* --- 024 US3: search, hide-drafted, stars and the target strip ---------------------- */
+.avail-region .avail-search {
+  width: 124px; height: 24px; padding: 0 8px; font: inherit; font-size: 12px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 999px;
+}
+.avail-region .avail-search:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.avail-hide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; cursor: pointer; }
+.star-btn {
+  flex: 0 0 auto; width: 20px; padding: 0; margin-right: 4px; background: none; border: 0;
+  font: inherit; font-size: 15px; line-height: 1; color: var(--muted); cursor: pointer;
+}
+.star-btn:hover { color: var(--text); }
+.star-btn.on { color: var(--teal); }
+.star-btn:focus-visible { outline: 2px solid var(--teal); border-radius: 4px; }
+.star-btn.star-gap { display: inline-block; cursor: default; }
+.avail tr.taken, .ds-table tr.taken { opacity: 0.5; }
+.taken-tag {
+  flex: 0 0 auto; margin-left: 6px; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 6px;
+}
+
+/* One line per player row (SC-001: >= 8 list rows in a 1440x900 room). The wrapper is a
+   flex row so the name gives way (ellipsis) before the team and the "Fills C" tag wrap;
+   measured before: 35-55px rows because the 260px name cell wrapped to two lines. */
+.avail .pc { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
+.avail .pc-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.avail .pc .team, .avail .pc .need-tag, .avail .pc .pos { flex: 0 0 auto; }
+@media (min-width: 1280px) {
+  /* Fixed layout so the name column really is 340px and the rest goes to the survival
+     strip, which was getting ~648px against the name's ~260. */
+  .avail-region .avail { table-layout: fixed; }
+  .avail-region .avail .player-col { width: 340px; }
+  .avail-region .avail thead th:nth-child(2) { width: 56px; }
+  .avail-region .avail .verdict-col { width: 84px; }
+  .avail-region .avail td { padding-top: 3px; padding-bottom: 3px; }
+  .avail-region .avail td.verdict { white-space: nowrap; }
+}
+
+.target-strip-wrap { position: relative; min-width: 0; }
+.target-strip {
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; overflow: hidden;
+  min-height: 30px; padding: 2px 0; min-width: 0;
+}
+.target-strip-note { min-height: 30px; }
+.target-label { flex: 0 0 auto; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.target-empty, .target-copy { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.target-copy { margin-left: auto; flex: 0 1 auto; }
+.target-chips { display: flex; flex-wrap: nowrap; gap: 6px; list-style: none; margin: 0; padding: 0; min-width: 0; overflow: hidden; }
+.target-chip {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 150px;
+  padding: 2px 8px 2px 4px; font-size: 12px; white-space: nowrap;
+  border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line)); border-radius: 999px;
+  background: color-mix(in oklch, var(--teal) 8%, var(--panel));
+}
+.target-chip .target-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.target-chip.taken { opacity: 0.55; border-color: var(--line); background: none; }
+.target-chip.taken .target-name { text-decoration: line-through; }
+.target-taken { flex: 0 0 auto; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.target-pct { flex: 0 0 auto; font-size: 11px; color: var(--teal); }
+.target-more, .target-edit { flex: 0 0 auto; }
+.target-error { flex: 0 0 auto; background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; text-decoration: underline wavy var(--crimson); white-space: nowrap; }
+.target-pop {
+  position: absolute; left: 0; top: 100%; z-index: 30; min-width: 320px; max-width: min(460px, 100%);
+  max-height: 60vh; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+.target-pop-list { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 2px; }
+.target-pop-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 13px; }
+.target-pop-row.taken .target-pop-name { text-decoration: line-through; color: var(--muted); }
+.target-pop-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.target-btn {
+  flex: 0 0 auto; width: 26px; height: 24px; padding: 0; font: inherit; font-size: 13px; cursor: pointer;
+  color: var(--text); background: none; border: 1px solid var(--line); border-radius: 6px;
+}
+.target-btn:hover:not(:disabled) { border-color: var(--teal); }
+.target-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.target-btn:focus-visible { outline: 2px solid var(--teal); }
+@media (max-width: 1279px) { .target-copy { display: none; } }
+
+/* 024 US5: the tag on a pick the user's own auto-pick made. */
+.pick-feed-auto {
+  flex-shrink: 0; margin-left: 6px; font-size: 10px; letter-spacing: 0.06em; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: 0 6px;
+}
+
+/* List head budget (SC-001), second pass after search + Hide drafted joined the head row:
+   measured 109px from the list top to the first player row at 1440x900; tighten the table
+   header, the tier heading and the panel's own top padding. */
+@media (min-width: 1280px) {
+  .room-list > .avail-region { padding-top: 10px; padding-bottom: 8px; }
+  .avail-region .avail thead th { padding-top: 3px; padding-bottom: 3px; }
+  .avail-region .avail .tier-head th { padding: 4px 6px 2px; }
+  .avail-region .panel-head { margin-bottom: 2px; }
+}
+
+/* 024 height budget (SC-001, second pass). */
+/* Honesty caveats as a marker next to the control they explain; full text in title + aria-label. */
+.info-mark {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; line-height: 1; color: var(--muted); cursor: pointer; border-radius: 999px;
+  background: none; border: 0; padding: 2px;
+}
+.info-mark-wrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+.info-pop {
+  position: absolute; z-index: 30; top: calc(100% + 4px); right: 0; width: max-content; max-width: min(260px, 70vw);
+  padding: 6px 8px; border-radius: 6px; font-size: 12px; line-height: 1.35; white-space: normal;
+  color: var(--text); background: var(--panel); border: 1px solid var(--line, rgba(255,255,255,0.18));
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+.info-mark:hover, .info-mark:focus-visible { color: var(--text); }
+.info-mark:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* The status strip is ONE line of at most ~45px (was 71 in the mock room): avatar shrinks, the
+   kicker and name share a row, the right-hand readout is inline, and the strip has no bottom margin. */
+.room-status > .on-clock { padding: 3px 12px; margin-bottom: 0; gap: 10px; min-width: 0; }
+.room-status > .on-clock .on-clock-avatar { width: 26px; height: 26px; font-size: 11px; }
+.room-status > .on-clock .on-clock-identity { padding: 2px 6px; gap: 8px; }
+.room-status > .on-clock .on-clock-text { flex-direction: row; align-items: baseline; gap: 8px; }
+.room-status > .on-clock .on-clock-eta { flex-direction: row; align-items: baseline; gap: 6px; white-space: nowrap; }
+.room-status > .on-clock .on-clock-eta b { font-size: 16px; }
+.room-status > .on-clock .status-note { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Compact row (was 77px with content in the live room): tighter vertical padding only. */
+.compact-row { gap: 2px 14px; }
+.pick-feed.compact .pick-feed-row { padding-top: 1px; padding-bottom: 1px; }
+.pick-feed.compact .pick-feed-btn, .pick-feed.compact .pick-feed-row.lead .pick-feed-btn { padding-top: 2px; padding-bottom: 2px; }
+.compact-scarcity .scarcity-meter { gap: 2px 10px; }
+.compact-scarcity .scarcity-chips { gap: 3px; }
+/* SC-001, measured 2026-10-09: on a filled live board the team half of the compact row
+   was 44px (slot chips with a full-size face; "Your team" and "N of M starters" wrapping
+   onto a second line), which held the row at 73px and left the list one row short. One
+   line here: smaller faces, tighter chips, labels that never wrap. */
+.compact-team > strong, .compact-team > .muted { white-space: nowrap; }
+.compact-team .team-slot { padding: 2px 6px; }
+/* The strip scrolls sideways when the roster outgrows it; a full-height scrollbar
+   added ~15px to the row, so keep it thin rather than hiding it. */
+.compact-row .compact-team .team-strip { scrollbar-width: thin; }
+.compact-team .team-slot .pface { width: 18px !important; height: 18px !important; margin: -2px 3px -2px 0; }
