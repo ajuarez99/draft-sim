@@ -4,6 +4,7 @@ import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
+import { familyCode, multiVars, positionLabel, posPill } from '../positions'
 import { PROVENANCE_LABEL } from '../provenance'
 import { isForward, pickNoAt } from '../snake'
 import { roundPickLabel } from '../roundPickLabel'
@@ -246,9 +247,11 @@ export default function DraftBoard({
                       : chosen
                         ? 'chosen'
                         : 'projected'
+                const multi = shown ? multiVars(shown, sport) : undefined
                 const cls =
                   `cell kind-${kind}` +
-                  (shown ? ` pos-${shown.position}` : '') +
+                  // A multi-position player never takes his first position's tint (A7): split instead.
+                  (shown ? (multi ? ' pos-multi' : ` pos-${shown.position}`) : '') +
                   (value && (value.kind === 'steal' || value.kind === 'reach') ? ` value-${value.kind}` : '') +
                   (gradeKind ? ` value-${gradeKind}` : '') +
                   (chosen ? ' chosen' : visible && !visible.isModal && room === 'projection' ? ' uncertain' : '') +
@@ -297,7 +300,11 @@ export default function DraftBoard({
                 const clockTag = onClock ? <span className="otc-tag cond">On the clock</span> : null
                 const inner = shown && label && density === 'compact' ? (
                   <>
-                    <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
+                    {/* Compact cells show a family code ("G", "F/C") for a multi-position
+                        player; the title carries the full list (A9). */}
+                    <span {...posPill(shown, sport)} title={multi ? positionLabel(shown, sport) : undefined}>
+                      {multi ? familyCode(shown, sport) : posRank(shown, sport)}
+                    </span>
                     <span className="name">
                       <span className="name-lead">{label.lead}</span>
                       {label.rest}
@@ -308,7 +315,7 @@ export default function DraftBoard({
                 ) : shown && label ? (
                   <>
                     <span className="pickno mono">{pickLabel}</span>
-                    <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
+                    <span {...posPill(shown, sport)}>{posRank(shown, sport)}</span>
                     <span className="name">
                       <span className="name-lead">{label.lead}</span>
                       {label.rest}
@@ -371,17 +378,17 @@ export default function DraftBoard({
                     title={titleAttr}
                     style={
                       value && value.delta != null && (value.kind === 'steal' || value.kind === 'reach')
-                        ? ({ '--vt': `${tintPercent(value.delta)}%` } as CSSProperties)
+                        ? ({ ...multi, '--vt': `${tintPercent(value.delta)}%` } as CSSProperties)
                         : gradeKind && grade?.valueOverSlot != null
-                          ? ({ '--vt': `${8 + valueTint(grade.valueOverSlot, gradeValues) * 18}%` } as CSSProperties)
-                          : undefined
+                          ? ({ ...multi, '--vt': `${8 + valueTint(grade.valueOverSlot, gradeValues) * 18}%` } as CSSProperties)
+                          : multi
                     }
                     onClick={() => onCellClick?.(visible)}
                   >
                     {inner}
                   </button>
                 ) : (
-                  <div key={slot} className={cls} data-kind={kind} data-pickno={pickNo}>
+                  <div key={slot} className={cls} data-kind={kind} data-pickno={pickNo} style={multi}>
                     {inner}
                   </div>
                 )

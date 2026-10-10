@@ -33,7 +33,7 @@ import ScarcityMeter from '../components/ScarcityMeter'
 import PlayerCard from '../components/PlayerCard'
 import SeatPopover from '../components/SeatPopover'
 import { roundPickLabel } from '../roundPickLabel'
-import { computeTeamNeeds, openPositions } from '../teamNeeds'
+import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
 import { INSIGHT } from '../insightConstants'
 import {
   buildFactInsight,
@@ -49,6 +49,8 @@ import {
 } from '../pickInsight'
 import { onBrandReads } from '../onBrand'
 import { positionScarcity } from '../scarcity'
+import { eligiblePositions } from '../positions'
+import { runLabel } from '../pickRun'
 import { readPickCardsPref, writePickCardsPref } from '../pickCardsPref'
 import PickInsightCard from '../components/PickInsightCard'
 import { prime, readSoundPref, speechSupported, writeSoundPref } from '../sound'
@@ -661,12 +663,19 @@ export default function LiveDraftView() {
     if (!cardInsight) return undefined
     const pick = cardInsight.pick
     const read = reads.find((r) => r.slot === pick.slot)
-    const row = scarcity?.rows.find((r) => r.position === pick.player.position)
+    // Spec 025 T010: the scarcest row among ALL the pick's eligible positions -- lowest
+    // leftNow, ties to a running position, then to the earlier (running-order) row.
+    const elig = eligiblePositions(pick.player, sport)
+    let row: NonNullable<typeof scarcity>['rows'][number] | undefined
+    for (const r of scarcity?.rows ?? []) {
+      if (!elig.includes(r.position)) continue
+      if (!row || r.leftNow < row.leftNow || (r.leftNow === row.leftNow && r.running && !row.running)) row = r
+    }
     let scarcityLine: string | undefined
     if (row && (row.running || row.leftNow <= INSIGHT.SCARCE_LEFT)) {
       const run =
         row.running && scarcity?.run
-          ? ` · ${scarcity.run.count} of the last ${scarcity.run.window} were ${row.position}`
+          ? ` · ${scarcity.run.count} of the last ${scarcity.run.window} were ${runLabel(scarcity.run, sport)}`
           : ''
       scarcityLine = `${row.position}: ${row.leftNow} of ${row.poolSize} starter-pool players left${run}`
     }
@@ -674,7 +683,7 @@ export default function LiveDraftView() {
       ...(read ? { onBrand: <OnBrandLine read={read} /> } : {}),
       ...(scarcityLine ? { scarcityLine } : {}),
     }
-  }, [cardInsight, reads, scarcity])
+  }, [cardInsight, reads, scarcity, sport])
 
   // Your own roster, off the same landed list rather than through
   // teamNeeds.draftedSoFar: that helper exists for the mock room, where the
@@ -690,7 +699,9 @@ export default function LiveDraftView() {
       ),
     [sport, rosterPositions, landedPicks, mySlot],
   )
-  const myOpenSlots = useMemo(() => openPositions(sport, myNeeds), [sport, myNeeds])
+  // One lineup per roster, one answer per player: this room re-renders every
+  // second, and the panel's memoized rows depend on this instance staying put.
+  const myFitFor = useMemo(() => makeFitFor(sport, myNeeds), [sport, myNeeds])
 
   // Fed from `landedPicks` rather than `feedPicks` on purpose: what is spoken
   // is the manager and the name, both of which are facts on the state frame,
@@ -926,6 +937,7 @@ export default function LiveDraftView() {
                 {cardInsight && (
                   <PickInsightCard
                     insight={cardInsight}
+                    sport={sport}
                     teams={teamsCount}
                     autoFocus={card?.autoFocus ?? false}
                     onClose={closeCard}
@@ -975,7 +987,7 @@ export default function LiveDraftView() {
                 sport={sport}
                 // Only when the seat is known -- "fills a need" against
                 // somebody else's roster is worse than no tag at all.
-                openSlots={slotKnown ? myOpenSlots : undefined}
+                fitFor={slotKnown ? myFitFor : undefined}
                 // The projection assumes a seat until the reader's is known,
                 // so its survival numbers would answer for somebody else's
                 // picks. Hold them back; the tiered list still shows.
@@ -1000,7 +1012,7 @@ export default function LiveDraftView() {
       </div>
 
       {openPick && result && (
-        <PlayerCard pick={openPick} teams={result.teams} onClose={() => setOpenPick(null)} />
+        <PlayerCard pick={openPick} teams={result.teams} sport={sport} onClose={() => setOpenPick(null)} />
       )}
 
       {openSeatSlot != null &&

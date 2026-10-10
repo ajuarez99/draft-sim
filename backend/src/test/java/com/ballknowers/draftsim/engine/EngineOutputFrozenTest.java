@@ -49,7 +49,10 @@ class EngineOutputFrozenTest {
     private static String run() throws Exception {
         SimulationResult r = new MonteCarloRunner().run(ctx(), 4, 400, 1.0, 20260929L,
                 MonteCarloRunnerTest.CONFIDENCE, null);
-        byte[] d = MessageDigest.getInstance("SHA-256").digest(r.toString().getBytes(StandardCharsets.UTF_8));
+        // Spec 025 added PlayerRef.positions (wire-only). Strip that one field from the
+        // text so the golden still proves the SIMULATION output is byte-identical.
+        String text = r.toString().replaceAll(", positions=\\[[^\\]]*\\]", "");
+        byte[] d = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(d);
     }
 

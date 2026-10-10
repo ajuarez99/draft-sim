@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { PlayerRef, Sport } from '../api'
-import { filterPositions } from '../positions'
+import { eligiblePositions, filterPositions, positionLabel, posPill } from '../positions'
 import { posRankOrAdp } from '../posRank'
-import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
+import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
 import PlayerFace from './PlayerFace'
 
 type Props = {
@@ -51,15 +51,15 @@ export default function OnTheClockPickInput({
 
   const rows = useMemo(() => {
     return available
-      .filter((p) => filter === 'ALL' || p.position === filter)
+      .filter((p) => filter === 'ALL' || eligiblePositions(p, sport).includes(filter))
       .sort((a, b) => a.adp - b.adp)
-  }, [available, filter])
+  }, [available, filter, sport])
 
   const needs = useMemo(
     () => computeTeamNeeds(sport, rosterPositions, draftedPlayers),
     [sport, rosterPositions, draftedPlayers],
   )
-  const open = useMemo(() => openPositions(sport, needs), [sport, needs])
+  const fitFor = useMemo(() => makeFitFor(sport, needs), [sport, needs])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -80,7 +80,7 @@ export default function OnTheClockPickInput({
               <div key={i} className={n.player ? 'team-slot filled' : 'team-slot open'}>
                 {n.player ? (
                   <>
-                    <span className={`pos ${n.player.position}`}>{n.player.position}</span>
+                    <span {...posPill(n.player, sport)}>{positionLabel(n.player, sport)}</span>
                     <PlayerFace sport={sport} sleeperId={n.player.sleeperId} team={n.player.team} position={n.player.position} name={n.player.name} size={16} />
                     <span className="team-slot-name">{n.player.name}</span>
                   </>
@@ -111,7 +111,7 @@ export default function OnTheClockPickInput({
             </thead>
             <tbody>
               {rows.map((p) => {
-                const need = needLabel(sport, p.position, open)
+                const need = fitFor(p)
                 return (
                   <tr
                     key={p.id}
@@ -126,12 +126,12 @@ export default function OnTheClockPickInput({
                     }}
                   >
                     <td className="player-col">
-                      <span className={`pos ${p.position}`}>{p.position}</span>
+                      <span {...posPill(p, sport)}>{positionLabel(p, sport)}</span>
                       <PlayerFace sport={sport} sleeperId={p.sleeperId} team={p.team} position={p.position} name={p.name} size={20} />
                       {p.name}
                       <span className="team">{p.team}</span>
                     </td>
-                    <td className="num">{posRankOrAdp(p)}</td>
+                    <td className="num">{posRankOrAdp(p, sport)}</td>
                     <td>{need && <span className="tag need">{need}</span>}</td>
                   </tr>
                 )

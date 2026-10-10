@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { runLabel } from '../pickRun'
 import type { ScarcityResult } from '../scarcity'
 
 type Props = {
@@ -28,11 +29,21 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
     )
   }
   const { run } = scarcity
-  // Counting is by FIRST-listed position (research A11), so a position nobody lists
-  // first has poolSize 0. "0 / 0" there reads as a measurement of scarcity; it is
-  // really "no data". Hide the chip and say so once (FR-018).
+  // A position with no eligible starter-pool player has poolSize 0. "0 / 0" there reads
+  // as a measurement of scarcity; it is really "no data". Hide the chip and say so
+  // once (FR-018). Counting is by eligibility now (spec 025), so this is rare.
+  // Eligibility wording is NBA-only: a football player has one position, so "eligible"
+  // and "can count at more than one position" would be noise there, and SC-005 says no
+  // football screen changes. Found in live verification (T024), 2026-10-10.
+  const multi = scarcity.sport === 'nba'
+  const definitionNote = multi
+    ? `${scarcity.definition}; a player can count at more than one position`
+    : scarcity.definition
   const shown = scarcity.rows.filter((r) => r.poolSize > 0)
   const hidden = scarcity.rows.filter((r) => r.poolSize === 0).map((r) => r.position)
+  // An NBA run covers a whole family, so both PG and SG chips are "running" -- say the
+  // sentence once, on the first running chip, instead of repeating it on each.
+  const runChip = shown.find((r) => r.running)?.position
   return (
     <div className="scarcity-meter" aria-label="Position scarcity">
       <ul className="scarcity-chips">
@@ -41,24 +52,34 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
             key={r.position}
             className={`scarcity-chip${r.running ? ' running' : ''}`}
             style={{ '--scar-hue': `var(--${r.position.toLowerCase()})` } as CSSProperties}
+            title={
+              multi
+                ? `${r.position}: ${r.leftNow} of the ${r.poolSize} starter-pool players eligible at ${r.position} are still on the board (a player can count at more than one position)`
+                : undefined
+            }
           >
             <span className="scarcity-pos">{r.position}</span>
             <span className="scarcity-count mono">{`${r.leftNow} / ${r.poolSize}`}</span>
+            {multi && <span className="scarcity-elig muted">{' eligible'}</span>}
             {r.expectedAtNext != null && (
               <span className="scarcity-next mono">
                 {` · ${approx(r.expectedAtNext)}${myNextPickLabel ? ` at ${myNextPickLabel}` : ''}`}
               </span>
             )}
-            {r.running && run && (
-              <span className="scarcity-run cond">{`${run.count} of the last ${run.window} were ${run.position}`}</span>
+            {r.running && run && r.position === runChip && (
+              <span className="scarcity-run cond">{`${run.count} of the last ${run.window} were ${runLabel(run, scarcity.sport)}`}</span>
             )}
           </li>
         ))}
       </ul>
       {hidden.length > 0 && (
-        <p className="scarcity-note muted">{`${hidden.join(', ')}: no starter-pool players list these first`}</p>
+        <p className="scarcity-note muted">
+          {multi
+            ? `${hidden.join(', ')}: no starter-pool players are eligible here`
+            : `${hidden.join(', ')}: no starter-pool players list these first`}
+        </p>
       )}
-      <p className="scarcity-note muted" title={scarcity.definition}>{scarcity.definition}</p>
+      <p className="scarcity-note muted" title={definitionNote}>{definitionNote}</p>
       {scarcity.gatedByDepth && (
         <p className="scarcity-note muted" title={`projected count from pick ~${scarcity.projectedFrom}`}>{`projected count from pick ~${scarcity.projectedFrom}`}</p>
       )}

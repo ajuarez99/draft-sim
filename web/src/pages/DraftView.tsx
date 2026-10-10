@@ -30,7 +30,7 @@ import PlayerCard from '../components/PlayerCard'
 import PickPrompt from '../components/PickPrompt'
 import PlayerPicker from '../components/PlayerPicker'
 import { useRevealedBoard } from '../useRevealedBoard'
-import { computeTeamNeeds, draftedSoFar } from '../teamNeeds'
+import { computeTeamNeeds, draftedSoFar, makeFitFor } from '../teamNeeds'
 import { usePageActionSlot } from '../appSlots'
 
 // Every league, of any size, has a slot 1 -- unlike the single-league app's old
@@ -464,11 +464,19 @@ export default function DraftView() {
   // Your roster as of the last settled pick, for the compact row's team strip.
   // draftedSoFar takes an exclusive bound, so +1 includes pick `decidedThrough`.
   // Shown only once the seat is known (see the `needs` prop below).
-  const myNeeds = computeTeamNeeds(
-    sport,
-    seats?.rosterPositions ?? [],
-    result ? draftedSoFar(result.myPicks, decidedThrough + 1, result.board, userPicks) : [],
+  // Memoized per roster: the basketball lineup is a matching, and this room re-renders
+  // on every reveal tick. The fit function the panel gets is built off the same lineup.
+  const seatRosterPositions = seats?.rosterPositions
+  const myNeeds = useMemo(
+    () =>
+      computeTeamNeeds(
+        sport,
+        seatRosterPositions ?? [],
+        result ? draftedSoFar(result.myPicks, decidedThrough + 1, result.board, userPicks) : [],
+      ),
+    [sport, seatRosterPositions, result, decidedThrough, userPicks],
   )
+  const myFitFor = useMemo(() => makeFitFor(sport, myNeeds), [sport, myNeeds])
 
   const targetIds = new Set(targets.items.map((t) => t.sleeperId))
   const markedTargets = markTaken(targets.items, revealedPlayerIds)
@@ -717,6 +725,9 @@ export default function DraftView() {
                 pickedPlayerIds={revealedPlayerIds}
                 started={started}
                 sport={sport}
+                // Only once the seat is confirmed: a "Fills X" tag against an assumed
+                // seat's roster is worse than none.
+                fitFor={slotConfirmed ? myFitFor : undefined}
                 recentPicks={feedPicks.map((p) => p.player)}
                 sleeperLeagueId={seats.sleeperLeagueId}
                 draftedPlayers={feedPicks.map((p) => p.player)}
@@ -750,6 +761,7 @@ export default function DraftView() {
         <PlayerCard
           pick={openPick}
           teams={result.teams}
+          sport={sport}
           yourPick={userPicks[openPick.pickNo]}
           onClose={() => setOpenPick(null)}
         />

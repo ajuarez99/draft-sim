@@ -24,7 +24,7 @@ import FormatSummary from '../components/FormatSummary'
 import CompactRow from '../components/CompactRow'
 import DraftRoomLayout from '../components/DraftRoomLayout'
 import AvailabilityPanel from '../components/AvailabilityPanel'
-import { computeTeamNeeds } from '../teamNeeds'
+import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
 import { LoadingScreen } from '../components/Skeleton'
 import { useRailLeagueHint } from '../appSlots'
 
@@ -114,6 +114,23 @@ export default function MockDraftView() {
     }
   }
 
+  // Your picks by pick number. AUTO is the user's own seat decided by auto-pick
+  // (MockSessionState.PickView.source), so it is still "your pick" for the board, the
+  // roster strip and the picker's fit. Above the early returns so the lineup built from
+  // it can be memoized per roster.
+  const userPicks = useMemo(() => {
+    const out: Record<number, PlayerRef> = {}
+    for (const p of state?.picks ?? []) {
+      if ((p.source === 'USER' || p.source === 'AUTO') && p.player) out[p.pickNo] = p.player
+    }
+    return out
+  }, [state])
+  const myNeeds = useMemo(
+    () => (state ? computeTeamNeeds(state.sport, state.rosterPositions, Object.values(userPicks)) : []),
+    [state, userPicks],
+  )
+  const myFitFor = useMemo(() => (state ? makeFitFor(state.sport, myNeeds) : undefined), [state, myNeeds])
+
   if (notFound && !state) return <NotFound what="mock" />
   if (error && !state) {
     return (
@@ -145,12 +162,6 @@ export default function MockDraftView() {
       alternatives: [],
     }))
 
-  const userPicks: Record<number, PlayerRef> = {}
-  for (const p of state.picks) {
-    // AUTO is the user's own seat decided by auto-pick (MockSessionState.PickView.source),
-    // so it is still "your pick" for the board, the roster strip and the picker's fit.
-    if ((p.source === 'USER' || p.source === 'AUTO') && p.player) userPicks[p.pickNo] = p.player
-  }
   const autoPickNos = new Set(state.picks.filter((p) => p.source === 'AUTO').map((p) => p.pickNo))
   const feedPicks = board.map((p) => ({ ...p, auto: autoPickNos.has(p.pickNo) }))
   const takenIds = new Set(state.picks.flatMap((p) => (p.player ? [p.player.id] : [])))
@@ -161,9 +172,7 @@ export default function MockDraftView() {
   const complete = state.status === 'COMPLETE'
   const round = state.onTheClockSlot != null ? Math.ceil(state.currentPickNo / state.teams) : state.rounds
   const draftedByUser = Object.values(userPicks)
-  // Your roster for the compact row.
-  const myPlayers = draftedByUser
-  const myNeeds = computeTeamNeeds(state.sport, state.rosterPositions, myPlayers)
+  // Your roster for the compact row: myNeeds, memoized above.
   // Every pick in a mock session is already committed -- there is no reveal
   // cutoff to respect here the way DraftView has one, so `board` is the feed.
   const nextOwnPick = state.myPicks.find((p) => p > state.currentPickNo) ?? null
@@ -300,6 +309,7 @@ export default function MockDraftView() {
               teams={state.teams}
               started
               sport={state.sport}
+              fitFor={myFitFor}
               // Spec 023 US3: the league the mock borrowed its settings from, for the Stats
               // view. Null for a mock started with no league, which the panel explains.
               sleeperLeagueId={state.sourceSleeperLeagueId ?? null}

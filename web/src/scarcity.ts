@@ -5,11 +5,18 @@
  * Everything here is a read over picks that have already landed plus, optionally,
  * one post-pick projection. Nothing waits on a simulation: leftNow and running
  * are facts; only expectedAtNext is model output, and it is gated (R7).
+ *
+ * Multi-position eligibility (spec 025, FR-004 = A): a player counts FULLY at every
+ * position he is eligible at, in both the pool and the left count, and drafting him
+ * removes him from every pool he was in. So the chip totals can exceed the number of
+ * starter-pool players (a PG/SG is one player in two pools); each chip answers "how
+ * many players eligible at this position are left", not a partition of the pool.
  */
 
 import type { PlayerRef, RealPick, SimulationResult, Sport } from './api'
 import { SNAPSHOT_DEPTH_MIRROR } from './insightConstants'
-import { RUNNABLE_BY_SPORT, positionRun, type PositionRun } from './pickRun'
+import { eligiblePositions } from './positions'
+import { RUNNABLE_BY_SPORT, positionRun, runCovers, type PositionRun } from './pickRun'
 
 export type PositionScarcity = {
   position: string
@@ -23,6 +30,8 @@ export type PositionScarcity = {
 }
 
 export type ScarcityResult = {
+  /** Needed by the run copy ("guards" for an NBA run, the position for football). */
+  sport: Sport
   S: number
   teams: number
   startersPerTeam: number
@@ -77,16 +86,17 @@ export function positionScarcity(input: ScarcityInput): ScarcityResult {
 
   const run = positionRun(landed.map((p) => p.player), 6, 4, sport)
   const rows: PositionScarcity[] = [...RUNNABLE_BY_SPORT[sport]].map((position) => {
-    const atPos = head.filter((p) => p.position === position)
+    const atPos = head.filter((p) => eligiblePositions(p, sport).includes(position))
     const left = atPos.filter((p) => !taken.has(p.id))
     let expectedAtNext: number | null = null
     if (gateOpen) {
       expectedAtNext = left.reduce((sum, p) => sum + (survival.get(p.id)?.[String(myNextPick)] ?? 0), 0)
     }
-    return { position, poolSize: atPos.length, leftNow: left.length, expectedAtNext, running: run?.position === position }
+    return { position, poolSize: atPos.length, leftNow: left.length, expectedAtNext, running: run != null && runCovers(run, position, sport) }
   })
 
   return {
+    sport,
     S,
     teams,
     startersPerTeam,

@@ -15,6 +15,11 @@ export type PlayerRef = {
   // positions (a filter chip row, a slot-eligibility check, the pick-run
   // detector) needs its own sport-scoped list; see positions.ts.
   position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
+  // Full eligible list in Sleeper's alphabetical order (not a ranking). Optional
+  // only because of the split deploy (an older backend omits it). Never treat
+  // `position` as primary in draft-room labels (spec 025 FR-002); use
+  // eligiblePositions() in positions.ts.
+  positions?: PlayerRef['position'][]
   team: string | null
   adp: number
   // 999 is Sleeper's own "no rank" sentinel (BoardService's default, never

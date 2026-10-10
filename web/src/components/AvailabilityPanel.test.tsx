@@ -5,6 +5,7 @@ import { board, row as statRow, win } from '../testStatBoard'
 import { mkPlayer } from '../testLiveRoom'
 import AvailabilityPanel from './AvailabilityPanel'
 import { clearDraftStatsCache } from '../draftStatsCache'
+import { sgEligible, top108Rows } from '../testPositionShapes'
 
 const cellRenders = vi.fn()
 vi.mock('../statCells', async (orig) => {
@@ -403,16 +404,19 @@ describe('AvailabilityPanel stat choice, window and mode (spec 023 US2)', () => 
     expect(getStatLeaderboard).toHaveBeenLastCalledWith('L1', 'LAST_10')
   })
 
+  // One stable instance, as the rooms' useMemo'd makeFitFor provides.
+  const fitPg = (p: { position: string }) => (p.position === 'PG' ? 'Fills PG' : null)
+
   it('does not re-render the table when the parent re-renders with equal props (SC-006)', async () => {
     getStatLeaderboard.mockResolvedValue(board(lb()))
-    const props = () => ({ ...nba, availability: pool, myPicks: [20, 33], pickedPlayerIds: new Set<number>(), openSlots: new Set(['PG']) })
+    const props = () => ({ ...nba, availability: pool, myPicks: [20, 33], pickedPlayerIds: new Set<number>(), fitFor: fitPg })
     const same = props()
     const { rerender } = render(<AvailabilityPanel {...same} />)
     await openStats()
     const before = cellRenders.mock.calls.length
     expect(before).toBeGreaterThan(0)
     // The live room's clock re-renders the panel with fresh-but-equal myPicks / Set instances.
-    // pickedPlayerIds and openSlots are memoized upstream, so those two stay the same instance.
+    // pickedPlayerIds and fitFor are memoized upstream, so those two stay the same instance.
     rerender(<AvailabilityPanel {...same} />)
     rerender(<AvailabilityPanel {...same} myPicks={[20, 33]} />)
     expect(cellRenders.mock.calls.length).toBe(before)
@@ -425,7 +429,7 @@ describe('AvailabilityPanel stat choice, window and mode (spec 023 US2)', () => 
     getStatLeaderboard.mockResolvedValue(board(lb()))
     const rookie = row('Rookie', 40, 0.5, 'SF')
     const statsPool = [...pool.map((r) => r.player), rookie.player]
-    const same = { ...nba, availability: pool, statsPool, openSlots: new Set(['PG']) }
+    const same = { ...nba, availability: pool, statsPool, fitFor: fitPg }
     const { rerender } = render(<AvailabilityPanel {...same} pickedPlayerIds={new Set()} />)
     await openStats()
     expect(document.querySelectorAll('.ds-table tbody tr')).toHaveLength(3)
@@ -683,5 +687,41 @@ describe('AvailabilityPanel search, hide-drafted and targets (spec 024 US3)', ()
     fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
     expect(screen.queryByRole('button', { name: 'Add Plain Pete to targets' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Add Nikola Jokić to targets' })).toBeInTheDocument()
+  })
+})
+
+describe('AvailabilityPanel multi-position eligibility (spec 025 US2)', () => {
+  const nba = { ...base, sport: 'nba' as const, sleeperLeagueId: 'L1', myPicks: [20] }
+  const shapes = top108Rows([20])
+  const chipBtn = (label: string) =>
+    screen.getAllByRole('button').find((b) => b.textContent === label && b.classList.contains('chip')) as HTMLElement
+
+  it('tiers: ALL lists each player once and the SG filter has 100% recall', () => {
+    const { container } = render(<AvailabilityPanel {...nba} availability={shapes} />)
+    const count = () => container.querySelectorAll('.avail .pc').length
+    // The tiers list caps at the top 60 live players; the cap applies after the filter.
+    expect(count()).toBe(60)
+    const listed = () => [...container.querySelectorAll('.avail .pc-name')].map((e) => e.textContent)
+    expect(new Set(listed()).size).toBe(60)
+    fireEvent.click(chipBtn('SG'))
+    expect(count()).toBe(sgEligible(shapes.map((r) => r.player)).length) // 42, under the cap
+  })
+
+  it('stats view: the SG filter has 100% recall too', async () => {
+    getStatLeaderboard.mockResolvedValue(board([]))
+    const { container } = render(<AvailabilityPanel {...nba} availability={shapes} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Stats' }))
+    await screen.findByText(/stats, regular season/)
+    expect(container.querySelectorAll('.ds-table tbody tr')).toHaveLength(108)
+    fireEvent.click(chipBtn('SG'))
+    expect(container.querySelectorAll('.ds-table tbody tr')).toHaveLength(42)
+  })
+
+  it('a multi-position row shows the label with no rank number', () => {
+    const { container } = render(<AvailabilityPanel {...nba} availability={shapes} />)
+    const pill = container.querySelector('.avail .pos.multi') as HTMLElement
+    expect(pill.textContent).toMatch(/^[A-Z]{1,2}(\/[A-Z]{1,2})+$/)
+    const single = [...container.querySelectorAll('.avail .pos')].find((e) => e.textContent === 'C')
+    expect(single).toBeDefined()
   })
 })

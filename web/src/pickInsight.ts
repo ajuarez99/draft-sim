@@ -11,6 +11,7 @@
 import type { Candidate, PlayerRef, PredictedPick, RealPick, Seat, SimulationResult, Sport } from './api'
 import { INSIGHT } from './insightConstants'
 import { RUNNABLE_BY_SPORT } from './pickRun'
+import { eligiblePositions } from './positions'
 import { pickNoAt } from './snake'
 import { computeTeamNeeds, fitSlot } from './teamNeeds'
 
@@ -26,7 +27,7 @@ export function fillsFor(
   priorRoster: PlayerRef[],
   player: PlayerRef,
 ): string | null {
-  return fitSlot(sport, player.position, computeTeamNeeds(sport, rosterPositions, priorRoster))
+  return fitSlot(sport, player, computeTeamNeeds(sport, rosterPositions, priorRoster))
 }
 
 /** Starting slots still empty once `player` joins `priorRoster`, in roster order. */
@@ -61,7 +62,9 @@ export function summarize(
   }
   parts.push(`Still open: ${open.join(', ')}.`)
   // Positions already named above (an open QB slot) would be said twice.
-  const have = new Set<string>(rosterSoFar.map((p) => p.position))
+  // "Has a PG" means someone on the roster is ELIGIBLE at PG (spec 025 T020): a
+  // PG/SG counts for both, so "No SG yet" is never said while he is on the roster.
+  const have = new Set<string>(rosterSoFar.flatMap((p) => eligiblePositions(p, sport)))
   const missing = [...RUNNABLE_BY_SPORT[sport]].filter((pos) => !have.has(pos) && !open.includes(pos))
   if (missing.length > 0) parts.push(`No ${missing.join(', ')} yet.`)
   return parts.join(' ')

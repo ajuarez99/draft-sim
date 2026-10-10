@@ -1,0 +1,1856 @@
+{
+  "template" : [ "PG", "SG", "G", "SF", "PF", "F", "C", "UTIL", "UTIL" ],
+  "cases" : [ {
+    "name" : "shape PG/SG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8 ],
+    "seating" : [ 1, 8, 7, 4, 5, null, 6, 3, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "shape PG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8 ],
+    "seating" : [ 2, 8, 3, 4, 5, null, 6, 7, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "shape C",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8 ],
+    "seating" : [ 2, 8, 3, 4, 5, null, 1, 7, 6 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "shape C/PF",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C", "PF" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 3, 2, 4, 5, 1, 9, 6, 8 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape PF/SF",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 3, 2, 1, 5, 4, 9, 6, 8 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape PF/SF/SG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 8, 2, 1, 5, 4, 9, 6, 3 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape SF/SG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 8, 2, 1, 5, 4, 9, 6, 3 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape PF",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PF" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 3, 2, 4, 5, 1, 9, 6, 8 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape PF/PG/SF",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PF", "PG", "SF" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 3, 2, 1, 5, 4, 9, 6, 8 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "shape PG/SF/SG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 42.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 50.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 58.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 3, 8, 1, 5, 4, 9, 6, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "empty roster",
+    "players" : [ ],
+    "seated" : [ ],
+    "seating" : [ null, null, null, null, null, null, null, null, null ],
+    "filledByKind" : { },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "counterexample: PG/SG first, then a pure PG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 5.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 20.0
+    } ],
+    "seated" : [ 1, 2 ],
+    "seating" : [ 2, 1, null, null, null, null, null, null, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "counterexample reversed: pure PG first, then PG/SG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 5.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 20.0
+    } ],
+    "seated" : [ 1, 2 ],
+    "seating" : [ 2, null, 1, null, null, null, null, null, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "G" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "five pure centres",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 4.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C" ],
+      "adp" : 12.0
+    }, {
+      "id" : 3,
+      "positions" : [ "C" ],
+      "adp" : 20.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C" ],
+      "adp" : 36.0
+    }, {
+      "id" : 5,
+      "positions" : [ "C" ],
+      "adp" : 52.0
+    } ],
+    "seated" : [ 1, 2, 3 ],
+    "seating" : [ null, null, null, null, null, null, 3, 2, 1 ],
+    "filledByKind" : {
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "full 14-player roster",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 2.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C" ],
+      "adp" : 9.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 15.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SG" ],
+      "adp" : 22.0
+    }, {
+      "id" : 5,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 29.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG" ],
+      "adp" : 36.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C", "PF" ],
+      "adp" : 43.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SF" ],
+      "adp" : 50.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF" ],
+      "adp" : 57.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 64.0
+    }, {
+      "id" : 11,
+      "positions" : [ "SG" ],
+      "adp" : 71.0
+    }, {
+      "id" : 12,
+      "positions" : [ "C" ],
+      "adp" : 78.0
+    }, {
+      "id" : 13,
+      "positions" : [ "PF", "PG", "SF" ],
+      "adp" : 85.0
+    }, {
+      "id" : 14,
+      "positions" : [ "PG" ],
+      "adp" : 92.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 1, 4, 6, 3, 9, 8, 7, 2, 5 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "10th pick with nine starters filled",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "SG" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 24.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 31.0
+    }, {
+      "id" : 6,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 38.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 45.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG", "SF" ],
+      "adp" : 52.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "C" ],
+      "adp" : 59.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG" ],
+      "adp" : 66.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 3, 2, 1, 4, 9, 5, 7, 6, 8 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "no SG-eligible player",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 4.0
+    }, {
+      "id" : 2,
+      "positions" : [ "SF" ],
+      "adp" : 11.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C" ],
+      "adp" : 25.0
+    }, {
+      "id" : 5,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 32.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C", "PF" ],
+      "adp" : 39.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG" ],
+      "adp" : 46.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PF" ],
+      "adp" : 53.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8 ],
+    "seating" : [ 7, null, 1, 5, 8, 6, 4, 3, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true, true, false, false, true, true ]
+  }, {
+    "name" : "no PG or SG at all (all bigs and wings)",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "SF" ],
+      "adp" : 6.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PF" ],
+      "adp" : 13.0
+    }, {
+      "id" : 3,
+      "positions" : [ "C" ],
+      "adp" : 20.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 27.0
+    }, {
+      "id" : 5,
+      "positions" : [ "C", "PF" ],
+      "adp" : 34.0
+    }, {
+      "id" : 6,
+      "positions" : [ "SF" ],
+      "adp" : 41.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF" ],
+      "adp" : 48.0
+    }, {
+      "id" : 8,
+      "positions" : [ "C" ],
+      "adp" : 55.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 62.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6 ],
+    "seating" : [ null, null, null, 6, 2, 1, 5, 3, 4 ],
+    "filledByKind" : {
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true ]
+  }, {
+    "name" : "one player",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 8.0
+    } ],
+    "seated" : [ 1 ],
+    "seating" : [ null, 1, null, null, null, null, null, null, null ],
+    "filledByKind" : {
+      "SG" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "auto-draft-like: balanced guards and bigs",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 26.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "C" ],
+      "adp" : 33.0
+    }, {
+      "id" : 6,
+      "positions" : [ "SG", "SF" ],
+      "adp" : 40.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 47.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG" ],
+      "adp" : 54.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SF" ],
+      "adp" : 61.0
+    }, {
+      "id" : 10,
+      "positions" : [ "SG" ],
+      "adp" : 68.0
+    }, {
+      "id" : 11,
+      "positions" : [ "PF" ],
+      "adp" : 75.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 82.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 8, 1, 6, 9, 3, 5, 2, 4, 7 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "auto-draft-like: guard heavy",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 2.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 8.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 14.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 20.0
+    }, {
+      "id" : 5,
+      "positions" : [ "SG" ],
+      "adp" : 26.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 32.0
+    }, {
+      "id" : 7,
+      "positions" : [ "SF" ],
+      "adp" : 38.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG" ],
+      "adp" : 44.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 50.0
+    }, {
+      "id" : 10,
+      "positions" : [ "SG" ],
+      "adp" : 56.0
+    }, {
+      "id" : 11,
+      "positions" : [ "PF" ],
+      "adp" : 62.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 7, 9, 11 ],
+    "seating" : [ 2, 5, 4, 7, 11, null, 9, 3, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "auto-draft-like: big heavy",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PF", "C" ],
+      "adp" : 7.0
+    }, {
+      "id" : 3,
+      "positions" : [ "C", "PF" ],
+      "adp" : 13.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PF" ],
+      "adp" : 19.0
+    }, {
+      "id" : 5,
+      "positions" : [ "C" ],
+      "adp" : 25.0
+    }, {
+      "id" : 6,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 31.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF" ],
+      "adp" : 37.0
+    }, {
+      "id" : 8,
+      "positions" : [ "C" ],
+      "adp" : 43.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SG" ],
+      "adp" : 49.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG" ],
+      "adp" : 55.0
+    }, {
+      "id" : 11,
+      "positions" : [ "PF" ],
+      "adp" : 61.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 9, 10 ],
+    "seating" : [ 10, 9, null, 6, 2, 4, 5, 3, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true, false, true, true, true ]
+  }, {
+    "name" : "auto-draft-like: wing heavy",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 5.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 11.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SF" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SG", "SF" ],
+      "adp" : 23.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 29.0
+    }, {
+      "id" : 6,
+      "positions" : [ "SF" ],
+      "adp" : 35.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 41.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SG" ],
+      "adp" : 47.0
+    }, {
+      "id" : 9,
+      "positions" : [ "C" ],
+      "adp" : 53.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG" ],
+      "adp" : 59.0
+    }, {
+      "id" : 11,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 65.0
+    }, {
+      "id" : 12,
+      "positions" : [ "SF" ],
+      "adp" : 71.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8, 9 ],
+    "seating" : [ 7, 8, 2, 1, 5, 6, 9, 4, 3 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "three-way versatile players only",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PF", "PG", "SF" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 9.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 15.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PF", "PG", "SF" ],
+      "adp" : 21.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 27.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 33.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF", "PG", "SF" ],
+      "adp" : 39.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG", "SF", "SG" ],
+      "adp" : 45.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 51.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG" ],
+      "adp" : 57.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6, 7, 8 ],
+    "seating" : [ 8, 6, 7, 4, 3, 1, null, 5, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "value order differs from drafted order",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 90.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 2.0
+    }, {
+      "id" : 3,
+      "positions" : [ "SG" ],
+      "adp" : 80.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SF" ],
+      "adp" : 4.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF" ],
+      "adp" : 70.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 6.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 60.0
+    }, {
+      "id" : 8,
+      "positions" : [ "SF", "PF" ],
+      "adp" : 8.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "C" ],
+      "adp" : 50.0
+    } ],
+    "seated" : [ 2, 4, 6, 8, 9, 7, 5, 3, 1 ],
+    "seating" : [ 6, 3, 2, 8, 9, 4, 1, 7, 5 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "equal-shape C/PF duplicates",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C", "PF" ],
+      "adp" : 5.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C", "PF" ],
+      "adp" : 15.0
+    }, {
+      "id" : 3,
+      "positions" : [ "C", "PF" ],
+      "adp" : 25.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 35.0
+    }, {
+      "id" : 5,
+      "positions" : [ "C", "PF" ],
+      "adp" : 45.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG" ],
+      "adp" : 55.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6 ],
+    "seating" : [ 6, null, null, null, 5, 4, 3, 2, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "second C with C filled and a UTIL open",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C" ],
+      "adp" : 12.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG" ],
+      "adp" : 20.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SG" ],
+      "adp" : 28.0
+    }, {
+      "id" : 5,
+      "positions" : [ "SF" ],
+      "adp" : 36.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PF" ],
+      "adp" : 44.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5, 6 ],
+    "seating" : [ 3, 4, null, 5, 6, null, 2, 1, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "C" : 1,
+      "UTIL" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "real auto-draft mock 3721",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C", "PF" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 46.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PG" ],
+      "adp" : 47.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 41.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 108.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG" ],
+      "adp" : 84.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 103.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 132.0
+    }, {
+      "id" : 11,
+      "positions" : [ "C" ],
+      "adp" : 124.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 120.0
+    }, {
+      "id" : 13,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 134.0
+    }, {
+      "id" : 14,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 148.0
+    } ],
+    "seated" : [ 1, 2, 3, 6, 4, 5, 8, 9, 7 ],
+    "seating" : [ 3, 7, 8, 9, 4, 2, 6, 5, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3721, first 9 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C", "PF" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 46.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PG" ],
+      "adp" : 47.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 41.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 108.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG" ],
+      "adp" : 84.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 103.0
+    } ],
+    "seated" : [ 1, 2, 3, 6, 4, 5, 8, 9, 7 ],
+    "seating" : [ 3, 7, 8, 9, 4, 2, 6, 5, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3721, first 12 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ "C", "PF" ],
+      "adp" : 10.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 17.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 46.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PG" ],
+      "adp" : 47.0
+    }, {
+      "id" : 6,
+      "positions" : [ "C" ],
+      "adp" : 41.0
+    }, {
+      "id" : 7,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 108.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG" ],
+      "adp" : 84.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 103.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 132.0
+    }, {
+      "id" : 11,
+      "positions" : [ "C" ],
+      "adp" : 124.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 120.0
+    } ],
+    "seated" : [ 1, 2, 3, 6, 4, 5, 8, 9, 7 ],
+    "seating" : [ 3, 7, 8, 9, 4, 2, 6, 5, 1 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3722",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 4.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 13.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 32.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 50.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 49.0
+    }, {
+      "id" : 7,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 65.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 101.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 98.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 64.0
+    }, {
+      "id" : 11,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 123.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 116.0
+    }, {
+      "id" : 13,
+      "positions" : [ "C", "PF" ],
+      "adp" : 140.0
+    }, {
+      "id" : 14,
+      "positions" : [ "SG" ],
+      "adp" : 158.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 6, 5, 10, 7, 9 ],
+    "seating" : [ 6, 9, 10, 7, 5, 3, 1, 4, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3722, first 9 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 4.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 13.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 32.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 50.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 49.0
+    }, {
+      "id" : 7,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 65.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 101.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 98.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 6, 5, 7, 9, 8 ],
+    "seating" : [ 4, 8, 9, 7, 5, 3, 1, 6, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3722, first 12 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 4.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 13.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 32.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 50.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 49.0
+    }, {
+      "id" : 7,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 65.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 101.0
+    }, {
+      "id" : 9,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 98.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 64.0
+    }, {
+      "id" : 11,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 123.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 116.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 6, 5, 10, 7, 9 ],
+    "seating" : [ 6, 9, 10, 7, 5, 3, 1, 4, 2 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3723",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 21.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 40.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 11.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 59.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 85.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 83.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 126.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 109.0
+    }, {
+      "id" : 11,
+      "positions" : [ "C" ],
+      "adp" : 124.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 159.0
+    }, {
+      "id" : 13,
+      "positions" : [ "C", "PF" ],
+      "adp" : 140.0
+    }, {
+      "id" : 14,
+      "positions" : [ "SF", "SG" ],
+      "adp" : 182.0
+    } ],
+    "seated" : [ 1, 5, 2, 3, 4, 6, 8, 7, 10 ],
+    "seating" : [ 8, 10, 2, 3, 6, 5, 7, 1, 4 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3723, first 9 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 21.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 40.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 11.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 59.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 85.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 83.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 126.0
+    } ],
+    "seated" : [ 1, 5, 2, 3, 4, 6, 8, 7, 9 ],
+    "seating" : [ 9, 8, 2, 3, 6, 5, 7, 1, 4 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3723, first 12 picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 21.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 26.0
+    }, {
+      "id" : 4,
+      "positions" : [ "C", "PF" ],
+      "adp" : 40.0
+    }, {
+      "id" : 5,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 11.0
+    }, {
+      "id" : 6,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 59.0
+    }, {
+      "id" : 7,
+      "positions" : [ "C" ],
+      "adp" : 85.0
+    }, {
+      "id" : 8,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 83.0
+    }, {
+      "id" : 9,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 126.0
+    }, {
+      "id" : 10,
+      "positions" : [ "PF", "SF", "SG" ],
+      "adp" : 109.0
+    }, {
+      "id" : 11,
+      "positions" : [ "C" ],
+      "adp" : 124.0
+    }, {
+      "id" : 12,
+      "positions" : [ "PF", "SF" ],
+      "adp" : 159.0
+    } ],
+    "seated" : [ 1, 5, 2, 3, 4, 6, 8, 7, 10 ],
+    "seating" : [ 8, 10, 2, 3, 6, 5, 7, 1, 4 ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "SF" : 1,
+      "PF" : 1,
+      "F" : 1,
+      "C" : 1,
+      "UTIL" : 2
+    },
+    "canJoinByMask" : [ false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false ]
+  }, {
+    "name" : "real auto-draft mock 3724 (5 picks, unfinished)",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "C" ],
+      "adp" : 1.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 4.0
+    }, {
+      "id" : 3,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 18.0
+    }, {
+      "id" : 4,
+      "positions" : [ "PG" ],
+      "adp" : 22.0
+    }, {
+      "id" : 5,
+      "positions" : [ "C" ],
+      "adp" : 48.0
+    } ],
+    "seated" : [ 1, 2, 3, 4, 5 ],
+    "seating" : [ 4, 3, 2, null, null, null, 5, 1, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "G" : 1,
+      "C" : 1,
+      "UTIL" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  } ]
+}

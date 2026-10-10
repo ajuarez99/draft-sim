@@ -125,3 +125,59 @@ describe('projectedFromPick', () => {
     expect(projectedFromPick(60)).toBe(1)
   })
 })
+
+// ---- Spec 025 US1: scarcity counts a player at every eligible position (FR-004 = A) ----
+
+describe('positionScarcity, multi-position eligibility (spec 025)', () => {
+  // A synthetic top-36 that reproduces the measured NBA shape: PG 18, SG 8, SF 7, PF 17, C 11.
+  // 36 players, 61 position memberships, so a player counts at more than one position.
+  const SHAPES: string[][] = [
+    ...Array.from({ length: 8 }, () => ['PG']),
+    ...Array.from({ length: 8 }, () => ['PG', 'SG']),
+    ...Array.from({ length: 2 }, () => ['PG', 'PF']),
+    ...Array.from({ length: 5 }, () => ['SF', 'PF']),
+    ...Array.from({ length: 2 }, () => ['SF', 'PF']),
+    ...Array.from({ length: 8 }, () => ['C', 'PF']),
+    ...Array.from({ length: 3 }, () => ['C']),
+  ]
+  const mkNba = (id: number, positions: string[] | undefined, position: string): PlayerRef =>
+    ({ ...mk(id, position), ...(positions ? { positions } : {}) }) as PlayerRef
+  // Interleave so board order is not grouped by shape.
+  const order = SHAPES.map((_, i) => (i * 7) % SHAPES.length)
+  const NBA_POOL: PlayerRef[] = order.map((s, i) => mkNba(i + 1, SHAPES[s], SHAPES[s][0]))
+  const nbaBase = { ...base, sport: 'nba' as const, pool: NBA_POOL, teams: 12, startersPerTeam: 3 }
+  const byPos = (r: ReturnType<typeof positionScarcity>, key: 'poolSize' | 'leftNow') =>
+    Object.fromEntries(r.rows.map((x) => [x.position, x[key]]))
+
+  it('the fixture really has 36 distinct players', () => {
+    expect(new Set(order).size).toBe(36)
+    expect(NBA_POOL).toHaveLength(36)
+  })
+
+  it('counts a player fully at every eligible position (pools PG 18, SG 8, SF 7, PF 17, C 11)', () => {
+    const r = positionScarcity(nbaBase)
+    expect(byPos(r, 'poolSize')).toEqual({ PG: 18, SG: 8, SF: 7, PF: 17, C: 11 })
+    expect(byPos(r, 'leftNow')).toEqual({ PG: 18, SG: 8, SF: 7, PF: 17, C: 11 })
+  })
+
+  it('drafting a PG/SG lowers both PG-left and SG-left by one', () => {
+    const pgsg = NBA_POOL.find((p) => p.positions?.join() === 'PG,SG')!
+    const r = positionScarcity({ ...nbaBase, landed: land([pgsg], 1) })
+    expect(byPos(r, 'leftNow')).toEqual({ PG: 17, SG: 7, SF: 7, PF: 17, C: 11 })
+    expect(byPos(r, 'poolSize')).toEqual({ PG: 18, SG: 8, SF: 7, PF: 17, C: 11 })
+  })
+
+  it('a player without positions counts only toward his position', () => {
+    const pool = [mkNba(1, undefined, 'PG'), mkNba(2, undefined, 'C')]
+    const r = positionScarcity({ ...nbaBase, pool, teams: 1, startersPerTeam: 2 })
+    expect(byPos(r, 'poolSize')).toEqual({ PG: 1, SG: 0, SF: 0, PF: 0, C: 1 })
+  })
+
+  it('marks every row inside a running family (guards run covers PG and SG)', () => {
+    const guards = NBA_POOL.filter((p) => p.positions?.length === 1 && p.positions[0] === 'PG').slice(0, 4)
+    const others = NBA_POOL.filter((p) => p.positions?.join() === 'C').slice(0, 2)
+    const r = positionScarcity({ ...nbaBase, landed: land([...others, ...guards], 6) })
+    expect(r.run).toEqual({ position: 'G', count: 4, window: 6 })
+    expect(r.rows.filter((x) => x.running).map((x) => x.position)).toEqual(['PG', 'SG'])
+  })
+})

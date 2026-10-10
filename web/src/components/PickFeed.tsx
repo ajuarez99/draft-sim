@@ -1,9 +1,9 @@
-import type { CSSProperties } from 'react'
 import type { PlayerRef, Sport } from '../api'
+import { leadHueStyle, posPill } from '../positions'
 import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
-import { positionRun } from '../pickRun'
+import { positionRun, runLabel } from '../pickRun'
 import { roundPickLabel } from '../roundPickLabel'
 
 export type FeedPick = {
@@ -80,13 +80,13 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick, 
         // The run wins the trailing slot when there is one: it is the rarer
         // signal and the one you can still act on, where the fit is a fact
         // about someone else's roster that will keep until you read it.
-        const clause = showRun && run ? `${run.count} of the last ${run.window} were ${run.position}` : null
+        const clause = showRun && run ? `${run.count} of the last ${run.window} were ${runLabel(run, sport)}` : null
         const runClass = showRun && run ? ` run pos-run-${run.position}` : ''
         const fit = isLead && !clause ? p.fit : null
         const body = (
           <>
             <span className="pick-feed-no mono">{roundPickLabel(p.pickNo, teams)}</span>
-            <span className={`pos ${p.player.position}`}>{posRank(p.player)}</span>
+            <span {...posPill(p.player, sport)}>{posRank(p.player, sport)}</span>
             {/* The announcement says the whole name. Everywhere else the
                 abbreviation is right -- three rows of "Ja'Marr Chase" crowd
                 out the numbers around them -- but the pick that just landed is
@@ -119,7 +119,8 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick, 
             // Set from the position code rather than through eleven CSS rules
             // because --qb/--rb/--pg/... are already named after it in
             // styles.css, so this covers both sports for free.
-            style={isLead ? ({ '--lead-hue': `var(--${p.player.position.toLowerCase()})` } as CSSProperties) : undefined}
+            // A multi-position player gets no hue (neutral fallback), never his first position's.
+            style={isLead ? leadHueStyle(p.player, sport) : undefined}
           >
             {onPickClick ? (
               <button

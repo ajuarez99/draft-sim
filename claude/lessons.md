@@ -827,3 +827,30 @@ file. `tsc` came back clean, and the suite gave 1,408/1,408, the last known coun
 `io.open(p, encoding='utf-8', newline='')`, building the whole new string before opening the
 file for writing. A script that opens for writing before its content is ready can destroy the
 file it was meant to change.** On this machine, also set `PYTHONUTF8=1` for any ad hoc Python.
+
+
+## 38. "First in the list" is not "primary": Sleeper sorts positions alphabetically
+
+The app treated `player.positions[0]` as an NBA player's primary position. Sleeper's
+`fantasy_positions` is sorted alphabetically for every player (1478 of 1478 active
+multi-position NBA players), and Sleeper's own stated primary (`position`) matched the first
+entry for only 52% of them. So Anthony Edwards was a "PG", Kevin Durant a "PF", and SG/SF
+almost never appeared first. That surfaced as "SG 0/0" chips, an SG filter that found 0 of 42
+SG-eligible players, and positional ranks ("PF4") counted within an alphabetical artefact.
+
+**Before treating an ordered list from an external API as meaningful (first = primary, first
+= best), check whether the source sorts it, against the source's own explicit field if it has
+one.** One query over the real payload answered it here.
+
+Two more from spec 025:
+
+- **A test can assert the bug.** A `teamNeeds` test expected "Fills SG" for a roster where the
+  re-seated lineup actually filled G. The test encoded the same wrong heuristic as the code, so
+  it passed until a property test ("the named slot is the one that becomes filled") compared the
+  claim with the result. When a label describes the outcome of a computation, test it against
+  that computation, not against a hand-written expectation.
+- **A layout spec that says "compact" needs a measured reading, not just a measured height.**
+  Spec 024 measured rounds and rows to the pixel and never measured the name inside a compact
+  cell: it had 15–19 px, about 2–3 characters, for every player. `scrollWidth <= clientWidth`
+  per cell is the check. Inside the Browser pane's scaled viewport, compare layout widths, not
+  `getBoundingClientRect`, which disagreed by about 10% here.
