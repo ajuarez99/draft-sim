@@ -1,5 +1,27 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-10 ~16:15 UTC (pre-draft push): steps 2–5 below are DONE; step 1 is still owed after the draft
+
+Pushed to `main` before the 21:15 UTC draft, at Allan's request:
+- **Spec 026** (`specs/026-nba-primary-position/`): NBA players now store Sleeper's own `position` first, so `Player.primary()` is real (Edwards SG, Durant SF).
+  - No migration; labels are unchanged.
+  - Measured locally: all 12 NBA managers now carry an SG tilt, where before none did.
+  - **Prod only changes after `POST /api/ingest/players?sport=nba` with `X-Admin-Token`.** The daily refresh already ran today. Do **not** use `/ingest/all` or `/ingest/board` during the draft: the board backfill stalls the poller.
+  - Check: Edwards reads `{SG,PG}`.
+- **027:** the 024/025 review follow-ups (025 R2, R3, N1–N8; 024 R7, R8). R1 and R4 were already done.
+- **028** (`specs/028-draft-reset-stale-picks/notes.md`): a Sleeper draft reset now clears stored picks. That happens **only** on `pre_draft` with an empty pick list; never mid-draft, and never on a fetch error.
+  - Not reproduced against a real Sleeper reset.
+- **Deploy notes** were added to 024/025 `verification.md`.
+- **Housekeeping:** stopped the 025 servers and removed the `draft-sim-024`/`-025` worktrees.
+  - `draft-sim-026/027/028` are merged and removable.
+  - Local servers `main-merge-api-8097` and `main-merge-web-5198` may still be running.
+- **Suites on the merged tree:** backend 1,568 / 0 skipped / 0 failed; web 1,729; `tsc` and build clean.
+
+**Still owed:**
+- **§1, the draft-night checks:** pick timer, list rows, pick cards, targets, "Fills X". Record them in 024/025 `verification.md`.
+- **Spec 017 T041:** the basketball paired next opponent.
+- **T004 redo:** Tue 10-13.
+
 ## START HERE (written 2026-10-10, for the session after the NBA draft)
 
 **Specs 024 and 025 are both merged and DEPLOYED** (PR #26 merged 025 into 024, then PR #25 merged 024 into `main` at `7b7472c`, on 2026-10-10, the day of the "Ball Knowers" NBA draft, 19:15 UTC).
