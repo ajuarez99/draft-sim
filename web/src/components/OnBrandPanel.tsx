@@ -42,7 +42,7 @@ export function OnBrandLine({ read }: { read: OnBrandRead }) {
       </span>
       <span
         className="onbrand-lean"
-        title="By each player's first listed position, the same way the manager's lean was fitted (Sleeper lists positions alphabetically, so for multi-position players this is not necessarily their main position)."
+        title="By each player's first listed position, the same way the manager's lean was fitted (for basketball that is Sleeper's own primary position; the few players whose primary isn't among their eligible positions keep Sleeper's listing order)."
       >
         {read.lean
           ? `leans ${read.lean.position} (${pct(read.leanShare)} of picks vs room ${pct(read.roomShare)})`

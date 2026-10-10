@@ -62,4 +62,37 @@ class PickScorerTest {
         assertEquals(0.0, scorer.runPressure(recent, Position.QB));
         assertEquals(0.0, scorer.runPressure(new ArrayDeque<>(), Position.WR));
     }
+
+    /**
+     * Spec 026 preference ordering (lessons class 1). A seat that favours SG: a player whose primary is SG
+     * ([SG,PG], Edwards-shaped) must outscore an equal-ADP pure PG. With the old alphabetical order
+     * ([PG,SG]) his primary is PG and he gets no SG credit -- the second assertion shows that direction.
+     */
+    @Test
+    void aSeatFavouringSgPrefersAnSgPrimaryOverAPurePgAtEqualAdp() {
+        ScoringProperties.SportScoring nba = new ScoringProperties.SportScoring(
+                new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
+                12.0, 3.0, 60.0, 0.15, 6, 0.85, Map.of(), 1.0, 30);
+        PickScorer s = new PickScorer(nba, new com.ballknowers.draftsim.sport.BasketballRules(new ScoringProperties(nba, null)),
+                PositionalPriors.uniform(Sport.NBA));
+        com.ballknowers.draftsim.profile.ManagerProfile sgSeat = new com.ballknowers.draftsim.profile.ManagerProfile(
+                1, "m", 0.0, Map.of(Position.SG, 2.0, Position.PG, 0.5), 1.0, null, 2, 100,
+                com.ballknowers.draftsim.profile.Provenance.FITTED, null);
+
+        BoardEntry edwardsFixed = nbaEntry(List.of(Position.SG, Position.PG));
+        BoardEntry edwardsOld = nbaEntry(List.of(Position.PG, Position.SG));
+        BoardEntry purePg = nbaEntry(List.of(Position.PG));
+
+        double fixed = s.positionalTerm(3, edwardsFixed.position(), sgSeat);
+        double old = s.positionalTerm(3, edwardsOld.position(), sgSeat);
+        double pg = s.positionalTerm(3, purePg.position(), sgSeat);
+
+        assertTrue(fixed > pg, "SG-primary player should beat a pure PG for an SG-favouring seat: " + fixed + " vs " + pg);
+        assertEquals(old, pg, 1e-12, "old alphabetical order gives him PG's term, i.e. no SG credit");
+    }
+
+    private static BoardEntry nbaEntry(List<Position> positions) {
+        return new BoardEntry(new Player(2, Sport.NBA, "n1", "Guard", positions, "FA", "Active", null, null, null),
+                10.0, 1);
+    }
 }

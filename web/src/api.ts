@@ -15,7 +15,7 @@ export type PlayerRef = {
   // positions (a filter chip row, a slot-eligibility check, the pick-run
   // detector) needs its own sport-scoped list; see positions.ts.
   position: 'QB' | 'RB' | 'WR' | 'TE' | 'K' | 'DEF' | 'PG' | 'SG' | 'SF' | 'PF' | 'C'
-  // Full eligible list in Sleeper's alphabetical order (not a ranking). Optional
+  // Full eligible list in stored order: for NBA, Sleeper's primary position first, the rest in Sleeper's order (not a ranking). Optional
   // only because of the split deploy (an older backend omits it). Never treat
   // `position` as primary in draft-room labels (spec 025 FR-002); use
   // eligiblePositions() in positions.ts.

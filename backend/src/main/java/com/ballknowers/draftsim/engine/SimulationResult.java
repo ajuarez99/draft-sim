@@ -23,9 +23,9 @@ public record SimulationResult(
      * player (BoardService's own sentinel, never null) -- a UI that renders
      * "{position}{positionalRank}" must special-case 999 rather than showing
      * "RB999".
-     * <p>{@code position} keeps its alphabetical-first meaning (BoardEntry.position()).
-     * {@code positions} is the full eligible list in stored (Sleeper, alphabetical)
-     * order; never null, empty when the player has no stored positions.
+     * <p>{@code position} is the first stored position (BoardEntry.position()); for basketball that is
+     * Sleeper's own primary position (spec 026). {@code positions} is the full eligible list in
+     * stored order, primary first; never null, empty when the player has no stored positions.
      */
     public record PlayerRef(long id, String sleeperId, String name, String position, List<String> positions,
                             String team, double adp, int positionalRank) {

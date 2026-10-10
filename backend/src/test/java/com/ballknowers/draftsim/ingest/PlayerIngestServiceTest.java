@@ -81,6 +81,72 @@ class PlayerIngestServiceTest {
         assertEquals(List.of(Position.PG, Position.SG), written.get(0).positions());
     }
 
+    // ---- spec 026: Sleeper's own `position` leads the stored list for NBA ----
+
+    private List<Position> ingestedNba(List<String> fantasy, String position) {
+        Map<String, Object> rec = new java.util.HashMap<>();
+        rec.put("full_name", "Test Player");
+        if (fantasy != null) rec.put("fantasy_positions", fantasy);
+        rec.put("position", position);
+        rec.put("search_rank", 5);
+        when(sleeper.allPlayers("nba")).thenReturn(Map.of("1", rec));
+        when(players.idsBySleeperId(Sport.NBA)).thenReturn(Map.of("1", 1L));
+        new PlayerIngestService(sleeper, players, boards, statusCaptures, rulesRegistry).ingest(Sport.NBA);
+        return capturedPlayers().get(0).positions();
+    }
+
+    @Test
+    void sleepersPositionMovesToFront() {
+        assertEquals(List.of(Position.SG, Position.PG), ingestedNba(List.of("PG", "SG"), "SG")); // Edwards
+    }
+
+    @Test
+    void positionAlreadyFirstOrMiddleKeepsTheRestInSleepersOrder() {
+        assertEquals(List.of(Position.PF, Position.PG, Position.SF), ingestedNba(List.of("PF", "PG", "SF"), "PF"));
+    }
+
+    @Test
+    void durantShapeMovesSfFirst() {
+        assertEquals(List.of(Position.SF, Position.PF), ingestedNba(List.of("PF", "SF"), "SF"));
+    }
+
+    @Test
+    void anIneligiblePositionIsNeverInserted() {
+        // Herbert Jones: position PF, fantasy_positions [SF,SG]
+        assertEquals(List.of(Position.SF, Position.SG), ingestedNba(List.of("SF", "SG"), "PF"));
+    }
+
+    @Test
+    void nullPositionLeavesOrderUnchanged() {
+        assertEquals(List.of(Position.PG, Position.SG), ingestedNba(List.of("PG", "SG"), null));
+    }
+
+    @Test
+    void anUnmappedPositionLikeGLeavesOrderUnchanged() {
+        assertEquals(List.of(Position.PG, Position.SG), ingestedNba(List.of("PG", "SG"), "G"));
+    }
+
+    @Test
+    void noFantasyPositionsFallsBackToTheSinglePosition() {
+        assertEquals(List.of(Position.SG), ingestedNba(null, "SG"));
+    }
+
+    @Test
+    void nflOrderIsUntouchedEvenWithADifferentPosition() {
+        Map<String, Object> rec = new java.util.HashMap<>();
+        rec.put("full_name", "Test Back");
+        rec.put("fantasy_positions", List.of("RB", "WR"));
+        rec.put("position", "WR");
+        rec.put("search_rank", 5);
+        when(sleeper.allPlayers("nfl")).thenReturn(Map.of("1", rec));
+        when(players.idsBySleeperId(Sport.NFL)).thenReturn(Map.of("1", 1L));
+        new PlayerIngestService(sleeper, players, boards, statusCaptures, rulesRegistry).ingest(Sport.NFL);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Player>> captor = ArgumentCaptor.forClass(List.class);
+        verify(players).upsertAll(org.mockito.ArgumentMatchers.eq(Sport.NFL), captor.capture());
+        assertEquals(List.of(Position.RB, Position.WR), captor.getValue().get(0).positions());
+    }
+
     private static Map<String, Object> nbaRecordWithoutRank(String fullName, List<String> fantasyPositions,
                                                             int searchRank) {
         return Map.of("full_name", fullName, "fantasy_positions", fantasyPositions, "search_rank", searchRank);
