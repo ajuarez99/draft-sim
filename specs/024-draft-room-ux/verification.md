@@ -229,3 +229,15 @@ Run against 5433 after Flyway applied V30 (`flyway_schema_history` top = 30, suc
 - **Postgres:** 5433 is listening, the throwaway cluster `draftsim`. 5432 is also listening, but it's the unrelated server and was left alone.
 - **Ports:** nothing listening on 8080 or 5173, so there's no stale backend to confuse a live check.
 - **Previews:** `preview_start` reads the **main checkout's** `.claude/launch.json`, not this worktree's (memory: "worktree preview serves main"). Peer sessions already add `cd /d C:\Users\allan\source\draft-sim-0NN\backend` entries there for their worktrees. Spec 024 will add `draft-sim-024-api-8094` / `draft-sim-024-web-5194` the same way before its live checks, and confirm the bootRun classpath points at `draft-sim-024`.
+
+## Deployed 2026-10-10 (PR #25, `main` `7b7472c`)
+
+**Production checks, read-only, run right after the deploy and re-run at 15:34 UTC the same day:**
+- backend health up; V30 applied;
+- `GET api.ballknowers.co/api/drafts/1339351318128517120/seats` returns `draftType: "snake"` and `pickTimerSeconds: null`;
+- the pool carries `positions`, e.g. Edwards `[PG,SG]` and Şengün `[C,PF]`;
+- the frontend serves bundle `index-h-PytgAf.js`, which contains spec 025's copy.
+
+**`pickTimerSeconds` null is expected pre-draft.** At 15:34 UTC Sleeper still reported the draft as `pre_draft`, with `last_picked: null`. Sleeper's own `pick_timer` is 90, and the draft starts at 21:15 UTC. The column fills when the live poller ticks or the league is re-ingested.
+
+**Not verified yet:** anything about a draft in progress. The draft-night checks are listed in HANDOFF.md's "START HERE" §1 and get recorded here after the draft.

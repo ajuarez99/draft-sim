@@ -141,3 +141,15 @@ Web 5197 on backend 8096.
 - **The fix:** the split tint is held in `--pos-split`, and the value-view steal/reach rules for `.pos-multi` cells layer the value tint over it rather than replacing it.
 - **Checked:** no local draft has ADP-at-draft data, so the view isn't offered through the UI. That is the known `adp_at_time` gap. Instead, the view's classes were added to a real multi-position cell on `/drafts/1229352720230514688/board` and the computed style read back: **2 gradient layers** (tint plus split). A single-position C cell keeps 1 image layer plus its background colour, unchanged.
 - **Not done:** seen through the UI toggle on a draft with ADP-at-draft.
+
+## Deployed 2026-10-10 (PR #25, `main` `7b7472c`)
+
+**Production checks, read-only, run right after the deploy and re-run at 15:34 UTC the same day:**
+- backend health up; V30 applied;
+- `GET api.ballknowers.co/api/drafts/1339351318128517120/seats` returns `draftType: "snake"` and `pickTimerSeconds: null`;
+- the pool carries `positions`, e.g. Edwards `[PG,SG]` and Şengün `[C,PF]`;
+- the frontend serves bundle `index-h-PytgAf.js`, which contains spec 025's copy.
+
+**`pickTimerSeconds` null is expected pre-draft.** At 15:34 UTC Sleeper still reported the draft as `pre_draft`, with `last_picked: null`. Sleeper's own `pick_timer` is 90, and the draft starts at 21:15 UTC. The column fills when the live poller ticks or the league is re-ingested.
+
+**Not verified yet:** anything about a draft in progress. The draft-night checks are listed in HANDOFF.md's "START HERE" §1 and get recorded here after the draft.
