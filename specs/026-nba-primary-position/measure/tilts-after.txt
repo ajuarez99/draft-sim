@@ -1,0 +1,13 @@
+pre_draft 90
+theadambomb98 2 {'C': 1.14, 'PF': 0.92, 'PG': 0.93, 'SF': 1.08, 'SG': 0.96}
+ImReallyHarry 2 {'C': 1.14, 'PF': 0.92, 'PG': 0.93, 'SF': 1.5, 'SG': 0.67}
+BamAddABio 2 {'C': 1.02, 'PF': 0.95, 'PG': 0.96, 'SF': 0.67, 'SG': 1.33}
+jstrobe 2 {'C': 0.82, 'PF': 0.92, 'PG': 1.05, 'SF': 0.67, 'SG': 1.53}
+popsharky 2 {'C': 1.14, 'PF': 1.17, 'PG': 0.8, 'SF': 0.67, 'SG': 1.24}
+njerickson 2 {'C': 0.82, 'PF': 1.42, 'PG': 1.05, 'SF': 0.67, 'SG': 0.96}
+nuggetchef 2 {'C': 0.98, 'PF': 0.67, 'PG': 1.31, 'SF': 1.08, 'SG': 0.67}
+wags707 1 {'C': 0.99, 'PF': 1.1, 'PG': 0.96, 'SF': 0.8, 'SG': 1.15}
+ChedddaBob 2 {'C': 1.02, 'PF': 1.24, 'PG': 0.81, 'SF': 1.14, 'SG': 1.0}
+xonicboom 2 {'C': 0.85, 'PF': 0.95, 'PG': 1.26, 'SF': 1.14, 'SG': 0.67}
+jpelwell 2 {'C': 1.08, 'PF': 0.67, 'PG': 1.01, 'SF': 1.78, 'SG': 0.67}
+GraftonCarlson 2 {'C': 0.98, 'PF': 1.17, 'PG': 0.8, 'SF': 1.08, 'SG': 1.24}

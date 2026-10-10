@@ -854,3 +854,11 @@ Two more from spec 025:
   cell: it had 15–19 px, about 2–3 characters, for every player. `scrollWidth <= clientWidth`
   per cell is the check. Inside the Browser pane's scaled viewport, compare layout widths, not
   `getBoundingClientRect`, which disagreed by about 10% here.
+
+## 39. A subagent's commit can store `\r\r\n` and turn a 250-line change into a 7,700-line one
+
+**What happened (2026-10-10).** A Sonnet build agent on Windows committed 26 files whose blobs held `\r\r\n` line endings. That's a doubled CR, most likely from writing CRLF text into a checkout with `core.autocrlf=true`. `git diff --stat` showed 3,945+/3,752−. `git diff -w` showed the real 248+/55−. `--ignore-cr-at-eol` did **not** hide it, because the extra CR isn't at the end of the line.
+
+**Check every agent commit before merging:** `git diff main...BRANCH --stat` against `git diff -w` on the same range. If they differ wildly, run `git cat-file -p HEAD:<file> | od -c | head` and look for `\r \r \n`.
+
+**The fix:** strip every `\r` from the affected files (`sed -i 's/\r//g'`), then re-add and amend. autocrlf stores LF.

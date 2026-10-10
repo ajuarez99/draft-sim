@@ -25,3 +25,23 @@ The optional fit test (completed picks produce tilt(SG) > 1) was not written.
 
 ## Not verified yet
 Local re-ingest before/after tilts, live UI, prod. The full backend suite was deliberately not run (shared Postgres on 5433). Prod needs `POST /api/ingest/players?sport=nba` after deploy (B1).
+
+## Integration and live verification (parent session, 2026-10-10 ~16:00 UTC, merged `main` with 027 + 028)
+
+- **Backend full suite:** **1,568 tests, 0 failed, 0 errors, 0 skipped**, with Postgres on 5433 up.
+- **Web:** `tsc -b` clean, **1,729/1,729** (110 files), production build OK.
+- **Local re-ingest:** `POST /api/ingest/players?sport=nba` (admin token) wrote 2,119 players. Measured on 5433:
+  - **Reordered:** Edwards `{PG,SG}`→`{SG,PG}`, Booker `{PG,SG}`→`{SG,PG}`, Durant `{PF,SF}`→`{SF,PF}`, Tatum `{PF,SF}`→`{SF,PF}`.
+  - **Unchanged, as designed:** LeBron `{PF,PG,SF}`, and Herbert Jones `{SF,SG}` (whose `position` is PF, not eligible).
+  - **First position across multi-position NBA players:** C 81 · PF 457 · PG 401 · SF 341 · SG 424.
+- **Tilts, before and after** (`measure/tilts-before.txt`, `measure/tilts-after.txt`):
+  - **Before:** no fitted manager had an SG tilt at all.
+  - **After:** all 12 "Ball Knowers" NBA managers have one, ranging 0.67–1.53.
+  - **Caveat on the comparison:** "before" was read from the stored `manager_profile.feature_json`, and "after" from the live `/seats` fit (`ProfileService.fit` per request). They're the same fitting code over the same two drafts, but not the same read path.
+  - The 0.67 floor appears in both. `weights.yml` is untouched.
+- **Browser** (local dev build, `/drafts/1339351318128517120`, signed in as popsharky):
+  - The simulation ran and the board rendered.
+  - Edwards's pill still reads "PG/SG", so labels are unchanged.
+  - The format line reads "12 teams · 14 rounds · 1 min 30 s · snake · order reverses from round 3". That's 024 R7 from branch 027.
+  - No console errors.
+- **Still not verified:** prod. That needs the deploy, then Allan's `POST /api/ingest/players?sport=nba` with `X-Admin-Token`, then a check that Edwards reads `{SG,PG}`.
