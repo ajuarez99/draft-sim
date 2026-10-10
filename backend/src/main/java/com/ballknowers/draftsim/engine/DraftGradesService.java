@@ -198,9 +198,7 @@ public class DraftGradesService {
                 excluded++;
                 continue;
             }
-            List<String> listed = p.positions().stream().map(Enum::name).toList();
-            String display = listed.isEmpty() ? null
-                    : multiGame ? String.join("/", listed) : listed.getFirst();
+            String display = positionsDisplay(p.positions(), multiGame);
             picks.add(new PickIn(pr.pickNo(), pr.round(), pr.draftSlot(), pr.managerId(), p.sleeperId(), p.name(),
                     sportRules.draftGradeGroup(p), display));
         }
@@ -533,5 +531,16 @@ public class DraftGradesService {
 
     private static double round2(double v) {
         return Math.round(v * 100.0) / 100.0;
+    }
+
+    /**
+     * The pick's position label. Basketball joins the whole eligibility in the fixed PG,SG,SF,PF,C order
+     * (enum declaration order), NOT stored order: stored order leads with Sleeper's primary (spec 026), so
+     * joining it directly would flip "PG/SG" to "SG/PG" for the same player. Football shows the first listed.
+     */
+    static String positionsDisplay(List<com.ballknowers.draftsim.domain.Position> positions, boolean multiGame) {
+        if (positions.isEmpty()) return null;
+        if (!multiGame) return positions.getFirst().name();
+        return positions.stream().sorted().map(Enum::name).collect(java.util.stream.Collectors.joining("/"));
     }
 }

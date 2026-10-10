@@ -605,4 +605,18 @@ class DraftGradesServiceTest {
         assertNull(pick(r, 1).countedForYou());
         assertEquals(1, r.unmappedPicks());
     }
+
+    @Test
+    void nbaPositionDisplayIsInFixedOrderRegardlessOfStoredOrder() {
+        // Spec 026: stored order now leads with Sleeper's primary; the label must not flip with it.
+        assertEquals("PG/SG", DraftGradesService.positionsDisplay(
+                List.of(com.ballknowers.draftsim.domain.Position.SG, com.ballknowers.draftsim.domain.Position.PG), true));
+        assertEquals("PG/SG", DraftGradesService.positionsDisplay(
+                List.of(com.ballknowers.draftsim.domain.Position.PG, com.ballknowers.draftsim.domain.Position.SG), true));
+        assertEquals("SF/PF", DraftGradesService.positionsDisplay(
+                List.of(com.ballknowers.draftsim.domain.Position.PF, com.ballknowers.draftsim.domain.Position.SF), true));
+        assertNull(DraftGradesService.positionsDisplay(List.of(), true));
+        assertEquals("RB", DraftGradesService.positionsDisplay(
+                List.of(com.ballknowers.draftsim.domain.Position.RB), false));
+    }
 }

@@ -15,7 +15,7 @@ type Ranked = Pick<PlayerRef, 'position' | 'positions' | 'positionalRank'>
  *
  * `sport` is REQUIRED (spec 025 A3): it encodes a rule, not a value. Basketball
  * shows the position label with NO rank number for every player ("C", "PG/SG"),
- * because the stored rank counts only each player's alphabetically-first listing
+ * because the stored rank counts only each player's first-listed (primary) position
  * and is not a rank among position-eligible players.
  */
 export function posRank(p: Ranked, sport: Sport): string {

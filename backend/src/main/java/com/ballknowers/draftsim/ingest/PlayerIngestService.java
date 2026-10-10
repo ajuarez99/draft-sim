@@ -182,7 +182,20 @@ public class PlayerIngestService {
         // is exactly ["DEF"] (verified 2026-09-08) -- an archive artifact, not a
         // real basketball position. Position.fromSleeper(String, Sport) drops
         // those for nba rather than mapping them onto football's DEF.
-        return raw.stream().map(pos -> Position.fromSleeper(pos, sport)).flatMap(Optional::stream).distinct().toList();
+        List<Position> mapped = raw.stream().map(pos -> Position.fromSleeper(pos, sport))
+                .flatMap(Optional::stream).distinct().toList();
+        if (sport != Sport.NBA || mapped.size() < 2) return mapped;
+        // Spec 026: Sleeper lists NBA fantasy_positions alphabetically, so [0] is not the player's
+        // real position. Sleeper's own `position` field is, so move it to the front -- but only if
+        // it is already eligible (never insert one), and leave an unmapped value like "G" alone.
+        // Player.primary() is positions.getFirst(), so this is what makes primary() the real one.
+        Optional<Position> primary = Optional.ofNullable(str(p.get("position")))
+                .flatMap(pos -> Position.fromSleeper(pos, sport));
+        if (primary.isEmpty() || !mapped.contains(primary.get())) return mapped;
+        List<Position> reordered = new ArrayList<>(mapped);
+        reordered.remove(primary.get());
+        reordered.addFirst(primary.get());
+        return List.copyOf(reordered);
     }
 
     private static String name(Map<String, Object> p) {
