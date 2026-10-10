@@ -5741,11 +5741,17 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 
 /* FR-001b: compact density. A filled cell is one line -- badge, short name,
    round.pick -- about 32px plus the 4px gap. */
-.board.compact .cell { padding: 0 7px; height: 32px; display: flex; align-items: center; gap: 6px; }
-.board.compact .cell .pos { flex: 0 0 auto; }
-.board.compact .cell .name { margin-top: 0; flex: 1 1 auto; min-width: 0; }
-.board.compact .cell .pickno { position: static; flex: 0 0 auto; font-size: 9px; }
-.board.compact .cell .otc-tag { position: absolute; top: -1px; right: 4px; font-size: 8px; }
+/* Measured 2026-10-10 (found during spec 025's live check, T024) at 1440 / 12 teams: the
+   92px compact cell left the NAME 15-19px -- 2-3 characters for every player -- after
+   padding 14 + a 30px min-width pill + two 6px gaps + a 17px inline round.pick. Tighter
+   padding/gaps, a pill sized to its text, and round.pick in the top-right corner
+   (Sleeper's placement) with badge + name on the lower line: names get >= 57px, 142 of
+   168 fully visible on the 2025 board, no overlap, cell height unchanged. */
+.board.compact .cell { padding: 0 5px 3px; height: 32px; display: flex; align-items: flex-end; gap: 4px; position: relative; }
+.board.compact .cell .pos { flex: 0 0 auto; min-width: 0; padding: 1px 4px; }
+.board.compact .cell .name { margin-top: 0; flex: 1 1 auto; min-width: 0; line-height: 15px; }
+.board.compact .cell .pickno { position: absolute; top: 1px; right: 4px; font-size: 8px; line-height: 10px; }
+.board.compact .cell .otc-tag { position: absolute; top: 1px; left: 5px; right: auto; font-size: 8px; line-height: 10px; }
 .board.compact .cell.kind-empty { height: 28px; padding: 0 7px; justify-content: flex-end; }
 
 /* --- 024 US4: one compact controls group, one primary ------------------------ */
