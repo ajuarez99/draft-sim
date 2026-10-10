@@ -31,7 +31,7 @@ only after the 2026-10-10 NBA draft.
 - **Owed:**
   - The follow-up "Use Sleeper's real primary position in the NBA sim" (it changes simulation
     numbers, so it needs measuring).
-  - Review risks R1–R3 (see `code-review.md`).
+  - Review risks R2–R3 (see `code-review.md`); R1 (steal/reach tint over split cells) is fixed.
   - Never run against a draft in progress.
   - Commit: ask Allan.
 

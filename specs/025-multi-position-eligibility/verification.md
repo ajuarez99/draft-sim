@@ -135,3 +135,9 @@ Web 5197 on backend 8096.
 - a live NBA draft *in progress*;
 - the steal/reach view with multi-position cells (R1);
 - the spec 024 branch's copy of the compact-cell CSS fix, which is applied in `draft-sim-024`, uncommitted and **unmeasured there**. Its badges still carry ranks ("PG12"), which are wider than 025's.
+
+## Review R1, steal/reach tint over multi-position cells (after 18a04b1, 2026-10-10) — VERIFIED via computed style
+
+- **The fix:** the split tint is held in `--pos-split`, and the value-view steal/reach rules for `.pos-multi` cells layer the value tint over it rather than replacing it.
+- **Checked:** no local draft has ADP-at-draft data, so the view isn't offered through the UI. That is the known `adp_at_time` gap. Instead, the view's classes were added to a real multi-position cell on `/drafts/1229352720230514688/board` and the computed style read back: **2 gradient layers** (tint plus split). A single-position C cell keeps 1 image layer plus its background colour, unchanged.
+- **Not done:** seen through the UI toggle on a draft with ADP-at-draft.
