@@ -87,6 +87,20 @@ describe('the announcement row', () => {
     expect(screen.getByText('Allan')).toBeTruthy()
   })
 
+  it('words a basketball run by family ("guards"), not by the raw family code', () => {
+    const picks = [
+      pick(1, 'C', 'Player One', 'Sam'),
+      pick(2, 'PG', 'Player Two', 'Kim'),
+      pick(3, 'SG', 'Player Three', 'Lee'),
+      pick(4, 'PG', 'Player Four', 'Ray'),
+      pick(5, 'SF', 'Player Five', 'Jo'),
+      pick(6, 'SG', 'Player Six', 'Allan'),
+    ]
+    render(<PickFeed sport="nba" teams={TEAMS} picks={picks} />)
+
+    expect(screen.getByText('4 of the last 6 were guards')).toBeTruthy()
+  })
+
   it('is inert without onPickClick: no buttons at all', () => {
     const { container } = render(
       <PickFeed sport="nfl" teams={TEAMS} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), pick(2, 'WR', "Ja'Marr Chase", 'Allan')]} />,

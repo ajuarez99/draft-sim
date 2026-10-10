@@ -229,7 +229,7 @@ export default function CompletedDraftBoard() {
         </section>
       </div>
 
-      {openPick && <PlayerCard pick={openPick} teams={board.teams} grades={showPlayed ? grades : null} onClose={() => setOpenPick(null)} />}
+      {openPick && <PlayerCard pick={openPick} teams={board.teams} sport={seats.sport} grades={showPlayed ? grades : null} onClose={() => setOpenPick(null)} />}
     </div>
   )
 }

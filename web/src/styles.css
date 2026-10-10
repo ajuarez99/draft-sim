@@ -810,6 +810,21 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .pos.SF { background: var(--sf); color: var(--bg); }
 .pos.PF { background: var(--pf); color: var(--bg); }
 .pos.C { background: var(--c); color: var(--bg); }
+/* Multi-position pill (spec 025): a hard split across --pos-a/b/c, set inline
+   from each position's own colour variable. --pos-c falls back to --pos-b so a
+   two-position pill is a clean 50/50. Narrower type so "PG/SF/PF" fits. */
+.pos.multi {
+  background: linear-gradient(100deg,
+    var(--pos-a) 0 var(--pos-s1, 50%),
+    var(--pos-b) var(--pos-s1, 50%) var(--pos-s2, 50%),
+    var(--pos-c, var(--pos-b)) var(--pos-s2, 50%) 100%);
+  color: var(--bg);
+  letter-spacing: 0;
+  font-size: 9px;
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
 
 table { border-collapse: collapse; width: 100%; }
 th { text-align: left; font-size: 11px; color: var(--muted); font-weight: 600; padding: 6px 8px; }
@@ -936,6 +951,25 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .cell.pos-SF:hover { background: color-mix(in oklch, var(--sf) 34%, var(--panel)); }
 .board .cell.pos-PF:hover { background: color-mix(in oklch, var(--pf) 34%, var(--panel)); }
 .board .cell.pos-C:hover  { background: color-mix(in oklch, var(--c) 34%, var(--panel)); }
+/* Multi-position cell (spec 025 A7): the tint splits across the player's
+   positions (--pos-a/b/c set inline) rather than taking the first one's colour.
+   --pos-c is optional, so it falls back to --pos-b to keep the gradient valid. */
+.board .cell.pos-multi {
+  /* Held in a variable so the steal/reach view (013 US8, below) can layer its tint over
+     the split instead of replacing it -- single-position cells keep their colour there
+     because theirs is a background-color; this one is an image (code review R1). */
+  --pos-split: linear-gradient(100deg,
+    color-mix(in oklch, var(--pos-a) 22%, var(--panel)) 0%,
+    color-mix(in oklch, var(--pos-b) 22%, var(--panel)) 50%,
+    color-mix(in oklch, var(--pos-c, var(--pos-b)) 22%, var(--panel)) 100%);
+  background: var(--pos-split);
+}
+.board .cell.pos-multi:hover {
+  background: linear-gradient(100deg,
+    color-mix(in oklch, var(--pos-a) 34%, var(--panel)) 0%,
+    color-mix(in oklch, var(--pos-b) 34%, var(--panel)) 50%,
+    color-mix(in oklch, var(--pos-c, var(--pos-b)) 34%, var(--panel)) 100%);
+}
 /* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
    this strips the browser's default button chrome so they still read as
    plain grid cells, not form controls. */
@@ -5173,6 +5207,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .board.value-view .cell.value-reach {
   background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
 }
+/* Spec 025 R1: a multi-position cell's position colour is itself an image, so the two
+   rules above would replace it. Layer the value tint over the split instead. */
+.board.value-view .cell.pos-multi.value-steal {
+  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent)), var(--pos-split);
+}
+.board.value-view .cell.pos-multi.value-reach {
+  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent)), var(--pos-split);
+}
 .value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
 .value-delta.steal { color: var(--up); }
 .value-delta.reach { color: var(--down); }
@@ -5741,12 +5783,14 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 
 /* FR-001b: compact density. A filled cell is one line -- badge, short name,
    round.pick -- about 32px plus the 4px gap. */
-/* Measured 2026-10-10 (found during spec 025's live check, T024) at 1440 / 12 teams: the
-   92px compact cell left the NAME 15-19px -- 2-3 characters for every player -- after
-   padding 14 + a 30px min-width pill + two 6px gaps + a 17px inline round.pick. Tighter
-   padding/gaps, a pill sized to its text, and round.pick in the top-right corner
-   (Sleeper's placement) with badge + name on the lower line: names get >= 57px, 142 of
-   168 fully visible on the 2025 board, no overlap, cell height unchanged. */
+/* Measured 2026-10-09 (spec 025 T024) at 1440 / 12 teams: a 92px compact cell left the
+   NAME 15-19px -- about 2-3 characters for every player, single-position included --
+   because padding 14 + a 30px min-width pill + two 6px gaps + the 17px round.pick ate
+   the rest. Tighter padding/gaps and a pill sized to its text give the name ~2x room.
+   (A spec 024 layout defect, found here; the same lines apply to 024's branch.) */
+/* Still 0/168 names fully visible with the round.pick inline (it took 17px + a gap), so
+   round.pick moves to the cell's top-right corner -- Sleeper's own placement -- and the
+   badge + name sit on the lower line, so the two never overlap. */
 .board.compact .cell { padding: 0 5px 3px; height: 32px; display: flex; align-items: flex-end; gap: 4px; position: relative; }
 .board.compact .cell .pos { flex: 0 0 auto; min-width: 0; padding: 1px 4px; }
 .board.compact .cell .name { margin-top: 0; flex: 1 1 auto; min-width: 0; line-height: 15px; }

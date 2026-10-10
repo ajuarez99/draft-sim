@@ -40,7 +40,10 @@ export function OnBrandLine({ read }: { read: OnBrandRead }) {
       <span className={`onbrand-verdict ${read.reachVerdict ?? 'none'}`} title={REACH_TITLE}>
         {verdictText(read.reachVerdict, read.reachReason)}
       </span>
-      <span className="onbrand-lean">
+      <span
+        className="onbrand-lean"
+        title="By each player's first listed position, the same way the manager's lean was fitted (Sleeper lists positions alphabetically, so for multi-position players this is not necessarily their main position)."
+      >
         {read.lean
           ? `leans ${read.lean.position} (${pct(read.leanShare)} of picks vs room ${pct(read.roomShare)})`
           : 'no positional lean'}

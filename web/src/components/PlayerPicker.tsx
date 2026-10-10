@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { AvailabilityRow, PlayerRef, Sport } from '../api'
-import { filterPositions } from '../positions'
+import { eligiblePositions, filterPositions, positionLabel, posPill } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
-import { computeTeamNeeds, needLabel, openPositions } from '../teamNeeds'
+import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
 import TeamStrip from './TeamStrip'
 import PlayerFace from './PlayerFace'
 
@@ -63,10 +63,10 @@ export default function PlayerPicker({
   const rows = useMemo(() => {
     const key = String(pausedAt)
     return availability
-      .filter((r) => filter === 'ALL' || r.player.position === filter)
+      .filter((r) => filter === 'ALL' || eligiblePositions(r.player, sport).includes(filter))
       .filter((r) => (r.survivalByPick[key] ?? 0) >= 0.2 && !alreadyPicked.has(r.player.id))
       .sort((a, b) => a.player.adp - b.player.adp)
-  }, [availability, filter, pausedAt, alreadyPicked])
+  }, [availability, filter, pausedAt, alreadyPicked, sport])
 
   // Empty rosterPositions is a real (if degraded) state -- roster settings
   // that haven't synced, or a malformed ingest -- not just "no data yet".
@@ -76,7 +76,7 @@ export default function PlayerPicker({
     () => computeTeamNeeds(sport, rosterPositions, draftedPlayers),
     [sport, rosterPositions, draftedPlayers],
   )
-  const open = useMemo(() => openPositions(sport, needs), [sport, needs])
+  const fitFor = useMemo(() => makeFitFor(sport, needs), [sport, needs])
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -114,7 +114,7 @@ export default function PlayerPicker({
             </thead>
             <tbody>
               {rows.map((r) => {
-                const need = needLabel(sport, r.player.position, open)
+                const need = fitFor(r.player)
                 return (
                   <tr
                     key={r.player.id}
@@ -129,12 +129,12 @@ export default function PlayerPicker({
                     }}
                   >
                     <td className="player-col">
-                      <span className={`pos ${r.player.position}`}>{r.player.position}</span>
+                      <span {...posPill(r.player, sport)}>{positionLabel(r.player, sport)}</span>
                       <PlayerFace sport={sport} sleeperId={r.player.sleeperId} team={r.player.team} position={r.player.position} name={r.player.name} size={20} />
                       {r.player.name}
                       <span className="team">{r.player.team}</span>
                     </td>
-                    <td className="num">{posRankOrAdp(r.player)}</td>
+                    <td className="num">{posRankOrAdp(r.player, sport)}</td>
                     <td>{need && <span className="tag need">{need}</span>}</td>
                   </tr>
                 )

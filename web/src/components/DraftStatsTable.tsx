@@ -2,6 +2,7 @@ import { memo } from 'react'
 import type { PlayerRef, StatLeaderboard } from '../api'
 import { likelyRule, shownSeason, type DraftStatRow } from '../draftRoomStats'
 import { posRank } from '../posRank'
+import { posPill } from '../positions'
 import { Cell } from '../statCells'
 import { COLUMNS, columnLabel, type SortState, type StatColumn, type StatMode } from '../statLeaderboard'
 import PlayerFace from './PlayerFace'
@@ -106,7 +107,7 @@ const StatRow = memo(function StatRow({ r, columns, board, sleeperLeagueId, mode
             </button>
           )}
           <PlayerFace sport="nba" sleeperId={p.sleeperId} team={p.team} position={p.position} name={p.name} size={20} />
-          <span className={`pos ${p.position}`}>{posRank(p)}</span>
+          <span {...posPill(p, 'nba')}>{posRank(p, 'nba')}</span>
           <a href={`/leagues/${sleeperLeagueId}/players/${p.sleeperId}`} target="_blank" rel="noopener">
             {p.name}
           </a>

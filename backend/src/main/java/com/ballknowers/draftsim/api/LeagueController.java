@@ -331,7 +331,9 @@ public class LeagueController {
     private static SimulationResult.PlayerRef fallbackPlayerRef(Player p) {
         if (p == null) return null;
         return new SimulationResult.PlayerRef(p.id(), p.sleeperId(), p.name(),
-                p.primary().name(), p.team(), 999, 999);
+                p.primary().name(),
+                p.positions() == null ? List.of() : p.positions().stream().map(Enum::name).toList(),
+                p.team(), 999, 999);
     }
 
     /**

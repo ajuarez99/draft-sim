@@ -8,7 +8,8 @@
  * output -- so the feed can say it without asking the backend anything.
  */
 
-import type { Sport } from './api'
+import type { PlayerRef, Sport } from './api'
+import { eligiblePositions } from './positions'
 
 /**
  * Positions worth calling out a run at, per sport. Football excludes K and
@@ -25,13 +26,47 @@ export const RUNNABLE_BY_SPORT: Record<Sport, ReadonlySet<string>> = {
 }
 
 export type PositionRun = {
+  /** Football: the position. NBA: the family code 'G' | 'F' | 'C' (spec 025 A2). */
   position: string
   count: number
   /** How many recent picks `count` is out of -- the feed says "4 of the last 6". */
   window: number
 }
 
-type Positioned = { position: string }
+type Positioned = { position: string; positions?: string[] | null }
+
+/**
+ * NBA run families (spec 025 A2, the user's decision). Counting a player at every
+ * eligible position fired a "run" in 108 of the 2025 draft's 163 six-pick windows
+ * (17 ties); counting by family fires in 26, with no ties. A pick counts toward a
+ * family only when ALL his eligible positions sit in it, so an SG/SF counts toward
+ * none. Each pick counts at most once, so two families can't tie on the same
+ * picks (FR-006). Football is unchanged: per position.
+ */
+const NBA_FAMILY_OF: Record<string, string> = { PG: 'G', SG: 'G', SF: 'F', PF: 'F', C: 'C' }
+const NBA_FAMILY_NOUN: Record<string, string> = { G: 'guards', F: 'forwards', C: 'centers' }
+
+/** The run's copy noun: "guards"/"forwards"/"centers" for NBA, the position for football. */
+export function runLabel(run: PositionRun, sport: Sport): string {
+  return sport === 'nba' ? (NBA_FAMILY_NOUN[run.position] ?? run.position) : run.position
+}
+
+/** Whether a scarcity row / position is part of the run (an NBA run covers its whole family). */
+export function runCovers(run: PositionRun, position: string, sport: Sport): boolean {
+  return sport === 'nba' ? NBA_FAMILY_OF[position] === run.position : run.position === position
+}
+
+/** The single family all of a pick's eligible positions share, or null (spans families / none). */
+function nbaFamily(p: Positioned): string | null {
+  const ps = eligiblePositions(p as Pick<PlayerRef, 'position' | 'positions'>, 'nba')
+  let fam: string | null = null
+  for (const x of ps) {
+    const f = NBA_FAMILY_OF[x]
+    if (f == null || (fam != null && fam !== f)) return null
+    fam = f
+  }
+  return fam
+}
 
 /**
  * The strongest run among the most recent `window` picks, or null.
@@ -62,8 +97,9 @@ export function positionRun(
   const runnable = RUNNABLE_BY_SPORT[sport]
   const counts = new Map<string, number>()
   for (const p of recent) {
-    if (!runnable.has(p.position)) continue
-    counts.set(p.position, (counts.get(p.position) ?? 0) + 1)
+    const key = sport === 'nba' ? nbaFamily(p) : runnable.has(p.position) ? p.position : null
+    if (key == null) continue
+    counts.set(key, (counts.get(key) ?? 0) + 1)
   }
 
   let best: PositionRun | null = null

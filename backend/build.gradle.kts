@@ -45,4 +45,11 @@ tasks.withType<Test> {
     // 2026-09-29: adding three contexts here took 74 ITs from run to skipped. A small pool is plenty
     // for a test JVM.
     systemProperty("spring.datasource.hikari.maximum-pool-size", "3")
+    // spec 025 SC-004: -DregenBaseline=true rewrites Spec025SimBaselineTest's frozen sequence.
+    // Forwarded explicitly because -D on gradlew reaches the Gradle JVM, not the forked test JVM.
+    systemProperty("regenBaseline", System.getProperty("regenBaseline") ?: "")
+    // spec 025 T016: -DregenFixture=true rewrites web/src/__fixtures__/nba-lineup-parity.json.
+    systemProperty("regenFixture", System.getProperty("regenFixture") ?: "")
+    // The fixture is read by the test, so declare it an input; otherwise editing it leaves the test UP-TO-DATE.
+    inputs.files(fileTree("../web/src/__fixtures__") { include("nba-lineup-parity.json") })
 }

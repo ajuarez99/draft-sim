@@ -1,5 +1,40 @@
 # Ball Knowers — handoff
 
+**2026-10-10, branch `025-multi-position-eligibility` (worktree `../draft-sim-025`, built on
+`024-draft-room-ux`): spec 025, multi-position eligibility for NBA players. All 29 tasks are built and
+live-verified locally. NOT committed, NOT merged, NOT deployed.** Merge it with or after 024, and
+only after the 2026-10-10 NBA draft.
+
+- **Why.** Sleeper lists NBA `fantasy_positions` **alphabetically** (1478 of 1478 players), so the
+  app's single "primary" position was alphabetical-first. It was wrong for 48% of multi-position
+  players: Edwards and Booker show as PG but are SG; Tatum and Durant show as PF but are SF. The
+  12-team room hid SG, the SG filter found 0 of 42 SG-eligible players, and auto-drafted rosters
+  read 7–8 of 9 starters where the backend counts 9.
+- **What changed.**
+  - **Data:** every `PlayerRef` carries `positions` (a wire-only change; no migration).
+  - **Scarcity:** counted by eligibility (PG 38 · SG 41 · SF 37 · PF 45 · C 31 on the 2026 draft's
+    top 108).
+  - **Filters and labels:** filters by eligibility; labels show "PG/SG", with no rank on any NBA
+    badge.
+  - **Board cells:** compact cells use family codes (G/F/C).
+  - **Runs:** counted by family, 26 of 163 windows on the 2025 draft.
+  - **"Your team" and "Fills X":** a TypeScript port of `BasketballRules`' seating, pinned by a
+    37-case parity fixture that the backend test regenerates and checks. "Fills X" names the slot
+    that actually fills.
+- **Simulation unchanged (SC-004):** checked by a new 168-pick fixed-seed replay test, the existing
+  frozen-output golden hash, and a diff showing only the wire record changed.
+- **Found by driving it** (unit tests passed every time):
+  - Football scarcity chips said "eligible". Fixed.
+  - **A spec 024 defect:** compact board cells left names 2–3 characters wide. Fixed here (≥ 57 px,
+    142 of 168 fully visible), and the same CSS is applied *uncommitted* in the 024 worktree.
+- **Found by review:** "Fills X" contradicted the strip in 9 of 32 real picks. Fixed by definition.
+- **Owed:**
+  - The follow-up "Use Sleeper's real primary position in the NBA sim" (it changes simulation
+    numbers, so it needs measuring).
+  - Review risks R2–R3 (see `code-review.md`); R1 (steal/reach tint over split cells) is fixed.
+  - Never run against a draft in progress.
+  - Commit: ask Allan.
+
 **2026-10-09, branch `024-draft-room-ux` (worktree `../draft-sim-024`, from `main` at `d145f38`):
 spec 024, the draft room UI/UX redesign borrowed from Sleeper and FantasyAlarm. All five user
 stories are built and live-verified locally. NOT committed, NOT merged, NOT deployed.** Don't merge

@@ -8,11 +8,10 @@ import { reasonSentence } from '../statCopy'
 import DraftStatsTable from './DraftStatsTable'
 import StatPickerModal from './StatPickerModal'
 import { readStatChoice, resetStatChoice, writeStatChoice } from '../statChoice'
-import { filterPositions } from '../positions'
-import { positionRun } from '../pickRun'
+import { eligiblePositions, filterPositions, posPill } from '../positions'
+import { positionRun, runLabel } from '../pickRun'
 import { tierPlayers } from '../tiers'
 import PlayerFace from './PlayerFace'
-import { needLabel } from '../teamNeeds'
 import { posRank } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { matchesSearch } from '../targets'
@@ -127,16 +126,18 @@ type Props = {
   // -- the caller's own board, never a union of both sports'.
   sport: Sport
   /**
-   * The user's own open starting slots, from teamNeeds.openPositions. When
-   * given, each row picks up the same "Fills RB" tag PlayerPicker already puts
-   * on its rows -- the two answers come from one function (openSlotFor), so
-   * the sheet and the picker cannot disagree about what you need.
+   * "Fills X" for a player against the user's own roster, or null -- built in
+   * each room by teamNeeds.makeFitFor from the room's lineup (spec 025 A6), the
+   * same function PlayerPicker and OnTheClockPickInput use, so the sheet and the
+   * pickers cannot disagree about what you need. It takes the PLAYER, not a
+   * position: a multi-position player's fit depends on the whole lineup.
    *
    * Optional and undefined by default: the rooms that don't know whose seat is
    * whose (or aren't showing your roster) should show no tag rather than a tag
-   * computed against somebody else's team.
+   * computed against somebody else's team. Callers must keep it referentially
+   * stable per roster (useMemo) -- the live room re-renders every second.
    */
-  openSlots?: Set<string>
+  fitFor?: (p: PlayerRef) => string | null
   /**
    * The league whose stats the NBA Stats view reads (spec 023). Undefined means the server
    * didn't send it (a backend older than this frontend); either way the Stats option is
@@ -269,7 +270,7 @@ export default function AvailabilityPanel({
   pickedPlayerIds = NO_PICKED,
   started,
   sport,
-  openSlots,
+  fitFor,
   sleeperLeagueId,
   statsPool,
   statsPoolError,
@@ -280,10 +281,10 @@ export default function AvailabilityPanel({
   onRemoveTarget,
 }: Props) {
   const POSITIONS = useMemo(() => filterPositions(sport), [sport])
-  // Undefined openSlots means "don't tag", not "nothing is open" -- an empty
-  // set is the legitimate reading for a team whose starters are all filled,
-  // and the two must not collapse into the same render.
-  const need = (position: string) => (openSlots ? needLabel(sport, position, openSlots) : null)
+  // Undefined fitFor means "don't tag", not "nothing is open" -- a function that
+  // returns null is the legitimate reading for a team whose starters are all
+  // filled, and the two must not collapse into the same render.
+  const need = (p: PlayerRef) => (fitFor ? fitFor(p) : null)
   const [saved] = useState(readStatsState)
   const [filter, setFilter] = useState<string>(() => (POSITIONS.includes(saved.filter) ? saved.filter : 'ALL'))
   const [depth, setDepth] = useState(4)
@@ -338,7 +339,7 @@ export default function AvailabilityPanel({
     let live = 0
     const candidates: ListRow[] = []
     for (const r of merged) {
-      if (filter !== 'ALL' && r.player.position !== filter) continue
+      if (filter !== 'ALL' && !eligiblePositions(r.player, sport).includes(filter)) continue
       if (!matchesSearch(search, r.player.name)) continue
       if (r.taken) {
         if (hideDrafted) continue
@@ -353,7 +354,7 @@ export default function AvailabilityPanel({
       candidates.push(r)
     }
     return candidates
-  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival, search, hideDrafted, draftedPlayers])
+  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival, search, hideDrafted, draftedPlayers, sport])
 
   // Tiers group by consensus ADP (tiers.ts). Inside a tier the sheet's old
   // job survives: when there are survival numbers, the player you are most at
@@ -436,17 +437,17 @@ export default function AvailabilityPanel({
     const pool = withDrafted.filter(
       (p) =>
         (!hideDrafted || !pickedPlayerIds.has(p.id)) &&
-        (filter === 'ALL' || p.position === filter) &&
+        (filter === 'ALL' || eligiblePositions(p, sport).includes(filter)) &&
         matchesSearch(search, p.name),
     )
     const joined = joinPoolStats(
       pool,
       statsBoard.rows,
       (p) => survival.get(p.id) ?? null,
-      (p) => (openSlots ? needLabel(sport, p.position, openSlots) : null),
+      (p) => (fitFor ? fitFor(p) : null),
     )
     return sortDraftRows(filterLikely(joined, likelyOnly), statSort, statMode)
-  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, showSurvival, nextMyPick, openSlots, sport, likelyOnly, statSort, statMode, hideDrafted, draftedPlayers, search])
+  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, showSurvival, nextMyPick, fitFor, sport, likelyOnly, statSort, statMode, hideDrafted, draftedPlayers, search])
   const statColumns = useMemo(() => statIds.map((id) => COLUMNS[id]).filter(Boolean), [statIds])
   // Callbacks and the label below are stable across renders so the memoized table skips the
   // live room's once-a-second re-render (SC-006).
@@ -590,7 +591,7 @@ export default function AvailabilityPanel({
       <div className="avail-scroll panel-body">
         {run && (
           <p className="avail-run" role="note">
-            <strong>{run.position} run:</strong> {run.count} of the last {run.window} picks
+            <strong>{runLabel(run, sport)} run:</strong> {run.count} of the last {run.window} picks
           </p>
         )}
         {inStats && (
@@ -686,7 +687,7 @@ export default function AvailabilityPanel({
                               onToggle={toggleTarget}
                             />
                           )}
-                          <span className={`pos ${r.player.position}`}>{posRank(r.player)}</span>
+                          <span {...posPill(r.player, sport)}>{posRank(r.player, sport)}</span>
                           <PlayerFace
                             sport={sport}
                             sleeperId={r.player.sleeperId}
@@ -698,7 +699,7 @@ export default function AvailabilityPanel({
                           <span className="pc-name" title={r.player.name}>{r.player.name}</span>
                           <span className="team">{r.player.team}</span>
                           {r.taken && <span className="taken-tag">taken</span>}
-                          {!r.taken && need(r.player.position) && <span className="need-tag">{need(r.player.position)}</span>}
+                          {!r.taken && need(r.player) && <span className="need-tag">{need(r.player)}</span>}
                         </div>
                       </td>
                       <td className="num">{Math.round(r.player.adp)}</td>

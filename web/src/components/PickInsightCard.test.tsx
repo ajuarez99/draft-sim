@@ -18,7 +18,7 @@ function insightFor(player: PlayerRef, pickNo = 16, prior: PlayerRef[] = []): Pi
 function renderCard(insight: PickInsight, over: Partial<Parameters<typeof PickInsightCard>[0]> = {}) {
   const onClose = vi.fn()
   const utils = render(
-    <PickInsightCard insight={insight} teams={TEAMS} autoFocus={false} onClose={onClose} {...over} />,
+    <PickInsightCard insight={insight} teams={TEAMS} autoFocus={false} onClose={onClose} {...over} sport={over.sport ?? 'nfl'} />,
   )
   return { onClose, ...utils }
 }
@@ -96,6 +96,7 @@ describe('PickInsightCard rows 1-3', () => {
     rerender(
       <PickInsightCard
         insight={insightFor(mkPlayer('RB'))}
+        sport="nfl"
         teams={TEAMS}
         autoFocus={false}
         onClose={() => {}}
