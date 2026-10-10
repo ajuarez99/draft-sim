@@ -198,6 +198,13 @@ public class LeagueIngestService {
                 JsonUtil.write(slotToManager), reversalRound, pickTimerSeconds);
 
         List<Map<String, Object>> raw = sleeper.draftPicks(draftId);
+        // Spec 028: a reset Sleeper draft (pre_draft + empty list) must drop what we
+        // stored. Narrow on purpose -- null or any other status leaves picks alone.
+        if (LiveDraftPoller.shouldClearStalePicks(str(draft.get("status")), raw)) {
+            int cleared = drafts.clearPicks(id);
+            if (cleared > 0) log.info("draft {} is pre_draft with an empty Sleeper pick list: cleared {} stale stored pick(s)", draftId, cleared);
+            return 0;
+        }
         if (raw == null || raw.isEmpty()) return 0;
 
         List<DraftRepository.PickRow> rows = new ArrayList<>(raw.size());

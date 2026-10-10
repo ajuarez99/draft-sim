@@ -152,6 +152,23 @@ public class DraftRepository {
         if (p.adpAtTime() == null) ps.setNull(7, Types.NUMERIC); else ps.setDouble(7, p.adpAtTime());
     }
 
+    /** How many picks are stored for this draft. Cheap guard so a pre_draft poller only asks Sleeper about picks when there is something to clear. */
+    public int countPicks(long draftId) {
+        Integer n = jdbc.queryForObject("select count(*) from draft_pick where draft_id = ?", Integer.class, draftId);
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * Deletes every stored pick of one draft and returns how many went. ONLY for
+     * the Sleeper-draft-was-reset case; callers must have passed
+     * {@code LiveDraftPoller.shouldClearStalePicks} (pre_draft AND Sleeper
+     * returned a successfully-parsed empty pick list). Never call this on a
+     * draft in progress.
+     */
+    public int clearPicks(long draftId) {
+        return jdbc.update("delete from draft_pick where draft_id = ?", draftId);
+    }
+
     /** Flips only status, without needing the full row this poller doesn't have on hand. */
     public void updateStatus(long draftId, String status) {
         jdbc.update("update draft set status = ? where id = ?", status, draftId);

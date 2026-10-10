@@ -434,6 +434,7 @@ public class LiveDraftPoller {
         Map<Integer, Long> slotLookup = refreshSeatMap(draft, raw, managerByUserId);
 
         if ("pre_draft".equals(status)) {
+            clearStalePicksIfReset(draft);
             return publishTick(draft, new Tick(true, status, slotLookup.size(), true), 0, 0);
         }
 
@@ -478,6 +479,40 @@ public class LiveDraftPoller {
         for (DraftRepository.PickRow r : rows) lastPickNo = Math.max(lastPickNo, r.pickNo());
         return publishTick(draft, new Tick(!complete, status, slotLookup.size(), true),
                 rows.size(), lastPickNo);
+    }
+
+    /**
+     * The one deletion rule for a reset Sleeper draft (spec 028): clear stored picks
+     * ONLY when Sleeper says the draft is pre_draft AND its picks endpoint returned
+     * a successfully-parsed, empty list. Null (empty/unparseable body), an error,
+     * or any other status ("drafting", "paused", "complete") never deletes -- a
+     * transient Sleeper hiccup mid-draft must not be able to wipe the picks.
+     */
+    public static boolean shouldClearStalePicks(String status, List<?> sleeperPicks) {
+        return "pre_draft".equals(status) && sleeperPicks != null && sleeperPicks.isEmpty();
+    }
+
+    /**
+     * pre_draft branch of pollOnce. A reset draft returns to pre_draft with zero
+     * picks, but nothing used to delete what we had stored. Only asks Sleeper when
+     * we actually hold picks, so an ordinary pre_draft draft costs no extra call.
+     * A fetch failure here is logged and swallowed (never a delete, and it must
+     * not fail the tick). The tick published right after reports picksMade=0,
+     * which is what tells open browsers the picks are gone; sim start state and
+     * board are read from draft_pick per request, so there is no cache to bust.
+     */
+    private void clearStalePicksIfReset(DraftRepository.DraftRow draft) {
+        try {
+            if (drafts.countPicks(draft.id()) <= 0) return;
+            List<Map<String, Object>> sleeperPicks = sleeper.draftPicks(draft.sleeperDraftId());
+            if (shouldClearStalePicks("pre_draft", sleeperPicks)) {
+                int cleared = drafts.clearPicks(draft.id());
+                log.info("draft {} is pre_draft with an empty Sleeper pick list: cleared {} stale stored pick(s) (Sleeper draft was reset)",
+                        draft.id(), cleared);
+            }
+        } catch (RuntimeException e) {
+            log.warn("pre_draft stale-pick check failed for draft {} -- leaving stored picks untouched", draft.id(), e);
+        }
     }
 
     /**
