@@ -397,6 +397,59 @@ class LiveDraftPollerTest {
     }
 
     /**
+     * Spec 029: while Sleeper says drafting, the loop sleeps the drafting interval,
+     * not the 10s one. With a 5s slow interval and a 20ms drafting interval, a
+     * second of drafting must see many ticks -- the old loop would see one.
+     */
+    @Test
+    void aDraftingDraftIsPolledAtTheDraftingInterval() throws InterruptedException {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players,
+                Duration.ofSeconds(5), Duration.ofHours(1), Duration.ofMillis(20));
+        DraftRepository.DraftRow draft = draftRow("drafting");
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "drafting");
+        CountDownLatch fiveTicks = new CountDownLatch(5);
+        when(sleeper.draft("sleeper-draft-123")).thenAnswer(inv -> {
+            fiveTicks.countDown();
+            return raw;
+        });
+        lenient().when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+        lenient().when(drafts.sportOf(anyLong())).thenReturn(java.util.Optional.of(Sport.NBA));
+        lenient().when(players.idsBySleeperId(any())).thenReturn(Map.of());
+        lenient().when(sleeper.draftPicks("sleeper-draft-123")).thenReturn(List.of());
+
+        Thread t = Thread.ofVirtual().start(() -> poller.loop(draft));
+        boolean fast = fiveTicks.await(3, TimeUnit.SECONDS);
+        t.interrupt();
+        t.join(Duration.ofSeconds(5));
+        assertTrue(fast, "five drafting ticks did not happen within 3s -- the loop is still sleeping the slow interval");
+    }
+
+    /** The control for the test above: pre_draft keeps the slow interval. */
+    @Test
+    void aPreDraftDraftKeepsTheSlowInterval() throws InterruptedException {
+        poller = new LiveDraftPoller(sleeper, drafts, managers, players,
+                Duration.ofSeconds(5), Duration.ofHours(1), Duration.ofMillis(20));
+        DraftRepository.DraftRow draft = draftRow("pre_draft");
+
+        Map<String, Object> raw = new LinkedHashMap<>();
+        raw.put("status", "pre_draft");
+        java.util.concurrent.atomic.AtomicInteger ticks = new java.util.concurrent.atomic.AtomicInteger();
+        when(sleeper.draft("sleeper-draft-123")).thenAnswer(inv -> {
+            ticks.incrementAndGet();
+            return raw;
+        });
+        lenient().when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+
+        Thread t = Thread.ofVirtual().start(() -> poller.loop(draft));
+        Thread.sleep(500);
+        t.interrupt();
+        t.join(Duration.ofSeconds(5));
+        assertEquals(1, ticks.get(), "pre_draft must not poll at the drafting interval");
+    }
+
+    /**
      * A draft that never starts must not be polled forever. pollOnce returns
      * keepPolling=true for pre_draft, so opening the live page on a draft
      * scheduled for next month used to leave a thread hitting Sleeper every ten

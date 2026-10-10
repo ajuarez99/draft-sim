@@ -40,6 +40,19 @@ public class LiveDraftPoller {
     private static final Logger log = LoggerFactory.getLogger(LiveDraftPoller.class);
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(10);
 
+    // While Sleeper says "drafting", ticks run this often instead (spec 029). The
+    // 10s interval put up to ten seconds between a pick on Sleeper and the server
+    // even asking about it -- measured 2026-10-10 on a test-league draft, where
+    // Sleeper answered in 70-250 ms and a 500-iteration resim took ~0.1-1 s, so the
+    // sleep was the dominant wait. At 2s one draft costs ~60 Sleeper calls a
+    // minute (draft + picks per tick), under Sleeper's ~1000/min guidance.
+    // pre_draft, paused and any failure keep the 10s interval and its backoff.
+    private static final Duration DRAFTING_INTERVAL = Duration.ofSeconds(2);
+
+    // A tick slower than this logs a WARN with its duration, so a slow draft night
+    // leaves a number behind instead of an impression.
+    private static final Duration SLOW_TICK = Duration.ofSeconds(1);
+
     // Consecutive failures stretch the interval to at most 6x (60s). The failure
     // mode this guards is Sleeper rate-limiting us: hammering a 429 produces more
     // 429s, so a run of failures is exactly when polling harder is worst. Capped
@@ -68,6 +81,7 @@ public class LiveDraftPoller {
     private final ManagerRepository managers;
     private final PlayerRepository players;
     private final Duration pollInterval;
+    private final Duration draftingInterval;
     private final Duration preDraftMax;
 
     private final ConcurrentHashMap<Long, Thread> active = new ConcurrentHashMap<>();
@@ -112,7 +126,7 @@ public class LiveDraftPoller {
     @Autowired
     public LiveDraftPoller(SleeperClient sleeper, DraftRepository drafts,
                            ManagerRepository managers, PlayerRepository players) {
-        this(sleeper, drafts, managers, players, POLL_INTERVAL);
+        this(sleeper, drafts, managers, players, POLL_INTERVAL, PRE_DRAFT_MAX, DRAFTING_INTERVAL);
     }
 
     /**
@@ -133,11 +147,20 @@ public class LiveDraftPoller {
     LiveDraftPoller(SleeperClient sleeper, DraftRepository drafts,
                     ManagerRepository managers, PlayerRepository players,
                     Duration pollInterval, Duration preDraftMax) {
+        // The test seams keep one interval for every status, so the loop tests'
+        // timing means what it meant before spec 029.
+        this(sleeper, drafts, managers, players, pollInterval, preDraftMax, pollInterval);
+    }
+
+    LiveDraftPoller(SleeperClient sleeper, DraftRepository drafts,
+                    ManagerRepository managers, PlayerRepository players,
+                    Duration pollInterval, Duration preDraftMax, Duration draftingInterval) {
         this.sleeper = sleeper;
         this.drafts = drafts;
         this.managers = managers;
         this.players = players;
         this.pollInterval = pollInterval;
+        this.draftingInterval = draftingInterval;
         this.preDraftMax = preDraftMax;
     }
 
@@ -367,6 +390,7 @@ public class LiveDraftPoller {
         // DST change landing mid-draft.
         long preDraftDeadline = System.nanoTime() + preDraftMax.toNanos();
         boolean everStarted = false;
+        String lastStatus = null;
         while (!Thread.currentThread().isInterrupted()) {
             // Checked before the tick rather than after, so a run of Sleeper
             // failures -- which leave the status unknown and so never clear
@@ -378,7 +402,13 @@ public class LiveDraftPoller {
                 break;
             }
             try {
+                long started = System.nanoTime();
                 Tick tick = pollOnce(draft);
+                long tookMs = (System.nanoTime() - started) / 1_000_000;
+                if (tookMs >= SLOW_TICK.toMillis()) {
+                    log.warn("slow poll tick for draft {}: {} ms (status {})", draft.id(), tookMs, tick.status());
+                }
+                lastStatus = tick.status();
                 // Anything that is not pre_draft means the draft is underway (or
                 // over, in which case keepPolling ends this on the next line
                 // anyway). From here the loop runs until Sleeper says complete,
@@ -398,8 +428,7 @@ public class LiveDraftPoller {
             // rate limit, which is itself an exception, which sustains the loop.
             // A self-inflicted outage, on draft night, from one transient 500.
             try {
-                Thread.sleep(pollInterval.multipliedBy(
-                        Math.min(consecutiveFailures + 1, MAX_BACKOFF_MULTIPLIER)));
+                Thread.sleep(sleepFor(lastStatus, consecutiveFailures, pollInterval, draftingInterval));
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
@@ -411,6 +440,20 @@ public class LiveDraftPoller {
         // the draft is still in `active`, and leaving a stale one behind would let a
         // later /track answer from an observation nothing is refreshing any more.
         lastTick.remove(draft.id());
+    }
+
+    /**
+     * How long the loop sleeps after a tick (spec 029). The fast interval only while
+     * the last successful tick saw "drafting" AND nothing is failing: a failure falls
+     * back to the 10s interval times the backoff multiplier, exactly as before, so a
+     * rate-limited Sleeper is never polled harder. lastStatus is the last
+     * successful tick's, so a failing tick doesn't reset it -- but the failure
+     * count alone already selects the slow path.
+     */
+    static Duration sleepFor(String lastStatus, int consecutiveFailures,
+                             Duration pollInterval, Duration draftingInterval) {
+        if (consecutiveFailures == 0 && "drafting".equals(lastStatus)) return draftingInterval;
+        return pollInterval.multipliedBy(Math.min(consecutiveFailures + 1, MAX_BACKOFF_MULTIPLIER));
     }
 
     /** One Sleeper fetch + (conditionally) one upsert + one status write. No sleep -- unit-testable. */
