@@ -257,6 +257,14 @@ export default function LiveDraftView() {
   // an autopick burst of more than 12), so ask the server for the lot.
   useEffect(() => {
     const known = realPicksRef.current
+    // Spec 028: the Sleeper draft was reset. realPicks is merge-only, so without
+    // this the old picks would stay on screen forever. Narrow, like the backend
+    // rule: only a pre_draft frame reporting zero picks counts, never a frame
+    // that is merely older than a fetch.
+    if (live && live.status === 'pre_draft' && live.picksMade === 0 && known != null && known.length > 0) {
+      setRealPicks([])
+      return
+    }
     if (!live || known == null || live.recentPicks.length === 0) return
     const highest = known.reduce((m, p) => Math.max(m, p.pickNo), 0)
     if (live.recentPicks[0].pickNo > highest + 1) loadRealPicks()
@@ -520,6 +528,12 @@ export default function LiveDraftView() {
     if (live == null || !realPicksSettled) return
     const newest = landedPicks.length ? landedPicks[landedPicks.length - 1].pickNo : 0
     if (seenThroughRef.current == null) {
+      seenThroughRef.current = newest
+      return
+    }
+    // Spec 028: the list shrank (draft reset). Rewind, or the first new pick after
+    // the reset would never open its card.
+    if (newest < seenThroughRef.current) {
       seenThroughRef.current = newest
       return
     }

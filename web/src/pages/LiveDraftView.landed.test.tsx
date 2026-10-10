@@ -134,4 +134,25 @@ describe('the landed list comes from facts', () => {
 
     await waitFor(() => expect(screen.getByText('Fills RB2')).toBeTruthy())
   })
+
+  it('drops the old picks when a pre_draft frame reports zero (the Sleeper draft was reset)', async () => {
+    const all = draftThrough(30)
+    liveValue = mkLive(all, TEAMS)
+    getRealDraftBoard.mockResolvedValue({ draftId: 'd1', teams: TEAMS, rounds: 15, status: 'drafting', picks: all })
+
+    const view = renderRoom()
+    await waitFor(() => expect(boardSeen.last.length).toBe(30))
+
+    liveValue = mkLive([], TEAMS, { status: 'pre_draft' })
+    view.rerender(
+      <MemoryRouter initialEntries={['/live/d1']}>
+        <Routes>
+          <Route path="/live/:draftId" element={<LiveDraftView />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(boardSeen.last.length).toBe(0))
+    expect(screen.queryByText('Player 30')).toBeNull()
+  })
 })

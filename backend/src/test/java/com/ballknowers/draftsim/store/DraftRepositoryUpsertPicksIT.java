@@ -190,4 +190,23 @@ class DraftRepositoryUpsertPicksIT {
         boolean leaked = drafts.allCompletedPicks(Sport.NFL).stream().anyMatch(p -> p.draftId() == draftId);
         assertFalse(leaked, "a pick under a 'drafting' draft must not appear in allCompletedPicks()");
     }
+
+    /** Spec 028: clearPicks deletes only this draft's rows and reports the count (SQL executed for real). */
+    @Test
+    void clearPicksDeletesOnlyThisDraftsPicksAndReturnsTheCount() {
+        long otherDraft = drafts.upsert(leagueId, "it-draft-clear-other", 2026, 15, 14, "snake", "drafting", null, "{}");
+        drafts.upsertPicks(draftId, List.of(
+                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
+                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+        drafts.upsertPicks(otherDraft, List.of(
+                new DraftRepository.PickRow(otherDraft, 1, 1, 1, managerId, null, null)));
+        assertEquals(2, drafts.countPicks(draftId));
+
+        assertEquals(2, drafts.clearPicks(draftId));
+
+        assertEquals(0, drafts.countPicks(draftId));
+        assertTrue(drafts.picks(draftId).isEmpty());
+        assertEquals(1, drafts.countPicks(otherDraft), "another draft's picks must be untouched");
+        assertEquals(0, drafts.clearPicks(draftId), "clearing an already-empty draft is a no-op returning 0");
+    }
 }
