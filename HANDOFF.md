@@ -1,5 +1,62 @@
 # Ball Knowers — handoff
 
+## START HERE (written 2026-10-10, for the session after the NBA draft)
+
+**Specs 024 and 025 are both merged and DEPLOYED** (PR #26 merged 025 into 024, then PR #25 merged 024 into `main` at `7b7472c`, on 2026-10-10, the day of the "Ball Knowers" NBA draft, 19:15 UTC).
+
+**Production was checked read-only right after the deploy:**
+- the backend health is up;
+- V30 applied;
+- `seats` carries `draftType: "snake"`;
+- the pool carries `positions` (Edwards `[PG,SG]`, Şengün `[C,PF]`);
+- the frontend serves bundle `index-h-PytgAf.js`, which contains spec 025's copy.
+
+**Neither spec has ever run against a draft in progress.** Last night's draft was the first real use. The list below is what's owed to make the work complete, in order.
+
+### 1. Check how the live room did on draft night (do this first)
+- **The pick timer.** Ask Allan how the room behaved, and check production read-only. `GET https://api.ballknowers.co/api/drafts/1339351318128517120/seats` with `X-Sleeper-User: 1122386008709910528` returns `pickTimerSeconds`. It was **null right after the deploy**: V30 created the column, and it fills when the live poller ticks or the league is re-ingested. If it is still null after the draft ran, the poller-write path (`LiveDraftPoller.pollOnce` → `DraftRepository.updatePickTimer`) never ran in production, so investigate.
+- **The live room mid-draft.** These have only been measured pre-draft or on a finished board:
+  - **List rows** on the live board: 8 is arithmetic, `(310−88)/27`; it was never counted on a draft in progress.
+  - **Pick cards and the compact row:** whether they kept up, and what the feed ticker showed.
+  - **The targets strip** in a real room: "TAKEN" marks as picks landed, and survival numbers once the seat was known.
+  - **"Fills X" tags** against the team strip as real picks landed (spec 025 B1).
+- **If anything broke:** `git revert -m 1 7b7472c` restores the pre-024 room. Don't do it without Allan.
+
+### 2. Record the deploy in the spec docs
+Add a "Deployed 2026-10-10" section to `specs/024-draft-room-ux/verification.md` and `specs/025-multi-position-eligibility/verification.md`, with the production checks above and whatever step 1 finds. Neither file mentions the deploy yet.
+
+### 3. The real NBA primary position in the simulation (the biggest remaining piece)
+- **The problem.** Sleeper's `fantasy_positions` is **alphabetical** (lessons #38). `Player.primary()` = `positions[0]` is therefore wrong for 48% of multi-position NBA players: Edwards "PG", Durant "PF".
+- **What spec 025 left alone:** the uses below still run on that alphabetical-first position. Spec 025 only stopped *labels* from presenting it.
+  - manager positional-tilt fitting (`ProfileService.java:135`);
+  - the board's position and positional rank (`BoardService.java:128`);
+  - `onBrand.ts`'s lean (research R9).
+- **The fix.** Store Sleeper's own `position` field at ingest (an append-only migration, V31 or later; check the highest first). Use it for `primary()` in NBA, then **measure the before and after**: fitted NBA tilts, `Spec025SimBaselineTest`, and `EngineOutputFrozenTest`. Both of those tests will change on purpose. Re-baseline them deliberately and say so. **Never edit `weights.yml` to match.**
+- **The data.** The chip "Use Sleeper's real primary position in the NBA sim" carries the measured examples. It should be its own spec (026), run through the full pipeline (plan → adversarial review → build → review → live).
+
+### 4. Smaller owed items, all recorded in the spec docs
+- **Spec 025 review** (`specs/025-multi-position-eligibility/code-review.md`):
+  - **R2:** football is unaffected only because no active NFL player has two positions.
+  - **R3:** the TypeScript seating (`lineup.ts`) accepts any lineup template, while the backend hardcodes nine slots.
+  - **Nits:**
+    - the feed says "UTIL2" where the tag says "Fills UTIL";
+    - a pill shows at most 3 colours;
+    - an NBA player with no position gets WR colours;
+    - the parity fixture has no ADP-tie or no-position cases;
+    - the ScarcityMeter run sentence vanishes if every chip in the running family is hidden.
+- **Spec 024 review** (`specs/024-draft-room-ux/code-review-frontend.md`): **R7**, a "linear" draft-type label over a board that always draws snake; **R8**, the stars without an identity.
+- **Spec 024 edge case not met:** a Sleeper draft reset leaves stale "taken" marks, because of the open bug where `upsertPicks` never deletes picks (memory: "Sleeper draft reset leaves stale picks").
+- **Idea, not built:** the team strip labels a filled entry with the player's positions ("PG/SG"). It could show *which slot* he fills instead (PG/SG/G/UTIL), now that seating follows the backend.
+- **Research gap:** the Sleeper research agent only saw the signed-out lobby (`specs/024-draft-room-ux/research/sleeper.md`). If Allan signs into Sleeper in the in-app browser, a re-run could study the live draft room.
+
+### 5. Housekeeping
+- **Local dev servers** from 2026-10-10 may still be running: `draft-sim-025-api-8096` and `draft-sim-025-web-5197`. Stop them (`preview_stop`) if so.
+- **The main checkout** `C:\Users\allan\source\draft-sim` is on branch `017-nba-schedule-grid`, with an uncommitted `.claude/launch.json`. Peer sessions added entries there, and so did this one: the 024 and 025 entries on ports 8094/5195/8095/5196/8096/5197. Don't commit it blindly (memory: concurrent sessions).
+- **Worktrees** `../draft-sim-024` and `../draft-sim-025` are merged and can be removed once nothing is running from them (`git worktree remove`).
+- **This handoff entry** was committed locally on `main` (worktree `.claude/worktrees/main-merge-006`) and **not pushed**, so production wasn't redeployed before the draft for a docs change. Railway has no watch paths, so any push to `main` redeploys. Push it once the draft is over.
+
+---
+
 **2026-10-10, branch `025-multi-position-eligibility` (worktree `../draft-sim-025`, built on
 `024-draft-room-ux`): spec 025, multi-position eligibility for NBA players. All 29 tasks are built and
 live-verified locally. NOT committed, NOT merged, NOT deployed.** Merge it with or after 024, and
