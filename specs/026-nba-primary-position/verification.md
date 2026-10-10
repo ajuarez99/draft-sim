@@ -45,3 +45,11 @@ Local re-ingest before/after tilts, live UI, prod. The full backend suite was de
   - The format line reads "12 teams · 14 rounds · 1 min 30 s · snake · order reverses from round 3". That's 024 R7 from branch 027.
   - No console errors.
 - **Still not verified:** prod. That needs the deploy, then Allan's `POST /api/ingest/players?sport=nba` with `X-Admin-Token`, then a check that Edwards reads `{SG,PG}`.
+
+## Production (2026-10-10, 16:27 UTC) — VERIFIED
+
+- Deployed with `main` `6787b2b`. The frontend bundle `index-UqUMPUv4.js` carries the 026/027 copy.
+- `POST api.ballknowers.co/api/ingest/players?sport=nba` (admin token) returned HTTP 200 with `playersWritten: 2119`.
+- **Prod `/seats` before:** at 15:34 UTC, theadambomb98's tilt was `{PG, SF, PF, C}`, with no SG.
+- **Prod `/seats` after:** all 12 managers carry an SG tilt (0.67–1.60). The old backend's ingest would have rewritten alphabetical order, so this also confirms the new backend was serving.
+- Draft `1339351318128517120` still `pre_draft`, with `pickTimerSeconds: 90`.
