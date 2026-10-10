@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { mkPlayer } from '../testLiveRoom'
 import type { MarkedTarget } from '../targets'
-import TargetStrip, { EMPTY_COPY, LIVE_COPY, MOCK_NOTE, UNAVAILABLE_COPY } from './TargetStrip'
+import TargetStrip, { EMPTY_COPY, LIVE_COPY, MOCK_NOTE, SIGNED_OUT_COPY, UNAVAILABLE_COPY } from './TargetStrip'
 
 const mk = (name: string, over: Partial<MarkedTarget> = {}): MarkedTarget => {
   const player = mkPlayer('RB', name)
@@ -127,5 +127,11 @@ describe('TargetStrip', () => {
     rerender(<TargetStrip {...p} />)
     fireEvent.click(screen.getByRole('button', { name: /Couldn.t load targets — retry/ }))
     expect(p.onRetry).toHaveBeenCalled()
+  })
+
+  it('a signed-out caller gets a sign-in note, not a retry button (review R8)', () => {
+    render(<TargetStrip {...props({ status: 'signedOut' })} />)
+    expect(screen.getByText(SIGNED_OUT_COPY)).toBeInTheDocument()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 })

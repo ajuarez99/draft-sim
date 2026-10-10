@@ -71,6 +71,19 @@ describe('multi-position pills, cells and accents (spec 025 US2)', () => {
     ])
   })
 
+  it('an NBA player with no position gets no football tint or colour (review N3)', () => {
+    const { container } = renderBoard([mkPlayer('WR', 'Nobody', 50)], 'full')
+    const cell = cellOf(container, 1)
+    expect(cell.className).not.toContain('pos-')
+    expect((cell.querySelector('.pos') as HTMLElement).className).toBe('pos')
+  })
+
+  it('a four-position player keeps all four colours (review N2)', () => {
+    const { container } = renderBoard([multi('Swiss', ['PG', 'SG', 'SF', 'PF'])], 'full')
+    const pill = cellOf(container, 1).querySelector('.pos') as HTMLElement
+    expect(pill.style.getPropertyValue('--pos-d')).toBe('var(--pf)')
+  })
+
   it('single-position cells are unchanged: solid class, no inline style, bare label', () => {
     const { container } = renderBoard([{ ...mkPlayer('C', 'Jokic', 3), positions: ['C'] }], 'compact')
     const cell = cellOf(container, 1)

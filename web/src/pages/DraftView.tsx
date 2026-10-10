@@ -486,6 +486,7 @@ export default function DraftView() {
       rounds={seats.rounds}
       pickTimerSeconds={seats.pickTimerSeconds}
       draftType={seats.draftType}
+      reversalRound={seats.reversalRound}
     />
   ) : null
 

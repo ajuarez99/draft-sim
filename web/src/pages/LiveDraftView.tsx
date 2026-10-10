@@ -884,6 +884,7 @@ export default function LiveDraftView() {
                     rounds={seats.rounds}
                     pickTimerSeconds={seats.pickTimerSeconds}
                     draftType={seats.draftType}
+                    reversalRound={seats.reversalRound}
                   />
                 ) : undefined
               }

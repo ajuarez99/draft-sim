@@ -80,7 +80,7 @@ describe('B1: the named slot is the one the re-seated lineup newly fills', () =>
     expect(open).not.toContain(fills)
   })
 
-  it('fitSlot numbers by the same index (second UTIL when the second UTIL is the one filled)', () => {
+  it('fitSlot names the bare slot for NBA, agreeing with the tag (review N1)', () => {
     // Fill every dedicated/pooled slot so only the two UTILs are left.
     const roster = [
       ref({ id: 1, positions: ['PG'], adp: 1 }),
@@ -95,7 +95,7 @@ describe('B1: the named slot is the one the re-seated lineup newly fills', () =>
     const needs = computeTeamNeeds('nba', TEMPLATE, roster)
     expect(needs.filter((n) => n.player == null).map((n) => n.slot)).toEqual(['UTIL'])
     const cand = ref({ id: 9, positions: ['C'], adp: 30 })
-    expect(fitSlot('nba', cand, needs)).toBe('UTIL2')
+    expect(fitSlot('nba', cand, needs)).toBe('UTIL')
     // and the bare-name tag agrees about the kind
     expect(makeFitFor('nba', needs)(cand)).toBe('Fills UTIL')
   })

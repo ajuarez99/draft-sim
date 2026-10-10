@@ -4,7 +4,7 @@ import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
-import { familyCode, multiVars, positionLabel, posPill } from '../positions'
+import { eligiblePositions, familyCode, multiVars, positionLabel, posPill } from '../positions'
 import { PROVENANCE_LABEL } from '../provenance'
 import { isForward, pickNoAt } from '../snake'
 import { roundPickLabel } from '../roundPickLabel'
@@ -251,7 +251,14 @@ export default function DraftBoard({
                 const cls =
                   `cell kind-${kind}` +
                   // A multi-position player never takes his first position's tint (A7): split instead.
-                  (shown ? (multi ? ' pos-multi' : ` pos-${shown.position}`) : '') +
+                  (shown
+                    ? multi
+                      ? ' pos-multi'
+                      : // An NBA player with no position gets no football tint (review N3).
+                        eligiblePositions(shown, sport).length > 0
+                        ? ` pos-${shown.position}`
+                        : ''
+                    : '') +
                   (value && (value.kind === 'steal' || value.kind === 'reach') ? ` value-${value.kind}` : '') +
                   (gradeKind ? ` value-${gradeKind}` : '') +
                   (chosen ? ' chosen' : visible && !visible.isModal && room === 'projection' ? ' uncertain' : '') +

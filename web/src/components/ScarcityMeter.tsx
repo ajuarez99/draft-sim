@@ -44,6 +44,9 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
   // An NBA run covers a whole family, so both PG and SG chips are "running" -- say the
   // sentence once, on the first running chip, instead of repeating it on each.
   const runChip = shown.find((r) => r.running)?.position
+  // If every chip in the running family is hidden (poolSize 0), no chip can carry the
+  // sentence -- print it once on its own so the run is never silently dropped (review N8).
+  const runLoose = runChip == null && run != null && scarcity.rows.some((r) => r.running)
   return (
     <div className="scarcity-meter" aria-label="Position scarcity">
       <ul className="scarcity-chips">
@@ -72,6 +75,9 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
           </li>
         ))}
       </ul>
+      {runLoose && run && (
+        <p className="scarcity-run cond">{`${run.count} of the last ${run.window} were ${runLabel(run, scarcity.sport)}`}</p>
+      )}
       {hidden.length > 0 && (
         <p className="scarcity-note muted">
           {multi

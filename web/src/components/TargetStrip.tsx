@@ -15,6 +15,7 @@ export const EMPTY_COPY = 'Star a player in the list to target them.'
 export const LIVE_COPY = 'Picks are made on Sleeper — this list only watches.'
 export const MOCK_NOTE = "Mocks don't run a simulation, so there's no survival number."
 export const UNAVAILABLE_COPY = "Targets aren't available on this server yet."
+export const SIGNED_OUT_COPY = 'Sign in to keep a target list.'
 
 type Props = {
   items: MarkedTarget[]
@@ -47,7 +48,7 @@ export default function TargetStrip({ items, status, error, sport, survivalOf, r
   // The measured div only exists in the main branch; the unavailable / loadFailed branches unmount
   // it. Depending on whether it is mounted re-attaches the observer to the new div after a
   // load-failure retry, so "+N" collapsing keeps working.
-  const mainMounted = status !== 'unavailable' && status !== 'loadFailed'
+  const mainMounted = status !== 'unavailable' && status !== 'signedOut' && status !== 'loadFailed'
   useEffect(() => {
     const el = rootRef.current
     if (!mainMounted || !el || typeof ResizeObserver === 'undefined') return
@@ -71,10 +72,10 @@ export default function TargetStrip({ items, status, error, sport, survivalOf, r
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
-  if (status === 'unavailable') {
+  if (status === 'unavailable' || status === 'signedOut') {
     return (
       <div className="target-strip target-strip-note" data-room={room}>
-        <span className="muted small">{UNAVAILABLE_COPY}</span>
+        <span className="muted small">{status === 'signedOut' ? SIGNED_OUT_COPY : UNAVAILABLE_COPY}</span>
       </div>
     )
   }

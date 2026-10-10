@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getTargets, putTargets, type PlayerRef, type TargetScope } from './api'
-import { isNotFound } from './apiError'
+import { isNotFound, isUnauthorized } from './apiError'
 import { itemsFromServer, type TargetItem } from './targets'
 
 /**
  * loading: first fetch in the air. ready: editable. unavailable: the server predates the
- * endpoint (404). loadFailed: the first fetch failed for another reason; editing is held
+ * endpoint (404). signedOut: a save came back 401 -- a caller with no identity can read an
+ * empty list but never write one, so stars are hidden rather than failing on every click
+ * (spec 024 review R8). loadFailed: the first fetch failed for another reason; editing is held
  * back because saving from an empty list would overwrite whatever the server has.
  */
-export type TargetsStatus = 'loading' | 'ready' | 'unavailable' | 'loadFailed'
+export type TargetsStatus = 'loading' | 'ready' | 'unavailable' | 'signedOut' | 'loadFailed'
 
 export type UseTargets = {
   items: TargetItem[]
@@ -97,6 +99,10 @@ export function useTargets(scope: TargetScope | null): UseTargets {
       if (isNotFound(e)) {
         dirty.current = false
         setStatus('unavailable')
+      } else if (isUnauthorized(e)) {
+        dirty.current = false
+        setItems([])
+        setStatus('signedOut')
       } else {
         setErr(true) // the local list stays on screen and stays dirty
       }

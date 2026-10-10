@@ -203,11 +203,11 @@ describe('naming the slot a pick fills', () => {
     expect(fitSlot('nfl', player('RB', 99), needs)).toBe('FLEX2')
   })
 
-  it('reports the most specific open slot in basketball, numbered where the template repeats', () => {
+  it('reports the most specific open slot in basketball, bare-named even where the template repeats', () => {
     const full = ['PG', 'SG', 'SF', 'PF', 'C'].map((p, i) => player(p, i + 1))
     // Every dedicated slot and both pooled G/F seats taken -- only UTIL is left.
     const needs = computeTeamNeeds('nba', NBA_TEMPLATE, [...full, player('PG', 6), player('SF', 7)])
-    expect(fitSlot('nba', player('PG', 99), needs)).toBe('UTIL1')
+    expect(fitSlot('nba', player('PG', 99), needs)).toBe('UTIL')
     const early = computeTeamNeeds('nba', NBA_TEMPLATE, [player('PG', 1)])
     expect(fitSlot('nba', player('PG', 99), early)).toBe('G')
   })
@@ -252,7 +252,7 @@ describe('basketball lineup with multi-position players (spec 025 US3)', () => {
 
   it('a second C with C filled and UTIL open fills UTIL, not the filled C (A1)', () => {
     const needs = computeTeamNeeds('nba', NBA_TEMPLATE, [multi(['C'], 3)])
-    expect(fitSlot('nba', multi(['C'], 12), needs)).toBe('UTIL1')
+    expect(fitSlot('nba', multi(['C'], 12), needs)).toBe('UTIL')
     const full = computeTeamNeeds('nba', ['PG', 'SG', 'G', 'SF', 'PF', 'F', 'C'], [multi(['C'], 3)])
     expect(fitSlot('nba', multi(['C'], 12), full)).toBeNull()
   })
