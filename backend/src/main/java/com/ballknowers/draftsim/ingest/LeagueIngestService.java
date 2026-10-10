@@ -175,6 +175,8 @@ public class LeagueIngestService {
         // exactly today's behaviour for every draft ingested before this column
         // existed. multi-sport-and-rebrand.md Phase 5; DraftSlot.isForward reads it.
         int reversalRound = asInt(settings.get("reversal_round"), 0);
+        // Nullable on purpose: absent means Sleeper sent no timer, never a default (spec 024 A2).
+        Integer pickTimerSeconds = asNullableInt(settings.get("pick_timer"));
 
         // draft_order maps sleeper user id -> slot. Invert it to slot -> manager.id.
         // Shared with LiveDraftPoller, which has to redo this on every tick — see
@@ -193,7 +195,7 @@ public class LeagueIngestService {
         long id = drafts.upsert(leagueId, draftId,
                 Integer.parseInt(str(draft.get("season"))), rounds, teams,
                 str(draft.get("type")), str(draft.get("status")), start,
-                JsonUtil.write(slotToManager), reversalRound);
+                JsonUtil.write(slotToManager), reversalRound, pickTimerSeconds);
 
         List<Map<String, Object>> raw = sleeper.draftPicks(draftId);
         if (raw == null || raw.isEmpty()) return 0;
@@ -213,6 +215,17 @@ public class LeagueIngestService {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> asMap(Object o) {
         return o instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    /** Like {@link #asInt} but absent/unparseable stays null instead of becoming a number. */
+    static Integer asNullableInt(Object o) {
+        if (o == null) return null;
+        if (o instanceof Number n) return n.intValue();
+        try {
+            return Integer.parseInt(o.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static int asInt(Object o, int fallback) {

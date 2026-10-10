@@ -84,11 +84,11 @@ class LeagueControllerSeatsOwnerConfiguredIT {
         draftWithOwnerId = "it-draft-seats-owner-present";
         jdbc.update("""
                 insert into draft (league_id, sleeper_draft_id, season, rounds, teams,
-                                   draft_type, status, start_time, slot_to_manager)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                                   draft_type, status, start_time, slot_to_manager, pick_timer_seconds)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
                 """,
                 leagueId, draftWithOwnerId, 2026, 15, 12, "snake", "pre_draft", null,
-                "{\"1\": " + otherManagerId + ", \"7\": " + ownerManagerId + "}");
+                "{\"1\": " + otherManagerId + ", \"7\": " + ownerManagerId + "}", 120);
 
         // A separate league/draft the configured owner isn't actually a manager in.
         draftWithoutOwnerId = "it-draft-seats-owner-absent";
@@ -127,6 +127,8 @@ class LeagueControllerSeatsOwnerConfiguredIT {
         assertEquals(7, map.get("mySlot"), "configured owner sits in slot 7 of this draft");
         assertEquals("it-league-seats-owner-configured", map.get("sleeperLeagueId"),
                 "spec 023: the seats payload names the league the draft room links into");
+        assertEquals("snake", map.get("draftType"), "spec 024: draft format rides on the seats payload");
+        assertEquals(120, map.get("pickTimerSeconds"), "spec 024: stored pick_timer_seconds is returned");
     }
 
     @Test
@@ -141,5 +143,7 @@ class LeagueControllerSeatsOwnerConfiguredIT {
         Map<String, Object> map = (Map<String, Object>) response.getBody();
         assertNotNull(map);
         assertNull(map.get("mySlot"), "configured owner isn't a manager in this league -- must be null, not throw");
+        assertTrue(map.containsKey("pickTimerSeconds"), "key present even when null");
+        assertNull(map.get("pickTimerSeconds"), "no timer stored -> null, never a default number");
     }
 }

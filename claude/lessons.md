@@ -777,3 +777,53 @@ tests that passed before it:
   been held"). The skip count went from 0 to 1 with no failure, which is exactly the signal
   that's easy to read past (memory: "Backend suite skips ITs silently"). Delete harness rows when
   the check is done, and re-run whatever skipped.
+
+## 36. A threshold of "> 0" on a score with a floor filters nothing
+
+Spec 024's first plan defined "fits an open slot" for mock auto-pick as
+`SportRules.rosterNeed(candidate, lineup) > 0`. `rosterNeed` documents its range as
+`[benchFloor, 1]`, and `benchFloor` is 0.15 in `config/weights.yml` for both sports. So `> 0`
+was true for every player. The "need over ADP" step would have collapsed to plain ADP, and its
+test could only have passed if it were written wrong. The adversarial plan review caught it by
+reading the two implementations, before any code existed.
+
+The fix compares against the floor read from config (`> benchFloor`), never a literal. It
+also keeps the bots' hard gate (`isDraftable`) in front, so auto-pick can't take a kicker in
+round 9. The guarding test was checked by flipping the rule back to `> 0` and seeing it fail
+(exactly one test went red), then restoring it.
+
+**Before thresholding a score, read the function's documented range and its early returns.
+A floor, a clamp or a default turns "> 0" into "always". Prove the test can fail under the
+wrong threshold, not just pass under the right one.**
+
+Two more from the same build, both caught by running the code rather than by reading it:
+
+- **A Java text block drops a line's trailing space.** A SQL fragment ending `... and` with a
+  trailing space was concatenated into `andt.sleeper_draft_id`. Unit tests with a mocked
+  repository could not see it; the real-Postgres IT failed on its first run (lessons #2's
+  class). Put the separator at the start of the next fragment, or concatenate `" and "`
+  explicitly, never rely on trailing whitespace in a text block.
+- **Delete-then-insert "replace the whole list" needs a lock.** Two concurrent PUTs for the
+  same owner and list both deleted, then both inserted, and the second hit the partial unique
+  index with `DuplicateKeyException`, which surfaced as a 500.
+  `pg_advisory_xact_lock(hashtext(owner || ':' || scope))` at the start of the transaction
+  fixed it. The IT was checked by commenting the lock out and watching it fail.
+
+## 37. `open(p, 'w').write(transform(s))` empties the file if the transform throws first
+
+A spec 024 fix agent edited `AvailabilityPanel.tsx` with a Python one-liner in the
+`open(p, 'w').write(...)` shape. On Windows, Python's default text encoding is cp1252. The new
+content had a "ⓘ" in it, so encoding failed. `open(p, 'w')` had already truncated the file, and
+the 0-byte result was left in the working tree. The file was uncommitted, and `git checkout`
+would only have restored main's version, dropping three agents' worth of edits from this
+feature.
+
+Recovery was possible only because every edit was still in the session transcripts. Main's
+version was replayed through the four scripts that had actually succeeded, in order, into a
+scratch copy. The scratch copy was checked for the expected markers, then copied over the empty
+file. `tsc` came back clean, and the suite gave 1,408/1,408, the last known count.
+
+**Edit source files with the Edit tool, or in Python only through
+`io.open(p, encoding='utf-8', newline='')`, building the whole new string before opening the
+file for writing. A script that opens for writing before its content is ready can destroy the
+file it was meant to change.** On this machine, also set `PYTHONUTF8=1` for any ad hoc Python.

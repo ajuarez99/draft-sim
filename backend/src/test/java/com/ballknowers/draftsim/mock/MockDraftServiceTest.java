@@ -14,6 +14,7 @@ import com.ballknowers.draftsim.sport.BasketballRules;
 import com.ballknowers.draftsim.sport.FootballRules;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.DraftTargetRepository;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
@@ -68,6 +69,7 @@ class MockDraftServiceTest {
     @Mock private DraftRepository drafts;
     @Mock private LeagueRepository leagues;
     @Mock private LeagueMembership membership;
+    @Mock private DraftTargetRepository targets;
 
     private FakeMockDraftRepository repo;
     private MockDraftService service;
@@ -129,7 +131,7 @@ class MockDraftServiceTest {
         // added here later fails on its own behavior, not on an unstubbed mock.
         lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
         service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers,
-                drafts, leagues, new OwnerProperties(null), membership);
+                drafts, leagues, new OwnerProperties(null), membership, targets);
     }
 
     @Test
@@ -681,6 +683,247 @@ class MockDraftServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 () -> service.createSessionFromDraft("sleeper-draft-bad-slot", 9, null));
+    }
+
+    // --- Spec 024 US5: auto-pick -----------------------------------------------------------
+    // Every test here asserts WHICH player was chosen. A structural assertion (no crash, one more
+    // pick, no duplicate) passes just as happily for a rule that picks the wrong man -- including the
+    // original "rosterNeed > 0" rule, which is true for everyone (research A1).
+
+    private static DraftTargetRepository.Target target(long playerId) {
+        return new DraftTargetRepository.Target(playerId, "s" + (playerId - 1), "Player " + (playerId - 1));
+    }
+
+    private static MockSessionState.PickView pickAt(MockSessionState s, int pickNo) {
+        return s.picks().stream().filter(p -> p.pickNo() == pickNo).findFirst().orElseThrow();
+    }
+
+    /** (a) The first target not yet drafted wins, even though a non-target has far better ADP. */
+    @Test
+    void autoPickTakesTheFirstUndraftedTargetOverABetterAdpNonTarget() {
+        MockSessionState created = service.createSession(8, 3, Map.of(), "tester");   // bots take picks 1-2
+        long drafted = created.picks().get(0).player().id();
+        when(targets.list("tester", new DraftTargetRepository.MockScope(created.id())))
+                .thenReturn(List.of(target(drafted), target(100L)));
+
+        MockSessionState after = service.auto(created.id(), MockDraftService.Scope.PICK, "tester").orElseThrow();
+
+        var pick = pickAt(after, 3);
+        assertEquals(100L, pick.player().id(), "X was already drafted, so Y (ADP 100) -- not the ADP-3 non-target");
+        assertEquals("AUTO", pick.source());
+        assertEquals("USER", pick.seatType().name());
+    }
+
+    /** (b) A target the hard gate forbids (a kicker in round 1) is skipped for the next one. */
+    @Test
+    void autoPickSkipsATargetThatIsNotDraftable() {
+        footballBoardWithAKickerFirst();
+        MockSessionState created = service.createSession(8, 1, Map.of(), "tester");
+        when(targets.list("tester", new DraftTargetRepository.MockScope(created.id())))
+                .thenReturn(List.of(target(1L), target(7L)));   // id 1 is the kicker
+
+        MockSessionState after = service.auto(created.id(), MockDraftService.Scope.PICK, "tester").orElseThrow();
+
+        assertEquals(7L, pickAt(after, 1).player().id());
+    }
+
+    /**
+     * (c) The case that separates "would start" from "is draftable". The user holds nine starters --
+     * eight guards/forwards and one weak center -- so the top-ADP player left (a point guard) cannot
+     * improve the lineup, while the next one (a center) displaces the weak center. rosterNeed is floored
+     * at benchFloor for the guard, so a "> 0" rule would take him; "> benchFloor" skips to the center.
+     */
+    @Test
+    void anNbaTenthPickSkipsABenchOnlyTopAdpPlayerForOneWhoWouldStart() {
+        MockSessionState s = seedNbaTenthPick(List.of(0, 1, 2, 3, 4, 5, 6, 7, 150));
+
+        MockSessionState after = service.auto(s.id(), MockDraftService.Scope.PICK, "tester").orElseThrow();
+
+        var pick = pickAt(after, 120);
+        assertEquals(10_009L, pick.player().id(),
+                "idx 9 (a C who displaces the weak C) -- not idx 8 (a PG who would sit on the bench)");
+        assertEquals("AUTO", pick.source());
+    }
+
+    /** (c, control) With no one to displace, the same board's top-ADP draftable man is taken. */
+    @Test
+    void autoPickFallsBackToTopAdpWhenNobodyWouldStart() {
+        // (e) Strong center at idx 9: every remaining player is worse than every starter, so all of
+        // them are pure depth and the answer is simply the best ADP -- idx 8.
+        MockSessionState s = seedNbaTenthPick(List.of(0, 1, 2, 3, 4, 5, 6, 7, 9));
+
+        MockSessionState after = service.auto(s.id(), MockDraftService.Scope.PICK, "tester").orElseThrow();
+
+        assertEquals(10_008L, pickAt(after, 120).player().id());
+    }
+
+    /** (d) With no targets and an empty roster, a top-ADP kicker is never taken in round 1. */
+    @Test
+    void autoPickNeverTakesAnEarlyKickerOrDefense() {
+        footballBoardWithAKickerFirst();   // id 1 = K, id 2 = DEF, both at the very top of the board
+        MockSessionState created = service.createSession(8, 1, Map.of(), "tester");
+
+        MockSessionState after = service.auto(created.id(), MockDraftService.Scope.PICK, "tester").orElseThrow();
+
+        assertEquals(3L, pickAt(after, 1).player().id(), "the best draftable player, skipping K (1) and DEF (2)");
+    }
+
+    /** (f) FINISH completes the draft; only the user's seat is AUTO, earlier manual picks stay USER. */
+    @Test
+    void autoFinishCompletesTheDraftAndMarksOnlyTheUsersOwnPicksAuto() {
+        MockSessionState created = service.createSession(8, 3, Map.of(), "tester");
+        String manual = created.available().get(0).sleeperId();
+        MockSessionState afterManual = service.submitPick(created.id(), manual, "tester").orElseThrow();
+        assertEquals("USER", pickAt(afterManual, 3).source());
+
+        MockSessionState done = service.auto(created.id(), MockDraftService.Scope.FINISH, "tester").orElseThrow();
+
+        assertEquals("COMPLETE", done.status());
+        assertEquals(8 * 15, done.picks().size());
+        assertEquals(8 * 15, done.picks().stream().map(p -> p.player().id()).distinct().count(),
+                "no player drafted twice");
+        List<MockSessionState.PickView> mine = done.picks().stream()
+                .filter(p -> p.seatType() == SeatSpec.Type.USER).toList();
+        assertEquals(15, mine.size());
+        assertEquals("USER", pickAt(done, 3).source(), "the earlier manual pick must not be relabelled");
+        assertEquals(14, mine.stream().filter(p -> "AUTO".equals(p.source())).count());
+        for (var p : done.picks()) {
+            if (p.seatType() != SeatSpec.Type.USER) assertEquals("BOT", p.source());
+        }
+    }
+
+    /**
+     * Auto-pick and FINISH on a session with reversalRound = 3 (8 teams, user on slot 1): the user's
+     * picks are 1, 16, 24, 25, ... -- NOT the plain-snake 1, 16, 17, 32. PICK in round 3 must land
+     * on pick 24 / slot 1, and FINISH must mark exactly the user-seat picks AUTO.
+     */
+    @Test
+    void autoUnderAReversalRoundPicksTheRightSlotAndFinishMarksExactlyTheUsersSeatAuto() {
+        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+                1L, 9L, "sleeper-draft-nba-auto", 2026, 14, 8, "drafting", Map.of(), 3);
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
+                9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null, null);
+        when(drafts.bySleeperId("sleeper-draft-nba-auto")).thenReturn(Optional.of(draft));
+        when(leagues.byId(9L)).thenReturn(Optional.of(league));
+        MockSessionState state = service.createSessionFromDraft("sleeper-draft-nba-auto", 1, null);
+        long id = state.id();
+        assertEquals(List.of(1, 16, 24, 25), state.myPicks().subList(0, 4));
+
+        // Pick 1 manually, pick 16 by auto PICK; bots then fill 17-23 and stop at 24.
+        state = service.submitPick(id, state.available().get(0).sleeperId(), "tester").orElseThrow();
+        assertEquals("USER", pickAt(state, 1).source());
+        assertEquals(16, state.currentPickNo());
+        state = service.auto(id, MockDraftService.Scope.PICK, "tester").orElseThrow();
+        assertEquals("AUTO", pickAt(state, 16).source());
+        assertEquals(24, state.currentPickNo(), "round 3 opens on slot 8's pick 17 and returns to the user at 24");
+
+        // Auto PICK in round 3: lands on pick 24, slot 1 (plain snake would put slot 1 on pick 17).
+        state = service.auto(id, MockDraftService.Scope.PICK, "tester").orElseThrow();
+        var p24 = pickAt(state, 24);
+        assertEquals(1, p24.draftSlot());
+        assertEquals(DraftSlot.slot(24, 8, 3), p24.draftSlot());
+        assertEquals(3, p24.round());
+        assertEquals("AUTO", p24.source());
+        assertEquals("USER", p24.seatType().name());
+        assertEquals(8, pickAt(state, 17).draftSlot(), "pick 17 is a bot on slot 8 under the reversal");
+        assertEquals("BOT", pickAt(state, 17).source());
+
+        MockSessionState done = service.auto(id, MockDraftService.Scope.FINISH, "tester").orElseThrow();
+
+        assertEquals("COMPLETE", done.status());
+        assertEquals(8 * 14, done.picks().size());
+        List<Integer> expectedMine = new ArrayList<>();
+        for (int n = 1; n <= 8 * 14; n++) if (DraftSlot.slot(n, 8, 3) == 1) expectedMine.add(n);
+        assertEquals(List.of(1, 16, 24, 25), expectedMine.subList(0, 4));
+        assertEquals(14, expectedMine.size());
+        List<Integer> userSeatPicks = done.picks().stream()
+                .filter(p -> p.seatType() == SeatSpec.Type.USER).map(p -> p.pickNo()).sorted().toList();
+        assertEquals(expectedMine, userSeatPicks, "the user's seat holds exactly the reversal-aware picks");
+        for (var p : done.picks()) {
+            if (p.pickNo() == 1) assertEquals("USER", p.source(), "the manual pick is not relabelled");
+            else if (p.seatType() == SeatSpec.Type.USER) assertEquals("AUTO", p.source(), "pick " + p.pickNo());
+            else assertEquals("BOT", p.source(), "pick " + p.pickNo());
+        }
+    }
+
+    /** (g) PICK off-turn and anything on a finished draft are conflicts, not silent no-ops. */
+    @Test
+    void autoRefusesAnOffTurnPickAndAFinishedDraft() {
+        MockSessionState created = service.createSession(8, 5, Map.of(), "tester");
+        repo.advanceCurrentPick(created.id(), 6, "IN_PROGRESS");   // force onto slot 6, a bot seat
+        assertThrows(IllegalStateException.class,
+                () -> service.auto(created.id(), MockDraftService.Scope.PICK, "tester"));
+        repo.advanceCurrentPick(created.id(), 5, "IN_PROGRESS");
+
+        service.auto(created.id(), MockDraftService.Scope.FINISH, "tester").orElseThrow();
+
+        assertThrows(IllegalStateException.class,
+                () -> service.auto(created.id(), MockDraftService.Scope.PICK, "tester"));
+        assertThrows(IllegalStateException.class,
+                () -> service.auto(created.id(), MockDraftService.Scope.FINISH, "tester"));
+    }
+
+    @Test
+    void autoOnSomeoneElsesOrAMissingMockIsEmpty() {
+        MockSessionState mine = service.createSession(8, 1, Map.of(), "user-a");
+
+        assertTrue(service.auto(mine.id(), MockDraftService.Scope.PICK, "user-b").isEmpty());
+        assertTrue(service.auto(mine.id(), MockDraftService.Scope.PICK, null).isEmpty());
+        assertTrue(service.auto(999L, MockDraftService.Scope.FINISH, "user-a").isEmpty());
+        assertEquals(1, service.get(mine.id(), "user-a").orElseThrow().currentPickNo(), "and nothing was picked");
+    }
+
+    /** The football fixture board with id 1 turned into a kicker and id 2 into a defense. */
+    private void footballBoardWithAKickerFirst() {
+        List<BoardEntry> out = new ArrayList<>();
+        for (BoardEntry e : board(400)) {
+            Position pos = e.player().id() == 1L ? Position.K : e.player().id() == 2L ? Position.DEF : e.position();
+            out.add(new BoardEntry(new Player(e.player().id(), Sport.NFL, e.player().sleeperId(), e.player().name(),
+                    List.of(pos), "FA", "Active", null, null, null), e.adp(), e.positionalRank()));
+        }
+        lenient().when(boards.currentBoard(Sport.NFL)).thenReturn(out);
+    }
+
+    /**
+     * A 12-team NBA mock whose user (slot 1) has made nine picks -- the board indices in
+     * {@code userBoardIdx} -- and is on the clock for pick 120, his tenth. Every other seat's pick is a
+     * filler taken from the tail of the board, so nothing near the top has been touched.
+     * Board: idx 0-7 are guards/forwards (no center), idx 8 is a PG, idx 9 and 150 are centers.
+     */
+    private MockSessionState seedNbaTenthPick(List<Integer> userBoardIdx) {
+        List<BoardEntry> scenario = new ArrayList<>();
+        for (int i = 0; i < 400; i++) {
+            Position pos = switch (i) {
+                case 0, 2, 6, 8 -> Position.PG;
+                case 1, 7 -> Position.SG;
+                case 3, 5 -> Position.SF;
+                case 9, 150 -> Position.C;
+                default -> Position.PF;
+            };
+            scenario.add(new BoardEntry(new Player(10_000L + i, Sport.NBA, "nba-s" + i, "Hooper " + i,
+                    List.of(pos), "LAL", "Active", null, null, null), i + 1.0, i / 6 + 1));
+        }
+        lenient().when(boards.currentBoard(Sport.NBA)).thenReturn(scenario);
+
+        MockSessionState created = service.createSession(Sport.NBA, 12, 1, Map.of(), "tester", null);
+        List<MockDraftRepository.PickRow> rows = new ArrayList<>();
+        int mine = 0;
+        int filler = 399;
+        for (int pickNo = 1; pickNo < 120; pickNo++) {
+            int slot = DraftSlot.slot(pickNo, 12, 0);
+            int round = DraftSlot.round(pickNo, 12);
+            if (slot == 1) {
+                rows.add(new MockDraftRepository.PickRow(created.id(), pickNo, round, slot, "USER", null,
+                        10_000L + userBoardIdx.get(mine++), "USER"));
+            } else {
+                rows.add(new MockDraftRepository.PickRow(created.id(), pickNo, round, slot, "BOT", null,
+                        10_000L + filler--, "BOT"));
+            }
+        }
+        assertEquals(9, mine, "the user must have exactly nine picks before pick 120");
+        repo.insertPicks(created.id(), rows);
+        repo.advanceCurrentPick(created.id(), 120, "IN_PROGRESS");
+        return created;
     }
 
     /** In-memory stand-in for the real JdbcClient-backed repository. */

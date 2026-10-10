@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   createMockSessionFromDraft,
@@ -18,15 +18,20 @@ import { ApiError } from '../apiError'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { useTargets } from '../useTargets'
+import { markTaken, survivalFor } from '../targets'
+import TargetStrip from '../components/TargetStrip'
 import { useStatsPool } from '../useStatsPool'
 import DraftBoard from '../components/DraftBoard'
 import LiveStatusBar from '../components/LiveStatusBar'
 import OnBrandPanel, { OnBrandLine } from '../components/OnBrandPanel'
-import PickFeed from '../components/PickFeed'
+import CompactRow from '../components/CompactRow'
+import RoomControls from '../components/RoomControls'
+import FormatSummary from '../components/FormatSummary'
+import DraftRoomLayout from '../components/DraftRoomLayout'
 import ScarcityMeter from '../components/ScarcityMeter'
 import PlayerCard from '../components/PlayerCard'
 import SeatPopover from '../components/SeatPopover'
-import TeamStrip from '../components/TeamStrip'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, openPositions } from '../teamNeeds'
 import { INSIGHT } from '../insightConstants'
@@ -119,6 +124,8 @@ export default function LiveDraftView() {
   const navigate = useNavigate()
 
   const { live, connected, secondsSinceContact, error: liveError } = useLiveDraft(draftId)
+  // One target list per draft, shared with the projection room (scope is the Sleeper draft).
+  const targets = useTargets(useMemo(() => ({ sleeperDraftId: draftId }), [draftId]))
 
   const [seats, setSeats] = useState<SeatsResponse | null>(null)
   // Every pick that has landed, from GET /drafts/{id}/board -- null until that
@@ -385,6 +392,18 @@ export default function LiveDraftView() {
   // landed since the last resim started is not still "available" until the next
   // one finishes.
   const takenPlayerIds = useMemo(() => new Set(landedPicks.map((p) => p.player.id)), [landedPicks])
+  // Stable props for AvailabilityPanel: the 1s freshness tick re-renders this
+  // page, and fresh arrays/Sets each time would defeat the panel's memoisation.
+  const draftedPlayerRefs = useMemo(() => landedPicks.map((p) => p.player), [landedPicks])
+  const targetIds = useMemo(() => new Set(targets.items.map((t) => t.sleeperId)), [targets.items])
+  // True only while the projection was run for the seat the reader is shown as.
+  // After a Claim / seat change the old result lingers until the re-run lands;
+  // its numbers answer for the previous seat, so show none rather than those.
+  const resultMatchesSeat = result != null && result.mySlot === mySlot
+  const seatedUpcomingPicks = useMemo(
+    () => (resultMatchesSeat ? upcomingMyPicks : []),
+    [resultMatchesSeat, upcomingMyPicks],
+  )
 
   // Same overlay `landedPicks` does, but kept as PredictedPick[] for the grid:
   // a landed real pick shown before the next resim lands is a fact, not a
@@ -672,7 +691,6 @@ export default function LiveDraftView() {
     [sport, rosterPositions, landedPicks, mySlot],
   )
   const myOpenSlots = useMemo(() => openPositions(sport, myNeeds), [sport, myNeeds])
-  const startersSet = myNeeds.filter((n) => n.player != null).length
 
   // Fed from `landedPicks` rather than `feedPicks` on purpose: what is spoken
   // is the manager and the name, both of which are facts on the state frame,
@@ -698,10 +716,31 @@ export default function LiveDraftView() {
   // Memoized so the once-a-second freshness tick (which re-renders this page by
   // design -- it is the one reading that has to stay current) doesn't re-render
   // 210 board cells with it.
-  const board = useMemo(
-    () =>
-      seats ? (
+  const claimSeat = useCallback(
+    (slot: number) =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('slot', String(slot))
+          return next
+        },
+        { replace: true },
+      ),
+    [setSearchParams],
+  )
+  // One element per density, so a density change swaps which one DraftRoomLayout
+  // renders without re-creating either on the once-a-second freshness tick.
+  const boards = useMemo(() => {
+    if (!seats) return null
+    const make = (density: 'compact' | 'full') => (
         <DraftBoard
+          density={density}
+          room="live"
+          onClaim={claimSeat}
+          mySlotAssumed={!slotKnown}
+          // Only while the draft is actually running: nothing is on the clock
+          // before it starts or after it ends (FR-007).
+          onTheClockPickNo={live?.status === 'drafting' ? live.picksMade + 1 : undefined}
           board={boardWithLive}
           teams={result?.teams ?? seats.teams}
           rounds={result?.rounds ?? seats.rounds}
@@ -713,174 +752,177 @@ export default function LiveDraftView() {
           // has been drafted" are different claims.
           revealedThrough={live ? live.picksMade : undefined}
           seats={seats.seats}
-          mySlot={slotKnown ? mySlot : undefined}
+          mySlot={mySlot}
           sport={sport}
           reversalRound={seats.reversalRound}
           onCellClick={setOpenPick}
           onSeatClick={setOpenSeatSlot}
         />
-      ) : null,
-    [seats, result, live, mySlot, slotKnown, sport],
-  )
+    )
+    return { compact: make('compact'), full: make('full') }
+  }, [seats, result, live, mySlot, slotKnown, sport, boardWithLive, claimSeat])
 
   const waiting = live == null || live.status === 'pre_draft'
-  const waitingTitle =
-    live == null
-      ? connected
-        ? 'Connecting…'
-        : 'Not connected'
-      : 'Waiting for the draft to start'
-  const startsAt = startTime
-    ? new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    : null
-  const waitingDetail =
-    live == null
-      ? connected
-        ? 'Opened the live stream, waiting for the first state frame.'
-        : "The live stream isn't answering — the backend may not have this endpoint yet. Retrying every few seconds; seats and the board below are still real."
-      : live.seatsMapped === 0
-        ? 'Waiting for the commissioner to set the draft order.'
-        : `${live.seatsMapped} seats mapped${startsAt ? ` · starts ${startsAt}` : ''}`
-
   if (notFound) return <NotFound what="draft" />
+
+  // The pieces DraftRoomLayout places. Region contract: contracts/api.md "UI contract:
+  // DraftRoomLayout" (live column).
+  const markedTargets = markTaken(targets.items, takenPlayerIds)
+  const roomNotices =
+    error || liveError || forkError || resimming ? (
+      <>
+        {error && <div className="error">{error}</div>}
+        {liveError && <div className="error">{liveError}</div>}
+        {forkError && <div className="error tiny">{forkError}</div>}
+        {resimming && (
+          <div className="progress live-resim-progress">
+            <div className="progress-bar" style={{ width: `${Math.round(resimProgress * 100)}%` }} />
+          </div>
+        )}
+      </>
+    ) : undefined
+
+  const roomControls = (
+    <RoomControls
+      primary={{
+        label: forking ? 'Forking…' : 'Continue as a mock →',
+        onClick: () => void forkToMock(),
+        disabled: forking || live?.status !== 'drafting',
+        title:
+          live?.status === 'drafting'
+            ? 'Start an interactive mock draft picking up from where this live draft is right now'
+            : 'Available once the draft is under way: a mock continues from where the live draft stands',
+      }}
+    >
+      <span className="muted tiny">
+        {resimming
+          ? `Simulating the rest of the draft… ${Math.round(resimProgress * 100)}%`
+          : result
+            ? live
+              ? // "projected past pick 210" is also nonsense on a
+                // finished draft -- there is nothing past the last pick
+                // to project, and every cell on the board is a fact.
+                picksMade >= live.totalPicks
+                ? 'Every pick is in — nothing left to project'
+                : `Picks after ${roundPickLabel(picksMade + 1, live.teams)} are projected`
+              : 'Projected from scratch — no live position to project from'
+            : 'No projection yet'}
+        {/* The crimson cells and the availability columns are both
+            "slot N", so say which N, and say when N is only a
+            fallback rather than something anyone confirmed. */}
+        {result && ` · slot ${mySlot}`}
+      </span>
+      {speechSupported() && (
+        <button
+          className={sound ? 'chip on' : 'chip'}
+          onClick={toggleSound}
+          aria-pressed={sound}
+          title={
+            sound
+              ? 'Stop reading picks out loud'
+              : 'Read each pick out loud, and chime when your turn comes up'
+          }
+        >
+          {sound ? '🔊 Announcing' : '🔈 Announce picks'}
+        </button>
+      )}
+      <button
+        className={cardsOn ? 'chip on' : 'chip'}
+        onClick={toggleCards}
+        aria-pressed={cardsOn}
+        title={
+          cardsOn
+            ? 'Stop showing a card for each pick as it lands'
+            : 'Show a card for each pick as it lands: how it fits that roster'
+        }
+      >
+        {cardsOn ? 'Pick cards on' : 'Pick cards off'}
+      </button>
+      <button
+        className="chip"
+        onClick={() => void resimulate()}
+        disabled={resimming || !seats}
+        title="Re-simulate the rest of the draft from where it stands now"
+      >
+        Project again
+      </button>
+    </RoomControls>
+  )
 
   return (
     <>
-      {error && <div className="error">{error}</div>}
-      {liveError && <div className="error">{liveError}</div>}
-
       <div className="content">
-        <LiveStatusBar
-          draftId={draftId}
-          live={live}
-          connected={connected}
-          secondsSinceContact={secondsSinceContact}
-          seats={seats?.seats ?? []}
-          mySlot={slotKnown ? mySlot : undefined}
-          nextOwnPick={upcomingMyPicks[0] ?? null}
-          onSeatClick={setOpenSeatSlot}
-          onTracked={() => getSeats(draftId).then(setSeats).catch(() => {})}
-        />
-
-        {/* The room where a position run matters most: these picks are real
-            and there is no rewinding them. Same component the other two rooms
-            use, fed from the landed prefix. */}
-        <PickFeed
-          picks={feedPicks}
-          teams={result?.teams ?? seats?.teams ?? 0}
-          sport={sport}
-          // With cards off the rows stay plain rows: "Pick cards off" means
-          // no card, including the one a click would have opened.
-          onPickClick={cardsOn ? openCardFor : undefined}
-        />
-
-        {/* Your team, on draft night. Gated on slotKnown for the same reason
-            the crimson board cells are: painting slot 1's roster as yours
-            because nobody has said otherwise is a claim about reality that
-            might be wrong. */}
-        {slotKnown && myNeeds.length > 0 && (
-          <div className="live-team">
-            <strong className="cond">Your team</strong>
-            <span className="muted tiny">
-              {startersSet} of {myNeeds.length} starters
-            </span>
-            <TeamStrip needs={myNeeds} sport={sport} />
-          </div>
-        )}
-
-        {/* Under the team block, and in the same place when the seat is unknown:
-            the team block is hidden then, the meters are not. They always show,
-            whatever the pick-cards preference says. */}
-        {seats && (pool != null || poolFailed) && (
-          <div className="live-meters">
-            <ScarcityMeter
-              scarcity={scarcity}
-              failed={poolFailed}
-              myNextPickLabel={myNextPick != null && teamsCount > 0 ? roundPickLabel(myNextPick, teamsCount) : undefined}
+        <DraftRoomLayout
+          rounds={result?.rounds ?? seats?.rounds ?? 0}
+          status={
+            <LiveStatusBar
+              draftId={draftId}
+              live={live}
+              connected={connected}
+              secondsSinceContact={secondsSinceContact}
+              seats={seats?.seats ?? []}
+              mySlot={slotKnown ? mySlot : undefined}
+              nextOwnPick={seatedUpcomingPicks[0] ?? null}
+              onSeatClick={setOpenSeatSlot}
+              onTracked={() => getSeats(draftId).then(setSeats).catch(() => {})}
+              startTime={startTime}
+              formatSummary={
+                seats ? (
+                  <FormatSummary
+                    teams={seats.teams}
+                    rounds={seats.rounds}
+                    pickTimerSeconds={seats.pickTimerSeconds}
+                    draftType={seats.draftType}
+                  />
+                ) : undefined
+              }
             />
-            <OnBrandPanel
-              reads={reads}
-              myManager={slotKnown ? seats.seats.find((x) => x.slot === mySlot)?.manager : null}
+          }
+          notices={roomNotices}
+          controls={roomControls}
+          compactRow={
+            <CompactRow
+              // The room where a position run matters most: these picks are real
+              // and there is no rewinding them. Fed from the landed prefix.
+              feedPicks={feedPicks}
+              teams={result?.teams ?? seats?.teams ?? 0}
+              sport={sport}
+              // With cards off the rows stay plain rows: "Pick cards off" means
+              // no card, including the one a click would have opened.
+              onPickClick={cardsOn ? openCardFor : undefined}
+              // Your team, on draft night. Gated on slotKnown for the same reason
+              // the crimson board cells are: painting slot 1's roster as yours
+              // because nobody has said otherwise is a claim about reality that
+              // might be wrong.
+              needs={slotKnown && myNeeds.length > 0 ? myNeeds : undefined}
+              // The meters always show, whatever the pick-cards preference says
+              // and whether or not the seat is known.
+              scarcity={
+                seats && (pool != null || poolFailed) ? (
+                  <ScarcityMeter
+                    scarcity={scarcity}
+                    failed={poolFailed}
+                    myNextPickLabel={myNextPick != null && teamsCount > 0 ? roundPickLabel(myNextPick, teamsCount) : undefined}
+                  />
+                ) : undefined
+              }
+              roomRead={
+                seats ? (
+                  <OnBrandPanel
+                    bare
+                    reads={reads}
+                    myManager={slotKnown ? seats.seats.find((x) => x.slot === mySlot)?.manager : null}
+                  />
+                ) : undefined
+              }
             />
-          </div>
-        )}
-
-        <div className="board-panel">
-          <section className="panel">
-            <div className="live-panel-head">
-              <span className="muted tiny">
-                {resimming
-                  ? `Simulating the rest of the draft… ${Math.round(resimProgress * 100)}%`
-                  : result
-                    ? live
-                      ? // "projected past pick 210" is also nonsense on a
-                        // finished draft -- there is nothing past the last pick
-                        // to project, and every cell on the board is a fact.
-                        picksMade >= live.totalPicks
-                        ? 'Every pick is in — nothing left to project'
-                        : `Picks after ${roundPickLabel(picksMade + 1, live.teams)} are projected`
-                      : 'Projected from scratch — no live position to project from'
-                    : 'No projection yet'}
-                {/* The crimson cells and the availability columns are both
-                    "slot N", so say which N, and say when N is only a
-                    fallback rather than something anyone confirmed. */}
-                {result && ` · slot ${mySlot}${slotKnown ? '' : ' (assumed — click your seat)'}`}
-              </span>
-              {speechSupported() && (
-                <button
-                  className={sound ? 'chip on' : 'chip'}
-                  onClick={toggleSound}
-                  aria-pressed={sound}
-                  title={
-                    sound
-                      ? 'Stop reading picks out loud'
-                      : 'Read each pick out loud, and chime when your turn comes up'
-                  }
-                >
-                  {sound ? '🔊 Announcing' : '🔈 Announce picks'}
-                </button>
-              )}
-              <button
-                className={cardsOn ? 'chip on' : 'chip'}
-                onClick={toggleCards}
-                aria-pressed={cardsOn}
-                title={
-                  cardsOn
-                    ? 'Stop showing a card for each pick as it lands'
-                    : 'Show a card for each pick as it lands: how it fits that roster'
-                }
-              >
-                {cardsOn ? 'Pick cards on' : 'Pick cards off'}
-              </button>
-              <button
-                className="chip"
-                onClick={() => void resimulate()}
-                disabled={resimming || !seats}
-                title="Re-simulate the rest of the draft from where it stands now"
-              >
-                Project again
-              </button>
-              <button
-                className="chip on"
-                onClick={() => void forkToMock()}
-                disabled={forking || live?.status !== 'drafting'}
-                title="Start an interactive mock draft picking up from where this live draft is right now"
-              >
-                {forking ? 'Forking…' : 'Continue as a mock →'}
-              </button>
-            </div>
-            {forkError && <div className="error tiny">{forkError}</div>}
-            {resimming && (
-              <div className="progress live-resim-progress">
-                <div className="progress-bar" style={{ width: `${Math.round(resimProgress * 100)}%` }} />
-              </div>
-            )}
-
-            {seats && (
-              <div className="board-stage">
-                {board}
-                {/* Over the top of the stage only, never above it: the status
-                    bar, feed, team strip and meters all sit outside. */}
+          }
+          board={(density) =>
+            seats && boards ? (
+              <>
+                {boards[density]}
+                {/* Over the top of the board region only, never above it: the
+                    status bar, ticker, team strip and meters all sit outside. */}
                 {cardInsight && (
                   <PickInsightCard
                     insight={cardInsight}
@@ -891,57 +933,70 @@ export default function LiveDraftView() {
                     extras={cardExtras}
                   />
                 )}
-                {/* Same floating sheet as the mock page (§E) -- the board owns
-                    the whole content area on both. `started` here is "there is
-                    a projection to read options out of", which is what the old
-                    `result &&` gate below the board was saying too. */}
-                <AvailabilityPanel
-                  availability={result?.availability ?? NO_AVAILABILITY}
-                  myPicks={upcomingMyPicks}
-                  teams={result?.teams ?? seats.teams}
-                  pickedPlayerIds={takenPlayerIds}
-                  started={result != null}
-                  sport={sport}
-                  // Only when the seat is known -- "fills a need" against
-                  // somebody else's roster is worse than no tag at all.
-                  openSlots={slotKnown ? myOpenSlots : undefined}
-                  // The projection assumes a seat until the reader's is known,
-                  // so its survival numbers would answer for somebody else's
-                  // picks. Hold them back; the tiered list still shows.
-                  noAvailabilityReason={slotKnown ? undefined : 'Availability appears once your seat is known.'}
-                  recentPicks={landedPicks.map((p) => p.player)}
-                  sleeperLeagueId={seats.sleeperLeagueId}
-                  statsPool={statsPool ?? undefined}
-                  statsPoolLoading={statsPoolLoading}
-                  statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
-                />
-                {waiting && !result && (
-                  <div className="start-overlay">
-                    <div className="start-overlay-cta">
-                      <h2 className="cond">{waitingTitle}</h2>
-                      <p className="muted small">{waitingDetail}</p>
-                      {resimming && (
-                        <p className="muted tiny">
-                          Projecting the board meanwhile… {Math.round(resimProgress * 100)}%
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
+              </>
+            ) : null
+          }
+          boardOverlay={
+            seats && waiting && !result ? (
+              <div className="start-overlay">
+                <div className="start-overlay-cta">
+                  {/* Not a second statement of the draft's status -- the status bar
+                      above owns that (FR-016). This only says why the board is blank. */}
+                  <h2 className="cond">No board yet</h2>
+                  <p className="muted small">The board fills in once the draft starts or a projection is built.</p>
+                  {resimming && (
+                    <p className="muted tiny">Projecting the board meanwhile… {Math.round(resimProgress * 100)}%</p>
+                  )}
+                </div>
               </div>
-            )}
-            {/* Once a projection exists there is something worth looking at
-                underneath, so the same waiting copy shrinks to a line rather
-                than covering the board with it. */}
-            {waiting && result && (
-              <div className={`live-waiting${live == null ? ' offline' : ''}`}>
-                <strong className="cond">{waitingTitle}</strong>
-                <span className="muted small">{waitingDetail}</span>
-              </div>
-            )}
-          </section>
-        </div>
-
+            ) : undefined
+          }
+          targets={
+            <TargetStrip
+              items={markedTargets}
+              status={targets.status}
+              error={targets.error}
+              sport={sport}
+              room="live"
+              survivalOf={(t) => survivalFor(t.player, result?.availability, seatedUpcomingPicks[0], slotKnown)}
+              onMove={targets.move}
+              onRemove={targets.remove}
+              onRetry={targets.retry}
+            />
+          }
+          list={
+            seats ? (
+              <AvailabilityPanel
+                availability={result?.availability ?? NO_AVAILABILITY}
+                myPicks={seatedUpcomingPicks}
+                teams={result?.teams ?? seats.teams}
+                pickedPlayerIds={takenPlayerIds}
+                started={result != null}
+                sport={sport}
+                // Only when the seat is known -- "fills a need" against
+                // somebody else's roster is worse than no tag at all.
+                openSlots={slotKnown ? myOpenSlots : undefined}
+                // The projection assumes a seat until the reader's is known,
+                // so its survival numbers would answer for somebody else's
+                // picks. Hold them back; the tiered list still shows.
+                noAvailabilityReason={slotKnown ? undefined : 'Availability appears once your seat is known.'}
+                recentPicks={landedPicks.map((p) => p.player)}
+                sleeperLeagueId={seats.sleeperLeagueId}
+                draftedPlayers={draftedPlayerRefs}
+                {...(targets.status === 'ready'
+                  ? { targetIds, onAddTarget: targets.add, onRemoveTarget: targets.remove }
+                  : {})}
+                statsPool={statsPool ?? undefined}
+                statsPoolLoading={statsPoolLoading}
+                statsPoolError={statsPoolFailed ? 'Couldn’t load the player list.' : undefined}
+              />
+            ) : (
+              <section className="panel avail-region">
+                <p className="muted small">The player list appears once this draft’s seats load.</p>
+              </section>
+            )
+          }
+        />
       </div>
 
       {openPick && result && (

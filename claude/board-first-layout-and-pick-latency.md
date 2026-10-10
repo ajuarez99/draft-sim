@@ -541,6 +541,23 @@ scrolling, which is the first time the round-to-round shape of a draft is legibl
 glance. Don't add anything to fill the space — that's what §4 of the feedback was
 asking for.
 
+> **Amended by spec 024 (2026-10-09).** The "availability" band here later became a sheet
+> floating over the board (`.avail-sheet`). It is now replaced, at widths of 1280 px and
+> up, by a **stacked, resizable split**: the board on top, a draggable divider, a target
+> strip, then the player list, with each part scrolling inside itself. Below 1280 px a
+> Board | Players toggle preserves this section's "the board owns the content area" goal.
+>
+> **Why it changed.** Since spec 023 the list is a 14-column stats table. Measured at a
+> 1440×900 viewport on a filled 12-team board, the sheet covered rounds 3–14: about two
+> rounds were visible. Filled cells were 70 px, so the split also introduced **compact
+> one-line cells** whenever the board region is shorter than full size, and folded the
+> live room's feed, team strip and scarcity chips into one compact row above the board.
+> Both were the user's decisions.
+>
+> All three rooms (live, projection, mock) now render through one `DraftRoomLayout`. See
+> `specs/024-draft-room-ux/` (spec FR-001/001a/001b/001c, research A4, verification.md).
+> The text above is left as written; it describes the 2026-09-01 design.
+
 ---
 
 ## F. Second markup pass (2026-09-01, after the live test run)

@@ -217,6 +217,8 @@ export default function CompletedDraftBoard() {
               mySlot={seats.mySlot ?? undefined}
               sport={seats.sport}
               reversalRound={seats.reversalRound}
+              room="real"
+              density="full"
               onCellClick={setOpenPick}
               valueView={showAdp}
               adpAtDraft={adpAtDraft}

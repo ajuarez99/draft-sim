@@ -28,10 +28,15 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
     )
   }
   const { run } = scarcity
+  // Counting is by FIRST-listed position (research A11), so a position nobody lists
+  // first has poolSize 0. "0 / 0" there reads as a measurement of scarcity; it is
+  // really "no data". Hide the chip and say so once (FR-018).
+  const shown = scarcity.rows.filter((r) => r.poolSize > 0)
+  const hidden = scarcity.rows.filter((r) => r.poolSize === 0).map((r) => r.position)
   return (
     <div className="scarcity-meter" aria-label="Position scarcity">
       <ul className="scarcity-chips">
-        {scarcity.rows.map((r) => (
+        {shown.map((r) => (
           <li
             key={r.position}
             className={`scarcity-chip${r.running ? ' running' : ''}`}
@@ -50,9 +55,12 @@ export default function ScarcityMeter({ scarcity, failed, myNextPickLabel }: Pro
           </li>
         ))}
       </ul>
-      <p className="scarcity-note muted">{scarcity.definition}</p>
+      {hidden.length > 0 && (
+        <p className="scarcity-note muted">{`${hidden.join(', ')}: no starter-pool players list these first`}</p>
+      )}
+      <p className="scarcity-note muted" title={scarcity.definition}>{scarcity.definition}</p>
       {scarcity.gatedByDepth && (
-        <p className="scarcity-note muted">{`projected count from pick ~${scarcity.projectedFrom}`}</p>
+        <p className="scarcity-note muted" title={`projected count from pick ~${scarcity.projectedFrom}`}>{`projected count from pick ~${scarcity.projectedFrom}`}</p>
       )}
     </div>
   )

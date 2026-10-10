@@ -19,6 +19,8 @@ export type FeedPick = {
    * See LiveDraftView, which computes it from teamNeeds.fitSlot.
    */
   fit?: string | null
+  /** The user's own pick, made by auto-pick (spec 024 FR-022): shown with a small "auto" tag. */
+  auto?: boolean
 }
 
 type Props = {
@@ -35,6 +37,8 @@ type Props = {
    * rows they always had. Only the live room uses it, to open a pick's card.
    */
   onPickClick?: (pickNo: number) => void
+  /** Tighter rows, for the draft room's compact row (CompactRow). Same rows, less padding. */
+  compact?: boolean
 }
 
 /**
@@ -58,14 +62,14 @@ type Props = {
  * `revealedThrough === pausedAt`, so the board's predicted player at your own
  * still-open pick would otherwise show up here as though it had happened.
  */
-export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }: Props) {
+export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick, compact }: Props) {
   if (picks.length === 0) return null
 
   const run = positionRun(picks.map((p) => p.player), 6, 4, sport)
   const recent = picks.slice(-limit).reverse()
 
   return (
-    <ol className="pick-feed" aria-label="Recent picks">
+    <ol className={`pick-feed${compact ? ' compact' : ''}`} aria-label="Recent picks">
       {recent.map((p, i) => {
         const { lead, rest } = shortName(p.player, sport)
         // The run belongs on the newest row only -- it describes the state the
@@ -104,6 +108,7 @@ export default function PickFeed({ picks, teams, limit = 3, sport, onPickClick }
             {(isLead || !clause) && <span className="pick-feed-by mono">{p.manager}</span>}
             {clause && <span className="pick-feed-run cond">{clause}</span>}
             {fit && <span className="pick-feed-fit cond">{fit}</span>}
+            {p.auto && <span className="pick-feed-auto cond" title="Made by auto-pick">auto</span>}
           </>
         )
         return (

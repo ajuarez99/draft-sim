@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { MockSeat } from '../api'
 import OnTheClock from './OnTheClock'
 
@@ -11,6 +12,8 @@ type Props = {
   rounds: number
   /** Your next pick, for the "picks until you" readout. Null once you're up. */
   nextOwnPick?: number | null
+  /** Trailing content on the same line (the room's FormatSummary). */
+  children?: ReactNode
 }
 
 /**
@@ -32,6 +35,7 @@ export default function TurnIndicator({
   teams,
   rounds,
   nextOwnPick,
+  children,
 }: Props) {
   const seat = seats.find((s) => s.slot === onTheClockSlot)
   return (
@@ -49,6 +53,8 @@ export default function TurnIndicator({
       nextOwnPick={nextOwnPick}
       idle={complete}
       idleLabel="Mock draft complete"
-    />
+    >
+      {children}
+    </OnTheClock>
   )
 }

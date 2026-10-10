@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { trackDraft, type LiveState, type Seat } from '../api'
 import { STALE_AFTER_SECONDS } from '../useLiveDraft'
 import OnTheClock from './OnTheClock'
@@ -15,6 +15,10 @@ type Props = {
   onSeatClick: (slot: number) => void
   /** Called after a manual /track so the page can refetch anything it derives from seats. */
   onTracked?: () => void
+  /** Draft start time (ISO), for the "starts 7:00 PM" part of the waiting detail. */
+  startTime?: string | null
+  /** The format line (FormatSummary), on the same line as the status. */
+  formatSummary?: ReactNode
 }
 
 function ago(seconds: number): string {
@@ -48,6 +52,8 @@ export default function LiveStatusBar({
   nextOwnPick,
   onSeatClick,
   onTracked,
+  startTime,
+  formatSummary,
 }: Props) {
   const [tracking, setTracking] = useState(false)
   const [trackNote, setTrackNote] = useState<string | null>(null)
@@ -106,8 +112,34 @@ export default function LiveStatusBar({
           ? 'Draft has not started'
           : 'Waiting for the draft order'
 
+  // The one place the room states that the draft is waiting (FR-016). The detail
+  // says why, in the variants the room used to print on a second line.
+  const startsAt = startTime
+    ? new Date(startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null
+  const waitingDetail =
+    onClockSeat != null
+      ? null
+      : live == null
+        ? connected
+          ? 'Opened the live stream, waiting for the first state frame.'
+          : "The live stream isn't answering — the backend may not have this endpoint yet. Retrying every few seconds."
+        : live.status !== 'pre_draft'
+          ? null // drafting or complete: the pre-draft "waiting" detail would be stale (FR-016)
+          : live.seatsMapped === 0
+            ? 'Waiting for the commissioner to set the draft order.'
+            : `${live.seatsMapped} seats mapped${startsAt ? ` · starts ${startsAt}` : ''}`
+
   const telemetry = (
     <>
+      {(formatSummary || waitingDetail) && (
+        <span className="live-status-detail">
+          {waitingDetail && (
+            <span className={`muted small${live == null && !connected ? ' offline' : ''}`}>{waitingDetail}</span>
+          )}
+          {formatSummary}
+        </span>
+      )}
       {total > 0 && (
         <div className="progress live-progress" title={`${made} of ${total} picks made`}>
           <div className="progress-bar" style={{ width: `${pct}%` }} />

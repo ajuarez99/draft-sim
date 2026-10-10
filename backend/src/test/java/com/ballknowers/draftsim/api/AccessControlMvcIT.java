@@ -38,6 +38,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -239,6 +240,91 @@ class AccessControlMvcIT {
         // And the operator override works.
         mvc.perform(get("/api/mocks/" + mockId).header("X-Admin-Token", TestAdmin.TOKEN))
                 .andExpect(notTheScopingNotFound());
+    }
+
+    // ------------------------------------------------------------ spec 024: targets and auto-pick
+
+    @Test
+    void targetsWriteNeedsAnIdentityEvenWithTheAdminToken() throws Exception {
+        String put = "{\"sleeperDraftId\":\"it-acl-draft\",\"sleeperPlayerIds\":[]}";
+        mvc.perform(put("/api/targets").contentType("application/json").content(put))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/api/targets").contentType("application/json").content(put).header("X-Sleeper-User", " "))
+                .andExpect(status().isUnauthorized());
+        // The operator override stands in for a visitor elsewhere; a target row needs an owner, so not here.
+        mvc.perform(put("/api/targets").contentType("application/json").content(put)
+                        .header("X-Admin-Token", TestAdmin.TOKEN))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void targetsReadIsEmptyWithNoIdentityAndAMemberSeesTheirOwn() throws Exception {
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "it-acl-draft"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.players").isEmpty())
+                .andExpect(jsonPath("$.missing").isEmpty());
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "it-acl-draft").header("X-Sleeper-User", ""))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.players").isEmpty());
+        // A member gets 200 (an empty list is a real answer for them). Needs a built board, which the
+        // local database has; a 409 here would mean no board, not a scoping failure.
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "it-acl-draft").header("X-Sleeper-User", MEMBER))
+                .andExpect(notTheScopingNotFound());
+        // Neither or both scopes are 400 for a signed-in caller.
+        mvc.perform(get("/api/targets").header("X-Sleeper-User", MEMBER)).andExpect(status().isBadRequest());
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "it-acl-draft").param("mockSessionId", "1")
+                .header("X-Sleeper-User", MEMBER)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void targetsOnADraftOrMockThatIsNotYoursAre404() throws Exception {
+        String putDraft = "{\"sleeperDraftId\":\"it-acl-draft\",\"sleeperPlayerIds\":[]}";
+        // STRANGER is a known manager in no league; the draft is the league's.
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "it-acl-draft").header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/targets").contentType("application/json").content(putDraft)
+                        .header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/targets").param("sleeperDraftId", "no-such-draft").header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isNotFound());
+
+        mockId = createMockAs(MEMBER);
+        String putMock = "{\"mockSessionId\":" + mockId + ",\"sleeperPlayerIds\":[]}";
+        mvc.perform(get("/api/targets").param("mockSessionId", String.valueOf(mockId))
+                        .header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        mvc.perform(put("/api/targets").contentType("application/json").content(putMock)
+                        .header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        // The owner of the mock is not turned away by the same rule.
+        mvc.perform(put("/api/targets").contentType("application/json").content(putMock)
+                        .header("X-Sleeper-User", MEMBER))
+                .andExpect(notTheScopingNotFound());
+    }
+
+    @Test
+    void autoPickOnSomeoneElsesMockIs404() throws Exception {
+        mockId = createMockAs(MEMBER);
+        long legacyId = createMockAs(null);
+        String pick = "{\"scope\":\"PICK\"}";
+        mvc.perform(post("/api/mocks/" + mockId + "/auto").contentType("application/json").content(pick)
+                        .header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/mocks/" + mockId + "/auto").contentType("application/json").content(pick))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/mocks/" + mockId + "/auto").contentType("application/json")
+                        .content("{\"scope\":\"FINISH\"}").header("X-Sleeper-User", STRANGER))
+                .andExpect(status().isNotFound());
+        // A blank identity cannot reach an unowned legacy row either.
+        mvc.perform(post("/api/mocks/" + legacyId + "/auto").contentType("application/json").content(pick))
+                .andExpect(status().isNotFound());
+        // The owner is past the scoping check (what happens next depends on the fixture's empty seats).
+        mvc.perform(post("/api/mocks/" + mockId + "/auto").contentType("application/json").content(pick)
+                        .header("X-Sleeper-User", MEMBER))
+                .andExpect(notTheScopingNotFound());
+        // A missing scope is a 400, not a 500.
+        mvc.perform(post("/api/mocks/" + mockId + "/auto").contentType("application/json").content("{}")
+                        .header("X-Sleeper-User", MEMBER))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

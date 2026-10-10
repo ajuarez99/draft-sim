@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.DraftSlot;
 import com.ballknowers.draftsim.domain.LeagueSettings;
+import com.ballknowers.draftsim.domain.RosterState;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.DraftContext;
 import com.ballknowers.draftsim.engine.DraftContextFactory;
@@ -15,6 +16,7 @@ import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import com.ballknowers.draftsim.store.DraftRepository;
+import com.ballknowers.draftsim.store.DraftTargetRepository;
 import com.ballknowers.draftsim.store.JsonUtil;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
@@ -51,12 +53,13 @@ public class MockDraftService {
     private final LeagueRepository leagues;
     private final OwnerProperties owner;
     private final LeagueMembership membership;
+    private final DraftTargetRepository targets;
 
     public MockDraftService(MockDraftRepository mockDrafts, DraftContextFactory contexts,
                             MockDraftEngine engine, BoardService boards, ProfileService profiles,
                             PlayerRepository players, ManagerRepository managers,
                             DraftRepository drafts, LeagueRepository leagues, OwnerProperties owner,
-                            LeagueMembership membership) {
+                            LeagueMembership membership, DraftTargetRepository targets) {
         this.mockDrafts = mockDrafts;
         this.contexts = contexts;
         this.engine = engine;
@@ -68,6 +71,7 @@ public class MockDraftService {
         this.leagues = leagues;
         this.owner = owner;
         this.membership = membership;
+        this.targets = targets;
     }
 
     /**
@@ -326,6 +330,12 @@ public class MockDraftService {
         }
         mockDrafts.insertPicks(id, seedRows);
 
+        // The caller's own targets for this draft ride along (spec 024 T028), inside this same
+        // transaction. Nobody else's: a target list is private to its owner.
+        if (!LeagueMembership.isAnonymous(sleeperUserId)) {
+            targets.copyDraftToMock(sleeperUserId, sleeperDraftId, id);
+        }
+
         advanceAndPersist(id, ctx, seats, rngSeed);
         return buildState(id, ctx);
     }
@@ -391,21 +401,9 @@ public class MockDraftService {
         if (locked.isEmpty()) return Optional.empty();
         MockDraftRepository.SessionRow row = locked.get();
 
-        if (!"IN_PROGRESS".equals(row.status())) {
-            throw new IllegalStateException("mock session " + id + " is already complete");
-        }
-
         List<SeatSpec> seats = readSeats(row.seatsJson());
-        // The session's own reversal round (V14), not plain snake. This is the
-        // call that decides WHOSE turn pick N is, so a session that reverses in
-        // round 3 and a DraftSlot call that doesn't would hand the pick to the
-        // wrong seat -- and then reject the user's own pick as "not your turn"
-        // for the rest of the draft.
+        SeatSpec seat = requireUsersTurn(id, row, seats);
         int onTheClockSlot = DraftSlot.slot(row.currentPickNo(), row.teams(), row.reversalRound());
-        SeatSpec seat = seatAt(seats, onTheClockSlot);
-        if (seat.type() != SeatSpec.Type.USER) {
-            throw new IllegalStateException("pick " + row.currentPickNo() + " is not the user's turn");
-        }
         if (sleeperPlayerId == null || sleeperPlayerId.isBlank()) {
             throw new IllegalArgumentException("sleeperPlayerId is required");
         }
@@ -426,16 +424,189 @@ public class MockDraftService {
             }
         }
 
-        int round = DraftSlot.round(row.currentPickNo(), row.teams());
-        mockDrafts.insertPicks(id, List.of(new MockDraftRepository.PickRow(
-                id, row.currentPickNo(), round, onTheClockSlot, "USER", seat.managerId(), playerId, "USER")));
-        completed.put(row.currentPickNo(), playerId);
+        recordUserPick(id, row.currentPickNo(), row.teams(), seat, onTheClockSlot, playerId, "USER", completed);
 
-        LeagueShape shape = new LeagueShape(row.sport(), row.teams(), row.rounds(), row.rosterPositions(),
-                row.pointsPerReception(), row.reversalRound());
-        DraftContext ctx = buildContext(shape, seats, completed);
+        DraftContext ctx = buildContext(shapeOf(row), seats, completed);
         advanceAndPersist(id, ctx, seats, row.rngSeed());
         return Optional.of(buildState(id, ctx));
+    }
+
+    /** What an auto action covers: one pick for the user, or every remaining pick (spec 024 US5). */
+    public enum Scope { PICK, FINISH }
+
+    /**
+     * Picks for the user. Targets first (in rank order), then the best-ADP player who would start
+     * for this roster, then the best-ADP draftable player -- see {@link #chooseAuto}.
+     *
+     * <p>One transaction under one {@code lockForUpdate}, so a closed tab cannot leave a
+     * half-finished auto-finish. The board and the fitted profiles are fetched once per request; the
+     * context is rebuilt per pick over the growing {@code completed} map, which is the only part of it
+     * that changes.
+     *
+     * @throws IllegalStateException the session is complete, or {@code PICK} when it isn't the user's turn
+     *         (the controller maps both to 409)
+     */
+    @Transactional
+    public Optional<MockSessionState> auto(long id, Scope scope, String sleeperUserId) {
+        if (!mayUse(id, sleeperUserId)) return Optional.empty();
+        Optional<MockDraftRepository.SessionRow> locked = mockDrafts.lockForUpdate(id);
+        if (locked.isEmpty()) return Optional.empty();
+        MockDraftRepository.SessionRow row = locked.get();
+        if (!"IN_PROGRESS".equals(row.status())) {
+            throw new IllegalStateException("mock session " + id + " is already complete");
+        }
+
+        List<SeatSpec> seats = readSeats(row.seatsJson());
+        LeagueShape shape = shapeOf(row);
+        List<BoardEntry> board = boards.currentBoard(shape.sport());
+        if (board.isEmpty()) {
+            throw new IllegalArgumentException("no " + shape.sport().code()
+                    + " board is available yet -- player data is still loading, try again shortly");
+        }
+        ProfileService.Fit fit = profiles.fit(shape.sport());
+
+        List<Long> targetIds = LeagueMembership.isAnonymous(sleeperUserId)
+                ? List.of()
+                : targets.list(sleeperUserId, new DraftTargetRepository.MockScope(id)).stream()
+                        .map(DraftTargetRepository.Target::playerId).toList();
+        List<BoardEntry> byAdp = board.stream().sorted(Comparator.comparingDouble(BoardEntry::adp)).toList();
+
+        Map<Integer, Long> completed = new HashMap<>();
+        for (MockDraftRepository.PickRow p : mockDrafts.picks(id)) completed.put(p.pickNo(), p.playerId());
+
+        // `ctx` is rebuilt (with a copy: DraftContext keeps the map it is given) only where the engine
+        // needs the latest picks replayed -- right after the user's pick. chooseAuto reads only parts
+        // of it that never change within a request (rules, config, settings, byId), and takes the
+        // live picks from `completed`.
+        DraftContext ctx = contexts.build(shape, seats, fit.profiles(), fit.priors(), board, new HashMap<>(completed));
+        int pickNo = row.currentPickNo();
+        boolean complete = false;
+
+        for (int guard = 0; guard <= ctx.totalPicks() && !complete; guard++) {
+            int slot = DraftSlot.slot(pickNo, row.teams(), row.reversalRound());
+            SeatSpec seat = seatAt(seats, slot);
+            MockDraftEngine.AdvanceResult adv;
+            if (seat.type() != SeatSpec.Type.USER) {
+                if (scope == Scope.PICK) {
+                    throw new IllegalStateException("pick " + pickNo + " is not the user's turn");
+                }
+                // FINISH from a state that is not the user's turn (the mock's idle state never is
+                // one): let the bots catch up first.
+                adv = advanceAndPersist(id, ctx, seats, row.rngSeed());
+            } else {
+                BoardEntry choice = chooseAuto(ctx, byAdp, completed, targetIds, slot,
+                        DraftSlot.round(pickNo, row.teams()));
+                if (choice == null) {
+                    // Nothing left to draft; the engine ends a draft the same way (MockDraftEngine).
+                    mockDrafts.advanceCurrentPick(id, pickNo, "COMPLETE");
+                    break;
+                }
+                recordUserPick(id, pickNo, row.teams(), seat, slot, choice.player().id(), "AUTO", completed);
+                ctx = contexts.build(shape, seats, fit.profiles(), fit.priors(), board, new HashMap<>(completed));
+                adv = advanceAndPersist(id, ctx, seats, row.rngSeed());
+            }
+            for (MockDraftEngine.Decision d : adv.newPicks()) completed.put(d.pickNo(), d.player().player().id());
+            pickNo = adv.nextPickNo();
+            complete = adv.complete();
+            if (scope == Scope.PICK) break;
+        }
+        return Optional.of(buildState(id, ctx));
+    }
+
+    /**
+     * The auto-pick rule (research A1, which corrects R5's {@code rosterNeed > 0}: rosterNeed is
+     * floored at benchFloor, so that test is true for every player). Every candidate must first pass
+     * {@link com.ballknowers.draftsim.sport.SportRules#isDraftable}, the same hard gate
+     * {@code PickDecider.choose} applies. Then, in order:
+     * <ol>
+     *   <li>the first draftable target, in rank order;</li>
+     *   <li>the top-ADP draftable player whose {@code rosterNeed} exceeds the sport's benchFloor
+     *       ("would start", including by displacing a weaker starter -- the engine's own notion);</li>
+     *   <li>the top-ADP draftable player.</li>
+     * </ol>
+     * Only players on this request's board are considered. If nothing is draftable (only gated
+     * positions are left) the best available is taken, as PickDecider does rather than stall.
+     *
+     * @return null when the board has nobody left
+     */
+    BoardEntry chooseAuto(DraftContext ctx, List<BoardEntry> byAdp, Map<Integer, Long> completed,
+                          List<Long> targetIds, int userSlot, int round) {
+        Set<Long> drafted = new HashSet<>(completed.values());
+        LeagueSettings settings = ctx.settings();
+        var rules = ctx.rules();
+
+        // Built exactly as PickDecider.choose builds it: this seat's roster so far, then prepareLineup
+        // with the context's own valueOf.
+        RosterState roster = new RosterState();
+        for (Map.Entry<Integer, Long> e : completed.entrySet()) {
+            if (DraftSlot.slot(e.getKey(), settings.teams(), settings.reversalRound()) != userSlot) continue;
+            BoardEntry picked = ctx.byId().get(e.getValue());
+            if (picked != null) roster.add(picked);
+        }
+        Object lineup = rules.prepareLineup(roster, settings, ctx::valueOf);
+
+        for (Long targetId : targetIds) {
+            BoardEntry t = ctx.byId().get(targetId);
+            if (t != null && !drafted.contains(targetId)
+                    && rules.isDraftable(t, lineup, round, settings.rounds())) {
+                return t;
+            }
+        }
+
+        double benchFloor = ctx.cfg().benchFloor();
+        BoardEntry firstDraftable = null;
+        for (BoardEntry e : byAdp) {
+            if (drafted.contains(e.player().id())) continue;
+            if (!rules.isDraftable(e, lineup, round, settings.rounds())) continue;
+            if (firstDraftable == null) firstDraftable = e;
+            // The epsilon only absorbs floating-point noise around the floor itself.
+            if (rules.rosterNeed(e, lineup) > benchFloor + 1e-9) return e;
+        }
+        if (firstDraftable != null) return firstDraftable;
+
+        for (BoardEntry e : byAdp) if (!drafted.contains(e.player().id())) return e;
+        return null;
+    }
+
+    /** Throws unless pick {@code row.currentPickNo()} is open and belongs to the USER seat; returns that seat. */
+    private SeatSpec requireUsersTurn(long id, MockDraftRepository.SessionRow row, List<SeatSpec> seats) {
+        if (!"IN_PROGRESS".equals(row.status())) {
+            throw new IllegalStateException("mock session " + id + " is already complete");
+        }
+        // The session's own reversal round (V14), not plain snake. This is the
+        // call that decides WHOSE turn pick N is, so a session that reverses in
+        // round 3 and a DraftSlot call that doesn't would hand the pick to the
+        // wrong seat -- and then reject the user's own pick as "not your turn"
+        // for the rest of the draft.
+        int onTheClockSlot = DraftSlot.slot(row.currentPickNo(), row.teams(), row.reversalRound());
+        SeatSpec seat = seatAt(seats, onTheClockSlot);
+        if (seat.type() != SeatSpec.Type.USER) {
+            throw new IllegalStateException("pick " + row.currentPickNo() + " is not the user's turn");
+        }
+        return seat;
+    }
+
+    /** Inserts the user seat's pick at {@code pickNo} and records it in {@code completed}. */
+    private void recordUserPick(long id, int pickNo, int teams, SeatSpec seat, int slot, long playerId,
+                                String source, Map<Integer, Long> completed) {
+        mockDrafts.insertPicks(id, List.of(new MockDraftRepository.PickRow(
+                id, pickNo, DraftSlot.round(pickNo, teams), slot, "USER", seat.managerId(), playerId, source)));
+        completed.put(pickNo, playerId);
+    }
+
+    private static LeagueShape shapeOf(MockDraftRepository.SessionRow row) {
+        return new LeagueShape(row.sport(), row.teams(), row.rounds(), row.rosterPositions(),
+                row.pointsPerReception(), row.reversalRound());
+    }
+
+    /**
+     * The sport of a mock this caller may use, for callers that need ownership and the sport but not
+     * the whole state (spec 024 targets). Empty for no such session and for someone else's -- the
+     * same collapse as {@link #get}.
+     */
+    public Optional<Sport> usableSport(long id, String sleeperUserId) {
+        if (!mayUse(id, sleeperUserId)) return Optional.empty();
+        return mockDrafts.find(id).map(MockDraftRepository.SessionRow::sport);
     }
 
     /**
@@ -445,7 +616,7 @@ public class MockDraftService {
      * before the user's very first turn) and {@link #submitPick} (advancing
      * past the user's pick just recorded).
      */
-    private void advanceAndPersist(long id, DraftContext ctx, List<SeatSpec> seats, long rngSeed) {
+    private MockDraftEngine.AdvanceResult advanceAndPersist(long id, DraftContext ctx, List<SeatSpec> seats, long rngSeed) {
         MockDraftEngine.AdvanceResult adv = engine.advanceUntilUserOrEnd(ctx, seats, rngSeed);
 
         List<MockDraftRepository.PickRow> newRows = adv.newPicks().stream()
@@ -454,6 +625,7 @@ public class MockDraftService {
                 .toList();
         mockDrafts.insertPicks(id, newRows);
         mockDrafts.advanceCurrentPick(id, adv.nextPickNo(), adv.complete() ? "COMPLETE" : "IN_PROGRESS");
+        return adv;
     }
 
     /**

@@ -140,4 +140,22 @@ public class MockDraftController {
     }
 
     public record PickRequest(String sleeperPlayerId) {}
+
+    /**
+     * Auto-pick for the user (spec 024 US5): {@code PICK} makes this one pick, {@code FINISH} makes every
+     * remaining pick. A missing scope is a 400; a pick when it isn't the user's turn, or on a finished
+     * draft, is a 409 (ErrorHandler); someone else's mock is a 404, as everywhere here.
+     */
+    @PostMapping("/{id}/auto")
+    public ResponseEntity<?> auto(@PathVariable long id, @RequestBody(required = false) AutoRequest body,
+                                  @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        if (body == null || body.scope() == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "scope is required: PICK or FINISH"));
+        }
+        return mocks.auto(id, body.scope(), sleeperUserId)
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    public record AutoRequest(MockDraftService.Scope scope) {}
 }

@@ -22,6 +22,9 @@ vi.mock('../api', () => ({
   getDrafts: (...a: unknown[]) => getDrafts(...a),
   streamSimulationQuietly: (...a: unknown[]) => streamSimulationQuietly(...a),
   createMockSessionFromDraft: vi.fn(),
+  // Spec 024: the room loads the user's targets; these tests have none.
+  getTargets: () => Promise.resolve({ players: [], missing: [] }),
+  putTargets: () => Promise.resolve({ players: [], missing: [] }),
 }))
 
 const store = vi.hoisted(() => ({
@@ -200,6 +203,8 @@ describe('card projection rows', () => {
       run3.resolve(result([cell(11, mkPlayer('WR', 'Second Answer'), 0.6)]))
     })
 
+    // Older rows sit behind the compact row's ticker toggle (spec 024 FR-001c).
+    fireEvent.click(screen.getByRole('button', { name: /^▾ Last/ }))
     fireEvent.click(screen.getByRole('button', { name: /Player 6/ }))
     const card = within(screen.getByRole('dialog'))
     expect(card.getByText('First Answer')).toBeTruthy()

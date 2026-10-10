@@ -190,6 +190,10 @@ public class LeagueController {
         // workaround wasn't even buying anything.
         response.put("status", draft.get().status());
         response.put("seats", seats);
+        // Draft format (spec 024 A9). Both may be null; LinkedHashMap tolerates that.
+        Optional<DraftRepository.DraftFormat> format = drafts.format(draft.get().id());
+        response.put("draftType", format.map(DraftRepository.DraftFormat::draftType).orElse(null));
+        response.put("pickTimerSeconds", format.map(DraftRepository.DraftFormat::pickTimerSeconds).orElse(null));
         response.put("mySlot", mySlot);
         response.put("rosterPositions", rosterPositions);
         // Added for multi-sport-and-rebrand.md Phase 6: the frontend's position

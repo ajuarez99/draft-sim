@@ -66,4 +66,29 @@ describe('ScarcityMeter', () => {
     rerender(<ScarcityMeter scarcity={null} failed={false} />)
     expect(screen.getByText('no board built yet')).toBeInTheDocument()
   })
+
+  // Spec 024 FR-018 / A11: counting is by FIRST-listed position, so SG and SF are 0/0
+  // on a real NBA board (measured: PG 17, C 11, PF 8, SG 0, SF 0 among the top 36).
+  const nba = () =>
+    result({
+      rows: [
+        { position: 'PG', poolSize: 17, leftNow: 15, expectedAtNext: null, running: false },
+        { position: 'SG', poolSize: 0, leftNow: 0, expectedAtNext: null, running: false },
+        { position: 'SF', poolSize: 0, leftNow: 0, expectedAtNext: null, running: false },
+        { position: 'PF', poolSize: 8, leftNow: 8, expectedAtNext: null, running: false },
+        { position: 'C', poolSize: 11, leftNow: 9, expectedAtNext: null, running: false },
+      ],
+    })
+
+  it('does not draw a chip for a position with no starter-pool players, and names them once', () => {
+    render(<ScarcityMeter scarcity={nba()} failed={false} />)
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.queryByText('0 / 0')).toBeNull()
+    expect(screen.getByText('SG, SF: no starter-pool players list these first')).toBeInTheDocument()
+  })
+
+  it('adds no note when nothing is hidden', () => {
+    render(<ScarcityMeter scarcity={result()} failed={false} />)
+    expect(screen.queryByText(/list these first/)).toBeNull()
+  })
 })

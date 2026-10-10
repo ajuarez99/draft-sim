@@ -22,6 +22,9 @@ vi.mock('../api', () => ({
   getDrafts: (...a: unknown[]) => getDrafts(...a),
   streamSimulationQuietly: (...a: unknown[]) => streamSimulationQuietly(...a),
   createMockSessionFromDraft: vi.fn(),
+  // Spec 024: the room loads the user's targets; these tests have none.
+  getTargets: () => Promise.resolve({ players: [], missing: [] }),
+  putTargets: () => Promise.resolve({ players: [], missing: [] }),
 }))
 
 const store = vi.hoisted(() => ({

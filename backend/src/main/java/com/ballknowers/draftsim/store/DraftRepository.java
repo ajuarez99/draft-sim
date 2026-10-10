@@ -40,17 +40,34 @@ public class DraftRepository {
     public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
                        String type, String status, Instant startTime, String slotToManagerJson,
                        int reversalRound) {
+        // Test-fixture convenience only. On conflict this WRITES pick_timer_seconds = NULL,
+        // wiping a stored timer -- so production ingest must call the 11-arg form with
+        // Sleeper's actual value (spec 024 A2; the "optional param that encodes a rule" trap).
+        return upsert(leagueId, sleeperDraftId, season, rounds, teams, type, status, startTime,
+                slotToManagerJson, reversalRound, null);
+    }
+
+    /**
+     * @param pickTimerSeconds Sleeper's {@code settings.pick_timer}; null when Sleeper did not send one
+     *                         (never defaulted to a number). Spec 024 A2.
+     */
+    public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
+                       String type, String status, Instant startTime, String slotToManagerJson,
+                       int reversalRound, Integer pickTimerSeconds) {
         return db.sql("""
                 insert into draft (league_id, sleeper_draft_id, season, rounds, teams,
-                                   draft_type, status, start_time, slot_to_manager, reversal_round)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                                   draft_type, status, start_time, slot_to_manager, reversal_round,
+                                   pick_timer_seconds)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
                 on conflict (sleeper_draft_id) do update set
                     rounds = excluded.rounds,
                     teams = excluded.teams,
                     status = excluded.status,
                     start_time = excluded.start_time,
                     slot_to_manager = excluded.slot_to_manager,
-                    reversal_round = excluded.reversal_round
+                    reversal_round = excluded.reversal_round,
+                    pick_timer_seconds = excluded.pick_timer_seconds,
+                    draft_type = excluded.draft_type
                 returning id
                 """)
                 .param(1, leagueId).param(2, sleeperDraftId).param(3, season).param(4, rounds)
@@ -58,6 +75,7 @@ public class DraftRepository {
                 .param(8, startTime == null ? null : OffsetDateTime.ofInstant(startTime, ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE)
                 .param(9, slotToManagerJson)
                 .param(10, reversalRound)
+                .param(11, pickTimerSeconds, Types.INTEGER)
                 .query(Long.class)
                 .single();
     }
@@ -137,6 +155,16 @@ public class DraftRepository {
     /** Flips only status, without needing the full row this poller doesn't have on hand. */
     public void updateStatus(long draftId, String status) {
         jdbc.update("update draft set status = ? where id = ?", status, draftId);
+    }
+
+    /** Refreshes only the pick timer (null = Sleeper sent none), same shape and reason as {@link #updateStatus}. */
+    public void updatePickTimer(long draftId, Integer seconds) {
+        // "is distinct from" makes an unchanged timer a no-op instead of a row rewrite every tick.
+        jdbc.update("update draft set pick_timer_seconds = ? where id = ? and pick_timer_seconds is distinct from ?", ps -> {
+            if (seconds == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, seconds);
+            ps.setLong(2, draftId);
+            if (seconds == null) ps.setNull(3, Types.INTEGER); else ps.setInt(3, seconds);
+        });
     }
 
     /**
@@ -253,6 +281,18 @@ public class DraftRepository {
         public int effective() {
             return override == null ? fromSleeper : override;
         }
+    }
+
+    /** Draft format shown in the draft room header (spec 024 A9). Both fields may be null. */
+    public record DraftFormat(String draftType, Integer pickTimerSeconds) {}
+
+    public Optional<DraftFormat> format(long draftId) {
+        return db.sql("select draft_type, pick_timer_seconds from draft where id = ?")
+                .param(draftId)
+                .query((rs, i) -> new DraftFormat(
+                        rs.getString(1),
+                        rs.getObject(2) == null ? null : rs.getInt(2)))
+                .optional();
     }
 
     public Optional<ReversalRound> reversalRound(long draftId) {

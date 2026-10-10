@@ -20,6 +20,9 @@ vi.mock('../api', () => ({
   getDrafts: (...a: unknown[]) => getDrafts(...a),
   streamSimulationQuietly: (...a: unknown[]) => streamSimulationQuietly(...a),
   createMockSessionFromDraft: vi.fn(),
+  // Spec 024: the room loads the user's targets; these tests have none.
+  getTargets: () => Promise.resolve({ players: [], missing: [] }),
+  putTargets: () => Promise.resolve({ players: [], missing: [] }),
 }))
 
 const store = vi.hoisted(() => ({
@@ -201,6 +204,8 @@ describe('the pick card lifecycle', () => {
   it('clicking an older feed row opens that pick\'s card and takes focus', async () => {
     await renderRoom(6)
     expect(dialogs()).toHaveLength(0)
+    // The compact row's ticker shows only the latest pick until expanded (spec 024 FR-001c).
+    fireEvent.click(screen.getByRole('button', { name: /^▾ Last/ }))
     fireEvent.click(screen.getByRole('button', { name: /Player 5/ }))
     const card = screen.getByRole('dialog', { name: /Player 5/ })
     expect(card.contains(document.activeElement)).toBe(true)

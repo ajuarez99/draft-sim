@@ -79,7 +79,8 @@ describe('AvailabilityPanel', () => {
         noAvailabilityReason="Availability needs a simulation, which mock drafts don't run."
       />,
     )
-    expect(screen.getByText("Availability needs a simulation, which mock drafts don't run.")).toBeInTheDocument()
+    const mark = screen.getByLabelText("Availability needs a simulation, which mock drafts don't run.")
+    expect(mark).toHaveAttribute('title', "Availability needs a simulation, which mock drafts don't run.")
     expect(screen.getByText('Solo')).toBeInTheDocument()
     expect(screen.queryByText('Verdict')).toBeNull()
     expect(screen.queryByText(/Act now|Coin flip|Safe/)).toBeNull()
@@ -93,7 +94,7 @@ describe('AvailabilityPanel', () => {
         noAvailabilityReason="Availability appears once your seat is known."
       />,
     )
-    expect(screen.getByText('Availability appears once your seat is known.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Availability appears once your seat is known.')).toBeInTheDocument()
     expect(screen.getByText('Held')).toBeInTheDocument()
     expect(screen.queryByText('Act now')).toBeNull()
   })
@@ -139,7 +140,7 @@ describe('AvailabilityPanel stats view (spec 023 US1)', () => {
   it('disables Stats with its reason when the server did not send a league id', () => {
     render(<AvailabilityPanel {...nba} sleeperLeagueId={undefined} availability={pool} />)
     expect(screen.getByRole('button', { name: 'Stats' })).toBeDisabled()
-    expect(screen.getByText('Stats aren’t available on this server yet.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Stats aren’t available on this server yet.')).toBeInTheDocument()
     expect(screen.getByText('Ann')).toBeInTheDocument() // tiers still work
   })
 
@@ -227,6 +228,15 @@ describe('AvailabilityPanel stats view (spec 023 US1)', () => {
     expect(untrackedRow.textContent).not.toMatch(/there at your next pick/)
     expect(screen.getByRole('link', { name: 'Ann' }).closest('tr')!.textContent).toMatch(/90% there at your next pick/)
     expect(getStatLeaderboard).toHaveBeenCalledTimes(1)
+  })
+
+  it('a taken row in the Stats view shows no survival number', async () => {
+    getStatLeaderboard.mockResolvedValue(board(lb()))
+    render(<AvailabilityPanel {...nba} availability={[ann, bob]} statsPool={[ann.player, bob.player]} pickedPlayerIds={new Set([ann.player.id])} />)
+    await openStats()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
+    expect(screen.getByRole('link', { name: 'Ann' }).closest('tr')!.textContent).not.toMatch(/there at your next pick/)
+    expect(screen.getByRole('link', { name: 'Bob' }).closest('tr')!.textContent).toMatch(/there at your next pick/)
   })
 
   it('removes picked statsPool players and applies the position filter, with no survival filter or cap', async () => {
@@ -450,8 +460,8 @@ describe('AvailabilityPanel stats in a mock room (spec 023 US3)', () => {
   it('disables Stats with the league reason for a mock started with no league', () => {
     render(<AvailabilityPanel {...mock} sleeperLeagueId={null} />)
     expect(screen.getByRole('button', { name: 'Stats' })).toBeDisabled()
-    expect(screen.getByText('Stats need a league: start the mock from a league to see them.')).toBeInTheDocument()
-    expect(screen.queryByText('Stats aren’t available on this server yet.')).toBeNull()
+    expect(screen.getByLabelText('Stats need a league: start the mock from a league to see them.')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Stats aren’t available on this server yet.')).toBeNull()
   })
 
   it('reopens on Stats after the sheet unmounts between turns, with the same stored columns', async () => {
@@ -579,7 +589,6 @@ describe('AvailabilityPanel empty states and loading (code review S2, S3, S4)', 
   it('does not claim no picks are left before the projection exists', async () => {
     getStatLeaderboard.mockResolvedValue(board(lb()))
     render(<AvailabilityPanel {...nba} started={false} myPicks={[]} availability={[]} statsPool={[ann.player]} />)
-    fireEvent.click(screen.getByRole('button', { name: '▾ Players' }))
     fireEvent.click(screen.getByRole('button', { name: 'Stats' }))
     await screen.findByText(/stats, regular season/)
     expect(screen.queryByText('You have no picks left.')).toBeNull()
@@ -603,5 +612,76 @@ describe('AvailabilityPanel empty states and loading (code review S2, S3, S4)', 
     rerender(<AvailabilityPanel {...nba} availability={[ann]} statsPool={[ann.player]} />)
     await screen.findByText(/stats, regular season/)
     expect(document.querySelectorAll('.ds-table tbody tr')).toHaveLength(1)
+  })
+})
+
+describe('AvailabilityPanel search, hide-drafted and targets (spec 024 US3)', () => {
+  const dropped = mkPlayer('RB', 'Dropped Dan', 5)
+  const two = [row('Nikola Jokić', 10, 0.5), row('Plain Pete', 12, 0.5)]
+
+  it('narrows by name ignoring case and accents, only from 2 characters', () => {
+    render(<AvailabilityPanel {...base} availability={two} />)
+    const box = screen.getByRole('searchbox', { name: 'Search players' })
+    fireEvent.change(box, { target: { value: 'j' } })
+    expect(screen.getByText('Plain Pete')).toBeInTheDocument()
+    fireEvent.change(box, { target: { value: 'JOKIC' } })
+    expect(screen.getByText('Nikola Jokić')).toBeInTheDocument()
+    expect(screen.queryByText('Plain Pete')).toBeNull()
+  })
+
+  it('hides drafted players by default and shows them marked taken when the toggle is off', () => {
+    const picked = new Set([two[1].player.id])
+    render(<AvailabilityPanel {...base} availability={two} pickedPlayerIds={picked} />)
+    expect(screen.queryByText('Plain Pete')).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
+    const rowEl = screen.getByText('Plain Pete').closest('tr')!
+    expect(rowEl.querySelector('.taken-tag')!.textContent).toBe('taken')
+    expect(screen.getByText('Nikola Jokić').closest('tr')!.querySelector('.taken-tag')).toBeNull()
+  })
+
+  it('a taken row shows only the taken tag: no survival tiles and no verdict', () => {
+    // 'Plain Pete' still has a 50% curve in the (stale) availability; he is taken, so none of it shows.
+    const picked = new Set([two[1].player.id])
+    const { container } = render(
+      <AvailabilityPanel {...base} availability={two} pickedPlayerIds={picked} draftedPlayers={[dropped]} />,
+    )
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
+    for (const name of ['Plain Pete', 'Dropped Dan']) {
+      const tr = screen.getByText(name).closest('tr')!
+      expect(tr.querySelector('.taken-tag')).not.toBeNull()
+      expect(tr.querySelector('.survival-block')).toBeNull()
+      expect(tr.textContent).not.toMatch(/Act now|Coin flip|Safe/)
+    }
+    // The live row keeps both.
+    const live = screen.getByText('Nikola Jokić').closest('tr')!
+    expect(live.querySelector('.survival-block')).not.toBeNull()
+    expect(container.querySelectorAll('td.verdict:not(:empty)')).toHaveLength(1)
+  })
+
+  it('adds drafted players the room supplies separately when the toggle is off', () => {
+    render(<AvailabilityPanel {...base} players={[mkPlayer('RB', 'Open Ollie', 30)]} draftedPlayers={[dropped]} pickedPlayerIds={new Set([dropped.id])} />)
+    expect(screen.queryByText('Dropped Dan')).toBeNull()
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
+    expect(screen.getByText('Dropped Dan').closest('tr')!.querySelector('.taken-tag')).not.toBeNull()
+  })
+
+  it('stars and unstars a row through the handlers, and draws no star without them', () => {
+    const onAdd = vi.fn()
+    const onRemove = vi.fn()
+    const { rerender } = render(<AvailabilityPanel {...base} availability={two} />)
+    expect(screen.queryByRole('button', { name: /to targets/ })).toBeNull()
+    rerender(<AvailabilityPanel {...base} availability={two} targetIds={new Set([two[0].player.sleeperId])} onAddTarget={onAdd} onRemoveTarget={onRemove} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add Plain Pete to targets' }))
+    expect(onAdd).toHaveBeenCalledWith(two[1].player)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Nikola Jokić from targets' }))
+    expect(onRemove).toHaveBeenCalledWith(two[0].player.sleeperId)
+  })
+
+  it('a taken row has no star', () => {
+    const picked = new Set([two[1].player.id])
+    render(<AvailabilityPanel {...base} availability={two} pickedPlayerIds={picked} targetIds={new Set()} onAddTarget={vi.fn()} onRemoveTarget={vi.fn()} />)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Hide drafted' }))
+    expect(screen.queryByRole('button', { name: 'Add Plain Pete to targets' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Add Nikola Jokić to targets' })).toBeInTheDocument()
   })
 })

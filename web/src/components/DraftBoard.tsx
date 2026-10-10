@@ -5,7 +5,8 @@ import PlayerFace from './PlayerFace'
 import { shortName } from '../playerName'
 import { posRank } from '../posRank'
 import { PROVENANCE_LABEL } from '../provenance'
-import { pickNoAt } from '../snake'
+import { isForward, pickNoAt } from '../snake'
+import { roundPickLabel } from '../roundPickLabel'
 import { pickValue, signedPicks, tintPercent } from '../stealsReaches'
 import { signedPoints, valueTint } from '../draftGrades'
 
@@ -13,13 +14,34 @@ type Props = {
   board: PredictedPick[]
   teams: number
   rounds: number
-  myPicks: number[]
+  /** Kept for callers; the board no longer marks cells from it (spec 024 A6: the column mark comes from `mySlot` only). */
+  myPicks?: number[]
   userPicks: Record<number, PlayerRef>
   revealedThrough?: number
   seats?: Seat[]
   // Undefined while the slot isn't known yet -- see DraftView's `slotKnown`.
   // Distinct from "no seats at all" (seats itself being undefined).
   mySlot?: number
+  /**
+   * `mySlot` is only a fallback nobody confirmed (spec 024 FR-006): the column is
+   * marked dashed and low-alpha and the header says "assumed".
+   */
+  mySlotAssumed?: boolean
+  /**
+   * A slot with no Seat object on a real draft renders "Unclaimed · Claim", which
+   * calls this. A mock never passes it (its BOT seats are seats, not vacancies).
+   */
+  onClaim?: (slot: number) => void
+  /** The one pick number that is on the clock now; undefined when no draft is in progress (FR-007). */
+  onTheClockPickNo?: number
+  /**
+   * Which room draws this, because the cell kinds differ per room (FR-008):
+   * 'live' -- landed vs empty; 'projection' (default) -- your chosen pick vs a
+   * projected one; 'real' -- a mock or a finished draft, every filled cell is a real pick.
+   */
+  room?: 'live' | 'projection' | 'real'
+  /** 'compact' draws a filled cell as one line (FR-001b); 'full' is the cell with face and meta line. */
+  density: 'compact' | 'full'
   // Required, never defaulted: it picks the player-photo CDN folder as well as
   // playerName.ts's DEF-abbreviation guard, and a silent 'nfl' would show a
   // football face on a basketball player. Callers pass the draft's own sport.
@@ -34,12 +56,13 @@ type Props = {
   // Same additive-prop pattern D used for live mode's `landed` field.
   hideProvenanceDots?: boolean
   /**
-   * The round from which snake parity flips; 0 (the default) is plain snake,
-   * which is every football draft and every caller that predates this prop.
+   * The round from which snake parity flips; 0 is plain snake,
+   * which is every football draft.
    * Comes from SeatsResponse.reversalRound, which is already the effective
-   * value -- Sleeper's, or the user's override of it.
+   * value -- Sleeper's, or the user's override of it. Required (spec 024 review
+   * #16): an optional rule is how a board once drew the wrong snake direction.
    */
-  reversalRound?: number
+  reversalRound: number
   /**
    * Steals-and-reaches view (a finished draft only). When `valueView` is on,
    * each cell is tinted by pickNo minus the player's ADP *at draft time*, from
@@ -75,23 +98,26 @@ export default function DraftBoard({
   board,
   teams,
   rounds,
-  myPicks,
   userPicks,
   revealedThrough,
   seats,
   mySlot,
+  mySlotAssumed = false,
+  onClaim,
+  onTheClockPickNo,
+  room = 'projection',
+  density,
   sport,
   onCellClick,
   onSeatClick,
   hideProvenanceDots,
-  reversalRound = 0,
+  reversalRound,
   valueView = false,
   adpAtDraft,
   grades,
   gradesBasis,
 }: Props) {
   const byPick = new Map(board.map((p) => [p.pickNo, p]))
-  const mine = new Set(myPicks)
   const seatBySlot = new Map((seats ?? []).map((s) => [s.slot, s]))
   const gradeValues = grades
     ? Object.values(grades).flatMap((g) => (g.valueOverSlot != null ? [g.valueOverSlot] : []))
@@ -99,28 +125,51 @@ export default function DraftBoard({
 
   return (
     <div className="board-scroll panel-body">
-      <div className={`board${valueView || grades ? ' value-view' : ''}`} style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
+      <div className={`board${valueView || grades ? ' value-view' : ''}${density === 'compact' ? ' compact' : ''}`} style={{ gridTemplateColumns: `44px repeat(${teams}, minmax(96px, 1fr))` }}>
         <div className="corner" />
         {Array.from({ length: teams }, (_, i) => {
           const slot = i + 1
           const seat = seatBySlot.get(slot)
-          const isMe = mySlot === slot
+          const marked = mySlot === slot
+          const isMe = marked && !mySlotAssumed
           const label = seat ? PROVENANCE_LABEL[seat.provenance] : null
+          // A vacancy on a real draft: no Seat object for this slot. The whole
+          // header is the one action, "make it your seat" (FR-004, A5).
+          if (!seat && onClaim) {
+            return (
+              <button
+                key={i}
+                type="button"
+                className={`col-head unclaimed${isMe ? ' mine' : ''}${marked && mySlotAssumed ? ' assumed' : ''}`}
+                onClick={() => onClaim(slot)}
+                title={
+                  isMe
+                    ? `You claimed slot ${slot}. Sleeper hasn't mapped a manager to it yet.`
+                    : `Nobody is mapped to slot ${slot} yet. Make it your seat.`
+                }
+              >
+                <Avatar seed={String(slot)} label={String(slot)} isMe={isMe} />
+                {/* A claimed vacancy is yours, not "assumed" -- the same isMe/assumed
+                    split the mapped-seat branch below makes. */}
+                <span className="col-head-name mono">{isMe ? 'Your seat' : 'Unclaimed · Claim'}</span>
+                <span className="col-head-meta">
+                  {marked && mySlotAssumed && <span className="col-head-you mono">assumed</span>}
+                </span>
+              </button>
+            )
+          }
           // The header carries what SeatList used to show in its own band
           // (avatar, name, provenance, "you") -- see
-          // claude/board-first-layout-and-pick-latency.md §C. A dot, not the
-          // old text chip: fourteen "league average" chips across the top
-          // would be exactly the noise that map's own comment warns about.
-          // A real <button> (not a div) so it's reachable/activatable the
-          // same way a revealed cell already is, and opens SeatPopover.
+          // claude/board-first-layout-and-pick-latency.md section C. A dot, not
+          // the old text chip. A real <button> so it opens SeatPopover.
           return (
             <button
               key={i}
               type="button"
-              className={`col-head${isMe ? ' mine' : ''}`}
+              className={`col-head${isMe ? ' mine' : ''}${marked && mySlotAssumed ? ' assumed' : ''}`}
               onClick={() => seat && onSeatClick?.(seat.slot)}
               disabled={!seat}
-              title={seat ? `${seat.manager} — click for details` : undefined}
+              title={seat ? `${seat.manager} — click for details${marked && mySlotAssumed ? ' (assumed to be your seat)' : ''}` : undefined}
             >
               <Avatar
                 avatarId={seat?.avatarId}
@@ -134,15 +183,20 @@ export default function DraftBoard({
                   <span className={`col-head-dot ${label.className}`} title={label.badge ?? 'drafts like the league average'} />
                 )}
                 {isMe && <span className="col-head-you mono">you</span>}
+                {marked && mySlotAssumed && <span className="col-head-you assumed mono">assumed</span>}
               </span>
             </button>
           )
         })}
         {Array.from({ length: rounds }, (_, r) => {
           const round = r + 1
+          const forward = isForward(round, reversalRound)
           return (
             <Fragment key={round}>
-              <div className="rnd cond">R{round}</div>
+              <div className="rnd cond" data-forward={forward} title={forward ? 'Picks run left to right' : 'Picks run right to left'}>
+                R{round}
+                <span className="rnd-arrow" aria-hidden="true">{forward ? '→' : '←'}</span>
+              </div>
               {Array.from({ length: teams }, (_, s) => {
                 const slot = s + 1
                 // snake -- even rounds run right to left, and from
@@ -178,13 +232,27 @@ export default function DraftBoard({
                       ? 'steal'
                       : 'reach'
                     : null
+                const onClock = onTheClockPickNo === pickNo
+                // FR-008: what kind of cell this is, per room. Live: a landed pick or
+                // an empty slot (the projection is never drawn past the last real
+                // pick). Projection: your own chosen pick or a projected one. Mock /
+                // finished: every filled cell is a real pick.
+                const kind = !shown
+                  ? 'empty'
+                  : room === 'live'
+                    ? 'landed'
+                    : room === 'real'
+                      ? 'real'
+                      : chosen
+                        ? 'chosen'
+                        : 'projected'
                 const cls =
-                  'cell' +
+                  `cell kind-${kind}` +
                   (shown ? ` pos-${shown.position}` : '') +
                   (value && (value.kind === 'steal' || value.kind === 'reach') ? ` value-${value.kind}` : '') +
                   (gradeKind ? ` value-${gradeKind}` : '') +
-                  (mine.has(pickNo) ? ' mine' : '') +
-                  (chosen ? ' chosen' : visible && !visible.isModal ? ' uncertain' : '')
+                  (chosen ? ' chosen' : visible && !visible.isModal && room === 'projection' ? ' uncertain' : '') +
+                  (onClock ? ' on-the-clock' : '')
                 const valueTitle =
                   value == null
                     ? ''
@@ -225,14 +293,27 @@ export default function DraftBoard({
                 // that identifies the player. "J. Gibbs" fits the same cell.
                 // The full name stays in the cell's own `title` and PlayerCard.
                 const label = shown ? shortName(shown, sport) : null
-                const inner = shown && label ? (
+                const pickLabel = roundPickLabel(pickNo, teams)
+                const clockTag = onClock ? <span className="otc-tag cond">On the clock</span> : null
+                const inner = shown && label && density === 'compact' ? (
                   <>
-                    <span className="pickno mono">{pickNo}</span>
                     <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
                     <span className="name">
                       <span className="name-lead">{label.lead}</span>
                       {label.rest}
                     </span>
+                    <span className="pickno mono">{pickLabel}</span>
+                    {clockTag}
+                  </>
+                ) : shown && label ? (
+                  <>
+                    <span className="pickno mono">{pickLabel}</span>
+                    <span className={`pos ${shown.position}`}>{posRank(shown)}</span>
+                    <span className="name">
+                      <span className="name-lead">{label.lead}</span>
+                      {label.rest}
+                    </span>
+                    {clockTag}
                     {/* The face sits on the meta line, not the name line: on the name
                         line it truncated 16 of 180 names at 1440 vs 1 without
                         (measured, spec 013 parent review). */}
@@ -272,7 +353,10 @@ export default function DraftBoard({
                   // staying absolutely positioned: with no flow content at all
                   // the cell collapses to its own padding and the absolute
                   // number hangs out the bottom of it.
-                  <span className="pickno-open mono">{pickNo}</span>
+                  <>
+                    <span className="pickno-open mono">{pickLabel}</span>
+                    {clockTag}
+                  </>
                 )
                 // A visible cell is a real button (native focus + Enter/Space
                 // activation) so it can open the player card; hidden/pick-less
@@ -282,6 +366,8 @@ export default function DraftBoard({
                     key={slot}
                     type="button"
                     className={cls}
+                    data-kind={kind}
+                    data-pickno={pickNo}
                     title={titleAttr}
                     style={
                       value && value.delta != null && (value.kind === 'steal' || value.kind === 'reach')
@@ -295,7 +381,7 @@ export default function DraftBoard({
                     {inner}
                   </button>
                 ) : (
-                  <div key={slot} className={cls}>
+                  <div key={slot} className={cls} data-kind={kind} data-pickno={pickNo}>
                     {inner}
                   </div>
                 )

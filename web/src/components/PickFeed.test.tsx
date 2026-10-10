@@ -118,4 +118,15 @@ describe('the announcement row', () => {
     const { container } = render(<PickFeed sport="nfl" teams={TEAMS} picks={[]} />)
     expect(container.firstChild).toBeNull()
   })
+
+  it('tags an auto-picked row "auto" and leaves other rows untagged (FR-022)', () => {
+    const auto = { ...pick(2, 'WR', "Ja'Marr Chase", 'Allan'), auto: true }
+    const { container } = render(
+      <PickFeed sport="nfl" teams={TEAMS} limit={2} picks={[pick(1, 'RB', 'Bijan Robinson', 'Sam'), auto]} />,
+    )
+    const tags = container.querySelectorAll('.pick-feed-auto')
+    expect(tags).toHaveLength(1)
+    expect(tags[0].textContent).toBe('auto')
+    expect(tags[0].closest('li')!.textContent).toContain("Ja'Marr Chase")
+  })
 })
