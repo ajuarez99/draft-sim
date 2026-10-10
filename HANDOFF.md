@@ -1,5 +1,19 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-10 ~16:50 UTC: spec 029 deployed (faster live polling)
+
+- **Why.** Allan watched a test-league draft live and saw slow pick arrival. The poller slept a fixed 10 s between ticks, while Sleeper answered in 70–250 ms. Per-tick server time was never logged.
+- **The change** (`specs/029-faster-live-poll/notes.md`):
+  - poll every 2 s while `drafting`;
+  - 10 s plus backoff for everything else, and on any failure;
+  - a WARN "slow poll tick" for ticks over 1 s.
+- **Deployed:** Railway deployment `8e691d83` = `d821e0e`, SUCCESS. Health up; NBA SG tilts intact (12/12).
+- **Verify tonight:**
+  - picks should land within about 2–3 s of Sleeper;
+  - grep the prod log for "slow poll tick";
+  - nobody has watched 029 in a real `drafting` draft yet.
+- **Note:** this machine's clock runs about 3 min ahead of Railway's log timestamps.
+
 ## UPDATE 2026-10-10 ~16:15 UTC (pre-draft push): steps 2–5 below are DONE; step 1 is still owed after the draft
 
 Pushed to `main` before the 21:15 UTC draft, at Allan's request:
