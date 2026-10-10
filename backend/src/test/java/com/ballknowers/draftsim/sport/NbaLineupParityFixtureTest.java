@@ -59,6 +59,7 @@ class NbaLineupParityFixtureTest {
     private record Spec(String name, List<BoardEntry> players) {}
 
     private static List<Position> pos(String csv) {
+        if (csv.isEmpty()) return List.of();   // a player with no recognized position (mask 0)
         return Arrays.stream(csv.split("/")).map(Position::valueOf).toList();
     }
 
@@ -124,6 +125,11 @@ class NbaLineupParityFixtureTest {
                 "C@90", "PG@2", "SG@80", "SF@4", "PF@70", "PG/SG@6", "C@60", "SF/PF@8", "PF/C@50")));
         out.add(new Spec("equal-shape C/PF duplicates", roster(
                 "C/PF@5", "C/PF@15", "C/PF@25", "C/PF@35", "C/PF@45", "PG@55")));
+        // Spec 025 review N6: ties and the no-position player, both sides must agree.
+        out.add(new Spec("ADP tie at the 999 sentinel: PG/SG first, then a pure PG", roster(
+                "PG/SG@999", "PG@999")));
+        out.add(new Spec("mask-0 player is skipped (no position) among normal picks", roster(
+                "PG@3", "@7", "C@12", "SG/SF@20")));
         out.add(new Spec("second C with C filled and a UTIL open", roster(
                 "C@3", "C@12", "PG@20", "SG@28", "SF@36", "PF@44")));
         addRealAutoDraftedRosters(out);

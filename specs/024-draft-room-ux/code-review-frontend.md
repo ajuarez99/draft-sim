@@ -286,3 +286,10 @@ list, so the hook goes `ready`, while PUT returns 401.
 **api.ts**
 - The new fields are optional and nullable.
 - `getTargets` and `autoMock` 404s degrade, as `unavailable` and hidden controls respectively.
+
+---
+
+## Amended after merge: Cleanups 2026-10-10 (branch 027-review-cleanups)
+
+- **R7** fixed: `FormatSummary` prints a non-snake type as e.g. "linear (board shows snake order)"; "snake" is unchanged. The live and projection summaries now pass `seats.reversalRound` (it was already on the client in `SeatsResponse`), so they print "order reverses from round N" when it is above 0. Not checked: whether ingest admits linear drafts at all; the copy is honest either way.
+- **R8** fixed with the smaller change: a 401 on a targets PUT sets a new `signedOut` status. The hook drops the local list, the stars disappear (they render only when `ready`), and the strip shows "Sign in to keep a target list." with no retry loop. Hiding on `currentUserId()` was rejected because GET succeeds for a caller with no identity, so only the PUT knows. Tests: `useTargets.test.ts`, `TargetStrip.test.tsx`, `FormatSummary.test.tsx`.

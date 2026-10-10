@@ -30,12 +30,15 @@ type PosLike = Pick<PlayerRef, 'position' | 'positions'>
 
 /**
  * THE one fallback rule: `p.positions` when present and non-empty, else
- * `[p.position]`. Exception (review note #13): the backend's no-position
+ * `[p.position]`. Football: always `[p.position]`. Exception (review note #13): the backend's no-position
  * fallback (Player.primary()) reports WR; for an NBA player that is "no
  * position", so when `sport` is 'nba' and position is 'WR' this returns [].
  * Pass `sport` wherever it is known.
  */
 export function eligiblePositions(p: PosLike, sport: Sport): string[] {
+  // Football is single-position by rule: should Sleeper ever list an NFL player at two
+  // positions, football screens keep treating him as his primary one (spec 025 R2).
+  if (sport === 'nfl') return [p.position]
   if (p.positions && p.positions.length > 0) return [...p.positions]
   if (sport === 'nba' && p.position === 'WR') return []
   return [p.position]
@@ -72,17 +75,29 @@ export function multiVars(p: PosLike, sport: Sport): CSSProperties | undefined {
   if (ps.length < 2) return undefined
   const ordered = sport === 'nba' ? nbaSorted(ps) : ps
   const style: Record<string, string> = {}
-  ;['--pos-a', '--pos-b', '--pos-c'].forEach((k, i) => {
+  ;['--pos-a', '--pos-b', '--pos-c', '--pos-d'].forEach((k, i) => {
     if (ordered[i]) style[k] = `var(--${ordered[i].toLowerCase()})`
   })
-  // Hard-stop positions for the pill gradient: 50/50 for two, thirds for three.
-  style['--pos-s1'] = ordered.length === 2 ? '50%' : '34%'
-  style['--pos-s2'] = ordered.length === 2 ? '50%' : '67%'
+  // Hard-stop positions for the pill gradient: halves for two, thirds for three,
+  // quarters for four.
+  const n = Math.min(ordered.length, 4)
+  style['--pos-s1'] = ['', '', '50%', '34%', '25%'][n]
+  style['--pos-s2'] = ['', '', '50%', '67%', '50%'][n]
+  style['--pos-s3'] = ['', '', '50%', '100%', '75%'][n]
+  // The board cell's smooth tint: b/c default to 50%/100% in the stylesheet (two and
+  // three positions); four positions spread evenly.
+  if (n === 4) {
+    style['--pos-t1'] = '33%'
+    style['--pos-t2'] = '67%'
+  }
   return style as CSSProperties
 }
 
 export function posPill(p: PosLike, sport: Sport): { className: string; style: CSSProperties | undefined } {
   const style = multiVars(p, sport)
+  // An NBA player with no position has nothing to colour by: a bare `pos` pill, not the
+  // football `pos WR` the backend's fallback position would give him (review N3).
+  if (!style && eligiblePositions(p, sport).length === 0) return { className: 'pos', style }
   return { className: style ? 'pos multi' : `pos ${p.position}`, style }
 }
 
@@ -92,7 +107,7 @@ export function posPill(p: PosLike, sport: Sport): { className: string; style: C
  * so the stylesheet's neutral fallback applies -- never the first position's colour.
  */
 export function leadHueStyle(p: PosLike, sport: Sport): CSSProperties | undefined {
-  if (isMultiPosition(p, sport)) return undefined
+  if (isMultiPosition(p, sport) || eligiblePositions(p, sport).length === 0) return undefined
   return { '--lead-hue': `var(--${p.position.toLowerCase()})` } as CSSProperties
 }
 

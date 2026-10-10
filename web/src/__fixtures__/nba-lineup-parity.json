@@ -1218,6 +1218,51 @@
     },
     "canJoinByMask" : [ false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true, false, true, true, true, true, true, true, true ]
   }, {
+    "name" : "ADP tie at the 999 sentinel: PG/SG first, then a pure PG",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG", "SG" ],
+      "adp" : 999.0
+    }, {
+      "id" : 2,
+      "positions" : [ "PG" ],
+      "adp" : 999.0
+    } ],
+    "seated" : [ 1, 2 ],
+    "seating" : [ 2, 1, null, null, null, null, null, null, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
+    "name" : "mask-0 player is skipped (no position) among normal picks",
+    "players" : [ {
+      "id" : 1,
+      "positions" : [ "PG" ],
+      "adp" : 3.0
+    }, {
+      "id" : 2,
+      "positions" : [ ],
+      "adp" : 7.0
+    }, {
+      "id" : 3,
+      "positions" : [ "C" ],
+      "adp" : 12.0
+    }, {
+      "id" : 4,
+      "positions" : [ "SG", "SF" ],
+      "adp" : 20.0
+    } ],
+    "seated" : [ 1, 3, 4 ],
+    "seating" : [ 1, 4, null, null, null, null, 3, null, null ],
+    "filledByKind" : {
+      "PG" : 1,
+      "SG" : 1,
+      "C" : 1
+    },
+    "canJoinByMask" : [ false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true ]
+  }, {
     "name" : "second C with C filled and a UTIL open",
     "players" : [ {
       "id" : 1,

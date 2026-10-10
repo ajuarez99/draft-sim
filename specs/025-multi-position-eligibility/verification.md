@@ -153,3 +153,8 @@ Web 5197 on backend 8096.
 **`pickTimerSeconds` null is expected pre-draft.** At 15:34 UTC Sleeper still reported the draft as `pre_draft`, with `last_picked: null`. Sleeper's own `pick_timer` is 90, and the draft starts at 21:15 UTC. The column fills when the live poller ticks or the league is re-ingested.
 
 **Not verified yet:** anything about a draft in progress. The draft-night checks are listed in HANDOFF.md's "START HERE" §1 and get recorded here after the draft.
+
+## Amended 2026-10-10 (post-merge cleanups)
+
+- **SC-005 caveat (review N5):** the compact-density CSS change applies to football boards too (it fixed a spec-024 defect), so "no football screen changes" is not strictly true of the stylesheet; football cell content is unchanged.
+- **SC-004 evidence (review N7):** `Spec025SimBaselineTest` guards future engine/profile/sport changes. It could not have failed on the original diff (no engine code changed), so it is not independent proof of SC-004; the `git diff --stat` is the evidence for this change.

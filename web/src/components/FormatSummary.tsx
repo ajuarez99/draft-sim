@@ -25,6 +25,14 @@ export function formatTimer(seconds: number): string {
 }
 
 /**
+ * The board always draws snake order, so any other Sleeper type is named with that caveat
+ * rather than printed bare next to snake arrows (spec 024 review R7).
+ */
+function draftTypeText(draftType: string): string {
+  return draftType.toLowerCase() === 'snake' ? draftType : `${draftType} (board shows snake order)`
+}
+
+/**
  * "4 teams · 14 rounds · 2 min · snake" (spec 024 FR-017). A missing timer or
  * type is left out, not printed as "unknown": the line states what is known.
  */
@@ -34,7 +42,7 @@ export default function FormatSummary({ teams, rounds, pickTimerSeconds, draftTy
     `${teams} ${teams === 1 ? 'team' : 'teams'}`,
     `${rounds} ${rounds === 1 ? 'round' : 'rounds'}`,
     ...(pickTimerSeconds != null && pickTimerSeconds > 0 ? [formatTimer(pickTimerSeconds)] : []),
-    ...(draftType ? [draftType] : []),
+    ...(draftType ? [draftTypeText(draftType)] : []),
     ...(reversalRound != null && reversalRound > 0 ? [`order reverses from round ${reversalRound}`] : []),
   ]
   return <span className="format-summary muted small">{parts.join(' · ')}</span>

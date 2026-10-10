@@ -182,6 +182,15 @@ describe('useTargets', () => {
       await waitFor(() => expect(result.current.status).toBe('unavailable'))
     })
 
+    it('a 401 on save hides the stars with a sign-in note instead of a retry loop (review R8)', async () => {
+      const { result } = await ready()
+      putTargets.mockRejectedValue(new ApiError(401))
+      act(() => result.current.add(A))
+      await waitFor(() => expect(result.current.status).toBe('signedOut'))
+      expect(result.current.error).toBe(false)
+      expect(result.current.items).toEqual([])
+    })
+
     it('another load failure holds editing back instead of risking an overwrite', async () => {
       getTargets.mockRejectedValue(new ApiError(500))
       const { result } = renderHook(() => useTargets(SCOPE))

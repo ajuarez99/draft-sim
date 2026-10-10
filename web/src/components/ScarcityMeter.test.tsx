@@ -114,6 +114,15 @@ describe('ScarcityMeter', () => {
     expect(screen.queryByText(/more than one position/)).toBeNull()
   })
 
+  it('NBA: still prints the run sentence when every chip in the running family is hidden (review N8)', () => {
+    const r = nba()
+    // SG/SF hidden (poolSize 0); mark the hidden SG running and PG not.
+    r.rows[1] = { ...r.rows[1], running: true }
+    r.run = { position: 'G', count: 4, window: 6 }
+    render(<ScarcityMeter scarcity={r} failed={false} />)
+    expect(screen.getAllByText('4 of the last 6 were guards')).toHaveLength(1)
+  })
+
   it('words an NBA run by family ("guards") once, even though both guard chips are running', () => {
     const r = nba()
     r.rows[0] = { ...r.rows[0], running: true }

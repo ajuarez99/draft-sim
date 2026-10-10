@@ -46,9 +46,8 @@ const SLOT_ELIGIBILITY: Record<Sport, Record<string, Set<string>>> = {
  * walks a list: lineup.canJoin orders open slots by how few positions they
  * accept (spec 025 A1), which gives G/F before UTIL for the real template.
  */
-const POOLED_SLOTS: Record<Sport, readonly string[]> = {
+const POOLED_SLOTS: Record<'nfl', readonly string[]> = {
   nfl: ['FLEX'],
-  nba: ['G', 'F', 'UTIL'],
 }
 
 export type SlotStatus = { slot: string; player: PlayerRef | null }
@@ -242,6 +241,9 @@ export function makeFitFor(sport: Sport, needs: SlotStatus[]): (player: PlayerRe
 export function fitSlot(sport: Sport, player: PlayerRef, needs: SlotStatus[]): string | null {
   const fit = fitterFor(sport, needs)(player)
   if (fit == null) return null
+  // Basketball names the bare slot, matching the picker's "Fills UTIL" tag (review N1);
+  // the numbered form below is football's convention ("RB2").
+  if (sport === 'nba') return fit.slot
   const sameName = needs.map((n, i) => ({ n, i })).filter(({ n }) => n.slot === fit.slot)
   if (sameName.length <= 1) return fit.slot
   return `${fit.slot}${sameName.findIndex(({ i }) => i === fit.index) + 1}`

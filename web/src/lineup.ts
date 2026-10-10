@@ -91,6 +91,13 @@ function tryAssign(
 /**
  * BasketballRules.prepareLineup for a roster of `players` (drafted order) into
  * the starter slots of `rosterPositions`.
+ *
+ * Parity with the simulation only holds for ONE template: BasketballRules hard-codes
+ * its slots as PG,SG,G,SF,PF,F,C,UTIL,UTIL and ignores the league's roster_positions.
+ * This function reads `rosterPositions`, so for any other template (an extra UTIL, no
+ * G/F, a different order) the lineup and "Fills X" here would diverge from what the
+ * sim scores. All current NBA leagues use that template; the parity fixture covers
+ * only it (spec 025 code review R3).
  */
 export function seatLineup(rosterPositions: string[], players: PlayerRef[]): Lineup {
   const slots = rosterPositions.filter((s) => s !== 'BN' && s !== 'IR')
