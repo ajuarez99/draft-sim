@@ -27,6 +27,14 @@ const scopeKey = (s: TargetScope | null) =>
   s == null ? '' : 'sleeperDraftId' in s ? `d:${s.sleeperDraftId}` : `m:${s.mockSessionId}`
 
 /**
+ * The save loop currently running for each scope, across every mounted (or just unmounted)
+ * hook. Each room mounts its own hook, so a user who edits in one room and moves to the
+ * other while the PUT is in the air would otherwise GET the pre-edit list from the new
+ * hook (code review R6). Entries never reject and are removed when the loop settles.
+ */
+const pendingSaves = new Map<string, Promise<void>>()
+
+/**
  * A user's target list for one draft or mock (spec 024 US3, research A8).
  *
  * Edits show immediately and are saved by whole-list PUTs, with exactly one in flight:
@@ -65,6 +73,12 @@ export function useTargets(scope: TargetScope | null): UseTargets {
     if (inFlight.current || !s) return
     const myEpoch = epoch.current
     inFlight.current = true
+    const saveKey = scopeKey(s)
+    let settle!: () => void
+    const pending = new Promise<void>((res) => {
+      settle = res
+    })
+    pendingSaves.set(saveKey, pending)
     try {
       for (;;) {
         const sent = itemsRef.current
@@ -88,6 +102,8 @@ export function useTargets(scope: TargetScope | null): UseTargets {
       }
     } finally {
       if (myEpoch === epoch.current) inFlight.current = false
+      if (pendingSaves.get(saveKey) === pending) pendingSaves.delete(saveKey)
+      settle()
     }
   }, [setErr])
 
@@ -107,7 +123,10 @@ export function useTargets(scope: TargetScope | null): UseTargets {
     if (!s) return
     const myEpoch = epoch.current
     const myEdit = editSeq.current
-    getTargets(s).then(
+    // Wait out a save for this scope that another (possibly unmounted) hook has in the air.
+    const saving = pendingSaves.get(scopeKey(s))
+    const fetched = saving ? saving.then(() => getTargets(s)) : getTargets(s)
+    fetched.then(
       (t) => {
         if (myEpoch !== epoch.current || myEdit !== editSeq.current || dirty.current || inFlight.current || errored.current) return
         setItems(itemsFromServer(t))

@@ -11,7 +11,14 @@ type Props = {
   bestAvailable: PlayerRef | undefined
   onPick: (player: PlayerRef) => void
   onOpenPicker: () => void
+  /**
+   * Render as bare pieces (a one-line ellipsized note plus the buttons) to sit inside a
+   * flex row such as RoomControls, instead of as its own banner region (spec 024).
+   */
+  inline?: boolean
 }
+
+const NOTE = 'Recalculates every pick after this one based on what you took — may take a few seconds.'
 
 // The pause banner, which used to live in the reveal scrubber that OnTheClock
 // replaced -- this is the one place
@@ -19,12 +26,35 @@ type Props = {
 // where the animation happened to stop. All actions below funnel through the
 // same onPick (see DraftView's choosePick): "take X" is a pick, not a
 // different code path, whichever button triggered it.
-export default function PickPrompt({ modelPick, bestAvailable, onPick, onOpenPicker }: Props) {
+export default function PickPrompt({ modelPick, bestAvailable, onPick, onOpenPicker, inline }: Props) {
   // Two buttons only when they'd actually offer different players -- the
   // model's own suggestion (reach bias, roster need, that manager's fitted
   // tendencies) and "best available" often agree, and a second identical
   // button would just be noise.
   const showBestAvailable = bestAvailable != null && bestAvailable.id !== modelPick?.player.id
+
+  if (inline) {
+    return (
+      <>
+        <span className="muted tiny pick-prompt-note" title={NOTE}>
+          {NOTE}
+        </span>
+        {modelPick && (
+          <button type="button" className="chip on pick-prompt-take" onClick={() => onPick(modelPick.player)}>
+            Take {modelPick.player.name}
+          </button>
+        )}
+        {showBestAvailable && bestAvailable && (
+          <button type="button" className="chip" onClick={() => onPick(bestAvailable)}>
+            Take {bestAvailable.name} (best available)
+          </button>
+        )}
+        <button type="button" className="chip" onClick={onOpenPicker}>
+          Choose a player
+        </button>
+      </>
+    )
+  }
 
   return (
     <div className="pause-banner pick-prompt">
@@ -34,9 +64,7 @@ export default function PickPrompt({ modelPick, bestAvailable, onPick, onOpenPic
           strip introduced; this one keeps the half the strip doesn't have --
           what happens when you press one of these buttons. */}
       <div className="pick-prompt-info">
-        <span className="muted tiny">
-          Recalculates every pick after this one based on what you took — may take a few seconds.
-        </span>
+        <span className="muted tiny">{NOTE}</span>
       </div>
       <div className="pick-prompt-actions">
         {modelPick && (

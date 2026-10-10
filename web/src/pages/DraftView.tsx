@@ -585,30 +585,33 @@ export default function DraftView() {
             ) : undefined
           }
           controls={
-            started && reveal.revealedThrough < maxPickNo ? (
+            // The pick prompt / recalculating text lives in this row (as the mock room's
+            // does) instead of its own region, which cost the list two rows.
+            started && (reveal.revealedThrough < maxPickNo || reveal.pausedAt != null) ? (
               <RoomControls>
-                <button className="chip" onClick={reveal.skip} disabled={resimming}>
-                  Skip to the end
-                </button>
+                {reveal.pausedAt != null &&
+                  (resimming ? (
+                    <span
+                      className="muted small pick-prompt-note"
+                      title={`Recalculating the board past pick ${reveal.pausedAt}`}
+                    >
+                      Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
+                    </span>
+                  ) : (
+                    <PickPrompt
+                      inline
+                      modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
+                      bestAvailable={result.bestAvailable[String(reveal.pausedAt)]?.[0]?.player}
+                      onPick={choosePick}
+                      onOpenPicker={() => setPickerOpen(true)}
+                    />
+                  ))}
+                {reveal.revealedThrough < maxPickNo && (
+                  <button className="chip" onClick={reveal.skip} disabled={resimming}>
+                    Skip to the end
+                  </button>
+                )}
               </RoomControls>
-            ) : undefined
-          }
-          prompt={
-            started && reveal.pausedAt != null ? (
-              resimming ? (
-                <div className="pause-banner">
-                  <span className="muted small">
-                    Recalculating the board past pick {reveal.pausedAt}... {Math.round(resimProgress * 100)}%
-                  </span>
-                </div>
-              ) : (
-                <PickPrompt
-                  modelPick={result.board.find((p) => p.pickNo === reveal.pausedAt)}
-                  bestAvailable={result.bestAvailable[String(reveal.pausedAt)]?.[0]?.player}
-                  onPick={choosePick}
-                  onOpenPicker={() => setPickerOpen(true)}
-                />
-              )
             ) : undefined
           }
           compactRow={

@@ -145,6 +145,28 @@ describe('useTargets', () => {
     })
   })
 
+  it('a hook mounted for the same scope waits for another hook\'s in-flight save before its first GET', async () => {
+    const a = await ready()
+    const save = deferred<DraftTargets>()
+    putTargets.mockReturnValueOnce(save.promise)
+    act(() => a.result.current.add(A))
+    a.unmount() // the user navigates to the other room while the PUT is in the air
+    expect(getTargets).toHaveBeenCalledTimes(1)
+
+    getTargets.mockResolvedValue({ players: [A], missing: [] }) // what the server holds once the PUT commits
+    const b = renderHook(() => useTargets(SCOPE))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(getTargets).toHaveBeenCalledTimes(1) // B has not asked yet
+    expect(b.result.current.status).toBe('loading')
+
+    await act(async () => save.resolve(empty))
+    await waitFor(() => expect(b.result.current.status).toBe('ready'))
+    expect(getTargets).toHaveBeenCalledTimes(2)
+    expect(b.result.current.items.map((t) => t.name)).toEqual(['Ann Alpha'])
+  })
+
   describe('an older backend', () => {
     it('a 404 on load means unavailable, without throwing', async () => {
       getTargets.mockRejectedValue(new ApiError(404))

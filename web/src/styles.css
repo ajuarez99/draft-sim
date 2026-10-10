@@ -5752,6 +5752,10 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .room-controls-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; min-width: 0; }
 .room-controls-group .room-primary { margin-left: auto; font-weight: 700; }
 .room-controls-group .room-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+/* PickPrompt inline in the controls row (projection room): the note gives way first. */
+.room-controls-group .pick-prompt-note { flex: 1 1 80px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-controls-group .pick-prompt-take { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
+.room-controls-group .chip { flex-shrink: 0; }
 .format-summary { white-space: nowrap; }
 .scarcity-meter .scarcity-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 

@@ -56,6 +56,25 @@ Against `draft-sim-024-api-8094` (this worktree, V30 applied), as popsharky:
 - **Pre-draft 12-team live at default 0.5:** board 299, list 299, **7 rounds, 7 rows**. That is one row short of SC-001.
 - **Projection room after "Start the mock draft":** grid rows `355px 8px 30px 201.6px`, so only 4 list rows. `aria-valuemax` = 502 means the divider believed the space was 709 px, but `.room-split` was really 595 px. **A stale measurement after the room's top stack grew (the PickPrompt appeared).** Sent to a fix agent, along with a better default policy: "enough for 7 compact rounds, the rest to the list" instead of a fixed fraction. *Re-measure after the fix.*
 
+## R6 and the projection room's height (after 8673126) — VERIFIED
+
+- **R6** (a save in flight when you switch rooms): `useTargets` keeps a module-level map of pending saves keyed by scope, and a newly mounted hook waits for that scope's pending PUT before its GET. A unit test covers it: hook B's GET is held until A's PUT resolves. *Unit-tested only*; reproducing the race in a browser needs a slowed network.
+- **Projection room height:** PickPrompt now sits inline in the controls row, next to "Skip to the end". Measured at 1440×900 on `1339351318128517120?slot=5` after Start:
+  - board 329, list 315, **8 rounds, 8 rows**, 0 overlap, no page scroll;
+  - every control on **one row**: note · "Take Anthony Davis" · "Take Victor Wembanyama (best available)" · "Choose a player" · "Skip to the end".
+
+  It was 6 rows before. ✓
+- **The pick still works:** "Take Anthony Davis" → cell 1.05 reads `C4 A. Davis` with kind `chosen`, and the status moved from "You — 1.05" to "You — 2.08". ✓
+- **Suites:** web tsc clean, **1415/1415**.
+
+## After commit 8673126: remaining browser gaps closed (2026-10-09)
+
+- **Targets popover, live room `1414306786223153152/live?slot=3`, 1440×900:**
+  - "Edit" opens a popover with labelled controls ("Move X up/down", "Remove X", "Done").
+  - Moving Dončić up twice and removing Edwards gave `L. Dončić | N. Jokić`.
+  - **After a full reload** the same order came back. ✓
+- **The save-error path (FR-014a) in the browser:** `PUT /api/targets` was made to return 500 in that tab only, by patching `window.fetch`. Adding Edwards kept him on screen and showed **"Couldn't save targets — retry"**. With the patch removed, Retry cleared the error, and a server GET returned `[Dončić, Jokić, Edwards]`. ✓
+
 ## Final pass (T045, 2026-10-09) — VERIFIED on the final code
 
 Backend `8094` restarted with the poller and SQL follow-ups; web `5195` hard-navigated.
