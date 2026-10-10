@@ -39,10 +39,9 @@ that draft night uses.
     symptom: "8 of 9 starters" after a full auto-draft. Fixing it means `positions[]` on
     `PlayerRef`; it's a separate task.
   - **The Sleeper reset edge case is not met.** It depends on the open stale-picks bug.
-  - **The projection room shows 6 list rows, not 8.** It's outside SC-001; dragging the divider
-    recovers them.
-  - **Review risks R6–R8,** recorded in `code-review-frontend.md`: a save in flight when you switch
-    rooms, a "linear" label over a snake board, and stars without an identity.
+  - **Review risks R7–R8,** recorded in `code-review-frontend.md`: a "linear" label over a snake
+    board, and stars without an identity. R6 (a save in flight when you switch rooms) is fixed in
+    `c26a3ec`. The projection room now fits 8 rounds / 8 rows too, measured.
   - **Never run against a draft in progress.** No drafting draft exists locally, so live mid-draft
     list rows are arithmetic (8).
   - **Commit and PR.** Ask Allan first.
