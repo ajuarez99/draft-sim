@@ -45,3 +45,17 @@ Vite :5187, signed in as `popsharky`.
   the stored-scores record. This is a follow-up across every page.
 - **In-season "so far"** shows only while `early`. The payload has no in-season flag (build
   deviation 1), and that's accepted.
+
+## Follow-up resolved: which NBA 2025 numbers are right (2026-10-12, Allan asked)
+
+**Measured.** Sleeper's official season record (`/rosters` `settings.fpts`/`wins`) agrees with
+**our stored** weekly scores: points within 0–44 per team (≈0–1%), wins exact for 8 of 12 teams
+and off by one for 4. Sleeper's **current** `/matchups` for that finished season disagrees with
+both: season sums are 150–1,530 points low per team (up to 35%), and wins match for only 3 of 12.
+In week 8 it credits 0.0 to starters who played (SGA, Avdija, Flagg, Butler…), with the same
+starters lists. So the stored data is right, and the live endpoint for the old season is degraded.
+
+The 4 off-by-one teams trace to two close games (week 8, 4 v 8; week 9, 1 v 6) where Sleeper's
+official result went the other way. Probably late stat corrections, since final weeks aren't
+re-fetched. That's inferred. So the diagonal's "record from the stored weekly scores" wording is
+accurate. **Never re-ingest finished NBA weeks from `/matchups`.**
