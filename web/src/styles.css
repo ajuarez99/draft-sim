@@ -5979,3 +5979,24 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
    added ~15px to the row, so keep it thin rather than hiding it. */
 .compact-row .compact-team .team-strip { scrollbar-width: thin; }
 .compact-team .team-slot .pface { width: 18px !important; height: 18px !important; margin: -2px 3px -2px 0; }
+
+/* --- 031: schedule swap grid ------------------------------------------------
+   The grid scrolls inside its own card; the first column sticks, with an OPAQUE
+   background (var(--bg), the page surface) in both themes so scrolled cells never show through.
+   Colour only repeats the printed W-L, it is never the only encoding. */
+.ew-swap-scroll { overflow-x: auto; max-width: 100%; margin-top: 10px; -webkit-overflow-scrolling: touch; }
+.ew-swap { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; font-size: 13px; }
+.ew-swap th, .ew-swap td { padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.ew-swap thead th { font-size: 11px; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; text-align: center; max-width: 11ch; overflow: hidden; text-overflow: ellipsis; }
+.ew-swap .ew-swap-corner, .ew-swap .ew-swap-rowhead { position: sticky; left: 0; z-index: 1; background: var(--bg); text-align: left; }
+.ew-swap .ew-swap-rowhead { font-weight: 500; }
+.ew-swap .ew-swap-rowhead .ew-avatar { display: inline-block; vertical-align: middle; margin-right: 8px; }
+.ew-swap .ew-swap-rowhead .ew-name { display: inline-block; vertical-align: middle; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; }
+.ew-swap-cell { text-align: center; }
+.ew-swap-up { background: color-mix(in oklab, var(--bg) 88%, var(--up) 12%); }
+.ew-swap-down { background: color-mix(in oklab, var(--bg) 88%, var(--down) 12%); }
+.ew-swap-diag { outline: 1px solid var(--muted); outline-offset: -2px; }
+.ew-swap-rec { display: block; }
+.ew-swap-actual { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ew-swap tfoot th { font-size: 11px; white-space: normal; min-width: 14ch; }
+.ew-swap-rate { font-weight: 600; }

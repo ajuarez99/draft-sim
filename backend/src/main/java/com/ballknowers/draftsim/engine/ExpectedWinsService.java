@@ -4,6 +4,9 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.*;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.*;
 
 /**
@@ -37,6 +40,8 @@ import java.util.*;
  */
 @Service
 public class ExpectedWinsService {
+
+    private static final Logger log = LoggerFactory.getLogger(ExpectedWinsService.class);
 
     private final LeagueRepository leagues;
     private final LeagueMatchupRepository matchups;
@@ -86,11 +91,25 @@ public class ExpectedWinsService {
                           double strengthOfSchedule, LuckSource luckSource, List<SwingWeek> swingWeeks,
                           WinLossTie allPlay, WinLossTie median) {}
 
+    /**
+     * Spec 031: every team's record on every other team's schedule.
+     *
+     * @param rosterIds         row and column order (the same order as {@code teams})
+     * @param cells             {@code cells.get(row).get(col)}: row's record had it played column's opponents
+     *                          week by week with its own score; the diagonal is the real record
+     * @param difficultyWinRate per column: mean over rows of (W + half the ties) / games, 3 dp.
+     *                          Higher means an easier schedule; a rate so columns with byes compare.
+     */
+    public record ScheduleSwap(List<Integer> rosterIds, List<List<WinLossTie>> cells,
+                               List<Double> difficultyWinRate) {}
+
+    /** {@code scheduleSwap} is null when the result is unavailable or fewer than two rosters played. */
     public record Result(boolean available, String reason, int season, Integer requestedSeason,
-                         Sport sport, int weeksScored, double leagueAveragePpg, List<TeamRow> teams) {
+                         Sport sport, int weeksScored, double leagueAveragePpg, List<TeamRow> teams,
+                         ScheduleSwap scheduleSwap) {
 
         static Result unavailable(String reason, int season, Sport sport) {
-            return new Result(false, reason, season, null, sport, 0, 0, List.of());
+            return new Result(false, reason, season, null, sport, 0, 0, List.of(), null);
         }
     }
 
@@ -252,6 +271,74 @@ public class ExpectedWinsService {
         return out;
     }
 
+    /**
+     * The schedule-swap matrix. Cell (T, S): T's record if it had played S's opponents week by week,
+     * using T's own score each week. <b>Self-pairing rule:</b> in a week where S's opponent is T
+     * itself, T plays S (otherwise T would face itself). That keeps the diagonal exactly the real
+     * record and makes the other N-1 schedules average to expected wins (no byes).
+     * A week S had no game is not played in that cell; a week T has no score is skipped for T (not a
+     * loss). Same ties rule as {@link #actualWins}. Rows and columns are {@code rosterOrder} limited
+     * to rosters that appear in {@code games}. A roster twice in one week throws.
+     *
+     * @return null when fewer than two rosters take part
+     */
+    static ScheduleSwap scheduleSwap(List<Game> games, List<Integer> rosterOrder) {
+        Map<Integer, Map<Integer, Integer>> oppByWeek = new TreeMap<>();
+        Map<Integer, Map<Integer, Double>> scores = new TreeMap<>();
+        Set<Integer> played = new HashSet<>();
+        for (Game g : games) {
+            Map<Integer, Integer> opp = oppByWeek.computeIfAbsent(g.week(), k -> new HashMap<>());
+            Map<Integer, Double> sc = scores.computeIfAbsent(g.week(), k -> new HashMap<>());
+            if (g.aRosterId() == g.bRosterId() || opp.containsKey(g.aRosterId()) || opp.containsKey(g.bRosterId())) {
+                throw new IllegalStateException("roster appears in more than one game in week " + g.week());
+            }
+            opp.put(g.aRosterId(), g.bRosterId());
+            opp.put(g.bRosterId(), g.aRosterId());
+            sc.put(g.aRosterId(), g.aPoints());
+            sc.put(g.bRosterId(), g.bPoints());
+            played.add(g.aRosterId());
+            played.add(g.bRosterId());
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (Integer r : rosterOrder) if (played.contains(r) && !ids.contains(r)) ids.add(r);
+        int n = ids.size();
+        if (n < 2) return null;
+
+        List<List<WinLossTie>> cells = new ArrayList<>();
+        double[] rateSum = new double[n];
+        int[] rateRows = new int[n];
+        for (int i = 0; i < n; i++) {
+            int t = ids.get(i);
+            List<WinLossTie> row = new ArrayList<>();
+            for (int j = 0; j < n; j++) {
+                int s = ids.get(j);
+                int[] a = new int[3];
+                for (Map.Entry<Integer, Map<Integer, Integer>> w : oppByWeek.entrySet()) {
+                    Integer x = w.getValue().get(s);
+                    if (x == null) continue;              // S had no game: week not played
+                    if (x == t) x = s;                    // self-pairing rule
+                    Map<Integer, Double> sc = scores.get(w.getKey());
+                    Double mine = sc.get(t);
+                    if (mine == null) continue;           // T had no score: skipped, not a loss
+                    int cmp = Double.compare(mine, sc.get(x));
+                    a[cmp > 0 ? 0 : cmp < 0 ? 1 : 2]++;
+                }
+                row.add(new WinLossTie(a[0], a[1], a[2]));
+                int played_ = a[0] + a[1] + a[2];
+                if (played_ > 0) {
+                    rateSum[j] += (a[0] + a[2] / 2.0) / played_;
+                    rateRows[j]++;
+                }
+            }
+            cells.add(row);
+        }
+        List<Double> difficulty = new ArrayList<>();
+        for (int j = 0; j < n; j++) {
+            difficulty.add(rateRows[j] == 0 ? 0.0 : Math.round(rateSum[j] / rateRows[j] * 1000.0) / 1000.0);
+        }
+        return new ScheduleSwap(List.copyOf(ids), cells, difficulty);
+    }
+
     private static Map<Integer, Map<Integer, Double>> scoresByWeek(List<Game> games) {
         Map<Integer, Map<Integer, Double>> byWeek = new TreeMap<>();
         for (Game g : games) {
@@ -273,7 +360,7 @@ public class ExpectedWinsService {
     public Optional<Result> forLeague(String sleeperLeagueId, WeekBound bound) {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
-        return Optional.of(compute(found.get(), bound));
+        return Optional.of(compute(found.get(), bound, false));
     }
 
     /**
@@ -286,7 +373,7 @@ public class ExpectedWinsService {
         Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
         if (found.isEmpty()) return Optional.empty();
         WeekBound bound = regularSeasonBound(found.get().league());
-        return Optional.of(compute(found.get(), bound));
+        return Optional.of(compute(found.get(), bound, true));
     }
 
     /**
@@ -304,7 +391,8 @@ public class ExpectedWinsService {
         return WeekBound.ALL_WEEKS;
     }
 
-    private Result compute(LeagueSeasonResolver.Resolved found, WeekBound bound) {
+    /** {@code withSwap}: only the regular-season path (the Luck page) builds the schedule-swap matrix. */
+    private Result compute(LeagueSeasonResolver.Resolved found, WeekBound bound, boolean withSwap) {
         LeagueRepository.LeagueRow league = found.league();
 
         List<Game> games = new ArrayList<>();
@@ -367,8 +455,18 @@ public class ExpectedWinsService {
                 .thenComparingInt(TeamRow::rosterId));
 
         int weeks = (int) games.stream().mapToInt(Game::week).distinct().count();
+        ScheduleSwap swap = null;
+        if (withSwap) {
+            try {
+                swap = scheduleSwap(games, teams.stream().map(TeamRow::rosterId).toList());
+            } catch (IllegalStateException e) {
+                // Only the matrix needs one game per roster per week; never let it take other callers down.
+                log.warn("schedule swap skipped for league {} (sleeper {}): {}", league.id(), league.sleeperId(), e.getMessage());
+            }
+        }
         return new Result(true, null, league.season(), found.requestedSeason(),
-                league.sport(), weeks, round2(leaguePpg(games)), teams);
+                league.sport(), weeks, round2(leaguePpg(games)), teams,
+                swap);
     }
 
     private static double round2(double d) {

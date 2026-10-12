@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import Avatar from '../components/Avatar'
-import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam } from '../api'
+import { getExpectedWins, type ExpectedWins as Data, type ExpectedWinsTeam, type ScheduleSwap } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import PersonName from '../components/PersonName'
@@ -156,6 +156,10 @@ export default function ExpectedWins() {
             </HowThisWorks>
           </section>
 
+          {data.scheduleSwap != null && (
+            <ScheduleSwapSection swap={data.scheduleSwap} teams={data.teams} early={isEarly(data)} />
+          )}
+
           <section className="section">
             <h3 className="section-title">Where the luck came from</h3>
             <div className="ew-luck">
@@ -169,6 +173,125 @@ export default function ExpectedWins() {
         </>
       )}
     </div>
+  )
+}
+
+const wlt = (c: { wins: number; losses: number; ties: number }) =>
+  c.ties > 0 ? `${c.wins}-${c.losses}-${c.ties}` : `${c.wins}-${c.losses}`
+
+/** Names of every column whose win rate equals `target`, in grid order (all tied names, never one). */
+function namesAt(swap: ScheduleSwap, name: (id: number) => string, target: number): string {
+  return swap.rosterIds
+    .filter((_, j) => swap.difficultyWinRate[j] === target)
+    .map(name)
+    .join(', ')
+}
+
+/**
+ * Spec 031: every team's record on every other team's schedule. Rows and columns are joined to the
+ * page's teams by rosterId, never by index. The diagonal is the real record. Colour only repeats
+ * the printed W-L (above .500, below, or level).
+ */
+function ScheduleSwapSection({ swap, teams, early }: { swap: ScheduleSwap; teams: ExpectedWinsTeam[]; early: boolean }) {
+  const byRoster = new Map(teams.map((t) => [t.rosterId, t]))
+  const name = (id: number) => byRoster.get(id)?.teamName ?? `Roster ${id}`
+  const rates = swap.difficultyWinRate
+  const easiest = rates.length ? Math.max(...rates) : 0
+  const toughest = rates.length ? Math.min(...rates) : 0
+  // Naming a toughest schedule on a few weeks of data would be noise: the page's own early rule.
+  const named = !early && rates.length > 0 && easiest !== toughest
+  const pct = (r: number) => `${(r * 100).toFixed(1)}%`
+
+  return (
+    <section className="section" data-testid="schedule-swap">
+      <h3 className="section-title">
+        Schedule swap
+        {early && (
+          <>
+            {' '}
+            <span className="sl-early small">so far</span>
+          </>
+        )}
+      </h3>
+      <p className="muted small">
+        Each row is a team; each column is whose schedule it plays. A cell is the row team's record
+        against that column's opponents, week by week, with the row team's own scores.
+      </p>
+
+      <div className="ew-swap-scroll">
+        <table className="ew-swap">
+          <thead>
+            <tr>
+              <th scope="col" className="ew-swap-corner">Team ↓ · schedule →</th>
+              {swap.rosterIds.map((id) => (
+                <th scope="col" key={id} className="ew-swap-col" title={`${name(id)}'s schedule`}>
+                  {name(id)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {swap.rosterIds.map((rid, i) => (
+              <tr key={rid}>
+                <th scope="row" className="ew-swap-rowhead">
+                  <Avatar
+                    avatarId={byRoster.get(rid)?.avatarId}
+                    seed={String(byRoster.get(rid)?.managerId ?? rid)}
+                    label={name(rid)}
+                    hue={hueForIndex(i, swap.rosterIds.length)}
+                    className="ew-avatar"
+                  />
+                  <span className="ew-name">{name(rid)}</span>
+                </th>
+                {swap.cells[i].map((c, j) => {
+                  const g = c.wins + c.losses + c.ties
+                  const share = g === 0 ? 0.5 : (c.wins + c.ties / 2) / g
+                  const tone = share > 0.5 ? 'ew-swap-up' : share < 0.5 ? 'ew-swap-down' : ''
+                  return (
+                    <td key={swap.rosterIds[j]} className={`ew-swap-cell ${tone} ${i === j ? 'ew-swap-diag' : ''}`}>
+                      <span className="ew-swap-rec">{wlt(c)}</span>
+                      {i === j && <span className="ew-swap-actual">actual</span>}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row" className="ew-swap-rowhead">Average win rate on this schedule</th>
+              {rates.map((r, j) => (
+                <td key={swap.rosterIds[j]} className="ew-swap-cell ew-swap-rate">{pct(r)}</td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {named && (
+        <p className="small">
+          Easiest schedule: <strong>{namesAt(swap, name, easiest)}</strong> ({pct(easiest)}). Toughest
+          schedule: <strong>{namesAt(swap, name, toughest)}</strong> ({pct(toughest)}).
+        </p>
+      )}
+
+      <HowThisWorks>
+        <p>
+          When a schedule's opponent is you, you play that team instead — otherwise you would be
+          facing yourself. That keeps the diagonal equal to each team's record from the stored weekly scores — the same scores every number on this page uses.
+        </p>
+        <p>
+          A row's average over the other schedules is the team's expected wins, the same number the
+          Luck column compares against.
+        </p>
+        <p>
+          Average win rate is how every team in the league would have done on that schedule, using
+          each team's own weekly scores. <strong>Higher means an easier schedule.</strong> That is
+          not the Schedule column above, which is the average points of the opponents faced and
+          ignores what you scored each week, so the two can disagree.
+        </p>
+      </HowThisWorks>
+    </section>
   )
 }
 

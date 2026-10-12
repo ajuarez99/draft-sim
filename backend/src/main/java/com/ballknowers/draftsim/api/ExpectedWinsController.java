@@ -58,6 +58,7 @@ public class ExpectedWinsController {
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("teams", List.of());
+            out.put("scheduleSwap", null);
             return out;
         }
         List<Map<String, Object>> teams = new ArrayList<>();
@@ -93,7 +94,24 @@ public class ExpectedWinsController {
             teams.add(row);
         }
         out.put("teams", teams);
+        out.put("scheduleSwap", swap(r.scheduleSwap()));
         return out;
+    }
+
+    /** Spec 031. Mutable map throughout: the whole value is null when there is no matrix. */
+    private static Map<String, Object> swap(ExpectedWinsService.ScheduleSwap s) {
+        if (s == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("rosterIds", s.rosterIds());
+        List<List<Map<String, Object>>> cells = new ArrayList<>();
+        for (List<ExpectedWinsService.WinLossTie> row : s.cells()) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (ExpectedWinsService.WinLossTie c : row) out.add(wlt(c));
+            cells.add(out);
+        }
+        m.put("cells", cells);
+        m.put("difficultyWinRate", s.difficultyWinRate());
+        return m;
     }
 
     private static Map<String, Object> wlt(ExpectedWinsService.WinLossTie r) {

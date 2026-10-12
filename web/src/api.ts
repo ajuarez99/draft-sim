@@ -1881,6 +1881,14 @@ export type ExpectedWinsTeam = {
   median?: { wins: number; losses: number; ties: number }
 }
 
+/** ExpectedWinsService.ScheduleSwap (spec 031). cells[row][col]: the row team's record had it played the column team's opponents, week by week, with its own scores; the diagonal is the real record. Rows and columns share the rosterIds order; join to teams by rosterId. */
+export type ScheduleSwap = {
+  rosterIds: number[]
+  cells: { wins: number; losses: number; ties: number }[][]
+  /** Per column: mean over rows of (W + half the ties) / games. Higher = easier schedule. */
+  difficultyWinRate: number[]
+}
+
 export type ExpectedWins = {
   available: boolean
   reason?: string | null
@@ -1893,6 +1901,8 @@ export type ExpectedWins = {
   early?: boolean
   leagueAveragePpg: number
   teams: ExpectedWinsTeam[]
+  /** Spec 031. Null when unavailable or under two rosters; absent on an older backend. */
+  scheduleSwap?: ScheduleSwap | null
 }
 
 export const getExpectedWins = (sleeperLeagueId: string) =>

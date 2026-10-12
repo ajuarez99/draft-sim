@@ -173,3 +173,81 @@ describe('Expected wins eyebrow names the season shown', () => {
     expect(await screen.findByText('Who the schedule has helped, and who it has hurt.')).toBeInTheDocument()
   })
 })
+
+/** Spec 031: the schedule-swap grid. */
+describe('Schedule swap', () => {
+  beforeEach(() => getExpectedWins.mockReset())
+
+  const swap = {
+    rosterIds: [2, 1, 3],
+    cells: [
+      [{ wins: 3, losses: 1, ties: 0 }, { wins: 2, losses: 1, ties: 1 }, { wins: 0, losses: 4, ties: 0 }],
+      [{ wins: 1, losses: 3, ties: 0 }, { wins: 2, losses: 2, ties: 0 }, { wins: 2, losses: 2, ties: 0 }],
+      [{ wins: 4, losses: 0, ties: 0 }, { wins: 1, losses: 3, ties: 0 }, { wins: 1, losses: 3, ties: 0 }],
+    ],
+    difficultyWinRate: [0.667, 0.5, 0.25],
+  }
+  const teams = [
+    team({ rosterId: 1, teamName: 'Alpha' }),
+    team({ rosterId: 2, teamName: 'Bravo' }),
+    team({ rosterId: 3, teamName: 'Charlie' }),
+  ]
+  const notEarly = { weeksScored: 4, early: false, teams, scheduleSwap: swap }
+
+  it('prints exact W-L and W-L-T, marks the diagonal actual, and joins rows by rosterId', async () => {
+    getExpectedWins.mockResolvedValue(data(notEarly))
+    render(<ExpectedWins />)
+
+    const section = await screen.findByTestId('schedule-swap')
+    expect(within(section).getByText('2-1-1')).toBeInTheDocument()
+    expect(within(section).getAllByText('actual')).toHaveLength(3)
+    // first row is rosterId 2, which is Bravo (not teams[0] = Alpha)
+    const rows = within(section).getAllByRole('row')
+    expect(within(rows[1]).getByRole('rowheader')).toHaveTextContent('Bravo')
+    expect(within(rows[1]).getAllByText('actual')).toHaveLength(1)
+    expect(within(section).getByText('Average win rate on this schedule')).toBeInTheDocument()
+    expect(within(section).getByText('66.7%')).toBeInTheDocument()
+    expect(within(section).getByText(/When a schedule's opponent is you, you play that team instead/)).toBeInTheDocument()
+  })
+
+  it('is hidden when scheduleSwap is absent or null', async () => {
+    getExpectedWins.mockResolvedValue(data({ teams }))
+    const { unmount } = render(<ExpectedWins />)
+    await screen.findByText(/Where the luck came from/)
+    expect(screen.queryByTestId('schedule-swap')).not.toBeInTheDocument()
+    unmount()
+
+    getExpectedWins.mockResolvedValue(data({ teams, scheduleSwap: null }))
+    render(<ExpectedWins />)
+    await screen.findByText(/Where the luck came from/)
+    expect(screen.queryByTestId('schedule-swap')).not.toBeInTheDocument()
+  })
+
+  it('names the easiest and toughest schedule once not early', async () => {
+    getExpectedWins.mockResolvedValue(data(notEarly))
+    render(<ExpectedWins />)
+    const section = await screen.findByTestId('schedule-swap')
+    expect(within(section).getByText(/Easiest schedule/)).toHaveTextContent(/Easiest schedule: Bravo \(66.7%\)/)
+    expect(within(section).getByText(/Toughest schedule/)).toHaveTextContent(/Toughest schedule: Charlie \(25.0%\)/)
+    expect(within(section).queryByText('so far')).not.toBeInTheDocument()
+  })
+
+  it('names no toughest schedule while early, and says so far', async () => {
+    getExpectedWins.mockResolvedValue(data({ ...notEarly, weeksScored: 3, early: true }))
+    render(<ExpectedWins />)
+    const section = await screen.findByTestId('schedule-swap')
+    expect(within(section).getByText('so far')).toBeInTheDocument()
+    expect(within(section).queryByText(/Toughest schedule/)).not.toBeInTheDocument()
+    expect(within(section).queryByText(/Easiest schedule/)).not.toBeInTheDocument()
+    expect(within(section).getByText('2-1-1')).toBeInTheDocument()
+  })
+
+  it('names every tied schedule', async () => {
+    getExpectedWins.mockResolvedValue(
+      data({ ...notEarly, scheduleSwap: { ...swap, difficultyWinRate: [0.667, 0.25, 0.25] } }),
+    )
+    render(<ExpectedWins />)
+    const section = await screen.findByTestId('schedule-swap')
+    expect(within(section).getByText(/Toughest schedule/)).toHaveTextContent(/Toughest schedule: Alpha, Charlie/)
+  })
+})
