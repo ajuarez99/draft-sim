@@ -271,7 +271,7 @@ aren't out yet…". After the 2026-10-10 draft, it names the same partner as Sle
 
   Make T035 pass.
 - [X] T040 [US3] Live check, quickstart V7: NBA 2026 → `season` 2026, week 1, "not out yet"; NFL endpoint answer vs Sleeper's matchups for `leg`; 404 with no header. Then browser V8.5 for NBA (block + Schedule link). Record in `verification.md`
-- [ ] T041 [US3] **Dated post-draft check (between 2026-10-11 and 10-19)**, quickstart V7 (F11): after a visit refresh of NBA 2026, `select week, count(*) from league_matchup where league_id = 210 and week = 1` is non-empty (check the real column names), and next-matchup names the same partner as `https://api.sleeper.app/v1/league/1339351318115946496/matchups/1` for the reader's roster. If they disagree, check N12 (stale pre-paired weeks) first. Record in `verification.md`
+- [X] T041 [US3] **Dated post-draft check (between 2026-10-11 and 10-19)**, quickstart V7 (F11): after a visit refresh of NBA 2026, `select week, count(*) from league_matchup where league_id = 210 and week = 1` is non-empty (check the real column names), and next-matchup names the same partner as `https://api.sleeper.app/v1/league/1339351318115946496/matchups/1` for the reader's roster. If they disagree, check N12 (stale pre-paired weeks) first. Record in `verification.md`
 
 ### Football switch (gated on T004)
 
