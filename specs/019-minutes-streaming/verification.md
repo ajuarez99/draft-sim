@@ -107,3 +107,21 @@ visibly in plan-review.md F2).
 
 Still owed (dated): the post-draft streaming and grid checks between 10-11 and 10-19, and the
 cutover dates between 10-20 and 10-29. Production's roster lists fill on the league's next refresh.
+
+## Post-draft check in production (dated, 2026-10-12)
+
+**Run**, signed in as `popsharky`, on `www.ballknowers.co/leagues/1339351318115946496/trends`, two
+days after the 10-10 draft.
+- Streaming is live. "Rosters as of Oct 11, 2026". The one-game note shows "99% of multi-game
+  weeks in 2025 … +4% for 4 vs 2 scheduled games". Both lists still read 2025 (the season hasn't
+  started).
+- **SC-003 passes.** All 20 streaming players resolve to Sleeper ids, and none is in the league's 12
+  rosters (187 players, players ∪ reserve ∪ taxi, fetched fresh from Sleeper `/rosters`). Top
+  three: Julian Reese NOP 20.3, Kennedy Chandler PHX 18.7, Shaedon Sharpe POR 18.3 (season pts/game).
+- **SC-004 passes.** "This week / next" equals Sleeper's 2026 schedule counts for weeks 1/2
+  (postponed/canceled excluded) for NOP 3/3, PHX 2/2, POR 2/3, CHA 3/4, BOS 2/4, CLE 2/4. That's the
+  same source and rule the grid uses.
+- "Missed last N team games" shows on real rows (Gafford 4, Spencer 3, Robinson 2). These are the
+  end of 2025, because the lists still read 2025.
+
+Still owed: the per-list cutover dates, 10-20 … 10-29.
