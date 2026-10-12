@@ -2,8 +2,11 @@ package com.ballknowers.draftsim.refresh;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardRefresh;
+import com.ballknowers.draftsim.engine.SeasonStateService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.store.DailyCaptureRepository;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,8 @@ import java.util.List;
  *
  * <p>{@code TRENDING} (spec 014) is best-effort: see {@link #trending}.
  *
+ * <p>{@code SEASON_PROJECTIONS} (spec 030) is best-effort too: see {@link #seasonProjections}.
+ *
  * <p>{@code BOARD} is not skipped by a same-day row: the contract skips only
  * {@code PLAYERS} ("skipped if today's row exists"), and the board must reflect a
  * re-run after a failed ADP fetch. It still records its row for the day-gap
@@ -41,11 +46,17 @@ public class DailyRefreshService {
     static final String KIND_PLAYERS = "PLAYERS";
     static final String KIND_BOARD = "BOARD";
     static final String KIND_TRENDING = "TRENDING";
+    static final String KIND_SEASON_PROJECTIONS = "SEASON_PROJECTIONS";
 
     public enum Outcome {
         DONE, DONE_ADP_FAILED_BEST_EFFORT,
         /** Trending is decoration (spec 014): its failure is reported but never fails the run. */
         DONE_TRENDING_FAILED_BEST_EFFORT,
+        /**
+         * Spec 030 (plan review N7): the source is an undocumented Sleeper endpoint, so a wobble is
+         * reported but must not make the daily refresh answer 500.
+         */
+        DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
         SKIPPED_ALREADY_TODAY, FAILED
     }
 
@@ -63,9 +74,17 @@ public class DailyRefreshService {
     private final BoardRefresh boardRefresh;
     private final DailyCaptureRepository captures;
     private final TrendingRefresh trendingRefresh;
+    private final SeasonProjectionIngestService seasonProjectionIngest;
+    private final LeagueRepository leagues;
+    private final SeasonStateService seasonState;
 
     public DailyRefreshService(PlayerIngestService playerIngest, BoardRefresh boardRefresh,
-                               DailyCaptureRepository captures, TrendingRefresh trendingRefresh) {
+                               DailyCaptureRepository captures, TrendingRefresh trendingRefresh,
+                               SeasonProjectionIngestService seasonProjectionIngest,
+                               LeagueRepository leagues, SeasonStateService seasonState) {
+        this.seasonProjectionIngest = seasonProjectionIngest;
+        this.leagues = leagues;
+        this.seasonState = seasonState;
         this.trendingRefresh = trendingRefresh;
         this.playerIngest = playerIngest;
         this.boardRefresh = boardRefresh;
@@ -79,6 +98,8 @@ public class DailyRefreshService {
             steps.add(players(sport));
             steps.add(board(sport));
             steps.add(trending(sport));
+            // Basketball only for now: football's projections are weekly and refreshed by hand.
+            if (sport == Sport.NBA) steps.add(seasonProjections(sport));
         }
         return new DailyResult(today, steps);
     }
@@ -129,6 +150,39 @@ public class DailyRefreshService {
             case FAILED -> new StepResult(sport, KIND_TRENDING, Outcome.DONE_TRENDING_FAILED_BEST_EFFORT,
                     "trending fetch failed; the stored list, if any, is unchanged");
         };
+    }
+
+    /**
+     * Spec 030 C4: refresh the sport's whole-season projections when it has a current-season league
+     * that is not finished. "Current" is the newest season any league of the sport is in; a league
+     * that is {@code COMPLETE} no longer needs them. Best-effort: a failure is {@link
+     * Outcome#DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT}, never {@code FAILED}. A set that is still
+     * fresh is a {@code DONE} with detail "fresh". Records no {@code daily_capture} row: its
+     * freshness gate is the stored {@code fetched_at}, as with trending.
+     */
+    StepResult seasonProjections(Sport sport) {
+        try {
+            List<LeagueRepository.LeagueRow> ofSport = leagues.all().stream()
+                    .filter(l -> l.sport() == sport).toList();
+            int season = ofSport.stream().mapToInt(LeagueRepository.LeagueRow::season).max().orElse(-1);
+            boolean active = ofSport.stream().filter(l -> l.season() == season)
+                    .anyMatch(l -> seasonState.stateOf(l) != SeasonStateService.SeasonState.COMPLETE);
+            if (!active) {
+                return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE,
+                        "no current-season league needs projections");
+            }
+            SeasonProjectionIngestService.Result r = seasonProjectionIngest.refresh(sport, season, false);
+            if (r.rejectedReason() != null) {
+                return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
+                        r.rejectedReason());
+            }
+            String detail = r.fresh() ? "fresh" : "rowsStored=" + r.rowsStored() + " rowsDeleted=" + r.rowsDeleted();
+            return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE, detail);
+        } catch (Exception e) {
+            log.warn("daily refresh {} {} failed: {}", sport.code(), KIND_SEASON_PROJECTIONS, e.toString());
+            return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
+                    "season projections fetch failed; the stored set, if any, is unchanged");
+        }
     }
 
     private static StepResult failed(Sport sport, String kind, Exception e) {

@@ -10,6 +10,7 @@ import com.ballknowers.draftsim.ingest.TransactionIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionIngestService;
+import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,6 +35,7 @@ public class IngestController {
     private final TransactionIngestService transactionIngest;
     private final PlayerGameIngestService playerGameIngest;
     private final BoardRefresh boardRefresh;
+    private final SeasonProjectionIngestService seasonProjectionIngest;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
@@ -41,7 +43,8 @@ public class IngestController {
                             ProjectionIngestService projectionIngest,
                             TransactionIngestService transactionIngest,
                             PlayerGameIngestService playerGameIngest,
-                            BoardRefresh boardRefresh) {
+                            BoardRefresh boardRefresh,
+                            SeasonProjectionIngestService seasonProjectionIngest) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -52,6 +55,7 @@ public class IngestController {
         this.transactionIngest = transactionIngest;
         this.playerGameIngest = playerGameIngest;
         this.boardRefresh = boardRefresh;
+        this.seasonProjectionIngest = seasonProjectionIngest;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -147,6 +151,19 @@ public class IngestController {
                             + "settings, which isn't built yet (claude/projection-tools.md).");
         }
         return projectionIngest.refresh(s.code(), season, fromWeek, toWeek, force);
+    }
+
+    /**
+     * specs/030-post-draft-season-view C3: one per-game stat line per player for a whole season,
+     * the source basketball's roster-strength ranking reads. Admin-gated with the rest of
+     * {@code /api/ingest/**}. Basketball only: football's projections are weekly and have their own
+     * route above, so {@code sport=nfl} is a 400 rather than a silent default.
+     */
+    @PostMapping("/season-projections")
+    public SeasonProjectionIngestService.Result seasonProjections(@RequestParam String sport,
+                                                                  @RequestParam int season,
+                                                                  @RequestParam(defaultValue = "false") boolean force) {
+        return seasonProjectionIngest.refresh(Sport.fromCode(sport), season, force);
     }
 
     /**

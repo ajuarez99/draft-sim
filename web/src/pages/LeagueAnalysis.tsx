@@ -35,6 +35,7 @@ import HowThisWorks from '../components/HowThisWorks'
 import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/GradeChip'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { extremes } from '../extremes'
+import { projectionNotes, reasonText } from '../projectionCopy'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -72,6 +73,16 @@ function useTeamName() {
 }
 
 const pts = (n: number) => n.toFixed(1)
+
+/**
+ * Basketball's projection is one average game per starter, shown as points per
+ * week; football's is the rest of the season (spec 030). The server says which
+ * with `unit`, and the page words everything by it rather than by sport.
+ */
+const isPerWeek = (block: AnalysisProjections) => block.unit === 'PER_WEEK'
+
+/** An unavailable projection's sentence: a code the client words, else the server's own sentence. */
+const projectionReason = (block: AnalysisProjections) => reasonText(block.reasonCode, block.reason, block.unit)
 
 /**
  * Sleeper's status words are long enough to swamp a name in a lineup row
@@ -282,11 +293,12 @@ function RankingScoresBlock({ block }: { block: AnalysisRankingScores }) {
  * as "a running back in the flex" without a second column saying so.
  */
 function LineupRow({ player }: { player: AnalysisLineupPlayer }) {
-  const benched = player.slot === 'BN'
+  // 'OUT' is basketball's: a player tagged Out/IR/Sus, left out of the lineup at zero.
+  const benched = player.slot === 'BN' || player.slot === 'OUT'
   return (
     <li className={`analysis-slot${benched ? ' bn' : ''}`}>
       <span className={`pos ${player.position} analysis-slot-pill`}>
-        {benched ? player.position : player.slot}
+        {player.slot === 'OUT' ? 'OUT' : benched ? player.position : player.slot}
       </span>
       <span className="analysis-slot-name">
         {player.name}
@@ -295,6 +307,12 @@ function LineupRow({ player }: { player: AnalysisLineupPlayer }) {
             last player ingest -- which is why it is shown as a label and never
             used to change a number. */}
         {player.injuryStatus && <InjuryTag status={player.injuryStatus} />}
+        {/* Parked in an IR+ slot but counted: the tag above says why, this says where. */}
+        {player.onReserve && !benched && (
+          <span className="analysis-inj" title="Sits in an IR+ slot on Sleeper. Counted in full unless tagged Out.">
+            IR+
+          </span>
+        )}
       </span>
       <span className="mono analysis-slot-pts">{pts(player.points)}</span>
     </li>
@@ -387,8 +405,9 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
   // form of comparison, and the panel below is the expensive one.
   const [open, setOpen] = useState<Set<number>>(new Set())
 
-  if (!block.available) return <NotYet reason={block.reason} />
+  if (!block.available) return <NotYet reason={projectionReason(block)} />
 
+  const perWeek = isPerWeek(block)
   const max = Math.max(...block.rosters.map((r) => r.total), 1)
 
   function toggle(rosterId: number) {
@@ -428,7 +447,7 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
                     key={g}
                     className={`analysis-seg pos-${g}`}
                     style={{ flexGrow: v }}
-                    title={`${g}: ${pts(v)} projected points`}
+                    title={`${g}: ${pts(v)} projected points${perWeek ? ' per week' : ''}`}
                   />
                 )
               })}
@@ -436,7 +455,7 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
 
             <div className="analysis-bar-total mono">
               {pts(r.total)}
-              <span className="muted small"> pts</span>
+              <span className="muted small"> {perWeek ? 'pts/week' : 'pts'}</span>
             </div>
 
             {/* Its own control rather than a clickable row: the row already
@@ -466,6 +485,14 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
                   </span>
                 )
               })}
+              {r.unavailable > 0 && (
+                <span
+                  className="muted small"
+                  title="Players tagged Out count as zero wherever they sit."
+                >
+                  {r.unavailable} out
+                </span>
+              )}
               {r.missing > 0 && (
                 <span
                   className="muted small"
@@ -484,6 +511,22 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * Where a basketball projection came from and what it leaves out: source and
+ * age, the "one average game" basis, the stat categories it can't project, and
+ * the injury caveat. The sentences are projectionCopy's, shared with the home
+ * page's strength block.
+ */
+function ProjectionNotes({ block }: { block: AnalysisProjections }) {
+  return (
+    <div className="muted small analysis-projnotes">
+      {projectionNotes(block).map((n) => (
+        <p key={n}>{n}</p>
+      ))}
     </div>
   )
 }
@@ -527,7 +570,7 @@ function ProjectedBumpBlock({ block }: { block: AnalysisProjections }) {
     [block.rosters, hues, teamName],
   )
 
-  if (!block.available) return <NotYet reason={block.reason} />
+  if (!block.available) return <NotYet reason={projectionReason(block)} />
 
   const weeks = block.rosters[0]?.byWeek.map((w) => w.week) ?? []
   if (weeks.length < 2) {
@@ -640,7 +683,7 @@ function BumpLegend({
 
 function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
   const teamName = useTeamName()
-  if (!block.available) return <NotYet reason={block.reason} />
+  if (!block.available) return <NotYet reason={projectionReason(block)} />
   const teams = block.rosters.length
 
   return (
@@ -672,7 +715,7 @@ function PositionGroupsBlock({ block }: { block: AnalysisProjections }) {
                     key={g}
                     className={`analysis-cell pos-${g}`}
                     style={{ '--tint': `${Math.round(strength * 26)}%` } as React.CSSProperties}
-                    title={`${teamName(r.manager, r.rosterId)} — ${g}: ${pts(points)} projected points, ${rank} of ${teams}`}
+                    title={`${teamName(r.manager, r.rosterId)} — ${g}: ${pts(points)} projected points${isPerWeek(block) ? ' per week' : ''}, ${rank} of ${teams}`}
                   >
                     <span className="mono analysis-cell-rank">{rank}</span>
                     <span className="mono analysis-cell-points">{points.toFixed(0)}</span>
@@ -1164,6 +1207,7 @@ export default function LeagueAnalysis() {
   }
 
   const window = data?.window
+  const perWeek = data != null && isPerWeek(data.projections)
   const labels = useMemo(
     () => new Map((data?.teams ?? []).map((t) => [t.rosterId, t] as const)),
     [data],
@@ -1210,41 +1254,56 @@ export default function LeagueAnalysis() {
             <div className="panel-head">
               <h2 className="section-title">Roster projections</h2>
               <span className="muted small">
-                {window && window.weeks > 0
-                  ? `weeks ${window.fromWeek}–${window.toWeek} · ${SCORING_LABEL[data.scoringKey] ?? data.scoringKey}`
-                  : SCORING_LABEL[data.scoringKey] ?? data.scoringKey}
+                {perWeek
+                  ? 'league scoring · per-game projections'
+                  : window && window.weeks > 0
+                    ? `weeks ${window.fromWeek}–${window.toWeek} · ${SCORING_LABEL[data.scoringKey] ?? data.scoringKey}`
+                    : SCORING_LABEL[data.scoringKey] ?? data.scoringKey}
               </span>
             </div>
             <ProjectionsBlock block={data.projections} />
+            {perWeek && data.projections.available && <ProjectionNotes block={data.projections} />}
             <HowThisWorks>
-              <p>
-                The rest of the regular season is projected onto the lineup each manager would
-                actually start. These are rest-of-season points for that starting lineup, split by
-                the position the starter actually plays — a running back filling a flex slot counts
-                under RB. Open a lineup to see the players the number is made of.
-              </p>
+              {perWeek ? (
+                <p>
+                  Each manager's best starting lineup under the league's own slots, valued at one
+                  projected average game per starter, in the league's own scoring. These are
+                  points per week for that lineup, split by each player's primary position. Open a
+                  lineup to see the players the number is made of.
+                </p>
+              ) : (
+                <p>
+                  The rest of the regular season is projected onto the lineup each manager would
+                  actually start. These are rest-of-season points for that starting lineup, split by
+                  the position the starter actually plays — a running back filling a flex slot counts
+                  under RB. Open a lineup to see the players the number is made of.
+                </p>
+              )}
             </HowThisWorks>
           </section>
 
-          <section className="section analysis-section">
-            <div className="panel-head">
-              <h2 className="section-title">Projected week by week</h2>
-              <span className="muted small">
-                {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
-              </span>
-            </div>
-            <p className="muted small">
-              This is the projection; what was actually scored is further down.
-            </p>
-            <ProjectedBumpBlock block={data.projections} />
-            <HowThisWorks>
-              <p>
-                Where each roster is projected to rank in each remaining week — the bye weeks are
-                the drops. Click a line to follow it. This is the projection; what was actually
-                scored is further down.
+          {/* A per-game projection has no weeks to lay out: every week would draw the same line. */}
+          {!perWeek && (
+            <section className="section analysis-section">
+              <div className="panel-head">
+                <h2 className="section-title">Projected week by week</h2>
+                <span className="muted small">
+                  {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
+                </span>
+              </div>
+              <p className="muted small">
+                This is the projection; what was actually scored is further down.
               </p>
-            </HowThisWorks>
-          </section>
+              <ProjectedBumpBlock block={data.projections} />
+              <HowThisWorks>
+                <p>
+                  Where each roster is projected to rank in each remaining week — the bye weeks are
+                  the drops. Click a line to follow it. This is the projection; what was actually
+                  scored is further down.
+                </p>
+              </HowThisWorks>
+            </section>
+          )}
 
           <section className="section analysis-section">
             <div className="panel-head">
@@ -1255,6 +1314,7 @@ export default function LeagueAnalysis() {
               <p>
                 The same projections read down the columns: where each roster stands at each
                 position. Big number is the rank, small number is the projected points behind it.
+                {perWeek && " Positions are each player's primary position."}
               </p>
             </HowThisWorks>
           </section>
@@ -1268,7 +1328,7 @@ export default function LeagueAnalysis() {
               <h2 className="section-title">
                 {data.matchups.available ? `Week ${data.matchups.week} matchups` : 'Upcoming matchups'}
               </h2>
-              {window && window.toWeek >= window.fromWeek && (
+              {!perWeek && window && window.toWeek >= window.fromWeek && (
                 <div className="analysis-weekpick" role="group" aria-label="Choose a week">
                   {Array.from(
                     { length: window.toWeek - window.fromWeek + 1 },
@@ -1298,11 +1358,18 @@ export default function LeagueAnalysis() {
               <MatchupsBlock block={data.matchups} />
             </div>
             <HowThisWorks>
-              <p>
-                The league's real pairings, each side's lineup rebuilt for the chosen week rather
-                than sliced out of the rest-of-season total — a bye or a one-week injury moves who
-                starts. The margin is two projections subtracted, not a win probability.
-              </p>
+              {perWeek ? (
+                <p>
+                  The league's real pairings, each side valued at the same per-game projection every
+                  week. The margin is two projections subtracted, not a win probability.
+                </p>
+              ) : (
+                <p>
+                  The league's real pairings, each side's lineup rebuilt for the chosen week rather
+                  than sliced out of the rest-of-season total — a bye or a one-week injury moves who
+                  starts. The margin is two projections subtracted, not a win probability.
+                </p>
+              )}
             </HowThisWorks>
           </section>
 
@@ -1326,16 +1393,24 @@ export default function LeagueAnalysis() {
             <div className="panel-head">
               <h2 className="section-title">Head to head</h2>
               <span className="muted small">
-                {window && window.weeks > 0 ? `weeks ${window.fromWeek}–${window.toWeek}` : null}
+                {perWeek
+                  ? 'per-game projections'
+                  : window && window.weeks > 0
+                    ? `weeks ${window.fromWeek}–${window.toWeek}`
+                    : null}
               </span>
             </div>
             {data.projections.available ? (
               <HeadToHead block={data.projections} />
             ) : (
-              <NotYet reason={data.projections.reason} />
+              <NotYet reason={projectionReason(data.projections)} />
             )}
             <HowThisWorks>
-              <p>Any two rosters, slot against slot, over the same rest-of-season window.</p>
+              <p>
+                {perWeek
+                  ? 'Any two rosters, slot against slot, on the same per-game projections.'
+                  : 'Any two rosters, slot against slot, over the same rest-of-season window.'}
+              </p>
             </HowThisWorks>
           </section>
         </>

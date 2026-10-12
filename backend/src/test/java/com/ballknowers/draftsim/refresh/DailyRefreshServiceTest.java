@@ -4,11 +4,14 @@ import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardRefresh;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
+import com.ballknowers.draftsim.engine.SeasonStateService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.DailyResult;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.Outcome;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.StepResult;
 import com.ballknowers.draftsim.store.DailyCaptureRepository;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +26,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -36,6 +41,9 @@ class DailyRefreshServiceTest {
     @Mock private BoardRefresh boardRefresh;
     @Mock private DailyCaptureRepository captures;
     @Mock private TrendingRefresh trending;
+    @Mock private SeasonProjectionIngestService seasonProjections;
+    @Mock private LeagueRepository leagues;
+    @Mock private SeasonStateService seasonState;
 
     private DailyRefreshService service;
 
@@ -58,10 +66,19 @@ class DailyRefreshServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new DailyRefreshService(players, boardRefresh, captures, trending);
+        service = new DailyRefreshService(players, boardRefresh, captures, trending, seasonProjections, leagues, seasonState);
         when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.DONE);
         when(players.ingest(any())).thenReturn(new PlayerIngestService.Result(2091, 300, true, 0));
         when(boardRefresh.run(any())).thenReturn(board(ffcOk()));
+        when(leagues.all()).thenReturn(List.of(nbaLeague(2026), nbaLeague(2025)));
+        when(seasonState.stateOf(any())).thenReturn(SeasonStateService.SeasonState.DRAFTED_UNSCORED);
+        when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
+                new SeasonProjectionIngestService.Result(true, false, 529, 3, 1591, "rotowire", null, null));
+    }
+
+    private static LeagueRepository.LeagueRow nbaLeague(int season) {
+        return new LeagueRepository.LeagueRow(season, Sport.NBA, "L" + season, "Ball Knowers", season, 12,
+                List.of("PG"), 0.0, null, "in_season");
     }
 
     private static StepResult step(DailyResult r, Sport sport, String kind) {
@@ -189,5 +206,65 @@ class DailyRefreshServiceTest {
 
         assertEquals(Outcome.DONE, step(r, Sport.NFL, "TRENDING").outcome());
         assertEquals(Outcome.SKIPPED_ALREADY_TODAY, step(r, Sport.NBA, "TRENDING").outcome());
+    }
+
+    // ---- spec 030 C4: the season-projections step ----
+
+    @Test
+    void seasonProjectionsRunsForNbaOnItsNewestSeasonAndNotForNfl() {
+        DailyResult r = service.runAll();
+
+        StepResult nba = step(r, Sport.NBA, "SEASON_PROJECTIONS");
+        assertEquals(Outcome.DONE, nba.outcome());
+        assertEquals("rowsStored=529 rowsDeleted=3", nba.detail());
+        verify(seasonProjections).refresh(Sport.NBA, 2026, false);
+        verify(seasonProjections, never()).refresh(eq(Sport.NFL), anyInt(), anyBoolean());
+        assertTrue(r.steps().stream().noneMatch(s -> s.sport() == Sport.NFL && s.kind().equals("SEASON_PROJECTIONS")));
+    }
+
+    @Test
+    void aFreshSeasonProjectionSetReportsDoneWithFreshDetail() {
+        when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
+                new SeasonProjectionIngestService.Result(false, true, 0, 0, 0, "rotowire", null, null));
+
+        StepResult nba = step(service.runAll(), Sport.NBA, "SEASON_PROJECTIONS");
+
+        assertEquals(Outcome.DONE, nba.outcome());
+        assertEquals("fresh", nba.detail());
+    }
+
+    @Test
+    void aRejectedSeasonProjectionFetchIsBestEffortFailedWithTheReason() {
+        when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
+                new SeasonProjectionIngestService.Result(true, false, 0, 0, 0, null, null, "player 9 has gp=3.0"));
+
+        DailyResult r = service.runAll();
+
+        StepResult nba = step(r, Sport.NBA, "SEASON_PROJECTIONS");
+        assertEquals(Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT, nba.outcome());
+        assertEquals("player 9 has gp=3.0", nba.detail());
+        assertFalse(r.failed());
+    }
+
+    @Test
+    void aThrownSeasonProjectionIngestIsBestEffortAndLaterStepsStillRun() {
+        when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenThrow(new IllegalStateException("sleeper 503"));
+
+        DailyResult r = service.runAll();
+
+        assertEquals(Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT, step(r, Sport.NBA, "SEASON_PROJECTIONS").outcome());
+        assertFalse(r.failed(), "an undocumented endpoint wobbling must not fail the daily refresh");
+        assertEquals(Outcome.DONE, step(r, Sport.NBA, "BOARD").outcome());
+        assertEquals(Outcome.DONE, step(r, Sport.NBA, "TRENDING").outcome());
+    }
+
+    @Test
+    void aCompleteSeasonDoesNotNeedProjections() {
+        when(seasonState.stateOf(any())).thenReturn(SeasonStateService.SeasonState.COMPLETE);
+
+        StepResult nba = step(service.runAll(), Sport.NBA, "SEASON_PROJECTIONS");
+
+        assertEquals(Outcome.DONE, nba.outcome());
+        verify(seasonProjections, never()).refresh(any(), anyInt(), anyBoolean());
     }
 }

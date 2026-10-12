@@ -862,3 +862,26 @@ Two more from spec 025:
 **Check every agent commit before merging:** `git diff main...BRANCH --stat` against `git diff -w` on the same range. If they differ wildly, run `git cat-file -p HEAD:<file> | od -c | head` and look for `\r \r \n`.
 
 **The fix:** strip every `\r` from the affected files (`sed -i 's/\r//g'`), then re-add and amend. autocrlf stores LF.
+
+## 40. A "parity" diff can catch nondeterminism that was already on `main`
+
+**What happened (2026-10-11, spec 030 V6).** The NFL `/analysis` before/after diff showed one
+roster's total move from 1156.7 to 1156.6. The starters, per-player points and position split
+were identical. The unrounded sum was exactly **1156.65**, and `LeagueSettings.dedicatedStarters()`
+is a `Map.of(...)`, **whose iteration order is salted per JVM**. That makes the lineup order,
+the floating-point summation order, and the rounding all vary by restart. `main` by itself gave
+1156.7 / 1156.6 / 1156.6 / 1156.7 across four fresh starts.
+
+**Before blaming a refactor for a last-digit diff, capture the baseline twice. Do it across a
+JVM restart, not two calls to one process.** Two captures from the same running `main` agreed,
+and that proved nothing about restarts. And `Map.of`/`Set.of` iteration feeding a numeric sum is
+a determinism bug, even when every individual value is right.
+
+Two more from the same verification:
+
+- **"Already built" isn't "available now".** Spec 030 assumed draft grades could fill the
+  preseason home. They're computed from scored games and answer `NO_SCORED_WEEKS` until week 1
+  (research R6). Check what a feature *needs* at the moment you plan to show it.
+- **Sleeper reports an NBA league as `in_season` the day after its draft, ten days before
+  tip-off** (`leg: 1`, `last_scored_leg: null`). Its status can't tell you the preseason
+  window. Stored final weeks (`ScoredWeeks.latestFinal`) can.

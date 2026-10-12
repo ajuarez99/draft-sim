@@ -5075,6 +5075,26 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lh-result.tied { font-weight: 600; }
 .lh-headline { font-weight: 600; margin: 0; }
 .lh-award-title { font-weight: 600; margin: 0; }
+/* spec 030: projected strength before week 1. Leader gets a neutral tint, you get the crimson one (.mine). */
+.lh-str-rows { margin: 8px 0 4px; }
+.lh-str-row { display: flex; align-items: center; gap: 10px; padding: 8px 8px; min-width: 0; border-radius: 6px; }
+.lh-str-row.lead { background: color-mix(in oklch, var(--text) 7%, transparent); }
+.lh-str-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-str-row.detached { margin-top: 6px; border-top: 1px dashed color-mix(in oklch, var(--muted) 45%, transparent); border-radius: 0 0 6px 6px; }
+.lh-str-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lh-str-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lh-str-track { height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--muted) 16%, transparent); overflow: hidden; }
+.lh-str-fill { display: block; height: 100%; border-radius: 3px; background: color-mix(in oklch, var(--muted) 75%, var(--text)); }
+.lh-str-row.mine .lh-str-fill { background: var(--crimson); }
+.lh-str-val { flex-shrink: 0; margin-left: auto; padding-left: 8px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lh-str-line .lh-name { flex: 0 1 auto; }
+.lh-str-caption { margin: 6px 0 0; letter-spacing: .02em; }
+.lh-str-num { font-weight: 600; }
+.lh-str-notes { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+.lh-str-notes p { margin: 0; }
+.lh-next-note { margin: 6px 0 0; }
+.lh-grades-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
+.lh-grades-tag { width: 44px; flex-shrink: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 
 /* --- 014: player spotlight -------------------------------------------------
    Rows reuse .lh-row; "Yours" and "Free agent" are tinted pills with the word, never

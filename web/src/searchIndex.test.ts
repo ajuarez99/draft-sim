@@ -51,9 +51,9 @@ describe('league destinations', () => {
   // The sport gate is read from the destination table, not restated here --
   // which is the point. If the rail and the palette ever disagree about this,
   // one of them is reading a second copy of the rule.
-  it('never offers Analysis for a basketball league', () => {
+  it('offers Analysis for a basketball league too (spec 030)', () => {
     const rows = leagueDestinations([draft({ sport: 'nba', leagueName: 'Hoops' })])
-    expect(rows.map((d) => d.label)).not.toContain('Team strength')
+    expect(rows.map((d) => d.label)).toContain('Team strength')
     expect(rows.map((d) => d.label)).toContain('Power rankings')
   })
 

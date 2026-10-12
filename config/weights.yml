@@ -227,3 +227,18 @@ draftsim:
     excluded-game-ids:
       - "20241217_OKC_MIL"       # 2024-25 Cup final, OKC v MIL (2024-12-17)
       - "1305814461864501248"    # 2025-26 Cup final, NYK v SAS (2025-12-16)
+
+  # Preseason roster strength (spec 030). ARBITRARY: both numbers are hand-set, not fitted
+  # (specs/030-post-draft-season-view plan review S10/S11/N12). favorite-min-gap-pct: when the
+  # top roster's projected total beats another roster's by LESS than this percentage (gap taken
+  # over the lower total), the two are called a tie and no single favorite is named. It is kept
+  # above 1 because the inputs carry errors bigger than that: one average game per starter reads
+  # about 15% under what Sleeper credits, scoring bonuses are not projected, injuries are not
+  # modelled, and the projections' own accuracy for this league has not been measured.
+  # stale-after-days: past this many days since the source last changed its numbers, the page
+  # says the projections are N days old instead of letting them read as current. Delete this block
+  # and the app fails at startup (the values are validated positive), so a missing key cannot
+  # silently bind to 0.
+  preseason:
+    favorite-min-gap-pct: 3.0
+    stale-after-days: 3

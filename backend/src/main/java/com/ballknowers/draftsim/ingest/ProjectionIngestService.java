@@ -34,7 +34,7 @@ public class ProjectionIngestService {
      * one number here that should be expected to change once somebody watches
      * a real week move.
      */
-    private static final Duration STALE_AFTER = Duration.ofHours(6);
+    static final Duration STALE_AFTER = Duration.ofHours(6);
 
     private final SleeperProjectionClient client;
     private final PlayerProjectionRepository projections;

@@ -66,6 +66,8 @@ class RefreshControllerDailyIT {
     @MockitoBean private BoardRefresh boardRefresh;
     /** Mocked so this IT neither calls Sleeper nor writes the shared local sport_trending rows. */
     @MockitoBean private TrendingRefresh trending;
+    // Spec 030: keeps the new daily step off the network.
+    @MockitoBean private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjections;
     @Autowired private RefreshController controller;
     @Autowired private ApiSecurityProperties security;
     @Autowired private JdbcTemplate jdbc;
@@ -106,7 +108,8 @@ class RefreshControllerDailyIT {
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         assertEquals(LocalDate.now(ZoneOffset.UTC).toString(), body.get("date"));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
-        assertEquals(Sport.values().length * 3, steps.size());
+        // Three steps per sport, plus spec 030's SEASON_PROJECTIONS for basketball only.
+        assertEquals(Sport.values().length * 3 + 1, steps.size());
         assertEquals(Sport.values()[0].code(), steps.get(0).get("sport"));
         assertEquals("PLAYERS", steps.get(0).get("kind"));
         assertEquals("DONE", steps.get(0).get("outcome"));

@@ -104,7 +104,7 @@ describe('what the palette offers', () => {
     expect(labels.some((l) => l.includes('Power rankings'))).toBe(true)
   })
 
-  it('offers no Analysis for a basketball league', async () => {
+  it('offers Analysis for a basketball league too (spec 030)', async () => {
     const user = userEvent.setup()
     renderAtPath('/', {
       drafts: [draftSummary({ sport: 'nba', leagueName: 'Hoops', sleeperLeagueId: 'LN', sleeperDraftId: 'DN' })],
@@ -114,7 +114,7 @@ describe('what the palette offers', () => {
 
     await waitFor(() => expect(screen.getAllByRole('option').length).toBeGreaterThan(0))
     const labels = screen.getAllByRole('option').map((o) => o.textContent ?? '')
-    expect(labels.some((l) => l.includes('Team strength'))).toBe(false)
+    expect(labels.some((l) => l.includes('Team strength'))).toBe(true)
   })
 })
 

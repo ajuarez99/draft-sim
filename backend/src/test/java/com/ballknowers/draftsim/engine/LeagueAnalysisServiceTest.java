@@ -127,7 +127,7 @@ class LeagueAnalysisServiceTest {
 
     private static LineupPlayer at(String slot, double points) {
         return new LineupPlayer("id-" + slot + "-" + points, slot + " " + points, "WR",
-                "CIN", slot, points, null);
+                "CIN", slot, points, null, false);
     }
 
     private static List<String> slotsOf(List<LineupPlayer> players) {
@@ -172,11 +172,11 @@ class LeagueAnalysisServiceTest {
 
     private static RosterProjection withStarters(double total, LineupPlayer... starters) {
         return new RosterProjection(1, 1L, "kieriskash", null, 1, false, total,
-                Map.of(), Map.of(), List.of(starters), List.of(), List.of(), 0);
+                Map.of(), Map.of(), List.of(starters), List.of(), List.of(), 0, 0);
     }
 
     private static LineupPlayer starter(String id, double points) {
-        return new LineupPlayer(id, id, "RB", "CIN", "RB", points, null);
+        return new LineupPlayer(id, id, "RB", "CIN", "RB", points, null, false);
     }
 
     /**
@@ -207,11 +207,11 @@ class LeagueAnalysisServiceTest {
     @Test
     void eachWeekIsRankedAcrossRostersAndTiesShareAPlace() {
         RosterProjection a = new RosterProjection(1, 1L, "a", null, 1, false, 20.0,
-                Map.of(), Map.of(), List.of(starter("a", 20.0)), List.of(), List.of(), 0);
+                Map.of(), Map.of(), List.of(starter("a", 20.0)), List.of(), List.of(), 0, 0);
         RosterProjection b = new RosterProjection(2, 2L, "b", null, 2, false, 20.0,
-                Map.of(), Map.of(), List.of(starter("b", 20.0)), List.of(), List.of(), 0);
+                Map.of(), Map.of(), List.of(starter("b", 20.0)), List.of(), List.of(), 0, 0);
         RosterProjection c = new RosterProjection(3, 3L, "c", null, 3, false, 5.0,
-                Map.of(), Map.of(), List.of(starter("c", 5.0)), List.of(), List.of(), 0);
+                Map.of(), Map.of(), List.of(starter("c", 5.0)), List.of(), List.of(), 0, 0);
 
         List<RosterProjection> out = LeagueAnalysisService.withWeekly(List.of(a, b, c), Map.of(
                 2, Map.of("a", 9.0, "b", 9.0, "c", 4.0)));
@@ -254,7 +254,7 @@ class LeagueAnalysisServiceTest {
 
     private static RosterProjection roster(int rosterId, double total) {
         return new RosterProjection(rosterId, (long) rosterId, "manager " + rosterId, null, 0,
-                false, total, Map.of(), Map.of(), List.of(), List.of(), List.of(), 0);
+                false, total, Map.of(), Map.of(), List.of(), List.of(), List.of(), 0, 0);
     }
 
     private static Map<Integer, RosterProjection> valued(RosterProjection... rosters) {
@@ -330,7 +330,7 @@ class LeagueAnalysisServiceTest {
     private static LeagueAnalysisService service(RosterSeasonRepository rs, RosterWeekPointsRepository wp,
                                                  GradeProperties grades) {
         return new LeagueAnalysisService(null, rs, wp, null, null, null, null, null, null, null,
-                new LetterGrades(grades));
+                new LetterGrades(grades), null, null, new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
     }
 
     private static LeagueAnalysisService.ScoreEntry raw(int rosterId, double rawScore) {
@@ -386,5 +386,387 @@ class LeagueAnalysisServiceTest {
         assertFalse(reason.contains("equivalent"), reason);
         assertFalse(reason.contains("/api/ingest"), reason);
         assertFalse(reason.contains("POST /api/"), reason);
+    }
+
+    // ---- spec 030: the basketball path (T023, T024) ----
+
+    private static final com.ballknowers.draftsim.config.ScoringProperties NBA_PROPS =
+            new com.ballknowers.draftsim.config.ScoringProperties(null,
+                    new com.ballknowers.draftsim.config.ScoringProperties.SportScoring(
+                            new com.ballknowers.draftsim.config.ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
+                            12.0, 3.0, 60.0, 0.15, 6, 0.85, Map.of(), 1.0, 30));
+    private static final com.ballknowers.draftsim.sport.SportRules NBA_RULES =
+            new com.ballknowers.draftsim.sport.BasketballRules(NBA_PROPS);
+    private static final List<String> NBA_SLOT_LIST = List.of(
+            "PG", "SG", "G", "SF", "PF", "F", "C", "UTIL", "UTIL", "BN", "BN", "BN");
+    private static final com.ballknowers.draftsim.domain.LeagueSettings NBA_SETTINGS =
+            new com.ballknowers.draftsim.domain.LeagueSettings(Sport.NBA, 4, 14, NBA_SLOT_LIST, 0.0);
+    private static final List<String> NBA_GROUPS = List.of("PG", "SG", "SF", "PF", "C");
+
+    private static final com.ballknowers.draftsim.domain.Position[] FIVE = {
+            com.ballknowers.draftsim.domain.Position.PG, com.ballknowers.draftsim.domain.Position.SG,
+            com.ballknowers.draftsim.domain.Position.SF, com.ballknowers.draftsim.domain.Position.PF,
+            com.ballknowers.draftsim.domain.Position.C};
+
+    /** Ten players per roster, two at each position: ids "r{roster}p{0..9}", position FIVE[i / 2]. */
+    private static Map<String, com.ballknowers.draftsim.domain.Player> nbaPlayers(int rosters) {
+        return nbaPlayers(rosters, Map.of());
+    }
+
+    /** As above, with Sleeper injury tags ({@code injury_status}) set on the named players. */
+    private static Map<String, com.ballknowers.draftsim.domain.Player> nbaPlayers(int rosters,
+                                                                                  Map<String, String> tags) {
+        Map<String, com.ballknowers.draftsim.domain.Player> out = new HashMap<>();
+        for (int r = 1; r <= rosters; r++) {
+            for (int i = 0; i < 10; i++) {
+                String id = "r" + r + "p" + i;
+                out.put(id, new com.ballknowers.draftsim.domain.Player(id.hashCode(), Sport.NBA, id, id,
+                        List.of(FIVE[i / 2]), "ATL", "Active", tags.get(id), null, null));
+            }
+        }
+        return out;
+    }
+
+    private static List<String> rosterIds(int r, int... skip) {
+        List<String> out = new ArrayList<>();
+        outer:
+        for (int i = 0; i < 10; i++) {
+            for (int s : skip) if (s == i) continue outer;
+            out.add("r" + r + "p" + i);
+        }
+        return out;
+    }
+
+    private static LeagueAnalysisService.RosterInput input(int r, List<String> players, List<String> reserve) {
+        return new LeagueAnalysisService.RosterInput(r, "owner" + r, (long) r, "mgr" + r, null, players, reserve);
+    }
+
+    private static List<RosterProjection> rankNba(List<LeagueAnalysisService.RosterInput> inputs,
+                                                   Map<String, Double> points) {
+        return rankNba(inputs, points, Map.of());
+    }
+
+    private static List<RosterProjection> rankNba(List<LeagueAnalysisService.RosterInput> inputs,
+                                                   Map<String, Double> points, Map<String, String> tags) {
+        // Through the static core and rankAll with the REAL BasketballRules: the ordering, not the wiring.
+        return LeagueAnalysisService.rankAll(LeagueAnalysisService.projectRosters(inputs, nbaPlayers(inputs.size(), tags),
+                points, NBA_RULES, NBA_SETTINGS, NBA_GROUPS, NBA_SLOT_LIST, "owner4"), NBA_GROUPS);
+    }
+
+    /** A per-game line {@code {pts: p}} scored under {pts: 1.0} by the real GameScoringService. */
+    private static Map<String, Double> pointsFor(Map<String, Double> pts) {
+        GameScoringService scorer = new GameScoringService();
+        Map<String, Double> out = new HashMap<>();
+        pts.forEach((id, p) -> out.put(id, scorer.score(Map.of("pts", 1.0), Map.of("pts", p))));
+        return out;
+    }
+
+    private static Map<String, Double> fourRosterPoints() {
+        Map<String, Double> pts = new HashMap<>();
+        double[] base = {0, 20, 22, 18, 16};
+        for (int r = 1; r <= 4; r++) for (String id : rosterIds(r)) pts.put(id, base[r]);
+        pts.put("r1p0", 50.0);   // the star on roster 1, a PG
+        return pointsFor(pts);
+    }
+
+    /**
+     * SC-004, AGENTS.md bug class 1: structure tests do not catch a sign inversion, only a test that asserts
+     * preference ordering does. Moving the single best player from the top roster to the bottom one must
+     * raise the bottom roster's total and rank, and lower the top one's.
+     */
+    @Test
+    void sc004_movingTheBestPlayerFromRankOneToRankFourRaisesRankFourAndLowersRankOne() {
+        Map<String, Double> points = fourRosterPoints();
+        List<RosterProjection> before = rankNba(List.of(
+                input(1, rosterIds(1), List.of()), input(2, rosterIds(2), List.of()),
+                input(3, rosterIds(3), List.of()), input(4, rosterIds(4), List.of())), points);
+        assertEquals(List.of(1, 2, 3, 4), before.stream().map(RosterProjection::rosterId).toList());
+        RosterProjection topBefore = before.get(0);
+        RosterProjection bottomBefore = before.get(3);
+        assertEquals(210.0, topBefore.total(), 1e-9);
+        assertEquals(144.0, bottomBefore.total(), 1e-9);
+
+        List<String> r1After = new ArrayList<>(rosterIds(1, 0));
+        List<String> r4After = new ArrayList<>(rosterIds(4));
+        r4After.add("r1p0");
+        Map<String, com.ballknowers.draftsim.domain.Player> players = nbaPlayers(4);
+        List<RosterProjection> after = LeagueAnalysisService.rankAll(LeagueAnalysisService.projectRosters(List.of(
+                input(1, r1After, List.of()), input(2, rosterIds(2), List.of()),
+                input(3, rosterIds(3), List.of()), input(4, r4After, List.of())),
+                players, points, NBA_RULES, NBA_SETTINGS, NBA_GROUPS, NBA_SLOT_LIST, "owner4"), NBA_GROUPS);
+
+        RosterProjection topAfter = after.stream().filter(r -> r.rosterId() == 1).findFirst().orElseThrow();
+        RosterProjection bottomAfter = after.stream().filter(r -> r.rosterId() == 4).findFirst().orElseThrow();
+        assertTrue(bottomAfter.total() > bottomBefore.total(), "rank 4's roster must gain: " + bottomAfter.total());
+        assertTrue(bottomAfter.rank() < bottomBefore.rank(), "rank 4's roster must climb");
+        assertTrue(topAfter.total() < topBefore.total(), "rank 1's roster must lose: " + topAfter.total());
+        assertEquals(180.0, topAfter.total(), 1e-9);
+        assertEquals(178.0, bottomAfter.total(), 1e-9);
+        assertTrue(bottomAfter.isMe(), "owner4 is the caller");
+    }
+
+    @Test
+    void anStarterIsOneProjectedGameScoredUnderTheLeaguesScoring() {
+        // A real-shaped line scored by hand under a league scoring: 31.88*0.5 + 7.71 + 8.17 + 1.59*2 + 0.48*2
+        // - 3.77 + 3.76*0.5 + 0.56*2 + 0.14*3 = 15.94 + 7.71 + 8.17 + 3.18 + 0.96 - 3.77 + 1.88 + 1.12 + 0.42
+        Map<String, Double> scoring = new HashMap<>(Map.of("pts", 0.5, "reb", 1.0, "ast", 1.0, "stl", 2.0,
+                "blk", 2.0, "to", -1.0, "tpm", 0.5, "dd", 2.0, "td", 3.0));
+        Map<String, Double> line = Map.of("pts", 31.88, "reb", 7.71, "ast", 8.17, "stl", 1.59, "blk", 0.48,
+                "to", 3.77, "tpm", 3.76, "dd", 0.56, "td", 0.14);
+        double byHand = 15.94 + 7.71 + 8.17 + 3.18 + 0.96 - 3.77 + 1.88 + 1.12 + 0.42;
+        assertEquals(byHand, new GameScoringService().score(scoring, line), 0.01);
+
+        Map<String, Double> points = new HashMap<>();
+        for (String id : rosterIds(1)) points.put(id, 1.0);
+        points.put("r1p0", new GameScoringService().score(scoring, line));
+        RosterProjection r = rankNba(List.of(input(1, rosterIds(1), List.of()), input(2, rosterIds(2), List.of()),
+                input(3, rosterIds(3), List.of()), input(4, rosterIds(4), List.of())), points).stream()
+                .filter(x -> x.rosterId() == 1).findFirst().orElseThrow();
+        LineupPlayer star = r.starters().stream().filter(s -> s.sleeperPlayerId().equals("r1p0")).findFirst().orElseThrow();
+        assertEquals(byHand, star.points(), 0.06, "one game, rounded to a tenth, not multiplied by games in a week");
+        assertTrue(r.byWeek().isEmpty(), "a flat per-week series would imply it was computed week by week");
+    }
+
+    private static RosterProjection roster1(List<RosterProjection> ranked) {
+        return ranked.stream().filter(r -> r.rosterId() == 1).findFirst().orElseThrow();
+    }
+
+    private static List<LeagueAnalysisService.RosterInput> fourRosters(List<String> r1Reserve) {
+        return List.of(input(1, rosterIds(1), r1Reserve), input(2, rosterIds(2), List.of()),
+                input(3, rosterIds(3), List.of()), input(4, rosterIds(4), List.of()));
+    }
+
+    /**
+     * Amended after the 2026-10-12 live check: this league has IR+, so the IR slot says nothing about
+     * availability. A day-to-day star parked there is started at full value and flagged onReserve.
+     */
+    @Test
+    void anIrPlusSlottedDayToDayStarIsStartedAndFlaggedOnReserve() {
+        List<RosterProjection> ranked = rankNba(fourRosters(List.of("r1p0")), fourRosterPoints(),
+                Map.of("r1p0", "DTD"));
+
+        RosterProjection r1 = roster1(ranked);
+        LineupPlayer star = r1.starters().stream().filter(s -> s.sleeperPlayerId().equals("r1p0"))
+                .findFirst().orElseThrow();
+        assertTrue(star.onReserve());
+        assertEquals("DTD", star.injuryStatus());
+        assertEquals(50.0, star.points(), 1e-9, "no discount: counted in full");
+        assertEquals(0, r1.unavailable());
+        assertEquals(210.0, r1.total(), 1e-9);
+        assertTrue(r1.starters().stream().filter(s -> !s.sleeperPlayerId().equals("r1p0")).noneMatch(LineupPlayer::onReserve));
+    }
+
+    /** An Out tag excludes wherever he sits: here NOT in reserve. */
+    @Test
+    void anOutTaggedPlayerNotInReserveIsExcludedCountedAndBenchedAsOutAtZero() {
+        List<RosterProjection> ranked = rankNba(fourRosters(List.of()), fourRosterPoints(),
+                Map.of("r1p0", "Out"));
+
+        RosterProjection r1 = roster1(ranked);
+        assertEquals(1, r1.unavailable());
+        assertTrue(r1.starters().stream().noneMatch(s -> s.sleeperPlayerId().equals("r1p0")));
+        LineupPlayer out = r1.bench().stream().filter(b -> b.sleeperPlayerId().equals("r1p0")).findFirst().orElseThrow();
+        assertEquals("OUT", out.slot());
+        assertEquals(0.0, out.points(), 1e-9);
+        assertFalse(out.onReserve());
+        assertEquals(180.0, r1.total(), 1e-9, "nine remaining players at 20");
+        assertEquals(0, r1.missing(), "left out on purpose, not missing a projection");
+        assertEquals(0, ranked.stream().filter(r -> r.rosterId() != 1).mapToInt(RosterProjection::unavailable).sum());
+    }
+
+    @Test
+    void anOutPlayerInReserveIsLikewiseExcluded() {
+        RosterProjection r1 = roster1(rankNba(fourRosters(List.of("r1p0")), fourRosterPoints(),
+                Map.of("r1p0", "Out")));
+
+        assertEquals(1, r1.unavailable());
+        assertTrue(r1.starters().stream().noneMatch(s -> s.sleeperPlayerId().equals("r1p0")));
+        LineupPlayer out = r1.bench().stream().filter(b -> b.sleeperPlayerId().equals("r1p0")).findFirst().orElseThrow();
+        assertEquals("OUT", out.slot());
+        assertTrue(out.onReserve());
+        assertEquals(180.0, r1.total(), 1e-9);
+    }
+
+    @Test
+    void aSuspendedAndAnIrTaggedPlayerAreExcludedCaseInsensitively() {
+        RosterProjection sus = roster1(rankNba(fourRosters(List.of()), fourRosterPoints(), Map.of("r1p0", "Sus")));
+        assertEquals(1, sus.unavailable());
+        assertEquals("OUT", sus.bench().stream().filter(b -> b.sleeperPlayerId().equals("r1p0")).findFirst().orElseThrow().slot());
+        RosterProjection ir = roster1(rankNba(fourRosters(List.of()), fourRosterPoints(), Map.of("r1p0", "ir")));
+        assertEquals(1, ir.unavailable());
+        assertEquals(180.0, ir.total(), 1e-9);
+    }
+
+    @Test
+    void anUntaggedPlayerInReserveCountsAndIsFlagged() {
+        RosterProjection r1 = roster1(rankNba(fourRosters(List.of("r1p0")), fourRosterPoints()));
+
+        assertEquals(0, r1.unavailable());
+        LineupPlayer star = r1.starters().stream().filter(s -> s.sleeperPlayerId().equals("r1p0")).findFirst().orElseThrow();
+        assertTrue(star.onReserve());
+        assertEquals(210.0, r1.total(), 1e-9);
+    }
+
+    private record NbaMocks(com.ballknowers.draftsim.ingest.SleeperClient sleeper,
+                            com.ballknowers.draftsim.store.PlayerSeasonProjectionRepository season,
+                            LeagueAnalysisService svc, LeagueRepository.LeagueRow league,
+                            LeagueRepository leagues) {}
+
+    private static NbaMocks nbaService(List<Map<String, Object>> sleeperRosters,
+                                       Map<String, Map<String, Double>> lines) {
+        var leagues = Mockito.mock(LeagueRepository.class);
+        var weekPoints = Mockito.mock(RosterWeekPointsRepository.class);
+        var players = Mockito.mock(com.ballknowers.draftsim.store.PlayerRepository.class);
+        var managers = Mockito.mock(com.ballknowers.draftsim.store.ManagerRepository.class);
+        var rosterSeasons = Mockito.mock(RosterSeasonRepository.class);
+        var sleeper = Mockito.mock(com.ballknowers.draftsim.ingest.SleeperClient.class);
+        var season = Mockito.mock(com.ballknowers.draftsim.store.PlayerSeasonProjectionRepository.class);
+        LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(5L, Sport.NBA, "LNBA", "Ball Knowers",
+                2026, 4, NBA_SLOT_LIST, 0.0, null, "in_season");
+        Mockito.when(weekPoints.storedWeeks(5L)).thenReturn(java.util.Set.of());
+        Mockito.when(leagues.playoffFormat(5L)).thenReturn(java.util.Optional.of(
+                new LeagueRepository.PlayoffFormat(6, 20, 0, false, false, 0)));
+        Mockito.when(leagues.scoringOf(5L)).thenReturn(Map.of("pts", 1.0, "ff", -2.0));
+        Mockito.when(season.statsByPlayer("nba", 2026)).thenReturn(lines);
+        Mockito.when(season.provenance("nba", 2026)).thenReturn(java.util.Optional.empty());
+        Mockito.when(sleeper.rosters("LNBA")).thenReturn(sleeperRosters);
+        Mockito.when(players.findAll(Sport.NBA)).thenReturn(new ArrayList<>(nbaPlayers(4, Map.of("r1p0", "Out")).values()));
+        Mockito.when(managers.idsBySleeperUserId()).thenReturn(Map.of());
+        Mockito.when(rosterSeasons.forLeague(5L)).thenReturn(List.of());
+        var svc = new LeagueAnalysisService(leagues, rosterSeasons, weekPoints, null, players, managers, null,
+                sleeper, new com.ballknowers.draftsim.sport.SportRulesRegistry(List.of(NBA_RULES)), null,
+                new LetterGrades(LADDER), season, new GameScoringService(),
+                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
+        return new NbaMocks(sleeper, season, svc, league, leagues);
+    }
+
+    private static Map<String, Object> sleeperRoster(int id, Object players, Object reserve) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("roster_id", id);
+        m.put("owner_id", "owner" + id);
+        m.put("players", players);
+        m.put("reserve", reserve);
+        return m;
+    }
+
+    private static Map<String, Map<String, Double>> lines() {
+        Map<String, Map<String, Double>> out = new HashMap<>();
+        fourRosterPoints().forEach((id, p) -> out.put(id, Map.of("pts", p)));
+        return out;
+    }
+
+    @Test
+    void basketballThroughTheServiceRanksIsPerWeekAndListsOnlyScoredKeysNoLineCarries() {
+        var m = nbaService(List.of(
+                sleeperRoster(1, rosterIds(1), List.of("r1p0")), sleeperRoster(2, rosterIds(2), null),
+                sleeperRoster(3, rosterIds(3), null), sleeperRoster(4, rosterIds(4), List.of())), lines());
+
+        var read = m.svc().projectionsRead(m.league(), "owner4");
+        var p = read.projections();
+
+        assertTrue(p.available(), p.reason());
+        assertNull(p.reasonCode());
+        assertEquals("PER_WEEK", p.unit());
+        assertEquals("ONE_AVERAGE_GAME_PER_STARTER", p.basisNote());
+        assertEquals(List.of("ff"), p.unprojectedCategories(), "ff is scored but on no line; pts is on every line");
+        assertEquals(3, p.staleAfterDays());
+        assertTrue(p.rosters().stream().allMatch(r -> r.byWeek().isEmpty()));
+        // Roster 1's star is tagged Out, so the order is 2, 1, 3, 4 (198, 180, 162, 144).
+        assertEquals(List.of(2, 1, 3, 4), p.rosters().stream().map(RosterProjection::rosterId).toList());
+        assertEquals(1, p.rosters().get(1).unavailable());
+    }
+
+    @Test
+    void basketballWithNoStoredLinesIsUnavailableWithACodeAndNoZeros() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of())), Map.of());
+
+        var p = m.svc().projectionsRead(m.league(), "owner4").projections();
+
+        assertFalse(p.available());
+        assertEquals("PROJECTIONS_NOT_LOADED", p.reasonCode());
+        assertTrue(p.reason().contains("2026"), "an English sentence, not the code: " + p.reason());
+        assertTrue(p.rosters().isEmpty());
+        assertEquals("PER_WEEK", p.unit());
+        assertEquals(List.of(), p.unprojectedCategories());
+    }
+
+    @Test
+    void rostersThatAreAllEmptyOrNullAreRostersEmptyNotARankingOfZeros() {
+        var m = nbaService(List.of(sleeperRoster(1, List.of(), null), sleeperRoster(2, null, null)), lines());
+
+        var p = m.svc().projectionsRead(m.league(), "owner4").projections();
+
+        assertFalse(p.available());
+        assertEquals("ROSTERS_EMPTY", p.reasonCode());
+        assertTrue(p.rosters().isEmpty());
+    }
+
+    @Test
+    void aLeagueWithADifferentStartingLineupIsUnsupportedSlots() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of())), lines());
+        LeagueRepository.LeagueRow odd = new LeagueRepository.LeagueRow(5L, Sport.NBA, "LNBA", "Ball Knowers",
+                2026, 4, List.of("PG", "SG", "SF", "PF", "C", "UTIL", "BN"), 0.0, null, "in_season");
+
+        var p = m.svc().projectionsRead(odd, "owner4").projections();
+
+        assertFalse(p.available());
+        assertEquals("UNSUPPORTED_SLOTS", p.reasonCode());
+        assertTrue(p.reason().contains("PG, SG, SF, PF, C, UTIL"), p.reason());
+    }
+
+    @Test
+    void anEmptyScoringMapIsScoringNotLoadedNotProjectionsNotLoaded() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of())), lines());
+        Mockito.when(m.leagues().scoringOf(5L)).thenReturn(Map.of());
+
+        var p = m.svc().projectionsRead(m.league(), "owner4").projections();
+
+        assertFalse(p.available());
+        assertEquals("SCORING_NOT_LOADED", p.reasonCode());
+        assertTrue(p.reason().contains("scoring"), p.reason());
+    }
+
+    @Test
+    void aZeroWeightScoringKeyIsNotListedAsNotProjected() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of()), sleeperRoster(2, rosterIds(2), null)), lines());
+        Mockito.when(m.leagues().scoringOf(5L)).thenReturn(Map.of("pts", 1.0, "ff", 0.0, "tf", -2.0));
+
+        var p = m.svc().projectionsRead(m.league(), "owner4").projections();
+
+        assertTrue(p.available(), p.reason());
+        assertEquals(List.of("tf"), p.unprojectedCategories());
+    }
+
+    @Test
+    void theSameNineSlotsInAnotherOrderAreStillSupported() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of()), sleeperRoster(2, rosterIds(2), null)), lines());
+        LeagueRepository.LeagueRow reordered = new LeagueRepository.LeagueRow(5L, Sport.NBA, "LNBA", "Ball Knowers",
+                2026, 4, List.of("UTIL", "C", "PG", "SG", "G", "SF", "PF", "F", "UTIL", "BN", "BN"), 0.0, null, "in_season");
+
+        var p = m.svc().projectionsRead(reordered, "owner4").projections();
+
+        assertTrue(p.available(), p.reason());
+    }
+
+    @Test
+    void basketballDoesNotNeedAPlayoffWeekStart() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of()), sleeperRoster(2, rosterIds(2), null)), lines());
+        Mockito.when(m.leagues().playoffFormat(5L)).thenReturn(java.util.Optional.empty());
+
+        var p = m.svc().projectionsRead(m.league(), "owner4").projections();
+
+        assertTrue(p.available(), p.reason());
+    }
+
+    @Test
+    void aCompleteBasketballLeagueIsSeasonOver() {
+        var m = nbaService(List.of(sleeperRoster(1, rosterIds(1), List.of())), lines());
+        LeagueRepository.LeagueRow done = new LeagueRepository.LeagueRow(5L, Sport.NBA, "LNBA", "Ball Knowers",
+                2026, 4, NBA_SLOT_LIST, 0.0, null, "complete");
+
+        var p = m.svc().projectionsRead(done, "owner4").projections();
+
+        assertFalse(p.available());
+        assertEquals("SEASON_OVER", p.reasonCode());
     }
 }

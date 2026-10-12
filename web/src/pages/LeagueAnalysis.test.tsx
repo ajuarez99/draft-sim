@@ -18,8 +18,8 @@ vi.mock('../api', () => ({
 }))
 
 function player(slot: string, position: string, name: string, points: number,
-                injuryStatus: string | null = null): AnalysisLineupPlayer {
-  return { sleeperPlayerId: `${name}-${slot}`, name, position, team: 'CIN', slot, points, injuryStatus }
+                injuryStatus: string | null = null, onReserve = false): AnalysisLineupPlayer {
+  return { sleeperPlayerId: `${name}-${slot}`, name, position, team: 'CIN', slot, points, injuryStatus, onReserve }
 }
 
 /**
@@ -47,7 +47,7 @@ function roster(rosterId: number, manager: string, rank: number, total: number,
     rosterId, managerId: rosterId, manager, avatarId: null, rank, isMe: over.isMe ?? false, total,
     byPosition, rankByPosition, starters: over.starters ?? LINEUP, bench: BENCH,
     byWeek: [{ week: 2, points: 120, rank: 1 }, { week: 3, points: 96, rank: 2 },
-      { week: 4, points: 130, rank: 1 }], missing,
+      { week: 4, points: 130, rank: 1 }], missing, unavailable: 0,
   }
 }
 
@@ -59,6 +59,16 @@ function side(rosterId: number, manager: string, projected: number, isMe = false
 }
 
 const GROUPS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF']
+
+/** The spec 030 fields a football projection carries: rest-of-season, nothing basketball-specific. */
+const FOOTBALL_UNIT = {
+  reasonCode: null,
+  unit: 'REST_OF_SEASON',
+  basisNote: null,
+  provenance: null,
+  unprojectedCategories: [] as string[],
+  staleAfterDays: 3,
+} as const
 
 /** The page draws two bump charts now, so every chart assertion names one. */
 function panelNamed(title: string): HTMLElement {
@@ -85,6 +95,7 @@ function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
       entries: [],
     },
     projections: {
+      ...FOOTBALL_UNIT,
       available: true,
       reason: null,
       positionGroups: GROUPS,
@@ -234,6 +245,7 @@ describe('LeagueAnalysis', () => {
     getLeagueAnalysis.mockResolvedValue(
       data({
         projections: {
+          ...FOOTBALL_UNIT,
           available: false,
           reason: 'no projections stored for nfl 2026 weeks 2-14',
           positionGroups: GROUPS,
@@ -385,6 +397,7 @@ describe('LeagueAnalysis', () => {
     getLeagueAnalysis.mockResolvedValue(
       data({
         projections: {
+          ...FOOTBALL_UNIT,
           available: true,
           reason: null,
           positionGroups: GROUPS,
@@ -730,5 +743,108 @@ describe('League analysis grades (spec 013 US8)', () => {
     )
     render(<LeagueAnalysis />)
     expect(await screen.findByText(/Grades are marked early for the first weeks of the season/)).toBeInTheDocument()
+  })
+})
+
+/** Spec 030 US2: the same page for a basketball league, whose projection is one average game per starter. */
+describe('League analysis, basketball per-week projection (spec 030)', () => {
+  const NBA_GROUPS = ['PG', 'SG', 'SF', 'PF', 'C']
+  const nbaRoster = (rosterId: number, manager: string, rank: number, total: number, unavailable = 0, isMe = false) => ({
+    ...roster(rosterId, manager, rank, total, { PG: total / 2, C: total / 2 }, { PG: rank, C: rank }, 0, {
+      isMe,
+      starters: [player('PG', 'PG', 'Tyrese Haliburton', total / 2),
+        player('C', 'C', 'Nikola Jokic', total / 2, 'DTD', true)],
+    }),
+    byWeek: [],
+    bench: unavailable ? [player('OUT', 'PF', 'Injured Guy', 0, 'Out')] : [],
+    unavailable,
+  })
+
+  const perWeek = (over: Partial<LeagueAnalysisData['projections']> = {}): LeagueAnalysisData['projections'] => ({
+    available: true,
+    reason: null,
+    reasonCode: null,
+    positionGroups: NBA_GROUPS,
+    rosters: [nbaRoster(1, 'kieriskash', 1, 310.4, 1), nbaRoster(2, 'jstrobe', 2, 288.2, 0, true)],
+    unit: 'PER_WEEK',
+    basisNote: 'ONE_AVERAGE_GAME_PER_STARTER',
+    provenance: { source: 'sleeper', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
+    unprojectedCategories: ['bonus_pt_40p', 'tf', 'some_new_key'],
+    staleAfterDays: 3,
+    ...over,
+  })
+
+  const nba = (proj = perWeek()) =>
+    data({ scoringKey: 'STANDARD', window: { fromWeek: 1, toWeek: 19, weeks: 19, scoredWeeks: 0 }, projections: proj })
+
+  it('labels every total as projected points per week, with no week-by-week section or picker', async () => {
+    getLeagueAnalysis.mockResolvedValue(nba())
+    render(<LeagueAnalysis />)
+    const panel = await waitFor(() => panelNamed('Roster projections'))
+    expect(within(panel).getAllByText('pts/week').length).toBe(2)
+    expect(within(panel).getByText('league scoring · per-game projections')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Projected week by week' })).toBeNull()
+    expect(screen.queryByRole('group', { name: 'Choose a week' })).toBeNull()
+    // None of football's wording survives.
+    expect(screen.queryByText(/rest-of-season/i)).toBeNull()
+    expect(screen.queryByText(/bye weeks/i)).toBeNull()
+    expect(screen.queryByText(/weeks 1–19/)).toBeNull()
+  })
+
+  it('prints the source and age, the one-game basis, the unprojected categories and the injury caveat', async () => {
+    getLeagueAnalysis.mockResolvedValue(nba())
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/Source: sleeper · updated today · accuracy for this league not measured/)).toBeInTheDocument()
+    expect(screen.getByText(/One average game per starter\. Sleeper credits one game a week/)).toBeInTheDocument()
+    expect(screen.getByText('Not projected: 40+ point bonus, technical fouls, some_new_key.')).toBeInTheDocument()
+    expect(screen.getByText(/Players tagged Out count as zero wherever they sit\. Day-to-day and game-time players count in full, including ones parked on IR\+, since one game a week is credited\./)).toBeInTheDocument()
+    expect(screen.queryByText(/days old/)).toBeNull()
+  })
+
+  it('says how old the projections are once past the stale threshold', async () => {
+    const old = new Date(Date.now() - 6 * 86_400_000).toISOString()
+    getLeagueAnalysis.mockResolvedValue(
+      nba(perWeek({ provenance: { source: 'sleeper', sourceModifiedAt: old, fetchedAt: old } })),
+    )
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText('Projections are 6 days old.')).toBeInTheDocument()
+  })
+
+  it('counts Out players as left out, lists them on the bench at zero, and flags an IR+ starter', async () => {
+    const user = userEvent.setup()
+    getLeagueAnalysis.mockResolvedValue(nba())
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText('1 out')).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /Lineup/ })[0])
+    expect(screen.getByText('Injured Guy')).toBeInTheDocument()
+    expect(screen.getByText('OUT')).toBeInTheDocument()
+    expect(screen.getAllByText('IR+').length).toBeGreaterThan(0)
+  })
+
+  it('words PROJECTIONS_NOT_LOADED and shows no ranking', async () => {
+    getLeagueAnalysis.mockResolvedValue(
+      nba(perWeek({ available: false, reason: 'raw', reasonCode: 'PROJECTIONS_NOT_LOADED', rosters: [] })),
+    )
+    render(<LeagueAnalysis />)
+    const panel = await waitFor(() => panelNamed('Roster projections'))
+    await waitFor(() => expect(within(panel).getByText(/Basketball projections haven't loaded yet/)).toBeInTheDocument())
+    expect(panel.querySelector('.analysis-bar-row')).toBeNull()
+    expect(within(panel).queryByText(/pts\/week/)).toBeNull()
+  })
+
+  it('words ROSTERS_EMPTY', async () => {
+    getLeagueAnalysis.mockResolvedValue(nba(perWeek({ available: false, reasonCode: 'ROSTERS_EMPTY', rosters: [] })))
+    render(<LeagueAnalysis />)
+    expect((await screen.findAllByText(/Rosters aren't filled in yet/)).length).toBeGreaterThan(0)
+  })
+
+  it('leaves football exactly as it was: rest-of-season wording, the weekly section, the picker', async () => {
+    getLeagueAnalysis.mockResolvedValue(data())
+    render(<LeagueAnalysis />)
+    const panel = await waitFor(() => panelNamed('Roster projections'))
+    expect(within(panel).getByText('weeks 2–14 · full PPR')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Projected week by week' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Choose a week' })).toBeInTheDocument()
+    expect(screen.queryByText(/Injuries and missed games/)).toBeNull()
   })
 })

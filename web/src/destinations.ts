@@ -241,13 +241,10 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     group: 'season',
     formerLabel: 'Analysis',
     glyph: '◫',
-    // Football-only on its own terms rather than by a shared sport gate: two of
-    // this page's three blocks are rest-of-season projections, and basketball
-    // projections aren't wired up yet. Sleeper does serve them
-    // (claude/projection-tools.md), but only football's are ingested. A
-    // basketball league reaching it would get one working block and two
-    // explaining themselves. See claude/league-analysis.md.
-    sports: ['nfl'],
+    // Both sports since spec 030. Basketball's projections come from per-game lines
+    // (one average game per starter), so the page words its numbers by the payload's
+    // `unit` rather than by sport; see claude/league-analysis.md and specs/030.
+    sports: ['nfl', 'nba'],
     label: 'Team strength',
     // one season: the page reads the season it is opened on
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/analysis`,

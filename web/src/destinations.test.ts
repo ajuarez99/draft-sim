@@ -116,11 +116,9 @@ describe('the destination table', () => {
 })
 
 describe('destinationsFor', () => {
-  // Invariant 4. The gate is one-way: football-only means basketball never
-  // sees it, not that basketball sees a broken version of it.
-  it('never offers Analysis to a basketball league', () => {
-    const keys = destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)
-    expect(keys).not.toContain('analysis')
+  // Spec 030 reversed the earlier football-only gate: basketball projections exist now.
+  it('offers Analysis to both sports', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('analysis')
     expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).toContain('analysis')
   })
 

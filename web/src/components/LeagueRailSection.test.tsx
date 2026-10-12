@@ -166,17 +166,14 @@ describe('what a league is offered', () => {
   // The sport gate is one-way, and it now lives in one place rather than in
   // this component's JSX -- so the rail and the palette cannot disagree about
   // whether basketball has an Analysis page.
-  it('does not offer Analysis to a basketball league', async () => {
+  it('offers Analysis to a basketball league too (spec 030)', async () => {
     const { leagueSection, rowLabels } = renderAtPath('/leagues/L_NBA/history', { drafts: [NBA] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(rowLabels()).not.toContain('Team strength')
+    expect(rowLabels()).toContain('Team strength')
     expect(rowLabels()).toContain('Power rankings')
-    // Roster management IS offered to basketball, and the contrast with
-    // Analysis one line up is the whole point: Analysis is gated because two
-    // of its blocks are projections and there is no basketball projection
-    // source, while nothing on Roster management is a projection -- it reads
-    // points already scored, which Sleeper reports for both sports.
+    // Roster management is offered to basketball too: nothing on it is a
+    // projection, it reads points already scored, which Sleeper reports for both sports.
     expect(rowLabels()).toContain('Bench points')
     expect(rowLabels()).toContain('Luck')
     expect(rowLabels()).toContain('Playoff odds')
@@ -481,19 +478,19 @@ describe('year links keep the page', () => {
 
   // (f2) Leagues-flyout coverage: year links cannot cross sports (a lineage is
   // one sport), so the "current page not offered by the target" fallback is only
-  // reachable from the Leagues group of the flyout. Analysis is football-only.
+  // reachable from the Leagues group of the flyout. The Schedule grid is basketball-only.
   it('(f2) falls back to League home when the target sport lacks the page', () => {
-    const nba25 = draftSummary({ sleeperDraftId: 'D_NBA25', sleeperLeagueId: 'L_NBA25', sport: 'nba', season: 2025 })
-    const nba26 = draftSummary({
-      sleeperDraftId: 'D_NBA26',
-      sleeperLeagueId: 'L_NBA26',
-      previousLeagueId: 'L_NBA25',
-      sport: 'nba',
+    const nfl25 = draftSummary({ sleeperDraftId: 'D_NFL25', sleeperLeagueId: 'L_NFL25', sport: 'nfl', season: 2025 })
+    const nfl26 = draftSummary({
+      sleeperDraftId: 'D_NFL26',
+      sleeperLeagueId: 'L_NFL26',
+      previousLeagueId: 'L_NFL25',
+      sport: 'nfl',
       season: 2026,
     })
-    const nbaLineage: LeagueLineage = { current: nba26, seasons: [nba26, nba25] }
-    const nbaCtx: LeagueContext = { lineage: nbaLineage, season: nba26 }
-    expect(switchTarget('analysis', nbaCtx)).toBe('/leagues/L_NBA26')
+    const nflLineage: LeagueLineage = { current: nfl26, seasons: [nfl26, nfl25] }
+    const nflCtx: LeagueContext = { lineage: nflLineage, season: nfl26 }
+    expect(switchTarget('schedule', nflCtx)).toBe('/leagues/L_NFL26')
   })
 
   // specs/022 T027: the player page lives at /leagues/:league/players/:player, and

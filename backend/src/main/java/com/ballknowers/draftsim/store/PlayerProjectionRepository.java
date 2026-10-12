@@ -78,6 +78,29 @@ public class PlayerProjectionRepository {
                 .optional();
     }
 
+    /** Who produced the numbers in a window and when the newest of them was fetched. */
+    public record WindowProvenance(String source, Instant fetchedAt) {}
+
+    /**
+     * Provenance for the window {@code [fromWeek, toWeek]} (specs/030, so the analysis page can say where
+     * football's numbers came from the way it does for basketball's): the source and the newest
+     * {@code fetched_at} over the window. Empty when nothing is stored there.
+     */
+    public Optional<WindowProvenance> provenance(String sport, int season, int fromWeek, int toWeek) {
+        return db.sql("""
+                select max(source), max(fetched_at), count(*)
+                from player_projection
+                where sport = ? and season = ? and week between ? and ?
+                """)
+                .params(sport, season, fromWeek, toWeek)
+                .query((rs, i) -> {
+                    if (rs.getInt(3) == 0) return Optional.<WindowProvenance>empty();
+                    java.time.OffsetDateTime at = rs.getObject(2, java.time.OffsetDateTime.class);
+                    return Optional.of(new WindowProvenance(rs.getString(1), at == null ? null : at.toInstant()));
+                })
+                .single();
+    }
+
     /**
      * Summed projected points per Sleeper player id over {@code [fromWeek,
      * toWeek]} inclusive, for one scoring key.

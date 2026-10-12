@@ -1,5 +1,19 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-11: spec 030 (season after the draft) built, verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/030-post-draft-season-view`, branch `030-post-draft-season-view` (from `main` 943b303). Docs are in `specs/030-post-draft-season-view/`: spec, plan, research, plan-review, code-review, verification, notes.
+- **What it does:** see README "The season after the draft". New migration `V31__player_season_projection.sql`, new `GET /api/leagues/{id}/season-start`, new admin route `POST /api/ingest/season-projections?sport=nba&season=2026`, and a best-effort `SEASON_PROJECTIONS` daily-refresh step.
+- **Measured locally on "Ball Knowers" NBA 2026:** a projected three-way dead heat (222.4 / 219.8 / 216.4 pts/week; 4th at 213.6). Totals were rebuilt by hand to within 0.07, and 108/108 starters are slot-eligible. Each roster has 1–2 IR players excluded. The NFL parity diff's only change (0.1 on one roster) predates this branch: `Map.of` order is salted per JVM, measured on `main` across 4 restarts (lessons #40).
+- **Deadline:** it must deploy before NBA week 1 is *final* (about 2026-10-26), or the preseason home can't be verified live until next season.
+- **After deploy (owed):**
+  1. Run `POST /api/ingest/season-projections?sport=nba&season=2026` on prod with `X-Admin-Token`.
+  2. Load the NBA home, checking the block list against verification.md V5.
+  3. Confirm the week-1 pairings show; locally they needed the league-history ingest.
+  4. Check both Railway services are on the new build.
+- **After tip-off:** quickstart V8.
+- **Follow-ups offered as task chips:** NFL IR exclusion, and deterministic NFL totals. **Story 5** (preseason odds) is specified but not built.
+
 ## UPDATE 2026-10-10 ~16:50 UTC: spec 029 deployed (faster live polling)
 
 - **Why.** Allan watched a test-league draft live and saw slow pick arrival. The poller slept a fixed 10 s between ticks, while Sleeper answered in 70–250 ms. Per-tick server time was never logged.

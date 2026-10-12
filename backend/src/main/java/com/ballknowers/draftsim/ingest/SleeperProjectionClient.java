@@ -25,10 +25,17 @@ import java.util.Map;
 public class SleeperProjectionClient {
 
     /**
-     * Every position a fantasy roster can hold. Sent explicitly because the
-     * endpoint filters on it; omitting the array does not mean "all".
+     * Every position a fantasy roster can hold, per sport. Sent explicitly because the
+     * endpoint filters on it; omitting the array does not mean "all". Football's list is
+     * unchanged from before spec 030; basketball's is the five positions Sleeper tags NBA
+     * players with (the same five {@code Position.forSport(NBA)} holds).
      */
-    private static final List<String> POSITIONS = List.of("QB", "RB", "WR", "TE", "K", "DEF");
+    private static final List<String> NFL_POSITIONS = List.of("QB", "RB", "WR", "TE", "K", "DEF");
+    private static final List<String> NBA_POSITIONS = List.of("PG", "SG", "SF", "PF", "C");
+
+    static List<String> positionsFor(String sport) {
+        return "nba".equals(sport) ? NBA_POSITIONS : NFL_POSITIONS;
+    }
 
     private final RestClient http;
 
@@ -50,8 +57,27 @@ public class SleeperProjectionClient {
                     var b = uriBuilder.path("/projections/{sport}/{season}/{week}")
                             .queryParam("season_type", "regular")
                             .queryParam("order_by", "ppr");
-                    POSITIONS.forEach(p -> b.queryParam("position[]", p));
+                    positionsFor(sport).forEach(p -> b.queryParam("position[]", p));
                     return b.build(sport, season, week);
+                })
+                .retrieve()
+                .body(List.class);
+    }
+
+    /**
+     * One whole season of projections, raw (specs/030-post-draft-season-view research R1).
+     * Measured 2026-10-11 against nba/2026: 200, ~1.5 MB, 0.37 s, 2,120 rows of which 529
+     * carry a stat line; every stat is a per-game average ({@code stats.gp} is 1.0). Filtering
+     * is the ingest service's job, as with {@link #week}.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> season(String sport, int season) {
+        return http.get()
+                .uri(uriBuilder -> {
+                    var b = uriBuilder.path("/projections/{sport}/{season}")
+                            .queryParam("season_type", "regular");
+                    positionsFor(sport).forEach(p -> b.queryParam("position[]", p));
+                    return b.build(sport, season);
                 })
                 .retrieve()
                 .body(List.class);

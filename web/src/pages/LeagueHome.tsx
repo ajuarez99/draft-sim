@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import NotFound from '../components/NotFound'
 import PlayerSpotlight from '../components/PlayerSpotlight'
 import PersonName from '../components/PersonName'
+import PreseasonStrengthBlock from '../components/PreseasonStrengthBlock'
+import GradeChip, { GradesEarlyBadge } from '../components/GradeChip'
 import { SkeletonRows } from '../components/Skeleton'
 import {
   fetchSuperlatives,
@@ -12,21 +15,25 @@ import {
   getNextMatchup,
   getPlayerSpotlight,
   getPowerRankings,
+  getSeasonStart,
   getWeeklyReport,
   type AnalysisMatchups,
+  type DraftGradeSummary,
   type DraftSummary,
+  type FirstWeek,
   type LeagueAnalysis,
   type LeagueHistory,
   type NextMatchup,
   type PlayerSpotlight as PlayerSpotlightData,
   type PowerRankings,
   type SeasonHistory,
+  type SeasonStart,
   type Sport,
   type StandingRow,
   type SuperlativesResponse,
   type WeeklyReport,
 } from '../api'
-import { LEAGUE_DESTINATIONS, destinationsFor, labelOf } from '../destinations'
+import { destinationsFor, labelOf } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock, type Block } from '../useBlock'
 import { cachedDrafts } from '../railLeague'
@@ -48,6 +55,9 @@ export type { Block } from '../useBlock'
  *                                          projected score); basketball: getNextMatchup (specs/017,
  *                                          pairing only, no projection). Football moves to
  *                                          getNextMatchup after spec 017 T043's measurement.
+ *   which blocks, and the preseason    <- getSeasonStart (specs/030): its `state` decides the layout.
+ *   strength + draft links                 DRAFTED_UNSCORED drops last season's matchup / power /
+ *                                          awards / empty standings and shows projected strength.
  *   power headline                      <- getPowerRankings, via PowerRankings' own
  *                                          computeWeeklyStory + buildHeadline
  *   top award                           <- fetchSuperlatives
@@ -60,9 +70,15 @@ export type { Block } from '../useBlock'
  * in the league gets no "you" blocks and no error.
  */
 
-/** Football-only on the destination table's own rule, not a second copy of it. */
-function analysisOffered(sport: Sport): boolean {
-  return LEAGUE_DESTINATIONS.find((d) => d.key === 'analysis')?.sports.includes(sport) ?? false
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * "2026-10-20" to "Oct 20". Split, never `new Date(str)`: a date-only string
+ * parses as UTC midnight and shows as the 19th in US time zones.
+ */
+export function formatIsoDate(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}` : iso
 }
 
 function record(r: StandingRow): string {
@@ -117,14 +133,18 @@ export default function LeagueHome() {
   const power = useBlock(id ? () => getPowerRankings(id) : null, [id, version])
   const awards = useBlock(id ? () => fetchSuperlatives(id) : null, [id, version])
   const spotlight = useBlock(id ? () => getPlayerSpotlight(id) : null, [id, version])
+  const seasonStart = useBlock(id ? () => getSeasonStart(id) : null, [id, version])
 
   const draft: DraftSummary | null =
     drafts.status === 'ok' ? (drafts.data.find((d) => d.sleeperLeagueId === id) ?? null) : null
   const sport: Sport | null = draft?.sport ?? (weekly.status === 'ok' ? weekly.data.sport : null)
 
   // Football only, and only once the sport is known: guessing it would fetch a
-  // projection for a league that has none.
-  const analysis = useBlock(sport && analysisOffered(sport) ? () => getLeagueAnalysis(id) : null, [id, sport, version])
+  // projection for a league that has none. Gated on the sport itself, not on
+  // "does the sport have an Analysis page": basketball has one now (spec 030),
+  // but its home shows the pairing block below, and fetching the analysis too
+  // would run a second full lineup pass and render a second "Next opponent".
+  const analysis = useBlock(sport === 'nfl' ? () => getLeagueAnalysis(id) : null, [id, sport, version])
   // Basketball only (specs/017 F7: football stays on the analysis block until its Tue/Wed
   // boundary is measured). Keyed on the data version so the visit's refresh refetches it (F8).
   const nextMatchup = useBlock(id && sport === 'nba' ? () => getNextMatchup(id) : null, [id, sport, version])
@@ -141,23 +161,49 @@ export default function LeagueHome() {
   // 0-0 and "1st of 12" would be a claim made from nothing (spec 013 review).
   const played = (r: StandingRow) => (r.wins ?? 0) + (r.losses ?? 0) + (r.ties ?? 0)
   const anyGames = standings.some((r) => played(r) > 0)
-  const preSeason = draft != null && (draft.status ?? 'unknown') !== 'complete'
-
+  // The layout is `seasonStart.state`'s, never re-derived from the draft or the standings.
+  // While it loads, the blocks that differ by state are held back so last season's matchup,
+  // power headline and awards never flash before disappearing (spec 030 N3).
+  const settling = seasonStart.status === 'loading'
+  const start: SeasonStart | null = seasonStart.status === 'ok' ? seasonStart.data : null
+  const unscored = start?.state === 'DRAFTED_UNSCORED'
+  // Only the error fallback: if season-start can't be read, the page falls back to the rule
+  // it used before spec 030 (a draft that isn't complete means pre-season) rather than going blank.
+  const legacyPreSeason = draft != null && (draft.status ?? 'unknown') !== 'complete'
+  const preSeason = start ? start.state === 'PRE_DRAFT' : legacyPreSeason
   const leagueName = draft?.leagueName ?? season?.name ?? 'League home'
   const seasonYear = draft?.season ?? season?.season ?? null
+  const draftBoardId = start?.draft.sleeperDraftId ?? draft?.sleeperDraftId ?? null
+  // DRAFTED_UNSCORED shows the latest-matchup block only if it holds a week of THIS season.
+  const scoredThisSeason =
+    weekly.status === 'ok' &&
+    weekly.data.available &&
+    weekly.data.week > 0 &&
+    weekly.data.season === seasonYear &&
+    weekly.data.requestedSeason == null
+
+  // What each state keeps. Matchup, standings, power and awards read last season's numbers
+  // in DRAFTED_UNSCORED: standings, power and awards are dropped there outright, the matchup
+  // only survives if it is this season's.
+  const showMatchup = !settling && !preSeason && (!unscored || scoredThisSeason)
+  const showSeasonBlocks = !settling && !unscored
+
+  const sub = unscored
+    ? `${start.season} · draft complete · ${
+        start.firstWeek?.startDate ? `first games ${formatIsoDate(start.firstWeek.startDate)}` : 'first games: date not known yet'
+      }`
+    : me && anyGames
+      ? `You're ${ordinal(meIndex + 1)} of ${standings.length} at ${record(me)}.`
+      : me
+        ? "Your season hasn't started yet."
+        : undefined
 
   return (
     <div className="content lh-page">
       <PageHeader
         eyebrow={seasonYear ? `League home · ${seasonYear}` : 'League home'}
         title={leagueName}
-        sub={
-          me && anyGames
-            ? `You're ${ordinal(meIndex + 1)} of ${standings.length} at ${record(me)}.`
-            : me
-              ? "Your season hasn't started yet."
-              : undefined
-        }
+        sub={sub}
       />
 
       {preSeason && draft && <DraftBlock draft={draft} />}
@@ -167,16 +213,30 @@ export default function LeagueHome() {
             three fit the first screen on a phone (SC-005); the league after. */}
         {me && anyGames && <YourSeason me={me} position={meIndex + 1} of={standings.length} />}
 
-        {!preSeason && <MatchupBlock block={weekly} isMember={me != null} leagueId={id} seasonYear={seasonYear} />}
+        {unscored && start.strength && <PreseasonStrengthBlock strength={start.strength} leagueId={id} />}
+
+        {showMatchup && <MatchupBlock block={weekly} isMember={me != null} leagueId={id} seasonYear={seasonYear} />}
 
         {analysis.status !== 'idle' && <NextOpponentBlock block={analysis} leagueId={id} />}
-        {nextMatchup.status !== 'idle' && <NextMatchupBlock block={nextMatchup} draft={draft} />}
+        {nextMatchup.status !== 'idle' && (
+          <NextMatchupBlock block={nextMatchup} draft={draft} note={unscored && start.sport === 'nba' ? idleStartersNote(start.firstWeek, start.strength?.available) : null} />
+        )}
 
-        <StandingsBlock block={history} season={anyGames ? season : null} meIndex={meIndex} leagueId={id} />
+        {unscored && <DraftDoneBlock draftId={draftBoardId} />}
 
-        <PowerBlock block={power} leagueId={id} seasonYear={seasonYear} />
+        {showSeasonBlocks && (
+          <>
+            <StandingsBlock block={history} season={anyGames ? season : null} meIndex={meIndex} leagueId={id} />
 
-        <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
+            <PowerBlock block={power} leagueId={id} seasonYear={seasonYear} />
+
+            <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
+          </>
+        )}
+
+        {start?.state === 'IN_SEASON' && start.draft.grades && draftBoardId && (
+          <GradesSummaryBlock grades={start.draft.grades} draftId={draftBoardId} />
+        )}
       </div>
 
       <SpotlightArea id={id} block={spotlight} weekly={weekly} />
@@ -233,6 +293,54 @@ function DraftBlock({ draft }: { draft: DraftSummary }) {
           </Link>
         )}
       </div>
+    </section>
+  )
+}
+
+/** After the draft, before week 1 (spec 030): the draft is done, so say so and link the board. */
+function DraftDoneBlock({ draftId }: { draftId: string | null }) {
+  return (
+    <section className="section lh-draft-done" aria-labelledby="lh-draft-done-h">
+      <h2 className="section-title" id="lh-draft-done-h">
+        Draft
+      </h2>
+      <p>The draft is complete.</p>
+      {draftId && (
+        <Link className="lh-link" to={`/drafts/${draftId}/board`}>
+          View the draft board
+        </Link>
+      )}
+    </section>
+  )
+}
+
+/** Once weeks are scored (spec 030 FR-010): the draft's best and worst grade, early-flagged like everywhere else. */
+function GradesSummaryBlock({ grades, draftId }: { grades: DraftGradeSummary; draftId: string }) {
+  const line = (tag: string, t: DraftGradeSummary['best']) => (
+    <li className="lh-grades-row">
+      <span className="lh-grades-tag">{tag}</span>
+      <Avatar avatarId={t.avatarId} seed={t.manager ?? tag} label={t.manager} />
+      <span className="lh-name" title={t.manager ?? undefined}>
+        {t.manager ?? 'Unknown'}
+      </span>
+      <GradeChip grade={t.grade}>{t.rank != null ? <span className="lh-rec">#{t.rank}</span> : null}</GradeChip>
+    </li>
+  )
+  return (
+    <section className="section lh-grades" aria-labelledby="lh-grades-h">
+      <h2 className="section-title" id="lh-grades-h">
+        Draft grades
+      </h2>
+      <ol className="row-list lh-rows">
+        {line('Best', grades.best)}
+        {line('Worst', grades.worst)}
+      </ol>
+      <p className="small">
+        <GradesEarlyBadge early={grades.gradesEarly} />
+      </p>
+      <Link className="lh-link" to={`/drafts/${draftId}/board`}>
+        Draft board and grades
+      </Link>
     </section>
   )
 }
@@ -453,7 +561,16 @@ function NextOpponentBlock({ block, leagueId }: { block: Block<LeagueAnalysis>; 
  * username, then "roster N". Nothing renders when `me` is null (not a member),
  * the same contract as the football block.
  */
-function NextMatchupBlock({ block, draft }: { block: Block<NextMatchup>; draft: DraftSummary | null }) {
+function NextMatchupBlock({
+  block,
+  draft,
+  note,
+}: {
+  block: Block<NextMatchup>
+  draft: DraftSummary | null
+  /** Before week 1 (spec 030): which of your projected starters have no scheduled game. */
+  note?: ReactNode
+}) {
   if (block.status === 'idle') return null
   let body
   if (block.status === 'loading') body = <p className="muted small">Loading…</p>
@@ -481,14 +598,13 @@ function NextMatchupBlock({ block, draft }: { block: Block<NextMatchup>; draft: 
         </p>
       )
     }
+    // Only beside a real pairing or bye: a non-member (returned above) gets no "you" text.
+    if (note) body = <>{body}{note}</>
   }
-  // The link is whatever the destination table offers this league (F9): Team
-  // strength where Analysis exists, otherwise the schedule grid. No sport test here.
-  const target = !draft
-    ? null
-    : analysisOffered(draft.sport)
-      ? { to: `/leagues/${draft.sleeperLeagueId}/analysis`, label: 'Team strength' }
-      : scheduleLink(draft)
+  // This block is basketball's, and its link stays the schedule grid even though basketball
+  // now has an Analysis page (spec 030 S1): the page it summarises is the pairing, and the
+  // strength block has its own link to Analysis.
+  const target = draft ? scheduleLink(draft) : null
   return (
     <section className="section lh-next" aria-labelledby="lh-next-h">
       <h2 className="section-title" id="lh-next-h">
@@ -501,6 +617,38 @@ function NextMatchupBlock({ block, draft }: { block: Block<NextMatchup>; draft: 
         </Link>
       )}
     </section>
+  )
+}
+
+/**
+ * "Which of my projected starters have no game in week 1" (spec 030 FR-010). Scheduled games
+ * only: it makes no claim about points, since Sleeper credits one game a week however many
+ * a player has.
+ */
+function idleStartersNote(first: FirstWeek | null, strengthAvailable: boolean | undefined): ReactNode {
+  const swg = first?.startersWithoutGame
+  if (strengthAvailable === false) return null // no lineup, so no starters to speak of
+  if (!swg) {
+    return (
+      <p className="muted small lh-next-note">
+        {first?.week != null ? `The week ${first.week} schedule isn't loaded yet.` : "The first week's schedule isn't loaded yet."}
+      </p>
+    )
+  }
+  if (swg.mine == null) return null // no roster or no projected starters: nothing to say
+  if (swg.mine.length === 0) {
+    return <p className="small lh-next-note">All your projected starters play in week {swg.week}.</p>
+  }
+  const n = swg.mine.length
+  return (
+    <div className="lh-next-note">
+      <p className="small">
+        {n} of your projected starters {n === 1 ? 'has' : 'have'} no game in week {swg.week}
+      </p>
+      <p className="muted small">
+        {swg.mine.map((p) => (p.team ? `${p.name} (${p.team})` : p.name)).join(', ')}. Scheduled games only.
+      </p>
+    </div>
   )
 }
 

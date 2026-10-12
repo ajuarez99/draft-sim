@@ -42,15 +42,17 @@ describe('switchTarget', () => {
     expect(switchTarget('power', ctxOf(NFL_B))).toBe('/leagues/LB/power')
   })
 
-  // The case that makes the fallback necessary. Analysis is football-only, and
-  // the rule for that lives in the destination table -- this reads it rather
-  // than restating it, which is why the two can't drift apart.
+  // The case that makes the fallback necessary. The Schedule grid is basketball-only
+  // (Analysis was the example until spec 030 gave basketball one), and the rule for that
+  // lives in the destination table -- this reads it rather than restating it, which is
+  // why the two can't drift apart.
   it('falls back to League home when the target league has no such page', () => {
-    expect(switchTarget('analysis', ctxOf(NBA_C))).toBe('/leagues/LC')
+    expect(switchTarget('schedule', ctxOf(NFL_B))).toBe('/leagues/LB')
   })
 
-  it('keeps Analysis between two football leagues', () => {
+  it('keeps Analysis for a football league and for a basketball one', () => {
     expect(switchTarget('analysis', ctxOf(NFL_B))).toBe('/leagues/LB/analysis')
+    expect(switchTarget('analysis', ctxOf(NBA_C))).toBe('/leagues/LC/analysis')
   })
 
   it('sends a board to the target league’s own board', () => {
@@ -99,16 +101,16 @@ describe('the switcher in the rail', () => {
     expect(beta?.getAttribute('href')).toBe('/leagues/LB/power')
   })
 
-  it('offers an NBA league its League home when you are on an NFL league’s Analysis', async () => {
+  it('offers an NFL league its League home when you are on an NBA league’s Schedule grid', async () => {
     const user = userEvent.setup()
-    const { leagueSection } = renderAtPath('/leagues/LA/analysis', { drafts: [NFL_A, NBA_C] })
+    const { leagueSection } = renderAtPath('/leagues/LC/schedule', { drafts: [NFL_A, NBA_C] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
     await waitFor(() => expect(screen.queryByTitle('Switch league or season')).not.toBeNull())
     await user.click(screen.getByTitle('Switch league or season'))
 
-    const hoops = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('Hoops'))
-    expect(hoops?.getAttribute('href')).toBe('/leagues/LC')
+    const alpha = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('Alpha'))
+    expect(alpha?.getAttribute('href')).toBe('/leagues/LA')
   })
 })
 

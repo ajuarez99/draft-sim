@@ -334,4 +334,49 @@ class ScheduleGridServiceTest {
             }
         }
     }
+
+    // ---------------------------------------------------------------- spec 030 T036
+
+    private static ScheduleGridService.Result gridWithWeek1() {
+        return compute(league(Sport.NBA, 2026, "pre_draft"), OptionalInt.of(1), format(20, 6, 0), fixture(2026));
+    }
+
+    /** Week 1 of the real 2026 grid: every franchise plays, so nobody is idle. */
+    @Test
+    void s030_everyRealTeamPlaysInWeek1() {
+        ScheduleGridService.Result r = gridWithWeek1();
+        List<String> all = r.teams().stream().map(ScheduleGridService.Team::team).toList();
+        assertEquals(java.util.Set.of(), ScheduleGridService.teamsWithoutGame(r, 1, all).orElseThrow());
+    }
+
+    @Test
+    void s030_aTeamWithZeroGamesInTheWeekIsReturnedAndOthersAreNot() {
+        ScheduleGridService.Result grid = new ScheduleGridService.Result("nba", 2026, true, null, FETCHED, 1, 19,
+                false, List.of(new ScheduleGridService.Week(1, null, null), new ScheduleGridService.Week(2, null, null)),
+                new ScheduleGridService.Playoff(20, 21, null),
+                List.of(new ScheduleGridService.Team("ATL", new int[]{0, 3}, 3),
+                        new ScheduleGridService.Team("BOS", new int[]{2, 0}, 2)),
+                new ScheduleGridService.Excluded(0, 0, 0));
+
+        assertEquals(java.util.Set.of("ATL"),
+                ScheduleGridService.teamsWithoutGame(grid, 1, List.of("ATL", "BOS", "ATL")).orElseThrow());
+        assertEquals(java.util.Set.of("BOS"),
+                ScheduleGridService.teamsWithoutGame(grid, 2, List.of("ATL", "BOS")).orElseThrow());
+    }
+
+    @Test
+    void s030_aNullTeamIsSkippedAndAnUnknownCodeHasNoGame() {
+        ScheduleGridService.Result r = gridWithWeek1();
+        var idle = ScheduleGridService.teamsWithoutGame(r, 1, java.util.Arrays.asList(null, "ZZZ")).orElseThrow();
+        assertEquals(java.util.Set.of("ZZZ"), idle);
+    }
+
+    @Test
+    void s030_anUnavailableGridOrAnAbsentWeekIsEmptyNotEveryonePlays() {
+        ScheduleGridService.Result none = compute(league(Sport.NBA, 2026, "pre_draft"), OptionalInt.of(1),
+                format(20, 6, 0), List.of());
+        assertTrue(ScheduleGridService.teamsWithoutGame(none, 1, List.of("ATL")).isEmpty());
+        assertTrue(ScheduleGridService.teamsWithoutGame(gridWithWeek1(), 999, List.of("ATL")).isEmpty());
+        assertTrue(ScheduleGridService.teamsWithoutGame(null, 1, List.of("ATL")).isEmpty());
+    }
 }

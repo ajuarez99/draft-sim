@@ -45,11 +45,12 @@ class IngestControllerTest {
     @Mock private ProjectionIngestService projectionIngest;
     @Mock private com.ballknowers.draftsim.ingest.TransactionIngestService transactionIngest;
     @Mock private com.ballknowers.draftsim.ingest.PlayerGameIngestService playerGameIngest;
+    @Mock private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjectionIngest;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
                 projectionIngest, transactionIngest, playerGameIngest,
-                new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles));
+                new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest);
     }
 
     // ---- POST /api/ingest/adp ----
@@ -163,5 +164,26 @@ class IngestControllerTest {
         assertFalse(e.getMessage().contains("/api/ingest"), e.getMessage());
         assertFalse(e.getMessage().contains("POST /api/"), e.getMessage());
         verifyNoInteractions(projectionIngest);
+    }
+
+    // ---- POST /api/ingest/season-projections (specs/030 C3) ----
+
+    @Test
+    void seasonProjectionsWithNbaReachesTheIngestService() {
+        var stub = new com.ballknowers.draftsim.ingest.SeasonProjectionIngestService.Result(
+                true, false, 529, 0, 1591, "rotowire", java.time.Instant.parse("2026-10-11T00:00:00Z"), null);
+        when(seasonProjectionIngest.refresh(Sport.NBA, 2026, false)).thenReturn(stub);
+
+        assertSame(stub, controller().seasonProjections("nba", 2026, false));
+        verify(seasonProjectionIngest).refresh(Sport.NBA, 2026, false);
+    }
+
+    /** The 400 comes from the service's IllegalArgumentException through ErrorHandler. */
+    @Test
+    void seasonProjectionsWithNflIsRefusedByTheService() {
+        when(seasonProjectionIngest.refresh(Sport.NFL, 2026, true))
+                .thenThrow(new IllegalArgumentException("season projections aren't wired up for nfl leagues"));
+
+        assertThrows(IllegalArgumentException.class, () -> controller().seasonProjections("nfl", 2026, true));
     }
 }

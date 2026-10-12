@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as api from '../api'
 import type {
   DraftSummary,
+  SeasonStart,
   LeagueAnalysis,
   LeagueHistory,
   PowerRankings,
@@ -12,6 +13,7 @@ import type {
   WeeklyReport,
 } from '../api'
 import { invalidateRailLeagues } from '../railLeague'
+import { strength } from '../testSeasonStart'
 import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import LeagueHome from './LeagueHome'
 
@@ -162,7 +164,20 @@ function awards(): SuperlativesResponse {
   } as unknown as SuperlativesResponse
 }
 
-type Key = 'drafts' | 'history' | 'weekly' | 'analysis' | 'power' | 'awards'
+/** A season-start payload; defaults to IN_SEASON, whose layout is the page as it was before spec 030. */
+function seasonStart(over: Partial<SeasonStart> = {}): SeasonStart {
+  return {
+    sport: 'nfl',
+    season: 2026,
+    state: 'IN_SEASON',
+    firstWeek: null,
+    strength: null,
+    draft: { sleeperDraftId: 'D1', grades: null },
+    ...over,
+  }
+}
+
+type Key = 'drafts' | 'history' | 'weekly' | 'analysis' | 'power' | 'awards' | 'seasonStart'
 
 function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
   invalidateRailLeagues()
@@ -172,6 +187,7 @@ function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
     history: vi.spyOn(api, 'getLeagueHistory').mockImplementation((over.history ?? ok(history(STANDINGS))) as never),
     weekly: vi.spyOn(api, 'getWeeklyReport').mockImplementation((over.weekly ?? ok(weekly())) as never),
     analysis: vi.spyOn(api, 'getLeagueAnalysis').mockImplementation((over.analysis ?? ok(analysis())) as never),
+    seasonStart: vi.spyOn(api, 'getSeasonStart').mockImplementation((over.seasonStart ?? ok(seasonStart())) as never),
     power: vi.spyOn(api, 'getPowerRankings').mockImplementation((over.power ?? ok(power())) as never),
     awards: vi.spyOn(api, 'fetchSuperlatives').mockImplementation((over.awards ?? ok(awards())) as never),
     // Spec 014: the spotlight is its own block; by default it does not apply, so no existing test sees it.
@@ -241,6 +257,7 @@ describe('League home', () => {
     const spies = arrange({
       drafts: () => Promise.resolve([draft({ sport: 'nba' })]),
       weekly: () => Promise.resolve(weekly({ sport: 'nba' })),
+      seasonStart: () => Promise.resolve(seasonStart({ sport: 'nba' })),
     })
     renderHome()
     await waitFor(() => section('Latest matchup'))
@@ -427,6 +444,7 @@ describe('League home', () => {
     arrange({
       drafts: () => Promise.resolve([draft({ status: 'pre_draft' })]),
       history: () => Promise.resolve(history([])),
+      seasonStart: () => Promise.resolve(seasonStart({ state: 'PRE_DRAFT', draft: { sleeperDraftId: 'D1', grades: null } })),
     })
     renderHome()
 
@@ -500,5 +518,269 @@ describe('League home', () => {
     arrange({ awards: () => Promise.resolve({ ...awards(), season: 2025 }) })
     renderHome()
     expect(await screen.findByText(/From the 2025 season; 2026 has no games yet/)).toBeInTheDocument()
+  })
+})
+
+/** Spec 030: the layout follows `season-start.state`, and DRAFTED_UNSCORED drops last season's blocks. */
+describe('League home by season state (spec 030)', () => {
+  const nbaSide = (rosterId: number, teamName: string) => ({ rosterId, teamName, username: `u${rosterId}`, avatarId: null })
+  // Before week 1 the weekly report falls back to the newest PLAYED season, which is last year's.
+  const lastSeasonsWeek = () => weekly({ sport: 'nba', season: 2025, requestedSeason: 2026 })
+  const arrangeNba = (ss: Partial<SeasonStart>, nm: Partial<api.NextMatchup> = {}, wk: () => unknown = lastSeasonsWeek) => {
+    const spies = arrange({
+      drafts: () => Promise.resolve([draft({ sport: 'nba' })]),
+      weekly: () => Promise.resolve(wk()),
+      seasonStart: () => Promise.resolve(seasonStart({ sport: 'nba', ...ss })),
+    })
+    spies.nextMatchup.mockImplementation((() =>
+      Promise.resolve({
+        sport: 'nba',
+        season: 2026,
+        week: 1,
+        available: true,
+        reason: null,
+        me: nbaSide(9, 'Dunk Tank'),
+        opponent: nbaSide(3, 'Brick City'),
+        ...nm,
+      })) as never)
+    return spies
+  }
+
+  const unscored = (over: Partial<SeasonStart> = {}): Partial<SeasonStart> => ({
+    state: 'DRAFTED_UNSCORED',
+    firstWeek: { week: 1, startDate: '2026-10-20', startersWithoutGame: null },
+    strength: strength(),
+    draft: { sleeperDraftId: 'D7', grades: null },
+    ...over,
+  })
+
+  const heading = (name: string) => screen.queryByRole('heading', { name })
+
+  describe('DRAFTED_UNSCORED', () => {
+    it('drops the matchup, power, award and standings blocks and shows the strength block', async () => {
+      arrangeNba(unscored())
+      renderHome()
+      await waitFor(() => section('Projected strength'))
+      expect(heading('Latest matchup')).toBeNull()
+      expect(heading('Power rankings')).toBeNull()
+      expect(heading('Awards')).toBeNull()
+      expect(heading('Standings')).toBeNull()
+    })
+
+    it('names the season and the date of the first games, formatted without a UTC parse', async () => {
+      arrangeNba(unscored())
+      renderHome()
+      expect(await screen.findByText('2026 · draft complete · first games Oct 20')).toBeInTheDocument()
+    })
+
+    it('says the date is not known when startDate is null', async () => {
+      arrangeNba(unscored({ firstWeek: { week: 1, startDate: null, startersWithoutGame: null } }))
+      renderHome()
+      expect(await screen.findByText('2026 · draft complete · first games: date not known yet')).toBeInTheDocument()
+    })
+
+    it('links the completed draft board by the Sleeper draft id', async () => {
+      arrangeNba(unscored())
+      renderHome()
+      const block = await waitFor(() => section('Draft'))
+      expect(within(block).getByRole('link', { name: 'View the draft board' })).toHaveAttribute('href', '/drafts/D7/board')
+    })
+
+    it('keeps the matchup block only when it holds a week of this season', async () => {
+      arrangeNba(unscored(), {}, () => weekly({ sport: 'nba' }))
+      renderHome()
+      await waitFor(() => section('Projected strength'))
+      await waitFor(() => section('Latest matchup'))
+      // Power and awards stay dropped either way.
+      expect(heading('Power rankings')).toBeNull()
+      expect(heading('Awards')).toBeNull()
+    })
+
+    it('does not ask for the football analysis and renders exactly one Next opponent heading', async () => {
+      const spies = arrangeNba(unscored())
+      renderHome()
+      await waitFor(() => section('Next opponent'))
+      expect(spies.analysis).not.toHaveBeenCalled()
+      expect(screen.getAllByRole('heading', { name: 'Next opponent' })).toHaveLength(1)
+      expect(document.querySelectorAll('#lh-next-h')).toHaveLength(1)
+      // Basketball's pairing block keeps linking the schedule grid, not Team strength.
+      const next = section('Next opponent')
+      expect(within(next).getByRole('link', { name: 'Schedule grid' })).toHaveAttribute('href', '/leagues/L1/schedule')
+    })
+
+    it('says how many projected starters have no game in week 1, by name', async () => {
+      arrangeNba(
+        unscored({
+          firstWeek: {
+            week: 1,
+            startDate: '2026-10-20',
+            startersWithoutGame: {
+              week: 1,
+              mine: [{ sleeperPlayerId: 'p1', name: 'Victor Wembanyama', team: 'SAS' }, { sleeperPlayerId: 'p2', name: 'Some Guy', team: null }],
+              countByRoster: { '9': 2 },
+            },
+          },
+        }),
+      )
+      renderHome()
+      const next = await waitFor(() => section('Next opponent'))
+      await waitFor(() => expect(within(next).getByText('2 of your projected starters have no game in week 1')).toBeInTheDocument())
+      expect(within(next).getByText(/Victor Wembanyama \(SAS\), Some Guy\. Scheduled games only\./)).toBeInTheDocument()
+    })
+
+    it('says so when every projected starter plays', async () => {
+      arrangeNba(
+        unscored({
+          firstWeek: { week: 1, startDate: '2026-10-20', startersWithoutGame: { week: 1, mine: [], countByRoster: {} } },
+        }),
+      )
+      renderHome()
+      expect(await screen.findByText('All your projected starters play in week 1.')).toBeInTheDocument()
+    })
+
+    it('says the schedule is not loaded when startersWithoutGame is null', async () => {
+      arrangeNba(unscored())
+      renderHome()
+      expect(await screen.findByText("The week 1 schedule isn't loaded yet.")).toBeInTheDocument()
+    })
+
+    it('says nothing about the schedule when strength is unavailable (no lineup, no starters)', async () => {
+      arrangeNba(
+        unscored({
+          strength: strength({ available: false, reason: 'raw', reasonCode: 'PROJECTIONS_NOT_LOADED', top: [], me: null, favorite: null, teamLabels: [] }),
+        }),
+      )
+      renderHome()
+      await waitFor(() => section('Projected strength'))
+      expect(screen.queryByText(/schedule isn't loaded/)).toBeNull()
+      expect(screen.queryByText(/projected starters/)).toBeNull()
+    })
+
+    it('says nothing when the server has no idle-starter answer for the caller (mine null)', async () => {
+      arrangeNba(
+        unscored({
+          firstWeek: { week: 1, startDate: '2026-10-20', startersWithoutGame: { week: 1, mine: null, countByRoster: {} } },
+        }),
+      )
+      renderHome()
+      await waitFor(() => section('Projected strength'))
+      expect(screen.queryByText(/All your projected starters/)).toBeNull()
+      expect(screen.queryByText(/schedule isn't loaded/)).toBeNull()
+    })
+
+    it('shows no grades block and no games note to a reader with no roster', async () => {
+      arrangeNba(unscored(), { me: null })
+      renderHome()
+      await waitFor(() => section('Projected strength'))
+      expect(heading('Draft grades')).toBeNull()
+      expect(screen.queryByText(/projected starters/)).toBeNull()
+    })
+  })
+
+  describe('while season-start loads or fails', () => {
+    it('holds back last season\'s blocks until season-start resolves', async () => {
+      let release: (v: unknown) => void = () => {}
+      arrange({ seasonStart: () => new Promise((r) => (release = r)) })
+      renderHome()
+      await screen.findByText('6th')
+      expect(heading('Latest matchup')).toBeNull()
+      expect(heading('Power rankings')).toBeNull()
+      expect(heading('Awards')).toBeNull()
+      await act(async () => release(seasonStart()))
+      await waitFor(() => section('Latest matchup'))
+      expect(section('Power rankings')).toBeInTheDocument()
+    })
+
+    it('falls back to today\'s layout on an error', async () => {
+      arrange({ seasonStart: () => Promise.reject(new Error('boom')) })
+      renderHome()
+      await waitFor(() => section('Latest matchup'))
+      expect(section('Power rankings')).toBeInTheDocument()
+      expect(section('Awards')).toBeInTheDocument()
+      expect(section('Standings')).toBeInTheDocument()
+    })
+  })
+
+  describe('PRE_DRAFT, IN_SEASON and COMPLETE', () => {
+    const headings = () =>
+      screen
+        .getAllByRole('heading', { level: 2 })
+        .map((h) => h.textContent)
+        .sort()
+
+    it('IN_SEASON keeps exactly the blocks the page had before spec 030', async () => {
+      arrange()
+      renderHome()
+      await waitFor(() => section('Latest matchup'))
+      await waitFor(() => section('Awards'))
+      expect(headings()).toEqual(['Awards', 'Latest matchup', 'Next opponent', 'Power rankings', 'Standings', 'Your season'])
+    })
+
+    it('COMPLETE renders the same blocks as IN_SEASON', async () => {
+      arrange({ seasonStart: () => Promise.resolve(seasonStart({ state: 'COMPLETE' })) })
+      renderHome()
+      await waitFor(() => section('Awards'))
+      expect(headings()).toEqual(['Awards', 'Latest matchup', 'Next opponent', 'Power rankings', 'Standings', 'Your season'])
+    })
+
+    it('PRE_DRAFT shows the draft block and no matchup', async () => {
+      arrange({
+        drafts: () => Promise.resolve([draft({ status: 'pre_draft' })]),
+        history: () => Promise.resolve(history([])),
+        seasonStart: () => Promise.resolve(seasonStart({ state: 'PRE_DRAFT' })),
+      })
+      renderHome()
+      await waitFor(() => section('Draft'))
+      expect(heading('Latest matchup')).toBeNull()
+      expect(heading('Projected strength')).toBeNull()
+    })
+
+    it('ignores the draft status once season-start has spoken', async () => {
+      // The draft row says "not complete", but the state says the draft is done and games are on.
+      arrange({
+        drafts: () => Promise.resolve([draft({ status: 'drafting' })]),
+        seasonStart: () => Promise.resolve(seasonStart({ state: 'IN_SEASON' })),
+      })
+      renderHome()
+      await waitFor(() => section('Latest matchup'))
+    })
+  })
+
+  describe('IN_SEASON draft grades summary', () => {
+    const grades = (over = {}) => ({
+      best: { manager: 'popsharky', avatarId: null, grade: 'A', rank: 1 },
+      worst: { manager: 'kieriskash', avatarId: null, grade: 'D', rank: 12 },
+      gradesEarly: true,
+      earlyThresholdWeeks: 4,
+      ...over,
+    })
+
+    it('shows best and worst with the early badge and a link to the draft board', async () => {
+      arrange({ seasonStart: () => Promise.resolve(seasonStart({ draft: { sleeperDraftId: 'D7', grades: grades() } })) })
+      renderHome()
+      const block = await waitFor(() => section('Draft grades'))
+      expect(within(block).getByText('popsharky')).toBeInTheDocument()
+      expect(within(block).getByText('A')).toBeInTheDocument()
+      expect(within(block).getByText('kieriskash')).toBeInTheDocument()
+      expect(within(block).getByText('D')).toBeInTheDocument()
+      expect(within(block).getByText(/early/)).toBeInTheDocument()
+      expect(within(block).getByRole('link', { name: 'Draft board and grades' })).toHaveAttribute('href', '/drafts/D7/board')
+    })
+
+    it('omits the early badge once grades are settled', async () => {
+      arrange({
+        seasonStart: () => Promise.resolve(seasonStart({ draft: { sleeperDraftId: 'D7', grades: grades({ gradesEarly: false }) } })),
+      })
+      renderHome()
+      const block = await waitFor(() => section('Draft grades'))
+      expect(within(block).queryByText(/early/)).toBeNull()
+    })
+
+    it('shows no grades block when grades are null, and is the only IN_SEASON addition when present', async () => {
+      arrange()
+      renderHome()
+      await waitFor(() => section('Awards'))
+      expect(heading('Draft grades')).toBeNull()
+    })
   })
 })

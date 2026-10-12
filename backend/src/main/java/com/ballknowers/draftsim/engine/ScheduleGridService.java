@@ -157,6 +157,39 @@ public class ScheduleGridService {
                 lastLeagueWeek, seasonOver, weeks, playoff, teams, new Excluded(postponed, canceled, exhibition));
     }
 
+    /**
+     * Of these NBA team codes, the ones with NO counted game in {@code week} (specs/030 plan review S5).
+     *
+     * <p>This is the number that matters under one-credited-game: Sleeper credits one game per starter per
+     * week (540/540), so a starter whose team plays 4 times is worth no more than one whose team plays
+     * once, but a starter whose team does not play at all scores nothing. A games count per roster would
+     * invite the "more games, more points" reading the schedule grid's old premise got wrong.
+     *
+     * <p>Pure: the grid {@link Result} is an argument. A null code is skipped (an unsigned player has no
+     * team to look up). A code the grid has never seen has no counted game all season (a franchise that
+     * only plays exhibitions, or a code that is not an NBA team) and is returned as without a game.
+     *
+     * @return empty when the schedule is unavailable or does not hold {@code week}: "not loaded" is a
+     *         different answer from "everyone plays", and the caller must be able to tell them apart
+     */
+    static Optional<java.util.Set<String>> teamsWithoutGame(Result grid, int week, java.util.Collection<String> teams) {
+        if (grid == null || !grid.available()) return Optional.empty();
+        int index = -1;
+        for (int i = 0; i < grid.weeks().size(); i++) {
+            if (grid.weeks().get(i).week() == week) { index = i; break; }
+        }
+        if (index < 0) return Optional.empty();
+        Map<String, int[]> byTeam = new java.util.HashMap<>();
+        for (Team t : grid.teams()) byTeam.put(t.team(), t.games());
+        java.util.Set<String> idle = new TreeSet<>();
+        for (String code : teams) {
+            if (code == null) continue;
+            int[] games = byTeam.get(code);
+            if (games == null || games[index] == 0) idle.add(code);
+        }
+        return Optional.of(idle);
+    }
+
     private static boolean isExhibitionSide(String team, Map<String, Integer> seasonGames, double floor) {
         return team != null && seasonGames.getOrDefault(team, 0) < floor;
     }

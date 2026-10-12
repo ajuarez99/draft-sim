@@ -1470,6 +1470,8 @@ export type AnalysisLineupPlayer = {
   points: number
   /** Sleeper's tag as of the last player ingest: "IR", "Out", "Questionable"... */
   injuryStatus: string | null
+  /** In the roster's reserve (IR+) slot. Basketball only; always false for football. A starter with this set is day-to-day or untagged. */
+  onReserve: boolean
 }
 
 export type AnalysisRosterProjection = {
@@ -1495,6 +1497,8 @@ export type AnalysisRosterProjection = {
   byWeek: AnalysisWeekTotal[]
   /** Rostered players with no projection in the window: IR, Out, PUP. */
   missing: number
+  /** Rostered players tagged Out, IR or Sus, set to 0 wherever they sit (basketball). Always 0 for football. They sit in `bench` with slot "OUT" at 0. */
+  unavailable: number
 }
 
 export type AnalysisWeekTotal = {
@@ -1504,11 +1508,37 @@ export type AnalysisWeekTotal = {
   rank: number
 }
 
+/** Why projections are unavailable, as a code; `reason` stays an English sentence (spec 030). */
+export type ProjectionReasonCode =
+  | 'NOT_BUILT_FOR_SPORT'
+  | 'PROJECTIONS_NOT_LOADED'
+  | 'SCORING_NOT_LOADED'
+  | 'STRENGTH_FAILED'
+  | 'ROSTERS_EMPTY'
+  | 'UNSUPPORTED_SLOTS'
+  | 'NO_PLAYOFF_WEEK_START'
+  | 'SEASON_OVER'
+/** Football totals are the rest of the season; basketball totals are one projected game per starter, per week. */
+export type ProjectionUnit = 'REST_OF_SEASON' | 'PER_WEEK'
+export type ProjectionProvenance = {
+  source: string | null
+  sourceModifiedAt: string | null
+  fetchedAt: string | null
+}
+
 export type AnalysisProjections = {
   available: boolean
   reason: string | null
+  reasonCode: ProjectionReasonCode | null
   positionGroups: string[]
   rosters: AnalysisRosterProjection[]
+  unit: ProjectionUnit
+  basisNote: 'ONE_AVERAGE_GAME_PER_STARTER' | null
+  provenance: ProjectionProvenance | null
+  /** Scored stat keys no stored projection line carries ([] for football). Never hard-coded client-side. */
+  unprojectedCategories: string[]
+  /** draftsim.preseason.stale-after-days: older than this and the page says how old the projections are. */
+  staleAfterDays: number
 }
 
 /**
@@ -2902,3 +2932,95 @@ export type NextMatchup = {
 }
 export const getNextMatchup = (id: string) =>
   apiFetch(`/api/leagues/${id}/next-matchup`).then(json<NextMatchup>)
+
+// Mirrors SeasonStartService's records (spec 030, contracts/wire-final.md section 3), field for field.
+export type SeasonState = 'PRE_DRAFT' | 'DRAFTED_UNSCORED' | 'IN_SEASON' | 'COMPLETE'
+
+export type IdleStarter = { sleeperPlayerId: string; name: string; team: string | null }
+export type StartersWithoutGame = {
+  week: number
+  /**
+   * The caller's projected starters with no game that week; [] when they all play. Null when the caller
+   * has no roster or no projected starters (amended after code review): say nothing in that case.
+   */
+  mine: IdleStarter[] | null
+  /** rosterId (as a JSON key) to how many of its projected starters have no game. */
+  countByRoster: Record<string, number>
+}
+export type FirstWeek = {
+  week: number | null
+  /** "YYYY-MM-DD" or null. Format by splitting the string; new Date(str) shifts a day in US time zones. */
+  startDate: string | null
+  /** Null for football, when the schedule for that week is not loaded, or when strength is unavailable. */
+  startersWithoutGame: StartersWithoutGame | null
+}
+
+export type SeasonLeader = {
+  rosterId: number
+  teamName: string | null
+  username: string | null
+  avatarId: string | null
+  total: number
+}
+export type SeasonFavorite = {
+  leaders: SeasonLeader[]
+  tie: boolean
+  leaderTotal: number
+  /** Null (with marginPoints) when every roster is a leader. */
+  nextTotal: number | null
+  /** Always pts/week, 1 decimal, even where the totals are rest-of-season. */
+  marginPoints: number | null
+  /** Also null when the next roster's total is zero or less (an infinite gap). */
+  marginPct: number | null
+  /** draftsim.preseason.favorite-min-gap-pct, hand-set: gaps under it are called a tie. */
+  minGapPct: number
+}
+export type SeasonStrength = {
+  available: boolean
+  reason: string | null
+  reasonCode: ProjectionReasonCode | null
+  unit: ProjectionUnit
+  /** The first three rosters; their starters, bench and byWeek are []. */
+  top: AnalysisRosterProjection[]
+  /** The caller's row when it is not in `top`. */
+  me: AnalysisRosterProjection | null
+  teams: number
+  favorite: SeasonFavorite | null
+  provenance: ProjectionProvenance | null
+  unprojectedCategories: string[]
+  basisNote: 'ONE_AVERAGE_GAME_PER_STARTER' | null
+  staleAfterDays: number
+  /** Every roster's display name (team name, else username, else "Roster N"); [] when unavailable. */
+  teamLabels: AnalysisTeamLabel[]
+}
+
+export type TeamGradeLite = {
+  manager: string | null
+  avatarId: string | null
+  grade: string | null
+  rank: number | null
+}
+export type DraftGradeSummary = {
+  best: TeamGradeLite
+  worst: TeamGradeLite
+  gradesEarly: boolean
+  earlyThresholdWeeks: number
+}
+export type SeasonDraft = {
+  sleeperDraftId: string | null
+  /** Non-null only IN_SEASON, and only when the grades are available. */
+  grades: DraftGradeSummary | null
+}
+
+export type SeasonStart = {
+  sport: Sport
+  season: number
+  state: SeasonState
+  /** Non-null only in DRAFTED_UNSCORED. */
+  firstWeek: FirstWeek | null
+  /** Non-null only in DRAFTED_UNSCORED. */
+  strength: SeasonStrength | null
+  draft: SeasonDraft
+}
+export const getSeasonStart = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/season-start`).then(json<SeasonStart>)

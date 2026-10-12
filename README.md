@@ -34,6 +34,16 @@ Built so far:
   and their likely next pick, re-projected in the background after every pick. A position
   scarcity meter (starter pool = the board's top teams × starters) and a per-manager
   "Room read" sit beside it.
+- **The season after the draft** (specs/030-post-draft-season-view). Between a completed draft
+  and the first *final* scored week, the league home leads with this season. It drops last
+  season's matchup, power and award blocks; shows the first-games date; ranks every roster by
+  projected strength (best legal lineup, league scoring, IR players left out); and names a
+  projected favorite only when the gap beats a hand-set, ARBITRARY 3% (otherwise it says "dead
+  heat"). Basketball projections are Sleeper/RotoWire per-game lines, scored per league, one
+  game per starter per week. That's a stated stand-in that reads about 15% low, not a fitted
+  correction. Their accuracy for these leagues is unmeasured. The Analysis page ("Team
+  strength") is now offered for basketball. There are no odds yet: preseason title odds are
+  spec 030's Story 5 follow-up.
 - **Player stats while you draft** (specs/023-draft-room-player-stats). Basketball only. The
   live room's player sheet switches between **Tiers** and **Stats**. Stats is a table of the
   undrafted pool (the board's top 400) with last season's real numbers from the Player stats
