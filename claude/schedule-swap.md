@@ -16,6 +16,13 @@ opponent schedules, with luck and strength of schedule.
 - The LUCKIEST/UNLUCKIEST superlatives (`SeasonSuperlativesService.Kind`, line
   84) already rest on the all-play gap.
 
+> **Amended 2026-10-12 (spec 031 review F1/F11), measured:** "schedule luck = actual wins − mean
+> wins across all N schedules" is **not** a second luck measure. With no byes it's exactly
+> (N−1)/N × the existing wins-above-expected (all 7 ingested leagues, error ≤ 3.6e-15). Spec 031
+> drops it and shows the matrix itself, plus each schedule's average win rate. Acceptance 2
+> ("wins + losses + ties = regular-season weeks") holds only without byes: with a bye, a cell
+> totals the column team's games.
+
 ## Proposed design
 
 An N×N matrix. Cell (row = team T, column = schedule of team S) is T's W-L if T

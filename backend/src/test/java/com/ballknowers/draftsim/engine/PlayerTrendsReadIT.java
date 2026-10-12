@@ -16,7 +16,11 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,6 +53,15 @@ class PlayerTrendsReadIT {
     @Autowired private LeagueRepository leagues;
     @Autowired private ScheduleGridService grid;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private com.ballknowers.draftsim.config.PlayerTrendsProperties props;
+
+    // NOTE: a second copy of PlayerTrendsService.cutoverMet (private there, not exposed), counting raw TEAM_ rows;
+    // the service counts distinct games after dropping configured Cup finals. They agree while 2026 has no games.
+    private static boolean cutoverMet(Map<String, Integer> teamGames, int minGames) {
+        if (teamGames.isEmpty()) return false;
+        long reached = teamGames.values().stream().filter(c -> c >= minGames).count();
+        return reached * 2 >= teamGames.size();
+    }
 
     private LeagueRepository.LeagueRow league(String sleeperId) {
         Optional<LeagueRepository.LeagueRow> l = leagues.bySleeperId(sleeperId);
@@ -107,8 +120,10 @@ class PlayerTrendsReadIT {
         // 4
         for (TrendRow r : t.risers()) assertEquals("RISER", r.role());
         for (TrendRow r : t.fallers()) assertEquals("FALLER", r.role());
-        assertTrue(t.risers().size() <= 10 && t.risersTotal() >= t.risers().size());
-        assertTrue(t.fallers().size() <= 10 && t.fallersTotal() >= t.fallers().size());
+        // B2: with ownership known (rosters loaded) each list is the top n of owned AND of unowned, so up to 2n
+        int listCap = t.streamingReason() == null ? 2 * props.listSize() : props.listSize();
+        assertTrue(t.risers().size() <= listCap && t.risersTotal() >= t.risers().size());
+        assertTrue(t.fallers().size() <= listCap && t.fallersTotal() >= t.fallers().size());
         // 5: nobody stale, nobody teamless
         for (TrendRow r : t.risers()) assertNotNull(r.team());
         for (TrendRow r : all(t)) assertNotNull(r.team(), r.name());
@@ -170,14 +185,48 @@ class PlayerTrendsReadIT {
         LeagueRepository.LeagueRow l = league(NBA_2026);
         PlayerTrends t = service.read(l, null);
         assertTrue(t.available());
-        assertTrue(t.rolesFallback());
-        assertTrue(t.streamingFallback());
-        assertEquals(2025, t.rolesSeason());
-        assertEquals(2025, t.streamingSeason());
-        assertEquals("NOT_DRAFTED", t.streamingReason(), "the local league is pre_draft until 2026-10-10");
+        // Season fallback holds only while 2026 is below the cutover: half the teams with at least N games.
+        Map<String, Integer> teamGames = new HashMap<>();
+        jdbc.query("""
+                select sleeper_player_id, count(*) from player_game
+                where sport = 'nba' and season = 2026 and left(sleeper_player_id, 5) = 'TEAM_'
+                  and length(sleeper_player_id) > 5 group by 1
+                """, rs -> { teamGames.put(rs.getString(1), rs.getInt(2)); });
+        boolean streamingCutover = cutoverMet(teamGames, props.formMinGames());
+        boolean rolesCutover = cutoverMet(teamGames, props.minSeasonGames());
+        assertEquals(!rolesCutover, t.rolesFallback());
+        assertEquals(!streamingCutover, t.streamingFallback());
+        assertEquals(rolesCutover ? 2026 : 2025, t.rolesSeason());
+        assertEquals(streamingCutover ? 2026 : 2025, t.streamingSeason());
+
+        // Streaming reason depends on the league's real status, read from the database.
+        String status = jdbc.queryForObject("select status from league where id = ?", String.class, l.id());
+        if ("pre_draft".equals(status) || "drafting".equals(status)) {
+            assertEquals("NOT_DRAFTED", t.streamingReason());
+            assertTrue(t.streaming().isEmpty());
+        } else {
+            Integer loaded = jdbc.queryForObject(
+                    "select count(*) from roster_season where league_id = ? and players is not null", Integer.class, l.id());
+            Integer total = jdbc.queryForObject("select count(*) from roster_season where league_id = ?", Integer.class, l.id());
+            if (total > 0 && loaded.equals(total)) {
+                assertNull(t.streamingReason(), "every roster has players, so ownership is known");
+            } else {
+                assertTrue(t.streamingReason() == null || "ROSTERS_NOT_LOADED".equals(t.streamingReason()),
+                        "status " + status + " gave streamingReason " + t.streamingReason());
+            }
+            if (t.streamingReason() == null) {
+                Set<String> rostered = new HashSet<>();
+                jdbc.query("select unnest(players) from roster_season where league_id = ? and players is not null",
+                        rs -> { rostered.add(rs.getString(1)); }, l.id());
+                for (TrendRow r : t.streaming()) {
+                    assertFalse(rostered.contains(r.sleeperPlayerId()), "streaming row is rostered: " + r.name());
+                    assertEquals(Boolean.FALSE, r.rostered(), r.name());
+                }
+            }
+        }
         assertNotNull(t.oneGameCredit(), "measured from the previous season's stored weeks");
         assertEquals(2025, t.oneGameCredit().seasonMeasured());
-        commonInvariants(t, 2025);
+        commonInvariants(t, t.rolesSeason());
 
         // 6: games this week equal the grid cell for that team at the current week NUMBER
         Optional<ScheduleGridService.Result> g = grid.forLeague(NBA_2026);

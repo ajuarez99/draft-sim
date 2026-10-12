@@ -200,7 +200,11 @@ class LeagueAnalyticsContractTest {
                                 0.45, 1.0, 0.55, -12.4,
                                 ExpectedWinsService.LuckSource.SWING_WEEKS,
                                 List.of(new ExpectedWinsService.SwingWeek(1, true, 146.16, 7, "She Hocken")),
-                                new ExpectedWinsService.WinLossTie(5, 7, 0), new ExpectedWinsService.WinLossTie(0, 1, 0))))));
+                                new ExpectedWinsService.WinLossTie(5, 7, 0), new ExpectedWinsService.WinLossTie(0, 1, 0))),
+                        new ExpectedWinsService.ScheduleSwap(List.of(6, 7),
+                                List.of(List.of(new ExpectedWinsService.WinLossTie(1, 0, 0), new ExpectedWinsService.WinLossTie(0, 1, 0)),
+                                        List.of(new ExpectedWinsService.WinLossTie(1, 0, 0), new ExpectedWinsService.WinLossTie(0, 0, 1))),
+                                List.of(0.75, 0.25)))));
 
         Map<String, Object> body = bodyOf(new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER));
         assertEquals(130.1, body.get("leagueAveragePpg"));
@@ -214,6 +218,14 @@ class LeagueAnalyticsContractTest {
         assertEquals("SWING_WEEKS", team.get("luckSource"));
         assertEquals(Map.of("wins", 5, "losses", 7, "ties", 0), team.get("allPlay"));
         assertEquals(Map.of("wins", 0, "losses", 1, "ties", 0), team.get("median"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> swap = (Map<String, Object>) body.get("scheduleSwap");
+        assertEquals(List.of(6, 7), swap.get("rosterIds"));
+        @SuppressWarnings("unchecked")
+        List<List<Map<String, Object>>> cells = (List<List<Map<String, Object>>>) swap.get("cells");
+        assertEquals(Map.of("wins", 0, "losses", 0, "ties", 1), cells.get(1).get(1));
+        assertEquals(List.of(0.75, 0.25), swap.get("difficultyWinRate"));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> swing = ((List<Map<String, Object>>) team.get("swingWeeks")).getFirst();
@@ -235,13 +247,15 @@ class LeagueAnalyticsContractTest {
                                 2.4, 2.0, -0.4, 5.1,
                                 ExpectedWinsService.LuckSource.CONSISTENT_OPPONENT_SCORING,
                                 List.of(),
-                                new ExpectedWinsService.WinLossTie(1, 2, 0), new ExpectedWinsService.WinLossTie(1, 1, 1))))));
+                                new ExpectedWinsService.WinLossTie(1, 2, 0), new ExpectedWinsService.WinLossTie(1, 1, 1))), null)));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> team = ((List<Map<String, Object>>) bodyOf(
                 new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER)).get("teams")).getFirst();
 
         assertEquals("CONSISTENT_OPPONENT_SCORING", team.get("luckSource"));
+        assertTrue(bodyOf(new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER)).containsKey("scheduleSwap"));
+        assertNull(bodyOf(new ExpectedWinsController(expectedWins, membership).expectedWins(LEAGUE, USER)).get("scheduleSwap"));
         assertEquals(List.of(), team.get("swingWeeks"));
     }
 
