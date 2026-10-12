@@ -161,3 +161,16 @@ Backend restarted on 8084 after the fixes:
 
 R2's unknown-playoff-end path and R3's disabled buttons are covered by unit/Vitest
 cases only. No NBA league here has an unknown playoff end, so there was no live case.
+
+
+## T041: dated post-draft next-opponent check (production, 2026-10-12)
+
+**Run**, two days after the 10-10 NBA draft, in production (`www.ballknowers.co`), signed in as
+`popsharky` (roster 1).
+- NBA league home shows **"Next opponent: Week 1 against LeTikka Masala (jstrobe)"**.
+- Sleeper `GET /v1/league/1339351318115946496/matchups/1` returns 12 rows. Roster 1 is in
+  matchup_id 1 with **roster 5**, owned by **jstrobe**, team name "LeTikka Masala". **Same
+  partner.** ✅
+- `league_matchup` itself wasn't queried, because the production DB isn't reachable from here.
+  The endpoint can only name a paired opponent from stored week-1 rows, so those rows exist. N12
+  (stale pre-paired weeks) didn't come up.
