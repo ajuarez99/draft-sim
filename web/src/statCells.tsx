@@ -1,6 +1,6 @@
 import type { LeaderboardRow, StatLeaderboard as Board } from './api'
 import { formatValue, type StatColumn, type StatMode } from './statLeaderboard'
-import { longDate, reasonSentence, reasonShort } from './statCopy'
+import { longDate, reasonSentence, reasonShort, type MissingReason } from './statCopy'
 
 /**
  * One leaderboard cell and the copy behind it, shared by the stat leaderboard page and the
@@ -39,6 +39,31 @@ function noPickText(d: Board): { short: string; long: string } {
   }
 }
 
+/** The columns whose value is a rank or value-over-replacement: blank for an unqualified row. */
+const isRankCol = (col: StatColumn) => col.format === 'rank' || col.id === 'rankMove' || col.id === 'vor'
+
+/**
+ * Why `col` has no number for `row` in `mode` (specs/032 R15). The one place the answer lives:
+ * `Cell` words it for the table and the calculator words it for its excluded list, so the two
+ * cannot disagree. Only meant to be called when `col.value(row, mode)` is null.
+ *
+ * `fp` (FP/G) is deliberately NOT qualification-gated (F3): it is computed for every row, so a
+ * null there is UNKNOWN_NULL rather than "not qualified".
+ */
+export function missingReason(col: StatColumn, row: LeaderboardRow, mode: StatMode): MissingReason {
+  // A zero-game row has no figure of any kind, so say that before anything column-specific; otherwise
+  // FP/G or game score on such a row would fall through to UNKNOWN_NULL (Phase 2 review).
+  if (row.stats.games === 0) return 'NO_GAMES'
+  if (col.rate) return col.rate(row).reason ?? 'UNKNOWN_NULL'
+  if (col.counting && mode === 'per36' && row.stats.per36 == null) return 'NO_MINUTES'
+  if (isRankCol(col)) {
+    if (!row.qualified) return row.reason ?? 'NOT_QUALIFIED'
+    if (col.id === 'vor') return 'NO_REPLACEMENT_LEVEL'
+    if (col.id === 'positionRank') return 'NO_POSITION'
+  }
+  return 'UNKNOWN_NULL'
+}
+
 export function Cell({ col, row, d, mode }: { col: StatColumn; row: LeaderboardRow; d: Board; mode: StatMode }) {
   const v = col.value(row, mode)
   if (v != null) {
@@ -64,7 +89,7 @@ export function Cell({ col, row, d, mode }: { col: StatColumn; row: LeaderboardR
     )
   }
   if (col.rate) {
-    const code = col.rate(row).reason ?? 'UNAVAILABLE'
+    const code = missingReason(col, row, mode)
     const s = reasonSentence(code)
     return <span className="pp-rate-none" title={s} aria-label={s}>{reasonShort(code)}</span>
   }
@@ -86,10 +111,11 @@ export function Cell({ col, row, d, mode }: { col: StatColumn; row: LeaderboardR
           : noPickText(d).long
     return <span className="pp-rate-none" title={s} aria-label={s}>{DASH}</span>
   }
-  if (col.counting && mode === 'per36') {
+  const code = missingReason(col, row, mode)
+  if (col.counting && mode === 'per36' && code === 'NO_MINUTES') {
     const s = reasonSentence('NO_MINUTES')
     return <span className="pp-rate-none" title={s} aria-label={s}>{reasonShort('NO_MINUTES')}</span>
   }
-  const s = row.reason ? reasonSentence(row.reason, { date: row.stats.lastGameDate }) : reasonSentence('NOT_QUALIFIED')
+  const s = reasonSentence(code, { date: row.stats.lastGameDate })
   return <span className="pp-rate-none" title={s} aria-label={s}>{DASH}</span>
 }

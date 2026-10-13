@@ -70,6 +70,12 @@ Built so far:
     players.
   - **Player stats leaderboard:** stat leaders, value over a replacement player, and draft cost
     against Draft Grades.
+  - **Stat calculator** (specs/032-stat-calculator): build your own stat from the leaderboard's
+    columns, such as `(USG + VOR) ÷ TO`, and see the top players on a ranked bar chart (or a
+    scatter of any two stats) for any season, window and mode. Three more charts appear only when they fit: **Spread** (where every player sits, optionally split by position), **Change** (season vs last 10, last 5 or last season, recent minus older), and **Breakdown** (what each term of a sum adds). Raw values by default, with a
+    "standardize inputs" switch, and every formula can be shared as a link or saved in this
+    browser. "VOR" here is this league's fantasy value over replacement, **not** Basketball
+    Reference's VORP, which the app doesn't compute.
   - **Nightly report:** still to come, after opening night.
 - **Best nights, beside best weeks** (specs/005-daily-weekly-top-players).
   Basketball only, and deliberately: an NBA player plays three or four games a

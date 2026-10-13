@@ -885,3 +885,25 @@ Two more from the same verification:
 - **Sleeper reports an NBA league as `in_season` the day after its draft, ten days before
   tip-off** (`leg: 1`, `last_scored_leg: null`). Its status can't tell you the preseason
   window. Stored final weeks (`ScoredWeeks.latestFinal`) can.
+
+## 41. Standardized inputs break every operator that isn't + or −, not just the one a review names
+
+**What happened (2026-10-13, spec 032).** The plan review found that dividing by a z-scored stat
+ranks players by how close they sit to the average, so the plan blocked `÷` by a stat under
+"standardize inputs". The code review then measured the same failure for `×`. Two below-average
+players have negative z-scores, their product is a large positive number, and the "Efficient
+volume" preset ranked the worst scorer first. Both reviews read the same R7. The first fixed the
+operator it was shown, and nobody asked which *other* operators assume their inputs are positive.
+
+**When a transform changes an input's sign or scale (z-scores, differences, logs), check every
+operator that consumes it, not just the one in the example.** Sums and differences of z-scores
+are meaningful. Products and ratios aren't. The ordering test (bug class 1) is what caught it.
+
+Two more from the same live pass:
+
+- **A `<select>` is as wide as its longest option.** One 80-character definition made a picker
+  549 px wide and pushed the phone layout out to 565 px. jsdom has no layout, so 2,017 green tests
+  couldn't see it. Measuring `scrollWidth` against `innerWidth` at 375 px in a real browser did.
+- **Live checks need a comparison.** The calculator's 565 px only read as a bug next to the
+  leaderboard measuring 375 px on the same emulated device. Before blaming the emulator, measure
+  a known-good page.

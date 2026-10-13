@@ -12,6 +12,7 @@ import {
   type StatLeaderboard as Board,
 } from '../api'
 import { Cell, DASH, GRADES_REASONS, adpSentence } from '../statCells'
+import { FilterBar, MODES, PlayerCell, SeasonPicker, Segmented, StatsPagesNav, WINDOWS } from '../components/statControls'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import {
   COLUMNS,
@@ -20,18 +21,17 @@ import {
   LEADERS_SIZE,
   NO_FILTERS,
   applyFilters,
+  boardContext,
   categoryLeaders,
   formatValue,
   columnLabel,
   groupDef,
-  hasKnownOwnership,
   leaderRows as leadersOf,
   ownershipOf,
   qualificationApplies,
   resolveSort,
   sortRows,
   toggleSort,
-  type Availability,
   type ColumnGroup,
   type Filters,
   type SortState,
@@ -41,7 +41,6 @@ import {
 import {
   fallbackNote,
   longDate,
-  ownershipAsOf,
   qualificationRule,
   reasonSentence,
   seasonLabel,
@@ -56,17 +55,6 @@ import { useBlock } from '../useBlock'
  * itself never scrolls sideways. Every cell that cannot show a number says why (or carries the
  * reason in its tooltip) -- never a blank, never a 0 standing in for "unknown".
  */
-
-const WINDOWS: { kind: PlayerWindowKind; label: string }[] = [
-  { kind: 'SEASON', label: 'Season' },
-  { kind: 'LAST_10', label: 'Last 10' },
-  { kind: 'LAST_5', label: 'Last 5' },
-]
-const MODES: { kind: StatMode; label: string }[] = [
-  { kind: 'perGame', label: 'Per game' },
-  { kind: 'totals', label: 'Totals' },
-  { kind: 'per36', label: 'Per 36' },
-]
 
 function OwnerCell({ o }: { o: PlayerOwnership }) {
   switch (o.state) {
@@ -84,25 +72,6 @@ function OwnerCell({ o }: { o: PlayerOwnership }) {
     case 'UNAVAILABLE':
       return <span className="muted small" title={reasonSentence('UNAVAILABLE')}>{DASH}</span>
   }
-}
-
-function PlayerCell({ row, d, leagueId }: { row: LeaderboardRow; d: Board; leagueId: string }) {
-  const name = row.name ?? 'Unknown player'
-  return (
-    <>
-      <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={row.sleeperPlayerId} sport={d.sport}>
-        {name}
-      </PlayerLink>
-      <span className="sl-sub muted small">
-        {[row.positions.join('/'), row.team].filter(Boolean).join(' · ') || DASH}
-      </span>
-      {!row.qualified && row.reason && (
-        <span className="sl-sub sl-unranked small">
-          {reasonSentence(row.reason, { date: row.stats.lastGameDate })}
-        </span>
-      )}
-    </>
-  )
 }
 
 function DraftNotes({ d }: { d: Board }) {
@@ -166,83 +135,6 @@ function SortHeader({ col, sort, onSort, label }: { col: StatColumn; sort: SortS
   )
 }
 
-function Segmented<T extends string>({
-  label, value, options, onChange,
-}: { label: string; value: T; options: { kind: T; label: string }[]; onChange: (k: T) => void }) {
-  return (
-    <div className="segmented sm" role="group" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.kind}
-          type="button"
-          className={`segment${o.kind === value ? ' on' : ''}`}
-          aria-pressed={o.kind === value}
-          onClick={() => onChange(o.kind)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-const availKey = (a: Availability) => (a.kind === 'roster' ? `roster:${a.rosterId}` : a.kind)
-const parseAvail = (k: string): Availability =>
-  k.startsWith('roster:') ? { kind: 'roster', rosterId: Number(k.slice(7)) } : k === 'free' ? { kind: 'free' } : k === 'rostered' ? { kind: 'rostered' } : { kind: 'all' }
-
-function FilterBar({ rows, f, onChange, nowLabel }: { rows: LeaderboardRow[]; f: Filters; onChange: (f: Filters) => void; nowLabel: string | null }) {
-  const known = useMemo(() => hasKnownOwnership(rows), [rows])
-  const positions = useMemo(() => [...new Set(rows.flatMap((r) => r.positions))].sort(), [rows])
-  const teams = useMemo(() => [...new Set(rows.map((r) => r.team).filter((t): t is string => !!t))].sort(), [rows])
-  const rosters = useMemo(() => {
-    const m = new Map<number, string>()
-    for (const r of rows) {
-      const o = ownershipOf(r)
-      if (o.state === 'ROSTERED' && o.rosterId != null) {
-        m.set(o.rosterId, o.ownerName ?? `Roster ${o.rosterId}`)
-      }
-    }
-    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  }, [rows])
-  return (
-    <div className="sl-filters">
-      <label className="sl-field">
-        <span className="muted small">Position</span>
-        <select value={f.position ?? ''} onChange={(e) => onChange({ ...f, position: e.target.value || null })}>
-          <option value="">All</option>
-          {positions.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </label>
-      <label className="sl-field">
-        <span className="muted small">NBA team</span>
-        <select value={f.team ?? ''} onChange={(e) => onChange({ ...f, team: e.target.value || null })}>
-          <option value="">All</option>
-          {teams.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </label>
-      <label className="sl-field">
-        <span className="muted small">Availability</span>
-        <select
-          value={availKey(f.availability)}
-          onChange={(e) => onChange({ ...f, availability: parseAvail(e.target.value) })}
-          disabled={!known}
-          aria-describedby={known ? undefined : 'sl-avail-why'}
-        >
-          <option value="all">All players</option>
-          <option value="free">{nowLabel ? `Free agents (${nowLabel})` : 'Free agents'}</option>
-          <option value="rostered">{nowLabel ? `Rostered (${nowLabel})` : 'Rostered'}</option>
-          {rosters.map(([id, name]) => <option key={id} value={`roster:${id}`}>{`${name}’s roster`}</option>)}
-        </select>
-      </label>
-      {!known && (
-        <span id="sl-avail-why" className="muted small">
-          {nowLabel ? `Nobody is on a roster yet (${nowLabel}), so there is no ownership to filter by.` : 'Ownership isn’t known for this season, so there is nothing to filter by.'}
-        </span>
-      )}
-    </div>
-  )
-}
-
 function Leaders({ rows, d, leagueId }: { rows: LeaderboardRow[]; d: Board; leagueId: string }) {
   return (
     <section className="sl-leaders" aria-label="Stat leaders">
@@ -273,28 +165,6 @@ function Leaders({ rows, d, leagueId }: { rows: LeaderboardRow[]; d: Board; leag
   )
 }
 
-function SeasonPicker({ d, leagueId }: { d: Board; leagueId: string }) {
-  if (d.seasons.length === 0) return null
-  return (
-    <nav className="pp-seasons" aria-label="Season">
-      {d.seasons.map((o) => {
-        const here = o.sleeperLeagueId === leagueId
-        return (
-          <Link
-            key={o.sleeperLeagueId}
-            to={`/leagues/${encodeURIComponent(o.sleeperLeagueId)}/stats`}
-            className={`pp-season${here ? ' on' : ''}${o.hasGames ? '' : ' empty'}`}
-            aria-current={here ? 'page' : undefined}
-          >
-            {seasonLabel(o.season)}
-            {!o.hasGames && <span className="pp-season-note">no games yet</span>}
-          </Link>
-        )
-      })}
-    </nav>
-  )
-}
-
 export default function StatLeaderboard() {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
   const leagueId = sleeperLeagueId ?? ''
@@ -321,18 +191,11 @@ export default function StatLeaderboard() {
   if (block.status === 'error' && block.notFound) return <NotFound what="page" />
 
   // The league id of the season actually shown, so a player link opens the same season's page.
-  const shownLeagueId = d?.seasons.find((s) => s.season === d.season)?.sleeperLeagueId ?? leagueId
+  const { shownLeagueId, fellBack, nowLabel, asOf } = d
+    ? boardContext(d, leagueId)
+    : { shownLeagueId: leagueId, fellBack: false, nowLabel: null, asOf: null }
   const g = groupDef(group)
   const cols = g.columns
-  const fellBack = d?.requestedSeason != null
-  const nowLabel = d && fellBack ? `now ${seasonLabel(d.requestedSeason as number)}` : null
-  // On a fallback the owners come from the requested season's league (`currentOwnership`), read now.
-  const currentAsOf = fellBack ? (rows.find((r) => r.currentOwnership?.asOf)?.currentOwnership?.asOf ?? null) : null
-  const asOf = d
-    ? fellBack
-      ? ownershipAsOf(currentAsOf, d.requestedSeason as number)
-      : ownershipAsOf(d.ownershipAsOf, d.season)
-    : null
   const windowLabel = win === 'SEASON' ? null : (WINDOWS.find((w) => w.kind === win)?.label.toLowerCase() ?? null)
   const sortCol = COLUMNS[sort.col]
   const qualApplies = sortCol ? qualificationApplies(sortCol) : false
@@ -349,6 +212,9 @@ export default function StatLeaderboard() {
         title="Player stats"
         sub="Real stats, this league’s fantasy numbers and the draft, side by side."
       />
+
+      {/* specs/032 T018: the Leaderboard | Calculator switch. Links, so the View control's "Table" stays unambiguous. */}
+      {d && d.available && !d.reason && <StatsPagesNav leagueId={leagueId} current="leaderboard" />}
 
       {(block.status === 'loading' || block.status === 'idle') && (
         <p className="muted small" role="status">Loading…</p>
@@ -462,7 +328,7 @@ export default function StatLeaderboard() {
                     {shown.map((r) => (
                       <tr key={r.sleeperPlayerId}>
                         <th scope="row" className="sl-pin">
-                          <PlayerCell row={r} d={d} leagueId={shownLeagueId} />
+                          <PlayerCell row={r} sport={d.sport} leagueId={shownLeagueId} />
                         </th>
                         <td className="sl-owner"><OwnerCell o={ownershipOf(r)} /></td>
                         {cols.map((c) => (

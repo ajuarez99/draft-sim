@@ -108,6 +108,14 @@ describe('StatLeaderboard', () => {
     expect(order()).toEqual(['Ann Alpha', 'Bob Beta'])
   })
 
+  it('links to the calculator from a "Stats pages" nav, without a second Table button (specs/032 F13)', async () => {
+    await show()
+    const nav = screen.getByRole('navigation', { name: 'Stats pages' })
+    expect(within(nav).getByRole('link', { name: 'Leaderboard' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('link', { name: 'Calculator' })).toHaveAttribute('href', '/leagues/L25/stats/calculator')
+    expect(screen.getAllByRole('button', { name: 'Table' })).toHaveLength(1)
+  })
+
   it('states the ownership date', async () => {
     await show()
     expect(screen.getByText(/Ownership: End of 2025–26 regular season \(week 18\)/)).toBeInTheDocument()

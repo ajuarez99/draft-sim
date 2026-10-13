@@ -6000,3 +6000,115 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .ew-swap-actual { display: block; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ew-swap tfoot th { font-size: 11px; white-space: normal; min-width: 14ch; }
 .ew-swap-rate { font-weight: 600; }
+
+/* --- Stat calculator (specs/032) ---------------------------------------------
+   Reuses .sl-controls / .sl-field / .sl-wrap / .sl-table / .sl-pin from the leaderboard. The ranked
+   chart is HTML rows: bar length is |value| from a zero baseline and nothing else, one colour
+   (the player page's meter colour, --teal), the exact value printed beside each bar. The page
+   never scrolls sideways; the table scrolls inside .sl-wrap with the player column pinned. */
+.sc-pages { display: flex; gap: 8px; margin: 0 0 12px; }
+.sc-page { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
+.sc-page:hover { background: var(--row-hover); }
+.sc-page.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.sc-editor { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; margin: 0 0 10px; min-width: 0; }
+.sc-formula-field { flex: 1 1 280px; min-width: 0; }
+.sc-input, .sc-top input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 14px; min-width: 0; max-width: 100%; }
+.sc-top input { width: 72px; font-size: 13px; }
+.sc-editor select { max-width: 100%; }
+.sc-run { align-self: end; }
+.sc-error { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--down) 10%, var(--panel)); min-width: 0; }
+.sc-caret { margin: 4px 0 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--muted); overflow-x: auto; max-width: 100%; }
+.sc-readable { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 0 0 10px; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.sc-tag { font-size: 11px; font-weight: 500; color: var(--muted); }
+.sc-chip { padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; color: var(--muted); background: color-mix(in oklab, var(--muted) 18%, transparent); }
+.sc-notes { margin: 0 0 10px; display: grid; gap: 4px; }
+.sc-notes p, .sc-notes ul { margin: 0; }
+.sc-notes ul { padding-left: 18px; }
+.sc-warnings { margin: 0 0 10px; padding: 8px 12px 8px 28px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--fitted) 8%, var(--panel)); display: grid; gap: 4px; }
+.sc-chart { margin: 0; min-width: 0; }
+.sc-chart-title { margin: 0 0 10px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.sc-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; }
+.sc-bar-row { display: grid; grid-template-columns: 24px minmax(90px, 170px) minmax(0, 1fr) minmax(56px, auto); align-items: center; gap: 8px; min-width: 0; font-size: 13px; }
+.sc-bar-rank { text-align: right; font-variant-numeric: tabular-nums; }
+.sc-bar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-bar-track { position: relative; display: block; height: 14px; min-width: 0; }
+.sc-bar { position: absolute; top: 0; bottom: 0; background: var(--teal); border-radius: 0 4px 4px 0; }
+.sc-bar.neg { border-radius: 4px 0 0 4px; }
+.sc-bar-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.sc-bar-val { text-align: right; font-variant-numeric: tabular-nums; }
+.sc-bar-row:hover { background: var(--row-hover); }
+.sc-excluded-group { margin-top: 8px; }
+.sc-excluded-group p { margin: 0 0 2px; }
+.sc-excluded-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; }
+@media (max-width: 640px) {
+  .sc-bar-row { grid-template-columns: 20px minmax(0, 1fr) auto; grid-template-areas: 'rank name val' '. track track'; row-gap: 3px; }
+  .sc-bar-rank { grid-area: rank; }
+  .sc-bar-name { grid-area: name; }
+  .sc-bar-val { grid-area: val; }
+  .sc-bar-track { grid-area: track; }
+}
+.sc-scatter-box { position: relative; width: 100%; max-width: 100%; overflow: hidden; min-width: 0; }
+.sc-scatter-box svg { display: block; max-width: 100%; height: auto; }
+.sc-grid { stroke: var(--line); stroke-width: 1; opacity: 0.6; }
+.sc-axis { stroke: var(--muted); stroke-width: 1; }
+.sc-tick { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.sc-axis-label { fill: var(--text); font-size: 12px; }
+.sc-dot { cursor: pointer; outline: none; }
+.sc-hit { fill: transparent; }
+.sc-pt { fill: var(--teal); stroke: var(--panel); stroke-width: 2; fill-opacity: 0.9; }
+.sc-dot:hover .sc-pt, .sc-dot.on .sc-pt, .sc-dot:focus-visible .sc-pt { stroke: var(--text); fill-opacity: 1; }
+.sc-tip { position: absolute; pointer-events: none; display: grid; gap: 2px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); box-sizing: border-box; overflow-wrap: anywhere; }
+.sc-scatter-note { margin: 6px 0 0; }
+.sc-scatter-table { margin-top: 8px; }
+.sc-chart-switch { margin: 0 0 10px; }
+.sc-presets, .sc-saved { margin: 0 0 12px; }
+.sc-preset-list, .sc-saved-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sc-preset, .sc-saved-item { display: grid; gap: 4px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); min-width: 0; }
+.sc-preset p, .sc-saved-item p { margin: 0; overflow-wrap: anywhere; }
+.sc-saved-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc-copy-fallback { width: 100%; max-width: 100%; box-sizing: border-box; }
+
+/* specs/032 live check (SC-005): a <select> is as wide as its longest option, and VOR's definition
+   made the picker 549px, pushing the phone layout out to 565px. Let it shrink to its column. */
+.sc-insert { min-width: 0; }
+.sc-insert select { width: 100%; max-width: 100%; min-width: 0; }
+
+/* --- Stat calculator US5 charts (specs/032 US5): Spread, Change, Breakdown ------------------------
+   Same tokens as the ranked chart and the scatter. --teal = the primary series, --up/--down = the app's
+   rise/fall colours (the sign is always printed too), --muted = everyone else. */
+.sc-legend { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
+.sc-legend li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.sc-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--muted); }
+.sc-swatch-top { background: var(--teal); border-radius: 50%; }
+.sc-swatch-rest { background: var(--muted); opacity: 0.6; border-radius: 50%; }
+.sc-swatch-band { background: color-mix(in oklab, var(--teal) 16%, transparent); box-shadow: inset 0 0 0 1px var(--line); }
+.sc-swatch-then { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); border-radius: 50%; }
+.sc-swatch-now { background: var(--text); border-radius: 50%; }
+.sc-swatch-rise { background: var(--teal); height: 4px; }
+.sc-swatch-fall { background: var(--wr); height: 4px; }
+.sc-dot.rest .sc-pt { fill: var(--muted); fill-opacity: 0.6; }
+.sc-dot.top .sc-pt { fill: var(--teal); fill-opacity: 1; }
+.sc-iqr { fill: color-mix(in oklab, var(--teal) 12%, transparent); stroke: var(--line); stroke-width: 1; }
+.sc-quart { stroke: var(--muted); stroke-width: 1; }
+.sc-median { stroke: var(--text); stroke-width: 2; }
+.sc-seg { position: absolute; top: 0; bottom: 0; box-shadow: inset 0 0 0 1px var(--panel); border-radius: 2px; }
+.sc-db-row { grid-template-columns: 24px minmax(90px, 170px) minmax(0, 1fr) minmax(96px, auto); }
+.sc-db-track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
+.sc-db-line { position: absolute; top: 50%; height: 3px; margin-top: -1px; border-radius: 2px; background: var(--muted); }
+.sc-db-line.rise { background: var(--teal); } /* US5 review C3: neutral hues; --up/--down mean better/worse elsewhere */
+.sc-db-line.fall { background: var(--wr); }
+.sc-db-dot { position: absolute; top: 50%; width: 10px; height: 10px; margin: -4px 0 0 -5px; border-radius: 50%; box-sizing: border-box; }
+.sc-db-dot.then { background: var(--panel); box-shadow: 0 0 0 2px var(--muted); }
+.sc-db-dot.now { background: var(--text); box-shadow: 0 0 0 2px var(--panel); }
+.sc-db-val { display: grid; gap: 0; justify-items: end; }
+.sc-spread-controls { margin: 0 0 8px; }
+.sc-picker-why { margin: 0 0 8px; display: grid; gap: 2px; }
+.sc-picker-why p { margin: 0; }
+.segment[aria-disabled='true'] { opacity: 0.45; cursor: not-allowed; }
+.segment[aria-disabled='true']:hover { background: transparent; color: inherit; }
+.sc-chart-controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; margin: 0 0 10px; min-width: 0; }
+.sc-chart-controls .sl-field { min-width: 0; max-width: 100%; }
+.sc-chart-controls select { min-width: 0; max-width: 100%; }
+@media (max-width: 640px) {
+  .sc-db-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
+}

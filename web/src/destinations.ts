@@ -336,7 +336,8 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     label: 'Player stats',
     // one season: the page reads the season it is opened on (spec 011's rule)
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/stats`,
-    match: /^\/leagues\/([^/]+)\/stats\/?$/,
+    // The calculator is part of Player stats, so the rail keeps this row lit on it (specs/032 R12).
+    match: /^\/leagues\/([^/]+)\/stats(?:\/calculator)?\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

@@ -1,4 +1,4 @@
-import type { PlayerQualificationRule } from './api'
+import type { PlayerQualificationRule, StatLeaderboard } from './api'
 
 /**
  * Copy for the player page (specs/022-player-stat-analysis). Kept out of the
@@ -22,6 +22,19 @@ export type StatReason =
   | 'NOT_CONFIGURED'
   | 'NOT_DRAFTED'
   | 'UNAVAILABLE'
+  | 'NO_REPLACEMENT_LEVEL'
+  | 'NO_POSITION'
+  | 'UNKNOWN_NULL'
+
+/**
+ * The reasons a leaderboard cell can be empty (specs/032 R15): what statCells.missingReason returns,
+ * shared by the table cell and the calculator's "excluded" list so the two can't disagree.
+ */
+export type MissingReason = Extract<
+  StatReason,
+  | 'NO_ATTEMPTS' | 'NO_MINUTES' | 'NO_TEAM_ROW' | 'NO_GAMES' | 'NOT_QUALIFIED' | 'NOT_QUALIFIED_STALE'
+  | 'NO_REPLACEMENT_LEVEL' | 'NO_POSITION' | 'UNKNOWN_NULL'
+>
 
 export const ALL_STAT_REASONS: readonly StatReason[] = [
   'NO_ATTEMPTS',
@@ -37,6 +50,9 @@ export const ALL_STAT_REASONS: readonly StatReason[] = [
   'NOT_CONFIGURED',
   'NOT_DRAFTED',
   'UNAVAILABLE',
+  'NO_REPLACEMENT_LEVEL',
+  'NO_POSITION',
+  'UNKNOWN_NULL',
 ]
 
 /** "Mar 4, 2026" from an ISO date or instant; the input unchanged if it is not one. */
@@ -78,6 +94,12 @@ export function reasonSentence(code: StatReason, opts: { date?: string | null; n
       return 'This league hasn’t drafted yet, so nobody owns him.'
     case 'UNAVAILABLE':
       return 'Who owned him then isn’t available.'
+    case 'NO_REPLACEMENT_LEVEL':
+      return 'There is no replacement level at his position, so there is no value over replacement.'
+    case 'NO_POSITION':
+      return 'He has no listed position, so there is no position rank.'
+    case 'UNKNOWN_NULL':
+      return 'No value is available for this figure.'
   }
 }
 
@@ -164,6 +186,12 @@ export function reasonShort(code: StatReason): string {
       return 'not drafted'
     case 'UNAVAILABLE':
       return 'unavailable'
+    case 'NO_REPLACEMENT_LEVEL':
+      return 'no repl. level'
+    case 'NO_POSITION':
+      return 'no position'
+    case 'UNKNOWN_NULL':
+      return 'no value'
   }
 }
 
@@ -296,4 +324,28 @@ export function rosteredGroupNote(
   const when = ownershipAsOf(asOf, season)
   const base = when ? `Players rostered in this league · ${when}` : 'Players rostered in this league · date not available'
   return fellBack ? `${base}. These are ${seasonLabel(season)} rosters, not today’s.` : `${base}.`
+}
+
+/**
+ * Which season a stats board shows and whose scoring scored it. Moved from draftRoomStats.ts so the
+ * draft room, the leaderboard and the calculator say it one way (specs/032 FR-012, F8).
+ */
+export type ShownSeason = {
+  /** "2025–26" (Sleeper start year). */
+  seasonLabel: string
+  /** The stats are an earlier season's because the requested one has no games yet. */
+  fellBack: boolean
+  /** Which season's league scoring scored the fantasy figures; null from an older backend. */
+  scoringLabel: string | null
+  /** True only when the server said the requested season's scoring differs. */
+  scoringChanged: boolean
+}
+
+export function shownSeason(b: StatLeaderboard): ShownSeason {
+  return {
+    seasonLabel: seasonLabel(b.season),
+    fellBack: b.requestedSeason != null,
+    scoringLabel: b.scoringSeason != null ? `Fantasy points under ${seasonLabel(b.scoringSeason)} league scoring.` : null,
+    scoringChanged: b.scoringMatchesRequested === false,
+  }
 }

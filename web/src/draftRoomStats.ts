@@ -1,6 +1,5 @@
-import type { LeaderboardRow, PlayerRef, StatLeaderboard } from './api'
+import type { LeaderboardRow, PlayerRef } from './api'
 import { RISK_MAX } from './survivalBands'
-import { seasonLabel } from './statCopy'
 import { COLUMNS, compareRows, type SortState, type StatMode } from './statLeaderboard'
 
 /**
@@ -76,22 +75,5 @@ export function filterLikely(rows: DraftStatRow[], on: boolean): DraftStatRow[] 
 /** The filter's rule, printed beside the toggle so the threshold is never a secret. */
 export const likelyRule = (pickLabel: string) => `${Math.round(RISK_MAX * 100)}%+ chance he’s there at ${pickLabel} (players the projection tracks)`
 
-export type ShownSeason = {
-  /** "2025–26" (Sleeper start year). */
-  seasonLabel: string
-  /** The stats are an earlier season's because the requested one has no games yet. */
-  fellBack: boolean
-  /** Which season's league scoring scored the fantasy figures; null from an older backend. */
-  scoringLabel: string | null
-  /** True only when the server said the requested season's scoring differs. */
-  scoringChanged: boolean
-}
-
-export function shownSeason(b: StatLeaderboard): ShownSeason {
-  return {
-    seasonLabel: seasonLabel(b.season),
-    fellBack: b.requestedSeason != null,
-    scoringLabel: b.scoringSeason != null ? `Fantasy points under ${seasonLabel(b.scoringSeason)} league scoring.` : null,
-    scoringChanged: b.scoringMatchesRequested === false,
-  }
-}
+// Moved to statCopy.ts so the stat calculator shares it (specs/032 T005, FR-012, F8); re-exported so callers are unchanged.
+export { shownSeason, type ShownSeason } from './statCopy'
