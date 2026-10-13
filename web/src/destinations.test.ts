@@ -327,6 +327,9 @@ describe('stats destination', () => {
   it('is recognised from its own path and carries the league id', () => {
     expect(destinationFromPath('/leagues/x/stats')).toBe('stats')
     expect(destinationFromPath('/leagues/x/stats/')).toBe('stats')
+    // specs/032 R12: the stat calculator lives under Player stats.
+    expect(destinationFromPath('/leagues/X/stats/calculator')).toBe('stats')
+    expect(leagueIdFromPath('/leagues/X/stats/calculator')).toEqual({ idKind: 'league', id: 'X' })
     expect(leagueIdFromPath('/leagues/x/stats')).toEqual({ idKind: 'league', id: 'x' })
   })
 

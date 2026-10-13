@@ -176,6 +176,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <LeagueRailSection
             league={railLeague}
             pathname={location.pathname}
+            search={location.search}
             collapsed={collapsed}
             onMockIt={(leagueId, sport) => openMockModal({ leagueId, sport })}
             allLeagues={allLeagues}

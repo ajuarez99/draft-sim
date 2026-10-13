@@ -18,6 +18,7 @@ import type { LeagueLineage } from '../leagueLineage'
 import type { RailLeague } from '../railLeague'
 import { getLeagueRefresh, refreshLeague, type DraftSummary, type RefreshStatus } from '../api'
 import { useBumpLeagueDataVersion } from '../leagueDataVersion'
+import { stripRoster } from '../statCalcUrl'
 import { relativeTime } from '../relativeTime'
 import { useNarrow } from '../useNarrow'
 import { laneOverflow, type LaneOverflow } from '../railLane'
@@ -25,6 +26,8 @@ import { laneOverflow, type LaneOverflow } from '../railLane'
 type Props = {
   league: RailLeague
   pathname: string
+  /** The location's query string (with or without the leading `?`); only the stat calculator's year links read it. */
+  search?: string
   collapsed: boolean
   /** Seeded with this league, the same way the home card's "Mock it" is. */
   onMockIt: (leagueId: string, sport: DraftSummary['sport']) => void
@@ -175,7 +178,12 @@ function writeGroupState(state: GroupState) {
  * second copy of "which sports have Analysis" is how the rail and the palette
  * would eventually disagree.
  */
-export function switchTarget(current: DestinationKey | null, target: LeagueContext, pathname?: string): string {
+export function switchTarget(
+  current: DestinationKey | null,
+  target: LeagueContext,
+  pathname?: string,
+  search?: string,
+): string {
   const offered = destinationsFor(target).filter((d) => !d.isAction)
   const same = current ? offered.find((d) => d.key === current) : undefined
   if (same) {
@@ -183,6 +191,13 @@ export function switchTarget(current: DestinationKey | null, target: LeagueConte
     // alone cannot say which player, so it is read back off the current path.
     // Without one (no pathname given) the row's href falls back to league home.
     const playerId = pathname ? playerIdFromPath(pathname) : null
+    // The stat calculator shares the Player stats row; its year links stay on the calculator and
+    // keep the query string (the formula travels), minus the roster filter, because roster ids
+    // repeat every season (specs/032 C2, F7, F9); the rule itself lives in statCalcUrl's stripRoster.
+    if (current === 'stats' && pathname && /\/stats\/calculator\/?$/.test(pathname)) {
+      const qs = stripRoster(new URLSearchParams(search ?? '')).toString()
+      return `${same.href(target)}/calculator${qs ? `?${qs}` : ''}`
+    }
     return same.href(playerId ? { ...target, playerId } : target)
   }
   const wasDraftPage = current
@@ -216,6 +231,7 @@ export function switchTarget(current: DestinationKey | null, target: LeagueConte
 export default function LeagueRailSection({
   league,
   pathname,
+  search,
   collapsed,
   onMockIt,
   allLeagues = [],
@@ -460,7 +476,7 @@ export default function LeagueRailSection({
           {lineage.seasons.map((s) => (
             <Link
               key={s.sleeperLeagueId}
-              to={switchTarget(currentKey, { lineage, season: s }, pathname)}
+              to={switchTarget(currentKey, { lineage, season: s }, pathname, search)}
               className={`league-season-link${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
               title={`${s.season} · ${s.teams} managers`}
             >
@@ -501,7 +517,7 @@ export default function LeagueRailSection({
                   {lineage.seasons.map((s) => (
                     <Link
                       key={s.sleeperLeagueId}
-                      to={switchTarget(currentKey, { lineage, season: s }, pathname)}
+                      to={switchTarget(currentKey, { lineage, season: s }, pathname, search)}
                       role="menuitem"
                       className={`rail-switcher-item${s.sleeperDraftId === season.sleeperDraftId ? ' on' : ''}`}
                     >

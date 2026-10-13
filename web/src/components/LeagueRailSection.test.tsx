@@ -503,6 +503,48 @@ describe('year links keep the page', () => {
     // no player in the path: League home rather than a broken URL
     expect(switchTarget('players', ctx)).toBe('/leagues/L_NBA25')
   })
+
+  // specs/032 C2 (F7, F9): the stat calculator shares the Player stats row, so a year link must stay
+  // on the calculator, keep the formula's query string, and drop the roster filter (roster ids
+  // repeat every season).
+  describe('stat calculator year links (specs/032)', () => {
+    const nba25 = draftSummary({ sleeperDraftId: 'D_NBA25', sleeperLeagueId: 'L_NBA25', sport: 'nba', season: 2025 })
+    const nba26 = draftSummary({ sleeperDraftId: 'D_NBA26', sleeperLeagueId: 'L_NBA26', previousLeagueId: 'L_NBA25', sport: 'nba', season: 2026 })
+    const ctx: LeagueContext = { lineage: { current: nba26, seasons: [nba26, nba25] }, season: nba25 }
+    const calc = '/leagues/L_NBA26/stats/calculator'
+
+    it('keeps /calculator and the query, and drops own=r:3', () => {
+      const t = switchTarget('stats', ctx, calc, '?f=pts%2Bast&w=LAST_10&own=r%3A3&team=LAL')
+      expect(t.startsWith('/leagues/L_NBA25/stats/calculator?')).toBe(true)
+      const q = new URLSearchParams(t.split('?')[1])
+      expect(q.get('f')).toBe('pts+ast')
+      expect(q.get('w')).toBe('LAST_10')
+      expect(q.get('team')).toBe('LAL')
+      expect(q.has('own')).toBe(false)
+    })
+
+    it('keeps own=free (only a roster id is season-specific) and has no "?" when the query is empty', () => {
+      expect(switchTarget('stats', ctx, calc, 'own=free')).toBe('/leagues/L_NBA25/stats/calculator?own=free')
+      expect(switchTarget('stats', ctx, calc, '')).toBe('/leagues/L_NBA25/stats/calculator')
+      expect(switchTarget('stats', ctx, calc + '/', undefined)).toBe('/leagues/L_NBA25/stats/calculator')
+    })
+
+    it('the plain stats page is unchanged: no /calculator, no query string', () => {
+      expect(switchTarget('stats', ctx, '/leagues/L_NBA26/stats', '?f=pts&own=r%3A3')).toBe('/leagues/L_NBA25/stats')
+      expect(switchTarget('stats', ctx)).toBe('/leagues/L_NBA25/stats')
+    })
+
+    it("in the rail, the other year's link carries the query and strips own=r:", async () => {
+      const { leagueSection } = renderAtPath(`${calc}?f=pts%2Bast&own=r%3A3`, { drafts: [nba26, nba25] })
+      await waitFor(() => expect(leagueSection()).not.toBeNull())
+      const link = [...leagueSection()!.querySelectorAll<HTMLAnchorElement>('a.league-season-link')].find((a) => a.textContent === '2025')!
+      const href = link.getAttribute('href')!
+      expect(href.startsWith('/leagues/L_NBA25/stats/calculator?')).toBe(true)
+      const q = new URLSearchParams(href.split('?')[1])
+      expect(q.get('f')).toBe('pts+ast')
+      expect(q.has('own')).toBe(false)
+    })
+  })
 })
 
 describe('rail groups (specs/013 US3)', () => {

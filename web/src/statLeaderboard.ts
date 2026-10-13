@@ -1,4 +1,5 @@
-import type { LeaderboardRow, PlayerCounting, PlayerOwnership, Rate } from './api'
+import type { LeaderboardRow, PlayerCounting, PlayerOwnership, Rate, StatLeaderboard } from './api'
+import { ownershipAsOf, seasonLabel } from './statCopy'
 
 /**
  * specs/022-player-stat-analysis US4: the stats leaderboard's rules, kept out of the page so one
@@ -175,6 +176,50 @@ export const PICKABLE: { id: ColumnGroup; label: string; columns: StatColumn[] }
 }))
 export const PICKABLE_IDS: ReadonlySet<string> = new Set(PICKABLE.flatMap((g) => g.columns.map((c) => c.id)))
 
+// --- formula metadata (specs/032) ------------------------------------------------------------
+//
+// What the stat calculator needs to know about each column, kept next to COLUMNS so a new column
+// is one edit in one file. The formula grammar itself lives in statFormula.ts (contract C1).
+
+/** Every column a formula may name: the draft room's pickable columns, minus text ones. */
+export const FORMULA_INPUTS: StatColumn[] = PICKABLE.flatMap((g) => g.columns).filter((c) => c.format !== 'text')
+
+/**
+ * The word a formula uses for a column. It is the column's label when that is already
+ * `[A-Za-z0-9%]+`; labels that would collide with the grammar (`FP/G` has a division, the two rank
+ * labels have a space) get an alias instead (F1).
+ */
+const TOKEN_ALIASES: Record<string, string> = { fp: 'FPG', positionRank: 'POSRANK', pointsRank: 'PTSRANK' }
+export const FORMULA_TOKEN: Record<string, string> = Object.fromEntries(
+  FORMULA_INPUTS.map((c) => [c.id, TOKEN_ALIASES[c.id] ?? c.label]),
+)
+
+/** Extra spellings that parse to a column but are never printed: users type `USG%` (N5). */
+export const FORMULA_EXTRA_ALIASES: Record<string, string> = { 'USG%': 'usg' }
+
+/**
+ * A column's unit class, for the mixed-units warning (R8, F11). `count:<mode>` stands for "the
+ * current mode" and is resolved by the unit inference. Hand-assigned; a column missing here falls
+ * back to a unit of its own id (`id:<id>`) so it warns rather than silently matching.
+ */
+export const FORMULA_UNIT: Record<string, string> = Object.fromEntries(
+  FORMULA_INPUTS.map((c) => {
+    const unit =
+      c.format === 'pct' ? 'pct'
+      : c.id === 'min' ? 'minutes:perGame'
+      : c.counting ? 'count:<mode>'
+      : c.id === 'fp' || c.id === 'vor' ? 'fp'
+      : ['leagueRank', 'positionRank', 'pointsRank', 'rankMove'].includes(c.id) ? 'rank'
+      : c.id === 'gp' ? 'games'
+      : c.id === 'gameScore' ? 'gmsc'
+      : `id:${c.id}`
+    return [c.id, unit]
+  }),
+)
+
+/** Inputs that are about this league's scoring rather than the real stat line (FR-013). */
+export const FORMULA_TAG: Record<string, 'fantasy'> = { vor: 'fantasy' }
+
 export const groupDef = (g: ColumnGroup): GroupDef => GROUPS.find((x) => x.id === g) ?? GROUPS[0]
 
 // --- sorting ---------------------------------------------------------------------------------
@@ -224,13 +269,21 @@ export function compareRows(col: StatColumn, dir: SortDir, mode: StatMode) {
           : (va as number) - (vb as number)
       if (c !== 0) return sign * c
     }
-    if (a.stats.games !== b.stats.games) return b.stats.games - a.stats.games
-    const na = a.name ?? '￿'
-    const nb = b.name ?? '￿'
-    const nc = na.localeCompare(nb)
-    if (nc !== 0) return nc
-    return a.sleeperPlayerId < b.sleeperPlayerId ? -1 : a.sleeperPlayerId > b.sleeperPlayerId ? 1 : 0
+    return tieBreak(a, b)
   }
+}
+
+/**
+ * The tail of the comparator, exported so the stat calculator breaks ties exactly as the table does
+ * (specs/032 T013): games played (more first), name (A to Z, a missing name last), then id.
+ */
+export function tieBreak(a: LeaderboardRow, b: LeaderboardRow): number {
+  if (a.stats.games !== b.stats.games) return b.stats.games - a.stats.games
+  const na = a.name ?? '￿'
+  const nb = b.name ?? '￿'
+  const nc = na.localeCompare(nb)
+  if (nc !== 0) return nc
+  return a.sleeperPlayerId < b.sleeperPlayerId ? -1 : a.sleeperPlayerId > b.sleeperPlayerId ? 1 : 0
 }
 
 export function sortRows(rows: LeaderboardRow[], sort: SortState, mode: StatMode): LeaderboardRow[] {
@@ -349,6 +402,36 @@ export function categoryLeaders(rows: LeaderboardRow[], cat: LeaderCategory, siz
     .sort(compareRows(cat.col, dir, cat.mode))
     .slice(0, size)
     .map((r) => ({ row: r, value: cat.col.value(r, cat.mode) as number }))
+}
+
+// --- shown board -----------------------------------------------------------------------------
+
+export type BoardContext = {
+  /** The league id of the season actually shown, so a player link opens the same season's page. */
+  shownLeagueId: string
+  /** The board fell back from the requested season to the last one with games. */
+  fellBack: boolean
+  /** "now 2026–27" on a fallback, else null. */
+  nowLabel: string | null
+  /** The ownership line's date, in words; null when the server has none to name. */
+  asOf: string | null
+}
+
+/**
+ * Which season's league, and which ownership date, the board in hand describes. Moved out of
+ * pages/StatLeaderboard.tsx so the leaderboard and the calculator cannot disagree (specs/032 F7):
+ * a wrong `shownLeagueId` would send a player link to 2026 while showing 2025 numbers.
+ */
+export function boardContext(d: StatLeaderboard, leagueId: string): BoardContext {
+  const shownLeagueId = d.seasons.find((s) => s.season === d.season)?.sleeperLeagueId ?? leagueId
+  const fellBack = d.requestedSeason != null
+  const nowLabel = fellBack ? `now ${seasonLabel(d.requestedSeason as number)}` : null
+  // On a fallback the owners come from the requested season's league (`currentOwnership`), read now.
+  const currentAsOf = fellBack ? (d.rows.find((r) => r.currentOwnership?.asOf)?.currentOwnership?.asOf ?? null) : null
+  const asOf = fellBack
+    ? ownershipAsOf(currentAsOf, d.requestedSeason as number)
+    : ownershipAsOf(d.ownershipAsOf, d.season)
+  return { shownLeagueId, fellBack, nowLabel, asOf }
 }
 
 // --- formatting ------------------------------------------------------------------------------

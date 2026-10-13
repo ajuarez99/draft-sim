@@ -1,5 +1,25 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-13: spec 032 (stat calculator) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/032-stat-calculator`, branch `032-stat-calculator` (from `origin/main` e9f71aa). Docs are in `specs/032-stat-calculator/`: spec, plan, research, plan-review, code-review, verification, tasks (T001–T027 done).
+- **What it does:** see README "Stat calculator". It's frontend only, with no Java, migration or `api.ts` change. The route is `/leagues/:id/stats/calculator`, reached from the Leaderboard/Calculator links on Player stats.
+- **Verified live (local, NBA 2025):**
+  - 11/11 hand-checked results against the payload, and 5/5 standardized values;
+  - the 375 px layout, after fixing a picker that pushed it to 565 px;
+  - window changes in 187–288 ms;
+  - the season fallback, and rail links keeping the formula.
+- **Not verified live:**
+  - a real clipboard;
+  - the saved list in a private window;
+  - the scatter view at real widths;
+  - SC-004 from a second signed-in profile.
+
+  See verification.md.
+- **Visible change outside the calculator:** the shared `missingReason` replaces the leaderboard's catch-all "not qualified" for some empty cells. The list is in verification.md, "Visible changes outside 032".
+- **US5 (added 2026-10-13):** Spread, Change and Breakdown charts, each disabled with a reason when it doesn't fit. Review C1 (Change sign inverted on its default view) and C2 (totals compared across game counts) were fixed and then verified live. See verification.md "US5 live".
+- **Owed:** Allan's go-ahead to commit, then PR and deploy (frontend service only).
+
 ## UPDATE 2026-10-11: spec 030 (season after the draft) built, verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/030-post-draft-season-view`, branch `030-post-draft-season-view` (from `main` 943b303). Docs are in `specs/030-post-draft-season-view/`: spec, plan, research, plan-review, code-review, verification, notes.

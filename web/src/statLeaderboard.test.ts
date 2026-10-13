@@ -8,10 +8,16 @@ import {
   LEADER_CATEGORIES,
   NO_FILTERS,
   applyFilters,
+  boardContext,
   categoryLeaders,
   columnLabel,
   compareRows,
   defaultDir,
+  FORMULA_EXTRA_ALIASES,
+  FORMULA_INPUTS,
+  FORMULA_TAG,
+  FORMULA_TOKEN,
+  FORMULA_UNIT,
   formatValue,
   hasKnownOwnership,
   resolveSort,
@@ -19,7 +25,7 @@ import {
   sortRows,
   toggleSort,
 } from './statLeaderboard'
-import { owner, rate, row, win } from './testStatBoard'
+import { board, owner, rate, row, win } from './testStatBoard'
 
 const ids = (rs: { sleeperPlayerId: string }[]) => rs.map((r) => r.sleeperPlayerId)
 
@@ -270,5 +276,93 @@ describe('PICKABLE (spec 023 US2)', () => {
 
   it('contains every default column', () => {
     for (const id of DEFAULT_COLUMNS) expect(PICKABLE_IDS.has(id), id).toBe(true)
+  })
+})
+
+describe('boardContext (specs/032 F7)', () => {
+  it("with no fallback: the shown season is the league asked for, and the date is the board's own", () => {
+    const c = boardContext(board([row('a')]), 'L25')
+    expect(c).toEqual({ shownLeagueId: 'L25', fellBack: false, nowLabel: null, asOf: 'End of 2025–26 regular season (week 18)' })
+  })
+
+  it("on a fallback: shownLeagueId is the SHOWN season's league, not the requested one", () => {
+    // Asked for 2026 (league L26), which has no games, so the board shows 2025 (L25).
+    const d = board(
+      [row('a', { currentOwnership: owner({ asOf: { kind: 'CURRENT', fetchedAt: '2026-10-12T12:00:00Z', week: null } }) })],
+      {
+        season: 2025,
+        requestedSeason: 2026,
+        seasons: [
+          { season: 2026, sleeperLeagueId: 'L26', hasGames: false },
+          { season: 2025, sleeperLeagueId: 'L25', hasGames: true },
+        ],
+      },
+    )
+    const c = boardContext(d, 'L26')
+    expect(c.shownLeagueId).toBe('L25')
+    expect(c.fellBack).toBe(true)
+    expect(c.nowLabel).toBe('now 2026–27')
+    expect(c.asOf).toMatch(/^As of /)
+  })
+
+  it("falls back to the league id asked for when the shown season is not in the list", () => {
+    expect(boardContext(board([], { seasons: [] }), 'LX').shownLeagueId).toBe('LX')
+  })
+})
+
+describe('formula metadata (specs/032 F1, F5, R8)', () => {
+  const tokens = FORMULA_INPUTS.map((c) => FORMULA_TOKEN[c.id])
+
+  it('inputs are PICKABLE minus text columns, and each has a token', () => {
+    expect(FORMULA_INPUTS.length).toBeGreaterThan(20)
+    for (const c of FORMULA_INPUTS) {
+      expect(PICKABLE_IDS.has(c.id), c.id).toBe(true)
+      expect(c.format, c.id).not.toBe('text')
+      expect(FORMULA_TOKEN[c.id], c.id).toBeTruthy()
+    }
+  })
+
+  it('every token, alias included, is [A-Za-z0-9%]+', () => {
+    for (const t of [...tokens, ...Object.keys(FORMULA_EXTRA_ALIASES)]) expect(t).toMatch(/^[A-Za-z0-9%]+$/)
+  })
+
+  it('tokens are unique case-insensitively, aliases included', () => {
+    const all = [...tokens, ...Object.keys(FORMULA_EXTRA_ALIASES)].map((t) => t.toLowerCase())
+    expect(new Set(all).size).toBe(all.length)
+  })
+
+  it("no token equals ANOTHER column's id (so a bare id never means two things)", () => {
+    for (const c of FORMULA_INPUTS) {
+      for (const other of FORMULA_INPUTS) {
+        if (other.id === c.id) continue
+        expect(FORMULA_TOKEN[c.id].toLowerCase(), `${c.id} vs ${other.id}`).not.toBe(other.id.toLowerCase())
+      }
+    }
+  })
+
+  it('the aliases for the three colliding labels, and USG% pointing at usg', () => {
+    expect(FORMULA_TOKEN.fp).toBe('FPG')
+    expect(FORMULA_TOKEN.positionRank).toBe('POSRANK')
+    expect(FORMULA_TOKEN.pointsRank).toBe('PTSRANK')
+    expect(FORMULA_EXTRA_ALIASES['USG%']).toBe('usg')
+    expect(COLUMNS.usg).toBeTruthy()
+  })
+
+  it('every input has a unit, and the classes follow R8 as amended', () => {
+    for (const c of FORMULA_INPUTS) expect(FORMULA_UNIT[c.id], c.id).toBeTruthy()
+    for (const c of FORMULA_INPUTS.filter((x) => x.format === 'pct')) expect(FORMULA_UNIT[c.id], c.id).toBe('pct')
+    for (const id of ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'tov']) expect(FORMULA_UNIT[id], id).toBe('count:<mode>')
+    expect(FORMULA_UNIT.min).toBe('minutes:perGame')
+    expect(FORMULA_UNIT.fp).toBe('fp')
+    expect(FORMULA_UNIT.vor).toBe('fp')
+    for (const id of ['leagueRank', 'positionRank', 'pointsRank', 'rankMove']) expect(FORMULA_UNIT[id], id).toBe('rank')
+    expect(FORMULA_UNIT.gp).toBe('games')
+    expect(FORMULA_UNIT.gameScore).toBe('gmsc')
+    // No input fell through to the "id:" fallback: that would mean a column nobody classified.
+    for (const c of FORMULA_INPUTS) expect(FORMULA_UNIT[c.id], c.id).not.toMatch(/^id:/)
+  })
+
+  it('only VOR is tagged fantasy (FR-013)', () => {
+    expect(FORMULA_TAG).toEqual({ vor: 'fantasy' })
   })
 })
