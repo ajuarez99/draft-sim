@@ -28,19 +28,22 @@ public class TransactionAnalysisService {
     private final RosterSeasonRepository rosterSeasons;
     private final LeagueMemberRepository members;
     private final PlayerRepository players;
+    private final TradeVerdictService tradeVerdicts;
 
     public TransactionAnalysisService(LeagueRepository leagues,
                                       LeagueTransactionRepository transactions,
                                       RosterWeekPointsRepository weekPoints,
                                       RosterSeasonRepository rosterSeasons,
                                       LeagueMemberRepository members,
-                                      PlayerRepository players) {
+                                      PlayerRepository players,
+                                      TradeVerdictService tradeVerdicts) {
         this.leagues = leagues;
         this.transactions = transactions;
         this.weekPoints = weekPoints;
         this.rosterSeasons = rosterSeasons;
         this.members = members;
         this.players = players;
+        this.tradeVerdicts = tradeVerdicts;
     }
 
     public record ManagerCounts(Long managerId, String teamName, Map<String, Integer> counts, int total) {}
@@ -58,17 +61,22 @@ public class TransactionAnalysisService {
     public record Add(int week, String teamName, MovedPlayer added, MovedPlayer dropped,
                       Integer faabBid, String type, String status) {}
 
-    public record TradeSide(String teamName, List<MovedPlayer> received) {}
-
-    public record Trade(int week, List<TradeSide> sides) {}
-
+    /**
+     * @param trades         spec 033: built from adds, draft picks AND FAAB, each with a verdict
+     * @param throughWeek    the last FINAL week (ScoredWeeks); no later week ever counts
+     * @param seasonFinal    league.status complete: verdicts read "final", else "so far"
+     * @param tradeAssetsLoaded false while any stored trade predates V34 (picks/FAAB unknown)
+     * @param reconciliation   how well the stored moves explain the weekly rosters (R5); null if unavailable
+     */
     public record Result(boolean available, String reason, int season, Sport sport,
-                         List<ManagerCounts> byManager, List<Trade> trades, List<Add> adds,
-                         String rankDirection) {
+                         List<ManagerCounts> byManager, List<TradeVerdictService.TradeResult> trades,
+                         List<Add> adds, String rankDirection,
+                         int throughWeek, boolean seasonFinal, boolean tradeAssetsLoaded,
+                         OwnershipTimeline.Reconciliation reconciliation) {
 
         static Result unavailable(String reason, int season, Sport sport) {
             return new Result(false, reason, season, sport, List.of(), List.of(), List.of(),
-                    RANK_DIRECTION);
+                    RANK_DIRECTION, 0, false, true, null);
         }
     }
 
@@ -250,9 +258,9 @@ public class TransactionAnalysisService {
         }
 
         // Weekly positional ranks, computed once for the whole season.
-        Map<Integer, Map<String, Integer>> rankByWeek =
-                positionalRanksByWeek(weekPoints.breakdownsFor(league.id(), league.season()),
-                        playersBySleeperId);
+        List<RosterWeekPointsRepository.WeekBreakdown> breakdowns =
+                weekPoints.breakdownsFor(league.id(), league.season());
+        Map<Integer, Map<String, Integer>> rankByWeek = positionalRanksByWeek(breakdowns, playersBySleeperId);
 
         // ---- counts by type
         Map<Integer, Map<String, Integer>> countsByRoster = new HashMap<>();
@@ -277,29 +285,14 @@ public class TransactionAnalysisService {
         byManager.sort(Comparator.comparingInt(ManagerCounts::total).reversed()
                 .thenComparing(ManagerCounts::teamName));
 
-        // ---- adds and trades
+        // ---- adds. Trades are graded by TradeVerdictService from adds, picks and FAAB together
+        // (a trade built from adds alone dropped FAAB-only and picks-only trades entirely).
         List<Add> adds = new ArrayList<>();
-        List<Trade> trades = new ArrayList<>();
         for (LeagueTransactionRepository.Row r : rows) {
             Map<String, Object> addMap = readIdMap(r.addsJson());
             Map<String, Object> dropMap = readIdMap(r.dropsJson());
 
-            if ("TRADE".equals(r.type())) {
-                Map<Integer, List<MovedPlayer>> received = new LinkedHashMap<>();
-                addMap.forEach((playerId, rosterObj) -> {
-                    int toRoster = rosterObj instanceof Number n ? n.intValue() : -1;
-                    if (toRoster < 0) return;
-                    received.computeIfAbsent(toRoster, k -> new ArrayList<>())
-                            .add(moved(playerId, playersBySleeperId, rankByWeek, r.week()));
-                });
-                if (!received.isEmpty()) {
-                    List<TradeSide> sides = new ArrayList<>();
-                    received.forEach((rosterId, got) -> sides.add(new TradeSide(
-                            nameByRoster.getOrDefault(rosterId, "Roster " + rosterId), got)));
-                    trades.add(new Trade(r.week(), sides));
-                }
-                continue;
-            }
+            if ("TRADE".equals(r.type())) continue;
 
             // A waiver/free-agent move: one add, optionally one drop.
             String addedId = addMap.keySet().stream().findFirst().orElse(null);
@@ -322,8 +315,12 @@ public class TransactionAnalysisService {
                         ? Double.MAX_VALUE : a.added().postMoveRank())
                 .thenComparingInt(Add::week));
 
+        TradeVerdictService.Result verdicts = tradeVerdicts.forLeague(league, rows, breakdowns,
+                playersBySleeperId, nameByRoster, managerByRoster, rankByWeek);
+
         return Optional.of(new Result(true, null, league.season(), sport,
-                byManager, trades, adds, RANK_DIRECTION));
+                byManager, verdicts.trades(), adds, RANK_DIRECTION,
+                verdicts.throughWeek(), verdicts.seasonFinal(), verdicts.tradeAssetsLoaded(), verdicts.reconciliation()));
     }
 
     /**

@@ -22,7 +22,7 @@ class SeasonSuperlativesMostAddedTest {
 
     private static LeagueTransactionRepository.Row faAdd(int week, String playerId, int rosterId) {
         return new LeagueTransactionRepository.Row(1L, 2026, week, "tx" + (seq++), "FREE_AGENT", "complete",
-                rosterId, null, "{\"" + playerId + "\": " + rosterId + "}", "{}", null, null);
+                rosterId, null, "{\"" + playerId + "\": " + rosterId + "}", "{}", null, null, null, null);
     }
 
     private static Superlative award(List<LeagueTransactionRepository.Row> rows) {

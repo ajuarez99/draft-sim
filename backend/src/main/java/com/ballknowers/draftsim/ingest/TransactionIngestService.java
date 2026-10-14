@@ -85,9 +85,14 @@ public class TransactionIngestService {
         }
 
         Set<Integer> finalWeeks = weekFetches.finalWeeks(league.id(), LeagueWeekFetchRepository.TRANSACTIONS);
+        // Trades stored before V34 have no draft_picks/waiver_budget. Their weeks are usually final
+        // (never refetched) and finished seasons are skipped by the daily refresh, so refetch them
+        // here until every trade carries its assets (spec 033 research R6).
+        Set<Integer> missingAssets = new HashSet<>(transactions.tradeWeeksMissingAssets(league.id()));
         int count = 0;
         for (int week = 1; week <= lastWeek; week++) {
-            if (WeekFinality.mayStopRefetching(finalWeeks.contains(week), week, lastScoredLeg)) continue;
+            if (WeekFinality.mayStopRefetching(finalWeeks.contains(week), week, lastScoredLeg)
+                    && !missingAssets.contains(week)) continue;
             List<Map<String, Object>> payload = sleeper.transactions(sleeperLeagueId, week);
             if (payload == null) continue;
             for (Map<String, Object> t : payload) {
@@ -105,7 +110,7 @@ public class TransactionIngestService {
     }
 
     /** Null for a payload with no usable id or an unrecognised type. */
-    private static LeagueTransactionRepository.Row toRow(LeagueRepository.LeagueRow league, int week,
+    static LeagueTransactionRepository.Row toRow(LeagueRepository.LeagueRow league, int week,
                                                         Map<String, Object> t,
                                                         Map<Integer, Long> managerByRoster) {
         String id = t.get("transaction_id") == null ? null : String.valueOf(t.get("transaction_id"));
@@ -138,7 +143,9 @@ public class TransactionIngestService {
                 rosterId == null ? null : managerByRoster.get(rosterId),
                 JsonUtil.write(t.get("adds") == null ? Map.of() : t.get("adds")),
                 JsonUtil.write(t.get("drops") == null ? Map.of() : t.get("drops")),
-                faab, createdAt);
+                faab, createdAt,
+                JsonUtil.write(t.get("draft_picks") == null ? List.of() : t.get("draft_picks")),
+                JsonUtil.write(t.get("waiver_budget") == null ? List.of() : t.get("waiver_budget")));
     }
 
     /**
