@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.api;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardRefresh;
+import com.ballknowers.draftsim.ingest.BracketIngestService;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.FfcAdpService;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
@@ -36,6 +37,7 @@ public class IngestController {
     private final PlayerGameIngestService playerGameIngest;
     private final BoardRefresh boardRefresh;
     private final SeasonProjectionIngestService seasonProjectionIngest;
+    private final BracketIngestService bracketIngest;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
@@ -44,7 +46,8 @@ public class IngestController {
                             TransactionIngestService transactionIngest,
                             PlayerGameIngestService playerGameIngest,
                             BoardRefresh boardRefresh,
-                            SeasonProjectionIngestService seasonProjectionIngest) {
+                            SeasonProjectionIngestService seasonProjectionIngest,
+                            BracketIngestService bracketIngest) {
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -56,6 +59,7 @@ public class IngestController {
         this.playerGameIngest = playerGameIngest;
         this.boardRefresh = boardRefresh;
         this.seasonProjectionIngest = seasonProjectionIngest;
+        this.bracketIngest = bracketIngest;
     }
 
     /** FFC ADP for the league shape configured in weights.yml. See claude/adp-sources.md. */
@@ -119,6 +123,25 @@ public class IngestController {
         Sport sport = leagueIngest.inferSport(sleeperLeagueId);
         // A manual re-ingest skips nothing: it is how a suspect season gets rebuilt.
         return leagueHistoryIngest.ingestChain(sport, sleeperLeagueId, java.util.Set.of());
+    }
+
+    /**
+     * specs/034-rivalry-schedule-grid C2: store each season's Sleeper winners bracket for a stored chain.
+     *
+     * <p>Fetches {@code winners_bracket} only -- never {@code /matchups}, so it cannot move a score. That
+     * is why it exists beside {@code /league-history}: a full re-ingest of a finished NBA season would
+     * re-read Sleeper's degraded live {@code /matchups} (research R10). A fully-played stored bracket is
+     * skipped unless {@code force=true} (plan.md F5); an empty Sleeper answer never deletes rows.
+     * 404 when the league isn't stored locally.
+     */
+    @PostMapping("/brackets/{sleeperLeagueId}")
+    public org.springframework.http.ResponseEntity<Map<String, Object>> brackets(
+            @PathVariable String sleeperLeagueId, @RequestParam(defaultValue = "false") boolean force) {
+        var seasons = bracketIngest.backfillChain(sleeperLeagueId, force);
+        if (seasons.isEmpty()) return org.springframework.http.ResponseEntity.notFound().build();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("seasons", seasons);
+        return org.springframework.http.ResponseEntity.ok(out);
     }
 
     /**

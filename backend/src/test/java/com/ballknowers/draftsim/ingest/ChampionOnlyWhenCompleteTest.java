@@ -47,13 +47,14 @@ class ChampionOnlyWhenCompleteTest {
     @Mock private LeagueMatchupRepository fixtures;
     @Mock private TransactionIngestService transactions;
     @Mock private LeagueWeekFetchRepository weekFetches;
+    @Mock private BracketIngestService bracketIngest;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions, weekFetches);
+                weekPoints, fixtures, transactions, weekFetches, bracketIngest);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
         lenient().when(sleeper.leagueUsers(anyString())).thenReturn(List.of(

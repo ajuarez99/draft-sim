@@ -46,11 +46,13 @@ class IngestControllerTest {
     @Mock private com.ballknowers.draftsim.ingest.TransactionIngestService transactionIngest;
     @Mock private com.ballknowers.draftsim.ingest.PlayerGameIngestService playerGameIngest;
     @Mock private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjectionIngest;
+    @Mock private com.ballknowers.draftsim.ingest.BracketIngestService bracketIngest;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
                 projectionIngest, transactionIngest, playerGameIngest,
-                new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest);
+                new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest,
+                bracketIngest);
     }
 
     // ---- POST /api/ingest/adp ----
@@ -185,5 +187,26 @@ class IngestControllerTest {
                 .thenThrow(new IllegalArgumentException("season projections aren't wired up for nfl leagues"));
 
         assertThrows(IllegalArgumentException.class, () -> controller().seasonProjections("nfl", 2026, true));
+    }
+
+    // ---- POST /api/ingest/brackets/{id} (specs/034 C2) ----
+
+    @Test
+    void bracketsReturnsThePerSeasonCountsAndPassesForceThrough() {
+        when(bracketIngest.backfillChain("L1", true)).thenReturn(List.of(
+                new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false)));
+
+        var resp = controller().brackets("L1", true);
+
+        assertEquals(200, resp.getStatusCode().value());
+        assertEquals(List.of(new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false)),
+                resp.getBody().get("seasons"));
+        verify(bracketIngest).backfillChain("L1", true);
+    }
+
+    @Test
+    void bracketsOnAnUnstoredLeagueIs404() {
+        when(bracketIngest.backfillChain("nope", false)).thenReturn(List.of());
+        assertEquals(404, controller().brackets("nope", false).getStatusCode().value());
     }
 }

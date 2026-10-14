@@ -158,18 +158,13 @@ public class HeadToHeadService {
                 boolean gAisOurA = g.aManagerId() == managerAId;
                 double aPoints = (gAisOurA ? g.aPoints() : g.bPoints()).doubleValue();
                 double bPoints = (gAisOurA ? g.bPoints() : g.aPoints()).doubleValue();
-                String winner;
                 // T047: a tie is its own outcome, counted once, never folded
                 // into either side's losses.
-                if (aPoints > bPoints) {
-                    winner = "A";
-                    aWins++;
-                } else if (bPoints > aPoints) {
-                    winner = "B";
-                    bWins++;
-                } else {
-                    winner = "TIE";
-                    ties++;
+                String winner = outcome(aPoints, bPoints);
+                switch (winner) {
+                    case "A" -> aWins++;
+                    case "B" -> bWins++;
+                    default -> ties++;
                 }
                 meetings.add(new Meeting(row.season(), g.week(), row.leagueName(), row.sleeperLeagueId(),
                         round2(aPoints), round2(bPoints), winner));
@@ -181,6 +176,18 @@ public class HeadToHeadService {
         meetings.sort(Comparator.comparing(Meeting::season).reversed().thenComparing(Meeting::week));
 
         return new SportHeadToHead(sport, aWins, bWins, ties, meetings, excluded);
+    }
+
+    /**
+     * The one definition of who won a meeting: {@code "A"} when {@code aPoints} is strictly greater,
+     * {@code "B"} when {@code bPoints} is, otherwise {@code "TIE"}. Package-visible because
+     * {@link RivalryService} must reach the same verdict from the same points -- a second copy of this
+     * comparison is the two-implementations-of-one-rule bug (specs/034 research R3, task T007).
+     */
+    static String outcome(double aPoints, double bPoints) {
+        if (aPoints > bPoints) return "A";
+        if (bPoints > aPoints) return "B";
+        return "TIE";
     }
 
     private static boolean isThisPair(Long gA, Long gB, long managerAId, long managerBId) {

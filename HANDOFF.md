@@ -1,5 +1,14 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-14: spec 034 (rivalries page) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/034-rivalry-schedule-grid`, branch `034-rivalry-schedule-grid` (from `origin/main` 8346cdf). Docs are in `specs/034-rivalry-schedule-grid/`: spec, plan (with "Amended after review"), research, plan-review, tasks (T001–T024 done), code-review (B1–B10 fixed, plus 2 found live), verification.
+- **What it does:** `/leagues/:id/rivalries`, for both sports, under History in the rail. It has an all-time H2H matrix, this season’s schedule with the prior record on every opponent, and a recommended rivalry week (an exact best matching, with a reason per pair, thin pairs labelled, and N = 3 hand-set). New `GET /api/leagues/{id}/rivalries`, admin `POST /api/ingest/brackets/{id}`, and **migration V33** `league_bracket_match` (Sleeper winners bracket: a playoff week is about half consolation games, lessons #42).
+- **MERGE ORDER, important:** V32 belongs to the uncommitted 033-trade-verdicts session, and is already applied to the shared 5433 DB. If 034 merges first, **033 must renumber to V34** before it merges, or Flyway refuses it on prod. Local verification ran on a scratch DB copy, `draftsim034-pg` on 5434 (remove with `docker rm -f draftsim034-pg && docker volume rm draftsim034-pgdata` when done).
+- **After deploy (owed):** deploy both Railway services. Then run `POST /api/ingest/brackets/{id}` with `X-Admin-Token` for each league chain once. Later refreshes also fetch a missing or incomplete bracket on their own, bracket-only, never `/matchups`. Then load the page on one NFL and one NBA league.
+- **Open data question:** both stored NBA finals (2025, 2024) disagree with Sleeper’s bracket winner, while 14/16 other bracket games agree. The page shows "final disputed" and prints both. Undiagnosed (verification.md).
+- **Pre-existing, not 034:** `BoardRepositoryLatestBeforeIT` fails on current data (it hard-codes the NBA 2026 draft start at 19:15:08Z; the DB says 21:16:19Z).
+
 ## UPDATE 2026-10-13: spec 032 (stat calculator) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/032-stat-calculator`, branch `032-stat-calculator` (from `origin/main` e9f71aa). Docs are in `specs/032-stat-calculator/`: spec, plan, research, plan-review, code-review, verification, tasks (T001–T027 done).

@@ -907,3 +907,35 @@ Two more from the same live pass:
 - **Live checks need a comparison.** The calculator's 565 px only read as a bug next to the
   leaderboard measuring 375 px on the same emulated device. Before blaming the emulator, measure
   a known-good page.
+
+## 42. A heavy restore into the shared dev Postgres can PANIC it, and a "playoff week" isn't a playoff game
+
+**What happened (2026-10-14, spec 034).** Two things worth keeping from one session.
+
+1. **The shared 5433 server crashed under a restore.** To build a scratch copy beside it, a
+   `pg_dump | pg_restore` went into a second database on the **same** server (`draftsim-pg`, whose data
+   directory is a Windows bind mount). Partway through an index build, Postgres logged
+   `PANIC: could not write to file "pg_wal/xlogtemp…": Interrupted system call`. Every backend was
+   killed, and the server sat in recovery for about 20 s. It recovered cleanly (row counts checked
+   afterwards), but other sessions' in-flight work against 5433 would have failed in that window.
+   **Don't run bulk writes on the shared dev server.** For a scratch DB, start a separate container
+   on a Docker named volume (not a bind mount) on another port, and restore into that.
+   `docker run -d --name draftsim034-pg -p 5434:5432 -v draftsim034-pgdata:/var/lib/postgresql/data postgres:17-alpine`
+   took the same 7 MB dump without trouble. Also: the host's `pg_dump` 14 refuses a 17 server, so
+   run `pg_dump` inside the container.
+
+2. **Every week at or after `playoff_week_start` holds consolation games too.** A 6-team-playoff league
+   stores 14 scored pairings in its playoff weeks: 7 from the winners bracket and 7 consolation
+   games. `roster_season.final_placement` only stores the champion, so nothing stored could tell them
+   apart until spec 034 stored Sleeper's `winners_bracket` (V33). Even the bracket needs care: before
+   the playoffs it's a *provisional* seeding that moves with the standings, the 3rd- and 5th-place
+   games are in it, and a round-type-1 final spans two weeks whose legs can split 1-1 (measured on
+   West Coast 2025). **Never treat "week ≥ playoff_week_start" as "a playoff game".**
+
+Also measured that session: two of two stored NBA finals disagree with Sleeper's bracket winner,
+while 14 of 16 other bracket games agree with the stored scores. That's still an open data question,
+not a code bug; see HANDOFF.
+
+My prediction that most football rivalry pairings would be "thin" was wrong: 2 of 6 measured,
+because the matching *selects* the most-met pairs. A guess about a selected subset can't be read off
+the whole population's distribution.
