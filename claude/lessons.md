@@ -907,3 +907,28 @@ Two more from the same live pass:
 - **Live checks need a comparison.** The calculator's 565 px only read as a bug next to the
   leaderboard measuring 375 px on the same emulated device. Before blaming the emulator, measure
   a known-good page.
+
+## 42. A Sleeper trade's `leg` is the week it was proposed, not the week it took effect
+
+Found 2026-10-13 in spec 033's review (`specs/033-trade-verdicts/spec-review.md` S1). The spec
+measured that traded NBA players kept scoring for their old roster for up to two weeks after
+the trade's stored `week`. It read that as data drift. It wasn't:
+
+- Sleeper's `leg` on a trade comes from `created`, the **proposal**. Trade 816 was proposed
+  2025-11-06 (leg 3) and accepted 2025-11-28 (week 6). `league_transaction.week` stores the leg.
+- `league_transaction.created_at` stores Sleeper's `status_updated`, the **acceptance**
+  (`TransactionIngestService.java:128-131`), despite the column's name. Mapped to the schedule
+  week, it predicts the first week on the new roster in 23 of 28 NBA moves. The 5 misses were
+  accepted at a week boundary.
+- Stored ids aren't chronological either: trade 1720 was accepted after 1753. Order by
+  `created_at`.
+
+The same review found a second "measured" claim built on the first. "Trade weeks are split
+between rosters (21 new / 19 old)" was measured against the proposal week. Re-measured
+directly, weeks are never split. A player appears on two rosters in a week only 4 times, with
+identical full points, started on exactly one side.
+
+**A column's name is a claim about its contents, like a `Content-Type` header (bug class 4).
+Before building on a time field, check which upstream field fills it.** When a measurement rests
+on a field that turned out to mean something else, re-run everything measured against it, not
+just the first number.

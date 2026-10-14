@@ -1,7 +1,9 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.engine.OwnershipTimeline;
 import com.ballknowers.draftsim.engine.RosterManagementService;
 import com.ballknowers.draftsim.engine.SeasonWindow;
+import com.ballknowers.draftsim.engine.TradeVerdictService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
@@ -126,6 +128,12 @@ public class RosterManagementController {
         // Stated, never implied: a 4 beside a name is good, and nothing on the
         // page says so unless this does (US6.3).
         out.put("rankDirection", r.rankDirection());
+        // Spec 033: "so far" vs "final", the last week any verdict could count, and whether every
+        // stored trade carries its picks and FAAB (false until the V32 backfill has run).
+        out.put("seasonFinal", r.seasonFinal());
+        out.put("tradeAssetsLoaded", r.tradeAssetsLoaded());
+        out.put("throughWeek", r.throughWeek());
+        out.put("reconciliation", reconciliationBody(r.reconciliation()));
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("byManager", List.of());
@@ -144,20 +152,10 @@ public class RosterManagementController {
         }
         out.put("byManager", managers);
 
+        // Built mutably, never Map.of: winnerRosterId, margin, position, firstWeek and the like
+        // are legitimately null, and Map.of throws on a null value.
         List<Map<String, Object>> trades = new ArrayList<>();
-        for (TransactionAnalysisService.Trade t : r.trades()) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("week", t.week());
-            List<Map<String, Object>> sides = new ArrayList<>();
-            for (TransactionAnalysisService.TradeSide side : t.sides()) {
-                Map<String, Object> s = new LinkedHashMap<>();
-                s.put("teamName", side.teamName());
-                s.put("received", side.received().stream().map(RosterManagementController::movedBody).toList());
-                sides.add(s);
-            }
-            row.put("sides", sides);
-            trades.add(row);
-        }
+        for (TradeVerdictService.TradeResult t : r.trades()) trades.add(tradeBody(t));
         out.put("trades", trades);
 
         List<Map<String, Object>> adds = new ArrayList<>();
@@ -173,6 +171,105 @@ public class RosterManagementController {
             adds.add(row);
         }
         out.put("adds", adds);
+        return out;
+    }
+
+    private static Map<String, Object> tradeBody(TradeVerdictService.TradeResult t) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("txId", t.txId());
+        row.put("week", t.week());
+        row.put("acceptedAt", t.acceptedAt() == null ? null : t.acceptedAt().toString());
+        row.put("assetsLoaded", t.assetsLoaded());
+        Map<String, Object> verdict = new LinkedHashMap<>();
+        verdict.put("state", t.verdict().state());
+        verdict.put("winnerRosterId", t.verdict().winnerRosterId());
+        verdict.put("margin", t.verdict().margin());
+        verdict.put("weeksCounted", t.verdict().weeksCounted());
+        verdict.put("final", t.verdict().isFinal());
+        row.put("verdict", verdict);
+        List<Map<String, Object>> sides = new ArrayList<>();
+        for (TradeVerdictService.SideResult side : t.sides()) {
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("rosterId", side.rosterId());
+            s.put("teamName", side.teamName());
+            s.put("startedTotal", side.startedTotal());
+            s.put("benchTotal", side.benchTotal());
+            s.put("weeksCounted", side.weeksCounted());
+            List<Map<String, Object>> assets = new ArrayList<>();
+            for (TradeVerdictService.AssetResult a : side.assets()) assets.add(assetBody(a));
+            s.put("assets", assets);
+            sides.add(s);
+        }
+        row.put("sides", sides);
+        return row;
+    }
+
+    private static Map<String, Object> assetBody(TradeVerdictService.AssetResult asset) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        switch (asset) {
+            case TradeVerdictService.PlayerResult p -> {
+                out.put("kind", "PLAYER");
+                out.putAll(playerFields(p));
+            }
+            case TradeVerdictService.PickResult k -> {
+                out.put("kind", "PICK");
+                out.put("season", k.season());
+                out.put("round", k.round());
+                out.put("originalRosterId", k.originalRosterId());
+                out.put("status", k.status());
+                out.put("pickNo", k.pickNo());
+                out.put("player", k.player() == null ? null : assetBody(k.player()));
+            }
+            case TradeVerdictService.FaabResult f -> {
+                out.put("kind", "FAAB");
+                out.put("amount", f.amount());
+                out.put("fromRosterId", f.fromRosterId());
+                out.put("fromTeamName", f.fromTeamName());
+            }
+        }
+        return out;
+    }
+
+    private static Map<String, Object> playerFields(TradeVerdictService.PlayerResult p) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("playerId", p.playerId());
+        out.put("playerName", p.playerName());
+        out.put("position", p.position());
+        out.put("status", p.status());
+        out.put("firstWeek", p.firstWeek());
+        out.put("lastWeek", p.lastWeek());
+        out.put("startedPoints", p.startedPoints());
+        out.put("benchPoints", p.benchPoints());
+        out.put("weeksCounted", p.weeksCounted());
+        out.put("duplicateWeeks", p.duplicateWeeks());
+        out.put("postMovePositionalRank", p.postMoveRank());
+        List<Map<String, Object>> stretches = new ArrayList<>();
+        for (TradeVerdictService.StretchResult st : p.stretches()) {
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("rosterId", st.rosterId());
+            s.put("teamName", st.teamName());
+            s.put("firstWeek", st.firstWeek());
+            s.put("lastWeek", st.lastWeek());
+            s.put("how", st.how());
+            s.put("viaTxId", st.viaTxId());
+            s.put("startedPoints", st.startedPoints());
+            s.put("benchPoints", st.benchPoints());
+            s.put("duplicateWeeks", st.duplicateWeeks());
+            s.put("leadingUnstarted", st.leadingUnstarted());
+            stretches.add(s);
+        }
+        out.put("stretches", stretches);
+        return out;
+    }
+
+    private static Map<String, Object> reconciliationBody(OwnershipTimeline.Reconciliation rec) {
+        if (rec == null) return null;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("playerWeeksChecked", rec.playerWeeksChecked());
+        out.put("unexplainedStretches", rec.unexplainedStretches());
+        out.put("sameWeekInAndOut", rec.sameWeekInAndOut());
+        out.put("neverOnAScoredRoster", rec.neverOnAScoredRoster());
+        out.put("examples", rec.examples());
         return out;
     }
 

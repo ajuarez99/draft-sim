@@ -26,7 +26,8 @@ public class LeagueTransactionRepository {
 
     public record Row(long leagueId, int season, int week, String sleeperTransactionId,
                       String type, String status, Integer rosterId, Long managerId,
-                      String addsJson, String dropsJson, Integer faabBid, Instant createdAt) {}
+                      String addsJson, String dropsJson, Integer faabBid, Instant createdAt,
+                      String draftPicksJson, String waiverBudgetJson) {}
 
     /**
      * Idempotent on {@code (league_id, sleeper_transaction_id)}: re-ingesting a
@@ -38,8 +39,8 @@ public class LeagueTransactionRepository {
         db.sql("""
                 insert into league_transaction (league_id, season, week, sleeper_transaction_id, type,
                                                 status, roster_id, manager_id, adds, drops, faab_bid,
-                                                created_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
+                                                created_at, draft_picks, waiver_budget)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?::jsonb, ?::jsonb)
                 on conflict (league_id, sleeper_transaction_id) do update set
                     season = excluded.season,
                     week = excluded.week,
@@ -50,11 +51,14 @@ public class LeagueTransactionRepository {
                     adds = excluded.adds,
                     drops = excluded.drops,
                     faab_bid = excluded.faab_bid,
-                    created_at = excluded.created_at
+                    created_at = excluded.created_at,
+                    draft_picks = excluded.draft_picks,
+                    waiver_budget = excluded.waiver_budget
                 """)
                 .params(r.leagueId(), r.season(), r.week(), r.sleeperTransactionId(), r.type(),
                         r.status(), r.rosterId(), r.managerId(), r.addsJson(), r.dropsJson(),
-                        r.faabBid(), r.createdAt() == null ? null : java.sql.Timestamp.from(r.createdAt()))
+                        r.faabBid(), r.createdAt() == null ? null : java.sql.Timestamp.from(r.createdAt()),
+                        r.draftPicksJson(), r.waiverBudgetJson())
                 .update();
     }
 
@@ -130,13 +134,30 @@ public class LeagueTransactionRepository {
                 .list();
     }
 
+    /**
+     * Weeks holding a trade stored before V32, whose {@code draft_picks} is still null
+     * (unknown, as opposed to {@code []} = none). The ingest refetches these weeks even when
+     * they are final (spec 033 research R6).
+     */
+    public List<Integer> tradeWeeksMissingAssets(long leagueId) {
+        return db.sql("""
+                select distinct week from league_transaction
+                where league_id = ? and type = 'TRADE' and draft_picks is null
+                order by week
+                """)
+                .params(leagueId)
+                .query((rs, i) -> rs.getInt(1))
+                .list();
+    }
+
     public List<Row> forSeason(long leagueId, int season) {
         return db.sql("""
                 select league_id, season, week, sleeper_transaction_id, type, status, roster_id,
-                       manager_id, adds::text, drops::text, faab_bid, created_at
+                       manager_id, adds::text, drops::text, faab_bid, created_at,
+                       draft_picks::text, waiver_budget::text
                 from league_transaction
                 where league_id = ? and season = ?
-                order by week, created_at nulls last, id
+                order by created_at nulls last, id
                 """)
                 .params(leagueId, season)
                 .query((rs, i) -> new Row(
@@ -145,7 +166,8 @@ public class LeagueTransactionRepository {
                         (Integer) rs.getObject(7), (Long) rs.getObject(8),
                         rs.getString(9), rs.getString(10),
                         (Integer) rs.getObject(11),
-                        rs.getTimestamp(12) == null ? null : rs.getTimestamp(12).toInstant()))
+                        rs.getTimestamp(12) == null ? null : rs.getTimestamp(12).toInstant(),
+                        rs.getString(13), rs.getString(14)))
                 .list();
     }
 }

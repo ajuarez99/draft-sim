@@ -1,5 +1,35 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-14: spec 033 (trade verdicts, roadmap 2.5) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/033-trade-verdicts`, branch `033-trade-verdicts` (from
+  `origin/main` 8346cdf).
+  - Docs in `specs/033-trade-verdicts/`: spec, spec-review, plan, plan-review (F1–F8 plus code
+    review R1/R2), research, data-model, contracts, quickstart, tasks (T001–T028), verification.
+- **What it does:** see README "Trade verdicts".
+  - New migration `V32__trade_assets.sql`: `draft_picks` and `waiver_budget` on
+    `league_transaction`.
+  - No new route: `GET /api/leagues/{id}/transactions` grows.
+- **Local dev DB already has V32 applied, and is backfilled**, because tests and verification
+  ran against it. Main-based servers ignore the extra migration (Flyway treats it as future).
+- **After deploy (owed):**
+  1. Run, on prod with `X-Admin-Token`, one call per league-season with trades:
+     `POST /api/ingest/transactions/{id}` for
+     - `1254190892974084096` (NFL 2025)
+     - `1141438340626231296` (NBA 2024)
+     - `1229352720222134272` (NBA 2025)
+     - `1339351318115946496` (NBA 2026)
+
+     Finished seasons never refetch on their own; until this runs, the page says "Picks and
+     FAAB not loaded".
+  2. Check that `tradeWeeksMissingAssets` is empty, i.e. no TRADE row has a null `draft_picks`.
+  3. Load Roster Management for NBA 2025 and check V2/V3/V4b against `verification.md`.
+- **Open for Allan:**
+  - verdict wording "over N weeks" counts weeks across both sides (verification.md, last
+    section);
+  - rail label "Bench points" vs a "Trades" relabel. Only an on-page jump link was added.
+- **Lesson recorded:** #42, Sleeper's trade `leg` is the proposal week.
+
 ## UPDATE 2026-10-13: spec 032 (stat calculator) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/032-stat-calculator`, branch `032-stat-calculator` (from `origin/main` e9f71aa). Docs are in `specs/032-stat-calculator/`: spec, plan, research, plan-review, code-review, verification, tasks (T001–T027 done).

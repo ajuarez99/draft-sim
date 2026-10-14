@@ -2534,8 +2534,111 @@ export type TransactionAdd = {
   faabBid: number | null
 }
 
-export type TradeSide = { teamName: string; received: MovedPlayer[] }
-export type LeagueTrade = { week: number; sides: TradeSide[] }
+// --- specs/033-trade-verdicts: mirrors contracts/api.md (TradeVerdictService / RosterManagementController) ---
+
+export type TradeAssetStatus =
+  | 'COUNTED'
+  | 'NO_WEEK_YET'
+  | 'UNDONE'
+  | 'LEFT_BEFORE_PLAYING'
+  | 'NEVER_PLAYED_FOR_THEM'
+  | 'NOT_DRAFTED_YET'
+  | 'PICK_NOT_MATCHED'
+  | 'ALREADY_HELD'
+
+/** A traded player. `firstWeek`/`lastWeek`/`postMovePositionalRank` are null unless status is COUNTED. */
+export type TradePlayerAsset = {
+  kind: 'PLAYER'
+  playerId: string
+  playerName: string
+  position: string | null
+  status: TradeAssetStatus
+  firstWeek: number | null
+  lastWeek: number | null
+  startedPoints: number
+  benchPoints: number
+  weeksCounted: number
+  duplicateWeeks: number[]
+  postMovePositionalRank: number | null
+  /** this player's whole season, ordered by first week (US2) */
+  stretches: TradeStretch[]
+}
+
+export type TradeStretchHow = 'DRAFT' | 'TRADE' | 'WAIVER' | 'FREE_AGENT' | 'COMMISSIONER' | 'UNEXPLAINED'
+
+/** One roster's unbroken run with the player. Points are from final weeks only, over the whole stretch. */
+export type TradeStretch = {
+  rosterId: number
+  teamName: string
+  firstWeek: number
+  lastWeek: number
+  how: TradeStretchHow
+  /** null for a draft pick (and an unexplained stretch) */
+  viaTxId: string | null
+  startedPoints: number
+  benchPoints: number
+  /** weeks where two rosters listed him and neither started him */
+  duplicateWeeks: number[]
+  /** true when the roster did not start him in the stretch's first week (possible boundary week) */
+  leadingUnstarted: boolean
+}
+
+/** `pickNo` and `player` are null unless the pick resolved to a drafted player. */
+export type TradePickAsset = {
+  kind: 'PICK'
+  season: number
+  round: number
+  originalRosterId: number
+  status: TradeAssetStatus
+  pickNo: number | null
+  player: TradePlayerAsset | null
+}
+
+export type TradeFaabAsset = { kind: 'FAAB'; amount: number; fromRosterId: number; fromTeamName: string }
+
+export type TradeAsset = TradePlayerAsset | TradePickAsset | TradeFaabAsset
+
+export type TradeVerdictState =
+  | 'WINNER'
+  | 'EVEN'
+  | 'NO_WEEK_YET'
+  | 'UNDONE'
+  | 'RESTORED'
+  | 'NONE_COUNTED'
+  | 'NOT_COMPARABLE'
+
+export type TradeVerdict = {
+  state: TradeVerdictState
+  /** null unless WINNER */
+  winnerRosterId: number | null
+  /** started points, winner minus runner-up; null unless WINNER or EVEN */
+  margin: number | null
+  weeksCounted: number
+  /** league.status complete: "final" rather than "so far" */
+  final: boolean
+}
+
+export type TradeSide = {
+  rosterId: number
+  teamName: string
+  startedTotal: number
+  benchTotal: number
+  weeksCounted: number
+  assets: TradeAsset[]
+}
+
+export type LeagueTrade = {
+  txId: string
+  /** Sleeper's leg: the week the trade was PROPOSED. Show `acceptedAt` instead. */
+  week: number
+  /** ISO-8601 instant of acceptance; null if Sleeper sent none */
+  acceptedAt: string | null
+  /** false when this trade was stored before V32: its picks and FAAB are unknown */
+  assetsLoaded: boolean
+  verdict: TradeVerdict
+  /** ranked by startedTotal, descending */
+  sides: TradeSide[]
+}
 
 export type ManagerTransactionCounts = {
   managerId: number | null
@@ -2553,6 +2656,26 @@ export type LeagueTransactions = {
   trades: LeagueTrade[]
   adds: TransactionAdd[]
   rankDirection: string
+  /** league.status complete: verdicts read "final", else "so far" */
+  seasonFinal: boolean
+  /** false while any stored trade predates V32 (picks and FAAB unknown) */
+  tradeAssetsLoaded: boolean
+  /** the last FINAL week; no later week ever counts */
+  throughWeek: number
+  /** how well the stored moves explain the weekly rosters (R5); null when unavailable */
+  reconciliation: TradeReconciliation | null
+}
+
+export type TradeReconciliation = {
+  playerWeeksChecked: number
+  /** roster changes with no draft pick or inbound move behind them */
+  unexplainedStretches: number
+  /** adds whose player's next move came in the same leg: expected, not errors */
+  sameWeekInAndOut: number
+  /** adds that never reached a scored roster before the next move; each is listed in examples */
+  neverOnAScoredRoster: number
+  /** at most 10 sentences */
+  examples: string[]
 }
 
 export const getLeagueTransactions = (sleeperLeagueId: string) =>
