@@ -57,13 +57,15 @@ public class LeagueHistoryIngestService {
     private final LeagueMatchupRepository fixtures;
     private final TransactionIngestService transactions;
     private final LeagueWeekFetchRepository weekFetches;
+    private final BracketIngestService bracketIngest;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                       ManagerRepository managers, LeagueMemberRepository leagueMembers,
                                       RosterSeasonRepository rosterSeasons, RosterWeekPointsRepository weekPoints,
                                       LeagueMatchupRepository fixtures,
                                       TransactionIngestService transactions,
-                                      LeagueWeekFetchRepository weekFetches) {
+                                      LeagueWeekFetchRepository weekFetches,
+                                      BracketIngestService bracketIngest) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
@@ -73,6 +75,7 @@ public class LeagueHistoryIngestService {
         this.fixtures = fixtures;
         this.transactions = transactions;
         this.weekFetches = weekFetches;
+        this.bracketIngest = bracketIngest;
     }
 
     public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested,
@@ -96,12 +99,24 @@ public class LeagueHistoryIngestService {
             long leagueId = LeagueMapper.upsert(leagues, sport, league);
             String sleeperLeagueId = String.valueOf(league.get("league_id"));
             int season = Integer.parseInt(String.valueOf(league.get("season")));
-            if (skip.contains(sleeperLeagueId)) continue;
+            if (skip.contains(sleeperLeagueId)) {
+                // Spec 034 F6: a skipped (finished) season gets ONE winners_bracket call if it has no stored
+                // bracket -- no /matchups, no standings, so it cannot touch scores. Once any row exists
+                // this is a no-op, so it is one call per season, once. A failure propagates like any other
+                // ingest error rather than letting the season sit as loaded_complete without a bracket.
+                bracketIngest.ingestIfMissing(leagueId, sleeperLeagueId);
+                continue;
+            }
 
             Map<String, Long> managerByUserId = upsertManagers(leagueId, sleeperLeagueId);
             rosterCount += ingestStandings(leagueId, sleeperLeagueId, league, managerByUserId);
             weekCount += ingestWeeklyPoints(leagueId, season, sleeperLeagueId, league);
             fixtureCount += ingestRemainingFixtures(leagueId, season, sleeperLeagueId, league);
+
+            // Spec 034 F2: the bracket is read AFTER the weekly points, so a playoff game scored in this
+            // pass is classified against a bracket at least as fresh as the score. A completed bracket is
+            // left alone (F5); an in-progress one is refreshed each pass.
+            bracketIngest.ingestSeason(leagueId, sleeperLeagueId, false);
 
             // Transactions are week-level league data on the same chain walk and
             // the same cadence as the weekly points above, so they are ingested

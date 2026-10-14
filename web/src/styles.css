@@ -6112,3 +6112,66 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 @media (max-width: 640px) {
   .sc-db-row { grid-template-columns: 20px minmax(0, 1fr) auto; }
 }
+
+/* --- Rivalries (specs/034-rivalry-schedule-grid) -----------------------------
+   Two grids (head-to-head matrix, season schedule), each scrolling inside its own
+   .rv-wrap with a sticky first column so the page never scrolls sideways at 375px.
+   The matrix tint (.rv-w0-4) repeats the win share printed in the cell: one encoding. */
+.rv-section { min-width: 0; margin-bottom: 28px; }
+.rv-h { margin: 0 0 8px; font-size: 15px; color: var(--text); }
+.rv-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+.rv-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+.rv-table thead th { font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 10px; text-align: center; vertical-align: bottom; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.rv-first { position: sticky; left: 0; z-index: 1; background: var(--panel); text-align: left; padding: 8px 12px; border-right: 1px solid var(--line); white-space: nowrap; }
+.rv-table thead .rv-corner { z-index: 2; }
+.rv-table tbody tr > * { border-bottom: 1px solid var(--line); }
+.rv-who { display: inline-flex; align-items: center; gap: 8px; }
+.rv-avatar { flex: none; }
+.rv-name { font-weight: 600; font-size: 12px; }
+.rv-cell { text-align: center; padding: 8px 10px; min-width: 96px; color: var(--text); vertical-align: top; }
+.rv-cell .rv-link { display: block; color: inherit; text-decoration: none; }
+.rv-cell .rv-link:hover { text-decoration: underline; }
+.rv-rec { font-weight: 700; }
+.rv-met { color: var(--muted); font-size: 11px; }
+.rv-fine { display: block; color: var(--muted); font-size: 10px; white-space: normal; }
+.rv-self { color: var(--muted); background: color-mix(in oklab, var(--bg) 60%, var(--panel)); }
+.rv-none { color: var(--muted); font-size: 11px; }
+.rv-all { border-left: 1px solid var(--line); }
+.rv-w0 { background: color-mix(in oklab, var(--down) 22%, var(--panel)); }
+.rv-w1 { background: color-mix(in oklab, var(--down) 10%, var(--panel)); }
+.rv-w2 { background: var(--panel); }
+.rv-w3 { background: color-mix(in oklab, var(--up) 12%, var(--panel)); }
+.rv-w4 { background: color-mix(in oklab, var(--up) 26%, var(--panel)); }
+.rv-table tbody tr:hover > .rv-cell { filter: brightness(1.15); }
+@media (max-width: 480px) {
+  /* Phone width: the sticky first column must not take half the screen. Avatar stays, the name ellipsizes. */
+  .rv-first { max-width: 120px; padding: 8px 8px; overflow: hidden; }
+  .rv-first .rv-who { max-width: 100%; }
+  .rv-first .rv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.rv-me > .rv-first { box-shadow: inset 3px 0 0 var(--crimson); }
+.rv-me > .rv-cell { box-shadow: inset 0 1px 0 color-mix(in oklab, var(--crimson) 40%, transparent); }
+.rv-legend { margin: 8px 0 4px; }
+.rv-season .rv-sc { min-width: 120px; text-align: left; }
+.rv-weekhead { min-width: 120px; }
+.rv-wk { display: block; color: var(--text); text-transform: uppercase; }
+.rv-tag { display: inline-block; margin: 4px 3px 0 0; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--teal) 18%, transparent); color: var(--teal); }
+.rv-tag-po { background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
+th.rv-now { box-shadow: inset 0 -2px 0 var(--teal); }
+td.rv-now { background: color-mix(in oklab, var(--teal) 10%, var(--panel)); }
+td.rv-po { border-left: 1px dashed var(--line); }
+.rv-opp { display: block; font-weight: 600; font-size: 12px; white-space: normal; }
+.rv-state { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; }
+.rv-result { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.rv-W { background: color-mix(in oklab, var(--up) 22%, transparent); color: var(--up); }
+.rv-L { background: color-mix(in oklab, var(--down) 22%, transparent); color: var(--down); }
+.rv-T { background: color-mix(in oklab, var(--muted) 22%, transparent); color: var(--text); }
+.rv-headline { font-weight: 600; margin: 8px 0; }
+.rv-pairs { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
+.rv-pair { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); transition: transform 120ms ease, box-shadow 120ms ease; }
+.rv-pair:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--teal); }
+.rv-pair-who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.rv-vs { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.rv-pair-why { font-size: 13px; }
+.rv-pair-meta { display: flex; gap: 8px; align-items: center; }
+.rv-thin { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }

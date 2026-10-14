@@ -37,13 +37,14 @@ class LeagueHistoryIngestServiceTest {
     @Mock private LeagueMatchupRepository fixtures;
     @Mock private TransactionIngestService transactions;
     @Mock private LeagueWeekFetchRepository weekFetches;
+    @Mock private BracketIngestService bracketIngest;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions, weekFetches);
+                weekPoints, fixtures, transactions, weekFetches, bracketIngest);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
     }
@@ -446,5 +447,53 @@ class LeagueHistoryIngestServiceTest {
         // Counted and reported, not merely called: the endpoint's own response is
         // how anyone running an ingest finds out whether transactions arrived.
         assertEquals(11, result.transactionsIngested());
+    }
+
+    /**
+     * specs/034 T005 / plan.md F6: a skipped (finished) season gets its winners bracket healed through
+     * {@code ingestIfMissing} -- and still makes no {@code matchups}, standings or roster call, so it
+     * cannot move a score.
+     */
+    @Test
+    void aSkippedSeasonOnlyGetsABracketCheck() {
+        Map<String, Object> league = leagueObject("L34a", 2025, Map.of("last_scored_leg", 17), Map.of());
+        when(sleeper.leagueChain("L34a")).thenReturn(List.of(league));
+
+        service.ingestChain(Sport.NFL, "L34a", Set.of("L34a"));
+
+        verify(bracketIngest).ingestIfMissing(55L, "L34a");
+        verify(bracketIngest, never()).ingestSeason(anyLong(), any(), anyBoolean());
+        verify(sleeper, never()).matchups(any(), anyInt());
+        verify(sleeper, never()).rosters(any());
+        verify(rosterSeasons, never()).upsertAll(any());
+    }
+
+    /** F2: a walked season's bracket is ingested after the weekly points, without force. */
+    @Test
+    void aWalkedSeasonIngestsItsBracketAfterThePoints() {
+        Map<String, Object> league = leagueObject("L34b", 2025, Map.of("last_scored_leg", 1), Map.of());
+        when(sleeper.leagueChain("L34b")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L34b")).thenReturn(List.of());
+        when(sleeper.rosters("L34b")).thenReturn(List.of());
+        when(weekPoints.storedWeeks(55L)).thenReturn(Set.of());
+        when(sleeper.matchups(eq("L34b"), anyInt())).thenReturn(List.of());
+
+        service.ingestChain(Sport.NFL, "L34b", Set.of());
+
+        var order = inOrder(sleeper, bracketIngest);
+        order.verify(sleeper).matchups("L34b", 1);
+        order.verify(bracketIngest).ingestSeason(55L, "L34b", false);
+    }
+
+    /** F6: a bracket failure fails the chain, so the refresh never marks the season loaded_complete. */
+    @Test
+    void aBracketFailurePropagates() {
+        Map<String, Object> league = leagueObject("L34c", 2025, Map.of("last_scored_leg", 0), Map.of());
+        when(sleeper.leagueChain("L34c")).thenReturn(List.of(league));
+        when(sleeper.leagueUsers("L34c")).thenReturn(List.of());
+        when(sleeper.rosters("L34c")).thenReturn(List.of());
+        doThrow(new IllegalStateException("sleeper down")).when(bracketIngest).ingestSeason(55L, "L34c", false);
+
+        assertThrows(IllegalStateException.class, () -> service.ingestChain(Sport.NFL, "L34c", Set.of()));
     }
 }

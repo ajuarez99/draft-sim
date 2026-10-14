@@ -375,3 +375,18 @@ describe('players destination', () => {
     expect(playerPagesFor('nfl')).toBe(false)
   })
 })
+
+// specs/034-rivalry-schedule-grid: both sports, season-scoped.
+describe('rivalries destination', () => {
+  it('is offered to both sports', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('rivalries')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).toContain('rivalries')
+  })
+
+  it('maps its path and builds the season being viewed', () => {
+    expect(destinationFromPath('/leagues/x/rivalries')).toBe('rivalries')
+    expect(leagueIdFromPath('/leagues/x/rivalries')).toEqual({ idKind: 'league', id: 'x' })
+    const d = LEAGUE_DESTINATIONS.find((r) => r.key === 'rivalries')!
+    expect(d.href(ctx())).toBe('/leagues/L100/rivalries')
+  })
+})
