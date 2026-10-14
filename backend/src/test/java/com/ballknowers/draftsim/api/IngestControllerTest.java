@@ -47,12 +47,23 @@ class IngestControllerTest {
     @Mock private com.ballknowers.draftsim.ingest.PlayerGameIngestService playerGameIngest;
     @Mock private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjectionIngest;
     @Mock private com.ballknowers.draftsim.ingest.BracketIngestService bracketIngest;
+    @Mock private com.ballknowers.draftsim.ingest.ProjectionSnapshotService projectionSnapshots;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
                 projectionIngest, transactionIngest, playerGameIngest,
                 new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest,
-                bracketIngest);
+                bracketIngest, projectionSnapshots);
+    }
+
+    // ---- POST /api/ingest/projection-snapshot (spec 036) ----
+
+    @Test
+    void projectionSnapshotRunsTheCaptureForTheRequestedSportWithTheCurrentInstant() {
+        var stub = new com.ballknowers.draftsim.ingest.ProjectionSnapshotService.Result("nba", 2026, List.of(1), 5, 0, 0);
+        when(projectionSnapshots.capture(org.mockito.ArgumentMatchers.eq(Sport.NBA), org.mockito.ArgumentMatchers.any())).thenReturn(stub);
+
+        assertSame(stub, controller().projectionSnapshot("nba"));
     }
 
     // ---- POST /api/ingest/adp ----

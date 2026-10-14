@@ -11,6 +11,7 @@ import com.ballknowers.draftsim.ingest.TransactionIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionIngestService;
+import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +39,7 @@ public class IngestController {
     private final BoardRefresh boardRefresh;
     private final SeasonProjectionIngestService seasonProjectionIngest;
     private final BracketIngestService bracketIngest;
+    private final ProjectionSnapshotService projectionSnapshots;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
@@ -47,7 +49,9 @@ public class IngestController {
                             PlayerGameIngestService playerGameIngest,
                             BoardRefresh boardRefresh,
                             SeasonProjectionIngestService seasonProjectionIngest,
-                            BracketIngestService bracketIngest) {
+                            BracketIngestService bracketIngest,
+                            ProjectionSnapshotService projectionSnapshots) {
+        this.projectionSnapshots = projectionSnapshots;
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -187,6 +191,18 @@ public class IngestController {
                                                                   @RequestParam int season,
                                                                   @RequestParam(defaultValue = "false") boolean force) {
         return seasonProjectionIngest.refresh(Sport.fromCode(sport), season, force);
+    }
+
+    /**
+     * specs/036-projection-foundation US1: capture and freeze pre-game projections for one sport. The
+     * same {@code capture(sport, now)} the daily refresh's PROJECTION_SNAPSHOT step runs; it can't
+     * write a post-cutoff line any more than the cron can, because the guards live in the service and
+     * the table, not in the route. {@code sport} is required, not defaulted: a default here would be a
+     * default rule.
+     */
+    @PostMapping("/projection-snapshot")
+    public ProjectionSnapshotService.Result projectionSnapshot(@RequestParam String sport) {
+        return projectionSnapshots.capture(Sport.fromCode(sport), java.time.Instant.now());
     }
 
     /**
