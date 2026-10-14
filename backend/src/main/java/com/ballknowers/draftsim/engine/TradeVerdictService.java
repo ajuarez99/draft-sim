@@ -129,7 +129,7 @@ public class TradeVerdictService {
         for (OwnershipTimeline.Evaluated e : evaluated) {
             out.add(translate(e, playersBySleeperId, nameByRoster, rankByWeek, analysis));
         }
-        // Newest accepted first. Never by stored id: ids are not chronological (lessons #42).
+        // Newest accepted first. Never by stored id: ids are not chronological (lessons #43).
         out.sort(Comparator.comparing(TradeResult::acceptedAt, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(TradeResult::txId));
         return new Result(out, snapshot.latestFinal(), seasonFinal, assetsLoaded, analysis.reconciliation());

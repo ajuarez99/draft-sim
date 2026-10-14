@@ -18,7 +18,7 @@ and neither started him, the week is a *duplicate*: it shows on both, flagged, w
 
 **Alternatives.**
 - *Replaying transactions to decide ownership.* Rejected: `week` is the proposal leg (lessons
-  #42), and NFL 2025 has no stored schedule to map an acceptance time to a week.
+  #43), and NFL 2025 has no stored schedule to map an acceptance time to a week.
 
 ## R2. A gap in the weekly rows means the player left
 
@@ -84,8 +84,8 @@ boundaries.
 - **Sleeper payload.** `draft_picks: [{season, round, roster_id (original owner), owner_id,
   previous_owner_id}]` and `waiver_budget: [{sender, receiver, amount}]`. Ingest drops both today
   (`TransactionIngestService.toRow`).
-- **Storage.** V32 adds two nullable `jsonb` columns to `league_transaction`:
-  - `null` means the row was stored before V32, so its picks and FAAB are unknown;
+- **Storage.** V34 adds two nullable `jsonb` columns to `league_transaction`:
+  - `null` means the row was stored before V34, so its picks and FAAB are unknown;
   - `[]` means none.
   The distinction is surfaced: a season with any TRADE row still null says "picks and FAAB not
   loaded".
@@ -142,7 +142,7 @@ repository query, it heals itself, and it touches about 20 weeks across all leag
 runs it after deploy. Until then the page says "picks
 and FAAB not loaded" for those seasons. It doesn't render them as absent.
 
-**Alternative.** A V32 that deletes `league_week_fetch` TRANSACTIONS rows. Rejected: it would
+**Alternative.** A V34 that deletes `league_week_fetch` TRANSACTIONS rows. Rejected: it would
 refetch every week of every league to fix about 20.
 
 ## R7. What the page shows today
@@ -154,7 +154,7 @@ refetch every week of every league to fix about 20.
   - player-for-FAAB trades (766, 1162) show **one side**.
 
   That's an existing defect, fixed by this spec.
-- "Week N" is the proposal leg (lessons #42). It's replaced by the acceptance date, shown in
+- "Week N" is the proposal leg (lessons #43). It's replaced by the acceptance date, shown in
   the league's timezone convention (US Eastern, as spec 017 uses).
 - **FR-013.** A traded player's `postMoveRank` is recomputed over the R3 window. Waiver adds keep
   the inclusive rule, which is correct for them.

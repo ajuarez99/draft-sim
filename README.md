@@ -37,7 +37,7 @@ Built so far:
 - **Trade verdicts** (specs/033-trade-verdicts). Roster Management grades every trade by the
   started points the received assets actually scored for their new team, from the first scored
   week they were on it. Ownership comes from the weekly scoring rows, not the transaction's week,
-  which is when it was *proposed* (lessons #42). Picks resolve to the drafted player. FAAB is shown,
+  which is when it was *proposed* (lessons #43). Picks resolve to the drafted player. FAAB is shown,
   and makes a trade "not comparable by points" when a side got nothing else. Reversed and restored
   trades say so. Each trade expands into its players' season stretches, a reconciliation
   count checks the transaction log against the scoring rows, and the trade log downloads as CSV.

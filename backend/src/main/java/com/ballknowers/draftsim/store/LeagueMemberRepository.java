@@ -59,6 +59,19 @@ public class LeagueMemberRepository {
                 .list();
     }
 
+    /**
+     * Sleeper's per-league team name by manager; the ingest already falls back to the display name and
+     * drops "TBD". The one definition: {@code LeagueHistoryController} and the rivalry page both read it
+     * from here (specs/034 T012: reuse, don't copy).
+     */
+    public java.util.Map<Long, String> teamNamesByManager(long leagueId) {
+        java.util.Map<Long, String> out = new java.util.HashMap<>();
+        for (MemberRow m : forLeague(leagueId)) {
+            if (m.teamName() != null && !m.teamName().isBlank()) out.put(m.managerId(), m.teamName());
+        }
+        return out;
+    }
+
     public boolean isMember(long leagueId, long managerId) {
         return Boolean.TRUE.equals(db.sql(
                 "select exists (select 1 from league_member where league_id = ? and manager_id = ?)")

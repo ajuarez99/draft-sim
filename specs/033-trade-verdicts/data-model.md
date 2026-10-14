@@ -1,12 +1,17 @@
 # Spec 033 data model
 
-## Storage: V32 (append-only; V31 is the highest today)
+> **Renumbered at merge (2026-10-14): V32 → V34.** Spec 034 merged to main first with V33, and
+> production applied it. Flyway (out-of-order off) would refuse a V32 arriving after V33, and fail
+> startup. V32 had never reached main or prod, so it was renamed rather than edited. Every "V34" in
+> this spec's docs was written as "V32" before the merge.
 
-`V32__trade_assets.sql`:
+## Storage: V34 (append-only; V31 is the highest today)
+
+`V34__trade_assets.sql`:
 
 | Table | Column | Type | Meaning |
 |---|---|---|---|
-| `league_transaction` | `draft_picks` | `jsonb` null | Sleeper `draft_picks` verbatim. `null` = stored before V32, unknown. `[]` = none. |
+| `league_transaction` | `draft_picks` | `jsonb` null | Sleeper `draft_picks` verbatim. `null` = stored before V34, unknown. `[]` = none. |
 | `league_transaction` | `waiver_budget` | `jsonb` null | Sleeper `waiver_budget` verbatim, with the same null/`[]` rule. |
 
 No other schema change. Everything else is computed per request from existing tables:

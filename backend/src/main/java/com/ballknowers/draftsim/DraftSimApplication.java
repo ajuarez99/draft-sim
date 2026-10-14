@@ -25,7 +25,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         PlayerStatsProperties.class,
         NbaGameProperties.class,
         PreseasonProperties.class,
-        RecapProperties.class
+        RecapProperties.class,
+        RivalryProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

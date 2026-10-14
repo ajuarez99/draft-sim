@@ -129,7 +129,7 @@ public class RosterManagementController {
         // page says so unless this does (US6.3).
         out.put("rankDirection", r.rankDirection());
         // Spec 033: "so far" vs "final", the last week any verdict could count, and whether every
-        // stored trade carries its picks and FAAB (false until the V32 backfill has run).
+        // stored trade carries its picks and FAAB (false until the V34 backfill has run).
         out.put("seasonFinal", r.seasonFinal());
         out.put("tradeAssetsLoaded", r.tradeAssetsLoaded());
         out.put("throughWeek", r.throughWeek());

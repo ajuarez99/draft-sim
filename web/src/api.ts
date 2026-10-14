@@ -2633,7 +2633,7 @@ export type LeagueTrade = {
   week: number
   /** ISO-8601 instant of acceptance; null if Sleeper sent none */
   acceptedAt: string | null
-  /** false when this trade was stored before V32: its picks and FAAB are unknown */
+  /** false when this trade was stored before V34: its picks and FAAB are unknown */
   assetsLoaded: boolean
   verdict: TradeVerdict
   /** ranked by startedTotal, descending */
@@ -2658,7 +2658,7 @@ export type LeagueTransactions = {
   rankDirection: string
   /** league.status complete: verdicts read "final", else "so far" */
   seasonFinal: boolean
-  /** false while any stored trade predates V32 (picks and FAAB unknown) */
+  /** false while any stored trade predates V34 (picks and FAAB unknown) */
   tradeAssetsLoaded: boolean
   /** the last FINAL week; no later week ever counts */
   throughWeek: number
@@ -3157,3 +3157,115 @@ export type SeasonStart = {
 }
 export const getSeasonStart = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/season-start`).then(json<SeasonStart>)
+
+/*
+ * specs/034-rivalry-schedule-grid. Mirrors the nested records of RivalryService (contracts/api.md C1)
+ * field for field. Every nullable Java reference below is `| null`; the enum-like strings are Java Strings.
+ */
+export type RivalryTally = { wins: number; losses: number; ties: number; meetings: number }
+export type RivalryRow = {
+  managerId: number
+  managerName: string
+  teamName: string
+  avatarId: string | null
+  isMe: boolean
+  allOpponents: RivalryTally
+  formerOpponentMeetings: number
+}
+export type RivalryKindTally = { aWins: number; bWins: number; ties: number }
+export type RivalryKind = 'REGULAR' | 'PLAYOFF' | 'PLACEMENT' | 'CONSOLATION' | 'POSTSEASON_UNSPLIT'
+/** `winner`: A | B, or null while the bracket match is undecided. */
+export type RivalryFinal = {
+  season: number
+  aPoints: number
+  bPoints: number
+  winner: 'A' | 'B' | null
+  twoWeek: boolean
+  /** Null while the winner is undecided; false when Sleeper's bracket winner has fewer stored points (code-review B2). */
+  scoresAgreeWithWinner: boolean | null
+}
+export type RivalryGameLine = {
+  season: number
+  week: number
+  aPoints: number
+  bPoints: number
+  winner: 'A' | 'B' | 'TIE'
+  kind: RivalryKind
+}
+export type RivalryPairStatus = 'MET' | 'NEVER_MET' | 'NOT_YET_MET' | 'NO_SHARED_HISTORY'
+/** `aManagerId` < `bManagerId`. Wins/losses are A's and B's; the pair is unordered on the wire. */
+export type RivalryPair = {
+  aManagerId: number
+  bManagerId: number
+  meetings: number
+  aWins: number
+  bWins: number
+  ties: number
+  byKind: Record<string, RivalryKindTally>
+  status: RivalryPairStatus
+  finals: RivalryFinal[]
+  games: RivalryGameLine[]
+}
+export type RivalrySplitNote = { season: number; reason: string; text: string }
+export type RivalryMatrix = { rows: RivalryRow[]; pairs: RivalryPair[]; splitNotes: RivalrySplitNote[] }
+export type RivalryWeekColumn = { week: number; isPlayoffWeek: boolean }
+export type RivalryCellResult = {
+  points: number
+  opponentPoints: number
+  outcome: 'W' | 'L' | 'T'
+  kind: RivalryKind
+  /** A final whose stored scores contradict Sleeper's bracket winner (code-review B2). */
+  bracketDisagrees: boolean
+}
+export type RivalryCellState = 'OPPONENT' | 'BYE' | 'NO_GAME' | 'TBD'
+/** `source`, `priorRecord` only for OPPONENT; `opponentManagerId` null for an opponent roster with no manager. */
+export type RivalryCell = {
+  managerId: number
+  week: number
+  state: RivalryCellState
+  source: 'SCHEDULE' | 'BRACKET' | null
+  opponentManagerId: number | null
+  priorRecord: RivalryTally | null
+  result: RivalryCellResult | null
+}
+export type RivalrySeasonGrid = {
+  scheduleStatus: 'OK' | 'NOT_PUBLISHED'
+  currentWeek: number | null
+  weeks: RivalryWeekColumn[]
+  playoffWindowNote: string | null
+  tbdNote: string | null
+  medianNote: string | null
+  rosterNote: string | null
+  cells: RivalryCell[]
+}
+export type RivalryReason = { code: string; text: string; numbers: Record<string, unknown> }
+export type RivalryPairing = {
+  aManagerId: number
+  bManagerId: number
+  meetings: number
+  score: number
+  reason: RivalryReason
+  thin: boolean
+}
+export type RivalryUnpaired = { managerId: number; why: string }
+export type RivalryRecommendationStatus =
+  | 'OK' | 'CONFIG_MISSING' | 'TOO_FEW_MANAGERS' | 'TOO_MANY_MANAGERS' | 'NO_HISTORY'
+export type RivalryRecommendation = {
+  status: RivalryRecommendationStatus
+  minMeetings: number | null
+  minMeetingsLabel: string | null
+  pairings: RivalryPairing[]
+  unpaired: RivalryUnpaired | null
+  thinCount: number
+  note: string
+}
+export type Rivalries = {
+  sport: Sport
+  season: number
+  seasonsCovered: number[]
+  matrix: RivalryMatrix
+  seasonGrid: RivalrySeasonGrid
+  recommendation: RivalryRecommendation
+}
+export const getRivalries = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/rivalries`).then(json<Rivalries>)

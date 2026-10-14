@@ -65,7 +65,7 @@ public class TransactionAnalysisService {
      * @param trades         spec 033: built from adds, draft picks AND FAAB, each with a verdict
      * @param throughWeek    the last FINAL week (ScoredWeeks); no later week ever counts
      * @param seasonFinal    league.status complete: verdicts read "final", else "so far"
-     * @param tradeAssetsLoaded false while any stored trade predates V32 (picks/FAAB unknown)
+     * @param tradeAssetsLoaded false while any stored trade predates V34 (picks/FAAB unknown)
      * @param reconciliation   how well the stored moves explain the weekly rosters (R5); null if unavailable
      */
     public record Result(boolean available, String reason, int season, Sport sport,

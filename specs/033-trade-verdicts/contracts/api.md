@@ -12,7 +12,7 @@ records field-for-field).
   // ...existing: available, season, sport, rankDirection, byManager, adds
   "trades": [ /* LeagueTrade, below */ ],
   "seasonFinal": true,                 // league.status complete; verdicts read "final", else "so far"
-  "tradeAssetsLoaded": true,           // false if any TRADE row predates V32 (picks/FAAB unknown, R6)
+  "tradeAssetsLoaded": true,           // false if any TRADE row predates V34 (picks/FAAB unknown, R6)
   "throughWeek": 21,                   // last_scored_leg; weeks after it never count (plan review F5)
   "reconciliation": {                  // R5 (renamed after plan review F1); numbers, never hidden
     "playerWeeksChecked": 3894,
@@ -84,4 +84,4 @@ records field-for-field).
 maps mutably (`LinkedHashMap`), never with `Map.of` (constitution).
 
 **Order.** `trades[]` is ordered by `acceptedAt`, newest first, then `txId`. It's never ordered
-by stored id (lessons #42).
+by stored id (lessons #43).

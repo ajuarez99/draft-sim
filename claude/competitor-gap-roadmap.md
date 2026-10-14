@@ -74,7 +74,7 @@ by recent form means more once minutes are visible beside it.
 > **Status 2026-10-14 (spec 033):** 2.5 is **built and live-verified locally** in
 > `specs/033-trade-verdicts`, not committed or deployed. It turned out larger than the doc said:
 > - picks and FAAB are real trade assets (the only NBA 2026 trade is picks-only, and 10 of 18 NBA 2025
->   trades move FAAB), so V32 now stores them;
+>   trades move FAAB), so V34 now stores them;
 > - a trade's stored week is its *proposal* week.
 >
 > The trade *tree* (downstream value) stays not built, as the doc proposed.

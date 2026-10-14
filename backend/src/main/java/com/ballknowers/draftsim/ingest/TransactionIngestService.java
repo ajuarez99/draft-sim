@@ -85,7 +85,7 @@ public class TransactionIngestService {
         }
 
         Set<Integer> finalWeeks = weekFetches.finalWeeks(league.id(), LeagueWeekFetchRepository.TRANSACTIONS);
-        // Trades stored before V32 have no draft_picks/waiver_budget. Their weeks are usually final
+        // Trades stored before V34 have no draft_picks/waiver_budget. Their weeks are usually final
         // (never refetched) and finished seasons are skipped by the daily refresh, so refetch them
         // here until every trade carries its assets (spec 033 research R6).
         Set<Integer> missingAssets = new HashSet<>(transactions.tradeWeeksMissingAssets(league.id()));

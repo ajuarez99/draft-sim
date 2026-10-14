@@ -17,7 +17,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Spec 033 T005: V32's draft_picks / waiver_budget columns through the real JDBC binds and SQL
+ * Spec 033 T005: V34's draft_picks / waiver_budget columns through the real JDBC binds and SQL
  * (AGENTS.md bug classes 2 and 3). Uses a throwaway league row and removes it afterwards.
  * READ THE SKIP COUNT, not just BUILD SUCCESSFUL.
  */
@@ -99,7 +99,7 @@ class LeagueTransactionAssetsIT {
 
     @Test
     void forSeasonOrdersByCreatedAtEvenWhenIdsAreReversed() {
-        // Inserted first (lower id) but accepted later, like trade 1720 vs 1753 (lessons #42).
+        // Inserted first (lower id) but accepted later, like trade 1720 vs 1753 (lessons #43).
         repo.upsert(row(1, "late", Instant.parse("2099-02-01T00:00:00Z"), "[]", "[]"));
         repo.upsert(row(1, "early", Instant.parse("2099-01-01T00:00:00Z"), "[]", "[]"));
         List<LeagueTransactionRepository.Row> rows = repo.forSeason(leagueId, 2099);

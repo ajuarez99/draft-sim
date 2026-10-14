@@ -149,6 +149,7 @@ describe('what a league is offered', () => {
       'Draft board',
       'Mock it',
       'Standings',
+      'Rivalries',
     ])
   })
 

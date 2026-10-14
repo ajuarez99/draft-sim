@@ -43,7 +43,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -397,6 +397,23 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // whole chain: History walks every season itself
     href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/history`,
     match: /^\/leagues\/([^/]+)\/history\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inRail: true,
+  },
+  {
+    key: 'rivalries',
+    group: 'history',
+    glyph: '⚔',
+    // Both sports: it reads scores and pairings already stored (specs/034).
+    sports: ['nfl', 'nba'],
+    label: 'Rivalries',
+    // one season, unlike History above: the page shows the head-to-head history up to and
+    // including the season being viewed, plus THAT season's schedule, so the rail's year
+    // links must keep you on it.
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/rivalries`,
+    match: /^\/leagues\/([^/]+)\/rivalries\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

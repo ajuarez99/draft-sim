@@ -24,10 +24,10 @@ the wire's `throughWeek` = `Snapshot.latestFinal()`.
 
 ## Phase 1: Setup
 
-- [X] T001 Create `backend/src/main/resources/db/migration/V32__trade_assets.sql`:
+- [X] T001 Create `backend/src/main/resources/db/migration/V34__trade_assets.sql`:
   `alter table league_transaction add column draft_picks jsonb, add column waiver_budget jsonb;`
   Both nullable, no default, with a header comment:
-  - "`null` = stored before V32 (unknown); `[]` = none".
+  - "`null` = stored before V34 (unknown); `[]` = none".
   - Verify V31 is still the highest existing version before writing.
 
 ---
@@ -39,7 +39,7 @@ the wire's `throughWeek` = `Snapshot.latestFinal()`.
   - Add `String draftPicksJson, String waiverBudgetJson` (nullable).
   - Write them in `upsert`, as `?::jsonb`, and in the `on conflict ... do update set` list.
   - Read them in `forSeason`.
-  - Change `forSeason`'s order to `order by created_at nulls last, id`. Lessons #42: stored
+  - Change `forSeason`'s order to `order by created_at nulls last, id`. Lessons #43: stored
     ids aren't chronological (trade 1720 was accepted after 1753), and week is the proposal leg.
   - Update every other constructor call site of `Row`. Grep for `new LeagueTransactionRepository.Row(`.
 - [X] T003 Add `List<Integer> tradeWeeksMissingAssets(long leagueId)` to the same repository:
@@ -54,7 +54,7 @@ the wire's `throughWeek` = `Snapshot.latestFinal()`.
     seasons are skipped by the daily refresh.
 - [X] T005 IT `backend/src/test/java/com/ballknowers/draftsim/store/LeagueTransactionAssetsIT.java`
   (`@SpringBootTest`, the `Assumptions` skip pattern of `engine/ScheduleSwapIT.java`):
-  - V32 applied;
+  - V34 applied;
   - upsert round-trips non-null `draft_picks` / `waiver_budget` jsonb, plus an explicit `[]` and
     a null (bug class 3: run the real bind);
   - `tradeWeeksMissingAssets` executes and returns the week of a null-assets TRADE (bug class 2);

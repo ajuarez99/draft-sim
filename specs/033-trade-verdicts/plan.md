@@ -5,6 +5,11 @@
 
 **Input**: Feature specification from `specs/033-trade-verdicts/spec.md`
 
+> **Renumbered at merge (2026-10-14): V32 → V34.** Spec 034 merged to main first with V33, and
+> production applied it. Flyway (out-of-order off) would refuse a V32 arriving after V33, and fail
+> startup. V32 had never reached main or prod, so it was renamed rather than edited. Every "V34" in
+> this spec's docs was written as "V32" before the merge.
+
 ## Summary
 
 Every trade on Roster Management gets a verdict: started points the received assets produced
@@ -12,8 +17,8 @@ for the receiving roster, side against side. Three rules come from measurement, 
 design doc:
 
 1. **Ownership comes from the weekly scoring rows**, by starter (R1–R3), not from a
-   transaction's week. That week is the *proposal* leg (lessons #42).
-2. **Picks and FAAB are trade assets.** A new V32 stores them. Same-season picks resolve to
+   transaction's week. That week is the *proposal* leg (lessons #43).
+2. **Picks and FAAB are trade assets.** A new V34 stores them. Same-season picks resolve to
    the drafted player (verified on the real 2026 trade). FAAB makes a trade "not comparable
    by points" when a side gets nothing else.
 3. **A reconciliation count** of transactions against the scoring rows rides on the wire as
@@ -27,7 +32,7 @@ No new route: `GET /transactions` grows. The CSV is built client-side from the s
 
 **Primary Dependencies**: Existing only. Nothing new.
 
-**Storage**: Postgres. One append-only migration, `V32__trade_assets.sql`, adds two nullable
+**Storage**: Postgres. One append-only migration, `V34__trade_assets.sql`, adds two nullable
 jsonb columns.
 
 **Testing**: JUnit (unit tests on the pure `OwnershipTimeline`, plus ITs against Postgres);
@@ -43,7 +48,7 @@ under 300 ms locally.
 
 **Constraints**:
 - Honesty rules (AGENTS.md): no "0–0", no winner for FAAB/picks-only sides, and "not loaded"
-  stated when V32 data is missing.
+  stated when V34 data is missing.
 - Constitution: `Map.of` is not used where values can be null; `api.ts` mirrors the records.
 
 **Scale/Scope**: 26 stored trades across 4 league-seasons; both sports
@@ -52,7 +57,7 @@ under 300 ms locally.
 
 | Rule | Status |
 |---|---|
-| Migrations append-only | ✅ V32 is new; V31 is untouched |
+| Migrations append-only | ✅ V34 is new; V31 is untouched |
 | `api.ts` mirrors records in the same change | ✅ Planned as one task with the controller body ([contracts/api.md](contracts/api.md)) |
 | No retuned constants | ✅ None introduced. The only threshold is EVEN at \|margin\| < 0.05, a rounding guard, not a tunable. |
 | No `Map.of` with nullable values | ✅ The contract lists the nullable fields; bodies are `LinkedHashMap` |
@@ -105,7 +110,7 @@ under 300 ms locally.
   - the 2026 picks trade, resolved to the four players;
   - 766: NOT_COMPARABLE.
 - **IT against Postgres:**
-  - V32 applies;
+  - V34 applies;
   - the upsert round-trips `draft_picks` / `waiver_budget` jsonb (bug class 3: run the real
     bind);
   - the `tradeWeeksMissingAssets` SQL executes (bug class 2).
@@ -128,7 +133,7 @@ specs/033-trade-verdicts/
 ### Source Code (repository root)
 
 ```text
-backend/src/main/resources/db/migration/V32__trade_assets.sql                 (new)
+backend/src/main/resources/db/migration/V34__trade_assets.sql                 (new)
 backend/src/main/java/com/ballknowers/draftsim/
 ├── ingest/TransactionIngestService.java                                      (store picks/FAAB, backfill)
 ├── store/LeagueTransactionRepository.java                                    (columns, order, missing-assets query)

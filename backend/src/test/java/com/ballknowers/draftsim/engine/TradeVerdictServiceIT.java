@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Spec 033 against the local database's real leagues, through the real read path (real SQL, real JDBC
  * binds). Skipped by {@link Assumptions} when Postgres or the league is absent: READ THE SKIP COUNT.
  *
- * <p>State observed when written (2026-10-14): the V32 backfill has NOT run, so every stored trade has
+ * <p>State observed when written (2026-10-14): the V34 backfill has NOT run, so every stored trade has
  * {@code draft_picks} null. These tests assert that state ({@code tradeAssetsLoaded == false}) and do not
  * assume the backfilled one; a trade stored before the backfill and made only of FAAB or picks has no
  * sides at all, which is shown as not comparable, never as a score.

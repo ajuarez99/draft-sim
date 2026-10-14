@@ -22,7 +22,7 @@ We store it as `adds = {}`, `drops = {}`, because ingest keeps neither `draft_pi
 - Older seasons: 0 pick-carrying trades in NFL 2025, NBA 2025 or NBA 2024. Measured by scanning
   legs 0–25 of each.
 
-**Fix:** ingest `draft_picks` (new migration V32, append-only). Then:
+**Fix:** ingest `draft_picks` (new migration V34, append-only). Then:
 - resolve same-season picks to the player taken with them, and grade that player's stretch;
 - show future-season picks as moved but "not drafted yet".
 
@@ -57,7 +57,7 @@ nonsense AGENTS.md warns about. 1455 and 1508 are FAAB-only. The spec's "a side 
 nothing" edge case is these, misread.
 
 **Fix:**
-- Ingest `waiver_budget` too (same V32).
+- Ingest `waiver_budget` too (same V34).
 - Show FAAB moved on each side.
 - FAAB has no points. When any side's only assets are FAAB or unresolved picks, the verdict is
   **"not comparable by points"**: show what each side got, crown no one.

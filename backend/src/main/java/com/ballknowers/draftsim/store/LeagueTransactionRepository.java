@@ -135,7 +135,7 @@ public class LeagueTransactionRepository {
     }
 
     /**
-     * Weeks holding a trade stored before V32, whose {@code draft_picks} is still null
+     * Weeks holding a trade stored before V34, whose {@code draft_picks} is still null
      * (unknown, as opposed to {@code []} = none). The ingest refetches these weeks even when
      * they are final (spec 033 research R6).
      */
