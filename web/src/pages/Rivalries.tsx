@@ -6,8 +6,11 @@ import {
   getRivalries,
   type Rivalries as RivalriesData,
   type RivalryCell,
+  type RivalryDisplaced,
   type RivalryPairing,
   type RivalryRow,
+  type RivalryWeekOption,
+  type RivalryWeekRecommendation,
 } from '../api'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock } from '../useBlock'
@@ -267,11 +270,165 @@ export function SeasonPanel({ data }: { data: RivalriesData }) {
   )
 }
 
+const WEEK_STATUS_TEXT: Record<string, string> = {
+  CONFIG_MISSING: "A week can't be recommended because this app's meeting-limit setting didn't load.",
+  NOT_PUBLISHED: "A week can't be recommended until the schedule is published.",
+  UNSUPPORTED_ROSTERS: "A week can't be recommended because not every team has exactly one manager this season.",
+  NO_SEASON_FORMAT: "This league's settings don't say where the regular season ends, so no week is recommended.",
+  NO_ELIGIBLE_WEEK: 'No regular-season week is left to recommend.',
+}
+
+/** The NO_WEEK_FITS sentence names the league's real limit; without a cap it stays generic. */
+function noWeekFitsText(cap: number | null): string {
+  return cap != null
+    ? `Every remaining week would make someone play the same manager more than ${cap} ${cap === 1 ? 'time' : 'times'}, so no week is recommended.`
+    : 'Every remaining week would break the meeting limit, so no week is recommended.'
+}
+
+/** [3] -> "week 3"; [3, 11] -> "weeks 3 and 11"; [3, 5, 11] -> "weeks 3, 5 and 11". */
+function weeksText(weeks: number[]): string {
+  if (weeks.length === 1) return `week ${weeks[0]}`
+  return `weeks ${weeks.slice(0, -1).join(', ')} and ${weeks[weeks.length - 1]}`
+}
+
+const NTH = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth']
+
+function PairRow({
+  p, rows, already,
+}: { p: RivalryPairing; rows: Map<number, RivalryRow>; already?: boolean }) {
+  const a = rows.get(p.aManagerId)
+  const b = rows.get(p.bManagerId)
+  return (
+    <li className="rv-pair">
+      <span className="rv-pair-who">
+        {a ? <Who row={a} /> : `Manager ${p.aManagerId}`}
+        <span className="rv-vs">vs</span>
+        {b ? <Who row={b} /> : `Manager ${p.bManagerId}`}
+      </span>
+      <span className="rv-pair-why">{p.reason.text}</span>
+      <span className="rv-pair-meta">
+        <span className="rv-met">{p.meetings} {p.meetings === 1 ? 'meeting' : 'meetings'}</span>
+        {p.thin && <span className="rv-thin">thin history</span>}
+        {already && <span className="rv-sched">already on the schedule</span>}
+      </span>
+    </li>
+  )
+}
+
+function ThinHeadline({ thin, total }: { thin: number; total: number }) {
+  if (total === 0 || thin * 2 <= total) return null
+  return (
+    <p className="rv-headline">
+      Most of these pairings ({thin} of {total}) rest on thin history, so treat the reasons as a starting point
+      rather than a verdict.
+    </p>
+  )
+}
+
+function vsText(rows: Map<number, RivalryRow>, a: number, b: number): string {
+  return `${nameOf(rows, a)} vs ${nameOf(rows, b)}`
+}
+
+function displacedText(d: RivalryDisplaced): string {
+  const bits: string[] = []
+  if (d.metInWeeks.length > 0) bits.push(`already met in ${weeksText(d.metInWeeks)}`)
+  if (d.stillMeetsInWeeks.length > 0) bits.push(`still meet in ${weeksText(d.stillMeetsInWeeks)}`)
+  return bits.length > 0 ? bits.join('; ') : "they wouldn't meet otherwise this season"
+}
+
+function RecommendedWeek({
+  week, rows,
+}: { week: RivalryWeekRecommendation; rows: Map<number, RivalryRow> }) {
+  const r = week.recommended as RivalryWeekOption
+  const thin = r.pairings.filter((p) => p.pairing.thin).length
+  const cap = week.cap
+  return (
+    <>
+      <h3 className="rv-week-h">Recommended: Week {r.week}</h3>
+      {week.asOfWeek != null && <p className="muted small">as of week {week.asOfWeek}</p>}
+      <p className="rv-headline">{r.reason.text}</p>
+      {cap != null && (
+        <p className="muted small">
+          Nobody plays the same manager more than {cap} times in the regular season
+          {week.capLabel ? ` (${week.capLabel})` : ''}.
+        </p>
+      )}
+      {week.overCapNote && <p className="muted small">{week.overCapNote}</p>}
+      <ThinHeadline thin={thin} total={r.pairings.length} />
+      <ul className="rv-pairs">
+        {r.pairings.map((wp) => (
+          <PairRow
+            key={`${wp.pairing.aManagerId}:${wp.pairing.bManagerId}`}
+            p={wp.pairing} rows={rows} already={wp.alreadyScheduled}
+          />
+        ))}
+      </ul>
+      {r.unpaired && (
+        <p className="muted small">
+          <strong>{nameOf(rows, r.unpaired.managerId)}</strong> sits out. {r.unpaired.why}
+        </p>
+      )}
+      {r.heldBack.length > 0 && (
+        <ul className="rv-held">
+          {r.heldBack.map((h) => (
+            <li key={`${h.aManagerId}:${h.bManagerId}`} className="small">
+              {nameOf(rows, h.aManagerId)} and {nameOf(rows, h.bManagerId)} already meet in{' '}
+              {weeksText(h.meetsInWeeks)}, so they'd play a {NTH[h.wouldMeet] ?? `${h.wouldMeet}th`} time.
+            </li>
+          ))}
+        </ul>
+      )}
+      {r.displaced.length > 0 && (
+        <details className="rv-details">
+          <summary>What this replaces</summary>
+          <ul className="rv-held">
+            {r.displaced.map((d) => (
+              <li key={`${d.aManagerId}:${d.bManagerId}`} className="small">
+                <strong>{vsText(rows, d.aManagerId, d.bManagerId)}</strong>: {displacedText(d)}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {week.unfitWeeks.length > 0 && (
+        <p className="muted small">
+          No full set fits in {weeksText(week.unfitWeeks)}.
+        </p>
+      )}
+      {week.others.length > 0 && (
+        <details className="rv-details">
+          <summary>Other weeks</summary>
+          {week.others.map((o) => (
+            <details key={o.week} className="rv-details rv-other">
+              <summary>
+                Week {o.week}: {o.total} of {o.bestTotal}
+                {o.heldBack.length > 0 ? ` · ${o.heldBack.length} held back` : ''}
+              </summary>
+              <p className="muted small">{o.reason.text}</p>
+              <ul className="rv-pairs">
+                {o.pairings.map((wp) => (
+                  <PairRow
+                    key={`${wp.pairing.aManagerId}:${wp.pairing.bManagerId}`}
+                    p={wp.pairing} rows={rows} already={wp.alreadyScheduled}
+                  />
+                ))}
+              </ul>
+            </details>
+          ))}
+        </details>
+      )}
+    </>
+  )
+}
+
 export function RivalryWeekPanel({ data }: { data: RivalriesData }) {
   const rec = data.recommendation
   const rows = new Map(data.matrix.rows.map((r) => [r.managerId, r]))
   const minText =
     rec.minMeetings != null ? `at least ${rec.minMeetings} meetings (${rec.minMeetingsLabel ?? 'hand-set'})` : null
+  // Loose equality on purpose: an older backend omits `week` (undefined) and must render spec 034's view.
+  const week = rec.week != null ? rec.week : null
+  const picked = week != null && week.status === 'OK' && week.recommended != null
   return (
     <section className="section rv-section" aria-labelledby="rv-week-h">
       <h2 id="rv-week-h" className="rv-h">Rivalry week</h2>
@@ -282,36 +439,33 @@ export function RivalryWeekPanel({ data }: { data: RivalriesData }) {
           {minText && (
             <p className="muted small">A pairing is marked thin history unless the two have met {minText}.</p>
           )}
-          {rec.pairings.length > 0 && rec.thinCount * 2 > rec.pairings.length && (
-            <p className="rv-headline">
-              Most of these pairings ({rec.thinCount} of {rec.pairings.length}) rest on thin history, so treat the
-              reasons as a starting point rather than a verdict.
-            </p>
-          )}
-          <ul className="rv-pairs">
-            {rec.pairings.map((p: RivalryPairing) => {
-              const a = rows.get(p.aManagerId)
-              const b = rows.get(p.bManagerId)
-              return (
-                <li key={`${p.aManagerId}:${p.bManagerId}`} className="rv-pair">
-                  <span className="rv-pair-who">
-                    {a ? <Who row={a} /> : `Manager ${p.aManagerId}`}
-                    <span className="rv-vs">vs</span>
-                    {b ? <Who row={b} /> : `Manager ${p.bManagerId}`}
-                  </span>
-                  <span className="rv-pair-why">{p.reason.text}</span>
-                  <span className="rv-pair-meta">
-                    <span className="rv-met">{p.meetings} {p.meetings === 1 ? 'meeting' : 'meetings'}</span>
-                    {p.thin && <span className="rv-thin">thin history</span>}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-          {rec.unpaired && (
-            <p className="muted small">
-              <strong>{nameOf(rows, rec.unpaired.managerId)}</strong> sits out. {rec.unpaired.why}
-            </p>
+          {picked ? (
+            <RecommendedWeek week={week as RivalryWeekRecommendation} rows={rows} />
+          ) : (
+            <>
+              {week != null && (
+                <>
+                  <p className="muted small">
+                    {week.status === 'NO_WEEK_FITS'
+                      ? noWeekFitsText(week.cap)
+                      : WEEK_STATUS_TEXT[week.status] ?? 'A rivalry week recommendation is not available.'}
+                  </p>
+                  {week.overCapNote && <p className="muted small">{week.overCapNote}</p>}
+                  <h3 className="rv-week-h">Best pairings from history</h3>
+                </>
+              )}
+              <ThinHeadline thin={rec.thinCount} total={rec.pairings.length} />
+              <ul className="rv-pairs">
+                {rec.pairings.map((p: RivalryPairing) => (
+                  <PairRow key={`${p.aManagerId}:${p.bManagerId}`} p={p} rows={rows} />
+                ))}
+              </ul>
+              {rec.unpaired && (
+                <p className="muted small">
+                  <strong>{nameOf(rows, rec.unpaired.managerId)}</strong> sits out. {rec.unpaired.why}
+                </p>
+              )}
+            </>
           )}
         </>
       )}

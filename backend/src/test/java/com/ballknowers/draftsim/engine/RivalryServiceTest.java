@@ -51,7 +51,7 @@ class RivalryServiceTest {
     private LeagueBracketRepository brackets;
     private LeagueMemberRepository members;
     private ManagerRepository managers;
-    private RivalryProperties props = new RivalryProperties(3, 1.5, 2.5, 16);
+    private RivalryProperties props = new RivalryProperties(3, 1.5, 2.5, 16, 2);
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -427,18 +427,18 @@ class RivalryServiceTest {
 
     @Test
     void aMissingOrPartialConfigBlockIsConfigMissing() {
-        props = new RivalryProperties(null, null, null, null);
+        props = new RivalryProperties(null, null, null, null, 2);
         assertEquals("CONFIG_MISSING", worldA(true).recommendation().status());
-        props = new RivalryProperties(3, 1.5, null, 16);
+        props = new RivalryProperties(3, 1.5, null, 16, 2);
         assertEquals("CONFIG_MISSING", worldA(true).recommendation().status(), "one null key is not loaded (F17)");
         assertNull(worldA(true).recommendation().minMeetings());
     }
 
     @Test
     void tooManyAndTooFewManagersAreRefusedWithAReason() {
-        props = new RivalryProperties(3, 1.5, 2.5, 4);
+        props = new RivalryProperties(3, 1.5, 2.5, 4, 2);
         assertEquals("TOO_MANY_MANAGERS", worldA(true).recommendation().status());
-        props = new RivalryProperties(3, 1.5, 2.5, 16);
+        props = new RivalryProperties(3, 1.5, 2.5, 16, 2);
         LeagueRow l = row(1, 2026, "s1", "s0");
         when(leagues.chainBySleeperId("s1")).thenReturn(List.of(l, row(0, 2025, "s0", null)));
         stubLeague(l, List.of(standing(1, 1, 11L)), List.of(), List.of(), null, OptionalInt.empty());

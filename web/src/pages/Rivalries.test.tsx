@@ -2,7 +2,13 @@ import { render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Rivalries from './Rivalries'
 import { indexPairs, viewFrom, kindSplit } from '../rivalries'
-import type { Rivalries as RivalriesData, RivalryPair, RivalryRow } from '../api'
+import type {
+  Rivalries as RivalriesData,
+  RivalryPair,
+  RivalryRow,
+  RivalryWeekOption,
+  RivalryWeekRecommendation,
+} from '../api'
 
 vi.mock('react-router-dom', () => ({
   useParams: () => ({ sleeperLeagueId: 'L1' }),
@@ -92,6 +98,7 @@ function data(over: Partial<RivalriesData> = {}): RivalriesData {
       unpaired: { managerId: 2, why: 'Leaving Bravo out gives the highest total.' },
       thinCount: 1,
       note: "This is a suggestion for a rivalry week; it doesn't change your Sleeper schedule.",
+      week: null,
     },
     ...over,
   }
@@ -248,5 +255,183 @@ describe('review fixes', () => {
     // matrix: Alpha's cell title names the winner from Alpha's side
     const alpha = within(matrixRow('Alpha')).getByRole('link', { name: /5-2/ })
     expect(alpha.getAttribute('title')).toContain("2025: Sleeper's bracket gives the final to Bravo; the stored scores say otherwise.")
+  })
+})
+
+// ---- specs/037-rivalry-week-pick
+
+const weekPairing = (a: number, b: number, text: string, over: { thin?: boolean; already?: boolean } = {}) => ({
+  pairing: {
+    aManagerId: a, bManagerId: b, meetings: 4, score: 3, thin: over.thin ?? false,
+    reason: { code: 'EVEN', text, numbers: {} },
+  },
+  alreadyScheduled: over.already ?? false,
+})
+
+const weekOption = (week: number, over: Partial<RivalryWeekOption> = {}): RivalryWeekOption => ({
+  week,
+  total: 31.5,
+  bestTotal: 34,
+  reason: {
+    code: 'BEST_UNDER_CAP',
+    text: "1 of the best pairings would go over the 2-meeting limit in week 9, so it's swapped out. This set scores 31.5 of a possible 34.",
+    numbers: {},
+  },
+  pairings: [
+    weekPairing(1, 2, 'WEEKNINE pair one.', { already: true }),
+    weekPairing(3, 4, 'WEEKNINE pair two.'),
+  ],
+  unpaired: null,
+  heldBack: [{ aManagerId: 1, bManagerId: 3, meetsInWeeks: [3, 11], wouldMeet: 3 }],
+  displaced: [
+    { aManagerId: 1, bManagerId: 3, metInWeeks: [], stillMeetsInWeeks: [16] },
+    { aManagerId: 2, bManagerId: 3, metInWeeks: [2], stillMeetsInWeeks: [] },
+    { aManagerId: 1, bManagerId: 2, metInWeeks: [], stillMeetsInWeeks: [] },
+  ],
+  ...over,
+})
+
+function weekData(over: Partial<RivalryWeekRecommendation> = {}): RivalriesData {
+  const d = data()
+  const week: RivalryWeekRecommendation = {
+    status: 'OK',
+    cap: 2,
+    capLabel: 'league rule',
+    asOfWeek: 6,
+    recommended: weekOption(9),
+    others: [
+      weekOption(12, {
+        total: 30, heldBack: [], displaced: [],
+        reason: { code: 'ALL_BEST_FIT', text: 'WEEKTWELVE reason.', numbers: {} },
+        pairings: [weekPairing(1, 4, 'WEEKTWELVE pair.')],
+      }),
+    ],
+    unfitWeeks: [],
+    overCapNote: null,
+    ...over,
+  }
+  return { ...d, recommendation: { ...d.recommendation, week } }
+}
+
+describe('rivalry week pick (spec 037)', () => {
+  beforeEach(() => getRivalries.mockReset())
+
+  it('names the week, its reason, the cap rule and the week pairings instead of the history-best set', async () => {
+    getRivalries.mockResolvedValue(weekData())
+    render(<Rivalries />)
+    expect(await screen.findByText('Recommended: Week 9')).toBeInTheDocument()
+    expect(screen.getByText(/1 of the best pairings would go over the 2-meeting limit in week 9/)).toBeInTheDocument()
+    expect(screen.getByText('Nobody plays the same manager more than 2 times in the regular season (league rule).'))
+      .toBeInTheDocument()
+    expect(screen.getByText('as of week 6')).toBeInTheDocument()
+    expect(screen.getByText('WEEKNINE pair one.')).toBeInTheDocument()
+    expect(screen.queryByText('One-sided so far.')).toBeNull()
+    expect(screen.getByText(/doesn't change your Sleeper schedule/)).toBeInTheDocument()
+  })
+
+  it('lists the other weeks with total against best and shows each week its own pairings', async () => {
+    getRivalries.mockResolvedValue(weekData())
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    const others = screen.getByText('Other weeks').closest('details') as HTMLElement
+    expect(within(others).getByText(/Week 12/)).toBeInTheDocument()
+    expect(within(others).getByText(/30 of 34/)).toBeInTheDocument()
+    expect(within(others).getByText('WEEKTWELVE pair.')).toBeInTheDocument()
+  })
+
+  it('tags pairs that are already on the schedule', async () => {
+    getRivalries.mockResolvedValue(weekData())
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    expect(screen.getAllByText('already on the schedule')).toHaveLength(1)
+  })
+
+  it('prints the held-back pair own would-be count, not one derived from the cap', async () => {
+    getRivalries.mockResolvedValue(weekData({
+      cap: 3,
+      recommended: weekOption(9, { heldBack: [{ aManagerId: 1, bManagerId: 3, meetsInWeeks: [1, 4, 5], wouldMeet: 4 }] }),
+    }))
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    expect(screen.getByText("Alpha and Charlie already meet in weeks 1, 4 and 5, so they'd play a fourth time."))
+      .toBeInTheDocument()
+  })
+
+  it('NO_WEEK_FITS names the real cap, and stays generic without one', async () => {
+    getRivalries.mockResolvedValue(weekData({ status: 'NO_WEEK_FITS', recommended: null, others: [], cap: 3 }))
+    const { unmount } = render(<Rivalries />)
+    expect(await screen.findByText(/more than 3 times, so no week is recommended/)).toBeInTheDocument()
+    unmount()
+    getRivalries.mockResolvedValue(weekData({ status: 'NO_WEEK_FITS', recommended: null, others: [], cap: null }))
+    render(<Rivalries />)
+    expect(await screen.findByText(/break the meeting limit, so no week is recommended/)).toBeInTheDocument()
+  })
+
+  it('says, per held-back pair, which weeks they already meet', async () => {
+    getRivalries.mockResolvedValue(weekData())
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    expect(screen.getByText("Alpha and Charlie already meet in weeks 3 and 11, so they'd play a third time."))
+      .toBeInTheDocument()
+  })
+
+  it('lists what the week replaces, past and future meetings in words', async () => {
+    getRivalries.mockResolvedValue(weekData())
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    const replaces = screen.getByText('What this replaces').closest('details') as HTMLElement
+    expect(within(replaces).getByText(/Alpha vs Charlie/)).toBeInTheDocument()
+    expect(within(replaces).getByText(/still meet in week 16/)).toBeInTheDocument()
+    expect(within(replaces).getByText(/already met in week 2/)).toBeInTheDocument()
+    expect(within(replaces).getByText(/they wouldn't meet otherwise this season/)).toBeInTheDocument()
+  })
+
+  it('names the weeks no full set fits in, and any over-cap note', async () => {
+    getRivalries.mockResolvedValue(weekData({ unfitWeeks: [18, 19], overCapNote: 'Alpha and Bravo meet 3 times.' }))
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    expect(screen.getByText('No full set fits in weeks 18 and 19.')).toBeInTheDocument()
+    expect(screen.getByText('Alpha and Bravo meet 3 times.')).toBeInTheDocument()
+  })
+
+  it('counts thin history on the pairings it shows, not on the history-best set', async () => {
+    // rec.thinCount is 1 of 2 (not more than half); the shown week has 2 thin of 2.
+    getRivalries.mockResolvedValue(weekData({
+      recommended: weekOption(9, {
+        pairings: [weekPairing(1, 2, 'a', { thin: true }), weekPairing(3, 4, 'b', { thin: true })],
+      }),
+    }))
+    render(<Rivalries />)
+    expect(await screen.findByText(/2 of 2\) rest on thin history/)).toBeInTheDocument()
+  })
+
+  it('falls back to spec 034 when the backend predates the week field (undefined, not null)', async () => {
+    const d = data()
+    const old = { ...d, recommendation: { ...d.recommendation } } as unknown as { recommendation: Record<string, unknown> }
+    delete old.recommendation.week
+    getRivalries.mockResolvedValue(old)
+    render(<Rivalries />)
+    expect(await screen.findByText('One-sided so far.')).toBeInTheDocument()
+    expect(screen.queryByText(/Recommended: Week/)).toBeNull()
+    expect(screen.queryByText('Best pairings from history')).toBeNull()
+  })
+
+  it.each([
+    ['NOT_PUBLISHED', "A week can't be recommended until the schedule is published."],
+    ['NO_SEASON_FORMAT', "This league's settings don't say where the regular season ends, so no week is recommended."],
+    ['NO_ELIGIBLE_WEEK', 'No regular-season week is left to recommend.'],
+    ['NO_WEEK_FITS', 'Every remaining week would make someone play the same manager more than 2 times, so no week is recommended.'],
+    ['UNSUPPORTED_ROSTERS', "A week can't be recommended because not every team has exactly one manager this season."],
+    ['CONFIG_MISSING', "A week can't be recommended because this app's meeting-limit setting didn't load."],
+  ] as const)('%s prints its sentence, then the history-best pairings', async (status, sentence) => {
+    getRivalries.mockResolvedValue(weekData({
+      status, recommended: null, others: [], cap: status === 'CONFIG_MISSING' ? null : 2,
+    }))
+    render(<Rivalries />)
+    expect(await screen.findByText(sentence)).toBeInTheDocument()
+    expect(screen.getByText('Best pairings from history')).toBeInTheDocument()
+    expect(screen.getByText('One-sided so far.')).toBeInTheDocument()
+    expect(screen.queryByText(/Recommended: Week/)).toBeNull()
+    expect(screen.getByText(/doesn't change your Sleeper schedule/)).toBeInTheDocument()
   })
 })

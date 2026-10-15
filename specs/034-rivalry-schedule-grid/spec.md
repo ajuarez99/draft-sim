@@ -245,6 +245,9 @@ exactly once, and every reason's numbers match US1's matrix for that pair.
 - **"Rivalry week" picks one week's pairings, not which week.** The commissioner chooses the
   week. The tool doesn't recommend a week number, because a commissioner-set week is a league
   decision, not a data question.
+  **Amended by spec 037 (2026-10-15):** at Allan's request the tool now does recommend a week,
+  chosen together with its pairings under a "no pair meets more than twice" rule. See
+  `specs/037-rivalry-week-pick/spec.md`. This line is kept as the original decision.
 - **Pairing objective**: favor pairs whose history makes the best story: close records with
   many meetings first, then playoff history and streaks. The exact scoring and how it trades
   off against a full matching is a plan-stage decision. The scoring must come with a test that

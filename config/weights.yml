@@ -183,11 +183,16 @@ draftsim:
   # meeting (a final counts once, not per week). championship-bonus: added once if they met in a final.
   # max-managers: the exact matching is a bitmask DP, so it is capped; above this the section is
   # refused rather than approximated. Delete this block and the rivalry week answers CONFIG_MISSING.
+  # max-regular-season-meetings (spec 037): the most times any two managers may meet in the regular season
+  # once rivalry week is in; the week recommendation only offers weeks and pairings that obey it. This is
+  # a LEAGUE RULE (Allan, 2026-10-15), not a fitted number; range 1-5. Leave it out and only the week
+  # recommendation answers CONFIG_MISSING; spec 034's pairings still show.
   rivalry:
     min-meetings: 3
     playoff-bonus: 1.5
     championship-bonus: 2.5
     max-managers: 16
+    max-regular-season-meetings: 2
 
   # Minutes trends and streaming candidates (spec 019). ARBITRARY: every number here is hand-set,
   # not fitted (specs/019-minutes-streaming research R5, plan review F7). role-threshold-minutes:

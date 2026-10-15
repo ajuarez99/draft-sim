@@ -3,6 +3,8 @@ package com.ballknowers.draftsim.engine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.BiPredicate;
 
 /**
  * The scoring and the exact matching behind the rivalry week (specs/034-rivalry-schedule-grid T010,
@@ -23,6 +25,11 @@ import java.util.List;
  * <p>Pairings are an exact maximum-weight perfect matching by bitmask DP, not a greedy pass (greedy is
  * order-sensitive and not optimal). Capped by the caller's {@code maxManagers}: above it the section is
  * refused, never approximated.
+ *
+ * <p>Spec 037 adds an {@code allowed} overload: a disallowed pair is simply not an edge, and when no full
+ * matching exists the answer is empty rather than an exception. The unconstrained {@link #match(List,
+ * PairScore, int)} delegates to it with every pair allowed, so spec 034's answer is unchanged
+ * ({@code RivalryMatchingTest} passes untouched). In an odd league the sit-out is never constrained.
  */
 public final class RivalryMatching {
 
@@ -74,6 +81,36 @@ public final class RivalryMatching {
      *                                  repeated id
      */
     public static Matching match(List<Long> managerIds, PairScore fn, int maxManagers) {
+        return solve(managerIds, fn, null, maxManagers).orElseThrow();
+    }
+
+    /**
+     * {@link #match(List, PairScore, int)} with a pair filter. {@code allowed} is asked once per unordered
+     * pair (lower id first) and turned into a matrix up front, so the DP's inner loop does no calls.
+     *
+     * @return empty when no full matching exists with every chosen pair allowed (in an odd league: even with
+     *         the best sit-out)
+     */
+    public static Optional<Matching> match(List<Long> managerIds, PairScore fn, BiPredicate<Long, Long> allowed,
+                                           int maxManagers) {
+        long[] sorted = managerIds.stream().mapToLong(Long::longValue).sorted().toArray();
+        boolean[][] ok = new boolean[sorted.length][sorted.length];
+        for (int i = 0; i < sorted.length; i++) {
+            for (int j = i + 1; j < sorted.length; j++) ok[i][j] = allowed.test(sorted[i], sorted[j]);
+        }
+        return solve(managerIds, fn, ok, maxManagers);
+    }
+
+    /**
+     * As above with the filter already a matrix over the ids sorted ascending ({@code allowed[i][j]} for
+     * {@code i < j}); the week picker builds it once per week.
+     */
+    static Optional<Matching> match(List<Long> managerIds, PairScore fn, boolean[][] allowed, int maxManagers) {
+        return solve(managerIds, fn, allowed, maxManagers);
+    }
+
+    private static Optional<Matching> solve(List<Long> managerIds, PairScore fn, boolean[][] allowed,
+                                            int maxManagers) {
         int n = managerIds.size();
         if (n < 2) throw new IllegalArgumentException("a matching needs at least 2 managers, got " + n);
         if (n > maxManagers) {
@@ -102,6 +139,7 @@ public final class RivalryMatching {
             }
             for (int j = i + 1; j < n; j++) {
                 if ((mask & (1 << j)) != 0) continue;
+                if (allowed != null && !allowed[i][j]) continue;
                 double rest = f[mask | (1 << i) | (1 << j)];
                 if (rest == Double.NEGATIVE_INFINITY) continue;
                 double cand = s[i][j] + rest;
@@ -110,6 +148,8 @@ public final class RivalryMatching {
             f[mask] = best;
             choice[mask] = pick;
         }
+
+        if (f[0] == Double.NEGATIVE_INFINITY) return Optional.empty();   // never walk `choice` without a solution
 
         List<Pair> pairs = new ArrayList<>();
         Long unpaired = null;
@@ -131,9 +171,10 @@ public final class RivalryMatching {
         if (unpairedIdx >= 0) {
             for (int j = 0; j < n; j++) {
                 if (j == unpairedIdx) continue;
+                if (allowed != null && !(unpairedIdx < j ? allowed[unpairedIdx][j] : allowed[j][unpairedIdx])) continue;
                 unpairedBest = Math.max(unpairedBest, unpairedIdx < j ? s[unpairedIdx][j] : s[j][unpairedIdx]);
             }
         }
-        return new Matching(List.copyOf(pairs), unpaired, unpairedBest, f[0]);
+        return Optional.of(new Matching(List.copyOf(pairs), unpaired, unpairedBest, f[0]));
     }
 }
