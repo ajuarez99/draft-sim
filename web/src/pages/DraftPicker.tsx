@@ -10,6 +10,8 @@ import SportFilterRail from '../components/SportFilterRail'
 import { useSportFilter, type SportFilter } from '../sportFilter'
 import StartMockModal, { type MockableLeague } from '../components/StartMockModal'
 import PageHeader from '../components/PageHeader'
+import PlatformBadge from '../components/PlatformBadge'
+import EspnLeagueSetup from '../components/EspnLeagueSetup'
 import HowThisWorks from '../components/HowThisWorks'
 import HomeSpotlight from '../components/HomeSpotlight'
 import { useRailContextSlot } from '../appSlots'
@@ -229,7 +231,7 @@ export default function DraftPicker() {
     nba: lineages.filter((l) => l.current.sport === 'nba').length,
   }
   const visibleLineages = lineages.filter((l) => sportFilter === 'all' || l.current.sport === sportFilter)
-  const mockableLeagues: MockableLeague[] = lineages.map((l) => ({
+  const mockableLeagues: MockableLeague[] = lineages.filter((l) => l.current.platform !== 'ESPN').map((l) => ({
     sleeperLeagueId: l.current.sleeperLeagueId,
     leagueName: l.current.leagueName,
     sport: l.current.sport,
@@ -349,7 +351,10 @@ export default function DraftPicker() {
                 // above this component that took out the entire picker screen --
                 // one unstarted draft row was enough to make the app unusable.
                 const status = d.status ?? 'unknown'
-                const live = status === 'pre_draft' || status === 'drafting'
+                // Spec 035: an ESPN league has no draft room to follow, so it is never "live" here
+                // and its card links to the league home only (T034).
+                const isEspn = d.platform === 'ESPN'
+                const live = !isEspn && (status === 'pre_draft' || status === 'drafting')
                 // Hashed on the NAME, not the id: every season of a league is a
                 // separate Sleeper league id, so hashing the id gave the two
                 // "(Foot) Ball Knowers" cards different colors -- the exact
@@ -374,6 +379,7 @@ export default function DraftPicker() {
                         {/* The sport pill -- load-bearing now that the sidebar
                             filter mixes both sports in "All sports". */}
                         <span className={`sport-pill ${d.sport}`}>{d.sport.toUpperCase()}</span>
+                        <PlatformBadge platform={d.platform} />
                         {d.season} &middot; {d.teams} managers
                       </span>
                     </span>
@@ -388,7 +394,9 @@ export default function DraftPicker() {
                       </Link>
                     ) : (
                       <span className="league-card-status">
-                        {status === 'complete' ? 'Draft complete' : 'Draft status unknown'}
+                        {isEspn
+                          ? 'ESPN league'
+                          : status === 'complete' ? 'Draft complete' : 'Draft status unknown'}
                       </span>
                     )}
 
@@ -400,13 +408,15 @@ export default function DraftPicker() {
                           its sport and itself -- design_handoff_multisport_
                           mock_drafts's "fastest correct path" for starting a
                           mock. */}
-                      <button
-                        type="button"
-                        className="league-card-mockit"
-                        onClick={() => openMockModal({ sport: d.sport, leagueId: d.sleeperLeagueId })}
-                      >
-                        Mock it
-                      </button>
+                      {!isEspn && (
+                        <button
+                          type="button"
+                          className="league-card-mockit"
+                          onClick={() => openMockModal({ sport: d.sport, leagueId: d.sleeperLeagueId })}
+                        >
+                          Mock it
+                        </button>
+                      )}
                     </span>
                   </li>
                 )
@@ -608,6 +618,7 @@ export default function DraftPicker() {
             </button>
           </div>
         </details>
+        <EspnLeagueSetup onAdded={refetch} />
       </div>
 
       {modalSeed && (

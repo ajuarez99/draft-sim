@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.store;
 
+import com.ballknowers.draftsim.domain.Platform;
 import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -76,6 +77,31 @@ public class DraftRepository {
                 .param(9, slotToManagerJson)
                 .param(10, reversalRound)
                 .param(11, pickTimerSeconds, Types.INTEGER)
+                .query(Long.class)
+                .single();
+    }
+
+    /**
+     * Spec 035: the ESPN draft row. {@code start_time} and the pick timer are null (ESPN reports neither),
+     * and {@code reversal_round} is 0 with a meaning of "N/A: ESPN drafts are never simulated" (plan F19).
+     * The 11-argument {@link #upsert} never touches {@code platform}, so a Sleeper ingest cannot flip it.
+     */
+    public long upsertEspn(long leagueId, String draftKey, int season, int rounds, int teams, String type,
+                           String status, String slotToManagerJson) {
+        return db.sql("""
+                insert into draft (league_id, sleeper_draft_id, season, rounds, teams, draft_type, status,
+                                   start_time, slot_to_manager, reversal_round, pick_timer_seconds, platform)
+                values (?, ?, ?, ?, ?, ?, ?, null, ?::jsonb, 0, null, 'ESPN')
+                on conflict (sleeper_draft_id) do update set
+                    rounds = excluded.rounds,
+                    teams = excluded.teams,
+                    status = excluded.status,
+                    slot_to_manager = excluded.slot_to_manager,
+                    draft_type = excluded.draft_type,
+                    platform = 'ESPN'
+                returning id
+                """)
+                .params(leagueId, draftKey, season, rounds, teams, type, status, slotToManagerJson)
                 .query(Long.class)
                 .single();
     }
@@ -393,18 +419,20 @@ public class DraftRepository {
      */
     public record DraftSummary(long id, String sleeperDraftId, long leagueId, String leagueName,
                                int season, int teams, int rounds, String status, Instant startTime,
-                               String sleeperLeagueId, String previousLeagueId, Sport sport) {}
+                               String sleeperLeagueId, String previousLeagueId, Sport sport,
+                               Platform platform) {}
 
     private static final String DRAFT_SUMMARY_COLUMNS = """
             d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-            d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport
+            d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport, d.platform
             """;
 
     private static DraftSummary mapDraftSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new DraftSummary(rs.getLong(1), rs.getString(2), rs.getLong(3),
                 rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
                 rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
-                rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12)));
+                rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12)),
+                Platform.fromCode(rs.getString(13)));
     }
 
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
@@ -443,6 +471,14 @@ public class DraftRepository {
                 .param(sleeperUserId)
                 .query(DraftRepository::mapDraftSummary)
                 .list();
+    }
+
+    /** The platform of the draft behind this key, empty when no such draft is stored (PlatformGuard). */
+    public Optional<Platform> platformOf(String sleeperDraftId) {
+        return db.sql("select platform from draft where sleeper_draft_id = ?")
+                .param(sleeperDraftId)
+                .query((rs, i) -> Platform.fromCode(rs.getString(1)))
+                .optional();
     }
 
     /** Every completed pick across every ingested draft, for profile fitting. */
@@ -484,6 +520,9 @@ public class DraftRepository {
                 join draft d on d.id = p.draft_id
                 join league l on l.id = d.league_id
                 where d.status = 'complete' and p.manager_id is not null and l.sport = ?
+                  -- Spec 035 F1: an ESPN draft never feeds the draft model. Its picks carry no
+                  -- adp_at_time and its seats are never simulated; the filter is the rule.
+                  and l.platform = 'SLEEPER'
                 order by p.draft_id, p.pick_no
                 """)
                 .param(sport.code())

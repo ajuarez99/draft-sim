@@ -59,6 +59,7 @@ public class LeagueAnalysisService {
     private final ManagerRepository managers;
     private final LeagueMatchupRepository matchupRepo;
     private final SleeperClient sleeper;
+    private final LeagueRosterSource rosterSource;
     private final SportRulesRegistry rulesRegistry;
     private final LeagueMemberRepository members;
     private final LetterGrades letterGrades;
@@ -86,6 +87,7 @@ public class LeagueAnalysisService {
         this.managers = managers;
         this.matchupRepo = matchupRepo;
         this.sleeper = sleeper;
+        this.rosterSource = new LeagueRosterSource(sleeper, leagues, rosterSeasons);
         this.rulesRegistry = rulesRegistry;
         this.members = members;
     }
@@ -382,7 +384,7 @@ public class LeagueAnalysisService {
         // are unavailable, so it cannot depend on the live roster fetch the
         // projection pass makes. `manager` is unique on sleeper_user_id, so the
         // two routes name the same person.
-        Long myManagerId = sleeperUserId == null ? null : managers.idsBySleeperUserId().get(sleeperUserId);
+        Long myManagerId = sleeperUserId == null ? null : ManagerRepository.caller(managers, league.id(), sleeperUserId);
 
         List<ScoreRow> rows = new ArrayList<>();
         for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
@@ -502,6 +504,14 @@ public class LeagueAnalysisService {
                                     String sleeperUserId, int matchupWeek, boolean withMatchups) {
         List<String> groups = Position.forSport(league.sport()).stream().map(Enum::name).toList();
         String unit = league.sport() == Sport.NFL ? UNIT_REST_OF_SEASON : UNIT_PER_WEEK;
+
+        // Spec 035 FR-012 (code review B1): an ESPN league whose scoring has untranslated rules is stored with an
+        // empty/partial scoring map, so league.ppr() is 0 and these blocks would project under STANDARD scoring.
+        // Refuse before any window or projection gate, in the one sentence LeagueAvailability owns.
+        Optional<LeagueAvailability.Reason> untranslated = LeagueAvailability.scoringUntranslated(league);
+        if (untranslated.isPresent()) {
+            return unavailable(groups, matchupWeek, unit, untranslated.get().code(), untranslated.get().message());
+        }
 
         // Basketball's strength is per-game and values no window, so the football window gates do not apply
         // to it: its season is over when the league is complete (amended after code review, R6).
@@ -860,17 +870,23 @@ public class LeagueAnalysisService {
         private final Map<Integer, String> managerNames = new HashMap<>();
         private final Map<Integer, String> avatars = new HashMap<>();
         private final String sleeperUserId;
+        private final Long callerManagerId;
         private final boolean basketball;
 
         LineupPass(LeagueRepository.LeagueRow league, List<String> groups, String sleeperUserId) {
             this.groups = groups;
             this.basketball = league.sport() == Sport.NBA;
-            this.sleeperUserId = sleeperUserId;
+            // S4: a header shaped like another platform's key is no identity at all.
+            this.sleeperUserId = LeagueMembership.isAnonymous(sleeperUserId) ? null : sleeperUserId;
             this.settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
             this.rules = rulesRegistry.get(league.sport());
             this.slotOrder = league.rosterPositions();
-            this.rosters = sleeper.rosters(league.sleeperId());
+            this.rosters = rosterSource.rosters(league);
             this.managerBySleeperUserId = managers.idsBySleeperUserId();
+            // S6 (spec 035 FR-004): "you" is the manager who owns a roster in this league, which for an ESPN
+            // league is the claimed link's manager, not the header string. Identical for Sleeper.
+            this.callerManagerId = this.sleeperUserId == null ? null
+                    : ManagerRepository.caller(managers, league.id(), this.sleeperUserId);
             players.findAll(league.sport()).forEach(p -> playerBySleeperId.put(p.sleeperId(), p));
             rosterSeasons.forLeague(league.id()).forEach(r -> {
                 managerNames.put(r.rosterId(), r.managerName());
@@ -896,7 +912,7 @@ public class LeagueAnalysisService {
                         avatars.get(rosterId), ids(roster.get("players")), reserve));
             }
             return projectRosters(inputs, playerBySleeperId, pointsByPlayer, rules, settings, groups,
-                    slotOrder, sleeperUserId);
+                    slotOrder, sleeperUserId, callerManagerId);
         }
 
         /** Every roster has no players: Sleeper's list is empty, or the key is absent or JSON null. */
@@ -934,6 +950,14 @@ public class LeagueAnalysisService {
                                                  Map<String, Double> pointsByPlayer, SportRules rules,
                                                  LeagueSettings settings, List<String> groups,
                                                  List<String> slotOrder, String sleeperUserId) {
+        return projectRosters(inputs, playerBySleeperId, pointsByPlayer, rules, settings, groups, slotOrder,
+                sleeperUserId, null);
+    }
+
+    static List<RosterProjection> projectRosters(List<RosterInput> inputs, Map<String, Player> playerBySleeperId,
+                                                 Map<String, Double> pointsByPlayer, SportRules rules,
+                                                 LeagueSettings settings, List<String> groups,
+                                                 List<String> slotOrder, String sleeperUserId, Long callerManagerId) {
         List<RosterProjection> out = new ArrayList<>();
         for (RosterInput in : inputs) {
             String owner = in.ownerId();
@@ -941,7 +965,9 @@ public class LeagueAnalysisService {
             // caller's header carries, so "is this mine" is a string
             // comparison and not a manager lookup. A signed-out reader has
             // no id and therefore owns nothing, which is the right answer.
-            boolean isMe = owner != null && owner.equals(sleeperUserId);
+            // Spec 035 S6: an ESPN claimant owns no roster by owner_id; they are the linked manager.
+            boolean isMe = (owner != null && owner.equals(sleeperUserId))
+                    || (callerManagerId != null && callerManagerId.equals(in.managerId()));
 
             Set<String> reserve = new HashSet<>(in.reserve());
             boolean basketball = settings.sport() == Sport.NBA;

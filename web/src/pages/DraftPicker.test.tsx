@@ -153,7 +153,7 @@ describe('DraftPicker hero subtitle', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
   })
   const drafts = [
     draftRow({}),
@@ -184,7 +184,7 @@ describe('DraftPicker league rows', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
   })
 
   beforeEach(() => {
@@ -251,7 +251,7 @@ describe('DraftPicker player spotlight', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
   })
 
   beforeEach(() => {

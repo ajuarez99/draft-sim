@@ -37,7 +37,17 @@ public class RosterSeasonRepository {
      */
     public record Upsert(long leagueId, Long managerId, int rosterId, Integer wins, Integer losses,
                          Integer ties, Double pointsFor, Double pointsAgainst, Double pointsPossible,
-                         Integer finalPlacement, List<String> players, OffsetDateTime playersFetchedAt) {}
+                         Integer finalPlacement, List<String> players, OffsetDateTime playersFetchedAt,
+                         List<String> reserve) {
+
+        /** Every Sleeper caller: no reserve list to store. */
+        public Upsert(long leagueId, Long managerId, int rosterId, Integer wins, Integer losses,
+                      Integer ties, Double pointsFor, Double pointsAgainst, Double pointsPossible,
+                      Integer finalPlacement, List<String> players, OffsetDateTime playersFetchedAt) {
+            this(leagueId, managerId, rosterId, wins, losses, ties, pointsFor, pointsAgainst, pointsPossible,
+                    finalPlacement, players, playersFetchedAt, null);
+        }
+    }
 
     /**
      * T025 (specs/006-deeper-history-both-sports): confirmed this upsert
@@ -63,8 +73,8 @@ public class RosterSeasonRepository {
         String sql = """
                 insert into roster_season (league_id, manager_id, roster_id, wins, losses, ties,
                                            points_for, points_against, points_possible, final_placement,
-                                           players, players_fetched_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                           players, players_fetched_at, reserve)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (league_id, roster_id) do update set
                     manager_id = excluded.manager_id,
                     wins = excluded.wins,
@@ -75,7 +85,8 @@ public class RosterSeasonRepository {
                     points_possible = excluded.points_possible,
                     final_placement = excluded.final_placement,
                     players = excluded.players,
-                    players_fetched_at = excluded.players_fetched_at
+                    players_fetched_at = excluded.players_fetched_at,
+                    reserve = excluded.reserve
                 """;
         for (Upsert r : rows) {
             jdbc.execute(sql, (PreparedStatement ps) -> {
@@ -97,6 +108,8 @@ public class RosterSeasonRepository {
                 }
                 if (r.playersFetchedAt() == null) ps.setNull(12, Types.TIMESTAMP_WITH_TIMEZONE);
                 else ps.setObject(12, r.playersFetchedAt());
+                if (r.reserve() == null) ps.setNull(13, Types.ARRAY);
+                else ps.setArray(13, ps.getConnection().createArrayOf("text", r.reserve().toArray()));
                 return ps.executeUpdate();
             });
         }
@@ -122,6 +135,58 @@ public class RosterSeasonRepository {
      *                  can only claim as much freshness as its stalest roster
      */
     public record Rostered(Map<String, Integer> byPlayer, OffsetDateTime fetchedAt) {}
+
+    /** One stored roster in the Sleeper-ish shape the engine reads (spec 035 LeagueRosterSource). */
+    public record EspnRoster(int rosterId, String ownerSleeperUserId, List<String> players, List<String> reserve) {}
+
+    /** Distinct players on this league's rosters that the matcher refused (their stored key is {@code espn:<id>}). */
+    public int unmatchedPlayerCount(long leagueId) {
+        Integer n = db.sql("""
+                select count(distinct k) from (
+                    select unnest(players) k from roster_season where league_id = ?
+                    union all
+                    select unnest(reserve) k from roster_season where league_id = ?) t
+                where k like 'espn:%'
+                """).params(leagueId, leagueId).query(Integer.class).single();
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * The players counted by {@link #unmatchedPlayerCount}, named: ESPN's name, position and team plus the
+     * outcome ({@code AMBIGUOUS}, {@code UNMATCHED}, {@code ESPN_ONLY_POSITION}). FR-007's "visible list".
+     */
+    public List<PlatformPlayerLinkRepository.UnmatchedPlayer> unmatchedPlayers(long leagueId, String sportCode) {
+        return db.sql("""
+                select l.external_name, l.external_position, l.external_team, l.outcome
+                from (select distinct substring(k from 6) ext from (
+                          select unnest(players) k from roster_season where league_id = ?
+                          union all
+                          select unnest(reserve) k from roster_season where league_id = ?) t
+                      where k like 'espn:%') x
+                join platform_player_link l on l.platform = 'ESPN' and l.sport = ? and l.external_id = x.ext
+                order by l.external_name, l.external_id
+                """).params(leagueId, leagueId, sportCode)
+                .query((rs, i) -> new PlatformPlayerLinkRepository.UnmatchedPlayer(rs.getString(1), rs.getString(2),
+                        rs.getString(3), rs.getString(4)))
+                .list();
+    }
+
+    public List<EspnRoster> espnRosters(long leagueId) {
+        return db.sql("""
+                select rs.roster_id, m.sleeper_user_id, rs.players, rs.reserve
+                from roster_season rs left join manager m on m.id = rs.manager_id
+                where rs.league_id = ? order by rs.roster_id
+                """)
+                .param(leagueId)
+                .query((rs, i) -> {
+                    Array p = rs.getArray(3);
+                    Array r = rs.getArray(4);
+                    return new EspnRoster(rs.getInt(1), rs.getString(2),
+                            p == null ? null : List.of((String[]) p.getArray()),
+                            r == null ? null : List.of((String[]) r.getArray()));
+                })
+                .list();
+    }
 
     private record PlayersRow(int rosterId, String[] players, OffsetDateTime fetchedAt) {}
 

@@ -58,7 +58,10 @@ public class PowerRankingService {
         this.weekPoints = weekPoints;
         this.rankings = rankings;
         this.rulesRegistry = rulesRegistry;
+        this.rosterSource = new LeagueRosterSource(sleeper, leagues, rosterSeasons);
     }
+
+    private final LeagueRosterSource rosterSource;
 
     public record SportState(int week, String season, String seasonStartDate, boolean started) {}
 
@@ -88,6 +91,19 @@ public class PowerRankingService {
             started = false;
         }
         return new SportState(week, season, startDate, started);
+    }
+
+    /**
+     * Per-league state (spec 035 F4). Sleeper delegates to the sport-wide {@link #sportState(Sport)} as
+     * before; an ESPN league has no Sleeper state to ask, so its week is the stored
+     * {@code settings_json.leg} (never defaulted: absent reads as week 0 / not started).
+     */
+    public SportState sportState(LeagueRepository.LeagueRow league) {
+        if (league.isSleeper()) return sportState(league.sport());
+        int week = leagues.currentLeg(league.id()).orElse(0);
+        boolean started = week >= 1 || league.complete();
+        // unverified: confirm against real league (T053) -- ESPN gives no season start date here.
+        return new SportState(week, String.valueOf(league.season()), null, started);
     }
 
     private record Scored(int rosterId, Long managerId, double score, String note) {}
@@ -137,6 +153,13 @@ public class PowerRankingService {
         LeagueSettings settings = LeagueRepository.toSettings(leagueRow, leagueRow.rosterPositions().size());
         SportRules rules = rulesRegistry.get(settings.sport());
 
+        // Spec 035 F16: untranslated ESPN scoring would be baselined as standard scoring, and this snapshot
+        // is write-once. Refuse, with the reason, and write nothing.
+        Optional<LeagueAvailability.Reason> untranslated = LeagueAvailability.scoringUntranslated(leagueRow);
+        if (untranslated.isPresent()) {
+            return new Week0Result(new PowerRankingRepository.Entry[0], untranslated.get().message());
+        }
+
         Map<String, Long> playerIdBySleeperId = players.idsBySleeperId(settings.sport());
         Map<Long, BoardEntry> boardByPlayerId = new HashMap<>();
         boards.currentBoard(settings.sport()).forEach(be -> boardByPlayerId.put(be.player().id(), be));
@@ -144,7 +167,7 @@ public class PowerRankingService {
 
         List<Scored> scored = new ArrayList<>();
         int rosteredAcrossLeague = 0;
-        for (Map<String, Object> roster : sleeper.rosters(sleeperLeagueId)) {
+        for (Map<String, Object> roster : rosterSource.rosters(sleeperLeagueId)) {
             int rosterId = asInt(roster.get("roster_id"), -1);
             if (rosterId < 0) continue;
             Object ownerId = roster.get("owner_id");
@@ -292,7 +315,7 @@ public class PowerRankingService {
                                                                   int season, int week,
                                                                   List<Integer> orderedRosterIds) {
         Map<Integer, Long> managerByRoster = RosterOwnerMapper.rosterToManager(
-                sleeper.rosters(sleeperLeagueId), managers.idsBySleeperUserId());
+                rosterSource.rosters(sleeperLeagueId), managers.idsBySleeperUserId());
 
         List<PowerRankingRepository.Entry> entries = new ArrayList<>(orderedRosterIds.size());
         for (int i = 0; i < orderedRosterIds.size(); i++) {

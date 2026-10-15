@@ -13,6 +13,7 @@ import type {
   WeeklyReport,
 } from '../api'
 import { invalidateRailLeagues } from '../railLeague'
+import { invalidateLeagueAvailability } from '../useLeagueAvailability'
 import { strength } from '../testSeasonStart'
 import { LeagueDataVersionProvider, useBumpLeagueDataVersion } from '../leagueDataVersion'
 import LeagueHome from './LeagueHome'
@@ -24,6 +25,7 @@ import LeagueHome from './LeagueHome'
 
 function draft(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
+    platform: 'SLEEPER',
     id: 1,
     sleeperDraftId: 'D1',
     leagueId: 1,
@@ -214,7 +216,10 @@ function renderHome() {
 
 const section = (name: string) => screen.getByRole('heading', { name }).closest('section') as HTMLElement
 
-beforeEach(() => invalidateRailLeagues())
+beforeEach(() => {
+  invalidateRailLeagues()
+  invalidateLeagueAvailability()
+})
 afterEach(() => vi.restoreAllMocks())
 
 describe('League home', () => {
@@ -782,5 +787,97 @@ describe('League home by season state (spec 030)', () => {
       await waitFor(() => section('Awards'))
       expect(heading('Draft grades')).toBeNull()
     })
+  })
+})
+
+describe('League home for an ESPN league (spec 035 F13)', () => {
+  const reason = (code: string, message: string) => ({ code, message })
+  const espnAvailability = (over: Partial<api.LeagueAvailability> = {}): api.LeagueAvailability => ({
+    leagueKey: 'L1',
+    platform: 'ESPN',
+    unmatchedPlayers: 0,
+    lastRefresh: { succeededAt: new Date(Date.now() - 5 * 60000).toISOString(), failedAt: null, failure: null },
+    canReplaceCookies: false,
+    unmatched: [],
+    unavailable: {
+      draftRoom: reason('PLATFORM_NOT_SUPPORTED', 'Live and simulated drafts follow Sleeper drafts only.'),
+      draftGrades: reason('PLATFORM_NOT_SUPPORTED', 'Draft grades are built from Sleeper drafts only.'),
+      stats: reason('SCORING_UNTRANSLATED', 'Scoring has rules we cannot translate yet.'),
+      schedule: reason('PLATFORM_NOT_SUPPORTED', 'The schedule grid follows Sleeper leagues only.'),
+      superlatives: reason('PLATFORM_NOT_SUPPORTED', 'Season superlatives follow Sleeper leagues only.'),
+      weeklyReport: reason('PLATFORM_NOT_SUPPORTED', 'The weekly report follows Sleeper leagues only.'),
+    },
+    ...over,
+  })
+
+  it('does not fetch a block the league cannot show, says so in one line each, and keeps standings and power', async () => {
+    const avail = vi.spyOn(api, 'getLeagueAvailability').mockResolvedValue(espnAvailability())
+    const spies = arrange({ drafts: () => Promise.resolve([draft({ platform: 'ESPN' })]) })
+    renderHome()
+
+    await waitFor(() => section('Standings'))
+    await waitFor(() => expect(within(section('Standings')).getAllByRole('listitem').length).toBeGreaterThan(0))
+    await waitFor(() => expect(within(section('Power rankings')).getByText(/No\. 1/)).toBeInTheDocument())
+
+    expect(avail).toHaveBeenCalledWith('L1')
+    // The gated blocks were never requested, not requested-and-refused.
+    expect(spies.weekly).not.toHaveBeenCalled()
+    expect(spies.awards).not.toHaveBeenCalled()
+    expect(spies.spotlight).not.toHaveBeenCalled()
+    expect(spies.nextMatchup).not.toHaveBeenCalled()
+    // One line per hidden block, in the server's words.
+    expect(screen.getByText(/Season superlatives follow Sleeper leagues only\./)).toBeInTheDocument()
+    expect(screen.getByText(/The weekly report follows Sleeper leagues only\./)).toBeInTheDocument()
+    expect(screen.getByText(/Scoring has rules we cannot translate yet\./)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Latest matchup' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Awards' })).toBeNull()
+    // The last-refresh line is there.
+    expect(screen.getByText(/Last refreshed 5 minutes ago/)).toBeInTheDocument()
+  })
+
+  it('shows the failure as text with its code, and only the cookie owner is offered "Replace cookies"', async () => {
+    const failed = espnAvailability({
+      lastRefresh: { succeededAt: new Date(Date.now() - 3600000).toISOString(), failedAt: new Date().toISOString(), failure: 'ESPN_ACCESS_DENIED' },
+    })
+    vi.spyOn(api, 'getLeagueAvailability').mockResolvedValue({ ...failed, canReplaceCookies: false })
+    arrange({ drafts: () => Promise.resolve([draft({ platform: 'ESPN' })]) })
+    const first = renderHome()
+    expect(await screen.findByText('ESPN_ACCESS_DENIED')).toBeInTheDocument()
+    expect(screen.getByText(/refused the stored login cookies/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Replace cookies' })).toBeNull()
+    first.unmount()
+    invalidateLeagueAvailability()
+
+    vi.spyOn(api, 'getLeagueAvailability').mockResolvedValue({ ...failed, canReplaceCookies: true })
+    arrange({ drafts: () => Promise.resolve([draft({ platform: 'ESPN' })]) })
+    renderHome()
+    expect(await screen.findByRole('button', { name: 'Replace cookies' })).toBeInTheDocument()
+  })
+
+  it('shows the unmatched-player count and names for an ESPN league (FR-007)', async () => {
+    vi.spyOn(api, 'getLeagueAvailability').mockResolvedValue(espnAvailability({
+      unmatchedPlayers: 2,
+      unmatched: [
+        { name: 'Zed Ambig', position: 'SF', team: 'ATL', outcome: 'AMBIGUOUS' },
+        { name: 'Ghost Player', position: null, team: null, outcome: 'UNMATCHED' },
+      ],
+    }))
+    arrange({ drafts: () => Promise.resolve([draft({ platform: 'ESPN' })]) })
+    renderHome()
+    expect(await screen.findByText(/2 players on these rosters could not be matched/)).toBeInTheDocument()
+    expect(screen.getByText(/Zed Ambig/)).toBeInTheDocument()
+    expect(screen.getByText(/Ghost Player/)).toBeInTheDocument()
+  })
+
+  it('never asks the availability endpoint for a Sleeper league, and fetches every block as before', async () => {
+    const avail = vi.spyOn(api, 'getLeagueAvailability')
+    const spies = arrange()
+    renderHome()
+    await waitFor(() => section('Standings'))
+    await waitFor(() => expect(spies.weekly).toHaveBeenCalled())
+    expect(spies.awards).toHaveBeenCalled()
+    expect(spies.spotlight).toHaveBeenCalled()
+    expect(avail).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Last refreshed/)).toBeNull()
   })
 })

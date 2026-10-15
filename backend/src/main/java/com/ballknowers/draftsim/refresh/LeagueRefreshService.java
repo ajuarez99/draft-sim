@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.refresh;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueSeasonResolver;
 import com.ballknowers.draftsim.ingest.LeagueHistoryIngestService;
+import com.ballknowers.draftsim.ingest.espn.EspnLeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerGameIngestService;
 import com.ballknowers.draftsim.store.LeagueRefreshRepository;
 import com.ballknowers.draftsim.store.SportWeekStatsRepository;
@@ -63,6 +64,7 @@ public class LeagueRefreshService {
     private final RefreshProperties properties;
     private final SportWeekStatsRepository sportWeeks;
     private final TrendingRefresh trendingRefresh;
+    private final EspnLeagueIngestService espn;
 
     /** Keyed {@code chain:<newest league sleeper id>}. Separate from the per-sport-season flight it waits on. */
     private final SingleFlight chainFlight = new SingleFlight();
@@ -70,8 +72,10 @@ public class LeagueRefreshService {
     public LeagueRefreshService(LeagueRepository leagues, LeagueRefreshRepository refreshes,
                                 LeagueSeasonResolver resolver, LeagueHistoryIngestService history,
                                 PlayerGameIngestService playerGames, RefreshProperties properties,
-                                SportWeekStatsRepository sportWeeks, TrendingRefresh trendingRefresh) {
+                                SportWeekStatsRepository sportWeeks, TrendingRefresh trendingRefresh,
+                                EspnLeagueIngestService espn) {
         this.trendingRefresh = trendingRefresh;
+        this.espn = espn;
         this.leagues = leagues;
         this.refreshes = refreshes;
         this.resolver = resolver;
@@ -85,6 +89,10 @@ public class LeagueRefreshService {
     public Optional<Status> trigger(String sleeperLeagueId) {
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperLeagueId);
         if (chain.isEmpty()) return Optional.empty();
+
+        // Spec 035 F4/T046: the chain refresh below walks Sleeper, so an ESPN league never starts it.
+        // It gets its own, with the same staleness rule and the same single-flight (one run per league).
+        if (!chain.getFirst().isSleeper()) return triggerEspn(sleeperLeagueId, chain.getFirst());
 
         if (properties.onVisitEnabled()) {
             Instant now = Instant.now();
@@ -115,12 +123,30 @@ public class LeagueRefreshService {
         return status(sleeperLeagueId);
     }
 
+    /**
+     * ESPN refresh on visit: only the CURRENT (newest) season is ever re-read, and only when
+     * {@link RefreshDecision} says it is stale. A second visit while one is running joins it.
+     */
+    private Optional<Status> triggerEspn(String sleeperLeagueId, LeagueRepository.LeagueRow current) {
+        if (properties.onVisitEnabled()) {
+            LeagueRefreshRepository.Row state = refreshes.find(current.id()).orElse(null);
+            if (RefreshDecision.decide(state, current.status(), Instant.now()) == RefreshDecision.Decision.START) {
+                // The service's own lock is league-wide, so this key only collapses duplicate visits.
+                String key = "espn:" + current.sport().code() + ":" + current.platformLeagueId();
+                chainFlight.run(key, () -> espn.refreshCurrent(current) ? 1 : 0);
+            }
+        }
+        return status(sleeperLeagueId);
+    }
+
     /** The same view as {@link #trigger}, with nothing started. */
     public Optional<Status> status(String sleeperLeagueId) {
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperLeagueId);
         if (chain.isEmpty()) return Optional.empty();
 
-        boolean chainRunning = chainFlight.isRunning(chainKey(chain));
+        boolean chainRunning = chainFlight.isRunning(chainKey(chain))
+                || (!chain.getFirst().isSleeper() && chainFlight.isRunning("espn:" + chain.getFirst().sport().code()
+                        + ":" + chain.getFirst().platformLeagueId()));
         List<SeasonStatus> seasons = new ArrayList<>();
         Instant newestSuccess = null;
         Instant newestFailure = null;

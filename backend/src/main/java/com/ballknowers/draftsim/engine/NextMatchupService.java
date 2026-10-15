@@ -73,7 +73,7 @@ public class NextMatchupService {
         }
 
         Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
-                : managers.idsBySleeperUserId().get(sleeperUserId);
+                : ManagerRepository.caller(managers, league.id(), sleeperUserId);
         Map<Long, String> teamNameByManager = new HashMap<>();
         for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
             teamNameByManager.put(m.managerId(), m.teamName());

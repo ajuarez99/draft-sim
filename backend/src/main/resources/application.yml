@@ -67,6 +67,16 @@ sleeper:
   base-url: ${SLEEPER_BASE_URL:https://api.sleeper.app/v1}
   players-cache-ttl: PT24H
 
+# ESPN league ingest (specs/035-espn-yahoo-ingest). base-url is the host EspnClient is allowed to
+# talk to; it refuses any other host and never follows a redirect (plan F14).
+espn:
+  base-url: ${ESPN_BASE_URL:https://lm-api-reads.fantasy.espn.com/apis/v3}
+
+# Key that seals stored ESPN cookies. Blank/invalid = private ESPN leagues disabled
+# (CredentialCipher.isConfigured() is false); there is no plaintext fallback.
+credentials:
+  key: ${BK_CREDENTIAL_KEY:}
+
 logging:
   level:
     com.ballknowers.draftsim: ${LOG_LEVEL:DEBUG}

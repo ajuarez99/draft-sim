@@ -1,0 +1,90 @@
+{
+  "_synthetic": true,
+  "_note": "Hand-built minimal payload in the shape of research R9. NOT recorded from ESPN. Replace with a recorded fixture at T053.",
+  "id": 9990001,
+  "seasonId": 2027,
+  "scoringPeriodId": 9,
+  "status": {
+    "currentMatchupPeriod": 2,
+    "isActive": true,
+    "previousSeasons": [2026]
+  },
+  "settings": {
+    "name": "Synthetic Hoops League",
+    "size": 4,
+    "isPublic": false,
+    "scheduleSettings": {
+      "matchupPeriodCount": 3,
+      "playoffTeamCount": 2,
+      "playoffSeedingRule": "TOTAL_WINS",
+      "playoffMatchupPeriodLength": 1,
+      "matchupPeriods": { "1": [1, 2, 3, 4, 5, 6, 7], "2": [8, 9, 10, 11, 12, 13, 14], "3": [15, 16, 17, 18, 19, 20, 21] },
+      "divisions": [{"id": 0, "name": "Division 1", "size": 4}]
+    },
+    "rosterSettings": {
+      "lineupSlotCounts": { "0": 1, "12": 2, "13": 1 }
+    },
+    "scoringSettings": {
+      "scoringType": "H2H_POINTS",
+      "scoringItems": [ { "statId": 0, "points": 1.0 }, { "statId": 6, "points": 1.2 } ]
+    },
+    "draftSettings": { "type": "SNAKE", "pickOrder": [1, 2, 3, 4] },
+    "acquisitionSettings": { "isUsingAcquisitionBudget": true, "acquisitionBudget": 100, "acquisitionType": "FAAB" }
+  },
+  "members": [
+    { "id": "{IT035-A}", "displayName": "Alpha Manager", "firstName": "A", "lastName": "A", "isLeagueManager": true },
+    { "id": "{IT035-B}", "displayName": "Bravo Manager", "firstName": "B", "lastName": "B" },
+    { "id": "{IT035-C}", "displayName": "Charlie Manager", "firstName": "C", "lastName": "C" },
+    { "id": "{IT035-D}", "displayName": "Delta Manager", "firstName": "D", "lastName": "D" }
+  ],
+  "teams": [
+    {
+      "id": 1, "name": "Team Alpha", "primaryOwner": "{IT035-A}", "owners": ["{IT035-A}"],
+      "record": { "overall": { "wins": 1, "losses": 0, "ties": 0, "pointsFor": 100.5, "pointsAgainst": 90.0 } },
+      "rankCalculatedFinal": 0,
+      "roster": { "entries": [
+        { "playerId": 9990001, "lineupSlotId": 0,  "playerPoolEntry": { "player": { "fullName": "Zed Itaa One",   "defaultPositionId": 1, "proTeamId": 1 } } },
+        { "playerId": 9990002, "lineupSlotId": 12, "playerPoolEntry": { "player": { "fullName": "Zed Itaa Two",   "defaultPositionId": 5, "proTeamId": 2 } } },
+        { "playerId": 9990003, "lineupSlotId": 13, "playerPoolEntry": { "player": { "fullName": "Zed Itaa Three", "defaultPositionId": 2, "proTeamId": 3 } } }
+      ] }
+    },
+    {
+      "id": 2, "name": "Team Bravo", "primaryOwner": "{IT035-B}", "owners": ["{IT035-B}"],
+      "record": { "overall": { "wins": 0, "losses": 1, "ties": 0, "pointsFor": 90.0, "pointsAgainst": 100.5 } },
+      "roster": { "entries": [
+        { "playerId": 9990004, "lineupSlotId": 0,  "playerPoolEntry": { "player": { "fullName": "Zed Itbb One", "defaultPositionId": 2, "proTeamId": 4 } } },
+        { "playerId": 9990005, "lineupSlotId": 12, "playerPoolEntry": { "player": { "fullName": "Zed Ambig",    "defaultPositionId": 3, "proTeamId": 5 } } },
+        { "playerId": 9990006, "lineupSlotId": 12, "playerPoolEntry": { "player": { "fullName": "Zed Ghost",    "defaultPositionId": 4, "proTeamId": 6 } } }
+      ] }
+    },
+    {
+      "id": 3, "location": "Team", "nickname": "Charlie", "primaryOwner": "{IT035-C}", "owners": ["{IT035-C}", "{IT035-D}"],
+      "record": { "overall": { "wins": 0, "losses": 1, "ties": 0, "pointsFor": 70.0, "pointsAgainst": 80.0 } },
+      "roster": { "entries": [
+        { "playerId": 9990007, "lineupSlotId": 12, "playerPoolEntry": { "player": { "fullName": "Zed Itcc One", "defaultPositionId": 99, "proTeamId": 7 } } }
+      ] }
+    },
+    {
+      "id": 4, "name": "Team Delta", "primaryOwner": "{IT035-D}", "owners": ["{IT035-D}"],
+      "record": { "overall": { "wins": 1, "losses": 0, "ties": 0, "pointsFor": 80.0, "pointsAgainst": 70.0 } },
+      "roster": { "entries": [] }
+    }
+  ],
+  "schedule": [
+    { "id": 1, "matchupPeriodId": 1, "winner": "HOME", "home": { "teamId": 1, "totalPoints": 100.5 }, "away": { "teamId": 2, "totalPoints": 90.0 } },
+    { "id": 2, "matchupPeriodId": 1, "winner": "AWAY", "home": { "teamId": 3, "totalPoints": 70.0 },  "away": { "teamId": 4, "totalPoints": 80.0 } },
+    { "id": 3, "matchupPeriodId": 2, "winner": "UNDECIDED", "home": { "teamId": 1, "totalPoints": 0.0 }, "away": { "teamId": 3, "totalPoints": 0.0 } },
+    { "id": 4, "matchupPeriodId": 2, "winner": "UNDECIDED", "home": { "teamId": 2, "totalPoints": 0.0 }, "away": { "teamId": 4, "totalPoints": 0.0 } },
+    { "id": 5, "matchupPeriodId": 3, "winner": "UNDECIDED", "home": { "teamId": 1, "totalPoints": 0.0 }, "away": { "teamId": 2, "totalPoints": 0.0 } },
+    { "id": 6, "matchupPeriodId": 3, "winner": "UNDECIDED", "home": { "teamId": 3, "totalPoints": 0.0 } }
+  ],
+  "draftDetail": {
+    "drafted": true,
+    "inProgress": false,
+    "picks": [
+      { "overallPickNumber": 1, "roundId": 1, "roundPickNumber": 1, "teamId": 1, "playerId": 9990001 },
+      { "overallPickNumber": 2, "roundId": 1, "roundPickNumber": 2, "teamId": 2, "playerId": 9990004 },
+      { "overallPickNumber": 3, "roundId": 1, "roundPickNumber": 3, "teamId": 3, "playerId": 9990007 }
+    ]
+  }
+}

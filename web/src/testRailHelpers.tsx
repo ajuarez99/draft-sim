@@ -23,6 +23,7 @@ import { clearUser, setUser } from './user'
 /** A draft row with every field the rail reads, overridable per test. */
 export function draftSummary(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
+    platform: 'SLEEPER',
     id: 1,
     sleeperDraftId: 'D1',
     leagueId: 1,

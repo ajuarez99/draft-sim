@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.store;
 
 import com.ballknowers.draftsim.domain.LeagueSettings;
+import com.ballknowers.draftsim.domain.Platform;
 import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -71,6 +72,64 @@ public class LeagueRepository {
     }
 
     /**
+     * The ESPN-aware upsert (spec 035). Same row, plus the platform columns; the 10-argument
+     * {@link #upsert} above is unchanged and never touches them, so a Sleeper ingest cannot flip a
+     * row's platform (FR-013).
+     *
+     * @param scoringUntranslated ESPN scoring items with no confirmed Sleeper key; null/empty means none
+     * @param unmodelledSlots     ESPN lineup slots this app has no equivalent for; null/empty means none
+     */
+    public long upsert(Sport sport, int season, String sleeperId, String previousLeagueId,
+                       String name, int totalRosters, String settingsJson, String scoringJson,
+                       List<String> rosterPositions, String status, Platform platform,
+                       String platformLeagueId, List<String> scoringUntranslated,
+                       List<String> unmodelledSlots) {
+        String sql = """
+                insert into league (sport, season, sleeper_id, previous_league_id, name,
+                                    total_rosters, settings_json, scoring_json, roster_positions, status,
+                                    platform, platform_league_id, scoring_untranslated, unmodelled_slots)
+                values (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?)
+                on conflict (sleeper_id) do update set
+                    season = excluded.season,
+                    previous_league_id = excluded.previous_league_id,
+                    name = excluded.name,
+                    total_rosters = excluded.total_rosters,
+                    settings_json = excluded.settings_json,
+                    scoring_json = excluded.scoring_json,
+                    roster_positions = excluded.roster_positions,
+                    status = excluded.status,
+                    platform = excluded.platform,
+                    platform_league_id = excluded.platform_league_id,
+                    scoring_untranslated = excluded.scoring_untranslated,
+                    unmodelled_slots = excluded.unmodelled_slots
+                returning id
+                """;
+        Long id = jdbc.execute(sql, (PreparedStatement ps) -> {
+            ps.setString(1, sport.code());
+            ps.setInt(2, season);
+            ps.setString(3, sleeperId);
+            ps.setString(4, previousLeagueId);
+            ps.setString(5, name);
+            ps.setInt(6, totalRosters);
+            ps.setString(7, settingsJson);
+            ps.setString(8, scoringJson);
+            ps.setArray(9, ps.getConnection().createArrayOf("text", rosterPositions.toArray()));
+            ps.setString(10, status);
+            ps.setString(11, platform.name());
+            ps.setString(12, platformLeagueId);
+            if (scoringUntranslated == null || scoringUntranslated.isEmpty()) ps.setNull(13, java.sql.Types.ARRAY);
+            else ps.setArray(13, ps.getConnection().createArrayOf("text", scoringUntranslated.toArray()));
+            if (unmodelledSlots == null || unmodelledSlots.isEmpty()) ps.setNull(14, java.sql.Types.ARRAY);
+            else ps.setArray(14, ps.getConnection().createArrayOf("text", unmodelledSlots.toArray()));
+            try (var rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        });
+        if (id == null) throw new IllegalStateException("league upsert returned no id: " + sleeperId);
+        return id;
+    }
+
+    /**
      * The league's full scoring settings, category to multiplier
      * (specs/005-daily-weekly-top-players).
      *
@@ -101,9 +160,29 @@ public class LeagueRepository {
         return out;
     }
 
+    /**
+     * @param platform             SLEEPER for every row written before spec 035
+     * @param platformLeagueId     ESPN's own league id; null for Sleeper
+     * @param scoringUntranslated  ESPN scoring items with no confirmed Sleeper key (empty for Sleeper)
+     * @param unmodelledSlots      ESPN lineup slots the app has no equivalent for (empty for Sleeper)
+     */
     public record LeagueRow(long id, Sport sport, String sleeperId, String name, int season,
                             int totalRosters, List<String> rosterPositions, double ppr,
-                            String previousLeagueId, String status) {
+                            String previousLeagueId, String status, Platform platform,
+                            String platformLeagueId, List<String> scoringUntranslated,
+                            List<String> unmodelledSlots) {
+
+        /** Back-compat for every caller built before spec 035: a Sleeper league. */
+        public LeagueRow(long id, Sport sport, String sleeperId, String name, int season,
+                         int totalRosters, List<String> rosterPositions, double ppr,
+                         String previousLeagueId, String status) {
+            this(id, sport, sleeperId, name, season, totalRosters, rosterPositions, ppr,
+                    previousLeagueId, status, Platform.SLEEPER, null, List.of(), List.of());
+        }
+
+        public boolean isSleeper() {
+            return platform == Platform.SLEEPER;
+        }
 
         /**
          * specs/006-deeper-history-both-sports data-model.md, "league.status",
@@ -143,7 +222,8 @@ public class LeagueRepository {
 
     private static final String ROW_COLUMNS = """
             id, sport, sleeper_id, name, season, total_rosters, roster_positions,
-            coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id, status
+            coalesce((scoring_json->>'rec')::numeric, 0) as ppr, previous_league_id, status,
+            platform, platform_league_id, scoring_untranslated, unmodelled_slots
             """;
 
     private static LeagueRow mapRow(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -151,7 +231,30 @@ public class LeagueRepository {
         List<String> slots = List.of((String[]) a.getArray());
         return new LeagueRow(rs.getLong("id"), Sport.fromCode(rs.getString("sport")), rs.getString("sleeper_id"),
                 rs.getString("name"), rs.getInt("season"), rs.getInt("total_rosters"),
-                slots, rs.getDouble("ppr"), rs.getString("previous_league_id"), rs.getString("status"));
+                slots, rs.getDouble("ppr"), rs.getString("previous_league_id"), rs.getString("status"),
+                Platform.fromCode(rs.getString("platform")), rs.getString("platform_league_id"),
+                textArray(rs.getArray("scoring_untranslated")), textArray(rs.getArray("unmodelled_slots")));
+    }
+
+    /** The platform of the league behind this key, empty when no such league is stored (PlatformGuard). */
+    public Optional<Platform> platformOf(String sleeperId) {
+        return db.sql("select platform from league where sleeper_id = ?")
+                .param(sleeperId)
+                .query((rs, i) -> Platform.fromCode(rs.getString(1)))
+                .optional();
+    }
+
+    /** Every stored season of one ESPN league (all sports share ids, so sport is part of the key), newest first. */
+    public List<LeagueRow> espnSeasons(Sport sport, String platformLeagueId) {
+        return db.sql("select " + ROW_COLUMNS + " from league where platform = 'ESPN' and sport = ?"
+                        + " and platform_league_id = ? order by season desc")
+                .params(sport.code(), platformLeagueId)
+                .query((rs, i) -> mapRow(rs))
+                .list();
+    }
+
+    private static List<String> textArray(Array a) throws java.sql.SQLException {
+        return a == null ? List.of() : List.of((String[]) a.getArray());
     }
 
     public Optional<LeagueRow> bySleeperId(String sleeperId) {
@@ -273,6 +376,15 @@ public class LeagueRepository {
                             rs.getBoolean(4), rs.getBoolean(5), round);
                 })
                 .optional();
+    }
+
+    /**
+     * A boolean the ESPN ingest wrote into {@code settings_json} that Sleeper never does (spec 035:
+     * {@code espn_multi_week_periods}); false when absent, so every Sleeper league reads false.
+     */
+    public boolean settingsFlag(long leagueId, String key) {
+        return Boolean.TRUE.equals(db.sql("select coalesce((settings_json->>?)::boolean, false) from league where id = ?")
+                .params(key, leagueId).query(Boolean.class).optional().orElse(false));
     }
 
     /**

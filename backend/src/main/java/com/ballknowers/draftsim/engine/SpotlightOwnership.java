@@ -51,7 +51,7 @@ public class SpotlightOwnership {
     /** Sleeper player id to ownership, for the latest stored week; empty when no week is stored. */
     public Map<String, Ownership> forLeague(LeagueRepository.LeagueRow league, String sleeperUserId) {
         Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
-                : managers.idsBySleeperUserId().get(sleeperUserId);
+                : ManagerRepository.caller(managers, league.id(), sleeperUserId);
         return build(weekPoints.breakdownsFor(league.id(), league.season()),
                 rosterSeasons.forLeague(league.id()), members.forLeague(league.id()), callerManagerId);
     }

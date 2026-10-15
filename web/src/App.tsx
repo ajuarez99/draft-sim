@@ -27,6 +27,7 @@ import ManagerComparison from './pages/ManagerComparison'
 import AppShell from './components/AppShell'
 import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
+import PlatformGate from './components/PlatformGate'
 import { useUser } from './user'
 
 // Forces a full remount of DraftView on every draft change. Without this,
@@ -37,14 +38,14 @@ import { useUser } from './user'
 // claude/reactive-resimulation.md §3, "Cross-draft leak".
 function KeyedDraftView() {
   const { draftId } = useParams<{ draftId: string }>()
-  return <DraftView key={draftId} />
+  return <PlatformGate page="draftRoom" draftId={draftId}><DraftView key={draftId} /></PlatformGate>
 }
 
 // Same remount wrapper, same reason: a param-only change would keep the old
 // draft's fetched board/seats alive across the switch.
 function KeyedCompletedDraftBoard() {
   const { draftId } = useParams<{ draftId: string }>()
-  return <CompletedDraftBoard key={draftId} />
+  return <PlatformGate page="draftRoom" draftId={draftId}><CompletedDraftBoard key={draftId} /></PlatformGate>
 }
 
 // Same remount wrapper, same reason: LiveDraftView holds a simulation in
@@ -53,7 +54,7 @@ function KeyedCompletedDraftBoard() {
 // an in-flight resim for the old draft could land and paint onto the new one.
 function KeyedLiveDraftView() {
   const { draftId } = useParams<{ draftId: string }>()
-  return <LiveDraftView key={draftId} />
+  return <PlatformGate page="draftRoom" draftId={draftId}><LiveDraftView key={draftId} /></PlatformGate>
 }
 
 // Same remount wrapper, same reason: a param-only change would keep the old
@@ -71,15 +72,23 @@ function KeyedMockDraftView() {
 // season's numbers, and an effect still in flight for the old id (LeagueAnalysis
 // has a few) can land late and overwrite the new season. Keying on the id gives
 // the same clean slate the draft routes above get.
-function KeyedByLeague({ page: Page }: { page: ComponentType }) {
+//
+// `gate` (spec 035 T042) is an availability page key: the page renders only if the server's
+// LeagueAvailability says this league can show it, otherwise the platform message does. The keys are the
+// server's (LeagueAvailability.ROUTES); this table only says which page uses which.
+function KeyedByLeague({ page: Page, gate }: { page: ComponentType; gate?: string }) {
   const { sleeperLeagueId } = useParams<{ sleeperLeagueId: string }>()
-  return <Page key={sleeperLeagueId} />
+  const page = <Page key={sleeperLeagueId} />
+  if (!gate) return page
+  return <PlatformGate page={gate} leagueKey={sleeperLeagueId}>{page}</PlatformGate>
 }
 
 // The player page is addressed by a league AND a player, so it is keyed on both (N4).
-function KeyedByLeagueAndPlayer({ page: Page }: { page: ComponentType }) {
+function KeyedByLeagueAndPlayer({ page: Page, gate }: { page: ComponentType; gate?: string }) {
   const { sleeperLeagueId, sleeperPlayerId } = useParams<{ sleeperLeagueId: string; sleeperPlayerId: string }>()
-  return <Page key={`${sleeperLeagueId}:${sleeperPlayerId}`} />
+  const page = <Page key={`${sleeperLeagueId}:${sleeperPlayerId}`} />
+  if (!gate) return page
+  return <PlatformGate page={gate} leagueKey={sleeperLeagueId}>{page}</PlatformGate>
 }
 
 export default function App() {
@@ -128,18 +137,18 @@ export default function App() {
               <Route path="/leagues/:sleeperLeagueId" element={<KeyedByLeague page={LeagueHome} />} />
               <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
               <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
-              <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} />} />
-              <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} />} />
-              <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} />} />
-              <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} />} />
+              <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} gate="analysis" />} />
+              <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} gate="schedule" />} />
+              <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} gate="stats" />} />
+              <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} gate="stats" />} />
               {/* specs/032: the stat calculator, a sibling view of Player stats (same rail row). */}
-              <Route path="/leagues/:sleeperLeagueId/stats/calculator" element={<KeyedByLeague page={StatCalculator} />} />
+              <Route path="/leagues/:sleeperLeagueId/stats/calculator" element={<KeyedByLeague page={StatCalculator} gate="stats" />} />
               {/* specs/022: addressed by a league AND a player, so it is keyed on both (N4):
                   moving from one player to another is a fresh page, not a re-render that
                   leaves the last player's numbers up while the next one loads. */}
               <Route
                 path="/leagues/:sleeperLeagueId/players/:sleeperPlayerId"
-                element={<KeyedByLeagueAndPlayer page={PlayerPage} />}
+                element={<KeyedByLeagueAndPlayer page={PlayerPage} gate="stats" />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
@@ -147,19 +156,19 @@ export default function App() {
               />
               <Route
                 path="/leagues/:sleeperLeagueId/expected-wins"
-                element={<KeyedByLeague page={ExpectedWins} />}
+                element={<KeyedByLeague page={ExpectedWins} gate="expectedWins" />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/forecast"
-                element={<KeyedByLeague page={SeasonForecast} />}
+                element={<KeyedByLeague page={SeasonForecast} gate="forecast" />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/weekly-report"
-                element={<KeyedByLeague page={WeeklyReport} />}
+                element={<KeyedByLeague page={WeeklyReport} gate="weeklyReport" />}
               />
               <Route
                 path="/leagues/:sleeperLeagueId/superlatives"
-                element={<KeyedByLeague page={Superlatives} />}
+                element={<KeyedByLeague page={Superlatives} gate="superlatives" />}
               />
               {/* React Router's own fallback renders a bare "Not Found" with no
                   way back -- on a mistyped draft id that was the whole screen. */}

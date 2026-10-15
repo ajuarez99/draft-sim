@@ -185,6 +185,11 @@ public class RosterManagementController {
         // Null when no week has been played since the move: ungraded, not bad.
         out.put("postMovePositionalRank", p.postMoveRank());
         out.put("weeksCounted", p.weeksCounted());
+        // Spec 035 F10: only present for an ESPN player the matcher refused, so a Sleeper payload is unchanged.
+        if (p.unmatched()) {
+            out.put("unmatched", true);
+            out.put("team", p.team());
+        }
         return out;
     }
 }

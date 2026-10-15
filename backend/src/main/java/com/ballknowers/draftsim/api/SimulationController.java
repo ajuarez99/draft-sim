@@ -46,6 +46,8 @@ public class SimulationController {
      * this endpoint does not become a way to test whether a draft id exists.
      */
     private void requireVisible(SimulationRequest request, String sleeperUserId) {
+        // Spec 035 F4: a body-keyed route, so it is not behind PlatformGuard's path interceptor.
+        PlatformGuard.requireSleeperDraft(membership, sleeperUserId, request.draftSleeperId());
         if (membership.visibleDraft(sleeperUserId, request.draftSleeperId()).isEmpty()) {
             throw new IllegalArgumentException("draft " + request.draftSleeperId() + " isn't loaded yet");
         }

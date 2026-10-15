@@ -7,6 +7,7 @@ import type { DraftSummary } from './api'
 // single-season league, which is the case that must NOT get a season list.
 function draft(over: Partial<DraftSummary> & Pick<DraftSummary, 'sleeperLeagueId' | 'season' | 'leagueName'>): DraftSummary {
   return {
+    platform: 'SLEEPER',
     id: Number(over.sleeperLeagueId),
     sleeperDraftId: `d${over.sleeperLeagueId}`,
     leagueId: Number(over.sleeperLeagueId),

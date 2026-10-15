@@ -128,6 +128,9 @@ public class MockDraftService {
         // Re-deriving either of those here risks drifting out of sync with the
         // one place that actually owns the rule.
         Map<Long, String> managerNames = managers.names();
+        // Spec 035 F1/T045: an ESPN manager has no fitted profile and is never seatable. Without this check
+        // the seat would be accepted and silently played as the league-average drafter.
+        java.util.Set<Long> espnManagers = managerSeats.isEmpty() ? java.util.Set.of() : managers.espnManagerIds();
         for (Map.Entry<Integer, Long> e : managerSeats.entrySet()) {
             int slot = e.getKey();
             Long managerId = e.getValue();
@@ -139,6 +142,9 @@ public class MockDraftService {
             }
             if (!managerNames.containsKey(managerId)) {
                 throw new IllegalArgumentException("managerSeats slot " + slot + " has unknown managerId " + managerId);
+            }
+            if (espnManagers.contains(managerId)) {
+                throw new IllegalArgumentException("managerSeats slot " + slot + " cannot seat an ESPN manager: ESPN drafts are never modelled");
             }
         }
 

@@ -1,5 +1,22 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-14: spec 035 (ESPN league ingest) BUILT through T051, NOT live-verified, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/035-espn-yahoo-ingest`, branch `035-espn-yahoo-ingest` (from `origin/main` 8346cdf). Docs are in `specs/035-espn-yahoo-ingest/`: spec, plan (its "Amended after review" section overrides the rest), research, data-model, contracts, plan-review, tasks (T001-T051 ticked; **T052-T054, the live verification, are not done**).
+- **What exists:** an ESPN football or basketball points league can be added by link, claimed, refreshed on visit, and read through the shared tables. See the contracts for the endpoints and `LeagueAvailability` for which pages an ESPN league can't show. Yahoo is a separate, later spec.
+- **Every ESPN shape is a guess.** No real ESPN league has been read: the only fixtures are hand-built and marked `"_synthetic": true`, and each guess carries `// unverified: confirm against real league (T053)`. The least certain one is the transactions payload (`mTransactions2`): if it is wrong the league still stores, `availability` and the add result say `transactions: ESPN_SHAPE_CHANGED`, and `league_refresh.last_failure` holds the code.
+- **Migration:** `V35__espn_platform.sql`, applied only to the scratch DB (`draftsim035`, container `draftsim035-pg`, port 5435), which carries the 5433 history rows 31, 34 and 33 and therefore needs `spring.flyway.ignore-migration-patterns=*:missing,*:future`. **Merge order: 033's V34 (trade assets) and 034's V33 (league bracket match) go first; V35 is last.** Re-list every worktree's migration directory right before committing (T001).
+- **Tests (all run, scratch DB):** see `specs/035-espn-yahoo-ingest/tasks.md` T051 for the counts. Pre-existing and unrelated: `BoardRepositoryLatestBeforeIT` fails on scratch data; `PlayerStatsLeaderboardReadIT` skips.
+- **A real leak was found and fixed in this build:** `PUT .../credential` took a plain `record(String, String)`, so Spring's DEBUG body-read line printed both cookies. Now the body type is `EspnCredential` (redacted). `CredentialLeakIT` and `EspnClientHttpTest` guard it. lessons.md #44.
+- **Frontend gating reads the platform from the cached league list first**, so a Sleeper league (and the live draft room) makes no extra request. Only an ESPN or unknown league asks `GET /api/leagues/{key}/availability`.
+- **Decided in-session, Allan can overturn:**
+  - ESPN `stats` is a fixed-unavailable page (the per-game stat credit is Sleeper's), reported as `SCORING_UNTRANSLATED` when the scoring has no confirmed translation. Every `EspnScoringMap` entry is still `confirmed=false`, so today it is always that.
+  - `next-matchup` is governed by the `schedule` key (it counts games from the NBA calendar and spec 017's one-credited-game rule).
+  - A transactions failure never fails the add or refresh; it is isolated and reported by code.
+  - A current ESPN season freezes (`loaded_complete`) only on a read *after* the one that first said it was over.
+- **Owed (T052-T054):** SC-005 Sleeper parity baseline before/after (incl. `GET /api/managers?sport=nfl|nba` and the profile-fit log line), the real league added through the real UI (Allan pastes any cookies himself), field-by-field R9 confirmation, the R3 re-run against the app's `player` table, every in-scope and out-of-scope page opened in a browser, and the cookie grep over the live server log.
+- **Owed before deploy:** `BK_CREDENTIAL_KEY` (32 random bytes, base64) on the backend service, or private ESPN leagues answer `CREDENTIALS_NOT_CONFIGURED` (public ones still work). Allan's go-ahead to commit.
+
 ## UPDATE 2026-10-13: spec 032 (stat calculator) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/032-stat-calculator`, branch `032-stat-calculator` (from `origin/main` e9f71aa). Docs are in `specs/032-stat-calculator/`: spec, plan, research, plan-review, code-review, verification, tasks (T001–T027 done).
