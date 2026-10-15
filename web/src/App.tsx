@@ -15,6 +15,7 @@ import LeagueAnalysis from './pages/LeagueAnalysis'
 import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
 import ScheduleGrid from './pages/ScheduleGrid'
+import Rivalries from './pages/Rivalries'
 import StatCalculator from './pages/StatCalculator'
 import StatLeaderboard from './pages/StatLeaderboard'
 import PlayerTrends from './pages/PlayerTrends'
@@ -139,6 +140,7 @@ export default function App() {
               <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
               <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} gate="analysis" />} />
               <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} gate="schedule" />} />
+              <Route path="/leagues/:sleeperLeagueId/rivalries" element={<KeyedByLeague page={Rivalries} />} />
               <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} gate="stats" />} />
               <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} gate="stats" />} />
               {/* specs/032: the stat calculator, a sibling view of Player stats (same rail row). */}

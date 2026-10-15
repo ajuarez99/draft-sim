@@ -26,7 +26,7 @@ class WaiverPickupAttributionTest {
 
     private static Row tx(int week, String txId, String type, String status, Integer rosterId,
                           String addsJson, Instant createdAt) {
-        return new Row(LEAGUE, SEASON, week, txId, type, status, rosterId, null, addsJson, "{}", null, createdAt);
+        return new Row(LEAGUE, SEASON, week, txId, type, status, rosterId, null, addsJson, "{}", null, createdAt, null, null);
     }
 
     private static StarterWeek starters(int week, int rosterId, Map<String, Double> playersPoints,
@@ -164,7 +164,7 @@ class WaiverPickupAttributionTest {
 
     private static Row txFaab(int week, String txId, String type, String status, Integer rosterId,
                               String addsJson, Instant createdAt, Integer faabBid) {
-        return new Row(LEAGUE, SEASON, week, txId, type, status, rosterId, null, addsJson, "{}", faabBid, createdAt);
+        return new Row(LEAGUE, SEASON, week, txId, type, status, rosterId, null, addsJson, "{}", faabBid, createdAt, null, null);
     }
 
     @Test

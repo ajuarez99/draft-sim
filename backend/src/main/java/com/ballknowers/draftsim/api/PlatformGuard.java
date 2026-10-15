@@ -64,8 +64,14 @@ public class PlatformGuard implements HandlerInterceptor {
     // Draft-keyed: everything under /api/drafts/{id}/ and the mock-from-draft bridge.
     private static final Pattern DRAFT_PATH = Pattern.compile("^/api/(?:drafts/([^/]+)(?:/.*)?|mocks/from-draft/([^/]+))$");
     // League-keyed Sleeper work: setup and ingest by Sleeper league id.
+    // The league-keyed ingest routes, ONE list: both LEAGUE_PATH (which key to check) and PATH_PATTERNS (where the
+    // interceptor runs) derive from it. They were two hand-kept lists, and adding spec 034's brackets route to only
+    // one of them let it through unguarded -- caught by EspnPlatformGuardIT at the 035 merge.
+    private static final List<String> INGEST_LEAGUE_ROUTES =
+            List.of("league", "league-history", "player-games", "transactions", "all", "brackets");
+
     private static final Pattern LEAGUE_PATH = Pattern.compile(
-            "^/api/(?:setup/(?:league|league-history)|" + OPS + "/(?:league|league-history|player-games|transactions|all))/([^/]+)$");
+            "^/api/(?:setup/(?:league|league-history)|" + OPS + "/(?:" + String.join("|", INGEST_LEAGUE_ROUTES) + "))/([^/]+)$");
 
     // League pages: /api/leagues/{key}/<rest>. Which <rest> is governed is LeagueAvailability.ROUTES, the one list.
     private static final Pattern LEAGUE_PAGE_PATH = Pattern.compile("^/api/leagues/([^/]+)/(.+)$");
@@ -75,8 +81,7 @@ public class PlatformGuard implements HandlerInterceptor {
             "/api/leagues/*/**",
             "/api/drafts/**", "/api/mocks/from-draft/**",
             "/api/setup/league/**", "/api/setup/league-history/**",
-            "/api/" + OPS + "/league/**", "/api/" + OPS + "/league-history/**", "/api/" + OPS + "/player-games/**",
-            "/api/" + OPS + "/transactions/**", "/api/" + OPS + "/all/**");
+            "/api/" + OPS + "/*/**");
 
     private final LeagueMembership membership;
     private final LeagueAvailability availability;

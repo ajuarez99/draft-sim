@@ -1,13 +1,15 @@
 # Ball Knowers — handoff
 
-## UPDATE 2026-10-14: spec 035 (ESPN league ingest) BUILT through T051, NOT live-verified, NOT committed or deployed
+## UPDATE 2026-10-15: spec 035 (ESPN league ingest) built, committed on its branch and merged up with main (033 + 034); PARTIALLY live-verified; NOT pushed, NOT deployed
+
+- **Verified 2026-10-15** (`specs/035-espn-yahoo-ingest/verification.md`): Sleeper parity across 214 routes on 10 leagues (only the added `platform` field differs), and the real-ESPN error paths for Allan's private NBA league 1314454666. **Not verified:** the happy path against real ESPN data. Every ESPN field mapping is still a guess (`unverified (T053)`). It needs Allan's saved API JSON in `fixtures-real/`, or his cookies pasted into the UI himself.
 
 - **Where:** worktree `.claude/worktrees/035-espn-yahoo-ingest`, branch `035-espn-yahoo-ingest` (from `origin/main` 8346cdf). Docs are in `specs/035-espn-yahoo-ingest/`: spec, plan (its "Amended after review" section overrides the rest), research, data-model, contracts, plan-review, tasks (T001-T051 ticked; **T052-T054, the live verification, are not done**).
 - **What exists:** an ESPN football or basketball points league can be added by link, claimed, refreshed on visit, and read through the shared tables. See the contracts for the endpoints and `LeagueAvailability` for which pages an ESPN league can't show. Yahoo is a separate, later spec.
 - **Every ESPN shape is a guess.** No real ESPN league has been read: the only fixtures are hand-built and marked `"_synthetic": true`, and each guess carries `// unverified: confirm against real league (T053)`. The least certain one is the transactions payload (`mTransactions2`): if it is wrong the league still stores, `availability` and the add result say `transactions: ESPN_SHAPE_CHANGED`, and `league_refresh.last_failure` holds the code.
 - **Migration:** `V35__espn_platform.sql`, applied only to the scratch DB (`draftsim035`, container `draftsim035-pg`, port 5435), which carries the 5433 history rows 31, 34 and 33 and therefore needs `spring.flyway.ignore-migration-patterns=*:missing,*:future`. **Merge order: 033's V34 (trade assets) and 034's V33 (league bracket match) go first; V35 is last.** Re-list every worktree's migration directory right before committing (T001).
 - **Tests (all run, scratch DB):** see `specs/035-espn-yahoo-ingest/tasks.md` T051 for the counts. Pre-existing and unrelated: `BoardRepositoryLatestBeforeIT` fails on scratch data; `PlayerStatsLeaderboardReadIT` skips.
-- **A real leak was found and fixed in this build:** `PUT .../credential` took a plain `record(String, String)`, so Spring's DEBUG body-read line printed both cookies. Now the body type is `EspnCredential` (redacted). `CredentialLeakIT` and `EspnClientHttpTest` guard it. lessons.md #44.
+- **A real leak was found and fixed in this build:** `PUT .../credential` took a plain `record(String, String)`, so Spring's DEBUG body-read line printed both cookies. Now the body type is `EspnCredential` (redacted). `CredentialLeakIT` and `EspnClientHttpTest` guard it. lessons.md #46 (renumbered after main's #42/#43 landed).
 - **Frontend gating reads the platform from the cached league list first**, so a Sleeper league (and the live draft room) makes no extra request. Only an ESPN or unknown league asks `GET /api/leagues/{key}/availability`.
 - **Decided in-session, Allan can overturn:**
   - ESPN `stats` is a fixed-unavailable page (the per-game stat credit is Sleeper's), reported as `SCORING_UNTRANSLATED` when the scoring has no confirmed translation. Every `EspnScoringMap` entry is still `confirmed=false`, so today it is always that.
@@ -16,6 +18,44 @@
   - A current ESPN season freezes (`loaded_complete`) only on a read *after* the one that first said it was over.
 - **Owed (T052-T054):** SC-005 Sleeper parity baseline before/after (incl. `GET /api/managers?sport=nfl|nba` and the profile-fit log line), the real league added through the real UI (Allan pastes any cookies himself), field-by-field R9 confirmation, the R3 re-run against the app's `player` table, every in-scope and out-of-scope page opened in a browser, and the cookie grep over the live server log.
 - **Owed before deploy:** `BK_CREDENTIAL_KEY` (32 random bytes, base64) on the backend service, or private ESPN leagues answer `CREDENTIALS_NOT_CONFIGURED` (public ones still work). Allan's go-ahead to commit.
+## UPDATE 2026-10-14: spec 033 (trade verdicts, roadmap 2.5) built, live-verified locally, committed (f19f881), PR open, NOT deployed
+
+- **Where:** worktree `.claude/worktrees/033-trade-verdicts`, branch `033-trade-verdicts` (from
+  `origin/main` 8346cdf).
+  - Docs in `specs/033-trade-verdicts/`: spec, spec-review, plan, plan-review (F1–F8 plus code
+    review R1/R2), research, data-model, contracts, quickstart, tasks (T001–T028), verification.
+- **What it does:** see README "Trade verdicts".
+  - New migration `V34__trade_assets.sql`: `draft_picks` and `waiver_budget` on
+    `league_transaction`.
+  - No new route: `GET /api/leagues/{id}/transactions` grows.
+- **Local dev DB already has V34 applied, and is backfilled**, because tests and verification
+  ran against it. Main-based servers ignore the extra migration (Flyway treats it as future).
+- **After deploy (owed):**
+  1. Run, on prod with `X-Admin-Token`, one call per league-season with trades:
+     `POST /api/ingest/transactions/{id}` for
+     - `1254190892974084096` (NFL 2025)
+     - `1141438340626231296` (NBA 2024)
+     - `1229352720222134272` (NBA 2025)
+     - `1339351318115946496` (NBA 2026)
+
+     Finished seasons never refetch on their own; until this runs, the page says "Picks and
+     FAAB not loaded".
+  2. Check that `tradeWeeksMissingAssets` is empty, i.e. no TRADE row has a null `draft_picks`.
+  3. Load Roster Management for NBA 2025 and check V2/V3/V4b against `verification.md`.
+- **Open for Allan:**
+  - verdict wording "over N weeks" counts weeks across both sides (verification.md, last
+    section);
+  - rail label "Bench points" vs a "Trades" relabel. Only an on-page jump link was added.
+- **Lesson recorded:** #43, Sleeper's trade `leg` is the proposal week.
+
+## UPDATE 2026-10-14: spec 034 (rivalries page) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/034-rivalry-schedule-grid`, branch `034-rivalry-schedule-grid` (from `origin/main` 8346cdf). Docs are in `specs/034-rivalry-schedule-grid/`: spec, plan (with "Amended after review"), research, plan-review, tasks (T001–T024 done), code-review (B1–B10 fixed, plus 2 found live), verification.
+- **What it does:** `/leagues/:id/rivalries`, for both sports, under History in the rail. It has an all-time H2H matrix, this season’s schedule with the prior record on every opponent, and a recommended rivalry week (an exact best matching, with a reason per pair, thin pairs labelled, and N = 3 hand-set). New `GET /api/leagues/{id}/rivalries`, admin `POST /api/ingest/brackets/{id}`, and **migration V33** `league_bracket_match` (Sleeper winners bracket: a playoff week is about half consolation games, lessons #42).
+- **MERGE ORDER, important:** V32 belongs to the uncommitted 033-trade-verdicts session, and is already applied to the shared 5433 DB. If 034 merges first, **033 must renumber to V34** before it merges, or Flyway refuses it on prod. *(Done 2026-10-14: 033 renumbered to V34 when merging main.)* Local verification ran on a scratch DB copy, `draftsim034-pg` on 5434 (remove with `docker rm -f draftsim034-pg && docker volume rm draftsim034-pgdata` when done).
+- **After deploy (owed):** deploy both Railway services. Then run `POST /api/ingest/brackets/{id}` with `X-Admin-Token` for each league chain once. Later refreshes also fetch a missing or incomplete bracket on their own, bracket-only, never `/matchups`. Then load the page on one NFL and one NBA league.
+- **Open data question:** both stored NBA finals (2025, 2024) disagree with Sleeper’s bracket winner, while 14/16 other bracket games agree. The page shows "final disputed" and prints both. Undiagnosed (verification.md).
+- **Pre-existing, not 034:** `BoardRepositoryLatestBeforeIT` fails on current data (it hard-codes the NBA 2026 draft start at 19:15:08Z; the DB says 21:16:19Z).
 
 ## UPDATE 2026-10-13: spec 032 (stat calculator) built, live-verified locally, NOT committed or deployed
 

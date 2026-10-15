@@ -602,11 +602,7 @@ public class LeagueHistoryController {
 
     /** Sleeper's per-league team name by manager; the ingest already falls back to the display name and drops "TBD". */
     private Map<Long, String> teamNamesByManager(long leagueId) {
-        Map<Long, String> out = new HashMap<>();
-        for (com.ballknowers.draftsim.store.LeagueMemberRepository.MemberRow m : leagueMembers.forLeague(leagueId)) {
-            if (m.teamName() != null && !m.teamName().isBlank()) out.put(m.managerId(), m.teamName());
-        }
-        return out;
+        return leagueMembers.teamNamesByManager(leagueId);
     }
 
     private static Map<String, Object> snapshotRow(com.ballknowers.draftsim.store.PowerRankingRepository.SnapshotRow r) {

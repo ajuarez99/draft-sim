@@ -53,7 +53,7 @@ Body `{ "rosterId": 3 }` → 200 `{ "leagueKey", "rosterId", "managerId" }`.
 
 ## PUT /api/setup/espn/league/{leagueKey}/credential
 Body `{ "espnS2", "swid" }`, bound to `EspnCredential` (redacted `toString`), not to a record of two
-Strings: Spring logs a request body's `toString` at DEBUG (found by `CredentialLeakIT`, lessons #44). The
+Strings: Spring logs a request body's `toString` at DEBUG (found by `CredentialLeakIT`, lessons #46). The
 server test-reads the league with the new cookies before storing them. Returns 204, or the error codes
 above. On success it also forgets a recorded `ESPN_ACCESS_DENIED` refusal so the next visit retries without
 waiting out the failure back-off; any other recorded failure is left alone.

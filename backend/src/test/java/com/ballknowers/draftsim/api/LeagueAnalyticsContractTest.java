@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.api;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.ExpectedWinsService;
 import com.ballknowers.draftsim.engine.RosterManagementService;
+import com.ballknowers.draftsim.engine.TradeVerdictService;
 import com.ballknowers.draftsim.engine.TransactionAnalysisService;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import com.ballknowers.draftsim.store.LeagueRepository;
@@ -267,12 +268,25 @@ class LeagueAnalyticsContractTest {
                 new TransactionAnalysisService.Result(true, null, 2026, Sport.NFL,
                         List.of(new TransactionAnalysisService.ManagerCounts(
                                 17L, "Master Bates", Map.of("WAIVER", 2, "FREE_AGENT", 1), 3)),
-                        List.of(),
+                        List.of(new TradeVerdictService.TradeResult("tx1", 3,
+                                java.time.Instant.parse("2025-11-28T02:36:13.417Z"), true,
+                                new TradeVerdictService.VerdictResult("WINNER", 12, 175.5, 16, true),
+                                List.of(
+                                        new TradeVerdictService.SideResult(12, "Team Twelve", 346.0, 46.0, 16, List.of(
+                                                new TradeVerdictService.PlayerResult("2449", "Player A", null, "COUNTED",
+                                                        6, 21, 346.0, 46.0, 16, List.of(), null,
+                                                        List.of(new TradeVerdictService.StretchResult(12, "Team Twelve", 1, 21,
+                                                                "DRAFT", null, 346.0, 46.0, List.of(), false))))),
+                                        new TradeVerdictService.SideResult(2, "Team Two", 0.0, 0.0, 0, List.of(
+                                                new TradeVerdictService.FaabResult(67, 12, "Team Twelve"),
+                                                new TradeVerdictService.PickResult(2026, 1, 11, "NOT_DRAFTED_YET", null, null))))
+                        )),
                         List.of(new TransactionAnalysisService.Add(1, "Torta Pounder with Cheese",
                                 new TransactionAnalysisService.MovedPlayer("12711", "Tyler Loop", "K", 2.0, 1),
                                 new TransactionAnalysisService.MovedPlayer("2", "Najee Harris", "RB", null, 0),
                                 0, "WAIVER", "complete")),
-                        "LOWER_IS_BETTER")));
+                        "LOWER_IS_BETTER", 21, true, false,
+                        new com.ballknowers.draftsim.engine.OwnershipTimeline.Reconciliation(3894, 0, 4, 2, List.of("example one")))));
 
         Map<String, Object> body = bodyOf(
                 new RosterManagementController(rosterManagement, transactionAnalysis, membership)
@@ -280,7 +294,52 @@ class LeagueAnalyticsContractTest {
 
         // Stated on the wire, because a 2 beside a name is otherwise ambiguous.
         assertEquals("LOWER_IS_BETTER", body.get("rankDirection"));
-        assertEquals(List.of(), body.get("trades"), "no trades is an empty list, not a missing key");
+        // Spec 033 top-level fields.
+        assertEquals(true, body.get("seasonFinal"));
+        assertEquals(false, body.get("tradeAssetsLoaded"));
+        assertEquals(21, body.get("throughWeek"));
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trade = ((List<Map<String, Object>>) body.get("trades")).getFirst();
+        assertEquals("tx1", trade.get("txId"));
+        assertEquals(3, trade.get("week"));
+        assertEquals("2025-11-28T02:36:13.417Z", trade.get("acceptedAt"));
+        assertEquals(true, trade.get("assetsLoaded"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> verdict = (Map<String, Object>) trade.get("verdict");
+        assertEquals("WINNER", verdict.get("state"));
+        assertEquals(12, verdict.get("winnerRosterId"));
+        assertEquals(175.5, verdict.get("margin"));
+        assertEquals(true, verdict.get("final"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sides = (List<Map<String, Object>>) trade.get("sides");
+        assertEquals(12, sides.get(0).get("rosterId"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> player = ((List<Map<String, Object>>) sides.get(0).get("assets")).getFirst();
+        assertEquals("PLAYER", player.get("kind"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> stretch = ((List<Map<String, Object>>) player.get("stretches")).getFirst();
+        assertEquals("Team Twelve", stretch.get("teamName"));
+        assertEquals("DRAFT", stretch.get("how"));
+        assertTrue(stretch.containsKey("viaTxId") && stretch.get("viaTxId") == null, "a draft stretch has no via tx, carried as null");
+        assertEquals(false, stretch.get("leadingUnstarted"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rec = (Map<String, Object>) body.get("reconciliation");
+        assertEquals(3894, rec.get("playerWeeksChecked"));
+        assertEquals(0, rec.get("unexplainedStretches"));
+        assertEquals(4, rec.get("sameWeekInAndOut"));
+        assertEquals(2, rec.get("neverOnAScoredRoster"));
+        assertEquals(List.of("example one"), rec.get("examples"));
+        assertTrue(player.containsKey("position") && player.get("position") == null, "null position is carried, not dropped");
+        assertTrue(player.containsKey("postMovePositionalRank"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> assets2 = (List<Map<String, Object>>) sides.get(1).get("assets");
+        assertEquals("FAAB", assets2.get(0).get("kind"));
+        assertEquals(67, assets2.get(0).get("amount"));
+        assertEquals("Team Twelve", assets2.get(0).get("fromTeamName"));
+        assertEquals("PICK", assets2.get(1).get("kind"));
+        assertTrue(assets2.get(1).containsKey("pickNo") && assets2.get(1).get("pickNo") == null);
+        assertTrue(assets2.get(1).containsKey("player") && assets2.get(1).get("player") == null);
 
         @SuppressWarnings("unchecked")
         Map<String, Object> manager = ((List<Map<String, Object>>) body.get("byManager")).getFirst();
@@ -327,7 +386,7 @@ class LeagueAnalyticsContractTest {
     private static final class TransactionAnalysisServiceResults {
         static TransactionAnalysisService.Result unavailable() {
             return new TransactionAnalysisService.Result(false, "Transactions for this league haven't loaded yet.",
-                    2026, Sport.NFL, List.of(), List.of(), List.of(), "LOWER_IS_BETTER");
+                    2026, Sport.NFL, List.of(), List.of(), List.of(), "LOWER_IS_BETTER", 0, false, true, null);
         }
     }
     // ------------------------------------------------------ league scoping (audit 2026-09-28/01)

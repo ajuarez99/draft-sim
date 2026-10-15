@@ -34,6 +34,13 @@ Built so far:
   and their likely next pick, re-projected in the background after every pick. A position
   scarcity meter (starter pool = the board's top teams × starters) and a per-manager
   "Room read" sit beside it.
+- **Trade verdicts** (specs/033-trade-verdicts). Roster Management grades every trade by the
+  started points the received assets actually scored for their new team, from the first scored
+  week they were on it. Ownership comes from the weekly scoring rows, not the transaction's week,
+  which is when it was *proposed* (lessons #43). Picks resolve to the drafted player. FAAB is shown,
+  and makes a trade "not comparable by points" when a side got nothing else. Reversed and restored
+  trades say so. Each trade expands into its players' season stretches, a reconciliation
+  count checks the transaction log against the scoring rows, and the trade log downloads as CSV.
 - **The season after the draft** (specs/030-post-draft-season-view). Between a completed draft
   and the first *final* scored week, the league home leads with this season. It drops last
   season's matchup, power and award blocks; shows the first-games date; ranks every roster by

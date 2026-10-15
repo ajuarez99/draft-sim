@@ -51,7 +51,8 @@ class EspnPlatformGuardIT extends EspnIT {
                 () -> post("/api/ingest/league-history/" + l),
                 () -> post("/api/ingest/player-games/" + l),
                 () -> post("/api/ingest/transactions/" + l),
-                () -> post("/api/ingest/all/" + l));
+                () -> post("/api/ingest/all/" + l),
+                () -> post("/api/ingest/brackets/" + l));
         for (Supplier<MockHttpServletRequestBuilder> route : routes) {
             mvc.perform(asAllan(route.get())).andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.error").value("PLATFORM_NOT_SUPPORTED"));

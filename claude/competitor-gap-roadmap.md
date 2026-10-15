@@ -71,6 +71,14 @@ by recent form means more once minutes are visible beside it.
 > weeks (NFL 2026 final weeks = 3), so NFL grades read "early" until week 4 is final. 2.3–2.6
 > are later specs.
 
+> **Status 2026-10-14 (spec 033):** 2.5 is **built and live-verified locally** in
+> `specs/033-trade-verdicts`, not committed or deployed. It turned out larger than the doc said:
+> - picks and FAAB are real trade assets (the only NBA 2026 trade is picks-only, and 10 of 18 NBA 2025
+>   trades move FAAB), so V34 now stores them;
+> - a trade's stored week is its *proposal* week.
+>
+> The trade *tree* (downstream value) stays not built, as the doc proposed.
+
 | # | Item | Doc | Size | Notes |
 |---|---|---|---|---|
 | 2.1 | **NFL scoring check:** `GameScoringService` vs `players_points` | [draft-grades.md](draft-grades.md) acceptance #1 | S | Gate for 2.2 and 3.1's NFL path. If it fails, fix that before anything reads NFL `player_game`. |

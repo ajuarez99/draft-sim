@@ -282,7 +282,7 @@ not executed (mostly because an ESPN shape is still unverified, T053).
 
 **Also read, not mutated:** `CredentialLeakIT` isn't vacuous. It asserts the sentinel reached the stub
 and that app log lines were captured, and it covers the Spring DEBUG body line that caught the real
-leak (lessons #44).
+leak (lessons #46).
 
 **Process note, so nobody repeats it:** I first queued a cleanup step that would have run
 `git checkout --` on `ManagerRepository.java`, a file this change modifies. I stopped the task before

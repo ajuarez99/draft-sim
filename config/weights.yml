@@ -176,6 +176,19 @@ draftsim:
   draft-grades:
     min-picks-per-position: 8
 
+  # Rivalry week (spec 034). ARBITRARY: every number here is hand-set, not fitted to anything
+  # (specs/034-rivalry-schedule-grid research R5/R6). min-meetings: a pairing with fewer meetings than
+  # this is labelled thin; 3 is the smallest count where a record can't be decided by one game's swing
+  # between 1-1 and 2-0 (R5). playoff-bonus: added to a pair's score per WINNERS-BRACKET elimination
+  # meeting (a final counts once, not per week). championship-bonus: added once if they met in a final.
+  # max-managers: the exact matching is a bitmask DP, so it is capped; above this the section is
+  # refused rather than approximated. Delete this block and the rivalry week answers CONFIG_MISSING.
+  rivalry:
+    min-meetings: 3
+    playoff-bonus: 1.5
+    championship-bonus: 2.5
+    max-managers: 16
+
   # Minutes trends and streaming candidates (spec 019). ARBITRARY: every number here is hand-set,
   # not fitted (specs/019-minutes-streaming research R5, plan review F7). role-threshold-minutes:
   # recent minus season minutes at which a player is flagged a riser/faller. min-season-games:

@@ -550,7 +550,11 @@ public class EspnLeagueIngestService {
                     "espn:" + t.externalId(), t.type(), t.status(), t.rosterId(),
                     t.rosterId() == null ? null : managerByTeam.get(t.rosterId()),
                     JsonUtil.write(keyed(t.adds(), l.players())), JsonUtil.write(keyed(t.drops(), l.players())),
-                    t.faabBid(), t.createdAt()));
+                    t.faabBid(), t.createdAt(),
+                    // V34 trade assets (spec 033): null = unknown, never [] = "none moved". ESPN's traded
+                    // picks/FAAB aren't mapped, so the trade page says assets aren't loaded rather than
+                    // asserting a player-only trade. Only the Sleeper ingest backfills these (guarded).
+                    null, null));
         }
         l.tx().finalByWeek().forEach((week, fin) ->
                 weekFetches.record(leagueId, LeagueWeekFetchRepository.TRANSACTIONS, week, now, fin));
