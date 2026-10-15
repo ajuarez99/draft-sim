@@ -3,6 +3,8 @@ package com.ballknowers.draftsim.engine;
 import com.ballknowers.draftsim.ingest.RosterOwnerMapper;
 import com.ballknowers.draftsim.ingest.SleeperClient;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
+import com.ballknowers.draftsim.store.LeagueRepository;
+import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RankingBallotRepository;
 import org.springframework.stereotype.Service;
@@ -35,13 +37,16 @@ public class MemberRankingService {
     private final SleeperClient sleeper;
     private final ManagerRepository managers;
     private final LeagueMemberRepository leagueMembers;
+    private final LeagueRosterSource rosterSource;
 
     public MemberRankingService(RankingBallotRepository ballots, SleeperClient sleeper,
-                                ManagerRepository managers, LeagueMemberRepository leagueMembers) {
+                                ManagerRepository managers, LeagueMemberRepository leagueMembers,
+                                LeagueRepository leagues, RosterSeasonRepository rosterSeasons) {
         this.ballots = ballots;
         this.sleeper = sleeper;
         this.managers = managers;
         this.leagueMembers = leagueMembers;
+        this.rosterSource = new LeagueRosterSource(sleeper, leagues, rosterSeasons);
     }
 
     /**
@@ -102,7 +107,7 @@ public class MemberRankingService {
         }
 
         Map<Integer, Long> managerByRoster = RosterOwnerMapper.rosterToManager(
-                sleeper.rosters(sleeperLeagueId), managers.idsBySleeperUserId());
+                rosterSource.rosters(sleeperLeagueId), managers.idsBySleeperUserId());
 
         // A roster ranked by very few ballots would otherwise win the week
         // outright on one enthusiastic vote (avgRank 1.00 beats an honest
@@ -197,8 +202,9 @@ public class MemberRankingService {
 
     public List<BallotMember> members(long leagueId, String sleeperLeagueId, String callerSleeperUserId) {
         Map<String, Long> managerBySleeperUserId = managers.idsBySleeperUserId();
-        Long callerManagerId = callerSleeperUserId == null || callerSleeperUserId.isBlank()
-                ? null : managerBySleeperUserId.get(callerSleeperUserId);
+        // Spec 035 S6: the per-league caller resolver, so an ESPN claimant is "you" (and an espn:-shaped
+        // header is nobody). Identical to the old lookup for a Sleeper league.
+        Long callerManagerId = ManagerRepository.caller(managers, leagueId, callerSleeperUserId);
 
         Map<Long, LeagueMemberRepository.MemberRow> byManager = new HashMap<>();
         for (LeagueMemberRepository.MemberRow m : leagueMembers.forLeague(leagueId)) {
@@ -206,7 +212,7 @@ public class MemberRankingService {
         }
 
         List<BallotMember> out = new ArrayList<>();
-        for (Map<String, Object> roster : sleeper.rosters(sleeperLeagueId)) {
+        for (Map<String, Object> roster : rosterSource.rosters(sleeperLeagueId)) {
             int rosterId = asInt(roster.get("roster_id"), -1);
             if (rosterId < 0) continue;
             Object ownerId = roster.get("owner_id");

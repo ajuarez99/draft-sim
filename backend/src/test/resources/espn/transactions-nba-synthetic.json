@@ -1,0 +1,21 @@
+{
+  "_synthetic": true,
+  "_note": "Hand-built minimal payload in the shape research R9 guesses for view=mTransactions2. NOT recorded from ESPN. Replace with a recorded fixture at T053.",
+  "transactions": [
+    { "id": "5001", "type": "WAIVER", "status": "EXECUTED", "teamId": 2, "bidAmount": 12, "proposedDate": 1700000000000,
+      "items": [ { "playerId": 9990002, "type": "ADD", "toTeamId": 2 }, { "playerId": 9990006, "type": "DROP", "fromTeamId": 2 } ] },
+    { "id": "5002", "type": "FREEAGENT", "status": "EXECUTED", "teamId": 1, "bidAmount": 0, "proposedDate": 1700000100000,
+      "items": [ { "playerId": 9990004, "type": "ADD", "toTeamId": 1 } ] },
+    { "id": "5003", "type": "TRADE_ACCEPT", "status": "EXECUTED", "teamId": 1, "proposedDate": 1700000200000,
+      "items": [ { "playerId": 9990001, "type": "TRADE", "fromTeamId": 1, "toTeamId": 2 },
+                 { "playerId": 9990004, "type": "TRADE", "fromTeamId": 2, "toTeamId": 1 } ] },
+    { "id": "5004", "type": "WAIVER", "status": "FAILED_PLAYERALREADYDROPPED", "teamId": 3, "bidAmount": 5, "proposedDate": 1700000300000,
+      "items": [ { "playerId": 9990007, "type": "ADD", "toTeamId": 3 } ] },
+    { "id": "5005", "type": "TRADE_PROPOSAL", "status": "PENDING", "teamId": 4,
+      "items": [ { "playerId": 9990001, "type": "TRADE", "fromTeamId": 1, "toTeamId": 4 } ] },
+    { "id": "5006", "type": "ROSTER", "status": "EXECUTED", "teamId": 1,
+      "items": [ { "playerId": 9990001, "type": "LINEUP", "fromLineupSlotId": 12, "toLineupSlotId": 0 } ] },
+    { "id": "5007", "type": "WAIVER", "status": "PENDING", "teamId": 4, "bidAmount": 1,
+      "items": [ { "playerId": 9990003, "type": "ADD", "toTeamId": 4 } ] }
+  ]
+}

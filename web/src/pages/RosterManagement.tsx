@@ -12,6 +12,7 @@ import {
   type RosterManagementTeam,
   type LeagueTransactions,
   type MovedPlayer,
+  type Sport,
   type TradePlayerAsset,
   type LeagueTrade,
   type TradeAssetStatus,
@@ -277,16 +278,12 @@ function Transactions({ tx, leagueId }: { tx: LeagueTransactions; leagueId: stri
               <span className="tx-week">Wk {a.week}</span>
               <span className="tx-added">
                 {a.added.position && <em className="tx-pos">{a.added.position}</em>}
-                <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={a.added.playerId} sport={tx.sport}>
-                  {a.added.playerName}
-                </PlayerLink>
+                <MovedName player={a.added} leagueId={leagueId} sport={tx.sport} />
               </span>
               <Rank player={a.added} />
               {a.dropped && (
                 <span className="muted small tx-dropped">for{' '}
-                  <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={a.dropped.playerId} sport={tx.sport}>
-                    {a.dropped.playerName}
-                  </PlayerLink>
+                  <MovedName player={a.dropped} leagueId={leagueId} sport={tx.sport} />
                 </span>
               )}
               <span className="tx-team muted">{a.teamName}</span>
@@ -303,6 +300,25 @@ function Transactions({ tx, leagueId }: { tx: LeagueTransactions; leagueId: stri
         </HowThisWorks>
       </section>
     </>
+  )
+}
+
+/**
+ * A moved player's name. An ESPN player the matcher refused (`unmatched`, key `espn:<id>`) has no player
+ * page, so he is the name ESPN gave him and nothing more; every Sleeper player links as before.
+ */
+function MovedName({ player, leagueId, sport }: { player: MovedPlayer; leagueId: string; sport: Sport }) {
+  if (player.unmatched) {
+    return (
+      <span className="tx-unmatched" title={`Not matched to a known player${player.team ? ` (ESPN team ${player.team})` : ''}`}>
+        {player.playerName}
+      </span>
+    )
+  }
+  return (
+    <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={player.playerId} sport={sport}>
+      {player.playerName}
+    </PlayerLink>
   )
 }
 
@@ -343,9 +359,14 @@ const pts = (n: number) => n.toFixed(1)
 function PlayerChip({ p, tx, leagueId }: { p: TradePlayerAsset; tx: LeagueTransactions; leagueId: string }) {
   return (
     <span className="tx-chip tx-chip-player">
-      <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={tx.sport}>
-        {p.playerName}
-      </PlayerLink>
+      {/* spec 035: an ESPN player the matcher refused (key `espn:<id>`) has no player page; name only. */}
+      {p.playerId.startsWith('espn:') ? (
+        <span className="tx-unmatched" title="Not matched to a known player">{p.playerName}</span>
+      ) : (
+        <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={p.playerId} sport={tx.sport}>
+          {p.playerName}
+        </PlayerLink>
+      )}
       {p.status === 'COUNTED' ? (
         <span className="tx-chip-note">{pts(p.startedPoints)} started</span>
       ) : (

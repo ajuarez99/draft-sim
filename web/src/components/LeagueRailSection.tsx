@@ -16,6 +16,7 @@ import {
 } from '../destinations'
 import type { LeagueLineage } from '../leagueLineage'
 import type { RailLeague } from '../railLeague'
+import PlatformBadge from './PlatformBadge'
 import { getLeagueRefresh, refreshLeague, type DraftSummary, type RefreshStatus } from '../api'
 import { useBumpLeagueDataVersion } from '../leagueDataVersion'
 import { stripRoster } from '../statCalcUrl'
@@ -451,6 +452,7 @@ export default function LeagueRailSection({
           <span className="rail-league-name">{d.leagueName}</span>
           <span className="rail-league-sub">
             <span className={`sport-pill ${d.sport}`}>{d.sport.toUpperCase()}</span>
+            <PlatformBadge platform={d.platform} />
             {season.teams} managers
           </span>
         </span>
@@ -542,6 +544,7 @@ export default function LeagueRailSection({
                       <span className={`sport-pill ${l.current.sport}`}>
                         {l.current.sport.toUpperCase()}
                       </span>
+                      <PlatformBadge platform={l.current.platform} />
                     </Link>
                   ))}
                 </>

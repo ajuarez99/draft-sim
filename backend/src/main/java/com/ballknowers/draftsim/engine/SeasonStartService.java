@@ -138,7 +138,13 @@ public class SeasonStartService {
         SeasonStrength strength = null;
         if (state == SeasonState.DRAFTED_UNSCORED) {
             LeagueAnalysisService.ProjectionsRead read = null;
-            try {
+            Optional<LeagueAvailability.Reason> untranslated = LeagueAvailability.scoringUntranslated(league);
+            if (untranslated.isPresent()) {
+                // Spec 035 F16: ESPN scoring we could not translate would read as plain standard scoring here.
+                strength = new SeasonStrength(false, untranslated.get().message(), untranslated.get().code(),
+                        unitOf(league), List.of(), null, 0, null, null, List.of(), null, preseason.staleAfterDays(),
+                        List.of(), null);
+            } else try {
                 read = analysis.projectionsRead(league, sleeperUserId);
                 strength = strength(league, read);
             } catch (RuntimeException e) {
@@ -200,6 +206,8 @@ public class SeasonStartService {
     }
 
     private String stateStartDate(LeagueRepository.LeagueRow league) {
+        // Spec 035: an ESPN league has no Sleeper state to read; the start date is simply unknown.
+        if (!league.isSleeper()) return null;
         try {
             Map<String, Object> state = sleeper.state(league.sport().code());
             if (state == null) return null;

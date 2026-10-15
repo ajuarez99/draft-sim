@@ -198,6 +198,8 @@ public class ProfileService {
         Set<Long> allManagers = new HashSet<>(names.keySet());
         allManagers.addAll(draftsByManager.keySet());
         allManagers.addAll(manual.keySet());
+        // Spec 035 F1: ESPN managers are never fitted and never seatable.
+        allManagers.removeAll(managers.espnManagerIds());
 
         Map<Long, ManagerProfile> out = new HashMap<>();
         Map<Long, Double> empirical = new HashMap<>();

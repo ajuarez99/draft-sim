@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ApiError } from '../apiError'
 import {
   getProjectionAccuracy,
   type AccuracyCell,
@@ -214,13 +215,21 @@ export default function ProjectionAccuracyPanel({
 }) {
   const [a, setA] = useState<ProjectionAccuracy | null>(null)
   const [failed, setFailed] = useState(false)
+  // Spec 035 FR-008: a 422 is the server saying this league can't be graded (an ESPN league whose scoring isn't
+  // translated), not a transient failure, so it gets its own sentence instead of "couldn't be loaded just now".
+  const [refused, setRefused] = useState<string | null>(null)
 
   useEffect(() => {
     let live = true
     setFailed(false)
+    setRefused(null)
     getProjectionAccuracy(sleeperLeagueId)
       .then((r) => live && setA(r))
-      .catch(() => live && setFailed(true))
+      .catch((e: unknown) => {
+        if (!live) return
+        if (e instanceof ApiError && e.status === 422) setRefused(refusalText(e.message))
+        else setFailed(true)
+      })
     return () => {
       live = false
     }
@@ -232,9 +241,17 @@ export default function ProjectionAccuracyPanel({
         <h2 className="section-title">Projection accuracy</h2>
         <span className="muted small">pre-game projections vs what happened · this league's scoring</span>
       </div>
+      {refused && <p className="muted small">{refused}</p>}
       {failed && <p className="muted small">Accuracy couldn't be loaded just now.</p>}
-      {!failed && !a && <p className="muted small">Loading…</p>}
+      {!failed && !refused && !a && <p className="muted small">Loading…</p>}
       {a && <ProjectionAccuracyView a={a} />}
     </section>
   )
+}
+
+/** The server's refusal code, in words. */
+function refusalText(code: string): string {
+  if (code === 'SCORING_UNTRANSLATED')
+    return "Not available for this league: its ESPN scoring rules aren't translated yet, so projections can't be graded against them."
+  return 'Not available for this league.'
 }

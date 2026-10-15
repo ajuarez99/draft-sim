@@ -52,6 +52,12 @@ public class RosterWeekPointsRepository {
                 .update();
     }
 
+    /** Whether any stored week carries a per-player breakdown (an ESPN week written without one does not). */
+    public boolean hasPlayerPoints(long leagueId) {
+        return Boolean.TRUE.equals(db.sql("select exists (select 1 from roster_week_points where league_id = ? and players_points <> '{}'::jsonb)")
+                .param(leagueId).query(Boolean.class).single());
+    }
+
     /**
      * Weeks whose starters list is populated for EVERY stored roster.
      *

@@ -6,6 +6,9 @@ import NotFound from '../components/NotFound'
 import PlayerSpotlight from '../components/PlayerSpotlight'
 import PersonName from '../components/PersonName'
 import PreseasonStrengthBlock from '../components/PreseasonStrengthBlock'
+import EspnRefreshNote from '../components/EspnRefreshNote'
+import UnmatchedPlayersNote from '../components/UnmatchedPlayersNote'
+import { BlockNote } from '../components/NotAvailableForPlatform'
 import GradeChip, { GradesEarlyBadge } from '../components/GradeChip'
 import { SkeletonRows } from '../components/Skeleton'
 import {
@@ -36,6 +39,7 @@ import {
 import { destinationsFor, labelOf } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock, type Block } from '../useBlock'
+import { isSettled, unavailableReason, useLeagueAvailability } from '../useLeagueAvailability'
 import { cachedDrafts } from '../railLeague'
 import { ordinal } from '../rankOrder'
 import { buildHeadline, computeWeeklyStory, leagueVoteHero } from './PowerRankings'
@@ -65,10 +69,27 @@ export type { Block } from '../useBlock'
  *                                          list is read from the `weekly` block, but nothing
  *                                          else depends on the spotlight block
  *
+ * <b>Per-block availability (spec 035 F13).</b> An ESPN league cannot produce some of these blocks. Each one
+ * the server's LeagueAvailability lists as unavailable is not fetched and is replaced by a one-line note
+ * (key: weeklyReport -> latest matchup, superlatives -> top award, stats -> player spotlight, schedule ->
+ * next matchup, draftGrades -> grades, draftRoom -> the draft links, analysis -> next opponent). Standings,
+ * power and the rest render. A Sleeper league never asks: the platform comes from the league list this page
+ * already reads, so its blocks load exactly as before.
+ *
  * "You" is only ever a server-side fact (`isMe` on a standings row, a weekly
  * side, an analysis side), never a client-side name match. A reader who is not
  * in the league gets no "you" blocks and no error.
  */
+
+/** Availability page key -> the league-home block it hides. The keys are the server's. */
+const BLOCK_LABELS: [string, string][] = [
+  ['weeklyReport', 'Latest matchup'],
+  ['schedule', 'Next matchup'],
+  ['superlatives', 'Season awards'],
+  ['stats', 'Player spotlight'],
+  ['draftGrades', 'Draft grades'],
+  ['draftRoom', 'Draft room'],
+]
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -128,11 +149,24 @@ export default function LeagueHome() {
   const version = useLeagueDataVersion(sleeperLeagueId)
 
   const drafts = useBlock(() => cachedDrafts(), [id])
+  // Spec 035: the platform comes off the league list this page reads anyway. Only an ESPN league asks which
+  // blocks it can show, and the gated blocks wait for the answer so they are never fetched just to be refused.
+  const isEspn = drafts.status === 'ok' && drafts.data.find((d) => d.sleeperLeagueId === id)?.platform === 'ESPN'
+  const availability = useLeagueAvailability(isEspn ? id : null, version)
+  const gateOpen = drafts.status !== 'loading' && (!isEspn || isSettled(availability))
+  const reasonFor = (key: string) => (isEspn ? unavailableReason(availability, key) : null)
+  const allow = (key: string) => gateOpen && reasonFor(key) == null
+  const okWeekly = allow('weeklyReport')
+  const okAwards = allow('superlatives')
+  const okSpotlight = allow('stats')
+  const okSchedule = allow('schedule')
+  const okAnalysis = allow('analysis')
+
   const history = useBlock(id ? () => getLeagueHistory(id) : null, [id, version])
-  const weekly = useBlock(id ? () => getWeeklyReport(id, 0) : null, [id, version])
+  const weekly = useBlock(id && okWeekly ? () => getWeeklyReport(id, 0) : null, [id, version, okWeekly])
   const power = useBlock(id ? () => getPowerRankings(id) : null, [id, version])
-  const awards = useBlock(id ? () => fetchSuperlatives(id) : null, [id, version])
-  const spotlight = useBlock(id ? () => getPlayerSpotlight(id) : null, [id, version])
+  const awards = useBlock(id && okAwards ? () => fetchSuperlatives(id) : null, [id, version, okAwards])
+  const spotlight = useBlock(id && okSpotlight ? () => getPlayerSpotlight(id) : null, [id, version, okSpotlight])
   const seasonStart = useBlock(id ? () => getSeasonStart(id) : null, [id, version])
 
   const draft: DraftSummary | null =
@@ -144,10 +178,10 @@ export default function LeagueHome() {
   // "does the sport have an Analysis page": basketball has one now (spec 030),
   // but its home shows the pairing block below, and fetching the analysis too
   // would run a second full lineup pass and render a second "Next opponent".
-  const analysis = useBlock(sport === 'nfl' ? () => getLeagueAnalysis(id) : null, [id, sport, version])
+  const analysis = useBlock(sport === 'nfl' && okAnalysis ? () => getLeagueAnalysis(id) : null, [id, sport, version, okAnalysis])
   // Basketball only (specs/017 F7: football stays on the analysis block until its Tue/Wed
   // boundary is measured). Keyed on the data version so the visit's refresh refetches it (F8).
-  const nextMatchup = useBlock(id && sport === 'nba' ? () => getNextMatchup(id) : null, [id, sport, version])
+  const nextMatchup = useBlock(id && sport === 'nba' && okSchedule ? () => getNextMatchup(id) : null, [id, sport, version, okSchedule])
 
   // An id the server does not know (or one that is not yours) is the shared
   // not-found state; any other failure stays inside its own block.
@@ -164,7 +198,7 @@ export default function LeagueHome() {
   // The layout is `seasonStart.state`'s, never re-derived from the draft or the standings.
   // While it loads, the blocks that differ by state are held back so last season's matchup,
   // power headline and awards never flash before disappearing (spec 030 N3).
-  const settling = seasonStart.status === 'loading'
+  const settling = seasonStart.status === 'loading' || !gateOpen
   const start: SeasonStart | null = seasonStart.status === 'ok' ? seasonStart.data : null
   const unscored = start?.state === 'DRAFTED_UNSCORED'
   // Only the error fallback: if season-start can't be read, the page falls back to the rule
@@ -185,7 +219,7 @@ export default function LeagueHome() {
   // What each state keeps. Matchup, standings, power and awards read last season's numbers
   // in DRAFTED_UNSCORED: standings, power and awards are dropped there outright, the matchup
   // only survives if it is this season's.
-  const showMatchup = !settling && !preSeason && (!unscored || scoredThisSeason)
+  const showMatchup = okWeekly && !settling && !preSeason && (!unscored || scoredThisSeason)
   const showSeasonBlocks = !settling && !unscored
 
   const sub = unscored
@@ -206,7 +240,18 @@ export default function LeagueHome() {
         sub={sub}
       />
 
-      {preSeason && draft && <DraftBlock draft={draft} />}
+      {availability.status === 'ok' && isEspn && (
+        <EspnRefreshNote
+          leagueKey={id}
+          lastRefresh={availability.data.lastRefresh}
+          canReplaceCookies={availability.data.canReplaceCookies}
+        />
+      )}
+      {availability.status === 'ok' && isEspn && (
+        <UnmatchedPlayersNote count={availability.data.unmatchedPlayers} players={availability.data.unmatched} />
+      )}
+
+      {preSeason && draft && reasonFor('draftRoom') == null && <DraftBlock draft={draft} />}
 
       <div className="lh-grid">
         {/* "You" first: record, then your latest matchup, then what's next, so all
@@ -222,7 +267,7 @@ export default function LeagueHome() {
           <NextMatchupBlock block={nextMatchup} draft={draft} note={unscored && start.sport === 'nba' ? idleStartersNote(start.firstWeek, start.strength?.available) : null} />
         )}
 
-        {unscored && <DraftDoneBlock draftId={draftBoardId} />}
+        {unscored && reasonFor('draftRoom') == null && <DraftDoneBlock draftId={draftBoardId} />}
 
         {showSeasonBlocks && (
           <>
@@ -230,16 +275,26 @@ export default function LeagueHome() {
 
             <PowerBlock block={power} leagueId={id} seasonYear={seasonYear} />
 
-            <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />
+            {okAwards && <AwardBlock block={awards} leagueId={id} seasonShown={seasonYear} />}
           </>
         )}
 
-        {start?.state === 'IN_SEASON' && start.draft.grades && draftBoardId && (
+        {start?.state === 'IN_SEASON' && start.draft.grades && draftBoardId && reasonFor('draftGrades') == null && (
           <GradesSummaryBlock grades={start.draft.grades} draftId={draftBoardId} />
         )}
       </div>
 
       <SpotlightArea id={id} block={spotlight} weekly={weekly} />
+
+      {/* Spec 035 FR-008: a hidden block says so, in one line, instead of just not being there. */}
+      {isEspn && availability.status === 'ok' && (
+        <ul className="lh-unavailable">
+          {BLOCK_LABELS.map(([key, label]) => {
+            const reason = reasonFor(key)
+            return reason ? <BlockNote key={key} label={label} reason={reason} /> : null
+          })}
+        </ul>
+      )}
     </div>
   )
 }

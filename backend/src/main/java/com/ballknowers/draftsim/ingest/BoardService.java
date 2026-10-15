@@ -309,6 +309,8 @@ public class BoardService {
                                                                and (d.start_time::date + make_interval(days => ?))
                     where d.start_time is not null
                       and l.sport = ?
+                      -- Spec 035 F1: ESPN drafts never feed the model and carry no start_time anyway.
+                      and l.platform = 'SLEEPER'
                 """ + draftFilter + """
 
                     order by d.id, abs(s2.captured_on - d.start_time::date), s2.captured_on

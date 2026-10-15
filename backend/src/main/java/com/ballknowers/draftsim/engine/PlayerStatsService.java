@@ -310,7 +310,7 @@ public class PlayerStatsService {
                 absences.forPlayers(sport, dataSeason, List.of(sleeperPlayerId))), scorer);
 
         Long callerManagerId = requester == null || requester.isBlank() ? null
-                : managers.idsBySleeperUserId().get(requester);
+                : ManagerRepository.caller(managers, league.id(), requester);
         Map<Integer, RosterOwners.RosterOwner> owners = RosterOwners.ownerNames(rosterSeasons.forLeague(league.id()),
                 members.forLeague(league.id()), callerManagerId);
         Facts seasonFacts = facts(league, owners);
@@ -448,7 +448,7 @@ public class PlayerStatsService {
                 league.totalRosters(), rules.get(sport));
 
         Long callerManagerId = requester == null || requester.isBlank() ? null
-                : managers.idsBySleeperUserId().get(requester);
+                : ManagerRepository.caller(managers, league.id(), requester);
         Map<Integer, RosterOwners.RosterOwner> owners = RosterOwners.ownerNames(rosterSeasons.forLeague(league.id()),
                 members.forLeague(league.id()), callerManagerId);
         Facts seasonFacts = facts(league, owners);

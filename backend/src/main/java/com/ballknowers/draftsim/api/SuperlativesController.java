@@ -107,7 +107,7 @@ public class SuperlativesController {
             return ResponseEntity.badRequest().body(Map.of("message", "unknown player for this league's sport"));
         }
 
-        Long addedBy = managers.idsBySleeperUserId().get(sleeperUserId);
+        Long addedBy = ManagerRepository.caller(managers, row.id(), sleeperUserId);
         LeagueConductRepository.Entry saved =
                 conduct.upsert(row.id(), body.playerId(), reason, body.appliesFromWeek(), addedBy);
         return ResponseEntity.ok(conductEntryRow(saved, row.sport()));

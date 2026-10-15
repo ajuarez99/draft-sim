@@ -168,6 +168,7 @@ Set on the `draft-sim` (backend) service unless noted.
 | `API_TOKEN` | **Currently blank in production — the shared bearer gate is OFF.** See below |
 | `ADMIN_TOKEN` | **The operator secret.** Sent as `X-Admin-Token`; gates `/api/ingest/**` and the commissioner-only actions, and overrides the membership checks for curl. **Blank means admin is DISABLED and every one of those refuses** (fail closed, the opposite of `API_TOKEN`). Server-side only: never a `VITE_` variable. **Not yet set in production** — set it before the next ingest, or none can be run |
 | `REFRESH_SECRET` | The daily GitHub Action's secret, `X-Refresh-Secret`; blank means `/api/refresh/daily` does not exist. Deliberately separate from `ADMIN_TOKEN`: the cron should not hold a secret that can rewrite picks |
+| `BK_CREDENTIAL_KEY` | Spec 035. 32 random bytes, base64 (`openssl rand -base64 32`); seals the ESPN cookies a user pastes for a private ESPN league (AES-256-GCM). **Absent = private ESPN leagues disabled** (public ESPN leagues still work; there is no plaintext fallback). Server-side only: never a `VITE_` variable, never logged. Rotating it makes every stored cookie set unreadable, so users re-paste them |
 | `CORS_ORIGINS` | Exact frontend origin, scheme included, no trailing slash |
 | `PORT` | Railway injects it; the app reads it |
 | `LOG_LEVEL` | `INFO` in production; defaults to `DEBUG` |
