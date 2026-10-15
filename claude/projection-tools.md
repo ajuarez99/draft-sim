@@ -68,6 +68,12 @@ wired up yet". Don't leave "no equivalent" standing.
 
 ### 1. One per-player weekly value, both sports (the foundation)
 
+> **Amended 2026-10-14 (spec 036):** the second bullet below, "Σ over that week's projected games", is wrong
+> for NBA. Sleeper credits one game per starter per week (measured 540/540), so the week's value is ONE
+> game, not the sum of the week's games, and a 4-game week is not "4 rows' worth". The "NBA rows also need
+> `game_id`/`game_date`" part stands: spec 036 stores one `projection_snapshot` row per player per game.
+> The migration number in the first bullet is also stale (spec 036's is V36).
+
 - Ingest: store projection **stat lines**, not points. Add a
   `stats jsonb` column (V27+ — V26 is the highest on main as of 2026-10-05; append-only) and widen `POSITIONS` per sport via
   `SportRules`. NBA rows also need `game_id`/`game_date`, since there are

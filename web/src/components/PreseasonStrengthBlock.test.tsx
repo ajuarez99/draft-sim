@@ -70,9 +70,30 @@ describe('PreseasonStrengthBlock', () => {
 
   it('names the source, its age, the unmeasured accuracy and the categories it does not project', () => {
     renderBlock(strength())
-    expect(screen.getByText(/Source: sleeper · updated today · accuracy for this league not measured/)).toBeInTheDocument()
+    expect(screen.getByText(/RotoWire projection via Sleeper · updated today · accuracy for this league not measured/)).toBeInTheDocument()
     expect(screen.getByText('Not projected: 50+ point bonus.')).toBeInTheDocument()
     expect(screen.getByText(/One average game per starter/)).toBeInTheDocument()
+  })
+
+  it('carries the same measured-accuracy clause as the Analysis page, from the object it is handed', () => {
+    renderBlock(strength({
+      accuracy: {
+        status: 'MEASURED', n: 640, minSamples: 500, mae: 7.26, lean: -2.1, unit: 'GAME',
+        kind: 'SEASON_AVERAGE', label: 'Season average (what the rankings use)',
+      },
+    }))
+    expect(screen.getByText(/off by ±7\.3 pts a game on average \(640 games, season-average line\)/)).toBeInTheDocument()
+  })
+
+  it('prints only counts while the accuracy is still too early', () => {
+    renderBlock(strength({
+      accuracy: {
+        status: 'TOO_EARLY', n: 212, minSamples: 500, mae: null, lean: null, unit: 'GAME',
+        kind: 'SEASON_AVERAGE', label: 'Season average (what the rankings use)',
+      },
+    }))
+    expect(screen.getByText(/accuracy: too early to measure \(212 of 500 games\)/)).toBeInTheDocument()
+    expect(document.body.textContent).not.toMatch(/off by/)
   })
 
   describe('favorite headline (US3)', () => {

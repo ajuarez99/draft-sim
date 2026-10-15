@@ -40,26 +40,72 @@ public class PlayerProjectionRepository {
         this.batch = batch;
     }
 
+    /**
+     * @param stats the projected stat line minus {@code adp_*} / {@code pos_adp_*} keys (spec 036 US3);
+     *              null for a row written before V36 or one whose payload carried no line
+     */
     public record Row(String sport, int season, int week, String sleeperPlayerId,
-                      Double ptsPpr, Double ptsHalfPpr, Double ptsStd, String source) {}
+                      Double ptsPpr, Double ptsHalfPpr, Double ptsStd, String source,
+                      Map<String, Object> stats) {}
 
     public void upsertAll(List<Row> rows) {
         if (rows.isEmpty()) return;
         batch.batchUpdate("""
                 insert into player_projection
-                    (sport, season, week, sleeper_player_id, pts_ppr, pts_half_ppr, pts_std, source, fetched_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, now())
+                    (sport, season, week, sleeper_player_id, pts_ppr, pts_half_ppr, pts_std, source, stats, fetched_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, now())
                 on conflict (sport, season, week, sleeper_player_id) do update set
                     pts_ppr = excluded.pts_ppr,
                     pts_half_ppr = excluded.pts_half_ppr,
                     pts_std = excluded.pts_std,
                     source = excluded.source,
+                    stats = excluded.stats,
                     fetched_at = now()
                 """,
                 rows.stream()
                         .map(r -> new Object[]{r.sport(), r.season(), r.week(), r.sleeperPlayerId(),
-                                r.ptsPpr(), r.ptsHalfPpr(), r.ptsStd(), r.source()})
+                                r.ptsPpr(), r.ptsHalfPpr(), r.ptsStd(), r.source(),
+                                r.stats() == null ? null : JsonUtil.write(r.stats())})
                         .toList());
+    }
+
+    /**
+     * One stored projection row for a window read (spec 036 US3).
+     *
+     * @param stats null when the row predates V36 or had no line; the exact-scoring path then falls back to the
+     *              column pick for this row, so a half-refreshed window still produces a number
+     */
+    public record WeekLine(int week, String sleeperPlayerId, Double ptsPpr, Double ptsHalfPpr, Double ptsStd,
+                           Map<String, Object> stats) {
+
+        /** The value the column pick would give (null column counts as 0, as in {@code coalesce(col, 0)}). */
+        public double column(ScoringKey key) {
+            Double v = switch (key) {
+                case PPR -> ptsPpr;
+                case HALF_PPR -> ptsHalfPpr;
+                case STANDARD -> ptsStd;
+            };
+            return v == null ? 0.0 : v;
+        }
+    }
+
+    /** Every stored row in {@code [fromWeek, toWeek]}, with its stat line. */
+    public List<WeekLine> linesInWindow(String sport, int season, int fromWeek, int toWeek) {
+        return db.sql("""
+                select week, sleeper_player_id, pts_ppr, pts_half_ppr, pts_std, stats::text
+                from player_projection
+                where sport = ? and season = ? and week between ? and ?
+                order by week
+                """)
+                .params(sport, season, fromWeek, toWeek)
+                .query((rs, i) -> new WeekLine(rs.getInt(1), rs.getString(2),
+                        dbl(rs.getBigDecimal(3)), dbl(rs.getBigDecimal(4)), dbl(rs.getBigDecimal(5)),
+                        rs.getString(6) == null ? null : JsonUtil.readMap(rs.getString(6))))
+                .list();
+    }
+
+    private static Double dbl(java.math.BigDecimal v) {
+        return v == null ? null : v.doubleValue();
     }
 
     /**
