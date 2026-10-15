@@ -260,3 +260,33 @@ draftsim:
   preseason:
     favorite-min-gap-pct: 3.0
     stale-after-days: 3
+
+  # Projection accuracy (spec 036). Every number here is ARBITRARY: hand-set before a single
+  # sample existed, NOT fitted to any measured accuracy, and FR-014 forbids feeding a result back
+  # into them. If a band split turns out lopsided the fix is to say so, not to retune it to look even.
+  # min-samples: scored games (NBA) / player-weeks (NFL) below which the page says "too early"
+  #   and prints no accuracy figure at all. A guess: about two NBA slates, about one NFL week.
+  # min-cell: a breakdown row (one position, one band) with fewer samples than this shows its
+  #   count and "too few", not a figure. A guess.
+  # bands: lower edges, in league points, of the 2nd..last band of the PROJECTED value
+  #   (nba [20,35,50] reads 0-20, 20-35, 35-50, 50+). Chosen to split a slate roughly in quarters;
+  #   not measured.
+  projection-accuracy:
+    min-samples:
+      nba: 500
+      nfl: 300
+    min-cell: 50
+    bands:
+      nba: [20, 35, 50]
+      nfl: [5, 10, 17]
+
+  # Projection snapshots (spec 036). ARBITRARY hand-set cutoffs, in America/New_York wall-clock on
+  # the game's date: a fetched line only counts as "pre-game" before this time. Set before the
+  # earliest regular tip-off / kickoff each sport has (NBA holiday matinees; NFL London 09:30 ET),
+  # because Sleeper's feed carries a date but no start time. lookahead-days: how many days ahead of
+  # today a game may be and still be captured. Deleting this block fails startup on purpose.
+  projection-snapshot:
+    cutoff-et:
+      nba: "12:00"
+      nfl: "09:00"
+    lookahead-days: 7

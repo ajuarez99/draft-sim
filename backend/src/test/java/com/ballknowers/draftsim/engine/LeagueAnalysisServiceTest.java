@@ -330,7 +330,7 @@ class LeagueAnalysisServiceTest {
     private static LeagueAnalysisService service(RosterSeasonRepository rs, RosterWeekPointsRepository wp,
                                                  GradeProperties grades) {
         return new LeagueAnalysisService(null, rs, wp, null, null, null, null, null, null, null,
-                new LetterGrades(grades), null, null, new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
+                new LetterGrades(grades), null, null, new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
     }
 
     private static LeagueAnalysisService.ScoreEntry raw(int rosterId, double rawScore) {
@@ -610,7 +610,7 @@ class LeagueAnalysisServiceTest {
     private record NbaMocks(com.ballknowers.draftsim.ingest.SleeperClient sleeper,
                             com.ballknowers.draftsim.store.PlayerSeasonProjectionRepository season,
                             LeagueAnalysisService svc, LeagueRepository.LeagueRow league,
-                            LeagueRepository leagues) {}
+                            LeagueRepository leagues, com.ballknowers.draftsim.store.ManagerRepository managers) {}
 
     private static NbaMocks nbaService(List<Map<String, Object>> sleeperRosters,
                                        Map<String, Map<String, Double>> lines) {
@@ -636,8 +636,8 @@ class LeagueAnalysisServiceTest {
         var svc = new LeagueAnalysisService(leagues, rosterSeasons, weekPoints, null, players, managers, null,
                 sleeper, new com.ballknowers.draftsim.sport.SportRulesRegistry(List.of(NBA_RULES)), null,
                 new LetterGrades(LADDER), season, new GameScoringService(),
-                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
-        return new NbaMocks(sleeper, season, svc, league, leagues);
+                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
+        return new NbaMocks(sleeper, season, svc, league, leagues, managers);
     }
 
     private static Map<String, Object> sleeperRoster(int id, Object players, Object reserve) {
@@ -768,5 +768,72 @@ class LeagueAnalysisServiceTest {
 
         assertFalse(p.available());
         assertEquals("SEASON_OVER", p.reasonCode());
+    }
+
+    // ---- spec 035 code review B1: an ESPN NFL league with untranslated scoring is never projected under STANDARD
+
+    @Test
+    void anEspnNflLeagueWithUntranslatedScoringIsRefusedNotProjectedAsStandard() {
+        var leagues = Mockito.mock(LeagueRepository.class);
+        var weekPoints = Mockito.mock(RosterWeekPointsRepository.class);
+        var projections = Mockito.mock(com.ballknowers.draftsim.store.PlayerProjectionRepository.class);
+        LeagueRepository.LeagueRow espn = new LeagueRepository.LeagueRow(7L, Sport.NFL, "espn:123:2026", "Espn NFL",
+                2026, 4, List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX"), 0.0, null, "in_season",
+                com.ballknowers.draftsim.domain.Platform.ESPN, "123", List.of("statId 53 (receptions)"), List.of());
+        Mockito.when(weekPoints.storedWeeks(7L)).thenReturn(java.util.Set.of(1));
+        Mockito.when(leagues.playoffFormat(7L)).thenReturn(java.util.Optional.of(
+                new LeagueRepository.PlayoffFormat(15, 20, 0, false, false, 0)));
+        // A STANDARD projection that WOULD be returned if the gate were missing.
+        Mockito.when(projections.totalsByPlayer(Mockito.eq("nfl"), Mockito.eq(2026), Mockito.anyInt(), Mockito.anyInt(), Mockito.any()))
+                .thenReturn(Map.of("p1", 100.0));
+        var svc = new LeagueAnalysisService(leagues, null, weekPoints, projections, null, null, null,
+                null, null, null, new LetterGrades(LADDER), null, null,
+                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
+
+        var p = svc.projectionsRead(espn, "someone").projections();
+
+        assertFalse(p.available());
+        assertEquals("SCORING_UNTRANSLATED", p.reasonCode());
+        assertTrue(p.rosters().isEmpty());
+        Mockito.verify(projections, Mockito.never()).totalsByPlayer(Mockito.any(), Mockito.anyInt(), Mockito.anyInt(),
+                Mockito.anyInt(), Mockito.any());
+    }
+
+    // ---- spec 035 code review S6: "you" on an ESPN league is the linked manager, not the header string
+
+    @Test
+    void theCallersClaimedRosterIsMarkedMeEvenThoughNoOwnerIdEqualsTheHeader() {
+        var m = nbaService(List.of(
+                espnRoster(1, "espn:{A}", rosterIds(1)), espnRoster(2, "espn:{B}", rosterIds(2)),
+                espnRoster(3, "espn:{C}", rosterIds(3)), espnRoster(4, "espn:{D}", rosterIds(4))), lines());
+        Mockito.when(m.managers().idsBySleeperUserId()).thenReturn(Map.of(
+                "espn:{A}", 11L, "espn:{B}", 12L, "espn:{C}", 13L, "espn:{D}", 14L, "claimant", 99L));
+        // The claimant (header "claimant") is linked to ESPN member B, who owns roster 2 in this league.
+        Mockito.when(m.managers().callerManagerIn(List.of(5L), "claimant")).thenReturn(java.util.Optional.of(12L));
+
+        var p = m.svc().projectionsRead(m.league(), "claimant").projections();
+
+        assertTrue(p.available(), p.reason());
+        assertEquals(List.of(2), p.rosters().stream().filter(RosterProjection::isMe).map(RosterProjection::rosterId).toList());
+    }
+
+    @Test
+    void anEspnShapedHeaderIsNeverMarkedMeEvenWhenItEqualsAnOwnerId() {
+        var m = nbaService(List.of(
+                espnRoster(1, "espn:{A}", rosterIds(1)), espnRoster(2, "espn:{B}", rosterIds(2)),
+                espnRoster(3, "espn:{C}", rosterIds(3)), espnRoster(4, "espn:{D}", rosterIds(4))), lines());
+        Mockito.when(m.managers().idsBySleeperUserId()).thenReturn(Map.of("espn:{A}", 11L, "espn:{B}", 12L));
+        Mockito.when(m.managers().callerManagerIn(Mockito.anyCollection(), Mockito.eq("espn:{A}"))).thenReturn(java.util.Optional.of(11L));
+
+        var p = m.svc().projectionsRead(m.league(), "espn:{A}").projections();
+
+        assertTrue(p.available(), p.reason());
+        assertTrue(p.rosters().stream().noneMatch(RosterProjection::isMe));
+    }
+
+    private static Map<String, Object> espnRoster(int id, String owner, Object players) {
+        Map<String, Object> m = sleeperRoster(id, players, List.of());
+        m.put("owner_id", owner);
+        return m;
     }
 }

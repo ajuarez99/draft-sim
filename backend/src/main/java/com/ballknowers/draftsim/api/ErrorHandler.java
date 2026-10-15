@@ -23,6 +23,17 @@ public class ErrorHandler {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", message(e)));
     }
 
+    /**
+     * Spec 035 F4: a Sleeper-only route was called with an ESPN league or draft. Fixed text, explicit
+     * JSON content type for the same reason as {@link #busy}: /live-stream is produces=text/event-stream.
+     */
+    @ExceptionHandler(PlatformNotSupported.class)
+    public ResponseEntity<Map<String, String>> platformNotSupported(PlatformNotSupported e) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(Map.of("error", e.code(), "message", e.getMessage()));
+    }
+
     /** Every simulation permit is taken. Fast refusal, not a queue: see {@link SimulationPermits}. */
     @ExceptionHandler(SimulationBusyException.class)
     public ResponseEntity<Map<String, String>> busy(SimulationBusyException e) {

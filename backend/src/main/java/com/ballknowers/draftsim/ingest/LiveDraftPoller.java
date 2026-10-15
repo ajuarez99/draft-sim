@@ -204,6 +204,12 @@ public class LiveDraftPoller {
      * our Sleeper load at exactly the wrong moment.
      */
     public TrackResult track(DraftRepository.DraftRow draft) {
+        // Spec 035 F4: only Sleeper drafts are followed. An ESPN draft has no Sleeper draft to poll,
+        // so answer "not followed" before any tick rather than asking Sleeper about a key it has never seen.
+        if (drafts.platformOf(draft.sleeperDraftId())
+                .filter(p -> p != com.ballknowers.draftsim.domain.Platform.SLEEPER).isPresent()) {
+            return new TrackResult(false, draft.status(), 0, false, false);
+        }
         TrackResult alreadyTracking = reportExistingPoller(draft);
         if (alreadyTracking != null) return alreadyTracking;
 

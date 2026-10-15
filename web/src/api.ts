@@ -344,7 +344,13 @@ export type DraftSummary = {
   // (multi-sport-and-rebrand.md Phase 2), not one list per sport. Not yet
   // rendered anywhere; the sport pill is Phase 6.
   sport: Sport
+  // Spec 035: where the league came from (draft.platform). Mirrors DraftSummary.platform in
+  // DraftRepository.java. 'ESPN' leagues have no draft room: the picker links them to the league home.
+  platform: Platform
 }
+
+/** Mirrors com.ballknowers.draftsim.domain.Platform. */
+export type Platform = 'SLEEPER' | 'ESPN'
 
 export const getDrafts = () => apiFetch('/api/drafts').then(json<DraftSummary[]>)
 
@@ -1539,6 +1545,72 @@ export type AnalysisProjections = {
   unprojectedCategories: string[]
   /** draftsim.preseason.stale-after-days: older than this and the page says how old the projections are. */
   staleAfterDays: number
+  /**
+   * spec 036: the measured accuracy of the pre-game projections, one line (the full breakdown is
+   * `getProjectionAccuracy`). Null only when the accuracy read itself failed, or the block is unavailable.
+   */
+  accuracy: AccuracySummary | null
+}
+
+/** NBA grades single games, football grades player-weeks. Deliberately not `PER_WEEK`, which already means
+ * "one NBA game a week" in `ProjectionUnit`. */
+export type AccuracyUnit = 'GAME' | 'PLAYER_WEEK'
+export type AccuracyStatus = 'TOO_EARLY' | 'MEASURED' | 'NO_SNAPSHOTS'
+export type AccuracySeriesKind = 'GAME' | 'SEASON_AVERAGE'
+
+/** Mirrors ProjectionAccuracyService.AccuracySummary: the overall cell of the series the page actually shows. */
+export type AccuracySummary = {
+  status: AccuracyStatus
+  n: number
+  minSamples: number
+  /** Typical miss in league points; null below minSamples. */
+  mae: number | null
+  /** mean(projected - actual); positive means projections ran high. Null below minSamples. */
+  lean: number | null
+  unit: AccuracyUnit
+  kind: AccuracySeriesKind
+  /** Names the series measured; null when there is none (NO_SNAPSHOTS). */
+  label: string | null
+}
+
+/** mae and lean are null when n is below minCell, or when the status is not MEASURED. */
+export type AccuracyCell = {
+  key: string
+  n: number
+  mae: number | null
+  lean: number | null
+}
+
+export type AccuracySeries = {
+  kind: AccuracySeriesKind
+  label: string
+  overall: AccuracyCell
+  byPosition: AccuracyCell[]
+  byBand: AccuracyCell[]
+  didNotPlay: number
+  pending: number
+}
+
+/** Mirrors ProjectionAccuracyService.ProjectionAccuracy (GET /api/leagues/{id}/projection-accuracy). */
+export type ProjectionAccuracy = {
+  sport: string
+  season: number
+  unit: AccuracyUnit
+  status: AccuracyStatus
+  minSamples: number
+  minCell: number
+  /** [] when status is NO_SNAPSHOTS. NBA has GAME and SEASON_AVERAGE; football has GAME only. */
+  series: AccuracySeries[]
+  snapshotsFrom: string | null
+  scoredThrough: string | null
+  /** NBA snapshots left out of both series for lacking a season-average line. */
+  withoutSeasonAverage: number
+  /** Snapshots whose game was postponed or canceled; excluded from everything else. */
+  voided: number
+  /** Scored categories no projection line carries; graded on neither side. */
+  excludedCategories: string[]
+  caveats: string[]
+  source: string | null
 }
 
 /**
@@ -1627,6 +1699,9 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
   apiFetch(
     `/api/leagues/${sleeperLeagueId}/analysis${week == null ? '' : `?week=${week}`}`,
   ).then(json<LeagueAnalysis>)
+
+export const getProjectionAccuracy = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/projection-accuracy`).then(json<ProjectionAccuracy>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
@@ -2522,6 +2597,11 @@ export type MovedPlayer = {
   position: string | null
   postMovePositionalRank: number | null
   weeksCounted: number
+  // Spec 035 F10: present (true) only for an ESPN player the matcher refused. His playerId is
+  // `espn:<id>`, he has no player page, and his rank is always null. Absent for every Sleeper player.
+  unmatched?: boolean
+  // ESPN's team for an unmatched player; absent otherwise.
+  team?: string | null
 }
 
 export type TransactionAdd = {
@@ -3125,6 +3205,8 @@ export type SeasonStrength = {
   staleAfterDays: number
   /** Every roster's display name (team name, else username, else "Roster N"); [] when unavailable. */
   teamLabels: AnalysisTeamLabel[]
+  /** spec 036: the SAME object as `AnalysisProjections.accuracy`, copied server-side and never recomputed. */
+  accuracy: AccuracySummary | null
 }
 
 export type TeamGradeLite = {
@@ -3158,6 +3240,141 @@ export type SeasonStart = {
 export const getSeasonStart = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/season-start`).then(json<SeasonStart>)
 
+// --- spec 035: ESPN league setup. Mirrors EspnSetupController / EspnLeagueIngestService records. ---
+
+/** Mirrors EspnSetupController.AddRequest. `season` is the APP season (not ESPN's seasonId). */
+export type EspnAddRequest = {
+  link: string | null
+  leagueId: string | null
+  sport: Sport | null
+  season: number | null
+  /** Cookies for a private league. Sent once, stored encrypted server-side, never returned. */
+  credential: { espnS2: string; swid: string } | null
+  /** The team the user says is theirs; null means "show me the teams, write nothing". */
+  claimRosterId: number | null
+}
+
+/** Mirrors EspnLeagueIngestService.SeasonRow. */
+export type EspnSeasonRow = { season: number; leagueKey: string; status: string }
+
+/** Mirrors EspnLeagueIngestService.MissingSeason. */
+export type EspnMissingSeason = { season: number; reason: string }
+
+/** Mirrors EspnLeagueIngestService.TeamChoice. managerName can be null. */
+export type EspnTeamChoice = {
+  rosterId: number
+  name: string
+  managerName: string | null
+  claimedByYou: boolean
+  claimedByOther: boolean
+}
+
+/** Mirrors EspnPlayerResolver.Counts. */
+export type EspnPlayerCounts = { matched: number; unmatched: number; ambiguous: number; espnOnly: number }
+
+/** Mirrors PlatformPlayerLinkRepository.UnmatchedPlayer: a player the matcher refused, in ESPN's own words. */
+export type UnmatchedPlayer = { name: string; position: string | null; team: string | null; outcome: string }
+
+/** Mirrors EspnLeagueIngestService.AddResult. `credentialStored` is the only credential field ever returned. */
+export type EspnAddResult = {
+  leagueKey: string
+  platform: string
+  sport: Sport
+  name: string
+  seasons: EspnSeasonRow[]
+  missingSeasons: EspnMissingSeason[]
+  teams: EspnTeamChoice[]
+  players: EspnPlayerCounts
+  unavailable: Record<string, string>
+  credentialStored: boolean
+  /** false when no claim was sent: the team list came back and nothing was written. */
+  written: boolean
+  /** The refused players named (FR-007), capped at 200. */
+  unmatched: UnmatchedPlayer[]
+}
+
+/** An ESPN setup refusal: the contract's `error` code and its fixed human text. */
+export class EspnSetupError extends Error {
+  readonly code: string
+  readonly status: number
+  constructor(code: string, status: number, message: string) {
+    super(message)
+    this.name = 'EspnSetupError'
+    this.code = code
+    this.status = status
+  }
+}
+
+async function espnJson<T>(res: Response): Promise<T> {
+  if (res.ok) return (res.status === 204 ? undefined : await res.json()) as T
+  let code = `HTTP_${res.status}`
+  let message = `HTTP ${res.status}`
+  try {
+    const body = (await res.json()) as { error?: string; message?: string }
+    if (body.error) code = body.error
+    if (body.message) message = body.message
+  } catch {
+    /* a non-JSON failure keeps the HTTP fallback above */
+  }
+  throw new EspnSetupError(code, res.status, message)
+}
+
+const jsonBody = (body: unknown): RequestInit => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+})
+
+export const addEspnLeague = (req: EspnAddRequest) =>
+  apiFetch('/api/setup/espn/league', jsonBody(req)).then(espnJson<EspnAddResult>)
+
+export const claimEspnTeam = (leagueKey: string, rosterId: number) =>
+  apiFetch(`/api/setup/espn/league/${encodeURIComponent(leagueKey)}/claim`, jsonBody({ rosterId })).then(
+    espnJson<{ leagueKey: string; rosterId: number; managerId: number }>,
+  )
+
+export const putEspnCredential = (leagueKey: string, espnS2: string, swid: string) =>
+  apiFetch(`/api/setup/espn/league/${encodeURIComponent(leagueKey)}/credential`, {
+    ...jsonBody({ espnS2, swid }),
+    method: 'PUT',
+  }).then(espnJson<void>)
+
+export const deleteEspnCredential = (leagueKey: string) =>
+  apiFetch(`/api/setup/espn/league/${encodeURIComponent(leagueKey)}/credential`, { method: 'DELETE' }).then(
+    espnJson<void>,
+  )
+
+// --- spec 035 T040: which pages a league can honestly show. Mirrors engine/LeagueAvailability.View. ---
+
+/** Mirrors LeagueAvailability.Reason. `code` is for logic, `message` is the server's own fixed sentence. */
+export type LeagueUnavailable = { code: string; message: string }
+
+/**
+ * Mirrors LeagueAvailability.LastRefresh. `failure` is a credential-free CODE
+ * (ESPN_ACCESS_DENIED, ESPN_SHAPE_CHANGED, ...), never message text.
+ */
+export type LeagueLastRefresh = { succeededAt: string | null; failedAt: string | null; failure: string | null }
+
+/**
+ * Mirrors LeagueAvailability.View. The ONE answer to "can this league show page X": the server's 422s
+ * and this client's gate both read it, so there is no second list here. Page keys: draftRoom,
+ * draftGrades, stats, schedule, superlatives, weeklyReport, expectedWins, forecast, recap, analysis,
+ * powerBaseline, lineups, playoffOdds. A Sleeper league has `unavailable: {}`.
+ */
+export type LeagueAvailability = {
+  leagueKey: string
+  platform: Platform
+  unavailable: Record<string, LeagueUnavailable>
+  unmatchedPlayers: number
+  lastRefresh: LeagueLastRefresh | null
+  /** True only for the person who stored this league's cookies (who may replace them). */
+  canReplaceCookies: boolean
+  /** The refused players named (FR-007); empty for Sleeper. */
+  unmatched: UnmatchedPlayer[]
+}
+
+export const getLeagueAvailability = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${encodeURIComponent(sleeperLeagueId)}/availability`).then(json<LeagueAvailability>)
 /*
  * specs/034-rivalry-schedule-grid. Mirrors the nested records of RivalryService (contracts/api.md C1)
  * field for field. Every nullable Java reference below is `| null`; the enum-like strings are Java Strings.

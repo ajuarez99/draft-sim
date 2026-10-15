@@ -8,6 +8,7 @@ import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -59,12 +60,16 @@ public class LeagueAnalysisService {
     private final ManagerRepository managers;
     private final LeagueMatchupRepository matchupRepo;
     private final SleeperClient sleeper;
+    private final LeagueRosterSource rosterSource;
     private final SportRulesRegistry rulesRegistry;
     private final LeagueMemberRepository members;
     private final LetterGrades letterGrades;
     private final PlayerSeasonProjectionRepository seasonProjections;
     private final GameScoringService gameScoring;
     private final PreseasonProperties preseason;
+    private final ProjectionAccuracyService accuracy;
+    /** specs/036 US3: value football projections by exact league scoring instead of the PPR column pick. Off by default. */
+    private final boolean nflExactScoring;
 
     public LeagueAnalysisService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                  RosterWeekPointsRepository weekPoints, PlayerProjectionRepository projections,
@@ -73,7 +78,11 @@ public class LeagueAnalysisService {
                                  SleeperClient sleeper, SportRulesRegistry rulesRegistry,
                                  LeagueMemberRepository members, LetterGrades letterGrades,
                                  PlayerSeasonProjectionRepository seasonProjections,
-                                 GameScoringService gameScoring, PreseasonProperties preseason) {
+                                 GameScoringService gameScoring, PreseasonProperties preseason,
+                                 ProjectionAccuracyService accuracy,
+                                 @Value("${draftsim.projections.nfl-exact-scoring:false}") boolean nflExactScoring) {
+        this.accuracy = accuracy;
+        this.nflExactScoring = nflExactScoring;
         this.letterGrades = letterGrades;
         this.seasonProjections = seasonProjections;
         this.gameScoring = gameScoring;
@@ -86,6 +95,7 @@ public class LeagueAnalysisService {
         this.managers = managers;
         this.matchupRepo = matchupRepo;
         this.sleeper = sleeper;
+        this.rosterSource = new LeagueRosterSource(sleeper, leagues, rosterSeasons);
         this.rulesRegistry = rulesRegistry;
         this.members = members;
     }
@@ -141,11 +151,16 @@ public class LeagueAnalysisService {
      *                    always present, empty for football.
      * @param staleAfterDays {@code draftsim.preseason.stale-after-days}, so the page can say a source is
      *                    N days old without a second copy of the number.
+     * @param accuracy    spec 036: the measured accuracy of the pre-game projections, one line (the full
+     *                    breakdown is {@code /projection-accuracy}); derived from the same computation as that
+     *                    route. Null when unavailable or when the accuracy read itself failed -- a failure
+     *                    there never takes the projections down.
      */
     public record Projections(boolean available, String reason, String reasonCode,
                               List<String> positionGroups, List<RosterProjection> rosters,
                               String unit, String basisNote, ProjectionProvenance provenance,
-                              List<String> unprojectedCategories, int staleAfterDays) {}
+                              List<String> unprojectedCategories, int staleAfterDays,
+                              ProjectionAccuracyService.AccuracySummary accuracy) {}
 
     public record ProjectionProvenance(String source, Instant sourceModifiedAt, Instant fetchedAt) {}
 
@@ -382,7 +397,7 @@ public class LeagueAnalysisService {
         // are unavailable, so it cannot depend on the live roster fetch the
         // projection pass makes. `manager` is unique on sleeper_user_id, so the
         // two routes name the same person.
-        Long myManagerId = sleeperUserId == null ? null : managers.idsBySleeperUserId().get(sleeperUserId);
+        Long myManagerId = sleeperUserId == null ? null : ManagerRepository.caller(managers, league.id(), sleeperUserId);
 
         List<ScoreRow> rows = new ArrayList<>();
         for (RosterSeasonRepository.StandingRow r : rosterSeasons.forLeague(league.id())) {
@@ -503,6 +518,14 @@ public class LeagueAnalysisService {
         List<String> groups = Position.forSport(league.sport()).stream().map(Enum::name).toList();
         String unit = league.sport() == Sport.NFL ? UNIT_REST_OF_SEASON : UNIT_PER_WEEK;
 
+        // Spec 035 FR-012 (code review B1): an ESPN league whose scoring has untranslated rules is stored with an
+        // empty/partial scoring map, so league.ppr() is 0 and these blocks would project under STANDARD scoring.
+        // Refuse before any window or projection gate, in the one sentence LeagueAvailability owns.
+        Optional<LeagueAvailability.Reason> untranslated = LeagueAvailability.scoringUntranslated(league);
+        if (untranslated.isPresent()) {
+            return unavailable(groups, matchupWeek, unit, untranslated.get().code(), untranslated.get().message());
+        }
+
         // Basketball's strength is per-game and values no window, so the football window gates do not apply
         // to it: its season is over when the league is complete (amended after code review, R6).
         if (league.sport() == Sport.NBA) {
@@ -531,8 +554,7 @@ public class LeagueAnalysisService {
                     projectionsNotBuiltReason(league.sport()));
         }
 
-        Map<String, Double> restOfSeason =
-                projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        Map<String, Double> restOfSeason = windowTotals(league, key, fromWeek, toWeek);
         if (restOfSeason.isEmpty()) {
             return unavailable(groups, matchupWeek, unit, "PROJECTIONS_NOT_LOADED",
                     noProjectionsStored(league, fromWeek, toWeek));
@@ -544,8 +566,7 @@ public class LeagueAnalysisService {
         }
         List<RosterProjection> rosters = pass.over(restOfSeason);
 
-        Map<Integer, Map<String, Double>> perWeek = projections.totalsByPlayerPerWeek(
-                league.sport().code(), league.season(), fromWeek, toWeek, key);
+        Map<Integer, Map<String, Double>> perWeek = windowPerWeek(league, key, fromWeek, toWeek);
 
         List<RosterProjection> ranked = rankAll(withWeekly(rosters, perWeek), groups);
 
@@ -557,11 +578,10 @@ public class LeagueAnalysisService {
                 .map(p -> new ProjectionProvenance(p.source(), null, p.fetchedAt()))
                 .orElse(null);
         Projections block = new Projections(true, null, null, groups, ranked, UNIT_REST_OF_SEASON, null,
-                provenance, List.of(), preseason.staleAfterDays());
+                provenance, List.of(), preseason.staleAfterDays(), accuracySummary(league));
         return new Blocks(block, withMatchups
                 ? matchupBlock(league, matchupWeek, pass,
-                        () -> projections.totalsByPlayer(league.sport().code(), league.season(),
-                                matchupWeek, matchupWeek, key))
+                        () -> windowTotals(league, key, matchupWeek, matchupWeek))
                 : null);
     }
 
@@ -610,8 +630,7 @@ public class LeagueAnalysisService {
         });
         // Scored keys carried by NO stored line, from the league's own scoring map -- never a hard-coded list.
         // A key on even one line is not listed (it is an implicit zero for everyone else, like dd and td).
-        List<String> unprojected = scoring.entrySet().stream().filter(e -> e.getValue() != null && e.getValue() != 0)
-                .map(Map.Entry::getKey).filter(k -> !projectedKeys.contains(k)).sorted().toList();
+        List<String> unprojected = ProjectedCategories.unprojected(scoring, projectedKeys);
 
         LineupPass pass = new LineupPass(league, groups, sleeperUserId);
         if (pass.allRostersEmpty()) {
@@ -626,10 +645,62 @@ public class LeagueAnalysisService {
                 .map(p -> new ProjectionProvenance(p.source(), p.sourceModifiedAt(), p.fetchedAt()))
                 .orElse(null);
         Projections block = new Projections(true, null, null, groups, ranked, UNIT_PER_WEEK, BASIS_ONE_AVERAGE_GAME,
-                provenance, unprojected, preseason.staleAfterDays());
+                provenance, unprojected, preseason.staleAfterDays(), accuracySummary(league));
         // The matchup preview is fed the SAME points map, so the home and the matchup cannot disagree.
         return new Blocks(block, withMatchups
                 ? matchupBlock(league, matchupWeek, pass, () -> pointsByPlayer) : null);
+    }
+
+    /**
+     * Football points per player over a window (spec 036 US3). With {@code draftsim.projections.nfl-exact-scoring}
+     * OFF (the default) this is exactly the column pick it always was. With it ON, a row that carries a stat line
+     * is valued by {@link GameScoringService} under THIS league's scoring, and a row without one (written before
+     * V36) falls back to the column pick, row by row. The flag stays off until the parity check says it may flip
+     * (specs/036 contracts/parity.md).
+     */
+    Map<String, Double> windowTotals(LeagueRepository.LeagueRow league, PlayerProjectionRepository.ScoringKey key,
+                                     int fromWeek, int toWeek) {
+        Map<String, Double> scoring = nflExactScoring ? leagues.scoringOf(league.id()) : Map.of();
+        if (scoring.isEmpty()) {
+            return projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        }
+        Map<String, Double> out = new HashMap<>();
+        for (PlayerProjectionRepository.WeekLine l : projections.linesInWindow(
+                league.sport().code(), league.season(), fromWeek, toWeek)) {
+            out.merge(l.sleeperPlayerId(), exactValue(l, key, scoring), Double::sum);
+        }
+        return out;
+    }
+
+    /** {@link #windowTotals} kept week by week. */
+    Map<Integer, Map<String, Double>> windowPerWeek(LeagueRepository.LeagueRow league,
+                                                    PlayerProjectionRepository.ScoringKey key,
+                                                    int fromWeek, int toWeek) {
+        Map<String, Double> scoring = nflExactScoring ? leagues.scoringOf(league.id()) : Map.of();
+        if (scoring.isEmpty()) {
+            return projections.totalsByPlayerPerWeek(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        }
+        Map<Integer, Map<String, Double>> byWeek = new LinkedHashMap<>();
+        for (PlayerProjectionRepository.WeekLine l : projections.linesInWindow(
+                league.sport().code(), league.season(), fromWeek, toWeek)) {
+            byWeek.computeIfAbsent(l.week(), w -> new HashMap<>()).put(l.sleeperPlayerId(), exactValue(l, key, scoring));
+        }
+        return byWeek;
+    }
+
+    private double exactValue(PlayerProjectionRepository.WeekLine l, PlayerProjectionRepository.ScoringKey key,
+                              Map<String, Double> scoring) {
+        return l.stats() == null ? l.column(key) : gameScoring.score(scoring, l.stats());
+    }
+
+    /** Null on any failure: the accuracy line is an extra, and must never take the projections block down. */
+    private ProjectionAccuracyService.AccuracySummary accuracySummary(LeagueRepository.LeagueRow league) {
+        try {
+            return accuracy.summary(league);
+        } catch (RuntimeException e) {
+            log.warn("league analysis: projection accuracy failed for league {}: {}", league.id(), e.toString());
+            return null;
+        }
     }
 
     private static List<String> sortedCopy(List<String> l) {
@@ -655,7 +726,7 @@ public class LeagueAnalysisService {
      */
     private Blocks unavailable(List<String> groups, int week, String unit, String reasonCode, String reason) {
         return new Blocks(new Projections(false, reason, reasonCode, groups, List.of(), unit, null, null, List.of(),
-                preseason.staleAfterDays()),
+                preseason.staleAfterDays(), null),
                 new Matchups(false, reason, week, List.of()));
     }
 
@@ -860,17 +931,23 @@ public class LeagueAnalysisService {
         private final Map<Integer, String> managerNames = new HashMap<>();
         private final Map<Integer, String> avatars = new HashMap<>();
         private final String sleeperUserId;
+        private final Long callerManagerId;
         private final boolean basketball;
 
         LineupPass(LeagueRepository.LeagueRow league, List<String> groups, String sleeperUserId) {
             this.groups = groups;
             this.basketball = league.sport() == Sport.NBA;
-            this.sleeperUserId = sleeperUserId;
+            // S4: a header shaped like another platform's key is no identity at all.
+            this.sleeperUserId = LeagueMembership.isAnonymous(sleeperUserId) ? null : sleeperUserId;
             this.settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
             this.rules = rulesRegistry.get(league.sport());
             this.slotOrder = league.rosterPositions();
-            this.rosters = sleeper.rosters(league.sleeperId());
+            this.rosters = rosterSource.rosters(league);
             this.managerBySleeperUserId = managers.idsBySleeperUserId();
+            // S6 (spec 035 FR-004): "you" is the manager who owns a roster in this league, which for an ESPN
+            // league is the claimed link's manager, not the header string. Identical for Sleeper.
+            this.callerManagerId = this.sleeperUserId == null ? null
+                    : ManagerRepository.caller(managers, league.id(), this.sleeperUserId);
             players.findAll(league.sport()).forEach(p -> playerBySleeperId.put(p.sleeperId(), p));
             rosterSeasons.forLeague(league.id()).forEach(r -> {
                 managerNames.put(r.rosterId(), r.managerName());
@@ -896,7 +973,7 @@ public class LeagueAnalysisService {
                         avatars.get(rosterId), ids(roster.get("players")), reserve));
             }
             return projectRosters(inputs, playerBySleeperId, pointsByPlayer, rules, settings, groups,
-                    slotOrder, sleeperUserId);
+                    slotOrder, sleeperUserId, callerManagerId);
         }
 
         /** Every roster has no players: Sleeper's list is empty, or the key is absent or JSON null. */
@@ -934,6 +1011,14 @@ public class LeagueAnalysisService {
                                                  Map<String, Double> pointsByPlayer, SportRules rules,
                                                  LeagueSettings settings, List<String> groups,
                                                  List<String> slotOrder, String sleeperUserId) {
+        return projectRosters(inputs, playerBySleeperId, pointsByPlayer, rules, settings, groups, slotOrder,
+                sleeperUserId, null);
+    }
+
+    static List<RosterProjection> projectRosters(List<RosterInput> inputs, Map<String, Player> playerBySleeperId,
+                                                 Map<String, Double> pointsByPlayer, SportRules rules,
+                                                 LeagueSettings settings, List<String> groups,
+                                                 List<String> slotOrder, String sleeperUserId, Long callerManagerId) {
         List<RosterProjection> out = new ArrayList<>();
         for (RosterInput in : inputs) {
             String owner = in.ownerId();
@@ -941,7 +1026,9 @@ public class LeagueAnalysisService {
             // caller's header carries, so "is this mine" is a string
             // comparison and not a manager lookup. A signed-out reader has
             // no id and therefore owns nothing, which is the right answer.
-            boolean isMe = owner != null && owner.equals(sleeperUserId);
+            // Spec 035 S6: an ESPN claimant owns no roster by owner_id; they are the linked manager.
+            boolean isMe = (owner != null && owner.equals(sleeperUserId))
+                    || (callerManagerId != null && callerManagerId.equals(in.managerId()));
 
             Set<String> reserve = new HashSet<>(in.reserve());
             boolean basketball = settings.sport() == Sport.NBA;

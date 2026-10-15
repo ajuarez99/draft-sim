@@ -5,6 +5,9 @@ import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { clearUser, setUser, type BkUser } from './user'
+import * as api from './api'
+import { invalidateRailLeagues } from './railLeague'
+import { invalidateLeagueAvailability } from './useLeagueAvailability'
 
 // App's route table imports every page unconditionally, so anything that
 // would fetch on mount needs a stub -- same convention as
@@ -48,8 +51,21 @@ vi.mock('./pages/DraftView', () => ({
 // SignIn imports getSleeperUser from here; the real module would hit the
 // network the instant a click on Continue happened. Not exercised in these
 // tests, but stubbed the same way SignIn.test.tsx does it.
+// Spec 035: league pages sit behind PlatformGate, which reads the cached league list (getDrafts) and, for a
+// league that is not a known Sleeper one, the availability endpoint (getLeagueAvailability).
+const availabilityFor = (key: string, unavailable: Record<string, { code: string; message: string }> = {}): api.LeagueAvailability => ({
+  leagueKey: key,
+  platform: Object.keys(unavailable).length > 0 ? 'ESPN' : 'SLEEPER',
+  unavailable,
+  unmatchedPlayers: 0,
+  lastRefresh: null,
+  canReplaceCookies: false,
+  unmatched: [],
+})
 vi.mock('./api', () => ({
   getSleeperUser: vi.fn(),
+  getDrafts: vi.fn(async () => []),
+  getLeagueAvailability: vi.fn(async (key: string) => availabilityFor(key)),
 }))
 
 const sampleUser: BkUser = {
@@ -279,5 +295,55 @@ describe('league routes remount on a league change', () => {
     await user.click(screen.getByRole('button', { name: 'go' }))
 
     expect(screen.getByText('stat leaderboard').getAttribute('data-instance')).not.toBe(before)
+  })
+
+  // Spec 035 T042: an ESPN league's stats page is not mounted at all; the platform message takes its place.
+  it('shows the platform message instead of the stats page for an ESPN league, and mounts it for a Sleeper one', async () => {
+    setUser(sampleUser)
+    invalidateRailLeagues()
+    invalidateLeagueAvailability()
+    const summary = (key: string, platform: 'SLEEPER' | 'ESPN') =>
+      ({
+        id: 1, sleeperDraftId: `${key}-d`, leagueId: 1, leagueName: `League ${key}`, season: 2026, teams: 12, rounds: 15,
+        status: 'complete', startTime: null, sleeperLeagueId: key, previousLeagueId: null, sport: 'nba', platform,
+      }) satisfies api.DraftSummary
+    vi.mocked(api.getDrafts).mockResolvedValue([summary('espn-1', 'ESPN'), summary('sleeper-1', 'SLEEPER')])
+    vi.mocked(api.getLeagueAvailability).mockImplementation(async (key: string) =>
+      availabilityFor(key, key === 'espn-1'
+        ? { stats: { code: 'SCORING_UNTRANSLATED', message: 'This league scoring has rules Ball Knowers cannot translate yet.' } }
+        : {}),
+    )
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/leagues/espn-1/stats']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Not available for ESPN leagues yet.')).toBeTruthy()
+    expect(screen.getByText(/cannot translate yet/)).toBeTruthy()
+    expect(screen.queryByText('stat leaderboard')).toBeNull()
+    unmount()
+
+    render(
+      <MemoryRouter initialEntries={['/leagues/sleeper-1/stats']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('stat leaderboard')).toBeTruthy()
+    // A Sleeper league never asks the availability endpoint: the platform came off the league list.
+    expect(vi.mocked(api.getLeagueAvailability)).not.toHaveBeenCalledWith('sleeper-1')
+  })
+
+  it('treats a failed availability read as available: the server refuses if it has to', async () => {
+    setUser(sampleUser)
+    invalidateRailLeagues()
+    invalidateLeagueAvailability()
+    vi.mocked(api.getDrafts).mockResolvedValue([])
+    vi.mocked(api.getLeagueAvailability).mockRejectedValue(new Error('network'))
+    render(
+      <MemoryRouter initialEntries={['/leagues/3/stats']}>
+        <App />
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('stat leaderboard')).toBeTruthy()
   })
 })

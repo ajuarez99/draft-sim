@@ -74,6 +74,23 @@ public class TradeVerdictService {
                             Map<Integer, String> nameByRoster,
                             Map<Integer, Long> managerByRoster,
                             Map<Integer, Map<String, Integer>> rankByWeek) {
+        return forLeague(league, rows, breakdowns, playersBySleeperId, nameByRoster, managerByRoster, rankByWeek,
+                Map.of());
+    }
+
+    /**
+     * @param externalNames spec 035: the platform's own name for a player key the matcher refused
+     *                      ({@code espn:<id>}), so a traded unmatched player is named, not "Unknown player".
+     *                      Empty for every Sleeper league.
+     */
+    public Result forLeague(LeagueRepository.LeagueRow league,
+                            List<LeagueTransactionRepository.Row> rows,
+                            List<RosterWeekPointsRepository.WeekBreakdown> breakdowns,
+                            Map<String, Player> playersBySleeperId,
+                            Map<Integer, String> nameByRoster,
+                            Map<Integer, Long> managerByRoster,
+                            Map<Integer, Map<String, Integer>> rankByWeek,
+                            Map<String, String> externalNames) {
         ScoredWeeks.Snapshot snapshot = scoredWeeks.of(league.id());
 
         // ---- moves (every completed one, in acceptance order) and trades (with their picks and FAAB)
@@ -127,7 +144,7 @@ public class TradeVerdictService {
 
         List<TradeResult> out = new ArrayList<>();
         for (OwnershipTimeline.Evaluated e : evaluated) {
-            out.add(translate(e, playersBySleeperId, nameByRoster, rankByWeek, analysis));
+            out.add(translate(e, playersBySleeperId, externalNames, nameByRoster, rankByWeek, analysis));
         }
         // Newest accepted first. Never by stored id: ids are not chronological (lessons #43).
         out.sort(Comparator.comparing(TradeResult::acceptedAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -138,6 +155,7 @@ public class TradeVerdictService {
     // ------------------------------------------------------------------ translation
 
     private static TradeResult translate(OwnershipTimeline.Evaluated e, Map<String, Player> players,
+                                         Map<String, String> externalNames,
                                          Map<Integer, String> nameByRoster,
                                          Map<Integer, Map<String, Integer>> rankByWeek,
                                          OwnershipTimeline.Analysis analysis) {
@@ -146,10 +164,10 @@ public class TradeVerdictService {
             List<AssetResult> assets = new ArrayList<>();
             for (OwnershipTimeline.Asset a : s.assets()) {
                 switch (a) {
-                    case OwnershipTimeline.PlayerAsset p -> assets.add(player(p, players, rankByWeek, analysis, nameByRoster));
+                    case OwnershipTimeline.PlayerAsset p -> assets.add(player(p, players, externalNames, rankByWeek, analysis, nameByRoster));
                     case OwnershipTimeline.PickAsset k -> assets.add(new PickResult(k.season(), k.round(),
                             k.originalRosterId(), k.status().name(), k.pickNo(),
-                            k.player() == null ? null : player(k.player(), players, rankByWeek, analysis, nameByRoster)));
+                            k.player() == null ? null : player(k.player(), players, externalNames, rankByWeek, analysis, nameByRoster)));
                     case OwnershipTimeline.FaabAsset f -> assets.add(new FaabResult(f.amount(), f.fromRosterId(),
                             nameByRoster.getOrDefault(f.fromRosterId(), "Roster " + f.fromRosterId())));
                 }
@@ -164,6 +182,7 @@ public class TradeVerdictService {
     }
 
     private static PlayerResult player(OwnershipTimeline.PlayerAsset p, Map<String, Player> players,
+                                       Map<String, String> externalNames,
                                        Map<Integer, Map<String, Integer>> rankByWeek,
                                        OwnershipTimeline.Analysis analysis, Map<Integer, String> nameByRoster) {
         Player pl = players.get(p.playerKey());
@@ -176,7 +195,7 @@ public class TradeVerdictService {
         }
         Double avg = ranks.isEmpty() ? null
                 : Math.round(ranks.stream().mapToInt(Integer::intValue).average().orElse(0) * 10.0) / 10.0;
-        return new PlayerResult(p.playerKey(), pl == null ? "Unknown player" : pl.name(),
+        return new PlayerResult(p.playerKey(), pl != null ? pl.name() : externalNames.getOrDefault(p.playerKey(), "Unknown player"),
                 pl == null ? null : pl.primary().name(), p.status().name(), p.firstWeek(), p.lastWeek(),
                 OwnershipTimeline.round1(p.startedPoints()), OwnershipTimeline.round1(p.benchPoints()), p.countedWeeks().size(), p.duplicateWeeks(), avg,
                 stretches(analysis.stretchesByPlayer().getOrDefault(p.playerKey(), List.of()), nameByRoster));

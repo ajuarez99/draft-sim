@@ -965,7 +965,65 @@ Before building on a time field, check which upstream field fills it.** When a m
 on a field that turned out to mean something else, re-run everything measured against it, not
 just the first number.
 
-## 44. Sleeper's `/state/nba` week is not the fantasy week, and a scratch copy's `leg` goes stale
+## 44. Two systems' "same id" is a hypothesis, not a join key: measure it, and look at the rows that disagree
+
+**What happened (2026-10-14, spec 035, research R2).** Sleeper's player table carries an `espn_id`,
+which looks like a ready crosswalk to ESPN's players. Joining on it matched **61 of the 200
+most-owned ESPN NFL players** and **0 of 200 NBA** (Sleeper has no NBA `espn_id` at all). Among the
+NFL hits, 63 had different names on the two sides. Most were suffix noise, but **one was a wrong
+person**: ESPN's Tyler Conklin pointed at Sleeper's Ryan Izzo. A wrong match is worse than a miss,
+because nothing downstream can tell it from a right one.
+
+**Before trusting a foreign id as a key, count what it covers on the population you will actually
+query (the most-owned players, not the whole table), and read the rows where the two sides'
+display names differ.** The covered fraction says whether it's usable at all. The disagreeing rows
+say whether it's *safe*. Here the id is kept only as a tie-breaker among same-name candidates, and
+only when exactly one candidate's id agrees. It is never a key.
+
+## 45. `putIfAbsent` on a lookup is a silent guess, and the guess is invisible in every test
+
+**What happened (same spec, research R3).** `PlayerMatcher.build` fills its name+position index with
+`putIfAbsent`. When two players share a name and a position (two Byron Youngs), the first one
+inserted silently wins. Nothing fails, no test notices (the structure is fine), and the match is
+presented exactly like a certain one. For Sleeper's own use that was tolerable. For a new platform
+whose data has to be *honest about thin evidence* it was not, so `buildStrict` records the key as
+ambiguous and refuses it.
+
+**Any first-wins insert into an index that is later read as "the answer" is a decision made without
+looking.** Grep for `putIfAbsent` / `computeIfAbsent` / `Collectors.toMap` without a merge function
+where the key is a human-readable name. The existing `build` was left alone on purpose (FR-013:
+changing it would change Sleeper boards), and the difference is pinned by a test that asserts it
+still returns the first id.
+
+## 46. A request record of plain Strings prints its secrets in the framework's own DEBUG line
+
+**What happened (2026-10-14, spec 035 T049).** The plan said credentials ride in a class with a
+redacted `toString`, and the add endpoint did that. The "replace cookies" endpoint, written in the
+same pass, took a `record CredentialRequest(String espnS2, String swid)` instead, and a record's
+free `toString` prints every component. Spring logs `Read "application/json" to [<the body object>]`
+at DEBUG from `RequestResponseBodyMethodProcessor`, so both cookies landed in the log at DEBUG. No
+line of application code logged them. It was found only because `CredentialLeakIT` sends a sentinel
+through every cookie-touching path with the root logger at DEBUG and greps what was captured.
+
+**A secret's protection is the type, not the call sites.** If the only thing keeping a value out of
+a log is that nobody calls `log.info` with it, any framework that logs "the request body" defeats
+it. Give the secret a type whose `toString` and serializer are redacted, and use that type at every
+boundary (request body, DB row, client argument), then prove it with a sentinel and a log capture
+rather than by reading the code. The capture is not vacuous only if the test also asserts that the
+sentinel reached the collaborator and that application log lines were captured.
+
+Two smaller ones from the same pass:
+
+- **A test asserting `status().isBadRequest()` passes for the wrong 400.** The mock-seating test
+  first sent `"sport":"NBA"` (the enum is lowercase), got "unknown sport code", and went green. Adding
+  an assertion on the *message* is what showed the rule under test never ran.
+- **A refusal that only ESPN leagues see must cost a Sleeper request nothing.** The platform guard
+  and the frontend gate both check the platform first off data they already hold (a primary-key
+  lookup, the cached league list), and only an ESPN or unknown league asks further. A gate that
+  made every Sleeper page, or the live draft room, wait on an extra request would have broken FR-013
+  without changing a byte of any payload.
+
+## 47. Sleeper's `/state/nba` week is not the fantasy week, and a scratch copy's `leg` goes stale
 
 Found 2026-10-15 verifying spec 037. Two different "current week" readings both looked authoritative
 and both were wrong for the check:

@@ -47,12 +47,34 @@ class IngestControllerTest {
     @Mock private com.ballknowers.draftsim.ingest.PlayerGameIngestService playerGameIngest;
     @Mock private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjectionIngest;
     @Mock private com.ballknowers.draftsim.ingest.BracketIngestService bracketIngest;
+    @Mock private com.ballknowers.draftsim.ingest.ProjectionSnapshotService projectionSnapshots;
+    @Mock private com.ballknowers.draftsim.engine.ProjectionParityService projectionParity;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
                 projectionIngest, transactionIngest, playerGameIngest,
                 new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest,
-                bracketIngest);
+                bracketIngest, projectionSnapshots, projectionParity);
+    }
+
+    // ---- POST /api/ingest/projection-snapshot (spec 036) ----
+
+    @Test
+    void projectionSnapshotRunsTheCaptureForTheRequestedSportWithTheCurrentInstant() {
+        var stub = new com.ballknowers.draftsim.ingest.ProjectionSnapshotService.Result("nba", 2026, List.of(1), 5, 0, 0);
+        when(projectionSnapshots.capture(org.mockito.ArgumentMatchers.eq(Sport.NBA), org.mockito.ArgumentMatchers.any())).thenReturn(stub);
+
+        assertSame(stub, controller().projectionSnapshot("nba"));
+    }
+
+    // ---- GET /api/ingest/projection-parity (spec 036 US3) ----
+
+    @Test
+    void projectionParityPassesTheOptionalLeagueThrough() {
+        var stub = new com.ballknowers.draftsim.engine.ProjectionParityService.Result("nfl", 2026, 7, "x", 1, 0, 1, 0, 0.0, List.of());
+        when(projectionParity.check("nfl", 2026, 7, "L1")).thenReturn(stub);
+
+        assertSame(stub, controller().projectionParity("nfl", 2026, 7, "L1"));
     }
 
     // ---- POST /api/ingest/adp ----

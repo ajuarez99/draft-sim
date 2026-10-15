@@ -2,6 +2,7 @@ package com.ballknowers.draftsim.config;
 
 import com.ballknowers.draftsim.api.AdminGateInterceptor;
 import com.ballknowers.draftsim.api.ApiTokenFilter;
+import com.ballknowers.draftsim.api.PlatformGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -20,11 +21,14 @@ public class WebConfig implements WebMvcConfigurer {
     private final CorsProperties cors;
     private final ApiSecurityProperties security;
     private final AdminAccess admin;
+    private final PlatformGuard platformGuard;
 
-    public WebConfig(CorsProperties cors, ApiSecurityProperties security, AdminAccess admin) {
+    public WebConfig(CorsProperties cors, ApiSecurityProperties security, AdminAccess admin,
+                     PlatformGuard platformGuard) {
         this.cors = cors;
         this.security = security;
         this.admin = admin;
+        this.platformGuard = platformGuard;
     }
 
     /**
@@ -36,6 +40,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new AdminGateInterceptor(admin)).addPathPatterns("/api/ingest/**", "/api/admin/**");
+        // After the admin gate, so an ingest route still refuses a caller without the token first.
+        registry.addInterceptor(platformGuard).addPathPatterns(PlatformGuard.PATH_PATTERNS.toArray(String[]::new));
     }
 
     @Override

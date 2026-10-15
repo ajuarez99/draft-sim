@@ -106,7 +106,7 @@ class SeasonStartServiceTest {
         List<RosterProjection> ranked = List.of(roster(1, 300, false), roster(2, 200, true), roster(3, 100, false),
                 roster(4, 90, false), roster(5, 80, false));
         var p = new LeagueAnalysisService.Projections(true, null, null, List.of(), ranked, "PER_WEEK",
-                "ONE_AVERAGE_GAME_PER_STARTER", null, List.of(), 3);
+                "ONE_AVERAGE_GAME_PER_STARTER", null, List.of(), 3, null);
         when(analysis.projectionsRead(any(), any())).thenReturn(new LeagueAnalysisService.ProjectionsRead(
                 p, new LeagueAnalysisService.Window(1, 1, 1, 0)));
         when(analysis.teamLabels(league)).thenReturn(List.of(

@@ -44,6 +44,7 @@ public class LeagueHistoryController {
     private final ProfileService profiles;
     private final LeagueMembership membership;
     private final SleeperClient sleeper;
+    private final com.ballknowers.draftsim.engine.LeagueRosterSource rosterSource;
     private final ManagerRepository managers;
     private final LeagueMemberRepository leagueMembers;
     private final RankingBallotRepository ballots;
@@ -68,6 +69,7 @@ public class LeagueHistoryController {
         this.profiles = profiles;
         this.membership = membership;
         this.sleeper = sleeper;
+        this.rosterSource = new com.ballknowers.draftsim.engine.LeagueRosterSource(sleeper, leagues, rosterSeasons);
         this.managers = managers;
         this.leagueMembers = leagueMembers;
         this.ballots = ballots;
@@ -100,7 +102,8 @@ public class LeagueHistoryController {
         // Spec 013 T031: caller -> manager id, never a username match. Null when
         // signed out or the user has no manager row, so isMe is false for everyone.
         boolean callerAnonymous = LeagueMembership.isAnonymous(sleeperUserId);
-        Long callerManagerId = callerAnonymous ? null : managers.idsBySleeperUserId().get(sleeperUserId);
+        Long callerManagerId = callerAnonymous ? null
+                : ManagerRepository.caller(managers, chain.stream().map(LeagueRepository.LeagueRow::id).toList(), sleeperUserId);
 
         List<Map<String, Object>> seasons = new ArrayList<>();
         for (int i = 0; i < chain.size(); i++) {
@@ -526,7 +529,7 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        PowerRankingService.SportState state = power.sportState(row.sport());
+        PowerRankingService.SportState state = power.sportState(row);
         // A computed (COMPUTED_REALIZED) ranking for a week past the latest FINAL one was written
         // from a partial or unplayed week; ignored on read, kept in the table. Week 0 (the
         // preseason baseline) and the human rankings (COMMISSIONER, MEMBER), which are opinions
@@ -673,7 +676,7 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        PowerRankingService.SportState state = power.sportState(row.sport());
+        PowerRankingService.SportState state = power.sportState(row);
         // Null check, never truthiness: week 0 is a real, submittable week for
         // a sport in its offseason, and `week != null` is the only test that
         // tells "the caller asked for week 0" from "the caller asked for
@@ -681,7 +684,7 @@ public class LeagueHistoryController {
         int effectiveWeek = week != null ? week : state.week();
 
         boolean anonymous = sleeperUserId == null || sleeperUserId.isBlank();
-        Long callerManagerId = anonymous ? null : managers.idsBySleeperUserId().get(sleeperUserId);
+        Long callerManagerId = anonymous ? null : ManagerRepository.caller(managers, row.id(), sleeperUserId);
         boolean isMember = callerManagerId != null && leagueMembers.isMember(row.id(), callerManagerId);
         boolean canSubmit = !anonymous && isMember && effectiveWeek == state.week();
 
@@ -764,7 +767,7 @@ public class LeagueHistoryController {
         if (league.isEmpty()) return ResponseEntity.notFound().build();
         LeagueRepository.LeagueRow row = league.get();
 
-        Long managerId = managers.idsBySleeperUserId().get(sleeperUserId);
+        Long managerId = ManagerRepository.caller(managers, row.id(), sleeperUserId);
         if (managerId == null || !leagueMembers.isMember(row.id(), managerId)) {
             return ResponseEntity.status(403).body(Map.of("message", "you are not a member of this league"));
         }
@@ -779,7 +782,7 @@ public class LeagueHistoryController {
         // Current week only -- backdating a ballot after seeing how the
         // games went is exactly the dishonesty this project designs out
         // everywhere else (same argument the commissioner gate below makes).
-        PowerRankingService.SportState state = power.sportState(row.sport());
+        PowerRankingService.SportState state = power.sportState(row);
         if (body.week() != state.week()) {
             return ResponseEntity.badRequest().body(Map.of("message",
                     "ballots can only be submitted for " + weekLabel(state.week()) + " -- no backdating"));
@@ -789,7 +792,7 @@ public class LeagueHistoryController {
         // league's roster-id set -- no missing roster, no extra, no
         // duplicate. The schema cannot enforce this (no FK on roster_id, by
         // design), so this is the only check that does.
-        Set<Integer> validRosterIds = RosterOwnerMapper.rosterIds(sleeper.rosters(sleeperId));
+        Set<Integer> validRosterIds = RosterOwnerMapper.rosterIds(rosterSource.rosters(sleeperId));
         Set<Integer> submitted = new HashSet<>(body.rosterIds());
         if (submitted.size() != body.rosterIds().size() || !submitted.equals(validRosterIds)) {
             return ResponseEntity.badRequest().body(Map.of("message",
@@ -987,7 +990,7 @@ public class LeagueHistoryController {
             return ResponseEntity.status(403).body(response);
         }
 
-        PowerRankingService.SportState state = power.sportState(row.sport());
+        PowerRankingService.SportState state = power.sportState(row);
         if (!body.week().equals(state.week())) {
             return ResponseEntity.badRequest().body(Map.of("message",
                     "the commissioner ranking can only be saved for " + weekLabel(state.week()) + " -- no backdating"));

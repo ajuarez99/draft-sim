@@ -98,11 +98,34 @@ public class LeagueMembership {
      * consumer appends its own {@code select ...} referencing it.
      */
     public static final String MEMBER_LEAGUE_IDS_CTE =
-            cteNaming("select id from manager where sleeper_user_id = ?");
+            // Spec 035 plan F3/T020: `me` is the header's manager UNION the ESPN managers it has
+            // claimed (manager_link), written once here. One bind parameter, as before: `meuser`
+            // takes it and `me` widens it. For a user with no claims the link side is empty, so
+            // `me` is the single manager it always was (FR-013).
+            "with recursive meuser as (select id from manager where sleeper_user_id = ?),\n"
+                    + "me as (select id from meuser union "
+                    + "select ml.linked_manager_id from manager_link ml join meuser on meuser.id = ml.manager_id),\n"
+                    + MINE_AND_CHAIN;
 
     /** Same body, naming the manager by {@code manager.id} instead. */
     private static final String MANAGER_LEAGUE_IDS_CTE =
             cteNaming("select ?::bigint as id");
+
+    /**
+     * The manager id that is "the caller" inside ONE league (spec 035 plan F5): the header's own
+     * manager if it owns a roster in that league, otherwise a manager it has claimed
+     * ({@code manager_link}) that does. Empty if neither plays there.
+     *
+     * <p>Every site that used to look the header up with {@code managers.idsBySleeperUserId().get(header)}
+     * and then compared the result with a league's rosters switches to this. For a Sleeper league the
+     * linked set is empty, so the answer is identical to the old lookup (FR-013).
+     *
+     * <p>Ownership is read from {@code roster_season} and {@code league_member}, the same two tables
+     * membership itself uses, so "can see the league" and "is the caller in the league" cannot disagree.
+     */
+    public Optional<Long> callerManagerIn(long leagueId, String sleeperUserId) {
+        return managers.callerManagerIn(leagueId, sleeperUserId);
+    }
 
     /**
      * The league ids this Sleeper user belongs to. An unknown user (no
@@ -182,7 +205,8 @@ public class LeagueMembership {
     public boolean canCommission(long leagueId, String sleeperUserId) {
         if (sleeperUserId == null || sleeperUserId.isBlank()) return false;
         if (ownerProperties.configured() && sleeperUserId.equals(ownerProperties.sleeperUserId())) return true;
-        Long managerId = managers.idsBySleeperUserId().get(sleeperUserId);
+        // Spec 035 F5: an ESPN commissioner reaches the app through a claimed manager_link.
+        Long managerId = ManagerRepository.caller(managers, leagueId, sleeperUserId);
         return managerId != null && leagueMembers.isCommissioner(leagueId, managerId);
     }
 
@@ -250,6 +274,42 @@ public class LeagueMembership {
         return canSee(sleeperUserId, found.get().leagueId()) ? found : Optional.empty();
     }
 
+    /**
+     * The platform of this draft, but only if the caller may see it (spec 035 plan F4). Empty for
+     * "no such draft" and "not yours" alike, so {@code PlatformGuard} cannot be used to probe whether
+     * an ESPN draft key exists. Also empty for a Sleeper draft, without any membership query.
+     */
+    public Optional<com.ballknowers.draftsim.domain.Platform> platformOfVisibleDraft(String sleeperUserId,
+                                                                                    String sleeperDraftId) {
+        // Cheap-first (code review S2): one indexed lookup, and a Sleeper draft returns here, before any
+        // membership work, so the live room's 2-second poll pays nothing extra. A Sleeper draft is never
+        // refused by the only caller, so returning empty for it loses nothing.
+        Optional<com.ballknowers.draftsim.domain.Platform> p = drafts.platformOf(sleeperDraftId);
+        if (p == null || p.isEmpty() || p.get() == com.ballknowers.draftsim.domain.Platform.SLEEPER) return Optional.empty();
+        if (visibleDraft(sleeperUserId, sleeperDraftId).isEmpty()) return Optional.empty();
+        return p;
+    }
+
+    /**
+     * The league behind this key when it is NOT a Sleeper league and the caller may see it; empty for a
+     * Sleeper league (one cheap query, no membership work), an unknown key, or a stranger. The cheap-first
+     * order keeps per-request cost off every Sleeper page (spec 035 FR-013).
+     */
+    public Optional<LeagueRepository.LeagueRow> visibleNonSleeperLeague(String sleeperUserId, String sleeperLeagueId) {
+        Optional<com.ballknowers.draftsim.domain.Platform> p = leagues.platformOf(sleeperLeagueId);
+        if (p == null || p.isEmpty() || p.get() == com.ballknowers.draftsim.domain.Platform.SLEEPER) return Optional.empty();
+        return visibleLeague(sleeperLeagueId, sleeperUserId);
+    }
+
+    /** League counterpart of {@link #platformOfVisibleDraft}. */
+    public Optional<com.ballknowers.draftsim.domain.Platform> platformOfVisibleLeague(String sleeperUserId,
+                                                                                     String sleeperLeagueId) {
+        Optional<com.ballknowers.draftsim.domain.Platform> p = leagues.platformOf(sleeperLeagueId);
+        if (p == null || p.isEmpty() || p.get() == com.ballknowers.draftsim.domain.Platform.SLEEPER) return Optional.empty();
+        if (visibleLeague(sleeperLeagueId, sleeperUserId).isEmpty()) return Optional.empty();
+        return p;
+    }
+
     /** Whether this request carries a valid {@code X-Admin-Token} -- the operator override. */
     public boolean isAdminRequest() {
         return admin.isAdmin();
@@ -257,7 +317,18 @@ public class LeagueMembership {
 
     /** No identity at all. Public so the routes that list rather than address a league can share the one definition. */
     public static boolean isAnonymous(String sleeperUserId) {
-        return sleeperUserId == null || sleeperUserId.isBlank();
+        return sleeperUserId == null || sleeperUserId.isBlank() || isForeignShaped(sleeperUserId);
+    }
+
+    /**
+     * An {@code X-Sleeper-User} that is shaped like another platform's key, never a Sleeper user id
+     * (spec 035 code review S4): ESPN managers are stored as {@code espn:{GUID}}, and ESPN member GUIDs are
+     * public, so accepting that shape as an identity would let anyone act as an ESPN member directly. Such a
+     * header is treated as no identity at all, everywhere identity is resolved.
+     */
+    public static boolean isForeignShaped(String id) {
+        return id != null && (id.regionMatches(true, 0, "espn:", 0, 5)
+                || id.indexOf(':') >= 0 || id.indexOf('{') >= 0 || id.indexOf('}') >= 0);
     }
 
     private static boolean anonymous(String sleeperUserId) {

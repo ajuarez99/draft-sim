@@ -68,6 +68,9 @@ class RefreshControllerDailyIT {
     @MockitoBean private TrendingRefresh trending;
     // Spec 030: keeps the new daily step off the network.
     @MockitoBean private com.ballknowers.draftsim.ingest.SeasonProjectionIngestService seasonProjections;
+    // Spec 036: keeps PROJECTION_SNAPSHOT off the network and off the snapshot table. A Result with no
+    // season is what the step reports as a plain DONE.
+    @MockitoBean private com.ballknowers.draftsim.ingest.ProjectionSnapshotService projectionSnapshots;
     @Autowired private RefreshController controller;
     @Autowired private ApiSecurityProperties security;
     @Autowired private JdbcTemplate jdbc;
@@ -77,6 +80,8 @@ class RefreshControllerDailyIT {
         // Today's rows would make PLAYERS skip; the shared local DB may already hold some.
         clear();
         when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.DONE);
+        when(projectionSnapshots.capture(any(), any())).thenReturn(
+                new com.ballknowers.draftsim.ingest.ProjectionSnapshotService.Result("x", null, List.of(), 0, 0, 0));
         when(players.ingest(any())).thenReturn(new PlayerIngestService.Result(7, 3, true, 0));
         when(boardRefresh.run(any())).thenReturn(new BoardRefresh.Result(
                 new FfcAdpService.Result(true, 1, 1, 0, 1, false, null, List.of()),
@@ -108,8 +113,9 @@ class RefreshControllerDailyIT {
         Map<String, Object> body = (Map<String, Object>) response.getBody();
         assertEquals(LocalDate.now(ZoneOffset.UTC).toString(), body.get("date"));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
-        // Three steps per sport, plus spec 030's SEASON_PROJECTIONS for basketball only.
-        assertEquals(Sport.values().length * 3 + 1, steps.size());
+        // Three steps per sport, plus spec 030's SEASON_PROJECTIONS for basketball only, plus spec 036's
+        // PROJECTION_SNAPSHOT for every sport.
+        assertEquals(Sport.values().length * 4 + 1, steps.size());
         assertEquals(Sport.values()[0].code(), steps.get(0).get("sport"));
         assertEquals("PLAYERS", steps.get(0).get("kind"));
         assertEquals("DONE", steps.get(0).get("outcome"));

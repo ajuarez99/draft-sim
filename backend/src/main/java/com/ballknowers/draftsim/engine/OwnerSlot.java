@@ -42,7 +42,7 @@ public final class OwnerSlot {
                 : owner.configured() ? owner.sleeperUserId() : null;
         if (effectiveId == null) return null;
 
-        Long managerId = managers.idsBySleeperUserId().get(effectiveId);
+        Long managerId = ManagerRepository.caller(managers, draft.leagueId(), effectiveId);
         if (managerId == null) return null;
 
         for (var entry : draft.slotToManager().entrySet()) {
@@ -93,7 +93,7 @@ public final class OwnerSlot {
         Object seat = draft.slotToManager().get(String.valueOf(slot));
         if (seat == null) return true;
 
-        Long callerManagerId = managers.idsBySleeperUserId().get(sleeperUserId);
+        Long callerManagerId = ManagerRepository.caller(managers, draft.leagueId(), sleeperUserId);
         if (callerManagerId == null) return false;
         return ((Number) seat).longValue() == callerManagerId;
     }

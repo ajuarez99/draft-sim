@@ -188,7 +188,7 @@ public class PlayerTrendsService {
         Map<Integer, RosterOwners.RosterOwner> owners = Map.of();
         if (rostered.isPresent()) {
             Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
-                    : managers.idsBySleeperUserId().get(sleeperUserId);
+                    : ManagerRepository.caller(managers, league.id(), sleeperUserId);
             owners = RosterOwners.ownerNames(rosterSeasons.forLeague(league.id()), members.forLeague(league.id()),
                     callerManagerId);
         }

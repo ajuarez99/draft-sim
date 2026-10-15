@@ -58,6 +58,17 @@ public class LeagueRefreshRepository {
                 .update();
     }
 
+    /**
+     * Forgets a recorded failure, but only if it is the one named: new cookies are a reason to try again
+     * now for an {@code ESPN_ACCESS_DENIED}, and say nothing about, say, a changed ESPN shape.
+     */
+    public void clearFailureIf(long leagueId, String failureCode) {
+        db.sql("""
+                update league_refresh set last_failure_at = null, last_failure = null
+                where league_id = ? and last_failure = ?
+                """).params(leagueId, failureCode).update();
+    }
+
     public void recordFailure(long leagueId, Instant at, String reason) {
         db.sql("""
                 insert into league_refresh (league_id, last_failure_at, last_failure)

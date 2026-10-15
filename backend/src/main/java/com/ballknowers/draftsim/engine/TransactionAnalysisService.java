@@ -28,6 +28,7 @@ public class TransactionAnalysisService {
     private final RosterSeasonRepository rosterSeasons;
     private final LeagueMemberRepository members;
     private final PlayerRepository players;
+    private final PlatformPlayerLinkRepository playerLinks;
     private final TradeVerdictService tradeVerdicts;
 
     public TransactionAnalysisService(LeagueRepository leagues,
@@ -36,7 +37,9 @@ public class TransactionAnalysisService {
                                       RosterSeasonRepository rosterSeasons,
                                       LeagueMemberRepository members,
                                       PlayerRepository players,
+                                      PlatformPlayerLinkRepository playerLinks,
                                       TradeVerdictService tradeVerdicts) {
+        this.playerLinks = playerLinks;
         this.leagues = leagues;
         this.transactions = transactions;
         this.weekPoints = weekPoints;
@@ -54,9 +57,18 @@ public class TransactionAnalysisService {
      * @param weeksCounted how many weeks that average covers -- reported beside
      *                     every rank so a one-week sample is not read as a
      *                     season verdict
+     * @param unmatched    spec 035 F10: an ESPN player the matcher refused. He is named from what ESPN
+     *                     called him (his key is {@code espn:<id>}), never dropped and never given a
+     *                     Sleeper id; false for every Sleeper player
+     * @param team         his ESPN team, only for an unmatched player (null otherwise, so a Sleeper
+     *                     league's payload is unchanged)
      */
     public record MovedPlayer(String playerId, String playerName, String position,
-                              Double postMoveRank, int weeksCounted) {}
+                              Double postMoveRank, int weeksCounted, boolean unmatched, String team) {
+        public MovedPlayer(String playerId, String playerName, String position, Double postMoveRank, int weeksCounted) {
+            this(playerId, playerName, position, postMoveRank, weeksCounted, false, null);
+        }
+    }
 
     public record Add(int week, String teamName, MovedPlayer added, MovedPlayer dropped,
                       Integer faabBid, String type, String status) {}
@@ -79,6 +91,9 @@ public class TransactionAnalysisService {
                     RANK_DIRECTION, 0, false, true, null);
         }
     }
+
+    /** The prefix of a stored player key the matcher refused (spec 035 F10). */
+    static final String ESPN_KEY_PREFIX = "espn:";
 
     /** Stated on the wire because "4" meaning good is not self-evident. */
     static final String RANK_DIRECTION = "LOWER_IS_BETTER";
@@ -257,6 +272,18 @@ public class TransactionAnalysisService {
             managerByRoster.put(s.rosterId(), s.managerId());
         }
 
+        // F10: names for the ESPN players the matcher refused, one lookup for the whole season.
+        Set<String> espnIds = new LinkedHashSet<>();
+        for (LeagueTransactionRepository.Row r : rows) {
+            for (String json : List.of(r.addsJson(), r.dropsJson())) {
+                for (String k : readIdMap(json).keySet()) {
+                    if (k.startsWith(ESPN_KEY_PREFIX)) espnIds.add(k.substring(ESPN_KEY_PREFIX.length()));
+                }
+            }
+        }
+        Map<String, PlatformPlayerLinkRepository.Link> espnLinks = espnIds.isEmpty() ? Map.of()
+                : playerLinks.find("ESPN", sport.code(), espnIds);
+
         // Weekly positional ranks, computed once for the whole season.
         List<RosterWeekPointsRepository.WeekBreakdown> breakdowns =
                 weekPoints.breakdownsFor(league.id(), league.season());
@@ -302,8 +329,8 @@ public class TransactionAnalysisService {
             adds.add(new Add(
                     r.week(),
                     roster == null ? "Unknown" : nameByRoster.getOrDefault(roster, "Roster " + roster),
-                    moved(addedId, playersBySleeperId, rankByWeek, r.week()),
-                    droppedId == null ? null : moved(droppedId, playersBySleeperId, rankByWeek, r.week()),
+                    moved(addedId, playersBySleeperId, rankByWeek, r.week(), espnLinks),
+                    droppedId == null ? null : moved(droppedId, playersBySleeperId, rankByWeek, r.week(), espnLinks),
                     r.faabBid(), r.type(), r.status()));
         }
 
@@ -315,8 +342,10 @@ public class TransactionAnalysisService {
                         ? Double.MAX_VALUE : a.added().postMoveRank())
                 .thenComparingInt(Add::week));
 
+        Map<String, String> externalNames = new HashMap<>();
+        espnLinks.forEach((id, link) -> externalNames.put(ESPN_KEY_PREFIX + id, link.externalName()));
         TradeVerdictService.Result verdicts = tradeVerdicts.forLeague(league, rows, breakdowns,
-                playersBySleeperId, nameByRoster, managerByRoster, rankByWeek);
+                playersBySleeperId, nameByRoster, managerByRoster, rankByWeek, externalNames);
 
         return Optional.of(new Result(true, null, league.season(), sport,
                 byManager, verdicts.trades(), adds, RANK_DIRECTION,
@@ -364,7 +393,14 @@ public class TransactionAnalysisService {
 
     /** A player plus his average positional rank in the weeks played since {@code sinceWeek}. */
     private static MovedPlayer moved(String playerId, Map<String, Player> players,
-                                     Map<Integer, Map<String, Integer>> rankByWeek, int sinceWeek) {
+                                     Map<Integer, Map<String, Integer>> rankByWeek, int sinceWeek,
+                                     Map<String, PlatformPlayerLinkRepository.Link> espnLinks) {
+        if (playerId.startsWith(ESPN_KEY_PREFIX)) {
+            PlatformPlayerLinkRepository.Link l = espnLinks.get(playerId.substring(ESPN_KEY_PREFIX.length()));
+            // No Sleeper id, so no positional rank: the move is shown by name and honestly ungraded.
+            return new MovedPlayer(playerId, l == null ? "Unknown player" : l.externalName(),
+                    l == null ? null : l.externalPosition(), null, 0, true, l == null ? null : l.externalTeam());
+        }
         Player p = players.get(playerId);
         List<Integer> ranks = new ArrayList<>();
         for (Map.Entry<Integer, Map<String, Integer>> e : rankByWeek.entrySet()) {

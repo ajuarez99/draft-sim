@@ -369,13 +369,16 @@ public class PlayerGameIngestService {
      * Every player who appears in any league of this sport-season's stored
      * weekly points -- the set whose no-entry weeks anyone could ask about.
      */
-    private Set<String> rosteredPlayers(Sport sport, int season) {
+    Set<String> rosteredPlayers(Sport sport, int season) {   // package-private: PlayerGameEspnKeyIT
         Set<String> ids = new LinkedHashSet<>();
         for (LeagueRepository.LeagueRow l : leagues.all()) {
             if (l.sport() != sport) continue;
             for (RosterWeekPointsRepository.WeekBreakdown w : weekPoints.breakdownsFor(l.id(), season)) {
                 if (w.playersPointsJson() == null || w.playersPointsJson().isBlank()) continue;
-                ids.addAll(JsonUtil.readMap(w.playersPointsJson()).keySet());
+                // Spec 035 F10: `espn:` keys are ESPN players the matcher refused; they have no Sleeper id.
+                for (String id : JsonUtil.readMap(w.playersPointsJson()).keySet()) {
+                    if (!id.startsWith("espn:")) ids.add(id);
+                }
             }
         }
         return ids;

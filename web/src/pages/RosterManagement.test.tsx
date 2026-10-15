@@ -322,6 +322,38 @@ describe('Roster management', () => {
       expect(screen.getByRole('link', { name: 'Trade Two' })).toHaveAttribute('href', '/leagues/L1/players/78')
     })
 
+    // Spec 035 F10: an ESPN player the matcher refused renders by name, as plain text, never as a link to a page that cannot exist.
+    it('shows an unmatched ESPN player by name with no link, and still links the matched ones', async () => {
+      getRosterManagement.mockResolvedValue(data({ sport: 'nba' }))
+      getLeagueTransactions.mockResolvedValue(
+        transactions({
+          sport: 'nba',
+          adds: [
+            {
+              week: 1,
+              teamName: 'Team Bravo',
+              type: 'WAIVER',
+              status: 'complete',
+              added: { playerId: 'it035-2', playerName: 'Matched Mike', position: 'C', postMovePositionalRank: 3, weeksCounted: 1 },
+              dropped: {
+                playerId: 'espn:9990006', playerName: 'Zed Ghost', position: 'PF', postMovePositionalRank: null, weeksCounted: 0,
+                unmatched: true, team: 'ATL',
+              },
+              faabBid: 12,
+            },
+          ],
+        }),
+      )
+      render(<RosterManagement />)
+
+      expect(await screen.findByRole('link', { name: 'Matched Mike' })).toHaveAttribute('href', '/leagues/L1/players/it035-2')
+      const ghost = screen.getByText('Zed Ghost')
+      expect(ghost.closest('a')).toBeNull()
+      expect(ghost).toHaveAttribute('title', expect.stringContaining('Not matched to a known player'))
+      expect(ghost).toHaveAttribute('title', expect.stringContaining('ATL'))
+      expect(screen.queryByText('Unknown player')).toBeNull()
+    })
+
     it('links a fallback-season transaction to that season league id', async () => {
       invalidateRailLeagues()
       getDrafts.mockResolvedValue([
