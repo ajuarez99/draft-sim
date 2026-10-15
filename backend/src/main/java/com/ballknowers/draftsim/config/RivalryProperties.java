@@ -12,6 +12,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *   <li>{@code championshipBonus}: score added once when the pair met in a final.
  *   <li>{@code maxManagers}: the exact matching is a bitmask DP, so it is capped; a larger league is
  *       refused with a reason rather than approximated.
+ *   <li>{@code maxRegularSeasonMeetings} (spec 037): the most times any two managers may meet in the
+ *       regular season once rivalry week is in. <b>A LEAGUE RULE (Allan, 2026-10-15), not fitted.</b>
+ *       Range 1-5. It is deliberately NOT part of {@link #loaded()}: a missing cap must not blank spec
+ *       034's pairings (plan F7), so the week pick has its own {@link #weekLoaded()}.
  * </ul>
  *
  * <p>A <b>missing</b> block binds to null fields and startup still succeeds (weights.yml is an optional
@@ -21,7 +25,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "draftsim.rivalry")
 public record RivalryProperties(Integer minMeetings, Double playoffBonus, Double championshipBonus,
-                                Integer maxManagers) {
+                                Integer maxManagers, Integer maxRegularSeasonMeetings) {
 
     public RivalryProperties {
         if (minMeetings != null && (minMeetings < 1 || minMeetings > 10)) {
@@ -40,10 +44,24 @@ public record RivalryProperties(Integer minMeetings, Double playoffBonus, Double
             throw new IllegalArgumentException(
                     "draftsim.rivalry.max-managers must satisfy 2 <= n <= 20, got " + maxManagers);
         }
+        if (maxRegularSeasonMeetings != null && (maxRegularSeasonMeetings < 1 || maxRegularSeasonMeetings > 5)) {
+            throw new IllegalArgumentException(
+                    "draftsim.rivalry.max-regular-season-meetings must satisfy 1 <= n <= 5, got "
+                            + maxRegularSeasonMeetings);
+        }
     }
 
     /** True only when every field is set; a partial block is not loaded (F17). */
     public boolean loaded() {
         return minMeetings != null && playoffBonus != null && championshipBonus != null && maxManagers != null;
+    }
+
+    /**
+     * Whether the week pick can run (spec 037, plan F7): the spec 034 block is loaded AND the cap is set.
+     * {@link #loaded()} is unchanged on purpose, so a weights.yml without the cap still gets spec 034's pairings
+     * and answers {@code CONFIG_MISSING} for the week alone.
+     */
+    public boolean weekLoaded() {
+        return loaded() && maxRegularSeasonMeetings != null;
     }
 }

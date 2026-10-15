@@ -3467,6 +3467,49 @@ export type RivalryPairing = {
 export type RivalryUnpaired = { managerId: number; why: string }
 export type RivalryRecommendationStatus =
   | 'OK' | 'CONFIG_MISSING' | 'TOO_FEW_MANAGERS' | 'TOO_MANY_MANAGERS' | 'NO_HISTORY'
+/**
+ * specs/037-rivalry-week-pick: the recommended week under the league's meeting cap. Mirrors the records in
+ * RivalryService field for field. There is deliberately no `note` here: `RivalryRecommendation.note` is
+ * rendered once.
+ */
+export type RivalryWeekStatus =
+  | 'OK' | 'CONFIG_MISSING' | 'NOT_PUBLISHED' | 'UNSUPPORTED_ROSTERS' | 'NO_SEASON_FORMAT'
+  | 'NO_ELIGIBLE_WEEK' | 'NO_WEEK_FITS'
+export type RivalryWeekPairing = { pairing: RivalryPairing; alreadyScheduled: boolean }
+/**
+ * A history-best pair the cap kept out of this week. `meetsInWeeks`: the regular-season weeks they already meet,
+ * this week excluded. `wouldMeet`: their regular-season meeting count if paired in this week.
+ */
+export type RivalryHeldBack = { aManagerId: number; bManagerId: number; meetsInWeeks: number[]; wouldMeet: number }
+/** A scheduled matchup this week's rivalry set replaces. Both lists empty: they would not meet otherwise. */
+export type RivalryDisplaced = {
+  aManagerId: number
+  bManagerId: number
+  metInWeeks: number[]
+  stillMeetsInWeeks: number[]
+}
+export type RivalryWeekOption = {
+  week: number
+  total: number
+  bestTotal: number
+  reason: RivalryReason
+  pairings: RivalryWeekPairing[]
+  unpaired: RivalryUnpaired | null
+  heldBack: RivalryHeldBack[]
+  displaced: RivalryDisplaced[]
+}
+export type RivalryWeekRecommendation = {
+  status: RivalryWeekStatus
+  /** Null only for CONFIG_MISSING. */
+  cap: number | null
+  capLabel: string | null
+  /** The latest week counted as played or under way, max(leg, last scored week); null when neither exists. */
+  asOfWeek: number | null
+  recommended: RivalryWeekOption | null
+  others: RivalryWeekOption[]
+  unfitWeeks: number[]
+  overCapNote: string | null
+}
 export type RivalryRecommendation = {
   status: RivalryRecommendationStatus
   minMeetings: number | null
@@ -3475,6 +3518,8 @@ export type RivalryRecommendation = {
   unpaired: RivalryUnpaired | null
   thinCount: number
   note: string
+  /** Null whenever `status` is not OK. An older backend omits it (undefined); the page treats both alike. */
+  week: RivalryWeekRecommendation | null
 }
 export type Rivalries = {
   sport: Sport

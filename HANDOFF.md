@@ -1,5 +1,12 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-15: spec 037 (rivalry week picks a week) built, live-verified locally, committed + pushed (branch 037-rivalry-week-pick), PR not yet opened, NOT deployed
+
+- **Where:** worktree `.claude/worktrees/037-rivalry-week-pick`, branch `037-rivalry-week-pick` (from `origin/main` 70159ea). Docs are in `specs/037-rivalry-week-pick/`: spec (with visible "amended after plan review" notes), plan ("Amended after review" overrides), research, plan-review (F1–F16), tasks, code-review (B1, S1–S3 fixed), verification, `check-week-pick.mjs`.
+- **What it does:** the Rivalries page's rivalry week now names a week. For every regular-season week after the current one, spec 034's exact matching reruns with any pair that would meet a **third** time removed (cap 2, `draftsim.rivalry.max-regular-season-meetings`, a league rule from Allan). Rank: total, then history-best pairs kept, then earliest (Allan chose this tie-break). Shows held-back pairs, the matchups the week replaces, and every other week's pairings. No migration, no new query; spec 034's `pairings` are unchanged (asserted).
+- **Measured:** "(Foot) Ball Knowers" → week 13, West Coast → week 14, NBA → week 8. The cap bites hard: 5 of 6 football and 4 of 6 NBA history-best pairs already meet twice, because Sleeper schedules wrap around.
+- **Owed:** open the PR (gh is unauthenticated here; branch already merged with origin/main 6f98793); `config/weights.yml` will textually merge with `adp-multi-source`; NBA eligibility re-check after the 10-20 tip-off against a refreshed `leg`. Scratch DB `draftsim037-pg` (5436) can be removed once merged.
+
 ## UPDATE 2026-10-15: spec 035 (ESPN league ingest) built, committed on its branch and merged up with main (033 + 034); PARTIALLY live-verified; NOT pushed, NOT deployed
 
 - **Verified 2026-10-15** (`specs/035-espn-yahoo-ingest/verification.md`): Sleeper parity across 214 routes on 10 leagues (only the added `platform` field differs), and the real-ESPN error paths for Allan's private NBA league 1314454666. **Not verified:** the happy path against real ESPN data. Every ESPN field mapping is still a guess (`unverified (T053)`). It needs Allan's saved API JSON in `fixtures-real/`, or his cookies pasted into the UI himself.

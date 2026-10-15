@@ -41,6 +41,11 @@ Built so far:
   and makes a trade "not comparable by points" when a side got nothing else. Reversed and restored
   trades say so. Each trade expands into its players' season stretches, a reconciliation
   count checks the transaction log against the scoring rows, and the trade log downloads as CSV.
+- **Rivalry week** (specs/034-rivalry-schedule-grid, specs/037-rivalry-week-pick). The
+  Rivalries page recommends a full set of rivalry pairings from league history and, since spec
+  037, **which week** to play them. No pair may meet more than twice in the regular season
+  (a league rule in `weights.yml`); the page names pairs the rule held back, the matchups the
+  week replaces, and every other eligible week with its own pairings. Read-only toward Sleeper.
 - **The season after the draft** (specs/030-post-draft-season-view). Between a completed draft
   and the first *final* scored week, the league home leads with this season. It drops last
   season's matchup, power and award blocks; shows the first-games date; ranks every roster by

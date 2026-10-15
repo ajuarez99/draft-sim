@@ -1022,3 +1022,21 @@ Two smaller ones from the same pass:
   lookup, the cached league list), and only an ESPN or unknown league asks further. A gate that
   made every Sleeper page, or the live draft room, wait on an extra request would have broken FR-013
   without changing a byte of any payload.
+
+## 47. Sleeper's `/state/nba` week is not the fantasy week, and a scratch copy's `leg` goes stale
+
+Found 2026-10-15 verifying spec 037. Two different "current week" readings both looked authoritative
+and both were wrong for the check:
+
+- Before tip-off, `https://api.sleeper.app/v1/state/nba` returned `season_type: "pre"`, `week: 3`. That is
+  Sleeper's preseason calendar. The NBA fantasy league's `leg` was 1, and fantasy week 1 hadn't started.
+  A "never offer a played week" check against `/state/nba` flagged weeks 2–3 falsely.
+- A `pg_dump` copy of the shared DB, served with on-visit refresh **off** (the safe setting for scratch
+  work), carries whatever `leg` the last ingest wrote. West Coast had `leg = 4` while the NFL was on
+  week 6, so the page legitimately offered weeks 5–6. Re-ingesting into the scratch copy fixed it.
+
+**How to apply:** for "is this week in the past" checks, use the league's own `leg` *after* a fresh
+ingest (record when), not the sport-wide state endpoint, and never the payload's own `currentWeek` (that
+is circular). When a verification runs against a copied DB, treat every time-dependent field as stale
+until re-ingested.
+
