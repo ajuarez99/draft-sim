@@ -36,6 +36,7 @@ import GradeChip, { GradesEarlyBadge, gradesEarlySentence } from '../components/
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { extremes } from '../extremes'
 import { projectionNotes, reasonText } from '../projectionCopy'
+import ProjectionAccuracyPanel from '../components/ProjectionAccuracyPanel'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -516,10 +517,11 @@ function ProjectionsBlock({ block }: { block: AnalysisProjections }) {
 }
 
 /**
- * Where a basketball projection came from and what it leaves out: source and
- * age, the "one average game" basis, the stat categories it can't project, and
- * the injury caveat. The sentences are projectionCopy's, shared with the home
- * page's strength block.
+ * Where a projection came from and what it leaves out. Both sports get the source,
+ * age and measured-accuracy line (spec 036 FR-010); basketball adds the "one
+ * average game" basis, the stat categories it can't project, and the injury
+ * caveat. The sentences are projectionCopy's, shared with the home page's
+ * strength block.
  */
 function ProjectionNotes({ block }: { block: AnalysisProjections }) {
   return (
@@ -527,6 +529,11 @@ function ProjectionNotes({ block }: { block: AnalysisProjections }) {
       {projectionNotes(block).map((n) => (
         <p key={n}>{n}</p>
       ))}
+      {block.accuracy && block.accuracy.status !== 'NO_SNAPSHOTS' && (
+        <p>
+          <a href="#projection-accuracy">See the accuracy breakdown ↓</a>
+        </p>
+      )}
     </div>
   )
 }
@@ -1262,7 +1269,7 @@ export default function LeagueAnalysis() {
               </span>
             </div>
             <ProjectionsBlock block={data.projections} />
-            {perWeek && data.projections.available && <ProjectionNotes block={data.projections} />}
+            {data.projections.available && <ProjectionNotes block={data.projections} />}
             <HowThisWorks>
               {perWeek ? (
                 <p>
@@ -1281,6 +1288,10 @@ export default function LeagueAnalysis() {
               )}
             </HowThisWorks>
           </section>
+
+          {sleeperLeagueId && data.projections.available && (
+            <ProjectionAccuracyPanel sleeperLeagueId={sleeperLeagueId} dataVersion={dataVersion} />
+          )}
 
           {/* A per-game projection has no weeks to lay out: every week would draw the same line. */}
           {!perWeek && (

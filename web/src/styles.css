@@ -6330,3 +6330,16 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .rv-pair-why { font-size: 13px; }
 .rv-pair-meta { display: flex; gap: 8px; align-items: center; }
 .rv-thin { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
+
+/* --- spec 036: projection accuracy panel ------------------------------------
+   Errors and counts only; the lean is words, so there is deliberately no good/bad colour here. */
+.projacc-head { margin: 4px 0 12px; }
+.projacc-head p { margin: 0 0 6px; }
+.projacc-meter { width: 100%; max-width: 360px; height: 8px; display: block; margin: 6px 0; accent-color: var(--teal); }
+.projacc-tabs { margin: 0 0 10px; max-width: 100%; overflow-x: auto; }
+.projacc-table caption { text-align: left; padding: 0 0 6px; caption-side: top; }
+.projacc-table tbody th { text-align: left; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.projacc-table tr.projacc-group th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding-top: 14px; }
+.projacc-table tr.projacc-overall th, .projacc-table tr.projacc-overall td { font-weight: 600; }
+.projacc-foot { margin: 8px 0 2px; }
+.projacc-caveats { margin: 6px 0 0; padding-left: 18px; }

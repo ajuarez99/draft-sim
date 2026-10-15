@@ -73,12 +73,15 @@ public class SeasonStartService {
      * @param me  the caller's row when it is not in {@code top}, else null
      * @param teamLabels every roster's display name (team name, else username, else "Roster N"), the same
      *                   lookup the Analysis page uses; empty when unavailable (amended after code review, N4)
+     * @param accuracy   spec 036 (plan S3): the SAME {@code Projections.accuracy} object, copied and never
+     *                   recomputed, so this block and the Analysis page cannot disagree; null on a failed pass
      */
     public record SeasonStrength(boolean available, String reason, String reasonCode, String unit,
                                  List<RosterProjection> top, RosterProjection me, int teams, Favorite favorite,
                                  ProjectionProvenance provenance, List<String> unprojectedCategories,
                                  String basisNote, int staleAfterDays,
-                                 List<LeagueAnalysisService.TeamLabel> teamLabels) {}
+                                 List<LeagueAnalysisService.TeamLabel> teamLabels,
+                                 ProjectionAccuracyService.AccuracySummary accuracy) {}
 
     /**
      * {@code nextTotal} and {@code marginPoints} are null when every roster is a leader; {@code marginPct} is
@@ -140,7 +143,7 @@ public class SeasonStartService {
                 // Spec 035 F16: ESPN scoring we could not translate would read as plain standard scoring here.
                 strength = new SeasonStrength(false, untranslated.get().message(), untranslated.get().code(),
                         unitOf(league), List.of(), null, 0, null, null, List.of(), null, preseason.staleAfterDays(),
-                        List.of());
+                        List.of(), null);
             } else try {
                 read = analysis.projectionsRead(league, sleeperUserId);
                 strength = strength(league, read);
@@ -151,7 +154,7 @@ public class SeasonStartService {
                 strength = new SeasonStrength(false,
                         "Roster strength couldn't be worked out just now. Try again in a minute.",
                         "STRENGTH_FAILED", unitOf(league), List.of(), null, 0, null, null, List.of(), null,
-                        preseason.staleAfterDays(), List.of());
+                        preseason.staleAfterDays(), List.of(), null);
             }
             firstWeek = firstWeek(league, read == null ? null : read.projections());
         }
@@ -250,7 +253,8 @@ public class SeasonStartService {
         Projections p = read.projections();
         if (!p.available()) {
             return new SeasonStrength(false, p.reason(), p.reasonCode(), p.unit(), List.of(), null, 0, null,
-                    p.provenance(), p.unprojectedCategories(), p.basisNote(), p.staleAfterDays(), List.of());
+                    p.provenance(), p.unprojectedCategories(), p.basisNote(), p.staleAfterDays(), List.of(),
+                    p.accuracy());
         }
         List<RosterProjection> ranked = p.rosters();
         List<RosterProjection> top = new ArrayList<>();
@@ -266,7 +270,8 @@ public class SeasonStartService {
         Favorite favorite = withTeamNames(favorite(ranked, preseason.favoriteMinGapPct(), weeksForPerWeek), labels);
 
         return new SeasonStrength(true, null, null, p.unit(), List.copyOf(top), me, ranked.size(), favorite,
-                p.provenance(), p.unprojectedCategories(), p.basisNote(), p.staleAfterDays(), labels);
+                p.provenance(), p.unprojectedCategories(), p.basisNote(), p.staleAfterDays(), labels,
+                p.accuracy());
     }
 
     /** Lineups are the Analysis page's business; the home's rows carry empty lists, never null (N11). */

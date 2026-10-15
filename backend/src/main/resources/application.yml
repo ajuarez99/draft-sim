@@ -47,6 +47,11 @@ draftsim:
     # Blank means slot auto-detection is OFF -- the local-dev default. Set to
     # your own Sleeper user id to have the draft view auto-select your seat.
     sleeper-user-id: ${APP_OWNER_SLEEPER_USER_ID:}
+  # Football valuation: false (the default) keeps picking Sleeper's pts_ppr / pts_half_ppr / pts_std
+  # column; true scores each stored stat line under the league's own scoring. Flip only per
+  # specs/036 contracts/parity.md decision rule -- it is a switch, not a model constant.
+  projections:
+    nfl-exact-scoring: false
   # AI weekly recap (specs/020-ai-weekly-recap). OFF unless RECAP_ENABLED=true AND a non-blank
   # ANTHROPIC_API_KEY env var (RecapEnabledCondition). The key is deliberately NOT a property here:
   # it is read from the environment only, so no properties record or log line can print it (F12).

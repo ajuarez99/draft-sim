@@ -11,14 +11,14 @@ Adds **ESPN league ingest** (spec 035; Yahoo is deferred to its own spec). An ES
 - **Players are matched by name with an ambiguity-refusing matcher.** Sleeper's `espn_id` crosswalk was measured as unusable: 61 of the 200 most-owned NFL players matched, one to the wrong person, and 0 NBA. Unmatched players are listed and shown by their ESPN name.
 - **Private leagues** use the user's ESPN cookies. They're encrypted per league (AES-256-GCM) with `BK_CREDENTIAL_KEY`, and never logged, returned or stored in failure text. That last point is guarded by `CredentialLeakIT` at DEBUG.
 - **ESPN NBA season numbering:** ESPN labels NBA seasons by the year they end (2027 for 2026-27), so ESPN season 2027 is app season 2026 (`EspnSeasons`).
-- **Migration `V35__espn_platform.sql`:** additive only. It comes after main's V33 (034) and V34 (033).
+- **Migration `V37__espn_platform.sql`:** additive only. It comes after main's V33 (034), V34 (033) and V36 (036). It was built as V35 and renumbered at the merge, because Flyway would refuse a V35 arriving after V36.
 
 Process docs are in `specs/035-espn-yahoo-ingest/`: spec, plan with amendments, `plan-review.md` (21 findings, all accepted), `code-review.md` (1 blocker and 9 should-fix, all fixed with tests shown to fail without the fix), and `verification.md`.
 
 ## Before merging: deploy notes
 
 - **Set `BK_CREDENTIAL_KEY`** on the Railway backend service: 32 random bytes, base64. Without it the app runs normally, but private ESPN leagues are refused with `CREDENTIALS_NOT_CONFIGURED`.
-- **V35 runs on the prod DB** at deploy. It's additive: new columns default to `SLEEPER`, plus new tables.
+- **V37 runs on the prod DB** at deploy. It's additive: new columns default to `SLEEPER`, plus new tables.
 
 ## Verification
 

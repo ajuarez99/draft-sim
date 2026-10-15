@@ -11,7 +11,7 @@ package com.ballknowers.draftsim.domain;
 public enum Platform {
     SLEEPER, ESPN;
 
-    /** Null reads as SLEEPER: the column defaults to it, so a missing value is a pre-V35 row. */
+    /** Null reads as SLEEPER: the column defaults to it, so a missing value is a pre-V37 row. */
     public static Platform fromCode(String code) {
         if (code == null) return SLEEPER;
         return valueOf(code.toUpperCase(java.util.Locale.ROOT));

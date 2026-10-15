@@ -46,10 +46,11 @@ export function strength(over: Partial<SeasonStrength> = {}): SeasonStrength {
     me: projRoster(9, 7, 250.5, { isMe: true, manager: 'popsharky' }),
     teams: 12,
     favorite: favorite(),
-    provenance: { source: 'sleeper', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
+    provenance: { source: 'rotowire', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
     unprojectedCategories: ['bonus_pt_50p'],
     basisNote: 'ONE_AVERAGE_GAME_PER_STARTER',
     staleAfterDays: 3,
+    accuracy: null,
     teamLabels: [
       { rosterId: 1, teamName: 'Dunk Tank', username: 'user1' },
       { rosterId: 2, teamName: 'Brick City', username: 'user2' },

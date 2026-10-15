@@ -1,9 +1,10 @@
 -- Spec 035: ESPN league ingest. Additive only; nothing here changes the type, nullability
 -- or meaning of an existing Sleeper row (FR-013).
 --
--- Numbering (plan F6, re-checked at build time, T001): main's highest is V31; 033's worktree
--- holds V34__trade_assets.sql and 034's holds V33__league_bracket_match.sql; no worktree holds
--- V35. Re-check every worktree's migration directory before this is committed or merged.
+-- Numbering: built as V35 (plan F6). Renumbered to V37 at the 2026-10-15 merge with main,
+-- because 036 merged first with V36__projection_snapshot.sql: Flyway refuses a pending V35
+-- once V36 is applied (out of order), so V35 could never reach a prod that already has V36.
+-- V37 was free in every worktree when checked. Never edit this after it reaches prod.
 
 -- Platform columns. The default makes every existing row SLEEPER without a rewrite.
 alter table league

@@ -115,6 +115,8 @@ All 21 are accepted. **These amendments override anything below, or in research,
 
 **Residual risk after the code review (S4, 2026-10-14; decided in-session, Allan can overturn).** A link is per ESPN member (F3), and identity is an unverified `X-Sleeper-User` header. So claiming a team in one league reaches every other stored ESPN league that member plays in, including private ones whose cookies someone else stored. ESPN member GUIDs are public for any public league the member is in, so anyone who adds a public league can claim an unclaimed member and then see that member's other stored leagues. This is inside the declared "scoping, not security" model, but R13/FR-009's rationale ("an impersonator can only refresh a league that is already visible to them") understates it: visibility of a private ESPN league is obtainable by anyone who knows one of its members' GUIDs. What the fix pass closed: a header shaped like another platform's key (`espn:{...}`, or containing `:`, `{` or `}`) is treated as no identity everywhere (`LeagueMembership.isAnonymous`), so a GUID can no longer be sent as the header directly. What it did not close: scoping a link to the leagues it was claimed through, which needs a design change and a migration. Real auth is the fix for both.
 
+- **Amended at merge (2026-10-15): the migration is `V37__espn_platform.sql`, not V35.** 036 merged into main first with V36, and Flyway refuses a pending V35 once V36 is applied.
+
 ## Amendment to the spec (shown, not hidden)
 
 **FR-009 said credentials are stored "one set per user." The plan stores them per league instead (research R13).**

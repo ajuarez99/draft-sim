@@ -105,7 +105,8 @@ public class ProjectionIngestService {
 
             rows.add(new PlayerProjectionRepository.Row(
                     sport, season, week, String.valueOf(playerId), ppr, half, std,
-                    r.get("company") == null ? null : String.valueOf(r.get("company"))));
+                    r.get("company") == null ? null : String.valueOf(r.get("company")),
+                    ProjectionSnapshotService.stripped(stats)));
         }
         return rows;
     }

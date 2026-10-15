@@ -2,8 +2,10 @@ package com.ballknowers.draftsim.refresh;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardRefresh;
+import com.ballknowers.draftsim.engine.ProjectionSeason;
 import com.ballknowers.draftsim.engine.SeasonStateService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
+import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.store.DailyCaptureRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
@@ -16,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.OptionalInt;
 
 /**
  * The scheduled job's work (specs/009-auto-data-refresh US3, contracts/refresh-api.md):
@@ -33,6 +36,9 @@ import java.util.List;
  *
  * <p>{@code SEASON_PROJECTIONS} (spec 030) is best-effort too: see {@link #seasonProjections}.
  *
+ * <p>{@code PROJECTION_SNAPSHOT} (spec 036) is best-effort and runs for both sports, after the
+ * steps above it so the NBA season-average line it copies is that morning's: see {@link #projectionSnapshot}.
+ *
  * <p>{@code BOARD} is not skipped by a same-day row: the contract skips only
  * {@code PLAYERS} ("skipped if today's row exists"), and the board must reflect a
  * re-run after a failed ADP fetch. It still records its row for the day-gap
@@ -47,6 +53,7 @@ public class DailyRefreshService {
     static final String KIND_BOARD = "BOARD";
     static final String KIND_TRENDING = "TRENDING";
     static final String KIND_SEASON_PROJECTIONS = "SEASON_PROJECTIONS";
+    static final String KIND_PROJECTION_SNAPSHOT = "PROJECTION_SNAPSHOT";
 
     public enum Outcome {
         DONE, DONE_ADP_FAILED_BEST_EFFORT,
@@ -57,6 +64,11 @@ public class DailyRefreshService {
          * reported but must not make the daily refresh answer 500.
          */
         DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
+        /**
+         * Spec 036: the snapshot reads two undocumented Sleeper endpoints, so a wobble is reported but
+         * must not make the run answer 500. Stored snapshots are untouched by a failed run.
+         */
+        DONE_PROJECTION_SNAPSHOT_FAILED_BEST_EFFORT,
         SKIPPED_ALREADY_TODAY, FAILED
     }
 
@@ -77,11 +89,14 @@ public class DailyRefreshService {
     private final SeasonProjectionIngestService seasonProjectionIngest;
     private final LeagueRepository leagues;
     private final SeasonStateService seasonState;
+    private final ProjectionSnapshotService projectionSnapshots;
 
     public DailyRefreshService(PlayerIngestService playerIngest, BoardRefresh boardRefresh,
                                DailyCaptureRepository captures, TrendingRefresh trendingRefresh,
                                SeasonProjectionIngestService seasonProjectionIngest,
-                               LeagueRepository leagues, SeasonStateService seasonState) {
+                               LeagueRepository leagues, SeasonStateService seasonState,
+                               ProjectionSnapshotService projectionSnapshots) {
+        this.projectionSnapshots = projectionSnapshots;
         this.seasonProjectionIngest = seasonProjectionIngest;
         this.leagues = leagues;
         this.seasonState = seasonState;
@@ -100,6 +115,7 @@ public class DailyRefreshService {
             steps.add(trending(sport));
             // Basketball only for now: football's projections are weekly and refreshed by hand.
             if (sport == Sport.NBA) steps.add(seasonProjections(sport));
+            steps.add(projectionSnapshot(sport));
         }
         return new DailyResult(today, steps);
     }
@@ -162,15 +178,13 @@ public class DailyRefreshService {
      */
     StepResult seasonProjections(Sport sport) {
         try {
-            List<LeagueRepository.LeagueRow> ofSport = leagues.all().stream()
-                    .filter(l -> l.sport() == sport).toList();
-            int season = ofSport.stream().mapToInt(LeagueRepository.LeagueRow::season).max().orElse(-1);
-            boolean active = ofSport.stream().filter(l -> l.season() == season)
-                    .anyMatch(l -> seasonState.stateOf(l) != SeasonStateService.SeasonState.COMPLETE);
-            if (!active) {
+            // The gate is shared with PROJECTION_SNAPSHOT (spec 036), so the two can't drift.
+            OptionalInt current = ProjectionSeason.current(leagues, seasonState, sport);
+            if (current.isEmpty()) {
                 return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE,
                         "no current-season league needs projections");
             }
+            int season = current.getAsInt();
             SeasonProjectionIngestService.Result r = seasonProjectionIngest.refresh(sport, season, false);
             if (r.rejectedReason() != null) {
                 return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
@@ -182,6 +196,30 @@ public class DailyRefreshService {
             log.warn("daily refresh {} {} failed: {}", sport.code(), KIND_SEASON_PROJECTIONS, e.toString());
             return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
                     "season projections fetch failed; the stored set, if any, is unchanged");
+        }
+    }
+
+    /**
+     * Spec 036 US1: capture each upcoming game's pre-game projection and freeze it at the game's
+     * cutoff. Best-effort, and it records no {@code daily_capture} row: its idempotence is the
+     * guarded upsert, so a hand re-run the same morning only refreshes rows whose cutoff has not
+     * passed. A sport with no current-season league that needs projections is a plain {@code DONE}.
+     */
+    StepResult projectionSnapshot(Sport sport) {
+        try {
+            ProjectionSnapshotService.Result r = projectionSnapshots.capture(sport, Instant.now());
+            if (r.season() == null) {
+                return new StepResult(sport, KIND_PROJECTION_SNAPSHOT, Outcome.DONE,
+                        "no current-season league needs projections");
+            }
+            return new StepResult(sport, KIND_PROJECTION_SNAPSHOT, Outcome.DONE,
+                    "weeks=" + r.weeks() + " rowsWritten=" + r.rowsWritten()
+                            + " rowsFrozenSkipped=" + r.rowsFrozenSkipped() + " rowsNotPreGame=" + r.rowsNotPreGame());
+        } catch (Exception e) {
+            log.warn("daily refresh {} {} failed: {}", sport.code(), KIND_PROJECTION_SNAPSHOT, e.toString());
+            return new StepResult(sport, KIND_PROJECTION_SNAPSHOT, Outcome.DONE_PROJECTION_SNAPSHOT_FAILED_BEST_EFFORT,
+                    "projection snapshot failed (" + e.getClass().getSimpleName()
+                            + "); stored snapshots are unchanged");
         }
     }
 

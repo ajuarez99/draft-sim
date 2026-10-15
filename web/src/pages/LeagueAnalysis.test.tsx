@@ -12,8 +12,10 @@ vi.mock('react-router-dom', () => ({
 
 const getLeagueAnalysis = vi.fn()
 const ingestLeagueHistory = vi.fn()
+const getProjectionAccuracy = vi.fn()
 vi.mock('../api', () => ({
   getLeagueAnalysis: (...args: unknown[]) => getLeagueAnalysis(...args),
+  getProjectionAccuracy: (...args: unknown[]) => getProjectionAccuracy(...args),
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
 }))
 
@@ -68,6 +70,7 @@ const FOOTBALL_UNIT = {
   provenance: null,
   unprojectedCategories: [] as string[],
   staleAfterDays: 3,
+  accuracy: null,
 } as const
 
 /** The page draws two bump charts now, so every chart assertion names one. */
@@ -137,6 +140,12 @@ function data(over: Partial<LeagueAnalysisData> = {}): LeagueAnalysisData {
 
 beforeEach(() => {
   getLeagueAnalysis.mockReset()
+  getProjectionAccuracy.mockReset()
+  getProjectionAccuracy.mockResolvedValue({
+    sport: 'nfl', season: 2026, unit: 'PLAYER_WEEK', status: 'NO_SNAPSHOTS', minSamples: 300, minCell: 50,
+    series: [], snapshotsFrom: null, scoredThrough: null, withoutSeasonAverage: 0, voided: 0,
+    excludedCategories: [], caveats: [], source: null,
+  })
   ingestLeagueHistory.mockReset()
 })
 
@@ -222,6 +231,26 @@ describe('LeagueAnalysis', () => {
     getLeagueAnalysis.mockResolvedValue(data())
     render(<LeagueAnalysis />)
     expect(await screen.findByText('1 unprojected')).toBeInTheDocument()
+  })
+
+  /** spec 036 FR-010/SC-006: football names its projection source and accuracy too, and only that. */
+  it('shows the projection source and accuracy clause on football, without basketball caveats', async () => {
+    const base = data()
+    getLeagueAnalysis.mockResolvedValue({
+      ...base,
+      projections: {
+        ...base.projections,
+        provenance: { source: 'rotowire', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
+        accuracy: {
+          kind: 'GAME', label: 'Per-game projection', unit: 'PLAYER_WEEK', status: 'MEASURED', n: 400, minSamples: 300,
+          mae: 5.2, lean: 0.4,
+        },
+      },
+    } as LeagueAnalysisData)
+    render(<LeagueAnalysis />)
+    expect(await screen.findByText(/RotoWire projection via Sleeper · updated today · off by ±5\.2 pts a week on average \(400 player-weeks\)/)).toBeInTheDocument()
+    expect(screen.queryByText(/One average game per starter/)).toBeNull()
+    expect(screen.queryByText(/Not projected/)).toBeNull()
   })
 
   /** Piece 3: rank AND the points it came from, in every cell. */
@@ -768,9 +797,10 @@ describe('League analysis, basketball per-week projection (spec 030)', () => {
     rosters: [nbaRoster(1, 'kieriskash', 1, 310.4, 1), nbaRoster(2, 'jstrobe', 2, 288.2, 0, true)],
     unit: 'PER_WEEK',
     basisNote: 'ONE_AVERAGE_GAME_PER_STARTER',
-    provenance: { source: 'sleeper', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
+    provenance: { source: 'rotowire', sourceModifiedAt: new Date().toISOString(), fetchedAt: new Date().toISOString() },
     unprojectedCategories: ['bonus_pt_40p', 'tf', 'some_new_key'],
     staleAfterDays: 3,
+    accuracy: null,
     ...over,
   })
 
@@ -794,7 +824,7 @@ describe('League analysis, basketball per-week projection (spec 030)', () => {
   it('prints the source and age, the one-game basis, the unprojected categories and the injury caveat', async () => {
     getLeagueAnalysis.mockResolvedValue(nba())
     render(<LeagueAnalysis />)
-    expect(await screen.findByText(/Source: sleeper · updated today · accuracy for this league not measured/)).toBeInTheDocument()
+    expect(await screen.findByText(/RotoWire projection via Sleeper · updated today · accuracy for this league not measured/)).toBeInTheDocument()
     expect(screen.getByText(/One average game per starter\. Sleeper credits one game a week/)).toBeInTheDocument()
     expect(screen.getByText('Not projected: 40+ point bonus, technical fouls, some_new_key.')).toBeInTheDocument()
     expect(screen.getByText(/Players tagged Out count as zero wherever they sit\. Day-to-day and game-time players count in full, including ones parked on IR\+, since one game a week is credited\./)).toBeInTheDocument()
@@ -804,7 +834,7 @@ describe('League analysis, basketball per-week projection (spec 030)', () => {
   it('says how old the projections are once past the stale threshold', async () => {
     const old = new Date(Date.now() - 6 * 86_400_000).toISOString()
     getLeagueAnalysis.mockResolvedValue(
-      nba(perWeek({ provenance: { source: 'sleeper', sourceModifiedAt: old, fetchedAt: old } })),
+      nba(perWeek({ provenance: { source: 'rotowire', sourceModifiedAt: old, fetchedAt: old } })),
     )
     render(<LeagueAnalysis />)
     expect(await screen.findByText('Projections are 6 days old.')).toBeInTheDocument()

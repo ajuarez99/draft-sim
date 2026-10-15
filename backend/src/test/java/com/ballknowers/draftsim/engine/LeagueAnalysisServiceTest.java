@@ -330,7 +330,7 @@ class LeagueAnalysisServiceTest {
     private static LeagueAnalysisService service(RosterSeasonRepository rs, RosterWeekPointsRepository wp,
                                                  GradeProperties grades) {
         return new LeagueAnalysisService(null, rs, wp, null, null, null, null, null, null, null,
-                new LetterGrades(grades), null, null, new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
+                new LetterGrades(grades), null, null, new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
     }
 
     private static LeagueAnalysisService.ScoreEntry raw(int rosterId, double rawScore) {
@@ -636,7 +636,7 @@ class LeagueAnalysisServiceTest {
         var svc = new LeagueAnalysisService(leagues, rosterSeasons, weekPoints, null, players, managers, null,
                 sleeper, new com.ballknowers.draftsim.sport.SportRulesRegistry(List.of(NBA_RULES)), null,
                 new LetterGrades(LADDER), season, new GameScoringService(),
-                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
+                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
         return new NbaMocks(sleeper, season, svc, league, leagues, managers);
     }
 
@@ -788,7 +788,7 @@ class LeagueAnalysisServiceTest {
                 .thenReturn(Map.of("p1", 100.0));
         var svc = new LeagueAnalysisService(leagues, null, weekPoints, projections, null, null, null,
                 null, null, null, new LetterGrades(LADDER), null, null,
-                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3));
+                new com.ballknowers.draftsim.config.PreseasonProperties(3.0, 3), null, false);
 
         var p = svc.projectionsRead(espn, "someone").projections();
 

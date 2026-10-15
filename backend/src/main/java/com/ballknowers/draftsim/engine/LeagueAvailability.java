@@ -72,7 +72,8 @@ public class LeagueAvailability {
         Map<String, List<String>> m = new LinkedHashMap<>();
         m.put("draftRoom", List.of());
         m.put("draftGrades", List.of());
-        m.put("stats", List.of("stats", "players", "player-spotlight", "player-trends"));
+        // "projection-accuracy" (spec 036, merged in after 035) grades projections against league scoring.
+        m.put("stats", List.of("stats", "players", "player-spotlight", "player-trends", "projection-accuracy"));
         m.put("schedule", List.of("schedule", "next-matchup"));
         m.put("superlatives", List.of("superlatives", "conduct-list"));
         m.put("weeklyReport", List.of("weekly-report"));
