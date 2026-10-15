@@ -8,6 +8,7 @@ import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -65,6 +66,9 @@ public class LeagueAnalysisService {
     private final PlayerSeasonProjectionRepository seasonProjections;
     private final GameScoringService gameScoring;
     private final PreseasonProperties preseason;
+    private final ProjectionAccuracyService accuracy;
+    /** specs/036 US3: value football projections by exact league scoring instead of the PPR column pick. Off by default. */
+    private final boolean nflExactScoring;
 
     public LeagueAnalysisService(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                  RosterWeekPointsRepository weekPoints, PlayerProjectionRepository projections,
@@ -73,7 +77,11 @@ public class LeagueAnalysisService {
                                  SleeperClient sleeper, SportRulesRegistry rulesRegistry,
                                  LeagueMemberRepository members, LetterGrades letterGrades,
                                  PlayerSeasonProjectionRepository seasonProjections,
-                                 GameScoringService gameScoring, PreseasonProperties preseason) {
+                                 GameScoringService gameScoring, PreseasonProperties preseason,
+                                 ProjectionAccuracyService accuracy,
+                                 @Value("${draftsim.projections.nfl-exact-scoring:false}") boolean nflExactScoring) {
+        this.accuracy = accuracy;
+        this.nflExactScoring = nflExactScoring;
         this.letterGrades = letterGrades;
         this.seasonProjections = seasonProjections;
         this.gameScoring = gameScoring;
@@ -141,11 +149,16 @@ public class LeagueAnalysisService {
      *                    always present, empty for football.
      * @param staleAfterDays {@code draftsim.preseason.stale-after-days}, so the page can say a source is
      *                    N days old without a second copy of the number.
+     * @param accuracy    spec 036: the measured accuracy of the pre-game projections, one line (the full
+     *                    breakdown is {@code /projection-accuracy}); derived from the same computation as that
+     *                    route. Null when unavailable or when the accuracy read itself failed -- a failure
+     *                    there never takes the projections down.
      */
     public record Projections(boolean available, String reason, String reasonCode,
                               List<String> positionGroups, List<RosterProjection> rosters,
                               String unit, String basisNote, ProjectionProvenance provenance,
-                              List<String> unprojectedCategories, int staleAfterDays) {}
+                              List<String> unprojectedCategories, int staleAfterDays,
+                              ProjectionAccuracyService.AccuracySummary accuracy) {}
 
     public record ProjectionProvenance(String source, Instant sourceModifiedAt, Instant fetchedAt) {}
 
@@ -531,8 +544,7 @@ public class LeagueAnalysisService {
                     projectionsNotBuiltReason(league.sport()));
         }
 
-        Map<String, Double> restOfSeason =
-                projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        Map<String, Double> restOfSeason = windowTotals(league, key, fromWeek, toWeek);
         if (restOfSeason.isEmpty()) {
             return unavailable(groups, matchupWeek, unit, "PROJECTIONS_NOT_LOADED",
                     noProjectionsStored(league, fromWeek, toWeek));
@@ -544,8 +556,7 @@ public class LeagueAnalysisService {
         }
         List<RosterProjection> rosters = pass.over(restOfSeason);
 
-        Map<Integer, Map<String, Double>> perWeek = projections.totalsByPlayerPerWeek(
-                league.sport().code(), league.season(), fromWeek, toWeek, key);
+        Map<Integer, Map<String, Double>> perWeek = windowPerWeek(league, key, fromWeek, toWeek);
 
         List<RosterProjection> ranked = rankAll(withWeekly(rosters, perWeek), groups);
 
@@ -557,11 +568,10 @@ public class LeagueAnalysisService {
                 .map(p -> new ProjectionProvenance(p.source(), null, p.fetchedAt()))
                 .orElse(null);
         Projections block = new Projections(true, null, null, groups, ranked, UNIT_REST_OF_SEASON, null,
-                provenance, List.of(), preseason.staleAfterDays());
+                provenance, List.of(), preseason.staleAfterDays(), accuracySummary(league));
         return new Blocks(block, withMatchups
                 ? matchupBlock(league, matchupWeek, pass,
-                        () -> projections.totalsByPlayer(league.sport().code(), league.season(),
-                                matchupWeek, matchupWeek, key))
+                        () -> windowTotals(league, key, matchupWeek, matchupWeek))
                 : null);
     }
 
@@ -610,8 +620,7 @@ public class LeagueAnalysisService {
         });
         // Scored keys carried by NO stored line, from the league's own scoring map -- never a hard-coded list.
         // A key on even one line is not listed (it is an implicit zero for everyone else, like dd and td).
-        List<String> unprojected = scoring.entrySet().stream().filter(e -> e.getValue() != null && e.getValue() != 0)
-                .map(Map.Entry::getKey).filter(k -> !projectedKeys.contains(k)).sorted().toList();
+        List<String> unprojected = ProjectedCategories.unprojected(scoring, projectedKeys);
 
         LineupPass pass = new LineupPass(league, groups, sleeperUserId);
         if (pass.allRostersEmpty()) {
@@ -626,10 +635,62 @@ public class LeagueAnalysisService {
                 .map(p -> new ProjectionProvenance(p.source(), p.sourceModifiedAt(), p.fetchedAt()))
                 .orElse(null);
         Projections block = new Projections(true, null, null, groups, ranked, UNIT_PER_WEEK, BASIS_ONE_AVERAGE_GAME,
-                provenance, unprojected, preseason.staleAfterDays());
+                provenance, unprojected, preseason.staleAfterDays(), accuracySummary(league));
         // The matchup preview is fed the SAME points map, so the home and the matchup cannot disagree.
         return new Blocks(block, withMatchups
                 ? matchupBlock(league, matchupWeek, pass, () -> pointsByPlayer) : null);
+    }
+
+    /**
+     * Football points per player over a window (spec 036 US3). With {@code draftsim.projections.nfl-exact-scoring}
+     * OFF (the default) this is exactly the column pick it always was. With it ON, a row that carries a stat line
+     * is valued by {@link GameScoringService} under THIS league's scoring, and a row without one (written before
+     * V36) falls back to the column pick, row by row. The flag stays off until the parity check says it may flip
+     * (specs/036 contracts/parity.md).
+     */
+    Map<String, Double> windowTotals(LeagueRepository.LeagueRow league, PlayerProjectionRepository.ScoringKey key,
+                                     int fromWeek, int toWeek) {
+        Map<String, Double> scoring = nflExactScoring ? leagues.scoringOf(league.id()) : Map.of();
+        if (scoring.isEmpty()) {
+            return projections.totalsByPlayer(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        }
+        Map<String, Double> out = new HashMap<>();
+        for (PlayerProjectionRepository.WeekLine l : projections.linesInWindow(
+                league.sport().code(), league.season(), fromWeek, toWeek)) {
+            out.merge(l.sleeperPlayerId(), exactValue(l, key, scoring), Double::sum);
+        }
+        return out;
+    }
+
+    /** {@link #windowTotals} kept week by week. */
+    Map<Integer, Map<String, Double>> windowPerWeek(LeagueRepository.LeagueRow league,
+                                                    PlayerProjectionRepository.ScoringKey key,
+                                                    int fromWeek, int toWeek) {
+        Map<String, Double> scoring = nflExactScoring ? leagues.scoringOf(league.id()) : Map.of();
+        if (scoring.isEmpty()) {
+            return projections.totalsByPlayerPerWeek(league.sport().code(), league.season(), fromWeek, toWeek, key);
+        }
+        Map<Integer, Map<String, Double>> byWeek = new LinkedHashMap<>();
+        for (PlayerProjectionRepository.WeekLine l : projections.linesInWindow(
+                league.sport().code(), league.season(), fromWeek, toWeek)) {
+            byWeek.computeIfAbsent(l.week(), w -> new HashMap<>()).put(l.sleeperPlayerId(), exactValue(l, key, scoring));
+        }
+        return byWeek;
+    }
+
+    private double exactValue(PlayerProjectionRepository.WeekLine l, PlayerProjectionRepository.ScoringKey key,
+                              Map<String, Double> scoring) {
+        return l.stats() == null ? l.column(key) : gameScoring.score(scoring, l.stats());
+    }
+
+    /** Null on any failure: the accuracy line is an extra, and must never take the projections block down. */
+    private ProjectionAccuracyService.AccuracySummary accuracySummary(LeagueRepository.LeagueRow league) {
+        try {
+            return accuracy.summary(league);
+        } catch (RuntimeException e) {
+            log.warn("league analysis: projection accuracy failed for league {}: {}", league.id(), e.toString());
+            return null;
+        }
     }
 
     private static List<String> sortedCopy(List<String> l) {
@@ -655,7 +716,7 @@ public class LeagueAnalysisService {
      */
     private Blocks unavailable(List<String> groups, int week, String unit, String reasonCode, String reason) {
         return new Blocks(new Projections(false, reason, reasonCode, groups, List.of(), unit, null, null, List.of(),
-                preseason.staleAfterDays()),
+                preseason.staleAfterDays(), null),
                 new Matchups(false, reason, week, List.of()));
     }
 

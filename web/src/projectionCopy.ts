@@ -1,4 +1,4 @@
-import type { ProjectionProvenance, ProjectionReasonCode, ProjectionUnit } from './api'
+import type { AccuracySummary, ProjectionProvenance, ProjectionReasonCode, ProjectionUnit } from './api'
 
 /*
  * spec 030: the words around a projection, in one place. The league home's
@@ -36,8 +36,22 @@ const CATEGORY_NAMES: Record<string, string> = {
   tf: 'technical fouls',
 }
 
+/** Bucket families (football DEF and K): the server excludes the whole family, so say it once, not per bucket. */
+const FAMILY_LABELS: [RegExp, string][] = [
+  [/^pts_allow_\w+$/, 'points-allowed brackets'],
+  [/^yds_allow_\w+$/, 'yards-allowed brackets'],
+  [/^fgm_\d/, 'field goals by distance'],
+  [/^fgmiss_\d/, 'missed field goals by distance'],
+]
+
 export function categoryNames(keys: readonly string[]): string[] {
-  return keys.map((k) => CATEGORY_NAMES[k] ?? k)
+  const out: string[] = []
+  for (const k of keys) {
+    const fam = FAMILY_LABELS.find(([re]) => re.test(k))
+    const name = fam ? fam[1] : (CATEGORY_NAMES[k] ?? k)
+    if (!out.includes(name)) out.push(name)
+  }
+  return out
 }
 
 /** Sentences for the codes the basketball path raises. Football keeps the server's own sentences. */
@@ -76,12 +90,38 @@ function ageWords(days: number): string {
   return days === 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`
 }
 
-/** "Source: sleeper · updated 2 days ago · accuracy for this league not measured". */
-export function provenanceLine(p: ProjectionProvenance | null, now: Date = new Date()): string {
+/** Sleeper serves RotoWire's numbers under the `rotowire` company tag; anything else is named as it came. */
+function sourceName(source: string): string {
+  return source === 'rotowire' ? 'RotoWire' : source
+}
+
+/**
+ * The measured-accuracy clause (spec 036). TOO_EARLY prints counts only: a figure below the threshold
+ * would read as a measurement. Null and NO_SNAPSHOTS both fall back to the old "not measured" wording,
+ * because "no samples yet" and "the read failed" read the same to someone looking at the page.
+ */
+export function accuracyClause(a: AccuracySummary | null | undefined): string {
+  if (!a || a.status === 'NO_SNAPSHOTS') return 'accuracy for this league not measured'
+  const noun = a.unit === 'GAME' ? 'games' : 'player-weeks'
+  if (a.status === 'TOO_EARLY') return `accuracy: too early to measure (${a.n} of ${a.minSamples} ${noun})`
+  if (a.mae == null) return 'accuracy for this league not measured'
+  const per = a.unit === 'GAME' ? 'a game' : 'a week'
+  const basis = a.kind === 'SEASON_AVERAGE' ? ', season-average line' : ''
+  return `off by ±${a.mae.toFixed(1)} pts ${per} on average (${a.n} ${noun}${basis})`
+}
+
+/** "RotoWire projection via Sleeper · updated 2 days ago · accuracy for this league not measured". */
+export function provenanceLine(
+  p: ProjectionProvenance | null,
+  accuracy: AccuracySummary | null | undefined = null,
+  now: Date = new Date(),
+): string {
   const parts: string[] = []
-  if (p?.source) parts.push(`Source: ${p.source}`)
+  if (p?.source) parts.push(`${sourceName(p.source)} projection via Sleeper`)
   if (p?.sourceModifiedAt) parts.push(`updated ${ageWords(ageInDays(p.sourceModifiedAt, now))}`)
-  parts.push('accuracy for this league not measured')
+  // Football's weekly cache records only when this app fetched it (spec 036 FR-010: say when, either way).
+  else if (p?.fetchedAt) parts.push(`fetched ${ageWords(ageInDays(p.fetchedAt, now))}`)
+  parts.push(accuracyClause(accuracy))
   const line = parts.join(' · ')
   return line.charAt(0).toUpperCase() + line.slice(1)
 }
@@ -99,6 +139,8 @@ type Footnoted = {
   provenance: ProjectionProvenance | null
   unprojectedCategories: string[]
   staleAfterDays: number
+  /** spec 036; absent on older fixtures, which read as "not measured". */
+  accuracy?: AccuracySummary | null
 }
 
 /**
@@ -108,11 +150,22 @@ type Footnoted = {
  * the source line.
  */
 export function projectionNotes(p: Footnoted, now: Date = new Date()): string[] {
-  const notes = [provenanceLine(p.provenance, now)]
+  const notes = [provenanceLine(p.provenance, p.accuracy, now)]
   const stale = staleLine(p.provenance, p.staleAfterDays, now)
   if (stale) notes.push(stale)
   if (p.basisNote === 'ONE_AVERAGE_GAME_PER_STARTER') notes.push(ONE_GAME_NOTE)
   if (p.unprojectedCategories.length > 0) notes.push(`Not projected: ${categoryNames(p.unprojectedCategories).join(', ')}.`)
   if (p.unit === 'PER_WEEK') notes.push(NOT_MODELLED_NOTE)
   return notes
+}
+
+/**
+ * The lean in words, never a colour (spec 036 FR-011): "runs 2.1 high" means the projections were
+ * above what happened. Rounds to one decimal first, so a lean that prints as 0.0 says so instead of
+ * claiming a direction.
+ */
+export function leanWords(lean: number): string {
+  const tenth = Math.round(Math.abs(lean) * 10) / 10
+  if (tenth === 0) return 'runs even'
+  return `runs ${tenth.toFixed(1)} ${lean > 0 ? 'high' : 'low'}`
 }

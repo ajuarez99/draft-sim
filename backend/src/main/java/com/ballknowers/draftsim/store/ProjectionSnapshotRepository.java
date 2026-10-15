@@ -156,6 +156,24 @@ public class ProjectionSnapshotRepository {
                 sport, season);
     }
 
+    /**
+     * A cheap fingerprint of everything {@link #forAccuracy} reads for the sport-season: when and how many
+     * snapshots, realized games and schedule rows there are. Two equal stamps mean the same accuracy inputs
+     * (plan N3: the full read measured ~1.4 s at a season's 29k samples, the stamp ~30 ms). Position changes
+     * are not stamped; they are rare and a stale position label lasts until the next data change.
+     */
+    public String stamp(String sport, int season) {
+        return jdbc.queryForObject("""
+                select concat_ws('|',
+                    (select max(fetched_at) from projection_snapshot where sport = ? and season = ?),
+                    (select count(*) from projection_snapshot where sport = ? and season = ?),
+                    (select max(fetched_at) from player_game where sport = ? and season = ?),
+                    (select count(*) from player_game where sport = ? and season = ?),
+                    (select max(fetched_at) from sport_schedule where sport = ? and season = ?))
+                """, String.class,
+                sport, season, sport, season, sport, season, sport, season, sport, season);
+    }
+
     private static OffsetDateTime utc(Instant i) {
         return i == null ? null : OffsetDateTime.ofInstant(i, ZoneOffset.UTC);
     }

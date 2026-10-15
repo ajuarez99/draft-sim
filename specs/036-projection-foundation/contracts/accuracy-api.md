@@ -13,6 +13,8 @@ when the league is unknown or the user can't see it.
   "status": "TOO_EARLY", "minSamples": 500, "minCell": 50,
   "source": "rotowire",
   "snapshotsFrom": "2026-10-20", "scoredThrough": "2026-10-21",
+  "withoutSeasonAverage": 0, "voided": 2,
+  "excludedCategories": ["bonus_pt_40p"],
   "caveats": [
     "Morning-of projection: late scratches and inactives are not reflected.",
     "Sleeper credits one game per starter per week; this grades individual games."
@@ -33,6 +35,12 @@ when the league is unknown or the user can't see it.
 **Field nullability (for `api.ts`):** `mae`, `lean`, `snapshotsFrom`, `scoredThrough`, `source`
 are nullable. Everything else is required.
 
+Fields added during the build (Java record `ProjectionAccuracyService.ProjectionAccuracy`, mirrored in `api.ts`):
+`withoutSeasonAverage: number` (players left out of both NBA series for having no season-average line),
+`voided: number` (games postponed or canceled), `excludedCategories: string[]` (scored keys not graded;
+a bucket family such as `pts_allow_*` is excluded whole when any member is unprojected).
+`snapshotsFrom` is the earliest GAME date covered, not when capture began.
+
 ## Change to `GET /api/leagues/{sleeperId}/analysis`
 
 `projections` (record `LeagueAnalysisService.Projections`) gains:
@@ -45,6 +53,8 @@ accuracy: {
   mae: number | null
   lean: number | null
   unit: 'GAME' | 'PLAYER_WEEK'
+  kind: 'GAME' | 'SEASON_AVERAGE'   // which series this summarizes (NBA: the one the rankings use)
+  label: string | null              // names that series; null for NO_SNAPSHOTS
 } | null
 ```
 

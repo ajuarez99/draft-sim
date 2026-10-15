@@ -11,6 +11,7 @@ import com.ballknowers.draftsim.ingest.TransactionIngestService;
 import com.ballknowers.draftsim.ingest.LeagueIngestService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionIngestService;
+import com.ballknowers.draftsim.engine.ProjectionParityService;
 import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
 import com.ballknowers.draftsim.profile.ProfileService;
@@ -40,6 +41,7 @@ public class IngestController {
     private final SeasonProjectionIngestService seasonProjectionIngest;
     private final BracketIngestService bracketIngest;
     private final ProjectionSnapshotService projectionSnapshots;
+    private final ProjectionParityService projectionParity;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
@@ -50,8 +52,10 @@ public class IngestController {
                             BoardRefresh boardRefresh,
                             SeasonProjectionIngestService seasonProjectionIngest,
                             BracketIngestService bracketIngest,
-                            ProjectionSnapshotService projectionSnapshots) {
+                            ProjectionSnapshotService projectionSnapshots,
+                            ProjectionParityService projectionParity) {
         this.projectionSnapshots = projectionSnapshots;
+        this.projectionParity = projectionParity;
         this.playerIngest = playerIngest;
         this.leagueIngest = leagueIngest;
         this.leagueHistoryIngest = leagueHistoryIngest;
@@ -203,6 +207,19 @@ public class IngestController {
     @PostMapping("/projection-snapshot")
     public ProjectionSnapshotService.Result projectionSnapshot(@RequestParam String sport) {
         return projectionSnapshots.capture(Sport.fromCode(sport), java.time.Instant.now());
+    }
+
+    /**
+     * specs/036 US3 (contracts/parity.md): does scoring the stored football stat lines reproduce Sleeper's own
+     * {@code pts_ppr}, within each row's rounding tolerance? Read-only. It never flips
+     * {@code draftsim.projections.nfl-exact-scoring}; that is a human decision on this result.
+     * {@code league} optionally names the stored league whose scoring to use.
+     */
+    @GetMapping("/projection-parity")
+    public ProjectionParityService.Result projectionParity(@RequestParam String sport, @RequestParam int season,
+                                                           @RequestParam int week,
+                                                           @RequestParam(required = false) String league) {
+        return projectionParity.check(Sport.fromCode(sport).code(), season, week, league);
     }
 
     /**

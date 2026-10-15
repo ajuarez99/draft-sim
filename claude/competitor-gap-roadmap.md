@@ -90,6 +90,19 @@ by recent form means more once minutes are visible beside it.
 
 ## Phase 3: projections, behind one decision (November)
 
+> **Amended 2026-10-14 (spec 036):** three corrections to this phase, found by reading the code and
+> measuring rather than trusting the plan.
+> - **3.2 was already built.** Spec 030 shipped the NBA Analysis page (per-game projections scored under
+>   the league's own scoring). It is not "S, reverses the Phase 0 rewording"; there is nothing left to build.
+> - **The "sum a week's NBA games" definition is wrong.** `projection-tools.md` §1 defines
+>   `projectedWeek` as the sum over that week's games. Measured (spec 019 / 030): Sleeper credits ONE game
+>   per starter per week (540/540 starter-weeks), so a 4-game week is not worth 4 games. Per-game it is.
+> - **3.1 is now spec 036**, split in three: frozen pre-game snapshots (`projection_snapshot`), a measured
+>   accuracy number for them, and a football parity check that decides whether exact league scoring may
+>   replace the `pts_ppr` column pick (flag `draftsim.projections.nfl-exact-scoring`, default off). It
+>   answers the "measure accuracy" decision above as *yes, for the inputs only*; see
+>   `specs/036-projection-foundation/`.
+
 **Decision needed from Allan before starting:** whether to measure RotoWire
 projection accuracy against these leagues, and whether the no-backtesting
 decision covers measuring an *input*. Both are listed in projection-tools.md

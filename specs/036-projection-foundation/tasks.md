@@ -91,7 +91,7 @@
 
 ### Tests for US2
 
-- [ ] T014 [P] [US2] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionAccuracyServiceTest.java`, a unit test over in-memory samples:
+- [x] T014 [P] [US2] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionAccuracyServiceTest.java`, a unit test over in-memory samples:
   1. **Lean sign and ordering:** projections uniformly 2 points above actual give lean +2.0 and MAE 2.0. Uniformly below gives lean −2.0.
   2. **B3:** a realized line equal to the projected line plus `bonus_pt_40p: 1`, where the league scores `bonus_pt_40p: 2` and no projected line carries it, gives lean 0.0. Without the restriction the test must fail: show that in a comment with the would-be number.
   3. **Bands are judged on the projected value:** a sample projected 18 and scored 40 lands in band "0–20".
@@ -103,15 +103,15 @@
      - `pre_game` or `in_game`: pending.
      - `postponed` or `canceled`: voided.
   7. NBA: both series are computed over the snapshots that have `seasonAvgStats` only, and `withoutSeasonAverage` counts the rest. The summary uses SEASON_AVERAGE for NBA and GAME for NFL.
-- [ ] T015 [P] [US2] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionAccuracyReadIT.java`, against `draftsim_036`. Seed about 6 snapshots, the matching `player_game` rows, `sport_schedule` statuses and a league with known `scoring_json`. Assert the full `ProjectionAccuracy` against numbers computed by hand **in the test comments** (SC-003).
-- [ ] T016 [P] [US2] `web/src/projectionCopy.test.ts` (extend if it exists). `provenanceLine` must render:
+- [x] T015 [P] [US2] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionAccuracyReadIT.java`, against `draftsim_036`. Seed about 6 snapshots, the matching `player_game` rows, `sport_schedule` statuses and a league with known `scoring_json`. Assert the full `ProjectionAccuracy` against numbers computed by hand **in the test comments** (SC-003).
+- [x] T016 [P] [US2] `web/src/projectionCopy.test.ts` (extend if it exists). `provenanceLine` must render:
   - `"RotoWire projection via Sleeper"` for source `rotowire`;
   - the MEASURED text with n;
   - the TOO_EARLY text "too early to measure (n of N games)";
   - the old "accuracy for this league not measured" when accuracy is null.
   
   It must never print a number for TOO_EARLY.
-- [ ] T017 [P] [US2] `web/src/components/ProjectionAccuracyPanel.test.tsx`:
+- [x] T017 [P] [US2] `web/src/components/ProjectionAccuracyPanel.test.tsx`:
   - TOO_EARLY shows counts and no figures.
   - MEASURED shows the typical miss and the lean in words ("runs 2.1 high" / "runs 2.1 low"), with no green/red class on the lean.
   - NBA shows two series tabs.
@@ -119,30 +119,30 @@
 
 ### Implementation for US2
 
-- [ ] T018 [US2] Add the read to `ProjectionSnapshotRepository`: `List<Sample> forAccuracy(sport, season)`. It's one SQL statement that left-joins `player_game` on (sleeper_player_id, game_id) and joins `sport_schedule` on (sport, season, game_id) for status. It returns the raw snapshot stats, season_avg_stats, realized stats (nullable), schedule status (nullable), position (`player.positions[1]` joined on sleeper_id + sport) and game_date. Run the SQL by hand once against `draftsim_036` before wiring it in (bug class #2).
-- [ ] T019 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/engine/ProjectionAccuracyService.java`:
+- [x] T018 [US2] Add the read to `ProjectionSnapshotRepository`: `List<Sample> forAccuracy(sport, season)`. It's one SQL statement that left-joins `player_game` on (sleeper_player_id, game_id) and joins `sport_schedule` on (sport, season, game_id) for status. It returns the raw snapshot stats, season_avg_stats, realized stats (nullable), schedule status (nullable), position (`player.positions[1]` joined on sleeper_id + sport) and game_date. Run the SQL by hand once against `draftsim_036` before wiring it in (bug class #2).
+- [x] T019 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/engine/ProjectionAccuracyService.java`:
   - `ProjectionAccuracy forLeague(LeagueRow)` and `AccuracySummary summary(LeagueRow)`. The summary is derived from `forLeague`'s result, never computed separately.
   - The records are as data-model E3 plus `withoutSeasonAverage`, `voided` and `excludedCategories` (amendments S2/S5/B3).
   - Unit values are `GAME`/`PLAYER_WEEK`.
   - Scoring goes through `GameScoringService.score` with `ProjectedCategories.restrict(...)`, where the projected-key set is every key on any snapshot line of that sport-season.
   - No `Map.of` with nullable values.
   - Caveats are fixed strings: the morning-of line; for NBA "one game credited per week, this grades games"; and "Not graded: …" for excluded categories.
-- [ ] T020 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/api/ProjectionAccuracyController.java` with `GET /api/leagues/{sleeperId}/projection-accuracy`. Its membership scoping is copied from `LeagueAnalysisController`, and it returns 404 when the league is unknown or not visible.
-- [ ] T021 [US2] Add `AccuracySummary accuracy` (nullable) to `LeagueAnalysisService.Projections`:
+- [x] T020 [US2] Create `backend/src/main/java/com/ballknowers/draftsim/api/ProjectionAccuracyController.java` with `GET /api/leagues/{sleeperId}/projection-accuracy`. Its membership scoping is copied from `LeagueAnalysisController`, and it returns 404 when the league is unknown or not visible.
+- [x] T021 [US2] Add `AccuracySummary accuracy` (nullable) to `LeagueAnalysisService.Projections`:
   - Fill it in both the football and the basketball paths via `accuracyService.summary(league)`, wrapped in try/catch so a failure gives null and never breaks projections.
   - Update the `unavailable(...)` constructor calls to pass null.
   - Then add the same field to `SeasonStartService.SeasonStrength` (`engine/SeasonStartService.java:77`), copied from the `Projections` it is built from at `:145`, `:244` and `:262`.
-- [ ] T022 [US2] Update `web/src/api.ts`, field-for-field with the Java records:
+- [x] T022 [US2] Update `web/src/api.ts`, field-for-field with the Java records:
   - Add `ProjectionAccuracy`, `AccuracySeries`, `AccuracyCell` and `AccuracySummary`.
   - Add `accuracy: AccuracySummary | null` to `AnalysisProjections` and `SeasonStrength`.
   - Add an api function `projectionAccuracy(sleeperLeagueId)` following the existing fetch helpers' auth headers.
-- [ ] T023 [US2] Update `web/src/projectionCopy.ts`: `provenanceLine` takes the accuracy summary, and the `Footnoted` type gains `accuracy`. Its wording per plan.md "Web":
+- [x] T023 [US2] Update `web/src/projectionCopy.ts`: `provenanceLine` takes the accuracy summary, and the `Footnoted` type gains `accuracy`. Its wording per plan.md "Web":
   - MEASURED: `"off by ±X.X pts a game on average (n games)"` for GAME, or `"… a week …"` for PLAYER_WEEK, with the series label for NBA ("season average").
   - TOO_EARLY: `"accuracy: too early to measure (n of N games)"`.
   - null: the current text.
-- [ ] T024 [US2] Create `web/src/components/ProjectionAccuracyPanel.tsx`. It fetches the full accuracy, and its table rows are Overall, then by position, then by projected band. The columns are Games · Typical miss · Lean · (DNP in the footer). A cell with null mae shows "too few (n)". The lean is in words. There are tabs for NBA's two series, plus the caveats list. Follow the existing Analysis-page card styles. Before inventing styles, read `web/src/pages/LeagueAnalysis.tsx` and memory feedback on avoiding flat uniform cards.
-- [ ] T025 [US2] Mount the panel in `web/src/pages/LeagueAnalysis.tsx` under the projections block, with `id="projection-accuracy"` so the source line can link to it.
-- [ ] T026 [US2] Run `cd web && npx tsc -b && npm run build && npx vitest run`, and run the backend tests. Record the results in verification.md.
+- [x] T024 [US2] Create `web/src/components/ProjectionAccuracyPanel.tsx`. It fetches the full accuracy, and its table rows are Overall, then by position, then by projected band. The columns are Games · Typical miss · Lean · (DNP in the footer). A cell with null mae shows "too few (n)". The lean is in words. There are tabs for NBA's two series, plus the caveats list. Follow the existing Analysis-page card styles. Before inventing styles, read `web/src/pages/LeagueAnalysis.tsx` and memory feedback on avoiding flat uniform cards.
+- [x] T025 [US2] Mount the panel in `web/src/pages/LeagueAnalysis.tsx` under the projections block, with `id="projection-accuracy"` so the source line can link to it.
+- [x] T026 [US2] Run `cd web && npx tsc -b && npm run build && npx vitest run`, and run the backend tests. Record the results in verification.md.
 
 ---
 
@@ -150,23 +150,23 @@
 
 **Goal**: football projections stored with stat lines, a parity check with a pre-set tolerance, and exact league scoring behind a flag.
 
-- [ ] T027 [P] [US3] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionParityTest.java`, testing the tolerance rule from amendment S6: tolerance = Σ|weight_k| × 0.005 over the keys the row carries, plus 0.005. A row off by less than its tolerance is `withinTolerance`; a row off by more is `beyondTolerance`.
-- [ ] T028 [US3] `ProjectionIngestService.toRows` keeps the stats map (minus `adp_*`/`pos_adp_*`). `PlayerProjectionRepository.Row` gains `Map<String,Object> stats` (nullable), and its upsert writes and updates `stats`. Fix every `Row` constructor caller.
-- [ ] T029 [US3] Create `engine/ProjectionParityService.java` + `GET /api/ingest/projection-parity?sport=nfl&season=&week=` in `IngestController`, per contracts/parity.md as amended (S6: `withinTolerance` and `beyondTolerance` counts, `scoringSource`, the first 50 beyond-tolerance rows). Full-PPR scoring source: a stored NFL league with `rec = 1.0`, otherwise a constant map of Sleeper's documented default PPR values with a comment citing where they came from.
-- [ ] T030 [US3] In `LeagueAnalysisService`'s football points path (around the `ScoringKey.forReceptionPoints` use, `:285-290` and `:500`): when `draftsim.projections.nfl-exact-scoring` is true and a row has stats, value it as `gameScoring.score(league scoring, stats)`. Otherwise use the column pick, row by row. Add a unit test showing both branches. **Leave the flag false.**
-- [ ] T031 [US3] On `draftsim_036`, ingest NFL 2026 weeks 7–8 with force, run the parity route for each, and record `withinTolerance`, `beyondTolerance`, `scoringSource` and a diagnosis of the beyond-tolerance rows in verification.md (SC-005). Do not flip the flag. That decision goes back to the parent session.
+- [x] T027 [P] [US3] `backend/src/test/java/com/ballknowers/draftsim/engine/ProjectionParityTest.java`, testing the tolerance rule from amendment S6: tolerance = Σ|weight_k| × 0.005 over the keys the row carries, plus 0.005. A row off by less than its tolerance is `withinTolerance`; a row off by more is `beyondTolerance`.
+- [x] T028 [US3] `ProjectionIngestService.toRows` keeps the stats map (minus `adp_*`/`pos_adp_*`). `PlayerProjectionRepository.Row` gains `Map<String,Object> stats` (nullable), and its upsert writes and updates `stats`. Fix every `Row` constructor caller.
+- [x] T029 [US3] Create `engine/ProjectionParityService.java` + `GET /api/ingest/projection-parity?sport=nfl&season=&week=` in `IngestController`, per contracts/parity.md as amended (S6: `withinTolerance` and `beyondTolerance` counts, `scoringSource`, the first 50 beyond-tolerance rows). Full-PPR scoring source: a stored NFL league with `rec = 1.0`, otherwise a constant map of Sleeper's documented default PPR values with a comment citing where they came from.
+- [x] T030 [US3] In `LeagueAnalysisService`'s football points path (around the `ScoringKey.forReceptionPoints` use, `:285-290` and `:500`): when `draftsim.projections.nfl-exact-scoring` is true and a row has stats, value it as `gameScoring.score(league scoring, stats)`. Otherwise use the column pick, row by row. Add a unit test showing both branches. **Leave the flag false.**
+- [x] T031 [US3] On `draftsim_036`, ingest NFL 2026 weeks 7–8 with force, run the parity route for each, and record `withinTolerance`, `beyondTolerance`, `scoringSource` and a diagnosis of the beyond-tolerance rows in verification.md (SC-005). Do not flip the flag. That decision goes back to the parent session.
 
 ---
 
 ## Phase 6: Polish
 
-- [ ] T032 Amend `claude/competitor-gap-roadmap.md` in place (FR-015) with a status note in Phase 3:
+- [x] T032 Amend `claude/competitor-gap-roadmap.md` in place (FR-015) with a status note in Phase 3:
   - 3.2 was already built by spec 030.
   - The "sum a week's NBA games" definition in `claude/projection-tools.md` is wrong under the measured one-game-per-week rule.
   - 3.1 is now spec 036.
   
   Add the matching "amended" note to `claude/projection-tools.md`'s Proposed design §1.
-- [ ] T033 Measure the costs and record them in verification.md (amendment N3):
+- [x] T033 Measure the costs and record them in verification.md (amendment N3):
   - `POST /api/refresh/daily` wall-clock on `draftsim_036` with the new steps (state the before/after if obtainable).
   - The `/analysis` response time for the NBA and NFL leagues with and without the accuracy summary.
   - Add the cache only if the summary adds more than 200 ms.

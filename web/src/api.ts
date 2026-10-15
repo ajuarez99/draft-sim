@@ -1539,6 +1539,72 @@ export type AnalysisProjections = {
   unprojectedCategories: string[]
   /** draftsim.preseason.stale-after-days: older than this and the page says how old the projections are. */
   staleAfterDays: number
+  /**
+   * spec 036: the measured accuracy of the pre-game projections, one line (the full breakdown is
+   * `getProjectionAccuracy`). Null only when the accuracy read itself failed, or the block is unavailable.
+   */
+  accuracy: AccuracySummary | null
+}
+
+/** NBA grades single games, football grades player-weeks. Deliberately not `PER_WEEK`, which already means
+ * "one NBA game a week" in `ProjectionUnit`. */
+export type AccuracyUnit = 'GAME' | 'PLAYER_WEEK'
+export type AccuracyStatus = 'TOO_EARLY' | 'MEASURED' | 'NO_SNAPSHOTS'
+export type AccuracySeriesKind = 'GAME' | 'SEASON_AVERAGE'
+
+/** Mirrors ProjectionAccuracyService.AccuracySummary: the overall cell of the series the page actually shows. */
+export type AccuracySummary = {
+  status: AccuracyStatus
+  n: number
+  minSamples: number
+  /** Typical miss in league points; null below minSamples. */
+  mae: number | null
+  /** mean(projected - actual); positive means projections ran high. Null below minSamples. */
+  lean: number | null
+  unit: AccuracyUnit
+  kind: AccuracySeriesKind
+  /** Names the series measured; null when there is none (NO_SNAPSHOTS). */
+  label: string | null
+}
+
+/** mae and lean are null when n is below minCell, or when the status is not MEASURED. */
+export type AccuracyCell = {
+  key: string
+  n: number
+  mae: number | null
+  lean: number | null
+}
+
+export type AccuracySeries = {
+  kind: AccuracySeriesKind
+  label: string
+  overall: AccuracyCell
+  byPosition: AccuracyCell[]
+  byBand: AccuracyCell[]
+  didNotPlay: number
+  pending: number
+}
+
+/** Mirrors ProjectionAccuracyService.ProjectionAccuracy (GET /api/leagues/{id}/projection-accuracy). */
+export type ProjectionAccuracy = {
+  sport: string
+  season: number
+  unit: AccuracyUnit
+  status: AccuracyStatus
+  minSamples: number
+  minCell: number
+  /** [] when status is NO_SNAPSHOTS. NBA has GAME and SEASON_AVERAGE; football has GAME only. */
+  series: AccuracySeries[]
+  snapshotsFrom: string | null
+  scoredThrough: string | null
+  /** NBA snapshots left out of both series for lacking a season-average line. */
+  withoutSeasonAverage: number
+  /** Snapshots whose game was postponed or canceled; excluded from everything else. */
+  voided: number
+  /** Scored categories no projection line carries; graded on neither side. */
+  excludedCategories: string[]
+  caveats: string[]
+  source: string | null
 }
 
 /**
@@ -1627,6 +1693,9 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
   apiFetch(
     `/api/leagues/${sleeperLeagueId}/analysis${week == null ? '' : `?week=${week}`}`,
   ).then(json<LeagueAnalysis>)
+
+export const getProjectionAccuracy = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/projection-accuracy`).then(json<ProjectionAccuracy>)
 
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
@@ -3125,6 +3194,8 @@ export type SeasonStrength = {
   staleAfterDays: number
   /** Every roster's display name (team name, else username, else "Roster N"); [] when unavailable. */
   teamLabels: AnalysisTeamLabel[]
+  /** spec 036: the SAME object as `AnalysisProjections.accuracy`, copied server-side and never recomputed. */
+  accuracy: AccuracySummary | null
 }
 
 export type TeamGradeLite = {
