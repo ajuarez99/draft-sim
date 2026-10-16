@@ -3477,8 +3477,8 @@ export type RivalryWeekStatus =
   | 'NO_ELIGIBLE_WEEK' | 'NO_WEEK_FITS'
 export type RivalryWeekPairing = { pairing: RivalryPairing; alreadyScheduled: boolean }
 /**
- * A history-best pair the cap kept out of this week. `meetsInWeeks`: the regular-season weeks they already meet,
- * this week excluded. `wouldMeet`: their regular-season meeting count if paired in this week.
+ * A history-best pair the cap kept out of this week. `meetsInWeeks`: every regular-season week they meet, played
+ * or still scheduled, this week excluded. `wouldMeet`: their regular-season meeting count if paired in this week.
  */
 export type RivalryHeldBack = { aManagerId: number; bManagerId: number; meetsInWeeks: number[]; wouldMeet: number }
 /** A scheduled matchup this week's rivalry set replaces. Both lists empty: they would not meet otherwise. */
@@ -3519,7 +3519,7 @@ export type RivalryRecommendation = {
   thinCount: number
   note: string
   /** Null whenever `status` is not OK. An older backend omits it (undefined); the page treats both alike. */
-  week: RivalryWeekRecommendation | null
+  week?: RivalryWeekRecommendation | null
 }
 export type Rivalries = {
   sport: Sport

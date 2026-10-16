@@ -56,10 +56,21 @@ public final class RivalryWeekPicker {
      * @param keptBest    how many pairs the matching shares with the unconstrained matching
      * @param sameAsBest  the matching's pairs equal the unconstrained matching's pairs (F1)
      * @param tiedWith    feasible weeks equal on rank keys 1 AND 2 (this one included); 0 when infeasible
+     * @param firstTiedWeek the earliest week of that tie group (this week when it stands alone); 0 when
+     *                      infeasible
      */
     public record Candidate(int week, boolean feasible, Matching matching, double total, List<PairId> heldBack,
                             List<PairId> displaced, Set<PairId> alreadyIn, int keptBest, boolean sameAsBest,
-                            int tiedWith) {}
+                            int tiedWith, int firstTiedWeek) {
+
+        Candidate withTies(int tiedWith, int firstTiedWeek) {
+            return new Candidate(week, feasible, matching, total, heldBack, displaced, alreadyIn, keptBest,
+                    sameAsBest, tiedWith, firstTiedWeek);
+        }
+    }
+
+    /** Rank keys 1 and 2; candidates with the same key are one tie group. */
+    record TieKey(double total, int keptBest) {}
 
     /**
      * @param unconstrained spec 034's history-best matching
@@ -86,8 +97,8 @@ public final class RivalryWeekPicker {
         return Integer.compare(x.week(), y.week());
     };
 
-    /** Solves the unconstrained matching itself; prefer the overload that takes spec 034's already-solved one. */
-    public static WeekPick pick(List<Long> managerIds, Map<Integer, List<long[]>> schedule, List<Integer> eligibleWeeks,
+    /** Solves the unconstrained matching itself (tests); production passes spec 034's already-solved one. */
+    static WeekPick pick(List<Long> managerIds, Map<Integer, List<long[]>> schedule, List<Integer> eligibleWeeks,
                                 int cap, PairScore fn, int maxManagers) {
         return pick(managerIds, schedule, eligibleWeeks, cap, fn, maxManagers,
                 RivalryMatching.match(managerIds, fn, maxManagers));
@@ -143,7 +154,7 @@ public final class RivalryWeekPicker {
             var solved = RivalryMatching.match(managerIds, fn, allowed, maxManagers);
             if (solved.isEmpty()) {
                 raw.add(new Candidate(week, false, null, 0.0, List.copyOf(heldBack), List.copyOf(scheduledInW),
-                        Set.of(), 0, false, 0));
+                        Set.of(), 0, false, 0, 0));
                 continue;
             }
             Matching m = solved.get();
@@ -159,26 +170,27 @@ public final class RivalryWeekPicker {
             }
             boolean same = kept == best.size() && chosen.size() == best.size();
             raw.add(new Candidate(week, true, m, m.total(), List.copyOf(heldBack), List.copyOf(displaced),
-                    Set.copyOf(already), kept, same, 0));
+                    Set.copyOf(already), kept, same, 0, 0));
         }
 
-        // tiedWith: feasible weeks equal on rank keys 1 and 2.
-        Map<String, Integer> groupSize = new HashMap<>();
-        for (Candidate c : raw) if (c.feasible()) groupSize.merge(tieKey(c), 1, Integer::sum);
+        // tiedWith / firstTiedWeek: feasible weeks equal on rank keys 1 and 2.
+        Map<TieKey, Integer> groupSize = new HashMap<>();
+        Map<TieKey, Integer> firstWeek = new HashMap<>();
+        for (Candidate c : raw) {
+            if (!c.feasible()) continue;
+            groupSize.merge(tieKey(c), 1, Integer::sum);
+            firstWeek.merge(tieKey(c), c.week(), Math::min);
+        }
         List<Candidate> ranked = new ArrayList<>();
         for (Candidate c : raw) {
-            ranked.add(c.feasible()
-                    ? new Candidate(c.week(), true, c.matching(), c.total(), c.heldBack(), c.displaced(),
-                            c.alreadyIn(), c.keptBest(), c.sameAsBest(), groupSize.get(tieKey(c)))
-                    : c);
+            ranked.add(c.feasible() ? c.withTies(groupSize.get(tieKey(c)), firstWeek.get(tieKey(c))) : c);
         }
         ranked.sort(RANK);
         Candidate recommended = !ranked.isEmpty() && ranked.get(0).feasible() ? ranked.get(0) : null;
         return new WeekPick(unconstrained, List.copyOf(ranked), recommended, List.copyOf(overCap));
     }
 
-    /** Rank keys 1 and 2; candidates with the same key are one tie group. */
-    static String tieKey(Candidate c) {
-        return round3(c.total()) + "|" + c.keptBest();
+    static TieKey tieKey(Candidate c) {
+        return new TieKey(round3(c.total()), c.keptBest());
     }
 }

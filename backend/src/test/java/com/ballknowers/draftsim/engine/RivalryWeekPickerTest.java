@@ -114,7 +114,7 @@ class RivalryWeekPickerTest {
     // ---- F11: the rank key is round3(total), the displayed value
 
     private static Candidate stub(int week, double total, int kept) {
-        return new Candidate(week, true, null, total, List.of(), List.of(), Set.of(), kept, false, 0);
+        return new Candidate(week, true, null, total, List.of(), List.of(), Set.of(), kept, false, 0, 0);
     }
 
     @Test

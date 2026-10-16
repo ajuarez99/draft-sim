@@ -353,7 +353,7 @@ describe('rivalry week pick (spec 037)', () => {
     }))
     render(<Rivalries />)
     await screen.findByText('Recommended: Week 9')
-    expect(screen.getByText("Alpha and Charlie already meet in weeks 1, 4 and 5, so they'd play a fourth time."))
+    expect(screen.getByText("Alpha and Charlie met in weeks 1, 4 and 5, so they'd play a fourth time."))
       .toBeInTheDocument()
   })
 
@@ -367,11 +367,21 @@ describe('rivalry week pick (spec 037)', () => {
     expect(await screen.findByText(/break the meeting limit, so no week is recommended/)).toBeInTheDocument()
   })
 
-  it('says, per held-back pair, which weeks they already meet', async () => {
+  it('says, per held-back pair, which weeks they met and which are still only scheduled', async () => {
     getRivalries.mockResolvedValue(weekData())
     render(<Rivalries />)
     await screen.findByText('Recommended: Week 9')
-    expect(screen.getByText("Alpha and Charlie already meet in weeks 3 and 11, so they'd play a third time."))
+    // asOfWeek is 6: week 3 was played, week 11 has not happened yet.
+    expect(screen.getByText(
+      "Alpha and Charlie met in week 3 and are scheduled to meet in week 11, so they'd play a third time.",
+    )).toBeInTheDocument()
+  })
+
+  it('says "more than once" for a cap of 1', async () => {
+    getRivalries.mockResolvedValue(weekData({ cap: 1 }))
+    render(<Rivalries />)
+    await screen.findByText('Recommended: Week 9')
+    expect(screen.getByText('Nobody plays the same manager more than once in the regular season (league rule).'))
       .toBeInTheDocument()
   })
 
