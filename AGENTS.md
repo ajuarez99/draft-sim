@@ -206,6 +206,39 @@ follows the same shape — match it rather than inventing a new process:
   (where "nothing built" is a legitimate outcome): `claude/next-features-roadmap.md`,
   `claude/borrowed-drafts.md`, `claude/adp-sources.md`.
 
+## `/speckit-specify` runs the whole pipeline
+
+When Allan runs `/speckit-specify <idea>`, that one prompt is the go-ahead for
+the full chain below. Don't stop between stages to ask "ready for the plan?" or
+"shall I implement?" — finish one, report it in a line, and start the next.
+
+1. **Specify** — `/speckit-specify` as normal.
+2. **Clarify, only if needed** — run `/speckit-clarify` only when the spec has
+   `[NEEDS CLARIFICATION]` markers or an ambiguity that would change the design.
+   Ask all its questions in one batch (AskUserQuestion, recommended answer
+   first), fold the answers in, and continue without further prompting. If
+   nothing is ambiguous, skip it and say you skipped it.
+3. **Plan** — `/speckit-plan`.
+4. **Adversarial plan review** — a separate pass (a subagent on the session's
+   model) reads the plan cold against the real code and writes
+   `specs/<feature>/plan-review.md`. Take each finding into the plan/spec in
+   place with a dated "amended after review" note (spec 017's `plan-review.md`
+   and commit 22470e0 are the reference).
+5. **Tasks** — `/speckit-tasks`, then `/speckit-analyze`; fix any CRITICAL/HIGH
+   findings before building.
+6. **Implement** — `/speckit-implement`, coding subagents on Sonnet (next
+   section).
+7. **Bug-hunting code review** → `specs/<feature>/code-review.md`, fix what it
+   finds, then **live verification** → `specs/<feature>/verification.md` —
+   same bar as the convention above: drive the real server and UI.
+
+Stop and wait for Allan only for: clarify questions; anything outside the
+repo's normal rules (a migration-number collision with another branch, a prod
+deploy, a destructive DB step, spending money); a review finding that changes
+what the feature *is* rather than how it's built; and the end — **commit,
+push and PR still need his go-ahead** (Hard rules). If he says "spec only" or
+"stop at plan/tasks", stop there.
+
 ## Subagents: coding runs on Sonnet
 
 Any subagent spawned to write or change code — the build stage of the pipeline
