@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.engine.RivalryMatching.Matching;
+import com.ballknowers.draftsim.engine.RivalryMatching.PairId;
 import com.ballknowers.draftsim.engine.RivalryMatching.PairScore;
 
 import java.util.ArrayList;
@@ -12,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import static com.ballknowers.draftsim.engine.RivalryMatching.round3;
 
 /**
  * Which week should be rivalry week, and with which pairings, under the league's meeting cap
@@ -34,13 +37,6 @@ import java.util.TreeSet;
 public final class RivalryWeekPicker {
 
     private RivalryWeekPicker() {}
-
-    /** An unordered manager pair, {@code a < b}. */
-    public record PairId(long a, long b) {
-        static PairId of(long x, long y) {
-            return new PairId(Math.min(x, y), Math.max(x, y));
-        }
-    }
 
     /** A pair the published schedule already has above the cap. */
     public record OverCap(long a, long b, int meetings) {}
@@ -80,11 +76,6 @@ public final class RivalryWeekPicker {
      */
     public record WeekPick(Matching unconstrained, List<Candidate> candidates, Candidate recommended,
                            List<OverCap> overCapPairs) {}
-
-    /** Rounds to the three decimals the page displays. */
-    static double round3(double d) {
-        return Math.round(d * 1000.0) / 1000.0;
-    }
 
     /** Feasible first; then round3(total) desc, kept pairs desc, week asc. Infeasible by week. */
     public static final Comparator<Candidate> RANK = (x, y) -> {

@@ -1,7 +1,7 @@
 package com.ballknowers.draftsim.engine;
 
 import com.ballknowers.draftsim.engine.RivalryWeekPicker.Candidate;
-import com.ballknowers.draftsim.engine.RivalryWeekPicker.PairId;
+import com.ballknowers.draftsim.engine.RivalryMatching.PairId;
 import com.ballknowers.draftsim.engine.RivalryWeekPicker.WeekPick;
 import org.junit.jupiter.api.Test;
 

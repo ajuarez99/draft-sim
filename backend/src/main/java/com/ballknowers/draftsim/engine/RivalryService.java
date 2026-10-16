@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.engine;
 import com.ballknowers.draftsim.config.RivalryProperties;
 import com.ballknowers.draftsim.engine.RivalryGameKind.Classification;
 import com.ballknowers.draftsim.engine.RivalryGameKind.Kind;
+import com.ballknowers.draftsim.engine.RivalryMatching.PairId;
 import com.ballknowers.draftsim.engine.RivalryMatching.PairStats;
 import com.ballknowers.draftsim.store.LeagueBracketRepository;
 import com.ballknowers.draftsim.store.LeagueMatchupRepository;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.TreeMap;
+
+import static com.ballknowers.draftsim.engine.RivalryMatching.round3;
 
 /**
  * The rivalry page (specs/034-rivalry-schedule-grid): an all-time manager x manager matrix, the requested
@@ -158,10 +161,10 @@ public class RivalryService {
                                  WeekRecommendation week) {}
 
     /**
-     * Spec 037: which week, under the league's meeting cap. {@code status}: OK | CONFIG_MISSING |
-     * NOT_PUBLISHED | UNSUPPORTED_ROSTERS | NO_SEASON_FORMAT | NO_ELIGIBLE_WEEK | NO_WEEK_FITS.
-     * {@code cap}/{@code capLabel} are null for CONFIG_MISSING. {@code asOfWeek} is the {@code leg} the
-     * eligibility used (null when Sleeper reported none). {@code recommended} is non-null iff status is OK.
+     * Spec 037: which week, under the league's meeting cap (built by {@link RivalryWeekRecommender}).
+     * {@code status}: OK | CONFIG_MISSING | NOT_PUBLISHED | UNSUPPORTED_ROSTERS | NO_SEASON_FORMAT |
+     * NO_ELIGIBLE_WEEK | NO_WEEK_FITS.
+     * {@code cap}/{@code capLabel} are null for CONFIG_MISSING. {@code recommended} is non-null iff status is OK.
      * {@code overCapNote} is set only when the published schedule already has a pair above the cap.
      *
      * <p>{@code asOfWeek}: the latest week counted as played or under way, i.e. {@code max(leg, lastScoredWeek)},
@@ -250,14 +253,14 @@ public class RivalryService {
         }
         games.sort(Comparator.comparingInt(Game::season).thenComparingInt(Game::week));
 
-        Map<PairKey, List<Game>> byPair = new HashMap<>();
+        Map<PairId, List<Game>> byPair = new HashMap<>();
         for (Game g : games) {
             if (g.aMgr() == null || g.bMgr() == null) continue;
-            byPair.computeIfAbsent(PairKey.of(g.aMgr(), g.bMgr()), k -> new ArrayList<>()).add(g);
+            byPair.computeIfAbsent(PairId.of(g.aMgr(), g.bMgr()), k -> new ArrayList<>()).add(g);
         }
 
         List<ScheduledPair> scheduled = fixtures.scheduledPairs(league.id());
-        Map<PairKey, Integer> scheduledWeek = new HashMap<>();
+        Map<PairId, Integer> scheduledWeek = new HashMap<>();
         // B10: "not yet met" means scheduled AFTER the last scored week of this season; a past week whose
         // game never got a score is not a game to wait for.
         int lastScoredWeek = 0;
@@ -265,7 +268,7 @@ public class RivalryService {
         for (ScheduledPair p : scheduled) {
             if (p.week() <= lastScoredWeek) continue;
             if (p.aManagerId() == null || p.bManagerId() == null || p.aManagerId().equals(p.bManagerId())) continue;
-            scheduledWeek.merge(PairKey.of(p.aManagerId(), p.bManagerId()), p.week(), Math::min);
+            scheduledWeek.merge(PairId.of(p.aManagerId(), p.bManagerId()), p.week(), Math::min);
         }
 
         Map<Long, String> teamNames = members.teamNamesByManager(league.id());
@@ -281,12 +284,12 @@ public class RivalryService {
 
         // ---- matrix
         List<Long> sortedIds = managerIds.stream().sorted().toList();
-        Map<PairKey, PairCalc> calc = new LinkedHashMap<>();
+        Map<PairId, PairCalc> calc = new LinkedHashMap<>();
         List<PairRecord> pairs = new ArrayList<>();
         for (int i = 0; i < sortedIds.size(); i++) {
             for (int j = i + 1; j < sortedIds.size(); j++) {
                 long a = sortedIds.get(i), b = sortedIds.get(j);
-                PairKey key = new PairKey(a, b);
+                PairId key = new PairId(a, b);
                 PairCalc pc = pairCalc(key, byPair.getOrDefault(key, List.of()), scheduledWeek.get(key),
                         managersOfScoredLeague, formatByLeague);
                 calc.put(key, pc);
@@ -325,7 +328,7 @@ public class RivalryService {
                 twoRosters ? ROSTER_NOTE : null);
 
         // ---- recommendation
-        WeekContext weekCtx = new WeekContext(league, scheduled, leg, lastScoredWeek, formatByLeague.get(league.id()),
+        var weekCtx = new RivalryWeekRecommender.WeekContext(league, scheduled, leg, lastScoredWeek, formatByLeague.get(league.id()),
                 standings.size(), orphanRoster || twoRosters);
         Recommendation rec = recommendation(chain, managerIds, nameOf, calc, weekCtx);
 
@@ -334,12 +337,6 @@ public class RivalryService {
     }
 
     // ---------------------------------------------------------------- internals
-
-    private record PairKey(long lo, long hi) {
-        static PairKey of(long x, long y) {
-            return new PairKey(Math.min(x, y), Math.max(x, y));
-        }
-    }
 
     /** One classified, deduplicated meeting. {@code aMgr}/{@code bMgr} follow roster order, not manager order. */
     private record Game(long leagueId, int season, int week, int aRoster, int bRoster, Long aMgr, Long bMgr,
@@ -356,7 +353,7 @@ public class RivalryService {
     private record PairCalc(PairRecord record, PairStats stats, List<Game> games, int playoffAWins, int playoffBWins,
                             List<int[]> placementGames, Integer scheduledWeek, String streakSide, int streakLength) {}
 
-    private PairCalc pairCalc(PairKey key, List<Game> games, Integer scheduledWeek,
+    private PairCalc pairCalc(PairId key, List<Game> games, Integer scheduledWeek,
                               Map<Long, Set<Long>> managersOfScoredLeague, Map<Long, PlayoffFormat> formats) {
         int aw = 0, bw = 0, ties = 0;
         EnumMap<Kind, int[]> by = new EnumMap<>(Kind.class);
@@ -365,7 +362,7 @@ public class RivalryService {
         // Bracket match -> legs, keyed by (league, match id); LinkedHashMap keeps chronological order.
         Map<String, List<Game>> legsOfMatch = new LinkedHashMap<>();
         for (Game g : games) {
-            boolean loIsA = g.aMgr() == key.lo();
+            boolean loIsA = g.aMgr() == key.a();
             double aPts = loIsA ? g.aPts() : g.bPts();
             double bPts = loIsA ? g.bPts() : g.aPts();
             String out = HeadToHeadService.outcome(aPts, bPts);
@@ -386,7 +383,7 @@ public class RivalryService {
         for (List<Game> legs : legsOfMatch.values()) {
             Game first = legs.get(0);
             var match = first.c().match();
-            boolean loIsA = first.aMgr() == key.lo();
+            boolean loIsA = first.aMgr() == key.a();
             int loRoster = loIsA ? first.aRoster() : first.bRoster();
             int hiRoster = loIsA ? first.bRoster() : first.aRoster();
             String winner = null;
@@ -404,7 +401,7 @@ public class RivalryService {
             if (match.placement() != null && match.placement() == 1) {
                 double a = 0, b = 0;
                 for (Game g : legs) {
-                    boolean lo = g.aMgr() == key.lo();
+                    boolean lo = g.aMgr() == key.a();
                     a += lo ? g.aPts() : g.bPts();
                     b += lo ? g.bPts() : g.aPts();
                 }
@@ -433,15 +430,15 @@ public class RivalryService {
 
         Map<String, KindTally> byKind = new LinkedHashMap<>();
         for (Kind k : Kind.values()) byKind.put(k.name(), new KindTally(by.get(k)[0], by.get(k)[1], by.get(k)[2]));
-        PairRecord rec = new PairRecord(key.lo(), key.hi(), m, aw, bw, ties, byKind, status, finals, lines);
+        PairRecord rec = new PairRecord(key.a(), key.b(), m, aw, bw, ties, byKind, status, finals, lines);
         PairStats stats = new PairStats(m, aw, bw, ties, playoffMeetings, !finals.isEmpty());
         return new PairCalc(rec, stats, games, playoffAWins, playoffBWins, placementGames, scheduledWeek,
                 streakSide, streak);
     }
 
-    private static boolean sharedScoredSeason(PairKey key, Map<Long, Set<Long>> managersOfScoredLeague) {
+    private static boolean sharedScoredSeason(PairId key, Map<Long, Set<Long>> managersOfScoredLeague) {
         for (Set<Long> owners : managersOfScoredLeague.values()) {
-            if (owners.contains(key.lo()) && owners.contains(key.hi())) return true;
+            if (owners.contains(key.a()) && owners.contains(key.b())) return true;
         }
         return false;
     }
@@ -482,7 +479,7 @@ public class RivalryService {
     private SeasonGrid seasonGrid(LeagueRow league, OptionalInt leg, PlayoffFormat fmt, List<LeagueBracketRepository.Match> bracket,
                                   List<Long> managerIds, Map<Long, Integer> rosterOfManager,
                                   Map<Integer, Long> managerOfRoster, List<ScheduledPair> scheduled,
-                                  List<Game> games, Map<PairKey, List<Game>> byPair, String rosterNote) {
+                                  List<Game> games, Map<PairId, List<Game>> byPair, String rosterNote) {
         Integer currentWeek = leg.isPresent() ? leg.getAsInt() : null;
         String median = fmt != null && fmt.medianMatch() ? MEDIAN_NOTE : null;
         if (scheduled.isEmpty()) {
@@ -565,7 +562,7 @@ public class RivalryService {
 
     private Cell opponentCell(LeagueRow league, long mid, int week, int oppRoster, String source,
                               Map<Integer, Long> managerOfRoster, Map<String, Game> scoredByWeekPair, int myRoster,
-                              Map<PairKey, List<Game>> byPair) {
+                              Map<PairId, List<Game>> byPair) {
         Long oppMgr = managerOfRoster.get(oppRoster);
         Tally prior = null;
         if (oppMgr != null && oppMgr != mid) prior = priorRecord(mid, oppMgr, league.season(), week, byPair);
@@ -586,12 +583,12 @@ public class RivalryService {
     }
 
     /** B2: whether {@code g} is a final whose summed stored scores contradict the bracket's winner. */
-    private static boolean finalDisagrees(Game g, Map<PairKey, List<Game>> byPair) {
+    private static boolean finalDisagrees(Game g, Map<PairId, List<Game>> byPair) {
         var match = g.c().match();
         if (match == null || match.placement() == null || match.placement() != 1 || match.winnerRosterId() == null
                 || g.aMgr() == null || g.bMgr() == null) return false;
         double a = 0, b = 0;   // by roster a/b of this game
-        for (Game x : byPair.getOrDefault(PairKey.of(g.aMgr(), g.bMgr()), List.of())) {
+        for (Game x : byPair.getOrDefault(PairId.of(g.aMgr(), g.bMgr()), List.of())) {
             if (x.leagueId() != g.leagueId() || x.c().match() == null || x.c().match().matchId() != match.matchId()) continue;
             boolean same = x.aRoster() == g.aRoster();
             a += same ? x.aPts() : x.bPts();
@@ -604,9 +601,9 @@ public class RivalryService {
     }
 
     /** The record of {@code mid} against {@code opp} counting only meetings strictly before (season, week). */
-    private static Tally priorRecord(long mid, long opp, int season, int week, Map<PairKey, List<Game>> byPair) {
+    private static Tally priorRecord(long mid, long opp, int season, int week, Map<PairId, List<Game>> byPair) {
         int w = 0, l = 0, t = 0;
-        for (Game g : byPair.getOrDefault(PairKey.of(mid, opp), List.of())) {
+        for (Game g : byPair.getOrDefault(PairId.of(mid, opp), List.of())) {
             if (g.season() > season || (g.season() == season && g.week() >= week)) continue;
             boolean mineIsA = g.aMgr() == mid;
             switch (HeadToHeadService.outcome(mineIsA ? g.aPts() : g.bPts(), mineIsA ? g.bPts() : g.aPts())) {
@@ -620,14 +617,8 @@ public class RivalryService {
 
     // ---- recommendation
 
-    /** What the week pick needs beyond spec 034's inputs, all already loaded by {@link #forLeague}. */
-    private record WeekContext(LeagueRow league, List<ScheduledPair> scheduled, OptionalInt leg, int lastScoredWeek,
-                               PlayoffFormat fmt, int rosterCount, boolean unsupportedRosters) {}
-
-    static final String CAP_LABEL = "league rule";
-
     private Recommendation recommendation(List<LeagueRow> chain, List<Long> managerIds, Map<Long, String> nameOf,
-                                          Map<PairKey, PairCalc> calc, WeekContext weekCtx) {
+                                          Map<PairId, PairCalc> calc, RivalryWeekRecommender.WeekContext weekCtx) {
         if (!props.loaded()) return refusal("CONFIG_MISSING", null);
         int n = managerIds.size();
         int minMeetings = props.minMeetings();
@@ -639,11 +630,10 @@ public class RivalryService {
         double playoffBonus = props.playoffBonus();
         double titleBonus = props.championshipBonus();
         RivalryMatching.PairScore fn = (a, b) ->
-                RivalryMatching.score(calc.get(new PairKey(a, b)).stats(), playoffBonus, titleBonus);
+                RivalryMatching.score(calc.get(new PairId(a, b)).stats(), playoffBonus, titleBonus);
         RivalryMatching.Matching matching = RivalryMatching.match(managerIds, fn, props.maxManagers());
 
-        int maxMeetings = 0;
-        for (PairCalc pc : calc.values()) maxMeetings = Math.max(maxMeetings, pc.stats().meetings());
+        int maxMeetings = calc.values().stream().mapToInt(pc -> pc.stats().meetings()).max().orElse(0);
         int atMax = 0;
         for (PairCalc pc : calc.values()) if (pc.stats().meetings() == maxMeetings) atMax++;
         // F16: only a UNIQUE maximum earns the reason, and a maximum of one meeting isn't "the most" of anything.
@@ -655,17 +645,17 @@ public class RivalryService {
         Unpaired unpaired = unpairedOf(matching, nameOf);
 
         // Spec 037: built from the same inputs; it never feeds back into `pairings` (034's answer is unmoved).
-        WeekRecommendation week = weekRecommendation(weekCtx, managerIds, fn, matching, calc, nameOf, minMeetings,
-                maxMeetings, mostIsUnique);
+        WeekRecommendation week = RivalryWeekRecommender.recommend(props, weekCtx, managerIds, fn, matching, nameOf,
+                m -> pairingsOf(m, calc, nameOf, minMeetings, maxMeetings, mostIsUnique), m -> unpairedOf(m, nameOf));
         return new Recommendation("OK", minMeetings, MINIMUM_LABEL, pairings, unpaired, thin, RECOMMENDATION_NOTE, week);
     }
 
-    private List<Pairing> pairingsOf(RivalryMatching.Matching matching, Map<PairKey, PairCalc> calc,
+    private List<Pairing> pairingsOf(RivalryMatching.Matching matching, Map<PairId, PairCalc> calc,
                                      Map<Long, String> nameOf, int minMeetings, int maxMeetings,
                                      boolean mostIsUnique) {
         List<Pairing> pairings = new ArrayList<>();
         for (RivalryMatching.Pair p : matching.pairs()) {
-            PairCalc pc = calc.get(new PairKey(p.a(), p.b()));
+            PairCalc pc = calc.get(new PairId(p.a(), p.b()));
             boolean isThin = pc.stats().meetings() < minMeetings;
             pairings.add(new Pairing(p.a(), p.b(), pc.stats().meetings(), round3(p.score()),
                     reason(pc, nameOf, minMeetings, maxMeetings, mostIsUnique), isThin));
@@ -689,183 +679,6 @@ public class RivalryService {
     private Recommendation refusal(String status, Integer minMeetings) {
         return new Recommendation(status, minMeetings, minMeetings == null ? null : MINIMUM_LABEL, List.of(), null, 0,
                 RECOMMENDATION_NOTE, null);
-    }
-
-    // ---- week pick (spec 037)
-
-    private WeekRecommendation weekRecommendation(WeekContext ctx, List<Long> managerIds, RivalryMatching.PairScore fn,
-                                                  RivalryMatching.Matching unconstrained, Map<PairKey, PairCalc> calc,
-                                                  Map<Long, String> nameOf, int minMeetings, int maxMeetings,
-                                                  boolean mostIsUnique) {
-        int boundary = Math.max(ctx.leg().isPresent() ? ctx.leg().getAsInt() : 0, ctx.lastScoredWeek());
-        // S3: the boundary eligibility really uses, not the raw leg, so the panel's "as of week" matches it.
-        Integer asOf = ctx.leg().isPresent() || ctx.lastScoredWeek() > 0 ? boundary : null;
-        // Order of checks (plan "Final week status union"): config, format, schedule, rosters, eligibility, fit.
-        if (!props.weekLoaded()) return weekRefusal("CONFIG_MISSING", null, asOf);
-        int cap = props.maxRegularSeasonMeetings();
-        PlayoffFormat fmt = ctx.fmt();
-        if (fmt == null || fmt.playoffWeekStart() < 2) return weekRefusal("NO_SEASON_FORMAT", cap, asOf);
-        int regularEnd = fmt.playoffWeekStart() - 1;
-
-        // F4: published means EVERY regular-season week has its full set of games; a short week would make the
-        // meeting counts undercount and a pair look allowed that will in fact meet a third time.
-        Map<Integer, Integer> gamesInWeek = new HashMap<>();
-        for (ScheduledPair p : ctx.scheduled()) gamesInWeek.merge(p.week(), 1, Integer::sum);
-        int perWeek = ctx.rosterCount() / 2;
-        boolean published = perWeek >= 1;
-        for (int w = 1; w <= regularEnd && published; w++) published = gamesInWeek.getOrDefault(w, 0) == perWeek;
-        if (!published) return weekRefusal("NOT_PUBLISHED", cap, asOf);
-
-        // F5: the rivalry set is per manager, Sleeper's week is per roster; only a one-to-one season maps.
-        if (ctx.unsupportedRosters()) return weekRefusal("UNSUPPORTED_ROSTERS", cap, asOf);
-
-        // R5/F8: strictly after the week Sleeper calls current and after the last scored week; never a played,
-        // in-progress or playoff week, and nothing at all once the season is complete.
-        List<Integer> eligible = new ArrayList<>();
-        if (!ctx.league().complete()) {
-            for (int w = boundary + 1; w <= regularEnd; w++) eligible.add(w);
-        }
-        if (eligible.isEmpty()) return weekRefusal("NO_ELIGIBLE_WEEK", cap, asOf);
-
-        // Manager-level regular-season schedule. After the F5 gate every roster has exactly one manager, so
-        // nothing is dropped except self-pairs (impossible here); the filter is kept defensive.
-        Map<Integer, List<long[]>> schedule = new TreeMap<>();
-        Map<RivalryWeekPicker.PairId, List<Integer>> weeksOfPair = new HashMap<>();
-        for (ScheduledPair p : ctx.scheduled()) {
-            if (p.week() > regularEnd) continue;
-            if (p.aManagerId() == null || p.bManagerId() == null || p.aManagerId().equals(p.bManagerId())) continue;
-            schedule.computeIfAbsent(p.week(), k -> new ArrayList<>()).add(new long[]{p.aManagerId(), p.bManagerId()});
-            weeksOfPair.computeIfAbsent(RivalryWeekPicker.PairId.of(p.aManagerId(), p.bManagerId()),
-                    k -> new ArrayList<>()).add(p.week());
-        }
-        for (List<Integer> weeks : weeksOfPair.values()) java.util.Collections.sort(weeks);
-
-        RivalryWeekPicker.WeekPick pick = RivalryWeekPicker.pick(managerIds, schedule, eligible, cap, fn,
-                props.maxManagers(), unconstrained);
-        String overCapNote = overCapNote(pick.overCapPairs(), nameOf, cap);
-
-        List<Integer> unfit = new ArrayList<>();
-        List<WeekOption> options = new ArrayList<>();
-        for (RivalryWeekPicker.Candidate c : pick.candidates()) {
-            if (!c.feasible()) { unfit.add(c.week()); continue; }
-            options.add(weekOption(c, pick, weeksOfPair, boundary, cap,
-                    calc, nameOf, minMeetings, maxMeetings, mostIsUnique));
-        }
-        java.util.Collections.sort(unfit);
-        if (options.isEmpty()) {
-            return new WeekRecommendation("NO_WEEK_FITS", cap, CAP_LABEL, asOf, null, List.of(), List.copyOf(unfit),
-                    overCapNote);
-        }
-        return new WeekRecommendation("OK", cap, CAP_LABEL, asOf, options.get(0),
-                List.copyOf(options.subList(1, options.size())), List.copyOf(unfit), overCapNote);
-    }
-
-    private static WeekRecommendation weekRefusal(String status, Integer cap, Integer asOf) {
-        return new WeekRecommendation(status, cap, cap == null ? null : CAP_LABEL, asOf, null, List.of(), List.of(),
-                null);
-    }
-
-    private WeekOption weekOption(RivalryWeekPicker.Candidate c, RivalryWeekPicker.WeekPick pick,
-                                  Map<RivalryWeekPicker.PairId, List<Integer>> weeksOfPair, int boundary,
-                                  int cap, Map<PairKey, PairCalc> calc, Map<Long, String> nameOf, int minMeetings,
-                                  int maxMeetings, boolean mostIsUnique) {
-        RivalryMatching.Matching m = c.matching();
-        List<Pairing> pairings = pairingsOf(m, calc, nameOf, minMeetings, maxMeetings, mostIsUnique);
-        List<WeekPairing> wire = new ArrayList<>();
-        for (Pairing p : pairings) {
-            wire.add(new WeekPairing(p,
-                    c.alreadyIn().contains(new RivalryWeekPicker.PairId(p.aManagerId(), p.bManagerId()))));
-        }
-        List<HeldBack> held = new ArrayList<>();
-        for (RivalryWeekPicker.PairId id : c.heldBack()) {
-            List<Integer> all = weeksOfPair.getOrDefault(id, List.of());
-            List<Integer> others = new ArrayList<>(all);
-            boolean inThisWeek = others.remove(Integer.valueOf(c.week()));
-            held.add(new HeldBack(id.a(), id.b(), List.copyOf(others), all.size() - (inThisWeek ? 1 : 0) + 1));
-        }
-        List<Displaced> displaced = new ArrayList<>();
-        for (RivalryWeekPicker.PairId id : c.displaced()) {
-            List<Integer> met = new ArrayList<>();
-            List<Integer> still = new ArrayList<>();
-            for (int w : weeksOfPair.getOrDefault(id, List.of())) {
-                if (w == c.week()) continue;
-                if (w <= boundary) met.add(w); else still.add(w);
-            }
-            displaced.add(new Displaced(id.a(), id.b(), List.copyOf(met), List.copyOf(still)));
-        }
-        double bestTotal = pick.unconstrained().total();
-        return new WeekOption(c.week(), round3(c.total()), round3(bestTotal), weekReason(c, pick, cap), wire,
-                unpairedOf(m, nameOf), held, displaced);
-    }
-
-    /**
-     * F1: the code is decided by SET comparison, not by comparing totals. ALL_BEST_FIT: nothing held back and
-     * the pairs equal the unconstrained pairs. EQUAL_UNDER_CAP: equal total (within EPS) but a different set.
-     * BEST_UNDER_CAP: a lower total. Every number in the text is in {@code numbers}.
-     */
-    private static Reason weekReason(RivalryWeekPicker.Candidate c, RivalryWeekPicker.WeekPick pick, int cap) {
-        int firstTiedWeek = c.firstTiedWeek();
-        int held = c.heldBack().size();
-        int bestPairs = pick.unconstrained().pairs().size();
-        double total = round3(c.total());
-        double bestTotal = round3(pick.unconstrained().total());
-        Map<String, Object> nums = new LinkedHashMap<>();
-        nums.put("week", c.week());
-        nums.put("cap", cap);
-        nums.put("heldBack", held);
-        nums.put("bestPairings", bestPairs);
-        nums.put("total", total);
-        nums.put("bestTotal", bestTotal);
-        nums.put("tiedWeeks", c.tiedWith());
-        // B1/S2: only the first week of a tie group is "the earliest"; later ones say which week comes first.
-        boolean tied = c.tiedWith() > 1;
-        boolean firstOfGroup = c.week() == firstTiedWeek;
-        if (tied && !firstOfGroup) nums.put("firstTiedWeek", firstTiedWeek);
-        String tieAll = !tied ? "" : firstOfGroup
-                ? " It's the earliest of " + c.tiedWith() + " weeks where they all fit."
-                : " Ties with week " + firstTiedWeek + " on every count; week " + firstTiedWeek + " comes first.";
-        String tieEqual = !tied ? "" : firstOfGroup
-                ? " It's the earliest of " + c.tiedWith() + " equally strong weeks."
-                : " Ties with week " + firstTiedWeek + " on every count; week " + firstTiedWeek + " comes first.";
-        String limit = cap == 1 ? "more than once" : "more than " + cap + " times";
-        String code;
-        String text;
-        // N8b: decided on the displayed (round3) totals, the same ones the ranking uses.
-        boolean equalTotal = total == bestTotal;
-        if (held == 0 && c.sameAsBest()) {
-            code = "ALL_BEST_FIT";
-            text = (bestPairs == 1
-                    ? "The best pairing fits week " + c.week()
-                    : "All " + bestPairs + " of the best pairings fit week " + c.week())
-                    + " without any pair meeting " + limit + "." + tieAll;
-        } else if (equalTotal) {
-            code = "EQUAL_UNDER_CAP";
-            text = (held == 0
-                    ? "An equally strong set fits week " + c.week() + "."
-                    : held + " of the best pairings would go over the " + cap + "-meeting limit in week " + c.week()
-                            + "; an equally strong set replaces " + (held == 1 ? "it." : "them."))
-                    + tieEqual;
-        } else {
-            code = "BEST_UNDER_CAP";
-            text = (held == 0
-                    ? "This set scores " + num3(total) + " of a possible " + num3(bestTotal) + " in week " + c.week() + "."
-                    : held + " of the best pairings would go over the " + cap + "-meeting limit in week " + c.week()
-                            + ", so " + (held == 1 ? "it's" : "they're") + " swapped out. This set scores "
-                            + num3(total) + " of a possible " + num3(bestTotal) + ".")
-                    + tieEqual;
-        }
-        return new Reason(code, text, nums);
-    }
-
-    private static String overCapNote(List<RivalryWeekPicker.OverCap> over, Map<Long, String> nameOf, int cap) {
-        if (over.isEmpty()) return null;
-        List<String> bits = new ArrayList<>();
-        for (RivalryWeekPicker.OverCap o : over) {
-            bits.add(nameOf.get(o.a()) + " and " + nameOf.get(o.b()) + " meet " + o.meetings() + " times");
-        }
-        return "The published schedule already has " + String.join("; ", bits) + ", above the " + cap
-                + "-meeting rule, so " + (over.size() == 1 ? "that pair isn't" : "those pairs aren't")
-                + " offered in any week.";
     }
 
     /**
@@ -1001,16 +814,12 @@ public class RivalryService {
         return String.format(Locale.ROOT, "%.2f", d);
     }
 
-    private static String num3(double d) {
+    static String num3(double d) {
         BigDecimal b = BigDecimal.valueOf(round3(d)).stripTrailingZeros();
         return b.scale() < 0 ? b.setScale(0).toPlainString() : b.toPlainString();
     }
 
     private static double round2(double d) {
         return Math.round(d * 100.0) / 100.0;
-    }
-
-    private static double round3(double d) {
-        return Math.round(d * 1000.0) / 1000.0;
     }
 }

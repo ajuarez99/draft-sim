@@ -60,6 +60,21 @@ public final class RivalryMatching {
     /** {@code a < b} by id. */
     public record Pair(long a, long b, double score) {}
 
+    /** An unordered manager pair, {@code a < b}: the one key for a pair across the matrix and the week pick. */
+    public record PairId(long a, long b) {
+        static PairId of(long x, long y) {
+            return new PairId(Math.min(x, y), Math.max(x, y));
+        }
+    }
+
+    /**
+     * Rounds to the three decimals the page displays. One copy on purpose: the week pick ranks and groups ties on
+     * it, and the reason text calls totals equal on it, so the two must never round differently.
+     */
+    static double round3(double d) {
+        return Math.round(d * 1000.0) / 1000.0;
+    }
+
     /**
      * @param unpaired          the one manager left out of an odd league, else null
      * @param unpairedBestScore the best score that manager could have had with anyone else (0 when none);
