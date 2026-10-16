@@ -3154,13 +3154,24 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; height: 16px; border-radius: 999px; overflow: hidden;
   background: var(--line); min-width: 2px;
 }
-.analysis-seg { display: block; min-width: 2px; }
+.analysis-seg {
+  display: block; min-width: 2px;
+  /* Fallback for a group with no rule below: a hatch, not a solid grey -- a
+     plain --muted is two lightness points off --k, so an unknown group on a
+     football bar would pass for a kicker. Visible, and visibly "unlabelled". */
+  background: repeating-linear-gradient(45deg, var(--muted) 0 3px, var(--line) 3px 6px);
+}
 .analysis-seg.pos-QB { background: var(--qb); }
 .analysis-seg.pos-RB { background: var(--rb); }
 .analysis-seg.pos-WR { background: var(--wr); }
 .analysis-seg.pos-TE { background: var(--te); }
 .analysis-seg.pos-K { background: var(--k); }
 .analysis-seg.pos-DEF { background: var(--def); }
+.analysis-seg.pos-PG { background: var(--pg); }
+.analysis-seg.pos-SG { background: var(--sg); }
+.analysis-seg.pos-SF { background: var(--sf); }
+.analysis-seg.pos-PF { background: var(--pf); }
+.analysis-seg.pos-C { background: var(--c); }
 
 .analysis-bar-total { grid-area: total; text-align: right; font-weight: 600; }
 
@@ -3191,6 +3202,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-cell.pos-TE { background: color-mix(in oklch, var(--te) var(--tint, 0%), var(--panel)); }
 .analysis-cell.pos-K { background: color-mix(in oklch, var(--k) var(--tint, 0%), var(--panel)); }
 .analysis-cell.pos-DEF { background: color-mix(in oklch, var(--def) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-PG { background: color-mix(in oklch, var(--pg) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-SG { background: color-mix(in oklch, var(--sg) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-SF { background: color-mix(in oklch, var(--sf) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-PF { background: color-mix(in oklch, var(--pf) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-C { background: color-mix(in oklch, var(--c) var(--tint, 0%), var(--panel)); }
 
 .analysis-cell-rank { display: block; font-size: 15px; font-weight: 600; }
 .analysis-cell-points { display: block; font-size: 10px; color: var(--muted); }
