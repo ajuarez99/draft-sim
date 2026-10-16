@@ -78,6 +78,16 @@ class RivalryMatchingAllowedTest {
     }
 
     @Test
+    void aSitOutWithNoAllowedPartnerHasNoScoreToQuote() {
+        // 5 may pair with nobody: it must sit out, and 0.0 would read as a measured "best available" score.
+        Optional<RivalryMatching.Matching> m = RivalryMatching.match(List.of(1L, 2L, 3L, 4L, 5L), (a, b) -> 1.0,
+                (a, b) -> b != 5, 16);
+        assertTrue(m.isPresent());
+        assertEquals(5L, m.get().unpaired());
+        assertTrue(Double.isNaN(m.get().unpairedBestScore()));
+    }
+
+    @Test
     void aDisallowedEdgeForcesTheDpToRearrangeOtherPairsToStayFeasible() {
         // Unconstrained: 1-2 (10) + 3-4 (0) + 5-6 (0) = 10. With 1-2 out, the DP must reshuffle all six.
         Map<String, Double> t = new HashMap<>();

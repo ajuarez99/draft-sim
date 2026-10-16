@@ -163,9 +163,8 @@ public class RivalryService {
      * {@code cap}/{@code capLabel} are null for CONFIG_MISSING. {@code asOfWeek} is the {@code leg} the
      * eligibility used (null when Sleeper reported none). {@code recommended} is non-null iff status is OK.
      * {@code overCapNote} is set only when the published schedule already has a pair above the cap.
-     */
-    /**
-     * {@code asOfWeek}: the latest week counted as played or under way, i.e. {@code max(leg, lastScoredWeek)},
+     *
+     * <p>{@code asOfWeek}: the latest week counted as played or under way, i.e. {@code max(leg, lastScoredWeek)},
      * the same boundary eligibility uses; null only when Sleeper reported no leg and nothing is scored.
      */
     public record WeekRecommendation(String status, Integer cap, String capLabel, Integer asOfWeek,
@@ -678,6 +677,11 @@ public class RivalryService {
     private static Unpaired unpairedOf(RivalryMatching.Matching matching, Map<Long, String> nameOf) {
         if (matching.unpaired() == null) return null;
         String name = nameOf.get(matching.unpaired());
+        // NaN: the meeting cap leaves this manager no partner this week, so there is no score to quote.
+        if (Double.isNaN(matching.unpairedBestScore())) {
+            return new Unpaired(matching.unpaired(), "Nobody else can play " + name
+                    + " this week without going over the meeting limit.");
+        }
         return new Unpaired(matching.unpaired(), "Leaving " + name + " out gives the highest total; " + name
                 + "'s best available pairing would score " + num3(matching.unpairedBestScore()) + ".");
     }
@@ -742,14 +746,9 @@ public class RivalryService {
 
         List<Integer> unfit = new ArrayList<>();
         List<WeekOption> options = new ArrayList<>();
-        // Candidates arrive in RANK order, so the first one seen per tie group is the group's earliest week.
-        Map<String, Integer> firstOfGroup = new HashMap<>();
-        for (RivalryWeekPicker.Candidate c : pick.candidates()) {
-            if (c.feasible()) firstOfGroup.putIfAbsent(RivalryWeekPicker.tieKey(c), c.week());
-        }
         for (RivalryWeekPicker.Candidate c : pick.candidates()) {
             if (!c.feasible()) { unfit.add(c.week()); continue; }
-            options.add(weekOption(c, pick, weeksOfPair, boundary, firstOfGroup.get(RivalryWeekPicker.tieKey(c)), cap,
+            options.add(weekOption(c, pick, weeksOfPair, boundary, cap,
                     calc, nameOf, minMeetings, maxMeetings, mostIsUnique));
         }
         java.util.Collections.sort(unfit);
@@ -768,7 +767,7 @@ public class RivalryService {
 
     private WeekOption weekOption(RivalryWeekPicker.Candidate c, RivalryWeekPicker.WeekPick pick,
                                   Map<RivalryWeekPicker.PairId, List<Integer>> weeksOfPair, int boundary,
-                                  int firstTiedWeek, int cap, Map<PairKey, PairCalc> calc, Map<Long, String> nameOf, int minMeetings,
+                                  int cap, Map<PairKey, PairCalc> calc, Map<Long, String> nameOf, int minMeetings,
                                   int maxMeetings, boolean mostIsUnique) {
         RivalryMatching.Matching m = c.matching();
         List<Pairing> pairings = pairingsOf(m, calc, nameOf, minMeetings, maxMeetings, mostIsUnique);
@@ -795,7 +794,7 @@ public class RivalryService {
             displaced.add(new Displaced(id.a(), id.b(), List.copyOf(met), List.copyOf(still)));
         }
         double bestTotal = pick.unconstrained().total();
-        return new WeekOption(c.week(), round3(c.total()), round3(bestTotal), weekReason(c, pick, firstTiedWeek, cap), wire,
+        return new WeekOption(c.week(), round3(c.total()), round3(bestTotal), weekReason(c, pick, cap), wire,
                 unpairedOf(m, nameOf), held, displaced);
     }
 
@@ -804,8 +803,8 @@ public class RivalryService {
      * the pairs equal the unconstrained pairs. EQUAL_UNDER_CAP: equal total (within EPS) but a different set.
      * BEST_UNDER_CAP: a lower total. Every number in the text is in {@code numbers}.
      */
-    private static Reason weekReason(RivalryWeekPicker.Candidate c, RivalryWeekPicker.WeekPick pick,
-                                     int firstTiedWeek, int cap) {
+    private static Reason weekReason(RivalryWeekPicker.Candidate c, RivalryWeekPicker.WeekPick pick, int cap) {
+        int firstTiedWeek = c.firstTiedWeek();
         int held = c.heldBack().size();
         int bestPairs = pick.unconstrained().pairs().size();
         double total = round3(c.total());

@@ -7,6 +7,7 @@ import {
   type Rivalries as RivalriesData,
   type RivalryCell,
   type RivalryDisplaced,
+  type RivalryHeldBack,
   type RivalryPairing,
   type RivalryRow,
   type RivalryWeekOption,
@@ -281,7 +282,7 @@ const WEEK_STATUS_TEXT: Record<string, string> = {
 /** The NO_WEEK_FITS sentence names the league's real limit; without a cap it stays generic. */
 function noWeekFitsText(cap: number | null): string {
   return cap != null
-    ? `Every remaining week would make someone play the same manager more than ${cap} ${cap === 1 ? 'time' : 'times'}, so no week is recommended.`
+    ? `Every remaining week would make someone play the same manager ${moreThanText(cap)}, so no week is recommended.`
     : 'Every remaining week would break the meeting limit, so no week is recommended.'
 }
 
@@ -329,6 +330,25 @@ function vsText(rows: Map<number, RivalryRow>, a: number, b: number): string {
   return `${nameOf(rows, a)} vs ${nameOf(rows, b)}`
 }
 
+/** "more than once" / "more than 2 times", the backend's own wording for the cap. */
+function moreThanText(cap: number): string {
+  return cap === 1 ? 'more than once' : `more than ${cap} times`
+}
+
+/**
+ * A held-back pair's other meetings, split at the as-of week the way `displacedText` splits them: weeks up to it
+ * were played, later ones are only scheduled. Without an as-of week nothing has been played yet.
+ */
+function heldBackText(rows: Map<number, RivalryRow>, h: RivalryHeldBack, asOfWeek: number | null): string {
+  const played = h.meetsInWeeks.filter((w) => asOfWeek != null && w <= asOfWeek)
+  const ahead = h.meetsInWeeks.filter((w) => asOfWeek == null || w > asOfWeek)
+  const bits: string[] = []
+  if (played.length > 0) bits.push(`met in ${weeksText(played)}`)
+  if (ahead.length > 0) bits.push(`are scheduled to meet in ${weeksText(ahead)}`)
+  return `${nameOf(rows, h.aManagerId)} and ${nameOf(rows, h.bManagerId)} ${bits.join(' and ')}, so they'd play a `
+    + `${NTH[h.wouldMeet] ?? `${h.wouldMeet}th`} time.`
+}
+
 function displacedText(d: RivalryDisplaced): string {
   const bits: string[] = []
   if (d.metInWeeks.length > 0) bits.push(`already met in ${weeksText(d.metInWeeks)}`)
@@ -349,7 +369,7 @@ function RecommendedWeek({
       <p className="rv-headline">{r.reason.text}</p>
       {cap != null && (
         <p className="muted small">
-          Nobody plays the same manager more than {cap} times in the regular season
+          Nobody plays the same manager {moreThanText(cap)} in the regular season
           {week.capLabel ? ` (${week.capLabel})` : ''}.
         </p>
       )}
@@ -372,8 +392,7 @@ function RecommendedWeek({
         <ul className="rv-held">
           {r.heldBack.map((h) => (
             <li key={`${h.aManagerId}:${h.bManagerId}`} className="small">
-              {nameOf(rows, h.aManagerId)} and {nameOf(rows, h.bManagerId)} already meet in{' '}
-              {weeksText(h.meetsInWeeks)}, so they'd play a {NTH[h.wouldMeet] ?? `${h.wouldMeet}th`} time.
+              {heldBackText(rows, h, week.asOfWeek)}
             </li>
           ))}
         </ul>

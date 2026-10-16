@@ -64,7 +64,9 @@ public final class RivalryMatching {
      * @param unpaired          the one manager left out of an odd league, else null
      * @param unpairedBestScore the best score that manager could have had with anyone else (0 when none);
      *                          the honest basis for "why", since the DP sits out whoever maximises the total
-     *                          (F12), which is not necessarily whoever has the fewest rivalries
+     *                          (F12), which is not necessarily whoever has the fewest rivalries. NaN when an
+     *                          {@code allowed} filter leaves that manager no partner at all: there is no score
+     *                          to quote, and 0 would read as a measured one
      */
     public record Matching(List<Pair> pairs, Long unpaired, double unpairedBestScore, double total) {}
 
@@ -91,8 +93,8 @@ public final class RivalryMatching {
      * @return empty when no full matching exists with every chosen pair allowed (in an odd league: even with
      *         the best sit-out)
      */
-    public static Optional<Matching> match(List<Long> managerIds, PairScore fn, BiPredicate<Long, Long> allowed,
-                                           int maxManagers) {
+    static Optional<Matching> match(List<Long> managerIds, PairScore fn, BiPredicate<Long, Long> allowed,
+                                    int maxManagers) {
         long[] sorted = managerIds.stream().mapToLong(Long::longValue).sorted().toArray();
         boolean[][] ok = new boolean[sorted.length][sorted.length];
         for (int i = 0; i < sorted.length; i++) {
@@ -169,11 +171,14 @@ public final class RivalryMatching {
         }
         double unpairedBest = 0.0;
         if (unpairedIdx >= 0) {
+            boolean anyAllowed = false;
             for (int j = 0; j < n; j++) {
                 if (j == unpairedIdx) continue;
                 if (allowed != null && !(unpairedIdx < j ? allowed[unpairedIdx][j] : allowed[j][unpairedIdx])) continue;
+                anyAllowed = true;
                 unpairedBest = Math.max(unpairedBest, unpairedIdx < j ? s[unpairedIdx][j] : s[j][unpairedIdx]);
             }
+            if (!anyAllowed) unpairedBest = Double.NaN;
         }
         return Optional.of(new Matching(List.copyOf(pairs), unpaired, unpairedBest, f[0]));
     }
