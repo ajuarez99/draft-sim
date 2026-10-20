@@ -2313,6 +2313,17 @@ export type SuperlativePlayerHolder = {
   distinctTeams: number
 }
 
+/** Spec 040: one player's share of a team's award figure. Mirrors SeasonSuperlativesService.PlayerContribution. Payload order is the ranking; never re-sort. */
+export type SuperlativePlayerContribution = {
+  rank: number
+  playerId: string
+  playerName: string
+  position: string | null
+  team: SuperlativeHolder
+  value: number
+  note: string | null
+}
+
 /**
  * One row of a superlative's full standings (specs/010-superlatives-full-standings).
  * Mirrors SeasonSuperlativesService.Standing. Payload order is the ranking order; never
@@ -2407,9 +2418,10 @@ export type SuperlativeDetail =
       playerId: string
       playerName: string
       position: string
+      /** Spec 040: distinct weeks charged (rostered, absent, zero games played that week). This is what the cost multiplies. */
+      weeksMissed: number
+      /** Spec 040: absence rows inside the charged weeks -- context ("sat M games"), not charged. */
       gamesMissed: number
-      /** Count of distinct weeks touched, not a list of them -- equals gamesMissed in football (one game per week); can be fewer in basketball, when more than one missed game falls in the same week (research R10). Fixed from an earlier `number[]` guess (T049). */
-      weeksAffected: number
       pointsPerGame: number
       estimatedPointsLost: number
       estimated: boolean
@@ -2454,6 +2466,8 @@ export type Superlative = {
   standings: SuperlativeStanding[]
   /** Spec 010: JABARI_SMITH_JR only; `[]` for every other kind. */
   playerStandings: SuperlativePlayerStanding[]
+  /** Spec 040: JOEL_EMBIID, WAIVER_WIRE_WARRIOR, UNETHICAL carry every contributing player; `[]` for every other kind. */
+  playerContributions: SuperlativePlayerContribution[]
 }
 
 export type SuperlativesResponse = {
@@ -2475,11 +2489,12 @@ export type SuperlativesResponse = {
    * The resolved league-season's own Sleeper id -- NOT necessarily the id in
    * the URL. The cards above resolve through `LeagueSeasonResolver`, which
    * can walk back to an older PLAYED season (`requestedSeason` says when it
-   * did); the conduct list is addressed by exact league row instead (per
-   * contracts/superlatives-api.md), so before a new season's first scored
-   * week, saving against the URL's own id silently edited a season the cards
-   * weren't even showing (code-review fix, 2026-09-23). Always fetch/save/
-   * delete the conduct list against THIS field, never the URL param.
+   * did). Use it for links that must land on the season the cards show.
+   *
+   * Spec 040 (2026-10-20): the commissioner's list is NO LONGER addressed by
+   * this field. It edits the URL's own league row and names its season; the
+   * 2026-09-23 rule "always the resolved id" is reversed on purpose (see
+   * CommissionerListPanel).
    */
   leagueSleeperId: string
 }
@@ -2522,15 +2537,41 @@ export const getLeagueRefresh = (sleeperLeagueId: string) =>
 
 // --- specs/008-season-superlatives T059: the commissioner's conduct list (UNETHICAL) ---
 
-/** One entry on the commissioner's list. `addedBy` is null when the configured app owner added it, who has no manager row in the league (data-model.md). */
+/**
+ * One entry on the commissioner's list. `addedBy` is null when the configured app owner added it, who has no manager row in the league (data-model.md).
+ *
+ * Spec 040: `appliesThroughWeek` null = rest of the season. `position` / `proTeam` are null for an id with no player row.
+ * `charges`, `playerWeeks` and `alsoFlaggedBySleeperWeeks` ride only on the GET list; POST and PUT return the plain row,
+ * so they are optional here and the panel refetches the list after every write.
+ */
 export type ConductEntry = {
   id: number
   playerId: string
   playerName: string
+  position: string | null
+  proTeam: string | null
   reason: string
   appliesFromWeek: number
+  appliesThroughWeek: number | null
   addedBy: string | null
   createdAt: string
+  /** Rosters this entry charges today (scored regular-season weeks only). */
+  charges?: ConductCharge[]
+  /** Distinct (roster, week) pairs this entry charges. 0 = "not rostered in these weeks yet". */
+  playerWeeks?: number
+  /** Charged weeks Sleeper's own suspension capture also covers, which add nothing on top. */
+  alsoFlaggedBySleeperWeeks?: number[]
+}
+
+export type ConductCharge = { team: SuperlativeHolder; weeks: number[] }
+
+/** A player the picker offers. `fantasyTeam` is null when no roster is known to hold him. */
+export type ConductCandidate = {
+  playerId: string
+  playerName: string
+  position: string | null
+  proTeam: string | null
+  fantasyTeam: SuperlativeHolder | null
 }
 
 /**
@@ -2538,12 +2579,16 @@ export type ConductEntry = {
  * league row starts with an empty list, and last season's entries stay
  * attached to last season. `canEdit` is `LeagueMembership.canCommission`,
  * the same gate the write endpoints enforce with, so display and
- * enforcement can't disagree.
+ * enforcement can't disagree. Spec 040: `season` names the league row this
+ * list belongs to (the URL's), which can be newer than the award cards';
+ * `candidates` are the players the picker can offer (empty until rosters load).
  */
 export type ConductList = {
+  season: number
   canEdit: boolean
   commissionerKnown: boolean
   entries: ConductEntry[]
+  candidates: ConductCandidate[]
 }
 
 export const fetchConductList = (sleeperLeagueId: string) =>
@@ -2563,15 +2608,27 @@ async function conductListResult<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>
 }
 
-/** Upserts on (league, player). 200 with the saved entry; throws with the server's message on 400/403. */
+/** Upserts on (league, player). 200 with the saved plain entry; throws with the server's message on 400/403. `appliesThroughWeek: null` = rest of the season. */
 export const saveConductEntry = (
   sleeperLeagueId: string,
-  entry: { playerId: string; reason: string; appliesFromWeek: number },
+  entry: { playerId: string; reason: string; appliesFromWeek: number; appliesThroughWeek: number | null },
 ) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
+  }).then((res) => conductListResult<ConductEntry>(res))
+
+/** Spec 040: edit an entry in place (the player is fixed). 200 with the plain row; 400 through < from, 403 not the commissioner, 404 an id from another league. */
+export const updateConductEntry = (
+  sleeperLeagueId: string,
+  entryId: number,
+  body: { reason: string; appliesFromWeek: number; appliesThroughWeek: number | null },
+) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/conduct-list/${entryId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   }).then((res) => conductListResult<ConductEntry>(res))
 
 /** 204 on success; throws with the server's message on 403, or a 404 when entryId belongs to a different league. */

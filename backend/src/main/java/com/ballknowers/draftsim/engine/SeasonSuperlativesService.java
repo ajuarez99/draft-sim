@@ -126,18 +126,12 @@ public class SeasonSuperlativesService {
                                String addType, List<Integer> startedWeeks, double points) implements DetailRow {}
 
     /**
-     * @param rosterId      the holder this row belongs to (coordinator
-     *                      clarification 2026-09-23: required, like every
-     *                      other per-holder detail row)
-     * @param weeksAffected a COUNT of distinct fantasy weeks containing at
-     *                      least one counted missed game -- not a list
-     *                      (coordinator clarification 2026-09-23); {@code
-     *                      gamesMissed} is the headline and can exceed this in
-     *                      basketball, where one week can hold several missed
-     *                      games
+     * @param rosterId    the holder this row belongs to (coordinator clarification 2026-09-23)
+     * @param weeksMissed spec 040: distinct weeks charged (rostered, absent, zero games played)
+     * @param gamesMissed spec 040: absence rows inside those weeks -- context only, not charged
      */
     public record AbsenceDetail(String playerId, String playerName, String position, int rosterId,
-                                int gamesMissed, int weeksAffected, double pointsPerGame,
+                                int weeksMissed, int gamesMissed, double pointsPerGame,
                                 double estimatedPointsLost, boolean estimated) implements DetailRow {}
 
     public record ConductDetail(String playerId, String playerName, int rosterId, String source,
@@ -183,7 +177,15 @@ public class SeasonSuperlativesService {
     public record Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                               List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
                               List<PlayerHolder> playerHolders, List<Standing> standings,
-                              List<PlayerStanding> playerStandings) {
+                              List<PlayerStanding> playerStandings, List<PlayerContribution> playerContributions) {
+        /** Old 13-argument shape (no playerContributions); defaults it to empty. Rebuilders must NOT use this -- see withUsernames/withStandings (spec 040 plan-review F2). */
+        public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
+                           List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
+                           List<PlayerHolder> playerHolders, List<Standing> standings,
+                           List<PlayerStanding> playerStandings) {
+            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, playerHolders,
+                    standings, playerStandings, List.of());
+        }
         /** Old 10-argument shape, kept so the 17 existing call sites don't all need touching (T076). */
         public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                            List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage) {
@@ -199,6 +201,13 @@ public class SeasonSuperlativesService {
                     List.of(), List.of());
         }
     }
+
+    /**
+     * Spec 040: one player's share of a team's award figure (JOEL_EMBIID, WAIVER_WIRE_WARRIOR, UNETHICAL).
+     * {@code position} and {@code note} are nullable.
+     */
+    public record PlayerContribution(int rank, String playerId, String playerName, String position, Holder team,
+                                     double value, String note) {}
 
     /** One tied-top player for JABARI_SMITH_JR. {@code team} is nullable: a free agent has none. */
     public record PlayerHolder(String playerId, String playerName, String position, String team,
@@ -221,6 +230,24 @@ public class SeasonSuperlativesService {
                          int earlyThresholdWeeks, Double closeGameMargin, List<Integer> suspensionWeeksObserved,
                          boolean commissionerListAvailable, List<Superlative> superlatives, String leagueSleeperId) {}
 
+    /** The regular-season weeks this league-season has scored, and where the regular season ends (null if unknown). */
+    private record ScoredWindow(Integer regularSeasonEnd, Set<Integer> scoredWeeks) {}
+
+    /**
+     * One definition of "a scored regular-season week", shared by {@link #forLeague} and {@link #conductView}
+     * (spec 040: the commissioner's list must charge exactly the weeks the award counts).
+     */
+    private ScoredWindow scoredWindow(LeagueRepository.LeagueRow league) {
+        Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
+        Set<Integer> stored = weekPoints.storedWeeks(league.id());
+        if (format.isPresent() && format.get().playoffWeekStart() >= 2) {
+            int pws = format.get().playoffWeekStart();
+            return new ScoredWindow(pws - 1, stored.stream().filter(w -> w < pws)
+                    .collect(Collectors.toCollection(TreeSet::new)));
+        }
+        return new ScoredWindow(null, stored);
+    }
+
     // ------------------------------------------------------------- forLeague
 
     public Optional<Result> forLeague(String sleeperLeagueId) {
@@ -231,16 +258,9 @@ public class SeasonSuperlativesService {
         SportRules rules = rulesRegistry.get(league.sport());
         double closeMargin = rules.closeGameMargin();
 
-        Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
-        Integer regularSeasonEnd = null;
-        Set<Integer> stored = weekPoints.storedWeeks(league.id());
-        Set<Integer> scoredWeeks = stored;
-        if (format.isPresent() && format.get().playoffWeekStart() >= 2) {
-            int pws = format.get().playoffWeekStart();
-            regularSeasonEnd = pws - 1;
-            scoredWeeks = stored.stream().filter(w -> w < pws)
-                    .collect(Collectors.toCollection(TreeSet::new));
-        }
+        ScoredWindow window = scoredWindow(league);
+        Integer regularSeasonEnd = window.regularSeasonEnd();
+        Set<Integer> scoredWeeks = window.scoredWeeks();
 
         boolean commissionerListAvailable = members.anyCommissioner(league.id());
 
@@ -534,7 +554,8 @@ public class SeasonSuperlativesService {
 
     private static Superlative withStandings(Superlative s, List<Standing> standings) {
         return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), s.holders(),
-                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings());
+                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings(),
+                s.playerContributions());
     }
 
     /**
@@ -743,7 +764,9 @@ public class SeasonSuperlativesService {
 
         return new Superlative(Kind.WAIVER_WIRE_WARRIOR, true, null, early, round2(max), "POINTS", holders, null,
                 detail, coverage, List.of(),
-                waiverStandings(byRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster), List.of());
+                waiverStandings(byRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster), List.of(),
+                waiverContributions(byRoster, rosterIds, playersBySleeperId, nameByRoster, avatarByRoster,
+                        managerByRoster));
     }
 
     /**
@@ -829,13 +852,13 @@ public class SeasonSuperlativesService {
             }
         }
 
-        // Spec 010: the full player standings, top 10 plus anyone tied with the 10th. MostAddedPlayers.top
+        // Spec 010: the full player standings (spec 040 FR-015: no longer capped at 10). MostAddedPlayers.top
         // shares rank()'s definition of which adds count, so its top tier is exactly the playerHolders
         // above. `standings` stays [] -- this award ranks players, not teams.
         List<PlayerStanding> playerStandings = new ArrayList<>();
         int rank = 0;
         int prevAdds = -1;
-        List<MostAddedPlayers.Ranked> top = MostAddedPlayers.top(completedAdds, throughWeek, eligible, 10);
+        List<MostAddedPlayers.Ranked> top = MostAddedPlayers.top(completedAdds, throughWeek, eligible, Integer.MAX_VALUE);
         for (int i = 0; i < top.size(); i++) {
             MostAddedPlayers.Ranked r = top.get(i);
             if (r.adds() != prevAdds) rank = i + 1; // competition ranks, like every other standings list
@@ -1022,7 +1045,7 @@ public class SeasonSuperlativesService {
             for (AbsenceCost.PlayerCost pc : byRoster.get(id).players().stream().limit(3).toList()) {
                 Player p = playersBySleeperId.get(pc.playerId());
                 detail.add(new AbsenceDetail(pc.playerId(), p == null ? "Unknown player" : p.name(),
-                        p == null ? null : p.primary().name(), id, pc.gamesMissed(), pc.weeksAffected(),
+                        p == null ? null : p.primary().name(), id, pc.weeksMissed(), pc.gamesMissed(),
                         pc.pointsPerGame(), pc.estimatedPointsLost(), true));
             }
         }
@@ -1030,7 +1053,9 @@ public class SeasonSuperlativesService {
         return new Superlative(Kind.JOEL_EMBIID, true, null, early, round2(max), "POINTS", holders, null,
                 detail, coverage, List.of(),
                 absenceStandings(byRoster, unclassifiedWeeksByRoster, rosterIds, nameByRoster, avatarByRoster,
-                        managerByRoster), List.of());
+                        managerByRoster), List.of(),
+                absenceContributions(byRoster, rosterIds, playersBySleeperId, nameByRoster, avatarByRoster,
+                        managerByRoster));
     }
 
     /**
@@ -1136,6 +1161,9 @@ public class SeasonSuperlativesService {
      * league applies from that week on. Package-private and pure -- no
      * Postgres, no DB rows -- so {@code UnethicalAwardTest} (T057) can drive
      * it directly.
+     *
+     * <p>Spec 040: a conduct entry applies from {@code appliesFromWeek} through {@code appliesThroughWeek}
+     * inclusive; a null through-week is the rest of the window (every pre-V38 row).
      */
     static Map<Integer, List<ConductQualifyingWeeks>> computeUnethical(
             Map<Integer, Map<String, Set<Integer>>> rosteredByRosterPlayer,
@@ -1160,7 +1188,8 @@ public class SeasonSuperlativesService {
                 for (LeagueConductRepository.Entry ce : conductEntries) {
                     if (!ce.playerId().equals(playerId)) continue;
                     List<Integer> weeks = rosteredWeeks.stream()
-                            .filter(w -> w >= ce.appliesFromWeek())
+                            .filter(w -> w >= ce.appliesFromWeek()
+                                    && (ce.appliesThroughWeek() == null || w <= ce.appliesThroughWeek()))
                             .sorted()
                             .toList();
                     if (!weeks.isEmpty()) {
@@ -1171,6 +1200,120 @@ public class SeasonSuperlativesService {
             }
         }
         return out;
+    }
+
+    /**
+     * Spec 040 (research R7): each roster's award total, counting DISTINCT (player, week) pairs. A player can
+     * have a SUSPENDED and a COMMISSIONER row over the same weeks; summing {@code weeks().size()} per row
+     * counted that player-week twice. Rows still list their own sources -- only the total dedupes.
+     * Package-private and pure so the test and {@code unethicalSuperlative} share one implementation.
+     */
+    static Map<Integer, Integer> unethicalTotals(Map<Integer, List<ConductQualifyingWeeks>> byRoster) {
+        Map<Integer, Integer> totals = new HashMap<>();
+        byRoster.forEach((rosterId, rows) -> {
+            Set<String> playerWeeks = new HashSet<>();
+            for (ConductQualifyingWeeks r : rows) {
+                for (int w : r.weeks()) playerWeeks.add(r.playerId() + "@" + w);
+            }
+            totals.put(rosterId, playerWeeks.size());
+        });
+        return totals;
+    }
+
+    // ------------------------------------------- the commissioner's list (spec 040, US2)
+
+    /** One roster an entry charges, with the weeks. */
+    public record RosterCharge(Holder team, List<Integer> weeks) {}
+
+    /**
+     * What one conduct entry costs today. {@code playerWeeks} is distinct (roster, week) pairs charged by this
+     * entry alone; {@code alsoFlaggedBySleeperWeeks} are charged weeks Sleeper's own suspension capture also
+     * covers -- the award counts each player-week once, so those add nothing on top (plan-review F9).
+     */
+    public record EntryCharges(List<RosterCharge> charges, int playerWeeks, List<Integer> alsoFlaggedBySleeperWeeks) {}
+
+    /** A player who can be put on the list. {@code fantasyTeam} is null when no roster is known to hold him. */
+    public record ConductCandidate(String playerId, Holder fantasyTeam) {}
+
+    public record ConductView(Map<Long, EntryCharges> chargesByEntryId, List<ConductCandidate> candidates) {}
+
+    /**
+     * For the conduct-list page: per-entry charges and the picker's candidates for ONE league row (the row the
+     * URL names, which can be a season with no scored week yet). One load of the week breakdowns and one
+     * in-memory pass per entry -- no per-entry queries.
+     *
+     * <p>Candidates are every id in {@code roster_season.players} (null-safe: null means never fetched, and
+     * that roster contributes nothing) plus every id in any stored week's {@code players_points}. A candidate's
+     * team comes from {@code roster_season.players}; for a roster whose list was never fetched it falls back to
+     * who held him in the latest stored week (plan-review F4b).
+     */
+    public ConductView conductView(LeagueRepository.LeagueRow league, List<LeagueConductRepository.Entry> entries) {
+        ScoredWindow window = scoredWindow(league);
+        List<RosterWeekPointsRepository.WeekBreakdown> all = weekPoints.breakdownsFor(league.id(), league.season());
+
+        Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> avatarByRoster = new HashMap<>();
+        Map<Integer, Long> managerByRoster = new HashMap<>();
+        teamMaps(league.id(), nameByRoster, avatarByRoster, managerByRoster);
+        Map<Integer, String> usernameByRoster = new HashMap<>();
+        for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
+            usernameByRoster.put(s.rosterId(), s.managerName());
+        }
+
+        // Charges: the regular-season scored window only, same membership rule as the award.
+        List<ParsedWeek> scored = parseWeeks(all.stream().filter(w -> window.scoredWeeks().contains(w.week())).toList());
+        Map<Integer, Map<String, Set<Integer>>> rostered = new HashMap<>();
+        for (ParsedWeek w : scored) {
+            for (String pid : w.playersPoints().keySet()) {
+                rostered.computeIfAbsent(w.rosterId(), k -> new HashMap<>())
+                        .computeIfAbsent(pid, k -> new TreeSet<>()).add(w.week());
+            }
+        }
+        Map<Integer, Set<String>> suspendedByWeek = statusCaptures.suspendedIn(league.sport(), league.season());
+        Map<Integer, List<ConductQualifyingWeeks>> sleeperRows = computeUnethical(rostered, suspendedByWeek, List.of());
+
+        Map<Long, EntryCharges> charges = new LinkedHashMap<>();
+        for (LeagueConductRepository.Entry e : entries) {
+            Map<Integer, List<ConductQualifyingWeeks>> mine = computeUnethical(rostered, Map.of(), List.of(e));
+            List<RosterCharge> perRoster = new ArrayList<>();
+            Set<Integer> flagged = new TreeSet<>();
+            int playerWeeks = 0;
+            for (int rosterId : new TreeSet<>(mine.keySet())) {
+                List<Integer> weeks = mine.get(rosterId).stream()
+                        .filter(r -> r.playerId().equals(e.playerId()))
+                        .flatMap(r -> r.weeks().stream()).distinct().sorted().toList();
+                if (weeks.isEmpty()) continue;
+                playerWeeks += weeks.size();
+                perRoster.add(new RosterCharge(
+                        withUsername(holder(rosterId, nameByRoster, avatarByRoster, managerByRoster), usernameByRoster),
+                        weeks));
+                for (ConductQualifyingWeeks sr : sleeperRows.getOrDefault(rosterId, List.of())) {
+                    if (!sr.playerId().equals(e.playerId())) continue;
+                    for (int w : sr.weeks()) if (weeks.contains(w)) flagged.add(w);
+                }
+            }
+            charges.put(e.id(), new EntryCharges(perRoster, playerWeeks, List.copyOf(flagged)));
+        }
+
+        // Candidates.
+        RosterSeasonRepository.RosterPlayers current = rosterSeasons.rosterPlayers(league.id());
+        Map<String, Integer> holderByPlayer = new HashMap<>(current.holderByPlayer());
+        Set<String> candidateIds = new TreeSet<>(holderByPlayer.keySet());
+        List<ParsedWeek> everyWeek = parseWeeks(all);
+        int latest = everyWeek.stream().mapToInt(ParsedWeek::week).max().orElse(-1);
+        for (ParsedWeek w : everyWeek) {
+            candidateIds.addAll(w.playersPoints().keySet());
+            if (w.week() == latest && current.rostersWithoutPlayers().contains(w.rosterId())) {
+                for (String pid : w.playersPoints().keySet()) holderByPlayer.putIfAbsent(pid, w.rosterId());
+            }
+        }
+        List<ConductCandidate> candidates = new ArrayList<>();
+        for (String pid : candidateIds) {
+            Integer rosterId = holderByPlayer.get(pid);
+            candidates.add(new ConductCandidate(pid, rosterId == null ? null
+                    : withUsername(holder(rosterId, nameByRoster, avatarByRoster, managerByRoster), usernameByRoster)));
+        }
+        return new ConductView(charges, candidates);
     }
 
     /**
@@ -1238,8 +1381,7 @@ public class SeasonSuperlativesService {
                     emptyReason, List.of(), null);
         }
 
-        Map<Integer, Integer> totalByRoster = new HashMap<>();
-        byRoster.forEach((id, rows) -> totalByRoster.put(id, rows.stream().mapToInt(r -> r.weeks().size()).sum()));
+        Map<Integer, Integer> totalByRoster = unethicalTotals(byRoster);
 
         int max = totalByRoster.values().stream().mapToInt(Integer::intValue).max().orElseThrow();
         List<Integer> topRosters = totalByRoster.entrySet().stream()
@@ -1262,7 +1404,9 @@ public class SeasonSuperlativesService {
 
         return new Superlative(Kind.UNETHICAL, true, null, early, (double) max, "GAMES", holders, null, detail, null,
                 List.of(), conductStandings(totalByRoster, rosterIds, nameByRoster, avatarByRoster, managerByRoster),
-                List.of());
+                List.of(),
+                unethicalContributions(byRoster, rosterIds, playersBySleeperId, nameByRoster, avatarByRoster,
+                        managerByRoster));
     }
 
     // ------------------------------------------------- full standings (spec 010)
@@ -1484,6 +1628,143 @@ public class SeasonSuperlativesService {
         return SuperlativeStandings.rank(entries, false);
     }
 
+    // ------------------------------------------- per-player contributions (spec 040, US3)
+
+    /** One un-ranked row of a team's award figure; {@link #rankContributions} orders and ranks them. */
+    record RawContribution(Holder team, String playerId, String playerName, String position, double value,
+                           String note) {}
+
+    /**
+     * Orders raw rows by value descending, then player name, then player id, then roster id, drops rows whose rounded value
+     * is exactly zero (negative rows stay, ranked last, so the rows sum to the team figure), and assigns competition ranks (1, 1, 3). Values are rounded the way the team figure is.
+     */
+    static List<PlayerContribution> rankContributions(List<RawContribution> raw) {
+        List<RawContribution> rows = new ArrayList<>();
+        for (RawContribution r : raw) {
+            if (round2(r.value()) != 0) rows.add(r); // negatives stay: the team total includes them (SC-004)
+        }
+        rows.sort(Comparator.<RawContribution>comparingDouble(r -> round2(r.value())).reversed()
+                .thenComparing(RawContribution::playerName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(RawContribution::playerId)
+                .thenComparingInt(r -> r.team().rosterId()));
+        List<PlayerContribution> out = new ArrayList<>();
+        int rank = 0;
+        Double prev = null;
+        for (int i = 0; i < rows.size(); i++) {
+            RawContribution r = rows.get(i);
+            double v = round2(r.value());
+            if (prev == null || Double.compare(prev, v) != 0) rank = i + 1;
+            prev = v;
+            out.add(new PlayerContribution(rank, r.playerId(), r.playerName(), r.position(), r.team(), v, r.note()));
+        }
+        return out;
+    }
+
+    private static String playerName(Map<String, Player> playersBySleeperId, String playerId) {
+        Player p = playersBySleeperId.get(playerId);
+        return p == null ? "Unknown player" : p.name();
+    }
+
+    private static String playerPosition(Map<String, Player> playersBySleeperId, String playerId) {
+        Player p = playersBySleeperId.get(playerId);
+        return p == null ? null : p.primary().name();
+    }
+
+    /** JOEL_EMBIID: every player of every roster in the standings' universe, value = estimated points lost. */
+    static List<PlayerContribution> absenceContributions(Map<Integer, AbsenceCost.RosterCost> byRoster,
+                                                         Set<Integer> rosterIds, Map<String, Player> playersBySleeperId,
+                                                         Map<Integer, String> nameByRoster,
+                                                         Map<Integer, String> avatarByRoster,
+                                                         Map<Integer, Long> managerByRoster) {
+        List<RawContribution> raw = new ArrayList<>();
+        for (int id : rosterIds) {
+            AbsenceCost.RosterCost c = byRoster.get(id);
+            if (c == null) continue;
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            for (AbsenceCost.PlayerCost pc : c.players()) {
+                String note = pc.weeksMissed() + (pc.weeksMissed() == 1 ? " week missed" : " weeks missed")
+                        + " · " + String.format(Locale.ROOT, "%.1f", pc.pointsPerGame()) + " pts/game";
+                raw.add(new RawContribution(team, pc.playerId(), playerName(playersBySleeperId, pc.playerId()),
+                        playerPosition(playersBySleeperId, pc.playerId()), pc.estimatedPointsLost(), note));
+            }
+        }
+        return rankContributions(raw);
+    }
+
+    /** WAIVER_WIRE_WARRIOR: every credited pickup of every roster in the universe, value = points while started. */
+    static List<PlayerContribution> waiverContributions(Map<Integer, WaiverPickupAttribution.RosterTotal> byRoster,
+                                                        Set<Integer> rosterIds, Map<String, Player> playersBySleeperId,
+                                                        Map<Integer, String> nameByRoster,
+                                                        Map<Integer, String> avatarByRoster,
+                                                        Map<Integer, Long> managerByRoster) {
+        List<RawContribution> raw = new ArrayList<>();
+        for (int id : rosterIds) {
+            WaiverPickupAttribution.RosterTotal t = byRoster.get(id);
+            if (t == null) continue;
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            for (WaiverPickupAttribution.PlayerContribution pc : t.contributions()) {
+                // addType is "WAIVER" or "FREE_AGENT" -- WaiverPickupAttribution drops everything else.
+                String note = "added wk " + pc.addedWeek() + " · "
+                        + ("WAIVER".equals(pc.addType()) ? "waiver" : "free agent");
+                raw.add(new RawContribution(team, pc.playerId(), playerName(playersBySleeperId, pc.playerId()),
+                        playerPosition(playersBySleeperId, pc.playerId()), pc.points(), note));
+            }
+        }
+        return rankContributions(raw);
+    }
+
+    /**
+     * UNETHICAL: one row per (roster, player), value = DISTINCT flagged weeks (the union across a player's
+     * SUSPENDED and COMMISSIONER rows), so the per-team sum equals {@link #unethicalTotals}.
+     */
+    static List<PlayerContribution> unethicalContributions(Map<Integer, List<ConductQualifyingWeeks>> byRoster,
+                                                           Set<Integer> rosterIds,
+                                                           Map<String, Player> playersBySleeperId,
+                                                           Map<Integer, String> nameByRoster,
+                                                           Map<Integer, String> avatarByRoster,
+                                                           Map<Integer, Long> managerByRoster) {
+        List<RawContribution> raw = new ArrayList<>();
+        for (int id : rosterIds) {
+            List<ConductQualifyingWeeks> rows = byRoster.get(id);
+            if (rows == null) continue;
+            Holder team = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            Map<String, TreeSet<Integer>> weeksByPlayer = new LinkedHashMap<>();
+            Map<String, TreeSet<String>> sourcesByPlayer = new LinkedHashMap<>();
+            for (ConductQualifyingWeeks r : rows) {
+                weeksByPlayer.computeIfAbsent(r.playerId(), k -> new TreeSet<>()).addAll(r.weeks());
+                sourcesByPlayer.computeIfAbsent(r.playerId(), k -> new TreeSet<>()).add(r.source());
+            }
+            weeksByPlayer.forEach((pid, weeks) -> {
+                List<String> sources = new ArrayList<>();
+                for (String src : sourcesByPlayer.get(pid)) {
+                    sources.add("COMMISSIONER".equals(src) ? "Commissioner" : "Suspended");
+                }
+                String note = String.join(" + ", sources) + " · " + weekSpan(weeks);
+                raw.add(new RawContribution(team, pid, playerName(playersBySleeperId, pid),
+                        playerPosition(playersBySleeperId, pid), weeks.size(), note));
+            });
+        }
+        return rankContributions(raw);
+    }
+
+    /** "wk 5" / "wks 5-7" / "wks 5-7, 9" (en dash): consecutive weeks collapse into a range. */
+    static String weekSpan(SortedSet<Integer> weeks) {
+        List<String> parts = new ArrayList<>();
+        Integer start = null;
+        Integer prev = null;
+        for (int w : weeks) {
+            if (start == null) {
+                start = w;
+            } else if (w != prev + 1) {
+                parts.add(start.equals(prev) ? String.valueOf(start) : start + "–" + prev);
+                start = w;
+            }
+            prev = w;
+        }
+        if (start != null) parts.add(start.equals(prev) ? String.valueOf(start) : start + "–" + prev);
+        return (weeks.size() == 1 ? "wk " : "wks ") + String.join(", ", parts);
+    }
+
     // -------------------------------------------------------------- shared
 
     /**
@@ -1557,8 +1838,14 @@ public class SeasonSuperlativesService {
                 .map(r -> new Standing(r.rank(), withUsername(r.team(), usernameByRoster), r.value(), r.note(),
                         r.hasValue(), r.missingReason()))
                 .toList();
+        // Spec 040 (plan-review F2): the Players view's team chips need the username too.
+        List<PlayerContribution> contributions = s.playerContributions().stream()
+                .map(c -> new PlayerContribution(c.rank(), c.playerId(), c.playerName(), c.position(),
+                        withUsername(c.team(), usernameByRoster), c.value(), c.note()))
+                .toList();
         return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), holders,
-                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings());
+                s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings(),
+                contributions);
     }
 
     private static Holder withUsername(Holder h, Map<Integer, String> usernameByRoster) {

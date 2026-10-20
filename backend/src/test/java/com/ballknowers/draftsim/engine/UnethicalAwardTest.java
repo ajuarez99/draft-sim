@@ -20,14 +20,17 @@ class UnethicalAwardTest {
 
     private static LeagueConductRepository.Entry conductEntry(long id, long leagueId, String playerId,
                                                                String reason, int appliesFromWeek) {
-        return new LeagueConductRepository.Entry(id, leagueId, playerId, reason, appliesFromWeek, null, Instant.now());
+        return new LeagueConductRepository.Entry(id, leagueId, playerId, reason, appliesFromWeek, null, null, Instant.now());
     }
 
+    /** Spec 040: points at the production total (distinct player-weeks) rather than re-implementing the sum. */
     private static int totalWeeks(Map<Integer, List<SeasonSuperlativesService.ConductQualifyingWeeks>> byRoster,
                                   int rosterId) {
-        return byRoster.getOrDefault(rosterId, List.of()).stream()
-                .mapToInt(r -> r.weeks().size())
-                .sum();
+        return SeasonSuperlativesService.unethicalTotals(byRoster).getOrDefault(rosterId, 0);
+    }
+
+    private static LeagueConductRepository.Entry ranged(long id, String playerId, int from, Integer through) {
+        return new LeagueConductRepository.Entry(id, 100L, playerId, "reason", from, through, null, Instant.now());
     }
 
     /** (a): the team with more qualifying player-weeks outranks one with fewer. */
@@ -136,5 +139,82 @@ class UnethicalAwardTest {
 
         assertEquals(List.of(1, 2), byRoster.get(4).get(0).weeks());
         assertEquals(List.of(3, 4), byRoster.get(9).get(0).weeks());
+    }
+
+    // ---- spec 040 (US2): through-week and distinct player-weeks --------------------------------
+
+    /** (a): an entry from week 5 through week 7 only qualifies rostered weeks 5-7. */
+    @Test
+    void entryWithAThroughWeekQualifiesOnlyItsRange() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(4, Map.of("p1", Set.of(3, 4, 5, 6, 7, 8, 9)));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, Map.of(), List.of(ranged(1, "p1", 5, 7)));
+
+        assertEquals(List.of(5, 6, 7), byRoster.get(4).get(0).weeks());
+        assertEquals(3, totalWeeks(byRoster, 4));
+    }
+
+    /** (b): a null through-week is the rest of the window -- the behaviour every pre-V38 row has. */
+    @Test
+    void nullThroughWeekMeansRestOfWindow() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(4, Map.of("p1", Set.of(3, 4, 5, 6, 7, 8, 9)));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, Map.of(), List.of(ranged(1, "p1", 5, null)));
+
+        assertEquals(List.of(5, 6, 7, 8, 9), byRoster.get(4).get(0).weeks());
+    }
+
+    /** A range that ends before he was ever rostered qualifies nothing. */
+    @Test
+    void rangeOutsideRosteredWeeksQualifiesNothing() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(4, Map.of("p1", Set.of(8, 9)));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, Map.of(), List.of(ranged(1, "p1", 2, 3)));
+
+        assertTrue(byRoster.isEmpty());
+    }
+
+    /** (c): SUSPENDED and COMMISSIONER over the same weeks count each (player, week) once (research R7). */
+    @Test
+    void samePlayerWeekUnderBothSourcesCountsOnce() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(4, Map.of("p1", Set.of(2, 3, 4)));
+        Map<Integer, Set<String>> suspended = Map.of(2, Set.of("p1"), 3, Set.of("p1"));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, suspended, List.of(ranged(1, "p1", 2, 3)));
+
+        assertEquals(2, byRoster.get(4).size(), "both source rows are still listed");
+        assertEquals(2, totalWeeks(byRoster, 4), "but weeks 2 and 3 are each one player-week, not two");
+    }
+
+    /** Two sources covering different weeks of one player union to their distinct weeks. */
+    @Test
+    void sourcesCoveringDifferentWeeksUnion() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(4, Map.of("p1", Set.of(1, 2, 3, 4)));
+        Map<Integer, Set<String>> suspended = Map.of(1, Set.of("p1"), 2, Set.of("p1"));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, suspended, List.of(ranged(1, "p1", 2, 4)));
+
+        assertEquals(4, totalWeeks(byRoster, 4));
+    }
+
+    /**
+     * (d) preference ordering (lessons class 1): a roster with 3 distinct flagged player-weeks outranks one with
+     * 2, even though the latter has 4 source rows' worth of week-entries (two players, each under both sources).
+     */
+    @Test
+    void threeDistinctPlayerWeeksOutrankTwoEvenWithMoreSourceRows() {
+        Map<Integer, Map<String, Set<Integer>>> rostered = Map.of(
+                4, Map.of("a", Set.of(1, 2, 3)),
+                9, Map.of("b", Set.of(1), "c", Set.of(1)));
+        Map<Integer, Set<String>> suspended = Map.of(1, Set.of("a", "b", "c"), 2, Set.of("a"), 3, Set.of("a"));
+        List<LeagueConductRepository.Entry> entries = List.of(ranged(1, "b", 1, null), ranged(2, "c", 1, null));
+
+        var byRoster = SeasonSuperlativesService.computeUnethical(rostered, suspended, entries);
+
+        int rowWeeks9 = byRoster.get(9).stream().mapToInt(r -> r.weeks().size()).sum();
+        assertEquals(4, rowWeeks9, "roster 9 has 4 week-entries across its source rows");
+        assertEquals(3, totalWeeks(byRoster, 4));
+        assertEquals(2, totalWeeks(byRoster, 9));
+        assertTrue(totalWeeks(byRoster, 4) > totalWeeks(byRoster, 9));
     }
 }

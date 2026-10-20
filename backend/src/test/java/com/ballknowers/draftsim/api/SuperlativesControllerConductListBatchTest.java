@@ -48,14 +48,17 @@ class SuperlativesControllerConductListBatchTest {
         when(leagueMembers.anyCommissioner(1L)).thenReturn(true);
 
         List<LeagueConductRepository.Entry> entries = List.of(
-                new LeagueConductRepository.Entry(1L, 1L, "100", "reason1", 1, null, Instant.now()),
-                new LeagueConductRepository.Entry(2L, 1L, "200", "reason2", 1, null, Instant.now()),
-                new LeagueConductRepository.Entry(3L, 1L, "300", "reason3", 1, null, Instant.now()));
+                new LeagueConductRepository.Entry(1L, 1L, "100", "reason1", 1, null, null, Instant.now()),
+                new LeagueConductRepository.Entry(2L, 1L, "200", "reason2", 1, null, null, Instant.now()),
+                new LeagueConductRepository.Entry(3L, 1L, "300", "reason3", 1, null, null, Instant.now()));
         when(conduct.forLeague(1L)).thenReturn(entries);
         when(players.byIds(eq(Sport.NFL), anySet())).thenReturn(Map.of(
                 "100", new Player(1L, Sport.NFL, "100", "Player A", List.of(Position.RB), null, null, null, null, null),
                 "200", new Player(2L, Sport.NFL, "200", "Player B", List.of(Position.WR), null, null, null, null, null)));
         // 300 is deliberately absent -- an unknown player must still render, not throw.
+
+        when(superlatives.conductView(any(), any())).thenReturn(
+                new SeasonSuperlativesService.ConductView(Map.of(), List.of()));
 
         SuperlativesController controller =
                 new SuperlativesController(superlatives, membership, conduct, leagueMembers, players, managers);

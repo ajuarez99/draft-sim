@@ -77,11 +77,11 @@ class LeagueConductRepositoryIT {
     @Test
     void editingAnEntryKeepsTheOriginalAdderRatherThanOverwritingIt() {
         LeagueConductRepository.Entry created =
-                repo.upsert(leagueId, "4034", "first reason", 1, originalAdderId);
+                repo.upsert(leagueId, "4034", "first reason", 1, null, originalAdderId);
         assertEquals(originalAdderId, created.addedByManagerId());
 
         LeagueConductRepository.Entry edited =
-                repo.upsert(leagueId, "4034", "edited reason", 3, editorId);
+                repo.upsert(leagueId, "4034", "edited reason", 3, null, editorId);
 
         assertEquals(originalAdderId, edited.addedByManagerId(),
                 "the original adder must survive an edit by someone else");
@@ -92,7 +92,7 @@ class LeagueConductRepositoryIT {
     @Test
     void aNewEntryRecordsWhoAddedIt() {
         LeagueConductRepository.Entry created =
-                repo.upsert(leagueId, "4034", "reason", 1, originalAdderId);
+                repo.upsert(leagueId, "4034", "reason", 1, null, originalAdderId);
         assertEquals(originalAdderId, created.addedByManagerId());
     }
 }

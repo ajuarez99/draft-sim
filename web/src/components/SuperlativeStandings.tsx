@@ -1,8 +1,8 @@
-import { useId } from 'react'
+import { useId, useState } from 'react'
 import Avatar from './Avatar'
 import PersonName from './PersonName'
 import PlayerLink from './PlayerLink'
-import type { Sport, Superlative, SuperlativePlayerStanding } from '../api'
+import type { Sport, Superlative, SuperlativePlayerContribution, SuperlativePlayerStanding } from '../api'
 
 const MAX_PLAYER_ROWS = 10
 
@@ -22,6 +22,11 @@ function splitPlayerGroups(rows: SuperlativePlayerStanding[]) {
   }
   return { shownPlayers: shown, collapsedGroups: groups.slice(i) }
 }
+
+type View = 'teams' | 'players'
+
+/** Spec 040 F12: Embiid and Waiver are about the players, so they open there; Unethical is about whose team, so Teams. */
+const DEFAULT_PLAYERS_VIEW = new Set<Superlative['kind']>(['JOEL_EMBIID', 'WAIVER_WIRE_WARRIOR'])
 
 type Props = {
   s: Superlative
@@ -49,6 +54,9 @@ type Props = {
 export default function SuperlativeStandings({ s, title, hue, leagueId, sport, figure }: Props) {
   const titleId = useId()
   const isPlayers = s.kind === 'JABARI_SMITH_JR'
+  const hasContributions = s.playerContributions.length > 0
+  const [view, setView] = useState<View>(DEFAULT_PLAYERS_VIEW.has(s.kind) ? 'players' : 'teams')
+  const showPlayersView = hasContributions && view === 'players'
 
   // T031 live finding: 41-way tie on NFL 2025. The backend sends everyone tied with the
   // 10th (correct), but 41 identical rows are noise. Group by rank in payload order (never
@@ -59,9 +67,14 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
   const firstGroupCollapsed = shownPlayers.length === 0 && collapsedGroups.length > 0
   const collapsedCount = collapsedGroups.reduce((n, g) => n + g.length, 0)
   const collapsedAdds = collapsedGroups[0]?.[0]?.adds ?? 0
+  const firstGroupSize = collapsedGroups[0]?.length ?? 0
+  const laterCollapsed = collapsedCount - firstGroupSize
+  // The backend no longer caps this list (spec 040 F6), so the folded groups can hold different add counts: say
+  // how many players there are, and name the add count only for the one tied group it is true of.
   const collapsedSummary = firstGroupCollapsed
-    ? `${collapsedCount} ${collapsedCount === 1 ? 'player' : 'players'} tied with ${collapsedAdds} ${collapsedAdds === 1 ? 'add' : 'adds'} each`
-    : `${collapsedCount} more ${collapsedCount === 1 ? 'player' : 'players'} with ${collapsedAdds} ${collapsedAdds === 1 ? 'add' : 'adds'} each`
+    ? `${firstGroupSize} ${firstGroupSize === 1 ? 'player' : 'players'} tied with ${collapsedAdds} ${collapsedAdds === 1 ? 'add' : 'adds'} each${
+        laterCollapsed > 0 ? `, then ${laterCollapsed} more ${laterCollapsed === 1 ? 'player' : 'players'}` : ''}`
+    : `${collapsedCount} more ${collapsedCount === 1 ? 'player' : 'players'}`
 
   function playerRow(p: SuperlativePlayerStanding) {
     return (
@@ -83,6 +96,34 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
     )
   }
 
+  function contributionRow(c: SuperlativePlayerContribution, i: number) {
+    return (
+      <li className={`sl-standing sl-player-standing${c.rank === 1 ? ' sl-standing-top' : ''}`} key={`${c.team.rosterId}:${c.playerId}:${i}`}>
+        <span className="sl-standing-rank">{c.rank}</span>
+        <span className="sl-standing-who">
+          <span className="sl-standing-name">
+            <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={c.playerId} sport={sport}>
+              {c.playerName}
+            </PlayerLink>
+            {c.position ? ` (${c.position})` : ''}
+          </span>
+          <span className="sl-contribution-team muted small">
+            <Avatar
+              avatarId={c.team.avatarId}
+              seed={String(c.team.managerId ?? c.team.rosterId)}
+              label={c.team.teamName}
+              hue={hue}
+              className="sl-avatar"
+            />
+            <span>{c.team.teamName}</span>
+          </span>
+          {c.note && <span className="muted small sl-standing-note">{c.note}</span>}
+        </span>
+        <span className="sl-standing-figure">{figure(c.value)}</span>
+      </li>
+    )
+  }
+
   return (
     // role=region labelled by the award: the in-place successor of the modal's
     // role=dialog. stopPropagation: this renders inside the row's <article>,
@@ -97,8 +138,31 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
       <h5 id={titleId} className="sl-standings-title">{title}: full standings</h5>
       {isPlayers && <p className="muted small sl-standings-sub">This award ranks players, not teams.</p>}
 
+      {hasContributions && (
+        <div className="segmented sm sl-view-toggle" role="group" aria-label={`${title}: view`}>
+          <button
+            type="button"
+            className={`segment${view === 'teams' ? ' on' : ''}`}
+            aria-pressed={view === 'teams'}
+            onClick={() => setView('teams')}
+          >
+            Teams
+          </button>
+          <button
+            type="button"
+            className={`segment${view === 'players' ? ' on' : ''}`}
+            aria-pressed={view === 'players'}
+            onClick={() => setView('players')}
+          >
+            Players
+          </button>
+        </div>
+      )}
+
       <ol className="sl-standings">
-        {isPlayers
+        {showPlayersView
+          ? s.playerContributions.map(contributionRow)
+          : isPlayers
           ? shownPlayers.map(playerRow)
           : s.standings.map((r) => (
               <li

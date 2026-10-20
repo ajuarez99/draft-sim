@@ -259,6 +259,35 @@ class SuperlativesStandingsIT {
         assertEquals(EXPECTED_CHECKED, checked, "the exact set of kinds that had holders and were checked");
     }
 
+    /**
+     * Spec 040 T024: the three kinds with a Players view carry per-player rows end to end, the rows sum to the
+     * team's standings value, and each row's team holder has its username filled (withUsernames must copy
+     * playerContributions through, not drop it -- plan-review F2). Every other kind carries [].
+     */
+    @Test
+    void playerContributionsArePresentSumToStandingsAndCarryUsernames() {
+        seedRichKinds();
+        Map<String, Object> body = body();
+        for (String kindName : List.of("JOEL_EMBIID", "WAIVER_WIRE_WARRIOR", "UNETHICAL")) {
+            Map<String, Object> s = kind(body, kindName);
+            List<Map<String, Object>> cs = list(s, "playerContributions");
+            assertFalse(cs.isEmpty(), kindName + ": playerContributions must not be empty on the fixture");
+            double sumRoster3 = 0;
+            for (Map<String, Object> c : cs) {
+                for (String key : List.of("rank", "playerId", "playerName", "position", "team", "value", "note")) {
+                    assertTrue(c.containsKey(key), kindName + ": contribution missing wire field " + key);
+                }
+                assertNotNull(team(c).get("username"), kindName + ": contribution team must carry a username");
+                if (Integer.valueOf(3).equals(team(c).get("rosterId"))) sumRoster3 += ((Number) c.get("value")).doubleValue();
+            }
+            Map<String, Object> standing = list(s, "standings").stream()
+                    .filter(r -> Integer.valueOf(3).equals(team(r).get("rosterId"))).findFirst().orElseThrow();
+            assertEquals(((Number) standing.get("value")).doubleValue(), sumRoster3, 0.01,
+                    kindName + ": roster 3's contributions must sum to its standings value");
+        }
+        assertTrue(list(kind(body, "HIGHEST_WEEK"), "playerContributions").isEmpty());
+    }
+
     @Test
     void highestWeekRanksAreOneOneThreeFourAndOrderedHighToLow() {
         List<Map<String, Object>> standings = list(kind(body(), "HIGHEST_WEEK"), "standings");

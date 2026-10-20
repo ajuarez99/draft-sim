@@ -13,10 +13,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -78,7 +80,31 @@ public class SuperlativesController {
         return ResponseEntity.ok(conductListBody(found.get(), sleeperUserId));
     }
 
-    public record ConductEntryRequest(String playerId, String reason, Integer appliesFromWeek) {}
+    /** {@code appliesThroughWeek} is optional (spec 040): null = rest of the season. */
+    public record ConductEntryRequest(String playerId, String reason, Integer appliesFromWeek,
+                                      Integer appliesThroughWeek) {}
+
+    /** PUT body: the player is fixed, so there is no playerId (changing the player is remove + add). */
+    public record ConductEntryUpdate(String reason, Integer appliesFromWeek, Integer appliesThroughWeek) {}
+
+    /**
+     * Shared by POST and PUT so the two can't disagree. Runs before any DB call: a through-week below the
+     * from-week would otherwise reach the V38 CHECK constraint and surface as a 500 (plan-review F10).
+     */
+    private static Optional<ResponseEntity<?>> validateWeeksAndReason(String rawReason, Integer from, Integer through) {
+        String reason = rawReason == null ? "" : rawReason.trim();
+        if (reason.isEmpty() || reason.length() > 140) {
+            return Optional.of(ResponseEntity.badRequest().body(Map.of("message", "reason must be 1-140 chars, trimmed")));
+        }
+        if (from == null || from < 1) {
+            return Optional.of(ResponseEntity.badRequest().body(Map.of("message", "appliesFromWeek must be >= 1")));
+        }
+        if (through != null && through < from) {
+            return Optional.of(ResponseEntity.badRequest()
+                    .body(Map.of("message", "appliesThroughWeek must be >= appliesFromWeek")));
+        }
+        return Optional.empty();
+    }
 
     @PostMapping("/leagues/{sleeperId}/conduct-list")
     public ResponseEntity<?> saveConductEntry(@PathVariable String sleeperId,
@@ -96,21 +122,43 @@ public class SuperlativesController {
         if (body == null || body.playerId() == null || body.playerId().isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("message", "playerId is required"));
         }
-        String reason = body.reason() == null ? "" : body.reason().trim();
-        if (reason.isEmpty() || reason.length() > 140) {
-            return ResponseEntity.badRequest().body(Map.of("message", "reason must be 1-140 chars, trimmed"));
-        }
-        if (body.appliesFromWeek() == null || body.appliesFromWeek() < 1) {
-            return ResponseEntity.badRequest().body(Map.of("message", "appliesFromWeek must be >= 1"));
-        }
+        Optional<ResponseEntity<?>> invalid =
+                validateWeeksAndReason(body.reason(), body.appliesFromWeek(), body.appliesThroughWeek());
+        if (invalid.isPresent()) return invalid.get();
+        String reason = body.reason().trim();
         if (players.bySleeperId(row.sport(), body.playerId()).isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "unknown player for this league's sport"));
         }
 
         Long addedBy = ManagerRepository.caller(managers, row.id(), sleeperUserId);
-        LeagueConductRepository.Entry saved =
-                conduct.upsert(row.id(), body.playerId(), reason, body.appliesFromWeek(), addedBy);
+        LeagueConductRepository.Entry saved = conduct.upsert(row.id(), body.playerId(), reason,
+                body.appliesFromWeek(), body.appliesThroughWeek(), addedBy);
         return ResponseEntity.ok(conductEntryRow(saved, row.sport()));
+    }
+
+    /**
+     * Spec 040: edit an entry in place. Same visibility, same commissioner rule, same validation as POST.
+     * 404 when the id is not in THIS league row (the repository pins {@code league_id}). Returns the plain
+     * entry row -- no {@code charges}; the client refetches the list for those.
+     */
+    @PutMapping("/leagues/{sleeperId}/conduct-list/{entryId}")
+    public ResponseEntity<?> updateConductEntry(@PathVariable String sleeperId, @PathVariable long entryId,
+                                                @RequestBody(required = false) ConductEntryUpdate body,
+                                                @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        Optional<LeagueRepository.LeagueRow> found = membership.visibleLeague(sleeperId, sleeperUserId);
+        if (found.isEmpty()) return ResponseEntity.notFound().build();
+        LeagueRepository.LeagueRow row = found.get();
+        if (!membership.canCommission(row.id(), sleeperUserId)) return forbidden(row);
+
+        if (body == null) return ResponseEntity.badRequest().body(Map.of("message", "a body is required"));
+        Optional<ResponseEntity<?>> invalid =
+                validateWeeksAndReason(body.reason(), body.appliesFromWeek(), body.appliesThroughWeek());
+        if (invalid.isPresent()) return invalid.get();
+
+        Optional<LeagueConductRepository.Entry> updated = conduct.update(row.id(), entryId, body.reason().trim(),
+                body.appliesFromWeek(), body.appliesThroughWeek());
+        if (updated.isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(conductEntryRow(updated.get(), row.sport()));
     }
 
     @DeleteMapping("/leagues/{sleeperId}/conduct-list/{entryId}")
@@ -141,36 +189,74 @@ public class SuperlativesController {
 
     private Map<String, Object> conductListBody(LeagueRepository.LeagueRow row, String sleeperUserId) {
         Map<String, Object> out = new LinkedHashMap<>();
+        // Spec 040: the panel names the season it edits (the URL's row, which may be newer than the award cards').
+        out.put("season", row.season());
         out.put("canEdit", membership.canCommission(row.id(), sleeperUserId));
         out.put("commissionerKnown", leagueMembers.anyCommissioner(row.id()));
         List<LeagueConductRepository.Entry> conductEntries = conduct.forLeague(row.id());
-        // Coordinator follow-up 2026-09-23, item 7: one batched lookup for
-        // every entry's player name, not one bySleeperId call per entry --
-        // the N+1 that grows with the conduct list's own length.
-        Map<String, Player> playersById = players.byIds(row.sport(),
-                conductEntries.stream().map(LeagueConductRepository.Entry::playerId).collect(Collectors.toSet()));
+        SeasonSuperlativesService.ConductView view = superlatives.conductView(row, conductEntries);
+        // Coordinator follow-up 2026-09-23, item 7: one batched lookup for every player name (now the entries'
+        // AND the picker's candidates), not one bySleeperId call per entry -- the N+1 that grows with the list.
+        Set<String> ids = new HashSet<>();
+        conductEntries.forEach(e -> ids.add(e.playerId()));
+        view.candidates().forEach(c -> ids.add(c.playerId()));
+        Map<String, Player> playersById = players.byIds(row.sport(), ids);
+
         List<Map<String, Object>> entries = new ArrayList<>();
         for (LeagueConductRepository.Entry e : conductEntries) {
-            entries.add(conductEntryRow(e, playersById));
+            Map<String, Object> m = conductEntryRow(e, playersById);
+            SeasonSuperlativesService.EntryCharges ch = view.chargesByEntryId().get(e.id());
+            List<Map<String, Object>> charges = new ArrayList<>();
+            if (ch != null) {
+                for (SeasonSuperlativesService.RosterCharge rc : ch.charges()) {
+                    Map<String, Object> c = new LinkedHashMap<>();
+                    c.put("team", holderRow(rc.team()));
+                    c.put("weeks", rc.weeks());
+                    charges.add(c);
+                }
+            }
+            m.put("charges", charges);
+            m.put("playerWeeks", ch == null ? 0 : ch.playerWeeks());
+            m.put("alsoFlaggedBySleeperWeeks", ch == null ? List.of() : ch.alsoFlaggedBySleeperWeeks());
+            entries.add(m);
         }
         out.put("entries", entries);
+
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (SeasonSuperlativesService.ConductCandidate c : view.candidates()) {
+            Player p = playersById.get(c.playerId());
+            if (p == null) continue; // an id with no player row can't be named, so it can't be picked
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("playerId", c.playerId());
+            m.put("playerName", p.name());
+            m.put("position", p.primary().name());
+            m.put("proTeam", p.team());
+            m.put("fantasyTeam", c.fantasyTeam() == null ? null : holderRow(c.fantasyTeam()));
+            candidates.add(m);
+        }
+        candidates.sort(java.util.Comparator.comparing(m -> (String) m.get("playerName"), String.CASE_INSENSITIVE_ORDER));
+        out.put("candidates", candidates);
         return out;
     }
 
-    /** Single-entry form for the POST response, where one lookup is already the minimum. */
+    /** Single-entry form for the POST/PUT response, where one lookup is already the minimum. */
     private Map<String, Object> conductEntryRow(LeagueConductRepository.Entry e, Sport sport) {
         return conductEntryRow(e, players.bySleeperId(sport, e.playerId())
                 .map(p -> Map.of(e.playerId(), p)).orElse(Map.of()));
     }
 
+    /** Mutable map: position, proTeam, appliesThroughWeek and addedBy are all legitimately null. */
     private Map<String, Object> conductEntryRow(LeagueConductRepository.Entry e, Map<String, Player> playersById) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("id", e.id());
         m.put("playerId", e.playerId());
         Player p = playersById.get(e.playerId());
         m.put("playerName", p == null ? "Unknown player" : p.name());
+        m.put("position", p == null ? null : p.primary().name());
+        m.put("proTeam", p == null ? null : p.team());
         m.put("reason", e.reason());
         m.put("appliesFromWeek", e.appliesFromWeek());
+        m.put("appliesThroughWeek", e.appliesThroughWeek());
         m.put("addedBy", e.addedByManagerId() == null ? null : managers.displayName(e.addedByManagerId()).orElse(null));
         m.put("createdAt", e.createdAt().toString());
         return m;
@@ -227,6 +313,20 @@ public class SuperlativesController {
         List<Map<String, Object>> playerStandings = new ArrayList<>();
         for (SeasonSuperlativesService.PlayerStanding ps : s.playerStandings()) playerStandings.add(playerStandingRow(ps));
         m.put("playerStandings", playerStandings);
+        // Spec 040: hand-copied like the rest; mutable maps because position and note are nullable.
+        List<Map<String, Object>> contributions = new ArrayList<>();
+        for (SeasonSuperlativesService.PlayerContribution pc : s.playerContributions()) {
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("rank", pc.rank());
+            c.put("playerId", pc.playerId());
+            c.put("playerName", pc.playerName());
+            c.put("position", pc.position());
+            c.put("team", holderRow(pc.team()));
+            c.put("value", pc.value());
+            c.put("note", pc.note());
+            contributions.add(c);
+        }
+        m.put("playerContributions", contributions);
         return m;
     }
 
@@ -348,8 +448,8 @@ public class SuperlativesController {
             m.put("playerName", a.playerName());
             m.put("position", a.position());
             m.put("rosterId", a.rosterId());
+            m.put("weeksMissed", a.weeksMissed());
             m.put("gamesMissed", a.gamesMissed());
-            m.put("weeksAffected", a.weeksAffected());
             m.put("pointsPerGame", a.pointsPerGame());
             m.put("estimatedPointsLost", a.estimatedPointsLost());
             m.put("estimated", a.estimated());

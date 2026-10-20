@@ -1,5 +1,23 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-20: spec 040 (awards: commissioner's list, every player, Embiid per week) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/040-superlatives-commissioner-ux`, branch `040-superlatives-commissioner-ux` (from `origin/main` 7736114). Docs are in `specs/040-superlatives-commissioner-ux/`: spec (clarified, with "amended after review" notes), plan (review amendments section), research, plan-review (F1–F12), tasks (T001–T030), code-review (M1, L1–L3 fixed), verification, `baseline/`.
+- **What it does:**
+  - **Embiid:** a week now costs one game's average, once, and only when the player played zero games that week. A basketball week he played any game in costs 0. This reverses Allan's 2026-09-23 per-game rule at his own request. The value stays the per-game mean (Allan picked that over the league's credited weekly points after plan-review F1), so NFL totals are identical.
+  - **Commissioner's list:** moved into the Unethical card as a panel. It has a name picker over the league's roster players, a through-week (**V38**), in-place edit (new `PUT …/conduct-list/{id}`), and per-entry charges / player-weeks. It edits the URL's own season, so the NBA 2026 list can be edited before week 1 is scored. That deliberately reverses the 2026-09-23 "never the URL id" fix, and the reversal is labelled.
+  - **Players view:** `playerContributions` gives a Players view for Embiid, Waiver and Unethical, with Embiid and Waiver opening on Players. Jabari's player list is uncapped (the 2-add floor stays).
+- **Measured:**
+  - NFL ×3: 0 rosters changed.
+  - NBA 2025 top went 3980.55 → 776.12. NBA 2024's winner changes from Fent Machines to Al Queta.
+  - SC-004: 0 mismatches on 5 leagues.
+- **Owed:**
+  - Commit, push and PR (Allan's go-ahead). V38 is already applied to the shared 5433 DB.
+  - Deploy, then a prod check.
+  - After the first NBA 2026 week, check code-review L5 (in-progress week reads as missed).
+  - Spec 038 should read its "top pickup" from `playerContributions` rather than add a second field (plan-review F7).
+  - `BoardRepositoryLatestBeforeIT` fails on clean main too (shared-DB timestamps).
+
 ## UPDATE 2026-10-15: spec 037 (rivalry week picks a week) built, live-verified locally, committed + pushed (branch 037-rivalry-week-pick), PR not yet opened, NOT deployed
 
 - **Where:** worktree `.claude/worktrees/037-rivalry-week-pick`, branch `037-rivalry-week-pick` (from `origin/main` 70159ea). Docs are in `specs/037-rivalry-week-pick/`: spec (with visible "amended after plan review" notes), plan ("Amended after review" overrides), research, plan-review (F1–F16), tasks, code-review (B1, S1–S3 fixed), verification, `check-week-pick.mjs`.
