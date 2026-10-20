@@ -4836,59 +4836,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   white-space: nowrap;
 }
 
-/* --- Commissioner's conduct list (specs/008-season-superlatives T060) ---- */
-
-.sl-conduct-list {
-  list-style: none;
-  margin: 8px 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sl-conduct-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: color-mix(in oklab, var(--panel) 86%, white 4%);
-}
-
-.sl-conduct-player {
-  font-weight: 600;
-  flex: 1 1 100%;
-}
-
-.sl-conduct-remove {
-  margin-left: auto;
-}
-
-.sl-conduct-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 420px;
-}
-
-.sl-conduct-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.sl-conduct-field label {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.sl-conduct-form input {
-  font: inherit;
-}
-
 /* PersonName: team name first, Sleeper username as a muted second line. */
 .person-name { display: inline-flex; flex-direction: column; min-width: 0; max-width: 100%; line-height: 1.25; vertical-align: middle; }
 .person-team, .person-user { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -5112,7 +5059,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    keep their grid until the trophy-list rework (T086). */
 .sl-card { border-left: 1px solid var(--line); background: var(--panel); }
 .sl-card-openable:hover { border-color: var(--line); background: var(--row-hover); box-shadow: none; }
-.sl-conduct { margin-top: 28px; }
 
 
 /* --- 013 US1: LeagueHistory (Standings) ------------------------------------
@@ -5421,7 +5367,10 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .sl-list { display: flex; flex-direction: column; }
 .sl-card.sl-row {
   display: grid;
-  grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) auto auto;
+  /* Spec 040 live check: the body column could collapse to ~60px at 1024px wide when the stat
+     ("776.12 estimated points lost", nowrap) and the two-button action column took the space.
+     The body now keeps a floor, the stat wraps inside a cap, and the actions stack. */
+  grid-template-columns: minmax(150px, 230px) minmax(220px, 1fr) auto auto;
   align-items: start;
   gap: 4px 18px;
   border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
@@ -5433,11 +5382,11 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .sl-row .sl-card-head h4 { font-size: 15px; font-weight: 600; }
 .sl-trophy { color: var(--fitted); flex-shrink: 0; }
 .sl-row-body { min-width: 0; }
-.sl-row-stat { text-align: right; align-self: center; min-width: 0; }
+.sl-row-stat { text-align: right; align-self: center; min-width: 0; max-width: 210px; }
 .sl-row-action { align-self: center; }
 .sl-row .sl-value, .sl-row .sl-stat {
   margin: 0; font-size: 24px; font-weight: 700; line-height: 1.1;
-  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-variant-numeric: tabular-nums; white-space: normal; overflow-wrap: normal;
 }
 .sl-row .sl-value .muted { font-size: 12px; font-weight: 400; display: block; white-space: normal; }
 .sl-row .sl-see-all { margin-left: 0; border: 1px solid var(--line); padding: 4px 10px; }
@@ -5449,8 +5398,11 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 @media (max-width: 700px) {
   .sl-card.sl-row { grid-template-columns: minmax(0, 1fr) auto; }
   .sl-row .sl-card-head { grid-column: 1 / -1; }
-  .sl-row-body { grid-column: 1; }
-  .sl-row-stat { grid-column: 2; align-self: start; }
+  /* Spec 040 live check (375px): the stat beside the body squeezed the holder/detail column to
+     ~120px. On phones the headline figure gets its own row under the title instead. */
+  .sl-row .sl-card-head { order: -2; }
+  .sl-row-stat { grid-column: 1 / -1; order: -1; align-self: start; text-align: left; max-width: none; }
+  .sl-row-body { grid-column: 1 / -1; }
   .sl-row-action { grid-column: 1 / -1; }
 }
 
@@ -6366,3 +6318,101 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .projacc-table tr.projacc-overall th, .projacc-table tr.projacc-overall td { font-weight: 600; }
 .projacc-foot { margin: 8px 0 2px; }
 .projacc-caveats { margin: 6px 0 0; padding-left: 18px; }
+
+/* --- Commissioner's list, opened in place from the Unethical card (spec 040 US2) ---------------
+   Replaces the old bottom-of-page section. Each entry is a tinted card in the award's hue, not a flat
+   row: a face, a name with position/team, week-range and player-week pills, the reason, and chips for
+   the teams actually charged. The panel sits under the award row like the standings panel does. */
+.sl-cl-trigger {
+  background: color-mix(in oklab, var(--panel) 82%, oklch(60% 0.12 var(--sl-hue, 250)) 18%);
+  border: 1px solid color-mix(in oklab, var(--line) 55%, oklch(60% 0.12 var(--sl-hue, 250)));
+  color: var(--text); font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 999px; cursor: pointer;
+  white-space: nowrap;
+}
+.sl-cl-trigger:hover { background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250)) 30%); }
+.sl-row-action { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+@media (max-width: 700px) {
+  .sl-row-action { flex-direction: row; flex-wrap: wrap; align-items: center; }
+}
+.sl-cl-slot { margin-top: 10px; }
+.sl-cl {
+  grid-column: 1 / -1; margin-top: 10px; padding: 10px 4px 0;
+  border-top: 1px dashed var(--line); cursor: auto; text-align: left;
+}
+.sl-cl-slot .sl-cl { grid-column: auto; }
+.sl-cl-title { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.sl-cl-sub { margin: 0 0 8px; }
+.sl-cl-seasonnote {
+  margin: 0 0 10px; padding: 8px 12px; border-radius: 8px;
+  background: color-mix(in oklab, var(--panel) 85%, oklch(70% 0.12 80) 15%);
+  border: 1px solid color-mix(in oklab, var(--line) 50%, oklch(70% 0.12 80));
+}
+.sl-cl-list { list-style: none; margin: 10px 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.sl-cl-entry {
+  border-radius: 12px; padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--line) 60%, oklch(60% 0.12 var(--sl-hue, 250)));
+  background: color-mix(in oklab, var(--panel) 90%, oklch(60% 0.12 var(--sl-hue, 250)) 10%);
+}
+.sl-cl-row { display: flex; flex-direction: column; gap: 8px; }
+.sl-cl-who { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sl-cl-name { display: flex; flex-direction: column; min-width: 0; font-weight: 600; line-height: 1.25; }
+.sl-cl-pills { display: inline-flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.sl-cl-pill {
+  font-size: 12px; font-variant-numeric: tabular-nums; padding: 2px 9px; border-radius: 999px; white-space: nowrap;
+  background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250)) 30%);
+}
+.sl-cl-pill-count { background: transparent; border: 1px solid color-mix(in oklab, var(--line) 60%, oklch(60% 0.12 var(--sl-hue, 250))); }
+.sl-cl-pill-listed { background: color-mix(in oklab, var(--panel) 75%, oklch(70% 0.12 80) 25%); }
+.sl-cl-reason { margin: 0; font-size: 14px; overflow-wrap: anywhere; }
+.sl-cl-charges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.sl-cl-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 4px; border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); max-width: 100%;
+}
+.sl-cl-chip-team { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-cl-flagged { margin: 0; }
+.sl-cl-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.sl-cl-actions, .sl-cl-confirm { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.sl-cl-btn {
+  font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--text); border: 1px solid var(--line);
+}
+.sl-cl-btn:hover:not(:disabled) { background: var(--row-hover); }
+.sl-cl-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.sl-cl-btn-primary {
+  background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250)) 30%);
+  border-color: color-mix(in oklab, var(--line) 40%, oklch(60% 0.12 var(--sl-hue, 250)));
+}
+.sl-cl-btn-danger { border-color: oklch(60% 0.16 25); color: oklch(78% 0.12 25); }
+.sl-cl-add { margin-top: 10px; }
+.sl-cl-form { display: flex; flex-direction: column; gap: 10px; max-width: 460px; }
+.sl-cl-field { display: flex; flex-direction: column; gap: 4px; position: relative; }
+.sl-cl-field label { font-size: 13px; color: var(--muted); }
+.sl-cl-field input { font: inherit; }
+.sl-cl-weeks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sl-cl-formbtns { display: flex; gap: 8px; }
+.sl-cl-editing { margin: 0; }
+.sl-cl-picked { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sl-cl-empty { margin: 0; }
+.sl-cl-options {
+  list-style: none; margin: 0; padding: 4px; position: absolute; top: 100%; left: 0; right: 0; z-index: 5;
+  max-height: 260px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+.sl-cl-option {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; flex-wrap: wrap;
+}
+.sl-cl-option-active { background: color-mix(in oklab, var(--panel) 75%, oklch(60% 0.12 var(--sl-hue, 250)) 25%); }
+.sl-cl-opt-name { font-weight: 600; }
+.sl-cl-opt-team { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
+.sl-cl-noopt { padding: 6px 8px; }
+@media (max-width: 700px) {
+  .sl-row-action { justify-content: flex-start; }
+  .sl-cl-pills { margin-left: 0; }
+  .sl-cl-weeks { grid-template-columns: 1fr; }
+  .sl-cl-opt-team { margin-left: 0; }
+}
+
+/* Spec 040 US3: the Teams / Players toggle on a standings panel, and a player row's team chip. */
+.sl-view-toggle { margin: 0 0 8px; }
+.sl-contribution-team { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }

@@ -160,7 +160,7 @@ function awards(): SuperlativesResponse {
         coverage: null,
         playerHolders: [],
         standings: [],
-        playerStandings: [],
+        playerStandings: [], playerContributions: [],
       },
     ],
   } as unknown as SuperlativesResponse

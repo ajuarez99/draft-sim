@@ -219,6 +219,37 @@ public class RosterSeasonRepository {
     }
 
     /**
+     * Spec 040: who holds whom right now, tolerant of partial data. {@code holderByPlayer} maps each id found in a
+     * roster's {@code players} (first roster by id wins) to that roster; {@code rostersWithoutPlayers} are the
+     * rosters whose list was never fetched (null), which callers may fill from another source -- unlike
+     * {@link #rosteredPlayers}, which gives up entirely when any roster is null.
+     */
+    public record RosterPlayers(Map<String, Integer> holderByPlayer, java.util.Set<Integer> rostersWithoutPlayers) {}
+
+    public RosterPlayers rosterPlayers(long leagueId) {
+        List<PlayersRow> rows = db.sql("""
+                select roster_id, players, players_fetched_at
+                from roster_season where league_id = ? order by roster_id
+                """)
+                .param(leagueId)
+                .query((rs, i) -> {
+                    Array a = rs.getArray(2);
+                    return new PlayersRow(rs.getInt(1), a == null ? null : (String[]) a.getArray(), null);
+                })
+                .list();
+        Map<String, Integer> by = new HashMap<>();
+        java.util.Set<Integer> without = new java.util.TreeSet<>();
+        for (PlayersRow r : rows) {
+            if (r.players() == null) {
+                without.add(r.rosterId());
+                continue;
+            }
+            for (String p : r.players()) by.putIfAbsent(p, r.rosterId());
+        }
+        return new RosterPlayers(by, without);
+    }
+
+    /**
      * season/sleeperLeagueId/sport/leagueName/complete are null from
      * {@link #forLeague} (the caller already knows all of them -- it asked
      * for this one league) and populated from {@link #forManager}, which

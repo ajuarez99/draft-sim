@@ -9,18 +9,14 @@ import PlayerLink from '../components/PlayerLink'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import {
   fetchSuperlatives,
-  fetchConductList,
-  saveConductEntry,
-  deleteConductEntry,
   type SuperlativesResponse,
   type Superlative,
   type Sport,
   type SuperlativeDetail,
-  type ConductList,
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
-import CommissionerHonourNote from '../components/CommissionerHonourNote'
+import CommissionerListPanel, { CommissionerListButton } from '../components/CommissionerListPanel'
 import PersonName from '../components/PersonName'
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -51,7 +47,7 @@ export const TITLES: Record<string, { title: string; subtitle?: string; note?: s
   // award's whole premise is that the source is never the injury tag, so it
   // is printed unconditionally under the title (T049), not folded into a
   // holder line the way other kinds' figures are.
-  JOEL_EMBIID: { title: 'The Joel Embiid Award', note: 'Games missed, cause unknown' },
+  JOEL_EMBIID: { title: 'The Joel Embiid Award', note: "Weeks missed, cause unknown. An estimate: each week he sat out entirely costs one game's average, and a week he played any game costs nothing." },
   UNETHICAL: { title: 'The Unethical Award' },
 }
 
@@ -63,7 +59,7 @@ export default function Superlatives() {
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
 
-  // Shared by the mount effect below AND by ConductListSection after a
+  // Shared by the mount effect below AND by CommissionerListPanel after a
   // successful save/remove (live-check finding, 2026-09-23): a commissioner
   // edit changes the UNETHICAL card's holders/detail too, and refetching
   // only the conduct list left that card showing "the list is empty" until
@@ -121,6 +117,16 @@ export default function Superlatives() {
         <section className="section">
           <h3 className="section-title">No scored weeks yet</h3>
           <p className="muted small">{data.reason ?? 'No week of this season has been scored yet.'}</p>
+          {/* Spec 040 (plan-review F4a): before the first scored week there are no cards, but the
+              commissioner still needs the list -- a suspension is announced before week 1. */}
+          {sleeperLeagueId && (
+            <ConductListSlot
+              urlLeagueId={sleeperLeagueId}
+              cardsSeason={data.season}
+              sport={data.sport}
+              onChanged={refetchSuperlatives}
+            />
+          )}
         </section>
       )}
 
@@ -144,6 +150,9 @@ export default function Superlatives() {
                 hue={hueForIndex(i, data.superlatives.length)}
                 sport={data.sport}
                 leagueId={data.leagueSleeperId ?? sleeperLeagueId ?? ''}
+                conductLeagueId={sleeperLeagueId ?? ''}
+                cardsSeason={data.season}
+                onConductChanged={refetchSuperlatives}
                 closeGameMargin={data.closeGameMargin}
                 throughWeek={data.throughWeek}
                 suspensionWeeksObserved={data.suspensionWeeksObserved}
@@ -154,17 +163,6 @@ export default function Superlatives() {
           <HowThisWorks>
             <p>One row each. If an award can&apos;t be worked out yet, its row says why.</p>
           </HowThisWorks>
-
-          {data.leagueSleeperId && (
-            <ConductListSection
-              leagueSleeperId={data.leagueSleeperId}
-              commissionerListAvailable={data.commissionerListAvailable}
-              season={data.season}
-              requestedSeason={data.requestedSeason ?? null}
-              sport={data.sport}
-              onChanged={refetchSuperlatives}
-            />
-          )}
         </>
       )}
     </div>
@@ -184,6 +182,9 @@ function SuperlativeCard({
   hue,
   sport,
   leagueId,
+  conductLeagueId,
+  cardsSeason,
+  onConductChanged,
   closeGameMargin,
   throughWeek,
   suspensionWeeksObserved,
@@ -193,6 +194,10 @@ function SuperlativeCard({
   sport: Sport
   /** The league season the cards resolved to; where a player's name links. */
   leagueId: string
+  /** The URL's own league id: what the commissioner's list edits (spec 040, see CommissionerListPanel). */
+  conductLeagueId: string
+  cardsSeason: number
+  onConductChanged: () => void | Promise<void>
   closeGameMargin: number
   throughWeek: number | null
   suspensionWeeksObserved: number[]
@@ -214,6 +219,12 @@ function SuperlativeCard({
   // so `standingFigure` closes over this card's own kind and unit.
   const openable = s.available && !isEmpty && (s.standings.length > 0 || s.playerStandings.length > 0)
   const [open, setOpen] = useState(false)
+  // Spec 040: the commissioner's list opens in place from the UNETHICAL card, whatever the award's own
+  // state -- available, empty or not openable (plan-review F3).
+  const hasConductList = s.kind === 'UNETHICAL'
+  const [conductOpen, setConductOpen] = useState(false)
+  const [conductCount, setConductCount] = useState<number | null>(null)
+  const conductPanelId = useId()
 
   // The headline figure, in big tabular numbers. Player-headed awards lead with
   // the winner's add count; every other kind reuses `standingFigure`, the same
@@ -404,6 +415,14 @@ function SuperlativeCard({
             {open ? 'Hide' : 'See all'}
           </button>
         )}
+        {hasConductList && (
+          <CommissionerListButton
+            count={conductCount}
+            open={conductOpen}
+            controlsId={conductPanelId}
+            onToggle={() => setConductOpen((o) => !o)}
+          />
+        )}
       </div>
 
       {open && (
@@ -414,6 +433,18 @@ function SuperlativeCard({
           leagueId={leagueId}
           sport={sport}
           figure={(v) => standingFigure(s.kind, s.unit, v)}
+        />
+      )}
+
+      {hasConductList && (
+        <CommissionerListPanel
+          leagueSleeperId={conductLeagueId}
+          cardsSeason={cardsSeason}
+          sport={sport}
+          open={conductOpen}
+          panelId={conductPanelId}
+          onCount={setConductCount}
+          onChanged={onConductChanged}
         />
       )}
     </article>
@@ -525,8 +556,9 @@ function holderDetailLines(
       (d) => (
         <>
           {who(d.playerId, d.playerName)}
-          {` (${d.position}) — ${d.gamesMissed} games missed (${d.weeksAffected} weeks), ` +
-            `~${d.pointsPerGame.toFixed(2)} per game (estimated)`}
+          {` (${d.position}) — ${d.weeksMissed} ${d.weeksMissed === 1 ? 'week' : 'weeks'} missed · ` +
+            `${d.pointsPerGame.toFixed(2)} pts/game · ${d.estimatedPointsLost.toFixed(2)} pts lost ` +
+            `(sat ${d.gamesMissed} ${d.gamesMissed === 1 ? 'game' : 'games'}, estimated)`}
         </>
       ),
     )
@@ -693,215 +725,35 @@ function ordinal(n: number): string {
 }
 
 /**
- * The commissioner's conduct list (T060), a separate season-scoped list
- * below the award cards -- readable by every member (FR-017), editable only
- * by the commissioner (`canEdit`, the same `LeagueMembership.canCommission`
- * gate the write endpoints enforce with).
- *
- * <p><b>Addressed by `leagueSleeperId`, never the URL's own id.</b> The cards
- * above resolve through `LeagueSeasonResolver`, which can walk back to an
- * older PLAYED season; the conduct list is addressed by exact league row
- * (contracts/superlatives-api.md), so before a new season's first scored
- * week the URL's id and the season actually shown disagree -- saving
- * against the URL id silently edited a season nothing on screen was
- * displaying (code-review fix, 2026-09-23). `data.leagueSleeperId` is
- * always the season the cards resolved to, so that is what this fetches,
- * saves and deletes against.
- *
- * <p>Player picker: no existing lightweight player-search/typeahead
- * component was found in `web/src/components` -- `PlayerPicker.tsx` is a
- * full draft-pick overlay wired to a draft's availability rows and team
- * needs, not a standalone player lookup, and pulling it in here would need
- * a second data source this page has no other reason to fetch. Falls back
- * to a plain Sleeper player-id input per the task's own escape hatch; the
- * player's name comes back from the server on save/refresh rather than
- * being resolved client-side.
+ * The commissioner's list on a page with no award cards (nothing scored yet), addressed by the URL's id like the
+ * panel on the UNETHICAL card. Same button, same panel.
  */
-function ConductListSection({
-  leagueSleeperId,
-  commissionerListAvailable,
-  season,
-  requestedSeason,
+function ConductListSlot({
+  urlLeagueId,
+  cardsSeason,
   sport,
   onChanged,
 }: {
-  leagueSleeperId: string
+  urlLeagueId: string
+  cardsSeason: number
   sport: Sport
-  commissionerListAvailable: boolean
-  season: number
-  /** Non-null when LeagueSeasonResolver walked back from the URL's own
-   *  season to an older played one -- the same signal SeasonFallbackNote
-   *  reads for the cards above. */
-  requestedSeason: number | null
-  /** Called after a successful save or remove, so the UNETHICAL card above
-   *  (a different fetch, from the parent) doesn't keep showing stale
-   *  holders/detail until a full reload (live-check finding, 2026-09-23). */
   onChanged: () => void | Promise<void>
 }) {
-  const [list, setList] = useState<ConductList | null>(null)
-  const { error, setError, fail } = useFailure()
-  const [formOpen, setFormOpen] = useState(false)
-  const [playerId, setPlayerId] = useState('')
-  const [reason, setReason] = useState('')
-  const [appliesFromWeek, setAppliesFromWeek] = useState(1)
-  const [saving, setSaving] = useState(false)
-
-  // Accessible names for the form's inputs: an explicit htmlFor/id pair
-  // rather than relying on the wrapping <label> alone, since a live check
-  // found the browser's accessibility tree listing these as unnamed
-  // textboxes (2026-09-23 fix).
-  const playerIdInputId = useId()
-  const reasonInputId = useId()
-  const weekInputId = useId()
-
-  useEffect(() => {
-    let cancelled = false
-    fetchConductList(leagueSleeperId)
-      .then((d) => {
-        if (!cancelled) setList(d)
-      })
-      .catch((e) => {
-        if (!cancelled) fail(e)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [leagueSleeperId])
-
-  async function refresh() {
-    const d = await fetchConductList(leagueSleeperId)
-    setList(d)
-  }
-
-  async function save() {
-    setSaving(true)
-    setError(null)
-    try {
-      await saveConductEntry(leagueSleeperId, { playerId, reason, appliesFromWeek })
-      await refresh()
-      await onChanged()
-      setPlayerId('')
-      setReason('')
-      setAppliesFromWeek(1)
-      setFormOpen(false)
-    } catch (e) {
-      fail(e)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function remove(entryId: number) {
-    setError(null)
-    try {
-      await deleteConductEntry(leagueSleeperId, entryId)
-      await refresh()
-      await onChanged()
-    } catch (e) {
-      fail(e)
-    }
-  }
-
-  const canEdit = commissionerListAvailable && Boolean(list?.canEdit)
-
+  const [open, setOpen] = useState(false)
+  const [count, setCount] = useState<number | null>(null)
+  const panelId = useId()
   return (
-    <section className="section sl-conduct">
-      <h3 className="section-title">Commissioner&apos;s list</h3>
-      <p className="muted small">
-        This list is for this season only — a new season starts with an empty one.
-      </p>
-
-      {requestedSeason != null && (
-        <p className="muted small">
-          Showing the {season} season — the list for the new season opens once it has a scored week.
-        </p>
-      )}
-
-      {error && <p className="error small">{error}</p>}
-
-      {!commissionerListAvailable && (
-        <p className="muted small">
-          No commissioner is known for this league, so the list can&apos;t be edited.
-        </p>
-      )}
-
-      {canEdit && <CommissionerHonourNote />}
-
-      {list && list.entries.length === 0 ? (
-        <p className="muted small">Nobody&apos;s on the list.</p>
-      ) : (
-        <ul className="sl-conduct-list">
-          {list?.entries.map((e) => (
-            <li key={e.id} className="sl-conduct-row">
-              <span className="sl-conduct-player">
-                <PlayerLink sleeperLeagueId={leagueSleeperId} sleeperPlayerId={e.playerId} sport={sport}>
-                  {e.playerName}
-                </PlayerLink>
-              </span>
-              <span className="muted small">{e.reason}</span>
-              <span className="muted small">applies from week {e.appliesFromWeek}</span>
-              <span className="muted small">added by {e.addedBy ?? 'the commissioner'}</span>
-              {canEdit && (
-                <button
-                  type="button"
-                  className="action-button sl-conduct-remove"
-                  onClick={() => remove(e.id)}
-                >
-                  Remove
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {canEdit && (
-        <div className="sl-conduct-form">
-          {formOpen ? (
-            <>
-              <div className="sl-conduct-field">
-                <label htmlFor={playerIdInputId}>Sleeper player id</label>
-                <input
-                  id={playerIdInputId}
-                  value={playerId}
-                  onChange={(e) => setPlayerId(e.target.value)}
-                />
-              </div>
-              <div className="sl-conduct-field">
-                <label htmlFor={reasonInputId}>Reason</label>
-                <input
-                  id={reasonInputId}
-                  value={reason}
-                  maxLength={140}
-                  onChange={(e) => setReason(e.target.value)}
-                />
-              </div>
-              <div className="sl-conduct-field">
-                <label htmlFor={weekInputId}>Applies from week</label>
-                <input
-                  id={weekInputId}
-                  type="number"
-                  min={1}
-                  value={appliesFromWeek}
-                  onChange={(e) => setAppliesFromWeek(Math.max(1, Number(e.target.value) || 1))}
-                />
-              </div>
-              <div className="controls-inline">
-                <button type="button" onClick={save} disabled={saving || !playerId || !reason}>
-                  Save
-                </button>
-                <button type="button" className="action-button" onClick={() => setFormOpen(false)}>
-                  Cancel
-                </button>
-              </div>
-            </>
-          ) : (
-            <button type="button" onClick={() => setFormOpen(true)}>
-              Add to the list
-            </button>
-          )}
-        </div>
-      )}
-    </section>
+    <div className="sl-cl-slot">
+      <CommissionerListButton count={count} open={open} controlsId={panelId} onToggle={() => setOpen((o) => !o)} />
+      <CommissionerListPanel
+        leagueSleeperId={urlLeagueId}
+        cardsSeason={cardsSeason}
+        sport={sport}
+        open={open}
+        panelId={panelId}
+        onCount={setCount}
+        onChanged={onChanged}
+      />
+    </div>
   )
 }

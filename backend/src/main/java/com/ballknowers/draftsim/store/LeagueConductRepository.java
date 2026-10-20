@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * The commissioner's own list of conduct the automatic suspension read can't
@@ -24,17 +25,23 @@ public class LeagueConductRepository {
         this.db = db;
     }
 
-    /** @param addedByManagerId null when added by the configured app owner, who has no manager row in the league. */
+    /**
+     * @param addedByManagerId   null when added by the configured app owner, who has no manager row in the league.
+     * @param appliesThroughWeek spec 040 (V38): last week the entry applies to; null = rest of the season.
+     */
     public record Entry(long id, long leagueId, String playerId, String reason, int appliesFromWeek,
-                        Long addedByManagerId, Instant createdAt) {}
+                        Integer appliesThroughWeek, Long addedByManagerId, Instant createdAt) {}
+
+    private static final String COLUMNS =
+            "id, league_id, sleeper_player_id, reason, applies_from_week, applies_through_week, added_by_manager_id, created_at";
 
     public List<Entry> forLeague(long leagueId) {
         return db.sql("""
-                select id, league_id, sleeper_player_id, reason, applies_from_week, added_by_manager_id, created_at
+                select %s
                 from league_conduct_entry
                 where league_id = ?
                 order by created_at
-                """)
+                """.formatted(COLUMNS))
                 .param(leagueId)
                 .query(LeagueConductRepository::toEntry)
                 .list();
@@ -52,18 +59,39 @@ public class LeagueConductRepository {
      * untouched on conflict -- the original adder from the INSERT branch
      * survives every subsequent edit.
      */
-    public Entry upsert(long leagueId, String playerId, String reason, int appliesFromWeek, Long addedByManagerId) {
+    public Entry upsert(long leagueId, String playerId, String reason, int appliesFromWeek, Integer appliesThroughWeek,
+                        Long addedByManagerId) {
         return db.sql("""
-                insert into league_conduct_entry (league_id, sleeper_player_id, reason, applies_from_week, added_by_manager_id)
-                values (?, ?, ?, ?, ?)
+                insert into league_conduct_entry (league_id, sleeper_player_id, reason, applies_from_week,
+                                                  applies_through_week, added_by_manager_id)
+                values (?, ?, ?, ?, ?, ?)
                 on conflict (league_id, sleeper_player_id) do update set
                     reason = excluded.reason,
-                    applies_from_week = excluded.applies_from_week
-                returning id, league_id, sleeper_player_id, reason, applies_from_week, added_by_manager_id, created_at
-                """)
-                .params(leagueId, playerId, reason, appliesFromWeek, addedByManagerId)
+                    applies_from_week = excluded.applies_from_week,
+                    applies_through_week = excluded.applies_through_week
+                returning %s
+                """.formatted(COLUMNS))
+                .params(leagueId, playerId, reason, appliesFromWeek, appliesThroughWeek, addedByManagerId)
                 .query(LeagueConductRepository::toEntry)
                 .single();
+    }
+
+    /**
+     * Spec 040: edit one entry in place (reason and week range; the player is fixed -- changing the player is
+     * remove + add). Pinned by {@code league_id} like {@link #delete}, so an id from another league matches
+     * nothing and comes back empty. Never touches {@code added_by_manager_id}.
+     */
+    public Optional<Entry> update(long leagueId, long entryId, String reason, int appliesFromWeek,
+                                  Integer appliesThroughWeek) {
+        return db.sql("""
+                update league_conduct_entry
+                set reason = ?, applies_from_week = ?, applies_through_week = ?
+                where id = ? and league_id = ?
+                returning %s
+                """.formatted(COLUMNS))
+                .params(reason, appliesFromWeek, appliesThroughWeek, entryId, leagueId)
+                .query(LeagueConductRepository::toEntry)
+                .optional();
     }
 
     /**
@@ -82,8 +110,10 @@ public class LeagueConductRepository {
     private static Entry toEntry(ResultSet rs, int n) throws SQLException {
         long addedBy = rs.getLong("added_by_manager_id");
         Long addedByManagerId = rs.wasNull() ? null : addedBy;
+        int through = rs.getInt("applies_through_week");
+        Integer appliesThroughWeek = rs.wasNull() ? null : through;
         return new Entry(rs.getLong("id"), rs.getLong("league_id"), rs.getString("sleeper_player_id"),
-                rs.getString("reason"), rs.getInt("applies_from_week"), addedByManagerId,
+                rs.getString("reason"), rs.getInt("applies_from_week"), appliesThroughWeek, addedByManagerId,
                 rs.getTimestamp("created_at").toInstant());
     }
 }

@@ -19,15 +19,17 @@ const fetchSuperlatives = vi.fn()
 const fetchConductList = vi.fn()
 const saveConductEntry = vi.fn()
 const deleteConductEntry = vi.fn()
+const updateConductEntry = vi.fn()
 vi.mock('../api', () => ({
   fetchSuperlatives: (...args: unknown[]) => fetchSuperlatives(...args),
   fetchConductList: (...args: unknown[]) => fetchConductList(...args),
   saveConductEntry: (...args: unknown[]) => saveConductEntry(...args),
   deleteConductEntry: (...args: unknown[]) => deleteConductEntry(...args),
+  updateConductEntry: (...args: unknown[]) => updateConductEntry(...args),
 }))
 
 function conductList(over: Partial<ConductList> = {}): ConductList {
-  return { canEdit: false, commissionerKnown: true, entries: [], ...over }
+  return { season: 2026, canEdit: false, commissionerKnown: true, entries: [], candidates: [], ...over }
 }
 
 const KINDS = [
@@ -47,7 +49,7 @@ function notBuiltYet(kind: (typeof KINDS)[number]): Superlative {
     holders: [],
     emptyReason: null,
     detail: [],
-    coverage: null, playerHolders: [], standings: [], playerStandings: [],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
   }
 }
 
@@ -134,7 +136,7 @@ describe('Superlatives', () => {
         { type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 },
         { type: 'WEEK_SCORE', week: 4, rosterId: 2, points: 180.5 },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), tied))
     render(<Superlatives />)
@@ -159,7 +161,7 @@ describe('Superlatives', () => {
           points: 118.4, opponentPoints: 112.1, margin: 6.3,
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     const data = withKind(baseline(), closeWins)
     data.closeGameMargin = 15
@@ -186,7 +188,7 @@ describe('Superlatives', () => {
         },
       ],
       coverage: { weeksCovered: 5, weeksExcluded: 1, reasons: ['week 3: no pairings stored'] },
-      playerHolders: [], standings: [], playerStandings: [],
+      playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -205,7 +207,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null,
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     const data = baseline()
     data.early = true
@@ -226,7 +228,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no close games yet',
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -264,7 +266,7 @@ describe('Superlatives', () => {
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Master Bates', username: null, avatarId: null }],
       emptyReason: null,
       detail: [{ type: 'WEEK_SCORE', week: 1, rosterId: 1, points: 164.96 }],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), highest))
     render(<Superlatives />)
@@ -289,7 +291,7 @@ describe('Superlatives', () => {
           opponentTeamName: 'Dart has hit anotha Bower', points: 150, opponentPoints: 50.32, margin: 99.68,
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), blowout))
     render(<Superlatives />)
@@ -317,7 +319,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 4, rosterId: 2, opponentRosterId: 8, opponentTeamName: 'Y', points: 88, opponentPoints: 87.5, margin: 0.5 },
         { type: 'GAME', week: 7, rosterId: 3, opponentRosterId: 7, opponentTeamName: 'Z', points: 77, opponentPoints: 76.5, margin: 0.5 },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closest))
     render(<Superlatives />)
@@ -342,7 +344,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 9, rosterId: 4, opponentRosterId: 2, opponentTeamName: 'Y', points: 101, opponentPoints: 97, margin: 4 },
         { type: 'GAME', week: 13, rosterId: 4, opponentRosterId: 3, opponentTeamName: 'Z', points: 102, opponentPoints: 99, margin: 3 },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeWins))
     render(<Superlatives />)
@@ -366,7 +368,7 @@ describe('Superlatives', () => {
       detail: [
         { type: 'GAME', week: 2, rosterId: 6, opponentRosterId: 1, opponentTeamName: 'X', points: 95, opponentPoints: 100, margin: 5 },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     const { container } = render(<Superlatives />)
@@ -391,7 +393,7 @@ describe('Superlatives', () => {
         { type: 'GAME', week: 5, rosterId: 6, opponentRosterId: 2, opponentTeamName: 'Y', points: 96, opponentPoints: 99, margin: 3 },
         { type: 'GAME', week: 8, rosterId: 6, opponentRosterId: 3, opponentTeamName: 'Z', points: 97, opponentPoints: 98, margin: 1 },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), closeLosses))
     render(<Superlatives />)
@@ -419,7 +421,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -445,7 +447,7 @@ describe('Superlatives', () => {
           swingWeeks: [], fromWeek: 3, throughWeek: 3, reading: '0.80 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -472,7 +474,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, reading: '2.40 more wins than their scores earned',
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), luckiest))
     render(<Superlatives />)
@@ -501,7 +503,7 @@ describe('Superlatives', () => {
           fromWeek: 1, throughWeek: 6, biggestWeek: { week: 4, pointsLeft: 55.2 },
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), bench))
     render(<Superlatives />)
@@ -533,7 +535,7 @@ describe('Superlatives', () => {
           addedWeek: 2, addType: 'FREE_AGENT', startedWeeks: [3], points: 36.3,
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -560,7 +562,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: null,
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), waiver))
     render(<Superlatives />)
@@ -601,7 +603,7 @@ describe('Superlatives', () => {
         { playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
         { playerId: 'p2', playerName: 'Brice Sensabaugh', position: 'SF', team: 'UTA', adds: 14, distinctTeams: 8 },
       ],
-      standings: [], playerStandings: [],
+      standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -650,7 +652,7 @@ describe('Superlatives', () => {
       playerHolders: [
         { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: null, adds: 4, distinctTeams: 4 },
       ],
-      standings: [], playerStandings: [],
+      standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -677,7 +679,7 @@ describe('Superlatives', () => {
       emptyReason: "nobody's been picked up yet",
       detail: [],
       coverage: null,
-      playerHolders: [], standings: [], playerStandings: [],
+      playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -708,7 +710,7 @@ describe('Superlatives', () => {
       playerHolders: [
         { playerId: 'p1', playerName: 'Some Guy', position: 'C', team: 'BOS', adds: 1, distinctTeams: 1 },
       ],
-      standings: [], playerStandings: [],
+      standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
     render(<Superlatives />)
@@ -733,19 +735,19 @@ describe('Superlatives', () => {
       detail: [
         {
           type: 'ABSENCE', rosterId: 5, playerId: 'e1', playerName: 'The Process', position: 'C',
-          gamesMissed: 6, weeksAffected: 5, pointsPerGame: 10.4, estimatedPointsLost: 62.4, estimated: true,
+          weeksMissed: 6, gamesMissed: 8, pointsPerGame: 10.4, estimatedPointsLost: 62.4, estimated: true,
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
 
-    expect(await screen.findByText('Games missed, cause unknown')).toBeInTheDocument()
+    expect(await screen.findByText(/^Weeks missed, cause unknown\./)).toBeInTheDocument()
     // The total is the row's headline figure (stat column) and still says "estimated".
     expect(screen.getByText('62.40 estimated points lost')).toHaveClass('sl-stat')
     expect(
-      screen.getByText('The Process (C) — 6 games missed (5 weeks), ~10.40 per game (estimated)'),
+      screen.getByText('The Process (C) — 6 weeks missed · 10.40 pts/game · 62.40 pts lost (sat 8 games, estimated)'),
     ).toBeInTheDocument()
   })
 
@@ -760,12 +762,12 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "nobody's been bitten yet",
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), embiid))
     render(<Superlatives />)
 
-    expect(await screen.findByText('Games missed, cause unknown')).toBeInTheDocument()
+    expect(await screen.findByText(/^Weeks missed, cause unknown\./)).toBeInTheDocument()
     expect(screen.getByText("nobody's been bitten yet")).toBeInTheDocument()
   })
 
@@ -806,7 +808,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: "suspension tracking hasn't covered a scored week yet, and the commissioner's list is empty",
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -829,7 +831,7 @@ describe('Superlatives', () => {
       holders: [],
       emptyReason: 'no suspensions or commissioner entries yet',
       detail: [],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     const data = baseline()
     data.suspensionWeeksObserved = [3, 4, 6]
@@ -867,7 +869,7 @@ describe('Superlatives', () => {
           source: 'SUSPENDED', weeks: [3, 7, 9], reason: null,
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), unethical))
     render(<Superlatives />)
@@ -879,57 +881,73 @@ describe('Superlatives', () => {
     expect(screen.getByText('Scattered Guy — Suspended · weeks 3, 7, 9')).toBeInTheDocument()
   })
 
-  it('hides add/edit/remove controls on the commissioner\'s list when canEdit is false', async () => {
-    fetchConductList.mockResolvedValue(
-      conductList({
-        canEdit: false,
-        entries: [
-          {
-            id: 1, playerId: '4034', playerName: 'A Player', reason: 'reasons',
-            appliesFromWeek: 3, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-          },
-        ],
-      }),
-    )
-    const data = baseline()
-    data.commissionerListAvailable = true
-    fetchSuperlatives.mockResolvedValue(data)
+  // ---- the commissioner's list, opened in place from the Unethical card (spec 040 US2) ----------
+
+  const A_PLAYER = {
+    id: 1, playerId: '4034', playerName: 'A Player', position: 'RB', proTeam: 'KC', reason: 'reasons',
+    appliesFromWeek: 3, appliesThroughWeek: null, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
+  }
+  const A_PLAYER_CANDIDATE = {
+    playerId: '4034', playerName: 'A Player', position: 'RB', proTeam: 'KC', fantasyTeam: null,
+  }
+  const B_PLAYER_CANDIDATE = {
+    playerId: '4035', playerName: 'B Player', position: 'WR', proTeam: 'DAL', fantasyTeam: null,
+  }
+
+  async function openConductList(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /^Commissioner's list/ }))
+  }
+
+  const emptyUnethical: Superlative = {
+    kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
+    holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
+  }
+
+  it("hides add/edit/remove controls on the commissioner's list when canEdit is false", async () => {
+    fetchConductList.mockResolvedValue(conductList({ canEdit: false, entries: [A_PLAYER] }))
+    fetchSuperlatives.mockResolvedValue(baseline())
+    const user = userEvent.setup()
     render(<Superlatives />)
 
-    await screen.findByText("Commissioner's list")
+    await openConductList(user)
     expect(await screen.findByText('A Player')).toBeInTheDocument()
     expect(screen.queryByText('Add to the list')).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument()
     expect(screen.queryByText('Remove')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
   })
 
-  it('shows add/edit/remove controls on the commissioner\'s list when canEdit is true', async () => {
-    fetchConductList.mockResolvedValue(
-      conductList({
-        canEdit: true,
-        entries: [
-          {
-            id: 1, playerId: '4034', playerName: 'A Player', reason: 'reasons',
-            appliesFromWeek: 3, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-          },
-        ],
-      }),
-    )
-    const data = baseline()
-    data.commissionerListAvailable = true
-    fetchSuperlatives.mockResolvedValue(data)
+  it("shows add/edit/remove controls on the commissioner's list when canEdit is true", async () => {
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, entries: [A_PLAYER] }))
+    fetchSuperlatives.mockResolvedValue(baseline())
+    const user = userEvent.setup()
     render(<Superlatives />)
 
+    await openConductList(user)
     expect(await screen.findByText('Add to the list')).toBeInTheDocument()
+    expect(screen.getByText('Edit')).toBeInTheDocument()
     expect(screen.getByText('Remove')).toBeInTheDocument()
   })
 
-  it("shows the no-commissioner note instead of controls when commissionerListAvailable is false", async () => {
+  // F5: canEdit and commissionerKnown come from the conduct-list response alone, never from the
+  // award payload's commissionerListAvailable (which is false here and must not matter).
+  it('takes canEdit from the conduct-list response, not from commissionerListAvailable', async () => {
     fetchConductList.mockResolvedValue(conductList({ canEdit: true }))
-    const data = baseline()
-    data.commissionerListAvailable = false
-    fetchSuperlatives.mockResolvedValue(data)
+    fetchSuperlatives.mockResolvedValue({ ...baseline(), commissionerListAvailable: false })
+    const user = userEvent.setup()
     render(<Superlatives />)
 
+    await openConductList(user)
+    expect(await screen.findByText('Add to the list')).toBeInTheDocument()
+  })
+
+  it('shows the no-commissioner note instead of controls when the list says no commissioner is known', async () => {
+    fetchConductList.mockResolvedValue(conductList({ canEdit: false, commissionerKnown: false }))
+    fetchSuperlatives.mockResolvedValue(baseline())
+    const user = userEvent.setup()
+    render(<Superlatives />)
+
+    await openConductList(user)
     expect(
       await screen.findByText("No commissioner is known for this league, so the list can't be edited."),
     ).toBeInTheDocument()
@@ -938,35 +956,21 @@ describe('Superlatives', () => {
 
   it('renders a reason containing a tag as literal text, never as markup', async () => {
     fetchConductList.mockResolvedValue(
-      conductList({
-        canEdit: false,
-        entries: [
-          {
-            id: 2, playerId: '9999', playerName: 'Sneaky Guy', reason: '<b>bold move</b>',
-            appliesFromWeek: 2, addedBy: null, createdAt: '2026-10-14T19:02:11Z',
-          },
-        ],
-      }),
+      conductList({ entries: [{ ...A_PLAYER, id: 2, playerId: '9999', playerName: 'Sneaky Guy', reason: '<b>bold move</b>', addedBy: null }] }),
     )
     fetchSuperlatives.mockResolvedValue(baseline())
+    const user = userEvent.setup()
     const { container } = render(<Superlatives />)
 
+    await openConductList(user)
     const reasonEl = await screen.findByText('<b>bold move</b>')
     expect(reasonEl.tagName.toLowerCase()).not.toBe('b')
     expect(container.querySelector('b')).toBeNull()
-
-    await waitFor(() => expect(fetchConductList).toHaveBeenCalled())
   })
 
-  // Live-check finding (2026-09-23): saving used to refetch only the conduct
-  // list, so the UNETHICAL card above kept showing its stale emptyReason
-  // until a full page reload. Assert the superlatives payload is refetched,
-  // and that the card actually picks up the new holder without a reload.
+  // Live-check finding (2026-09-23): saving used to refetch only the conduct list, so the UNETHICAL
+  // card above kept showing its stale emptyReason until a full page reload.
   it('refetches the superlatives payload after saving a commissioner entry', async () => {
-    const emptyUnethical: Superlative = {
-      kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [],
-    }
     const filledUnethical: Superlative = {
       kind: 'UNETHICAL', available: true, reason: null, early: false, value: 1, unit: 'GAMES',
       holders: [{ rosterId: 9, managerId: 90, teamName: 'Team X', username: null, avatarId: null }],
@@ -977,151 +981,269 @@ describe('Superlatives', () => {
           source: 'COMMISSIONER', weeks: [2], reason: 'reasons',
         },
       ],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     fetchSuperlatives
-      .mockResolvedValueOnce(withKind({ ...baseline(), commissionerListAvailable: true }, emptyUnethical))
-      .mockResolvedValueOnce(withKind({ ...baseline(), commissionerListAvailable: true }, filledUnethical))
-    fetchConductList.mockResolvedValue(conductList({ canEdit: true }))
-    saveConductEntry.mockResolvedValue({
-      id: 1, playerId: '4034', playerName: 'A Player', reason: 'reasons',
-      appliesFromWeek: 2, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-    })
+      .mockResolvedValueOnce(withKind(baseline(), emptyUnethical))
+      .mockResolvedValueOnce(withKind(baseline(), filledUnethical))
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, candidates: [A_PLAYER_CANDIDATE] }))
+    saveConductEntry.mockResolvedValue(A_PLAYER)
 
     const user = userEvent.setup()
     render(<Superlatives />)
 
     expect(await screen.findByText('nobody has been named yet')).toBeInTheDocument()
 
+    await openConductList(user)
     await user.click(await screen.findByRole('button', { name: 'Add to the list' }))
-    await user.type(screen.getByLabelText('Sleeper player id'), '4034')
+    await user.type(screen.getByRole('combobox', { name: 'Player' }), 'a pla')
+    await user.click(screen.getByRole('option', { name: /A Player/ }))
     await user.type(screen.getByLabelText('Reason'), 'reasons')
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
-    expect(await screen.findByText('A Player — Commissioner\'s call: reasons · week 2')).toBeInTheDocument()
+    expect(await screen.findByText("A Player — Commissioner's call: reasons · week 2")).toBeInTheDocument()
     expect(fetchSuperlatives).toHaveBeenCalledTimes(2)
+    expect(saveConductEntry).toHaveBeenCalledWith('L1', {
+      playerId: '4034', reason: 'reasons', appliesFromWeek: 1, appliesThroughWeek: null,
+    })
   })
 
-  it('refetches the superlatives payload after removing a commissioner entry', async () => {
-    const emptyUnethical: Superlative = {
-      kind: 'UNETHICAL', available: true, reason: null, early: false, value: null, unit: null,
-      holders: [], emptyReason: 'nobody has been named yet', detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [],
-    }
+  it('refetches the superlatives payload after removing a commissioner entry, only after a Yes', async () => {
     fetchSuperlatives
-      .mockResolvedValueOnce(
-        withKind({ ...baseline(), commissionerListAvailable: true }, { ...emptyUnethical, emptyReason: 'still on the list' }),
-      )
-      .mockResolvedValueOnce(withKind({ ...baseline(), commissionerListAvailable: true }, emptyUnethical))
-    fetchConductList.mockResolvedValue(
-      conductList({
-        canEdit: true,
-        entries: [
-          {
-            id: 5, playerId: '4034', playerName: 'A Player', reason: 'reasons',
-            appliesFromWeek: 2, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-          },
-        ],
-      }),
-    )
+      .mockResolvedValueOnce(withKind(baseline(), { ...emptyUnethical, emptyReason: 'still on the list' }))
+      .mockResolvedValueOnce(withKind(baseline(), emptyUnethical))
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, entries: [{ ...A_PLAYER, id: 5 }] }))
     deleteConductEntry.mockResolvedValue(undefined)
 
     const user = userEvent.setup()
     render(<Superlatives />)
 
     expect(await screen.findByText('still on the list')).toBeInTheDocument()
-    await user.click(await screen.findByRole('button', { name: 'Remove' }))
+    await openConductList(user)
+    await user.click(await screen.findByRole('button', { name: 'Remove A Player' }))
+
+    // The inline confirm: nothing is deleted yet, and No backs out.
+    expect(deleteConductEntry).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'No' }))
+    expect(deleteConductEntry).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Remove A Player' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove A Player' }))
+    await user.click(screen.getByRole('button', { name: 'Yes' }))
 
     await waitFor(() => expect(screen.getByText('nobody has been named yet')).toBeInTheDocument())
+    expect(deleteConductEntry).toHaveBeenCalledWith('L1', 5)
     expect(fetchSuperlatives).toHaveBeenCalledTimes(2)
   })
 
-  // Accessibility (2026-09-23 live-check finding): a browser's accessibility
-  // tree listed these as unnamed textboxes because the <label>s weren't
-  // associated with their inputs -- getByLabelText fails exactly the same
-  // way an accessibility tree does when that association is missing.
+  // Accessibility (2026-09-23): getByLabelText fails exactly the way an accessibility tree does when a
+  // <label> isn't associated with its input.
   it('makes every form control findable by its label text', async () => {
-    fetchConductList.mockResolvedValue(conductList({ canEdit: true }))
-    const data = baseline()
-    data.commissionerListAvailable = true
-    fetchSuperlatives.mockResolvedValue(data)
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, candidates: [A_PLAYER_CANDIDATE] }))
+    fetchSuperlatives.mockResolvedValue(baseline())
 
     const user = userEvent.setup()
     render(<Superlatives />)
 
+    await openConductList(user)
     await user.click(await screen.findByRole('button', { name: 'Add to the list' }))
 
-    expect(screen.getByLabelText('Sleeper player id')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Player' })).toBeInTheDocument()
     expect(screen.getByLabelText('Reason')).toBeInTheDocument()
     expect(screen.getByLabelText('Applies from week')).toBeInTheDocument()
+    expect(screen.getByLabelText('Through week (optional)')).toBeInTheDocument()
   })
 
-  // Code-review fix (2026-09-23): the cards resolve through
-  // LeagueSeasonResolver and can land on an older PLAYED season than the
-  // URL's own id ('L1' here, per the react-router-dom mock above); the
-  // conduct list is addressed by exact league row, so it must fetch/save/
-  // delete against the payload's leagueSleeperId, never that URL id.
-  it('fetches, saves and deletes the conduct list against leagueSleeperId, not the URL id', async () => {
-    const data = { ...baseline(), leagueSleeperId: 'L1_2025', commissionerListAvailable: true }
+  // Spec 040 plan-review F5. This REVERSES the 2026-09-23 code-review fix that asserted the list was
+  // fetched/saved/deleted against the payload's leagueSleeperId and "not the URL id". The list now
+  // addresses the URL's own league row ('L1' here, per the react-router mock) so a commissioner can
+  // prepare a new season before its first scored week, and it names the season it edits instead.
+  it("addresses the conduct list by the URL's league id and names its own season when it differs", async () => {
+    const data = { ...baseline(), leagueSleeperId: 'L1_2025', season: 2025, requestedSeason: 2026 }
     fetchSuperlatives.mockResolvedValue(data)
     fetchConductList.mockResolvedValue(
       conductList({
-        canEdit: true,
-        entries: [
-          {
-            id: 3, playerId: '4034', playerName: 'A Player', reason: 'reasons',
-            appliesFromWeek: 2, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-          },
-        ],
+        season: 2026, canEdit: true,
+        entries: [{ ...A_PLAYER, id: 3 }],
+        candidates: [A_PLAYER_CANDIDATE, B_PLAYER_CANDIDATE],
       }),
     )
-    saveConductEntry.mockResolvedValue({
-      id: 4, playerId: '4035', playerName: 'B Player', reason: 'more reasons',
-      appliesFromWeek: 3, addedBy: 'Commish', createdAt: '2026-10-14T19:02:11Z',
-    })
+    saveConductEntry.mockResolvedValue({ ...A_PLAYER, id: 4, playerId: '4035', playerName: 'B Player' })
     deleteConductEntry.mockResolvedValue(undefined)
 
     const user = userEvent.setup()
     render(<Superlatives />)
 
-    await waitFor(() => expect(fetchConductList).toHaveBeenCalledWith('L1_2025'))
-    expect(fetchConductList).not.toHaveBeenCalledWith('L1')
+    await waitFor(() => expect(fetchConductList).toHaveBeenCalledWith('L1'))
+    expect(fetchConductList).not.toHaveBeenCalledWith('L1_2025')
+
+    await openConductList(user)
+    expect(await screen.findByRole('heading', { name: "Commissioner's list · 2026" })).toBeInTheDocument()
+    expect(
+      screen.getByText('The awards above show 2025. This 2026 list starts counting once 2026 has a scored week.'),
+    ).toBeInTheDocument()
 
     await user.click(await screen.findByRole('button', { name: 'Add to the list' }))
-    await user.type(screen.getByLabelText('Sleeper player id'), '4035')
+    await user.type(screen.getByRole('combobox', { name: 'Player' }), 'b pl')
+    await user.click(screen.getByRole('option', { name: /B Player/ }))
     await user.type(screen.getByLabelText('Reason'), 'more reasons')
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() =>
-      expect(saveConductEntry).toHaveBeenCalledWith(
-        'L1_2025',
-        expect.objectContaining({ playerId: '4035' }),
-      ),
+      expect(saveConductEntry).toHaveBeenCalledWith('L1', expect.objectContaining({ playerId: '4035' })),
     )
 
-    await user.click(await screen.findByRole('button', { name: 'Remove' }))
-    await waitFor(() => expect(deleteConductEntry).toHaveBeenCalledWith('L1_2025', 3))
+    await user.click(await screen.findByRole('button', { name: 'Remove A Player' }))
+    await user.click(screen.getByRole('button', { name: 'Yes' }))
+    await waitFor(() => expect(deleteConductEntry).toHaveBeenCalledWith('L1', 3))
+
+    // The cards show 2025 and this edit was to 2026, so the cards cannot have changed: no refetch.
+    expect(fetchSuperlatives).toHaveBeenCalledTimes(1)
   })
 
-  // The same fallback SeasonFallbackNote reads for the cards above: when the
-  // resolver walked back, the list below needs its own note, since it is
-  // addressed by exact league row and won't exist for the new season yet.
-  it('notes which season the list belongs to when the resolver walked back', async () => {
-    const data = { ...baseline(), requestedSeason: 2026, season: 2025 }
-    fetchSuperlatives.mockResolvedValue(data)
+  it('shows no season note when the list is for the season the cards show', async () => {
+    fetchSuperlatives.mockResolvedValue(baseline())
+    const user = userEvent.setup()
     render(<Superlatives />)
 
-    expect(
-      await screen.findByText(
-        'Showing the 2025 season — the list for the new season opens once it has a scored week.',
-      ),
-    ).toBeInTheDocument()
+    await openConductList(user)
+    expect(await screen.findByRole('heading', { name: "Commissioner's list · 2026" })).toBeInTheDocument()
+    expect(screen.queryByText(/The awards above show/)).not.toBeInTheDocument()
   })
 
-  it('shows no season note when the list is for the season the URL asked for', async () => {
+  // F3: the card is a clickable <article>; the panel and its button live inside it.
+  it('keeps clicks and keystrokes inside the panel from reaching the card', async () => {
+    const openable: Superlative = {
+      ...emptyUnethical,
+      value: 2, unit: 'GAMES', emptyReason: null,
+      holders: [{ rosterId: 9, managerId: 90, teamName: 'Team X', username: null, avatarId: null }],
+      standings: [{ rank: 1, team: { rosterId: 9, managerId: 90, teamName: 'Team X', username: null, avatarId: null }, value: 2, note: null, hasValue: true, missingReason: null }],
+    }
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), openable))
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, entries: [A_PLAYER], candidates: [A_PLAYER_CANDIDATE] }))
+    const onKeyDown = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <div onKeyDown={onKeyDown}>
+        <Superlatives />
+      </div>,
+    )
+
+    const card = (await screen.findByText('The Unethical Award')).closest('article') as HTMLElement
+    const seeAll = within(card).getByRole('button', { name: 'See all' })
+    expect(seeAll).toHaveAttribute('aria-expanded', 'false')
+
+    await openConductList(user)
+    // opening the list (its own button stops propagation) did not open the standings
+    expect(seeAll).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(await within(card).findByRole('heading', { name: /Commissioner's list/ }))
+    await user.click(within(card).getByText('A Player'))
+    await user.click(within(card).getByRole('button', { name: 'Add to the list' }))
+    await user.type(within(card).getByRole('combobox', { name: 'Player' }), 'a')
+    await user.keyboard('{Enter}')
+
+    expect(seeAll).toHaveAttribute('aria-expanded', 'false')
+    expect(within(card).queryByRole('region', { name: /full standings/ })).not.toBeInTheDocument()
+    expect(onKeyDown).not.toHaveBeenCalled()
+  })
+
+  // F3: the button must exist whatever the award's own state.
+  it('offers the commissioner\'s list on an empty Unethical card', async () => {
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), emptyUnethical))
+    fetchConductList.mockResolvedValue(conductList({ entries: [A_PLAYER, { ...A_PLAYER, id: 2, playerId: '1' }] }))
+    render(<Superlatives />)
+
+    expect(await screen.findByRole('button', { name: "Commissioner's list · 2" })).toBeInTheDocument()
+  })
+
+  it('offers the commissioner\'s list on a card that is not available yet', async () => {
+    fetchSuperlatives.mockResolvedValue(baseline()) // every kind notBuiltYet
+    render(<Superlatives />)
+
+    expect(await screen.findByRole('button', { name: "Commissioner's list · 0" })).toBeInTheDocument()
+  })
+
+  // F4a: no scored week means no cards at all, but the commissioner still needs the list.
+  it('offers the commissioner\'s list when the whole page is unavailable, addressed by the URL id', async () => {
+    fetchSuperlatives.mockResolvedValue({
+      ...baseline(), available: false, reason: 'no week of this season has been scored yet',
+      throughWeek: null, weeksScored: 0, regularSeasonEnd: null, superlatives: [],
+    })
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, season: 2026, candidates: [A_PLAYER_CANDIDATE] }))
+    const user = userEvent.setup()
+    render(<Superlatives />)
+
+    await openConductList(user)
+    expect(fetchConductList).toHaveBeenCalledWith('L1')
+    expect(await screen.findByRole('button', { name: 'Add to the list' })).toBeInTheDocument()
+  })
+
+  it('puts the button on the Unethical card only', async () => {
     fetchSuperlatives.mockResolvedValue(baseline())
     render(<Superlatives />)
 
-    await screen.findByText("Commissioner's list")
-    expect(screen.queryByText(/Showing the .* season/)).not.toBeInTheDocument()
+    await screen.findByRole('button', { name: /^Commissioner's list/ })
+    expect(screen.getAllByRole('button', { name: /^Commissioner's list/ })).toHaveLength(1)
+    const card = screen.getByText('The Unethical Award').closest('article') as HTMLElement
+    expect(within(card).getByRole('button', { name: /^Commissioner's list/ })).toBeInTheDocument()
+  })
+
+  it('L3: the trigger only points aria-controls at the panel once the panel exists', async () => {
+    fetchSuperlatives.mockResolvedValue(baseline())
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true }))
+    const user = userEvent.setup()
+    render(<Superlatives />)
+
+    const button = await screen.findByRole('button', { name: /^Commissioner's list/ })
+    expect(button).toHaveAttribute('aria-expanded', 'false')
+    expect(button).not.toHaveAttribute('aria-controls')
+
+    await user.click(button)
+    const id = button.getAttribute('aria-controls')
+    expect(id).toBeTruthy()
+    expect(document.getElementById(id as string)).not.toBeNull()
+  })
+
+  it('edits an entry in place with a PUT, then refetches the cards', async () => {
+    fetchSuperlatives.mockResolvedValue(withKind(baseline(), emptyUnethical))
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, entries: [{ ...A_PLAYER, id: 7, appliesThroughWeek: 5 }] }))
+    updateConductEntry.mockResolvedValue({ ...A_PLAYER, id: 7 })
+    const user = userEvent.setup()
+    render(<Superlatives />)
+
+    await openConductList(user)
+    expect(await screen.findByText('wk 3–5')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Edit A Player' }))
+    const reason = screen.getByLabelText('Reason')
+    expect(reason).toHaveValue('reasons')
+    await user.clear(reason)
+    await user.type(reason, 'new reason')
+    const through = screen.getByLabelText('Through week (optional)')
+    expect(through).toHaveValue(5)
+    await user.clear(through)
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() =>
+      expect(updateConductEntry).toHaveBeenCalledWith('L1', 7, {
+        reason: 'new reason', appliesFromWeek: 3, appliesThroughWeek: null,
+      }),
+    )
+    expect(saveConductEntry).not.toHaveBeenCalled()
+    await waitFor(() => expect(fetchSuperlatives).toHaveBeenCalledTimes(2))
+  })
+
+  it('shows the server message inline when a save is refused', async () => {
+    fetchSuperlatives.mockResolvedValue(baseline())
+    fetchConductList.mockResolvedValue(conductList({ canEdit: true, entries: [A_PLAYER] }))
+    updateConductEntry.mockRejectedValue(new Error('appliesThroughWeek must be >= appliesFromWeek'))
+    const user = userEvent.setup()
+    render(<Superlatives />)
+
+    await openConductList(user)
+    await user.click(await screen.findByRole('button', { name: 'Edit A Player' }))
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByText('appliesThroughWeek must be >= appliesFromWeek')).toBeInTheDocument()
   })
 
   // specs/009-auto-data-refresh T027/T028: the rail bumps a league's data
@@ -1184,7 +1306,7 @@ describe('Superlatives', () => {
           row(2, 2, 'Team B', 150.25, 'week 5'),
           row(3, 3, 'Team C', 120, 'week 1'),
         ],
-        playerStandings: [],
+        playerStandings: [], playerContributions: [],
         ...over,
       }
     }
@@ -1369,6 +1491,7 @@ describe('Superlatives', () => {
           { rank: 1, playerId: 'p1', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 },
           { rank: 2, playerId: 'p2', playerName: 'Some Guy', position: null, team: null, adds: 1, distinctTeams: 1 },
         ],
+        playerContributions: [],
       }
       fetchSuperlatives.mockResolvedValue(withKind(baseline(), jabari))
       render(<Superlatives />)
@@ -1390,6 +1513,7 @@ describe('Superlatives', () => {
         kind: 'JABARI_SMITH_JR', available: true, reason: null, early: false, value: 3, unit: 'ADDS',
         holders: [], emptyReason: null, detail: [], coverage: null, playerHolders: playerStandings.filter((p) => p.rank === 1).slice(0, 1), standings: [],
         playerStandings,
+        playerContributions: [],
       }
     }
     function players(n: number, rank: number, adds: number, prefix: string) {
@@ -1407,7 +1531,8 @@ describe('Superlatives', () => {
       const dialog = panel()
       const lists = within(dialog).getAllByRole('list')
       expect(within(lists[0]).getAllByRole('listitem')).toHaveLength(6)
-      const summary = within(dialog).getByText(/41 more players with 2 adds each/)
+      // Spec 040 F6: the backend no longer caps the list, so a folded group no longer claims one add count.
+      const summary = within(dialog).getByText(/41 more players/)
       expect(summary).toBeInTheDocument()
       const details = summary.closest('details') as HTMLDetailsElement
       expect(details.open).toBe(false)
@@ -1458,7 +1583,7 @@ describe('Superlatives trophy list', () => {
       kind: 'HIGHEST_WEEK', available: true, reason: null, early: true, value: 180.5, unit: 'POINTS',
       holders: [{ rosterId: 1, managerId: 10, teamName: 'Team A', username: null, avatarId: null }],
       emptyReason: null, detail: [{ type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 }],
-      coverage: null, playerHolders: [], standings: [], playerStandings: [],
+      coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
     }
     const empty: Superlative = { ...notBuiltYet('LOWEST_WEEK'), available: true, reason: null, emptyReason: 'nobody yet' }
     fetchSuperlatives.mockResolvedValue(withKind(withKind(baseline(), early), empty))
@@ -1488,7 +1613,7 @@ describe('Superlatives player links', () => {
     detail: [
       { type: 'PICKUP', rosterId: 3, playerId: 'p1', playerName: 'Some Guy', position: 'RB', addedWeek: 4, addType: 'WAIVER', startedWeeks: [5, 6], points: 52.1 },
     ],
-    coverage: null, playerHolders: [], standings: [], playerStandings: [],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
   }
   const jabari: Superlative = {
     kind: 'JABARI_SMITH_JR', available: true, reason: null, early: false, value: 14, unit: 'ADDS',
@@ -1496,15 +1621,16 @@ describe('Superlatives player links', () => {
     playerHolders: [{ playerId: 'p9', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 }],
     standings: [],
     playerStandings: [{ rank: 1, playerId: 'p9', playerName: 'Jake LaRavia', position: 'PF', team: 'MEM', adds: 14, distinctTeams: 8 }],
+    playerContributions: [],
   }
   const embiid: Superlative = {
     kind: 'JOEL_EMBIID', available: true, reason: null, early: false, value: 10, unit: 'POINTS',
     holders: [{ rosterId: 3, managerId: 30, teamName: 'Waiver Wire Warriors', username: null, avatarId: null }],
     emptyReason: null,
     detail: [
-      { type: 'ABSENCE', rosterId: 3, playerId: 'p5', playerName: 'Big Man', position: 'C', gamesMissed: 7, weeksAffected: 3, pointsPerGame: 1.5, estimatedPointsLost: 10, estimated: true },
+      { type: 'ABSENCE', rosterId: 3, playerId: 'p5', playerName: 'Big Man', position: 'C', weeksMissed: 3, gamesMissed: 7, pointsPerGame: 1.5, estimatedPointsLost: 10, estimated: true },
     ],
-    coverage: null, playerHolders: [], standings: [], playerStandings: [],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
   }
 
   function payload(sport: 'nba' | 'nfl'): SuperlativesResponse {
@@ -1533,11 +1659,13 @@ describe('Superlatives player links', () => {
     fetchSuperlatives.mockResolvedValue({ ...payload('nba'), commissionerListAvailable: true })
     fetchConductList.mockResolvedValue(
       conductList({
-        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
+        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, appliesThroughWeek: null, position: null, proTeam: null, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
       }),
     )
+    const user = userEvent.setup()
     render(<Superlatives />)
 
+    await user.click(await screen.findByRole('button', { name: /^Commissioner's list/ }))
     expect(await screen.findByRole('link', { name: 'Flagged Guy' })).toHaveAttribute('href', '/leagues/L1/players/p7')
   })
 
@@ -1545,11 +1673,13 @@ describe('Superlatives player links', () => {
     fetchSuperlatives.mockResolvedValue({ ...payload('nfl'), commissionerListAvailable: true })
     fetchConductList.mockResolvedValue(
       conductList({
-        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
+        entries: [{ id: 1, playerId: 'p7', playerName: 'Flagged Guy', reason: 'r', appliesFromWeek: 2, appliesThroughWeek: null, position: null, proTeam: null, addedBy: null, createdAt: '2026-01-01T00:00:00Z' }],
       }),
     )
+    const user = userEvent.setup()
     render(<Superlatives />)
 
+    await user.click(await screen.findByRole('button', { name: /^Commissioner's list/ }))
     expect(await screen.findByText('Flagged Guy')).toBeInTheDocument()
     expect(screen.getByText(/Some Guy/)).toBeInTheDocument()
     expect(screen.queryByRole('link')).not.toBeInTheDocument()

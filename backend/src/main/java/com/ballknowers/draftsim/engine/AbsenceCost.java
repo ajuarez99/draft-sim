@@ -8,7 +8,15 @@ import java.util.*;
  * no Postgres, so {@code AbsenceCostTest} can exercise every case in-memory
  * (T046/T047), the same shape as {@link WaiverPickupAttribution}.
  *
- * <p><b>Cost is measured per missed game, not per fantasy week.</b> Allan
+ * <p><b>SUPERSEDED 2026-10-20 by spec 040</b>, at Allan's request: cost is now
+ * per missed WEEK, not per missed game. A (roster, player, week) counts only
+ * when the roster held him, he has at least one non-UNCLASSIFIED absence row
+ * that week, and he played ZERO games that week; each counted week costs his
+ * per-game mean ({@code pointsPerGame}) once. A basketball week he played any
+ * game in costs nothing. Football (one game per week) is unchanged. The
+ * 2026-09-23 rationale below is kept, marked superseded:
+ *
+ * <p><s>Cost is measured per missed game, not per fantasy week.</s> Allan
  * overruled the first version of this rule ("as a player you want every
  * single game anyways and not just that one game"): a player who missed three
  * nights but played a fourth in the same fantasy week still costs three
@@ -27,14 +35,15 @@ public final class AbsenceCost {
     private AbsenceCost() {}
 
     /**
-     * One player's counted cost against one roster.
+     * One player's counted cost against one roster (spec 040).
      *
-     * @param weeksAffected a COUNT of distinct fantasy weeks with at least one
-     *                      counted missed game -- not a list. {@code
-     *                      gamesMissed} is the headline and can exceed this
-     *                      (a basketball week with more than one missed game).
+     * @param weeksMissed distinct fantasy weeks counted: rostered, with an
+     *                    absence row, and zero games played. This is what is
+     *                    charged ({@code weeksMissed * pointsPerGame}).
+     * @param gamesMissed absence rows falling inside counted weeks only --
+     *                    context ("sat M games"), not part of the cost.
      */
-    public record PlayerCost(String playerId, int gamesMissed, int weeksAffected,
+    public record PlayerCost(String playerId, int weeksMissed, int gamesMissed,
                              double pointsPerGame, double estimatedPointsLost) {}
 
     /** One roster's total estimated points lost to absence, and the players who make it up. */
@@ -85,19 +94,21 @@ public final class AbsenceCost {
             if (!isRegularContributor(m, playedWeeksByPlayer)) continue;
 
             List<Integer> playerAbsenceWeeks = absenceWeeksByPlayer.getOrDefault(m.playerId(), List.of());
-            List<Integer> gamesInWindow = playerAbsenceWeeks.stream()
-                    .filter(m.rosteredWeeks()::contains)
-                    .sorted()
-                    .toList();
-            if (gamesInWindow.isEmpty()) continue;
+            Set<Integer> playedWeeks = playedWeeksByPlayer.getOrDefault(m.playerId(), Set.of());
+            // Spec 040 FR-001: a week counts only if rostered, absent, and no game played that week.
+            Set<Integer> countedWeeks = new TreeSet<>();
+            for (int wk : playerAbsenceWeeks) {
+                if (m.rosteredWeeks().contains(wk) && !playedWeeks.contains(wk)) countedWeeks.add(wk);
+            }
+            if (countedWeeks.isEmpty()) continue;
+            int gamesMissed = (int) playerAbsenceWeeks.stream().filter(countedWeeks::contains).count();
 
             double ppg = pointsPerGame.getOrDefault(m.playerId(), 0.0);
-            int gamesMissed = gamesInWindow.size();
-            int weeksAffected = (int) gamesInWindow.stream().distinct().count();
-            double lost = round2(gamesMissed * ppg);
+            int weeksMissed = countedWeeks.size();
+            double lost = round2(weeksMissed * ppg);
 
             byRoster.computeIfAbsent(m.rosterId(), k -> new ArrayList<>())
-                    .add(new PlayerCost(m.playerId(), gamesMissed, weeksAffected, ppg, lost));
+                    .add(new PlayerCost(m.playerId(), weeksMissed, gamesMissed, ppg, lost));
         }
 
         Map<Integer, RosterCost> out = new HashMap<>();

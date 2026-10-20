@@ -121,7 +121,7 @@ class SuperlativesControllerIT {
     void notVisibleIs404OnAllFourEndpoints() {
         assertEquals(404, controller.conductList(LEAGUE_SLEEPER_ID, OUTSIDER_USER).getStatusCode().value());
         assertEquals(404, controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "reason", 1), OUTSIDER_USER)
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "reason", 1, null), OUTSIDER_USER)
                 .getStatusCode().value());
         assertEquals(404, controller.deleteConductEntry(LEAGUE_SLEEPER_ID, 1L, OUTSIDER_USER).getStatusCode().value());
 
@@ -132,7 +132,7 @@ class SuperlativesControllerIT {
     @Test
     void nonCommissionerPostIs403() {
         ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "bad behavior", 1), MEMBER_USER);
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "bad behavior", 1, null), MEMBER_USER);
 
         assertEquals(403, response.getStatusCode().value());
         @SuppressWarnings("unchecked")
@@ -146,7 +146,7 @@ class SuperlativesControllerIT {
     void reasonOver140CharsIs400() {
         String tooLong = "x".repeat(141);
         ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, tooLong, 1), COMMISSIONER_USER);
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, tooLong, 1, null), COMMISSIONER_USER);
 
         assertEquals(400, response.getStatusCode().value());
     }
@@ -154,7 +154,7 @@ class SuperlativesControllerIT {
     @Test
     void deleteOfAnotherLeaguesEntryIs404() {
         ResponseEntity<?> saved = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "conduct reason", 3), COMMISSIONER_USER);
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "conduct reason", 3, null), COMMISSIONER_USER);
         assertEquals(200, saved.getStatusCode().value());
         @SuppressWarnings("unchecked")
         Map<String, Object> savedBody = (Map<String, Object>) saved.getBody();
@@ -172,7 +172,7 @@ class SuperlativesControllerIT {
     @Test
     void commissionerPostThenGetRoundTrips() {
         ResponseEntity<?> saved = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "  conduct reason  ", 4),
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "  conduct reason  ", 4, null),
                 COMMISSIONER_USER);
         assertEquals(200, saved.getStatusCode().value());
         @SuppressWarnings("unchecked")
@@ -215,7 +215,7 @@ class SuperlativesControllerIT {
     void theRealCommissionerWithoutTheAdminTokenCanWriteBoth() {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
             ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "no token", 1), COMMISSIONER_USER);
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "no token", 1, null), COMMISSIONER_USER);
             assertEquals(200, post.getStatusCode().value());
             @SuppressWarnings("unchecked")
             long entryId = ((Number) ((Map<String, Object>) post.getBody()).get("id")).longValue();
@@ -230,7 +230,7 @@ class SuperlativesControllerIT {
     void aNonCommissionerWithoutTheAdminTokenIsRefusedAsNotTheCommissioner() {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
             ResponseEntity<?> response = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
-                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1), MEMBER_USER);
+                    new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "x", 1, null), MEMBER_USER);
             assertEquals(403, response.getStatusCode().value());
             @SuppressWarnings("unchecked")
             Map<String, Object> body = (Map<String, Object>) response.getBody();
@@ -251,5 +251,128 @@ class SuperlativesControllerIT {
         try (var noToken = com.ballknowers.draftsim.TestAdmin.withToken(null)) {
             assertEquals(404, controller.conductList(LEAGUE_SLEEPER_ID, null).getStatusCode().value());
         }
+    }
+
+    // --- spec 040 (US2): through-week, PUT, charges, candidates ---------------------------------
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> bodyOf(ResponseEntity<?> r) {
+        return (Map<String, Object>) r.getBody();
+    }
+
+    private long saveEntry(String reason, int from, Integer through) {
+        ResponseEntity<?> saved = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, reason, from, through), COMMISSIONER_USER);
+        assertEquals(200, saved.getStatusCode().value());
+        return ((Number) bodyOf(saved).get("id")).longValue();
+    }
+
+    @Test
+    void putEditsInPlaceAndKeepsTheOriginalAdder() {
+        long id = saveEntry("first", 2, null);
+
+        ResponseEntity<?> put = controller.updateConductEntry(LEAGUE_SLEEPER_ID, id,
+                new SuperlativesController.ConductEntryUpdate("  second  ", 3, 5), COMMISSIONER_USER);
+
+        assertEquals(200, put.getStatusCode().value());
+        Map<String, Object> b = bodyOf(put);
+        assertEquals(id, ((Number) b.get("id")).longValue(), "same row, not a new one");
+        assertEquals("second", b.get("reason"));
+        assertEquals(3, b.get("appliesFromWeek"));
+        assertEquals(5, b.get("appliesThroughWeek"));
+        assertEquals("IT Commissioner", b.get("addedBy"));
+        assertFalse(b.containsKey("charges"), "PUT returns the plain row; charges are GET-only");
+        assertEquals(1L, jdbc.queryForObject("select count(*) from league_conduct_entry where league_id = ?", Long.class, leagueId));
+    }
+
+    @Test
+    void putWithThroughBeforeFromIs400NotA500() {
+        long id = saveEntry("r", 4, null);
+        ResponseEntity<?> put = controller.updateConductEntry(LEAGUE_SLEEPER_ID, id,
+                new SuperlativesController.ConductEntryUpdate("r", 4, 3), COMMISSIONER_USER);
+        assertEquals(400, put.getStatusCode().value());
+
+        ResponseEntity<?> post = controller.saveConductEntry(LEAGUE_SLEEPER_ID,
+                new SuperlativesController.ConductEntryRequest(PLAYER_SLEEPER_ID, "r", 4, 3), COMMISSIONER_USER);
+        assertEquals(400, post.getStatusCode().value(), "POST validates the same way");
+    }
+
+    @Test
+    void putByANonCommissionerIs403() {
+        long id = saveEntry("r", 1, null);
+        ResponseEntity<?> put = controller.updateConductEntry(LEAGUE_SLEEPER_ID, id,
+                new SuperlativesController.ConductEntryUpdate("hijack", 1, null), MEMBER_USER);
+        assertEquals(403, put.getStatusCode().value());
+        assertEquals("r", jdbc.queryForObject("select reason from league_conduct_entry where id = ?", String.class, id));
+    }
+
+    @Test
+    void putWithAnotherLeaguesEntryIdIs404() {
+        long id = saveEntry("r", 1, null);
+        leagueMembers.upsert(otherLeagueId, commissionerManagerId, true, "IT Commissioner's Other Team");
+        ResponseEntity<?> put = controller.updateConductEntry(OTHER_LEAGUE_SLEEPER_ID, id,
+                new SuperlativesController.ConductEntryUpdate("x", 1, null), COMMISSIONER_USER);
+        assertEquals(404, put.getStatusCode().value());
+        assertEquals("r", jdbc.queryForObject("select reason from league_conduct_entry where id = ?", String.class, id));
+    }
+
+    @Test
+    void postReAddOfAListedPlayerOverwritesTheThroughWeek() {
+        long id = saveEntry("r", 2, 6);
+        long again = saveEntry("r", 2, null);
+        assertEquals(id, again, "upsert on (league, player)");
+        assertNull(jdbc.queryForObject("select applies_through_week from league_conduct_entry where id = ?",
+                Integer.class, id), "re-adding without a through-week clears it (plan-review F10)");
+    }
+
+    /**
+     * roster_season.players is null here (never fetched), so the fantasy team has to come from the latest scored
+     * week's players_points (plan-review F4b); and a ranged entry charges only its weeks.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void getReturnsCandidatesFromWeekPointsAndChargesForARangedEntry() {
+        long secondPlayerRow = jdbc.queryForObject(
+                "insert into player (sport, sleeper_id, name, positions) values ('nfl', ?, ?, '{WR}') returning id",
+                Long.class, "it-player-conduct-second", "IT Second Player");
+        try {
+            jdbc.update("insert into roster_season (league_id, manager_id, roster_id) values (?, ?, 1)",
+                    leagueId, commissionerManagerId);
+            for (int week = 1; week <= 4; week++) {
+                String pp = week == 4
+                        ? "{\"" + PLAYER_SLEEPER_ID + "\": 10.0, \"it-player-conduct-second\": 4.0}"
+                        : "{\"" + PLAYER_SLEEPER_ID + "\": 10.0}";
+                jdbc.update("insert into roster_week_points (league_id, season, week, roster_id, starters_points, players_points)"
+                        + " values (?, 2026, ?, 1, 10, ?::jsonb)", leagueId, week, pp);
+            }
+            saveEntry("range", 2, 3);
+
+            Map<String, Object> list = bodyOf(controller.conductList(LEAGUE_SLEEPER_ID, COMMISSIONER_USER));
+
+            assertEquals(2026, list.get("season"));
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) list.get("candidates");
+            assertEquals(2, candidates.size());
+            for (Map<String, Object> c : candidates) {
+                Map<String, Object> team = (Map<String, Object>) c.get("fantasyTeam");
+                assertNotNull(team, c.get("playerName") + " is on roster 1 in the latest week");
+                assertEquals(1, team.get("rosterId"));
+            }
+            Map<String, Object> entry = ((List<Map<String, Object>>) list.get("entries")).get(0);
+            assertEquals(3, entry.get("appliesThroughWeek"));
+            assertEquals(2, entry.get("playerWeeks"), "weeks 2 and 3 only");
+            List<Map<String, Object>> charges = (List<Map<String, Object>>) entry.get("charges");
+            assertEquals(1, charges.size());
+            assertEquals(List.of(2, 3), charges.get(0).get("weeks"));
+            assertEquals(List.of(), entry.get("alsoFlaggedBySleeperWeeks"));
+        } finally {
+            jdbc.update("delete from player where id = ?", secondPlayerRow);
+        }
+    }
+
+    /** A brand-new season: no scored week, no roster fetch -- the picker's candidates are empty, not an error. */
+    @Test
+    void getOnALeagueWithNoRosterDataHasNoCandidates() {
+        Map<String, Object> list = bodyOf(controller.conductList(LEAGUE_SLEEPER_ID, COMMISSIONER_USER));
+        assertEquals(List.of(), list.get("candidates"));
     }
 }
