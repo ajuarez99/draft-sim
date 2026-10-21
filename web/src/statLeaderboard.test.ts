@@ -20,6 +20,7 @@ import {
   FORMULA_UNIT,
   formatValue,
   hasKnownOwnership,
+  hasMine,
   resolveSort,
   sortOffered,
   sortRows,
@@ -153,6 +154,20 @@ describe('filters', () => {
   it('filters to one manager roster by rosterId', () => {
     expect(ids(applyFilters(rs, { ...NO_FILTERS, availability: { kind: 'roster', rosterId: 2 } }, off))).toEqual(['2'])
     expect(ids(applyFilters(rs, { ...NO_FILTERS, availability: { kind: 'roster', rosterId: 99 } }, off))).toEqual([])
+  })
+
+  it('"mine" keeps only players on the viewer’s roster (specs/042 T008)', () => {
+    const withMe = [
+      row('1', { ownership: owner({ rosterId: 1, isMe: true, ownerName: 'Me' }) }),
+      row('2', { ownership: owner({ rosterId: 2, ownerName: 'B' }) }),
+      row('3', { ownership: owner({ state: 'FREE_AGENT', rosterId: null, ownerName: null }) }),
+    ]
+    expect(ids(applyFilters(withMe, { ...NO_FILTERS, availability: { kind: 'mine' } }, off))).toEqual(['1'])
+    expect(hasMine(withMe)).toBe(true)
+    expect(hasMine(rs)).toBe(false)
+    // a fallback board answers "mine" from currentOwnership, like every ownership filter
+    const fell = [row('a', { ownership: owner({ isMe: false }), currentOwnership: owner({ isMe: true }) })]
+    expect(ids(applyFilters(fell, { ...NO_FILTERS, availability: { kind: 'mine' } }, off))).toEqual(['a'])
   })
 
   it('qualification applies to rate and rank columns only (FR-025), not counting, totals or text sorts', () => {

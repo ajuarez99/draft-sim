@@ -709,8 +709,11 @@ public class LeagueAnalysisService {
         return c;
     }
 
-    /** Slots in {@code roster_positions} that are not starting slots. */
-    private static final Set<String> NON_STARTING_SLOTS = Set.of("BN", "IR", "TAXI");
+    /**
+     * Slots in {@code roster_positions} that are not starting slots. Package-visible so the lineup check
+     * (specs/042, F3) reads this one list instead of re-listing it.
+     */
+    static final Set<String> NON_STARTING_SLOTS = Set.of("BN", "IR", "TAXI");
 
     /** The nine slots {@code BasketballRules} hard-codes, in Sleeper's order. */
     static final List<String> BASKETBALL_STARTING_SLOTS =
@@ -1099,7 +1102,10 @@ public class LeagueAnalysisService {
                 round(points, 1), p.injuryStatus(), onReserve);
     }
 
-    /** Sleeper's tags that mean he will not play: Out, IR, Sus. DTD/GTD/Questionable count in full. */
+    /**
+     * Sleeper's tags that mean he will not play: Out, IR, Sus. DTD/GTD/Questionable count in full.
+     * Package-visible: the lineup check's OUT is this rule plus {@code rules.isSuspended} (specs/042, F4).
+     */
     static boolean isUnavailable(String injuryStatus) {
         if (injuryStatus == null) return false;
         String t = injuryStatus.trim();

@@ -28,9 +28,15 @@ import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.SportScheduleRepository;
+import com.ballknowers.draftsim.store.StatusCaptureRepository;
+import com.ballknowers.draftsim.ingest.SportSchedule;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,6 +58,8 @@ class PlayerStatsServiceTest {
 
     private static final LocalDate D0 = LocalDate.parse("2025-11-01");
     private static final GameScoringService SCORER = new GameScoringService();
+    /** 2026-10-21 11:00 ET: a pinned "now" for the header's next game (specs/042). */
+    private static final Clock NOW = Clock.fixed(Instant.parse("2026-10-21T15:00:00Z"), ZoneOffset.UTC);
     /** share 0.5, 15 mpg, small sample 100 min, recency 14 days, ... */
     private static final PlayerStatsProperties PROPS = new PlayerStatsProperties(0.5, 15, 100, 14, 5, 15, 10, 10, 5);
 
@@ -350,6 +358,8 @@ class PlayerStatsServiceTest {
         final SportRulesRegistry rules = mock(SportRulesRegistry.class);
         final SportRules nbaRules = mock(SportRules.class);
         final PlayerAbsenceRepository absences = mock(PlayerAbsenceRepository.class);
+        final SportScheduleRepository schedules = mock(SportScheduleRepository.class);
+        final StatusCaptureRepository statusCaptures = mock(StatusCaptureRepository.class);
 
         Wiring(boolean basketball) {
             when(rules.get(any())).thenReturn(nbaRules);
@@ -365,7 +375,8 @@ class PlayerStatsServiceTest {
 
         PlayerStatsService service(PlayerStatsProperties props) {
             return new PlayerStatsService(props, box, resolver, SCORER, leagues, players, rosterSeasons, members,
-                    managers, weekPoints, rules, absences, org.mockito.Mockito.mock(DraftAndAdpJoin.class));
+                    managers, weekPoints, rules, absences, org.mockito.Mockito.mock(DraftAndAdpJoin.class),
+                    schedules, statusCaptures, NOW);
         }
     }
 
@@ -505,6 +516,146 @@ class PlayerStatsServiceTest {
         assertNull(page.player().team());
         assertEquals(5, page.windows().get(WindowKind.SEASON).games());
         assertNull(page.fantasy().ranks().position(), "no row, no position");
+    }
+
+
+    // ------------------------------------------------------------------ spec 042: status and next game
+
+    private static Player playerOn(String id, String team, String status, String injury) {
+        return new Player(1L, Sport.NBA, id, "Pat", List.of(Position.PG), team, status, injury, null, null);
+    }
+
+    private static SportSchedule.Game game(String id, int week, String date, String status, String home, String away) {
+        return new SportSchedule.Game(id, week, LocalDate.parse(date), status, home, away);
+    }
+
+    /** A schedule where AAA and BBB each play plenty (so neither is an exhibition side) plus the given upcoming games. */
+    private static List<SportSchedule.Game> schedule(SportSchedule.Game... upcoming) {
+        List<SportSchedule.Game> out = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            out.add(game("old" + i, 1, "2026-10-01", "complete", i % 2 == 0 ? "AAA" : "BBB", i % 2 == 0 ? "BBB" : "AAA"));
+        }
+        out.addAll(List.of(upcoming));
+        return out;
+    }
+
+    /** A wiring whose URL league is {@code requested}, answered from 2025 box scores (the opening-night fallback). */
+    private Wiring headerWiring(LeagueRow requested, Player target) {
+        Wiring w = new Wiring(true);
+        when(w.resolver.resolve(requested.sleeperId(), Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(requested, null)));
+        when(w.resolver.seasons(requested.sleeperId())).thenReturn(List.of());
+        Map<String, List<Line>> by = new HashMap<>();
+        by.put(target.sleeperId(), flat(target.sleeperId(), 5, 10, 25));
+        when(w.box.get(Sport.NBA, requested.season())).thenReturn(season(by, 5, true));
+        when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of(target.sleeperId(), target));
+        when(w.leagues.scoringOf(anyLong())).thenReturn(scoring("pts", 1));
+        return w;
+    }
+
+    @Test
+    void anNbaLeagueWithZeroBoxScoresForItsSeasonStillReturnsANextGame() {
+        // Review F1 (BLOCKER): opening night. The URL's 2026 league has no 2026 box scores, so the stats fall
+        // back to 2025 (requestedSeason is set) -- but the NEXT GAME is about the URL's 2026 season.
+        Wiring w = new Wiring(true);
+        LeagueRow requested = row(3, 2026, "L26", "in_season");
+        when(w.resolver.resolve("L26", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(requested, null)));
+        when(w.resolver.seasons("L26")).thenReturn(List.of());
+        when(w.box.get(Sport.NBA, 2026)).thenReturn(season(Map.of(), 0, false));
+        when(w.box.token(Sport.NBA, 2025)).thenReturn(new SeasonToken(5, OffsetDateTime.parse("2026-04-01T00:00:00Z")));
+        Map<String, List<Line>> by = new HashMap<>();
+        by.put("p", flat("p", 5, 10, 25));
+        when(w.box.get(Sport.NBA, 2025)).thenReturn(season(by, 5, true));
+        when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of("p", playerOn("p", "AAA", null, "Questionable")));
+        when(w.leagues.scoringOf(anyLong())).thenReturn(scoring("pts", 1));
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(
+                game("a", 1, "2026-10-21", "pre_game", "BBB", "AAA"),
+                game("b", 1, "2026-10-23", "pre_game", "AAA", "BBB")));
+        when(w.statusCaptures.statusAsOf(Sport.NBA, 2026)).thenReturn(Optional.of(Instant.parse("2026-10-21T11:02:00Z")));
+        when(w.schedules.fetchedAt("nba", 2026)).thenReturn(Optional.of(OffsetDateTime.parse("2026-10-20T09:00:00Z")));
+
+        PlayerStatsPage page = w.service(PROPS).read(requested, "p", null).orElseThrow();
+
+        assertEquals(OffsetDateTime.parse("2026-10-20T09:00:00Z"), page.scheduleAsOf(), "the schedule's own fetched-at (S2)");
+        assertEquals(2025, page.season());
+        assertEquals(2026, page.requestedSeason(), "the stats fell back");
+        assertNull(page.nextGameReason());
+        assertEquals(new PlayerStatsService.NextGame("a", LocalDate.parse("2026-10-21"), "BBB", false, 1), page.nextGame());
+        assertEquals(List.of("a", "b"), page.upcoming().stream().map(PlayerStatsService.NextGame::gameId).toList());
+        assertTrue(page.upcoming().get(1).isHome());
+        assertEquals("Questionable", page.status().injuryStatus());
+        assertFalse(page.status().out(), "Questionable is listed, not out");
+        assertEquals(OffsetDateTime.parse("2026-10-21T11:02:00Z"), page.status().asOf());
+        org.mockito.Mockito.verify(w.schedules, org.mockito.Mockito.never()).forSeason("nba", 2025);
+    }
+
+    @Test
+    void aCompleteUrlLeagueHasNoGamesLeftAndNoHeaderStatus() {
+        LeagueRow league = row(2, 2025, "L25", "complete");
+        Wiring w = headerWiring(league, playerOn("p", "AAA", null, "Out"));
+        when(w.schedules.forSeason("nba", 2025)).thenReturn(schedule(game("a", 1, "2026-10-25", "pre_game", "AAA", "BBB")));
+
+        PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
+
+        assertNull(page.nextGame());
+        assertEquals("NO_GAMES_LEFT", page.nextGameReason());
+        assertTrue(page.upcoming().isEmpty());
+        assertNull(page.status());
+    }
+
+    @Test
+    void aPlayerWithNoTeamIsNoTeamAndStillCarriesHisStatus() {
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        Wiring w = headerWiring(league, playerOn("p", null, "FA", null));
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(game("a", 1, "2026-10-25", "pre_game", "AAA", "BBB")));
+
+        PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
+
+        assertNull(page.nextGame());
+        assertEquals("NO_TEAM", page.nextGameReason());
+        assertEquals("FA", page.status().status());
+        assertNull(page.status().asOf(), "no capture is unknown, not fresh");
+    }
+
+    @Test
+    void anUnstoredScheduleIsNoScheduleAndAFinishedOneIsNoGamesLeft() {
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        Wiring none = headerWiring(league, playerOn("p", "AAA", null, null));
+        assertEquals("NO_SCHEDULE", none.service(PROPS).read(league, "p", null).orElseThrow().nextGameReason());
+
+        Wiring over = headerWiring(league, playerOn("p", "AAA", null, null));
+        when(over.schedules.forSeason("nba", 2026)).thenReturn(schedule());
+        PlayerStatsPage page = over.service(PROPS).read(league, "p", null).orElseThrow();
+        assertEquals("NO_GAMES_LEFT", page.nextGameReason());
+        assertNull(page.nextGame());
+    }
+
+    @Test
+    void aSuspendedNbaPlayerCarriesPlayerStatusSusWithANullInjuryStatus() {
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        Wiring w = headerWiring(league, playerOn("p", "AAA", "SUS", null));
+        when(w.nbaRules.isSuspended(any())).thenReturn(true);
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(game("a", 1, "2026-10-25", "pre_game", "AAA", "BBB")));
+
+        PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
+
+        assertEquals("SUS", page.status().status());
+        assertNull(page.status().injuryStatus());
+        assertTrue(page.status().out(), "a suspension is OUT through rules.isSuspended, not through injury_status");
+    }
+
+    @Test
+    void upcomingIsCappedAtSevenAndAPreDraftLeagueStillGetsItsNextGame() {
+        LeagueRow league = row(3, 2026, "L26", "pre_draft");
+        Wiring w = headerWiring(league, playerOn("p", "AAA", null, "Out"));
+        SportSchedule.Game[] many = new SportSchedule.Game[10];
+        for (int i = 0; i < many.length; i++) many[i] = game("n" + i, 1, "2026-10-" + (22 + i), "pre_game", "AAA", "BBB");
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(many));
+
+        PlayerStatsPage page = w.service(PROPS).read(league, "p", null).orElseThrow();
+
+        assertEquals(PlayerStatsService.UPCOMING_LIMIT, page.upcoming().size());
+        assertEquals("n0", page.nextGame().gameId());
+        assertTrue(page.status().out(), "Out is the shared isUnavailable rule");
     }
 
     @Test

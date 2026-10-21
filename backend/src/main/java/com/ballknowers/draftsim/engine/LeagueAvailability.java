@@ -81,6 +81,9 @@ public class LeagueAvailability {
         m.put("forecast", List.of("forecast"));
         m.put("recap", List.of("recap"));
         m.put("analysis", List.of("analysis"));
+        // specs/042 US3 (review F12): the lineup check reads a roster's live `starters`, which ESPN rosters
+        // do not carry here; "not available for ESPN leagues yet" rather than a service-only NO_STARTERS.
+        m.put("lineupCheck", List.of("lineup-check"));
         m.put("powerBaseline", List.of());
         m.put("lineups", List.of());
         m.put("playoffOdds", List.of());
@@ -101,6 +104,7 @@ public class LeagueAvailability {
         m.put("expectedWins", "Expected wins follows Sleeper leagues only.");
         m.put("forecast", "The season forecast follows Sleeper leagues only.");
         m.put("recap", "The weekly recap follows Sleeper leagues only.");
+        m.put("lineupCheck", "The lineup check is not available for ESPN leagues yet.");
         return m;
     }
 

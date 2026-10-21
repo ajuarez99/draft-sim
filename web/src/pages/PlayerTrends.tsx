@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
 import NotFound from '../components/NotFound'
+import OwnershipMark, { ownershipFromTrend } from '../components/OwnershipMark'
 import PlayerLink from '../components/PlayerLink'
 import { getPlayerTrends, type PlayerTrends as Trends, type PlayerTrendsReason, type TrendRow } from '../api'
 import { useLeagueDataVersion } from '../leagueDataVersion'
@@ -68,7 +69,7 @@ function StreamingTable({ rows, d, leagueId }: { rows: TrendRow[]; d: Trends; le
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.sleeperPlayerId}>
+            <tr key={r.sleeperPlayerId} className={r.rosteredByMe ? 'mine' : undefined}>
               <PlayerCell row={r} d={d} leagueId={leagueId} />
               <td className="pt-num">{fmt(r.seasonPts)}</td>
               <td>{fmt(r.formPts)}</td>
@@ -101,14 +102,14 @@ function RoleTable({ rows, d, showOwner, leagueId }: { rows: TrendRow[]; d: Tren
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.sleeperPlayerId}>
+            <tr key={r.sleeperPlayerId} className={r.rosteredByMe ? 'mine' : undefined}>
               <PlayerCell row={r} d={d} leagueId={leagueId} />
               <MinutesCell row={r} />
               <td>
                 {r.recentUsg == null ? '–' : `${fmt(r.recentUsg)}%`} recent ·{' '}
                 {r.seasonUsg == null ? '–' : `${fmt(r.seasonUsg)}%`} season
               </td>
-              {showOwner && <td>{r.rosteredBy ?? '–'}</td>}
+              {showOwner && <td><OwnershipMark o={ownershipFromTrend(r)} /></td>}
             </tr>
           ))}
         </tbody>

@@ -73,6 +73,7 @@ class LeagueAvailabilityIT extends EspnIT {
                 .andExpect(jsonPath("$.unavailable.expectedWins.code").value("PLATFORM_NOT_SUPPORTED"))
                 .andExpect(jsonPath("$.unavailable.forecast.code").value("PLATFORM_NOT_SUPPORTED"))
                 .andExpect(jsonPath("$.unavailable.recap.code").value("PLATFORM_NOT_SUPPORTED"))
+                .andExpect(jsonPath("$.unavailable.lineupCheck.code").value("PLATFORM_NOT_SUPPORTED"))
                 // The synthetic scoring has statIds with no CONFIRMED translation, so the more specific reason wins.
                 .andExpect(jsonPath("$.unavailable.stats.code").value("SCORING_UNTRANSLATED"))
                 .andExpect(jsonPath("$.unavailable.powerBaseline.code").value("SCORING_UNTRANSLATED"))
@@ -148,6 +149,16 @@ class LeagueAvailabilityIT extends EspnIT {
             }
         }
         assertTrue(refused >= 10, "expected the stats, schedule, superlatives, weekly-report, expected-wins, forecast, recap routes: " + refused);
+        verifyNoInteractions(sleeper);
+    }
+
+    @Test
+    void theLineupCheckRouteIsRefusedForAnEspnLeague() throws Exception {
+        espnLeague();
+        mvc.perform(asAllan("/api/leagues/" + LEAGUE_KEY + "/lineup-check"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("PLATFORM_NOT_SUPPORTED"))
+                .andExpect(jsonPath("$.message").value("The lineup check is not available for ESPN leagues yet."));
         verifyNoInteractions(sleeper);
     }
 

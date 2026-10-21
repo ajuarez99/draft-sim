@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader'
 import Avatar from '../components/Avatar'
 import NotFound from '../components/NotFound'
 import PlayerSpotlight from '../components/PlayerSpotlight'
+import LineupCheckSection from '../components/LineupCheck'
 import PersonName from '../components/PersonName'
 import PreseasonStrengthBlock from '../components/PreseasonStrengthBlock'
 import EspnRefreshNote from '../components/EspnRefreshNote'
@@ -15,6 +16,7 @@ import {
   fetchSuperlatives,
   getLeagueAnalysis,
   getLeagueHistory,
+  getLineupCheck,
   getNextMatchup,
   getPlayerSpotlight,
   getPowerRankings,
@@ -85,6 +87,7 @@ export type { Block } from '../useBlock'
 const BLOCK_LABELS: [string, string][] = [
   ['weeklyReport', 'Latest matchup'],
   ['schedule', 'Next matchup'],
+  ['lineupCheck', 'Lineup check'],
   ['superlatives', 'Season awards'],
   ['stats', 'Player spotlight'],
   ['draftGrades', 'Draft grades'],
@@ -161,6 +164,7 @@ export default function LeagueHome() {
   const okSpotlight = allow('stats')
   const okSchedule = allow('schedule')
   const okAnalysis = allow('analysis')
+  const okLineup = allow('lineupCheck')
 
   const history = useBlock(id ? () => getLeagueHistory(id) : null, [id, version])
   const weekly = useBlock(id && okWeekly ? () => getWeeklyReport(id, 0) : null, [id, version, okWeekly])
@@ -182,6 +186,13 @@ export default function LeagueHome() {
   // Basketball only (specs/017 F7: football stays on the analysis block until its Tue/Wed
   // boundary is measured). Keyed on the data version so the visit's refresh refetches it (F8).
   const nextMatchup = useBlock(id && sport === 'nba' && okSchedule ? () => getNextMatchup(id) : null, [id, sport, version, okSchedule])
+  // specs/042 US3: your live starters' tags and byes. A member's block only (the server answers 404 to anyone
+  // else, so a non-member never asks), keyed on the data version like its neighbours (review F12).
+  const viewerIsMember = history.status === 'ok' && (seasonFor(history.data, id)?.standings ?? []).some((r) => r.isMe)
+  const lineupCheck = useBlock(id && okLineup && viewerIsMember ? () => getLineupCheck(id) : null, [id, version, okLineup, viewerIsMember])
+  // When the check read live starters it REPLACES the projected-starters note (review F5b): two lists of "your
+  // starters" from two definitions of who starts would sit side by side. The note stays as the fallback.
+  const lineupCheckLive = lineupCheck.status === 'ok' && lineupCheck.data.available
 
   // An id the server does not know (or one that is not yours) is the shared
   // not-found state; any other failure stays inside its own block.
@@ -264,8 +275,10 @@ export default function LeagueHome() {
 
         {analysis.status !== 'idle' && <NextOpponentBlock block={analysis} leagueId={id} />}
         {nextMatchup.status !== 'idle' && (
-          <NextMatchupBlock block={nextMatchup} draft={draft} note={unscored && start.sport === 'nba' ? idleStartersNote(start.firstWeek, start.strength?.available) : null} />
+          <NextMatchupBlock block={nextMatchup} draft={draft} note={unscored && start.sport === 'nba' && !lineupCheckLive ? idleStartersNote(start.firstWeek, start.strength?.available) : null} />
         )}
+
+        {lineupCheck.status === 'ok' && sport && <LineupCheckSection check={lineupCheck.data} leagueId={id} sport={sport} />}
 
         {unscored && reasonFor('draftRoom') == null && <DraftDoneBlock draftId={draftBoardId} />}
 

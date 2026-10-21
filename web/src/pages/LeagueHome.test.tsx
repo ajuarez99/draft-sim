@@ -179,6 +179,10 @@ function seasonStart(over: Partial<SeasonStart> = {}): SeasonStart {
   }
 }
 
+function lineupCheckData(over: Partial<api.LineupCheck> = {}): api.LineupCheck {
+  return { available: true, reason: null, week: 1, statusAsOf: '2026-10-21T11:02:00Z', scheduleAsOf: '2026-10-20T09:00:00Z', gameCheck: true, gameCheckReason: null, flags: [], ...over }
+}
+
 type Key = 'drafts' | 'history' | 'weekly' | 'analysis' | 'power' | 'awards' | 'seasonStart'
 
 function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
@@ -198,6 +202,11 @@ function arrange(over: Partial<Record<Key, () => Promise<unknown>>> = {}) {
       (() =>
         Promise.resolve({ sport: 'nba', season: 2026, week: 1, available: true, reason: null, me: null, opponent: null })) as never,
     ),
+    // Spec 042 US3: by default the check says nothing applies (NOT_IN_SEASON), which renders no section and
+    // leaves every pre-existing assertion about the projected-starters note exactly as it was.
+    lineupCheck: vi
+      .spyOn(api, 'getLineupCheck')
+      .mockImplementation(() => Promise.resolve(lineupCheckData({ available: false, reason: 'NOT_IN_SEASON' })) as never),
     spotlight: vi
       .spyOn(api, 'getPlayerSpotlight')
       .mockImplementation(() => Promise.resolve({ applies: false, reason: 'PAST_SEASON', season: 2025, sport: 'nfl' }) as never),
@@ -633,6 +642,50 @@ describe('League home by season state (spec 030)', () => {
       expect(within(next).getByText(/Victor Wembanyama \(SAS\), Some Guy\. Scheduled games only\./)).toBeInTheDocument()
     })
 
+    describe('lineup check (spec 042 US3)', () => {
+      const withStarterNote = () =>
+        unscored({
+          firstWeek: {
+            week: 1,
+            startDate: '2026-10-20',
+            startersWithoutGame: { week: 1, mine: [{ sleeperPlayerId: 'p1', name: 'Victor Wembanyama', team: 'SAS' }], countByRoster: {} },
+          },
+        })
+
+      it('replaces the projected-starters note once the live check is available', async () => {
+        const spies = arrangeNba(withStarterNote())
+        spies.lineupCheck.mockImplementation((() => Promise.resolve(lineupCheckData())) as never)
+        renderHome()
+        expect(await screen.findByRole('heading', { name: 'Check your lineup' })).toBeInTheDocument()
+        expect(screen.getByText('All starters are active')).toBeInTheDocument()
+        expect(screen.queryByText(/of your projected starters/)).toBeNull()
+        expect(spies.lineupCheck).toHaveBeenCalledWith('L1')
+      })
+
+      it('keeps the note as the fallback when the live rosters could not be read', async () => {
+        const spies = arrangeNba(withStarterNote())
+        spies.lineupCheck.mockImplementation((() => Promise.resolve(lineupCheckData({ available: false, reason: 'ROSTERS_FAILED' }))) as never)
+        renderHome()
+        expect(await screen.findByText(/Couldn’t read your live lineup from Sleeper right now\./)).toBeInTheDocument()
+        expect(await screen.findByText('1 of your projected starters has no game in week 1')).toBeInTheDocument()
+      })
+
+      it('keeps the note, and shows no section, when the check does not apply', async () => {
+        arrangeNba(withStarterNote())
+        renderHome()
+        expect(await screen.findByText('1 of your projected starters has no game in week 1')).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Check your lineup' })).toBeNull()
+      })
+
+      it('does not ask a reader who is not in the league', async () => {
+        const spies = arrangeNba(withStarterNote())
+        spies.history.mockImplementation((() => Promise.resolve(history(STANDINGS.map((r) => ({ ...r, isMe: false }))))) as never)
+        renderHome()
+        await waitFor(() => section('Next opponent'))
+        expect(spies.lineupCheck).not.toHaveBeenCalled()
+      })
+    })
+
     it('says so when every projected starter plays', async () => {
       arrangeNba(
         unscored({
@@ -806,6 +859,7 @@ describe('League home for an ESPN league (spec 035 F13)', () => {
       schedule: reason('PLATFORM_NOT_SUPPORTED', 'The schedule grid follows Sleeper leagues only.'),
       superlatives: reason('PLATFORM_NOT_SUPPORTED', 'Season superlatives follow Sleeper leagues only.'),
       weeklyReport: reason('PLATFORM_NOT_SUPPORTED', 'The weekly report follows Sleeper leagues only.'),
+      lineupCheck: reason('PLATFORM_NOT_SUPPORTED', 'The lineup check is not available for ESPN leagues yet.'),
     },
     ...over,
   })
@@ -825,6 +879,8 @@ describe('League home for an ESPN league (spec 035 F13)', () => {
     expect(spies.awards).not.toHaveBeenCalled()
     expect(spies.spotlight).not.toHaveBeenCalled()
     expect(spies.nextMatchup).not.toHaveBeenCalled()
+    expect(spies.lineupCheck).not.toHaveBeenCalled()
+    expect(screen.getByText(/The lineup check is not available for ESPN leagues yet\./)).toBeInTheDocument()
     // One line per hidden block, in the server's words.
     expect(screen.getByText(/Season superlatives follow Sleeper leagues only\./)).toBeInTheDocument()
     expect(screen.getByText(/The weekly report follows Sleeper leagues only\./)).toBeInTheDocument()

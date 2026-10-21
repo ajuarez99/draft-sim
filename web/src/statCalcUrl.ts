@@ -2,6 +2,7 @@ import type { LeaderboardRow, PlayerWindowKind } from './api'
 import {
   NO_FILTERS,
   hasKnownOwnership,
+  hasMine,
   ownershipOf,
   type Filters,
   type SortDir,
@@ -79,21 +80,20 @@ export function stripRoster(params: URLSearchParams): URLSearchParams {
 }
 
 /**
- * State from a query string. `rows`, once loaded, validates the filters: a position, team or roster
- * that is not in this season's rows is dropped and named in `dropped` (F9). With `rows` null (still
- * loading) the filters are taken as written.
+ * The position / team / availability filters from a query string, shared by the calculator and the
+ * stat leaderboard so one link encoding serves both (specs/042 F9). `own=` is `free`, `rostered`,
+ * `mine` or `r:<rosterId>`. Validated against `rows` once loaded; with `rows` null the filters are
+ * taken as written.
  */
-export function readCalcState(params: URLSearchParams, rows: LeaderboardRow[] | null): { state: CalcState; dropped: string[] } {
+export function readFilters(params: URLSearchParams, rows: LeaderboardRow[] | null): { filters: Filters; dropped: string[] } {
   const dropped: string[] = []
-  const w = params.get('w')
-  const m = params.get('m')
-  const topRaw = Number(params.get('top'))
   let position = params.get('pos') || null
   let team = params.get('team') || null
   let availability: Filters['availability'] = { kind: 'all' }
   const own = params.get('own')
   if (own === 'free') availability = { kind: 'free' }
   else if (own === 'rostered') availability = { kind: 'rostered' }
+  else if (own === 'mine') availability = { kind: 'mine' }
   else if (own?.startsWith('r:')) {
     const id = Number(own.slice(2))
     if (own.slice(2) !== '' && Number.isInteger(id)) availability = { kind: 'roster', rosterId: id }
@@ -115,11 +115,40 @@ export function readCalcState(params: URLSearchParams, rows: LeaderboardRow[] | 
         dropped.push(`roster ${id}`)
         availability = { kind: 'all' }
       }
+    } else if (availability.kind === 'mine' && !hasMine(rows)) {
+      // "mine" is re-resolved per season, so it survives a season switch; a viewer with no roster has none.
+      dropped.push('availability mine')
+      availability = { kind: 'all' }
     } else if (availability.kind !== 'all' && !hasKnownOwnership(rows)) {
       dropped.push(`availability ${own}`)
       availability = { kind: 'all' }
     }
   }
+
+  return { filters: { position, team, availability }, dropped }
+}
+
+/** Writes the filters into `p`, only what differs from the default. The inverse of {@link readFilters}. */
+export function writeFilters(f: Filters, p: URLSearchParams): void {
+  if (f.position) p.set('pos', f.position)
+  if (f.team) p.set('team', f.team)
+  const a = f.availability
+  if (a.kind === 'free' || a.kind === 'rostered' || a.kind === 'mine') p.set('own', a.kind)
+  else if (a.kind === 'roster') p.set('own', `r:${a.rosterId}`)
+}
+
+/**
+ * State from a query string. `rows`, once loaded, validates the filters: a position, team or roster
+ * that is not in this season's rows is dropped and named in `dropped` (F9). With `rows` null (still
+ * loading) the filters are taken as written.
+ */
+export function readCalcState(params: URLSearchParams, rows: LeaderboardRow[] | null): { state: CalcState; dropped: string[] } {
+  const dropped: string[] = []
+  const w = params.get('w')
+  const m = params.get('m')
+  const topRaw = Number(params.get('top'))
+  const { filters, dropped: filterDropped } = readFilters(params, rows)
+  dropped.push(...filterDropped)
 
   const wv: PlayerWindowKind = WINDOW_KINDS.includes(w as PlayerWindowKind) ? (w as PlayerWindowKind) : 'SEASON'
   const cmpRaw = params.get('cmp') as CompareKind | null
@@ -135,7 +164,7 @@ export function readCalcState(params: URLSearchParams, rows: LeaderboardRow[] | 
       q: params.get('q') !== '0',
       z: params.get('z') === '1',
       dir: params.get('dir') === 'asc' ? 'asc' : 'desc',
-      filters: { position, team, availability },
+      filters,
       chart: chartRaw && CHART_KINDS.includes(chartRaw) ? chartRaw : 'ranked',
       split: params.get('split') === 'pos',
       cmp,
@@ -158,11 +187,7 @@ export function writeCalcState(s: CalcState): URLSearchParams {
   if (!s.q) p.set('q', '0')
   if (s.z) p.set('z', '1')
   if (s.dir === 'asc') p.set('dir', 'asc')
-  if (s.filters.position) p.set('pos', s.filters.position)
-  if (s.filters.team) p.set('team', s.filters.team)
-  const a = s.filters.availability
-  if (a.kind === 'free' || a.kind === 'rostered') p.set('own', a.kind)
-  else if (a.kind === 'roster') p.set('own', `r:${a.rosterId}`)
+  writeFilters(s.filters, p)
   if (s.chart !== 'ranked') p.set('chart', s.chart)
   // specs/032 US5: like the axes, these stay in the link on other charts so a chart toggle keeps them.
   if (s.split) p.set('split', 'pos')

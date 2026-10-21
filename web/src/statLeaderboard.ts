@@ -297,6 +297,8 @@ export type Availability =
   | { kind: 'all' }
   | { kind: 'free' }
   | { kind: 'rostered' }
+  /** The viewer's own roster (`ownership.isMe`), re-resolved per season. */
+  | { kind: 'mine' }
   | { kind: 'roster'; rosterId: number }
 
 export type Filters = {
@@ -323,8 +325,17 @@ export function matchesAvailability(r: LeaderboardRow, a: Availability): boolean
     case 'all': return true
     case 'free': return o.state === 'FREE_AGENT'
     case 'rostered': return o.state === 'ROSTERED'
+    case 'mine': return o.state === 'ROSTERED' && o.isMe
     case 'roster': return o.state === 'ROSTERED' && o.rosterId === a.rosterId
   }
+}
+
+/** Whether any row is on the viewer's roster; "My roster" is offered only then. */
+export function hasMine(rows: LeaderboardRow[]): boolean {
+  return rows.some((r) => {
+    const o = ownershipOf(r)
+    return o.state === 'ROSTERED' && o.isMe
+  })
 }
 
 /** Whether any row's ownership is known (ROSTERED or FREE_AGENT); when none is, the ownership filters are moot (V5). */
