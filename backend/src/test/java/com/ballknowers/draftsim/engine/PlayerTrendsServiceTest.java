@@ -379,6 +379,35 @@ class PlayerTrendsServiceTest {
     }
 
     @Test
+    void rosteredByMeIsTrueForMyRosterFalseForAnotherAndNullWhenOwnershipIsUnknown() {
+        // specs/042 T005: mine, another manager's, and unknown.
+        B b = prev().info("mine", "AAA").info("theirs", "BBB");
+        b.previous.run("mine", "AAA", 0, 10, 18, 10).run("mine", "AAA", 10, 3, 32, 20);
+        b.previous.run("theirs", "BBB", 0, 10, 18, 10).run("theirs", "BBB", 10, 3, 32, 20);
+        b.rostered("mine", 1).rostered("theirs", 2);
+        b.owners.put(1, new RosterOwner("Me", null, true));
+        b.owners.put(2, new RosterOwner("Dunk Tank", null, false));
+        PlayerTrends t = b.run();
+        assertEquals(Boolean.TRUE, row(t.risers(), "mine").rosteredByMe());
+        assertEquals(Boolean.FALSE, row(t.risers(), "theirs").rosteredByMe());
+
+        b.rostered = Optional.empty();
+        for (TrendRow r : b.run().risers()) {
+            assertNull(r.rostered());
+            assertNull(r.rosteredByMe(), "unknown ownership is null, not false");
+        }
+    }
+
+    @Test
+    void aFreeAgentIsNotMine() {
+        B b = prev().info("free", "AAA");
+        b.previous.run("free", "AAA", 0, 6, 25, 10);
+        TrendRow r = row(b.run().streaming(), "free");
+        assertEquals(Boolean.FALSE, r.rostered());
+        assertEquals(Boolean.FALSE, r.rosteredByMe());
+    }
+
+    @Test
     void completeSeasonIsSeasonCompleteAndNothingIsSplit() {
         B b = streamingFixture();
         b.status = "complete";

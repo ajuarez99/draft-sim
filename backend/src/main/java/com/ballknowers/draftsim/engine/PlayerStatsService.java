@@ -16,6 +16,8 @@ import com.ballknowers.draftsim.engine.PlayerOwnership.AsOf;
 import com.ballknowers.draftsim.engine.PlayerOwnership.Facts;
 import com.ballknowers.draftsim.engine.PlayerOwnership.Ownership;
 import com.ballknowers.draftsim.engine.PlayerTrendsService.PlayerInfo;
+import com.ballknowers.draftsim.ingest.NextGames;
+import com.ballknowers.draftsim.ingest.SportSchedule;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
@@ -25,10 +27,15 @@ import com.ballknowers.draftsim.store.PlayerAbsenceRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
+import com.ballknowers.draftsim.store.SportScheduleRepository;
+import com.ballknowers.draftsim.store.StatusCaptureRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -117,13 +124,41 @@ public class PlayerStatsService {
      * @param dataAsOf         {@code max(player_game.fetched_at)} for the season; null when unknown
      * @param currentOwnership the requested season's current ownership; only when {@code requestedSeason} is set (F6)
      * @param ownership        at the end of the answered season's regular season, or current when it is in progress
+     * @param status           the header's injury/suspension status and when it was refreshed (specs/042); null when
+     *                         unavailable, when there is no player row, or when the URL's league is complete
+     * @param nextGame         the player's team's next counted game (specs/042); null with {@code nextGameReason}
+     * @param nextGameReason   NO_TEAM, NO_GAMES_LEFT or NO_SCHEDULE; null exactly when {@code nextGame} is set
+     *                         (and null on an unavailable page, which has no header)
+     * @param upcoming         up to {@value #UPCOMING_LIMIT} of the team's next counted games, earliest first, for the
+     *                         Schedule tab; empty when {@code nextGame} is null
+     * @param scheduleAsOf     when the stored schedule was fetched (a game played earlier today can still read
+     *                         pre_game until the next refresh); null when no schedule is stored
      */
     public record PlayerStatsPage(String sport, int season, Integer requestedSeason, boolean available,
                                   String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
                                   Ownership currentOwnership, PlayerRef player, List<String> teamsThisSeason,
                                   int teamGamesMissed, Ownership ownership, Map<WindowKind, Window> windows,
                                   Fantasy fantasy, Map<WindowKind, Map<String, List<Pct>>> percentiles,
-                                  List<GameLogRow> gameLog, QualificationRule qualification) {}
+                                  List<GameLogRow> gameLog, QualificationRule qualification,
+                                  PlayerStatus status, NextGame nextGame, String nextGameReason,
+                                  List<NextGame> upcoming, OffsetDateTime scheduleAsOf) {}
+
+    public static final String NO_TEAM = "NO_TEAM";
+    public static final String NO_GAMES_LEFT = "NO_GAMES_LEFT";
+    public static final String NO_SCHEDULE = "NO_SCHEDULE";
+    public static final int UPCOMING_LIMIT = 7;
+
+    /**
+     * Sleeper's raw {@code injury_status} and {@code player.status} (NBA suspension is {@code status = "SUS"}
+     * with a null injury status, measured 2026-10-20), and when the player rows were last refreshed
+     * ({@link StatusCaptureRepository#statusAsOf}); {@code asOf} null means unknown, never fresh.
+     * {@code out} is the one "will not play" rule ({@link LeagueAnalysisService#isUnavailable} or
+     * {@code rules.isSuspended}, review F4), computed here so the client never restates it.
+     */
+    public record PlayerStatus(String injuryStatus, String status, boolean out, OffsetDateTime asOf) {}
+
+    /** A scheduled game. {@code date} only: the stored schedule has no time of day. */
+    public record NextGame(String gameId, LocalDate date, String opponent, Boolean isHome, int week) {}
 
     /**
      * Who the page ranks (the rule behind {@link #qualify}), so the client never restates it. {@code minGames}
@@ -220,13 +255,17 @@ public class PlayerStatsService {
     private final SportRulesRegistry rules;
     private final PlayerAbsenceRepository absences;
     private final DraftAndAdpJoin draftJoin;
+    private final SportScheduleRepository schedules;
+    private final StatusCaptureRepository statusCaptures;
+    private final Clock clock;
 
     public PlayerStatsService(PlayerStatsProperties props, SeasonBoxCache boxCache, LeagueSeasonResolver resolver,
                               GameScoringService scorer, LeagueRepository leagues, PlayerRepository players,
                               RosterSeasonRepository rosterSeasons, LeagueMemberRepository members,
                               ManagerRepository managers, RosterWeekPointsRepository weekPoints,
                               SportRulesRegistry rules, PlayerAbsenceRepository absences,
-                              DraftAndAdpJoin draftJoin) {
+                              DraftAndAdpJoin draftJoin, SportScheduleRepository schedules,
+                              StatusCaptureRepository statusCaptures, Clock clock) {
         this.props = props;
         this.boxCache = boxCache;
         this.resolver = resolver;
@@ -240,6 +279,9 @@ public class PlayerStatsService {
         this.rules = rules;
         this.absences = absences;
         this.draftJoin = draftJoin;
+        this.schedules = schedules;
+        this.statusCaptures = statusCaptures;
+        this.clock = clock;
     }
 
     // ------------------------------------------------------------------ read
@@ -282,14 +324,17 @@ public class PlayerStatsService {
         OffsetDateTime dataAsOf = box.token().maxFetchedAt();
 
         Map<String, PlayerInfo> infos = new HashMap<>();
+        Player targetPlayer = null;
         for (Map.Entry<String, Player> e : players.byIds(sport, box.lines().byPlayer().keySet()).entrySet()) {
             Player p = e.getValue();
+            if (e.getKey().equals(sleeperPlayerId)) targetPlayer = p;
             infos.put(e.getKey(), new PlayerInfo(p.name(), p.positions().stream().map(Enum::name).toList(), p.team()));
         }
         PlayerInfo targetInfo = infos.get(sleeperPlayerId);
         if (targetInfo == null) {
             Player p = players.byIds(sport, List.of(sleeperPlayerId)).get(sleeperPlayerId);
             if (p != null) {
+                targetPlayer = p;
                 targetInfo = new PlayerInfo(p.name(), p.positions().stream().map(Enum::name).toList(), p.team());
                 infos.put(sleeperPlayerId, targetInfo);
             }
@@ -328,11 +373,53 @@ public class PlayerStatsService {
             currentOwnership = PlayerOwnership.currentOf(sleeperPlayerId, facts(requested, requestedOwners));
         }
 
+        Header header = header(requested, targetPlayer);
         return Optional.of(new PlayerStatsPage(sport.code(), dataSeason, requestedSeason, true,
                 hasGames ? null : NO_PLAYER_GAMES, dataAsOf, seasons, currentOwnership, ref, c.teams(),
                 c.teamGamesMissed(), ownership, c.windows(), c.fantasy(), percentiles, c.gameLog(),
                 new QualificationRule(props.rankMinGamesShare(), minGames(box.lines(), props),
-                        maxTeamGames(box.lines()), props.rankMinMinutesPerGame(), props.recencyDays())));
+                        maxTeamGames(box.lines()), props.rankMinMinutesPerGame(), props.recencyDays()),
+                header.status(), header.nextGame(), header.reason(), header.upcoming(), header.scheduleAsOf()));
+    }
+
+    private record Header(PlayerStatus status, NextGame nextGame, String reason, List<NextGame> upcoming,
+                          OffsetDateTime scheduleAsOf) {}
+
+    /**
+     * The header's status and next game (specs/042 US2, review F1 BLOCKER).
+     *
+     * <p><b>Everything here comes from {@code requested}</b> -- the URL's league row, the one
+     * {@code visibleLeague} returned -- and the player's <i>current</i> {@code player.team}. It never reads the
+     * resolved league or {@code dataSeason}: {@link #read} falls back to an earlier season's box scores
+     * ({@code requestedSeason}) whenever the URL's season has none yet, which is every NBA player page on
+     * opening night, and blanking "next game" then would blank it exactly when it matters. The page's stats
+     * are about the answered season; a game that is about to be played is about the URL's.
+     *
+     * <p>Gated on the URL league being complete only: a finished season has no games left and its status is
+     * today's, not that season's. A pre-draft league is not gated: the player's real next game does not depend
+     * on the league's draft, and no reason code in the contract says otherwise.
+     */
+    private Header header(LeagueRow requested, Player target) {
+        if (requested.complete()) return new Header(null, null, NO_GAMES_LEFT, List.of(), null);
+        Sport sport = requested.sport();
+        Instant asOf = statusCaptures.statusAsOf(sport, requested.season()).orElse(null);
+        PlayerStatus status = target == null ? null : new PlayerStatus(target.injuryStatus(), target.status(),
+                LeagueAnalysisService.isUnavailable(target.injuryStatus()) || rules.get(sport).isSuspended(target),
+                asOf == null ? null : OffsetDateTime.ofInstant(asOf, ZoneOffset.UTC));
+        String team = target == null ? null : target.team();
+        if (team == null || team.isBlank()) return new Header(status, null, NO_TEAM, List.of(), null);
+        List<SportSchedule.Game> games = schedules.forSeason(sport.code(), requested.season());
+        if (games.isEmpty()) return new Header(status, null, NO_SCHEDULE, List.of(), null);
+        OffsetDateTime scheduleAsOf = schedules.fetchedAt(sport.code(), requested.season()).orElse(null);
+        List<NextGame> upcoming = NextGames.forTeam(games, team, NextGames.today(clock), UPCOMING_LIMIT).stream()
+                .map(g -> toNextGame(g, team)).toList();
+        if (upcoming.isEmpty()) return new Header(status, null, NO_GAMES_LEFT, List.of(), scheduleAsOf);
+        return new Header(status, upcoming.getFirst(), null, upcoming, scheduleAsOf);
+    }
+
+    private static NextGame toNextGame(SportSchedule.Game g, String team) {
+        boolean home = team.equals(g.home());
+        return new NextGame(g.gameId(), g.date(), home ? g.away() : g.home(), home, g.week());
     }
 
     /**
@@ -361,7 +448,7 @@ public class PlayerStatsService {
                                                OffsetDateTime dataAsOf, List<SeasonOption> seasons, PlayerRef player) {
         return new PlayerStatsPage(sport.code(), season, requestedSeason, false, reason, dataAsOf, seasons, null,
                 player, List.of(), 0, null, new EnumMap<>(WindowKind.class), null, new EnumMap<>(WindowKind.class),
-                List.of(), null);
+                List.of(), null, null, null, null, List.of(), null);
     }
 
     // ------------------------------------------------------------------ leaderboard (contract C2)

@@ -1,17 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import Avatar from '../components/Avatar'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import NotFound from '../components/NotFound'
+import OwnershipMark from '../components/OwnershipMark'
 import PageHeader from '../components/PageHeader'
 import PlayerLink from '../components/PlayerLink'
 import {
   getStatLeaderboard,
   type LeaderboardRow,
-  type PlayerOwnership,
   type PlayerWindowKind,
   type StatLeaderboard as Board,
 } from '../api'
-import { Cell, DASH, GRADES_REASONS, adpSentence } from '../statCells'
+import { Cell, GRADES_REASONS, adpSentence } from '../statCells'
 import { FilterBar, MODES, PlayerCell, SeasonPicker, Segmented, StatsPagesNav, WINDOWS } from '../components/statControls'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import {
@@ -19,7 +18,6 @@ import {
   GROUPS,
   LEADER_CATEGORIES,
   LEADERS_SIZE,
-  NO_FILTERS,
   applyFilters,
   boardContext,
   categoryLeaders,
@@ -45,6 +43,7 @@ import {
   reasonSentence,
   seasonLabel,
 } from '../statCopy'
+import { readFilters, stripRoster, writeFilters } from '../statCalcUrl'
 import { useBlock } from '../useBlock'
 
 /**
@@ -55,24 +54,6 @@ import { useBlock } from '../useBlock'
  * itself never scrolls sideways. Every cell that cannot show a number says why (or carries the
  * reason in its tooltip) -- never a blank, never a 0 standing in for "unknown".
  */
-
-function OwnerCell({ o }: { o: PlayerOwnership }) {
-  switch (o.state) {
-    case 'ROSTERED':
-      return (
-        <span className="pp-owner">
-          <Avatar avatarId={o.avatarId} seed={o.ownerName ?? String(o.rosterId ?? '')} label={o.ownerName} isMe={o.isMe} />
-          <span className="pp-owner-name">{o.ownerName ?? 'A team in this league'}</span>
-        </span>
-      )
-    case 'FREE_AGENT':
-      return <span className="lh-fa">Free agent</span>
-    case 'NOT_DRAFTED':
-      return <span className="muted small" title={reasonSentence('NOT_DRAFTED')}>not drafted</span>
-    case 'UNAVAILABLE':
-      return <span className="muted small" title={reasonSentence('UNAVAILABLE')}>{DASH}</span>
-  }
-}
 
 function DraftNotes({ d }: { d: Board }) {
   const g = d.draftGrades
@@ -174,7 +155,9 @@ export default function StatLeaderboard() {
   const [mode, setMode] = useState<StatMode>('perGame')
   const [group, setGroup] = useState<ColumnGroup>('fantasy')
   const [sort, setSort] = useState<SortState>({ col: 'fp', dir: 'desc' })
-  const [filters, setFilters] = useState<Filters>(NO_FILTERS)
+  // specs/042 T009: the filters live in the URL (same `own=`/`pos=`/`team=` as the calculator), so a reload
+  // or a shared link keeps them. Everything else on this page is still component state.
+  const [params, setParams] = useSearchParams()
   const [qualifiedOnly, setQualifiedOnly] = useState(true)
   const [view, setView] = useState<'table' | 'leaders'>('table')
 
@@ -182,6 +165,13 @@ export default function StatLeaderboard() {
   const d = block.status === 'ok' ? block.data : null
 
   const rows = d?.rows ?? []
+  const { filters, dropped } = useMemo(() => readFilters(params, d?.rows ?? null), [params, d])
+  const setFilters = (f: Filters) => {
+    const next = new URLSearchParams(params)
+    for (const k of ['pos', 'team', 'own']) next.delete(k)
+    writeFilters(f, next)
+    setParams(next, { replace: true })
+  }
   const shown = useMemo(
     () => sortRows(applyFilters(rows, filters, { qualifiedOnly, sortCol: sort.col }), sort, mode),
     [rows, filters, qualifiedOnly, sort, mode],
@@ -229,7 +219,7 @@ export default function StatLeaderboard() {
 
       {d && d.available && !d.reason && (
         <>
-          <SeasonPicker d={d} leagueId={shownLeagueId} />
+          <SeasonPicker d={d} leagueId={shownLeagueId} keepSearch={stripRoster} />
           {d.requestedSeason != null && (
             <p className="small pt-note" role="note">
               {fallbackNote(seasonLabel(d.requestedSeason), seasonLabel(d.season))}
@@ -265,6 +255,9 @@ export default function StatLeaderboard() {
           )}
 
           <FilterBar rows={rows} f={filters} onChange={setFilters} nowLabel={nowLabel} />
+          {dropped.length > 0 && (
+            <p className="small pt-note" role="note">{`This link named a filter that isn’t in this season’s data, so it was left out: ${dropped.join(', ')}.`}</p>
+          )}
 
           {view === 'table' ? (
             <>
@@ -326,11 +319,11 @@ export default function StatLeaderboard() {
                   </thead>
                   <tbody>
                     {shown.map((r) => (
-                      <tr key={r.sleeperPlayerId}>
+                      <tr key={r.sleeperPlayerId} className={ownershipOf(r).isMe ? 'mine' : undefined}>
                         <th scope="row" className="sl-pin">
                           <PlayerCell row={r} sport={d.sport} leagueId={shownLeagueId} />
                         </th>
-                        <td className="sl-owner"><OwnerCell o={ownershipOf(r)} /></td>
+                        <td className="sl-owner"><OwnershipMark o={ownershipOf(r)} /></td>
                         {cols.map((c) => (
                           <td key={c.id} className={c.id === 'fp' ? 'pp-fant pp-strong' : undefined}>
                             <Cell col={c} row={r} d={d} mode={mode} />

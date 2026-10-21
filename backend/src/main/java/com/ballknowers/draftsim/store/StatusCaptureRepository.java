@@ -7,12 +7,15 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -70,6 +73,33 @@ public class StatusCaptureRepository {
                     ps.setInt(3, week);
                     ps.setString(4, id);
                 });
+    }
+
+    /**
+     * When this sport's player statuses (injury_status, status) were last refreshed, or empty when that
+     * isn't known (specs/042 T004, review F2).
+     *
+     * <p>The greatest of the season's {@code status_capture.captured_at} (max across weeks) and the
+     * daily job's {@code PLAYERS} {@code completed_at}. Neither alone is right: {@code status_capture} is
+     * not written outside {@code season_type == regular} or when the state call fails, although the
+     * player rows are rewritten regardless, and {@code daily_capture} is not written by a manual
+     * {@code /api/ingest/players}. Empty means <i>unknown</i>, never "fresh"; the caller must say so.
+     */
+    public Optional<Instant> statusAsOf(Sport sport, int season) {
+        return statusAsOf(sport.code(), season);
+    }
+
+    /** The code-keyed form, so the IT can isolate a throwaway sport key. */
+    Optional<Instant> statusAsOf(String sportCode, int season) {
+        return db.sql("""
+                select greatest(
+                    (select max(captured_at) from status_capture where sport = ? and season = ?),
+                    (select max(completed_at) from daily_capture where sport = ? and kind = 'PLAYERS'))
+                """)
+                .params(sportCode, season, sportCode)
+                .query((rs, i) -> rs.getObject(1, OffsetDateTime.class))
+                .list().stream().filter(Objects::nonNull).findFirst()
+                .map(OffsetDateTime::toInstant);
     }
 
     /** Every week this sport/season has a status_capture row for -- FR-019's "we actually looked" record. */

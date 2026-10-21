@@ -2866,6 +2866,8 @@ export type TrendRow = {
   missedTeamGames: number
   rostered: boolean | null
   rosteredBy: string | null
+  /** null exactly when `rostered` is null (ownership unknown); false for a free agent (spec 042). */
+  rosteredByMe: boolean | null
   gamesThisWeek: number | null
   gamesNextWeek: number | null
 }
@@ -3072,6 +3074,38 @@ export type PlayerStatsPage = {
   gameLog: PlayerGameLogRow[]
   /** The ranking rule the server applied; null when `available` is false. */
   qualification: PlayerQualificationRule | null
+  /**
+   * specs/042: the header's status and next game. Computed from the league in the URL and the player's
+   * CURRENT team, not from `season`/`requestedSeason`. Null when `available` is false, when there is no
+   * player row, or when the URL's league is complete.
+   */
+  status: PlayerStatus | null
+  nextGame: NextGame | null
+  /** Null exactly when `nextGame` is set (and on a page with no header). */
+  nextGameReason: NextGameReason | null
+  /** Up to 7 of the team's next counted games, earliest first; empty when `nextGame` is null. */
+  upcoming: NextGame[]
+  /** When the stored schedule was fetched (a game played earlier today can still read pre_game until the next refresh); null = no schedule. */
+  scheduleAsOf: string | null
+}
+export type NextGameReason = 'NO_TEAM' | 'NO_GAMES_LEFT' | 'NO_SCHEDULE'
+export type PlayerStatus = {
+  /** Sleeper's raw injury_status (Out, IR, Questionable, DTD, GTD, ...). */
+  injuryStatus: string | null
+  /** Sleeper's player.status; NBA suspension is 'SUS' here with a null injuryStatus. */
+  status: string | null
+  /** The server's one "will not play" rule (Out/IR/Sus injury tag, or suspended); the client never restates it. */
+  out: boolean
+  /** When the player rows were last refreshed; null = unknown (never read as fresh). */
+  asOf: string | null
+}
+export type NextGame = {
+  gameId: string
+  /** ISO date, no time of day: the stored schedule has none. */
+  date: string
+  opponent: string | null
+  isHome: boolean | null
+  week: number
 }
 export type PlayerQualificationRule = {
   minGamesShare: number
@@ -3084,6 +3118,57 @@ export type PlayerQualificationRule = {
 }
 export const getPlayerStats = (leagueId: string, playerId: string) =>
   apiFetch(`/api/leagues/${leagueId}/players/${encodeURIComponent(playerId)}`).then(json<PlayerStatsPage>)
+
+// --- specs/042 US3: the lineup check (contracts/lineup-check.md) ---
+// Mirrors engine/LineupCheck's records field for field. `player` is the player page's PlayerStatsPlayer
+// (PlayerStatsService.PlayerRef). Facts only: nothing here says who should start (SC-006).
+export type LineupCheckUnavailableReason = 'NOT_MEMBER' | 'NOT_IN_SEASON' | 'ROSTERS_FAILED'
+export type LineupFlagReason = 'EMPTY_SLOT' | 'OUT' | 'LISTED' | 'NO_GAME_IN_WEEK' | 'UNKNOWN_PLAYER'
+/** Why the game check did not run: no stored schedule, Sleeper has not said the week, or the schedule lacks that week. */
+export type LineupGameCheckReason = 'NO_SCHEDULE' | 'WEEK_UNKNOWN' | 'WEEK_NOT_IN_SCHEDULE'
+/** How `options` are sorted: season fp/g high to low, by name, or not at all (the slot name has no eligibility rule). */
+export type LineupOptionsOrder = 'FP_PER_GAME' | 'NAME' | 'SLOT_UNSUPPORTED'
+export type BenchOption = {
+  player: PlayerStatsPlayer
+  /** Counted games still to play this week; null when there is no game check. A fact, never a sort key. */
+  gamesLeft: number | null
+  fpPerGame: number | null
+  /** The season `fpPerGame` is from (it falls back to an earlier season early in a year); null with no average. */
+  fpSeason: number | null
+  /** Games behind `fpPerGame`; 0 with no average. */
+  fpGames: number
+  /** Sleeper's raw tag for a LISTED bench player (DTD, GTD, Questionable, ...); null when untagged. An OUT player is never an option. */
+  injuryStatus: string | null
+}
+export type LineupFlag = {
+  slot: string
+  /** Null for an empty slot. */
+  player: PlayerStatsPlayer | null
+  reason: LineupFlagReason
+  /** Sleeper's raw injury_status. */
+  injuryStatus: string | null
+  /** Sleeper's player.status as stored; NBA suspension is 'SUS' here with a null injuryStatus. */
+  playerStatus: string | null
+  options: BenchOption[]
+  optionsOrder: LineupOptionsOrder
+}
+export type LineupCheck = {
+  available: boolean
+  reason: LineupCheckUnavailableReason | null
+  week: number | null
+  /** When player statuses were last refreshed; null = unknown (never read as fresh). */
+  statusAsOf: string | null
+  /** When the stored schedule was fetched; null = no schedule stored. */
+  scheduleAsOf: string | null
+  /** False when NO_GAME_IN_WEEK could not be evaluated; `gameCheckReason` says why. */
+  gameCheck: boolean
+  /** Null exactly when `gameCheck` is true (and on an unavailable check). */
+  gameCheckReason: LineupGameCheckReason | null
+  /** Starters with a reason, in starter order; empty means every starter is active. */
+  flags: LineupFlag[]
+}
+export const getLineupCheck = (leagueId: string) =>
+  apiFetch(`/api/leagues/${leagueId}/lineup-check`).then(json<LineupCheck>)
 
 // --- specs/022-player-stat-analysis: the stats leaderboard (contracts/api.md C2) ---
 // Mirrors PlayerStatsService.StatLeaderboard / LeaderboardRow, ReplacementLevel.Replacement and

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AXIS_FORMULA, DEFAULT_STATE, defaultCmp, readCalcState, stripRoster, writeCalcState, type CalcState } from './statCalcUrl'
+import { AXIS_FORMULA, DEFAULT_STATE, defaultCmp, readCalcState, readFilters, stripRoster, writeCalcState, writeFilters, type CalcState } from './statCalcUrl'
 import { owner, row } from './testStatBoard'
 
 /** specs/032 T014, contract C2. */
@@ -110,6 +110,35 @@ describe('chart, x and y (US4, FR-018)', () => {
     const back = read(writeCalcState(s).toString()).state
     expect(back).toEqual(s)
     expect(AXIS_FORMULA).toBe('f')
+  })
+})
+
+describe('own=mine (specs/042 T008, F9)', () => {
+  const mineRows = [row('1', { ownership: owner({ rosterId: 1, isMe: true }) }), row('2')]
+
+  it('round-trips through the calculator state', () => {
+    const s = { ...DEFAULT_STATE, filters: { position: null, team: null, availability: { kind: 'mine' as const } } }
+    expect(writeCalcState(s).toString()).toBe('own=mine')
+    expect(read('own=mine', mineRows).state).toEqual(s)
+    expect(read('own=mine', mineRows).dropped).toEqual([])
+  })
+
+  it('is dropped, and named, when no row is the viewer’s', () => {
+    const { state, dropped } = read('own=mine')
+    expect(state.filters.availability).toEqual({ kind: 'all' })
+    expect(dropped).toEqual(['availability mine'])
+  })
+
+  it('is taken as written while the rows are loading, and survives stripRoster', () => {
+    expect(readCalcState(new URLSearchParams('own=mine'), null).state.filters.availability).toEqual({ kind: 'mine' })
+    expect(stripRoster(new URLSearchParams('own=mine&f=pts')).toString()).toBe('own=mine&f=pts')
+  })
+
+  it('shares the filter encoding with the leaderboard', () => {
+    const p = new URLSearchParams()
+    writeFilters({ position: 'C', team: 'DEN', availability: { kind: 'mine' } }, p)
+    expect(p.toString()).toBe('pos=C&team=DEN&own=mine')
+    expect(readFilters(p, null).filters).toEqual({ position: 'C', team: 'DEN', availability: { kind: 'mine' } })
   })
 })
 

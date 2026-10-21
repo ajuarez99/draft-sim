@@ -61,12 +61,17 @@ public class PlayerTrendsService {
 
     public record OneGameCredit(String code, double share, int seasonMeasured) {}
 
+    /**
+     * {@code rosteredByMe} (specs/042 T005): null exactly when {@code rostered} is null (ownership unknown);
+     * otherwise {@link RosterOwners.RosterOwner#isMe} of the owning roster, false for a free agent.
+     */
     public record TrendRow(String sleeperPlayerId, String name, List<String> positions, String team,
                            int games, LocalDate lastGameDate,
                            Double recentMin, Double seasonMin, Double minDelta, String role,
                            Double recentUsg, Double seasonUsg, Double ptsPerMin,
                            Double seasonPts, Double formPts, int missedTeamGames,
-                           Boolean rostered, String rosteredBy, Integer gamesThisWeek, Integer gamesNextWeek) {}
+                           Boolean rostered, String rosteredBy, Boolean rosteredByMe,
+                           Integer gamesThisWeek, Integer gamesNextWeek) {}
 
     public record PlayerTrends(String sport, int season, boolean available, String reason,
                                Integer rolesSeason, boolean rolesFallback,
@@ -388,12 +393,15 @@ public class PlayerTrendsService {
                                 Map<String, Integer> rosterOf, Input in, boolean complete) {
         Boolean rostered = null;
         String rosteredBy = null;
+        Boolean rosteredByMe = null;
         if (ownershipKnown) {
             Integer rid = rosterOf.get(pid);
             rostered = rid != null;
+            rosteredByMe = false;
             if (rid != null) {
                 RosterOwners.RosterOwner o = in.owners().get(rid);
                 rosteredBy = o == null ? "Roster " + rid : o.name();
+                rosteredByMe = o != null && o.isMe();
             }
         }
         Integer thisWeek = null;
@@ -405,7 +413,7 @@ public class PlayerTrendsService {
         return new TrendRow(pid, info.name(), info.positions(), team, st.games(), st.lastGame(),
                 st.recentMin(), st.seasonMin(), st.minDelta(), st.role(), st.recentUsg(), st.seasonUsg(),
                 st.ptsPerMin(), st.seasonPts(), st.formPts(), st.missedTeamGames(),
-                rostered, rosteredBy, thisWeek, nextWeek);
+                rostered, rosteredBy, rosteredByMe, thisWeek, nextWeek);
     }
 
     /** The grid cell for a team in a week NUMBER (not a position: N8); null when either is not in the grid. */

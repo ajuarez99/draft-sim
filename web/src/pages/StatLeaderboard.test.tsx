@@ -283,6 +283,59 @@ describe('StatLeaderboard', () => {
     expect(screen.getByRole('link', { name: 'Ann Alpha' })).toHaveAttribute('href', '/leagues/L25/players/1')
   })
 
+  describe('filters in the URL (specs/042 T009)', () => {
+    const mineRows = () => [
+      row('1', { name: 'Ann Alpha', ownership: owner({ rosterId: 3, isMe: true, ownerName: 'Me' }) }),
+      row('2', { name: 'Bob Beta', ownership: owner({ rosterId: 4, ownerName: 'Dee' }) }),
+      row('3', { name: 'Cy Free', ownership: owner({ state: 'FREE_AGENT', rosterId: null, ownerName: null }) }),
+    ]
+
+    it('a reload with own=mine keeps the filter and shows only my players, with a Yours mark', async () => {
+      getStatLeaderboard.mockResolvedValue(board(mineRows()))
+      mount('/leagues/L25/stats?own=mine')
+      await screen.findByRole('region', { name: 'Player stats' })
+      expect(order()).toEqual(['Ann Alpha'])
+      expect(screen.getByLabelText('Availability')).toHaveValue('mine')
+      expect(screen.getByText('Yours')).toBeInTheDocument()
+    })
+
+    it('choosing My roster filters to my players', async () => {
+      getStatLeaderboard.mockResolvedValue(board(mineRows()))
+      mount()
+      await screen.findByRole('region', { name: 'Player stats' })
+      fireEvent.change(screen.getByLabelText('Availability'), { target: { value: 'mine' } })
+      expect(order()).toEqual(['Ann Alpha'])
+    })
+
+    it('does not offer My roster when nobody is the viewer', async () => {
+      getStatLeaderboard.mockResolvedValue(board(rows()))
+      mount()
+      await screen.findByRole('region', { name: 'Player stats' })
+      expect(within(screen.getByLabelText('Availability')).queryByRole('option', { name: 'My roster' })).not.toBeInTheDocument()
+    })
+
+    it('a season switch drops own=r:<id> (roster ids repeat) and keeps own=mine', async () => {
+      getStatLeaderboard.mockResolvedValue(board(mineRows()))
+      mount('/leagues/L25/stats?own=r:3&team=LAL')
+      const nav = await screen.findByRole('navigation', { name: 'Season' })
+      const other = within(nav).getByRole('link', { name: /2024/ })
+      expect(other).toHaveAttribute('href', '/leagues/L24/stats?team=LAL')
+    })
+
+    it('keeps own=mine across a season switch', async () => {
+      getStatLeaderboard.mockResolvedValue(board(mineRows()))
+      mount('/leagues/L25/stats?own=mine')
+      const nav = await screen.findByRole('navigation', { name: 'Season' })
+      expect(within(nav).getByRole('link', { name: /2024/ })).toHaveAttribute('href', '/leagues/L24/stats?own=mine')
+    })
+
+    it('names a filter the link carried that this season does not have', async () => {
+      getStatLeaderboard.mockResolvedValue(board(mineRows()))
+      mount('/leagues/L25/stats?team=ZZZ')
+      expect(await screen.findByText(/left out: team ZZZ/)).toBeInTheDocument()
+    })
+  })
+
   it.each([
     ['NOT_BASKETBALL', /for basketball leagues/],
     ['NOT_CONFIGURED', /aren’t set up/],
