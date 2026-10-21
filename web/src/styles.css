@@ -6449,3 +6449,32 @@ td.rv-po { border-left: 1px dashed var(--line); }
 /* Spec 040 US3: the Teams / Players toggle on a standings panel, and a player row's team chip. */
 .sl-view-toggle { margin: 0 0 8px; }
 .sl-contribution-team { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+
+/* Spec 043: the admin morning digest (an unlisted page). One bordered card per post, textarea + counter + Copy. */
+.dg-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.dg-toolbar label, .dg-token label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.dg-toolbar input[type="date"], .dg-token input {
+  font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px;
+}
+.dg-token form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.dg-sport { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.dg-status { margin: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.dg-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); min-width: 0; }
+.dg-card {
+  display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px; background: color-mix(in oklab, var(--bg) 35%, var(--panel));
+}
+.dg-card h3 { margin: 0; font-size: 13px; }
+.dg-card p { margin: 0; }
+.dg-card textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; padding: 10px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text);
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.dg-card textarea:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.dg-card-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dg-card-actions { display: inline-flex; gap: 8px; margin-left: auto; }
+.dg-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.dg-count.over { color: var(--down); font-weight: 700; }
+.dg-notes { margin: 0; padding-left: 18px; }

@@ -165,6 +165,22 @@ public class PlayerGameRepository {
     }
 
     /**
+     * The seasons that have player rows on one calendar date, newest first (specs/043, T004). An
+     * explicit past date has to name its season: the 2025 NBA finale is dated 2026-04, so "the
+     * current season" is the wrong guess for it. Normally one season; two only if a date straddles.
+     */
+    public List<Integer> seasonsOn(Sport sport, LocalDate date) {
+        return db.sql("""
+                select distinct season from player_game
+                where sport = ? and game_date = ?
+                order by season desc
+                """)
+                .params(sport.code(), java.sql.Date.valueOf(date))
+                .query(Integer.class)
+                .list();
+    }
+
+    /**
      * Every game played by a specific set of players in one sport and season
      * (specs/008-season-superlatives, research R10): the input to a player's
      * mean points per game played, over however many weeks are stored.

@@ -34,6 +34,13 @@ Built so far:
   and their likely next pick, re-projected in the background after every pick. A position
   scarcity meter (starter pool = the board's top teams × starters) and a per-manager
   "Room read" sit beside it.
+- **Morning tweet digest** (specs/043-tweet-digest-admin). An unlinked admin page,
+  `/admin/digest`, asks for the operator's `X-Admin-Token`. It turns last night's stored games
+  into copyable posts of 280 characters or fewer: Sleeper's most-added players and how they did,
+  top fantasy scores, how the top-15 stars did against their own average, the best single line,
+  and NFL position leaders. Points are Sleeper's own (`pts_std` for NBA, `pts_ppr` for NFL), not
+  any league's scoring. Read-only, apart from a "Fetch latest stats" button, which is needed
+  because no scheduled job fetches the night's stat lines.
 - **Trade verdicts** (specs/033-trade-verdicts). Roster Management grades every trade by the
   started points the received assets actually scored for their new team, from the first scored
   week they were on it. Ownership comes from the weekly scoring rows, not the transaction's week,
