@@ -1,6 +1,6 @@
 // Types mirror the Java records in engine/SimulationResult.java. They are
 // hand-maintained; if you change a record over there, change it here.
-import { ApiError, isNotFound } from './apiError'
+import { AdminTokenRequiredError, ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
 
@@ -3673,3 +3673,116 @@ export type Rivalries = {
 }
 export const getRivalries = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/rivalries`).then(json<Rivalries>)
+
+// ---- Morning tweet digest (spec 043). Mirrors AdminDigestService's records field for field. ----
+
+export type DigestStatus =
+  | 'READY'
+  | 'NO_GAMES_LAST_NIGHT'
+  | 'NOT_FETCHED'
+  | 'NIGHT_INCOMPLETE'
+  | 'NO_GAMES_ON_DATE'
+  | 'NO_SEASON'
+  | 'DATE_IN_FUTURE'
+
+/** Non-zero headline stats only (NBA: pts reb ast stl blk tpm; NFL: pass_yd ... rec_td). */
+export type DigestLine = Record<string, number>
+
+export type DigestEntry = {
+  playerId: string
+  name: string
+  position: string
+  team: string | null
+  opponent: string | null
+  isAway: boolean | null
+  /** Null unless he played that night. */
+  points: number | null
+  line: DigestLine | null
+}
+
+export type DigestTrendingOutcome = 'PLAYED' | 'DID_NOT_PLAY' | 'NO_GAME' | 'NO_PERIOD'
+
+export type DigestTrendingItem = {
+  rank: number
+  addCount: number
+  outcome: DigestTrendingOutcome
+  entry: DigestEntry
+}
+
+export type DigestTrendingCard = {
+  status: 'OK' | 'NEVER_FETCHED' | 'TRENDING_NOT_HISTORICAL'
+  lookbackHours: number
+  fetchedAt: string | null
+  stale: boolean
+  omittedUnknownPlayers: number
+  entries: DigestTrendingItem[]
+}
+
+export type DigestKeyEntry = {
+  rank: number
+  entry: DigestEntry
+  played: boolean
+  expectation: number | null
+  expectationBasis: 'THIS_SEASON' | 'LAST_SEASON' | 'NONE'
+  verdict: 'ABOVE' | 'BELOW' | 'DNP' | 'NO_BASELINE'
+}
+
+export type SportDigest = {
+  sport: 'nba' | 'nfl'
+  season: number | null
+  pointsBasis: string
+  status: DigestStatus
+  statsFetchedAt: string | null
+  date: string | null
+  week: number | null
+  gamesCount: number | null
+  lastSlateDate: string | null
+  inProgressDate: string | null
+  nextGameDate: string | null
+  trending: DigestTrendingCard | null
+  topPerformers: DigestEntry[]
+  keyPlayers: DigestKeyEntry[]
+  /** NFL only; null for basketball. */
+  positionLeaders: DigestEntry[] | null
+}
+
+export type AdminDigest = {
+  generatedAt: string
+  yesterday: string
+  sports: SportDigest[]
+}
+
+export type DigestRefreshResult = {
+  sport: 'nba' | 'nfl'
+  season: number | null
+  weeksFetched: number
+  gamesStored: number
+  weeksFailed: number
+  scheduleStoreFailed: boolean
+  error: string | null
+}
+
+/**
+ * The digest routes need `X-Admin-Token` on top of what every call already sends, so they go through
+ * apiFetch like the rest (Authorization and X-Sleeper-User stay). A 403 `admin_token_required` becomes
+ * an AdminTokenRequiredError the page can detect; anything else is an ordinary ApiError.
+ */
+async function adminJson<T>(res: Response): Promise<T> {
+  if (res.status === 403) {
+    const body: { code?: string } = await res.json().catch(() => ({}))
+    if (body.code === 'admin_token_required') throw new AdminTokenRequiredError()
+    throw new ApiError(403, 'Forbidden')
+  }
+  return json<T>(res)
+}
+
+export const getAdminDigest = (token: string, date?: string) =>
+  apiFetch(`/api/admin/digest${date ? `?date=${encodeURIComponent(date)}` : ''}`, {
+    headers: { 'X-Admin-Token': token },
+  }).then(adminJson<AdminDigest>)
+
+export const refreshDigestStats = (token: string) =>
+  apiFetch('/api/admin/digest/refresh-stats', {
+    method: 'POST',
+    headers: { 'X-Admin-Token': token },
+  }).then(adminJson<{ results: DigestRefreshResult[] }>)

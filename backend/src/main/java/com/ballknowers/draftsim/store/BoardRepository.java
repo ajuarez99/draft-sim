@@ -134,6 +134,31 @@ public class BoardRepository {
                 .list();
     }
 
+    /** One player's place in a source's ranking: Sleeper's id and the rank (1 = best). */
+    public record RankedPlayer(String sleeperPlayerId, int rank) {}
+
+    /**
+     * The top {@code limit} players of a source's NEWEST capture for a sport, best first
+     * (specs/043, T005). Reads {@code adp} only as an ordering, so for {@link #SOURCE_SEARCH_RANK}
+     * (a dense 1..N ordinal, no ties) the rank is the stored value. Joins {@code player} to give back
+     * Sleeper's id, the key every per-game table uses; a snapshot row whose player is gone drops out.
+     */
+    public List<RankedPlayer> topRanked(Sport sport, String source, int limit) {
+        return db.sql("""
+                select p.sleeper_id, s.adp
+                from adp_snapshot s
+                join player p on p.id = s.player_id and p.sport = s.sport
+                where s.sport = ? and s.source = ?
+                  and s.captured_on = (select max(captured_on) from adp_snapshot
+                                       where sport = ? and source = ?)
+                order by s.adp, p.sleeper_id
+                limit ?
+                """)
+                .params(sport.code(), source, sport.code(), source, limit)
+                .query((rs, i) -> new RankedPlayer(rs.getString(1), (int) Math.round(rs.getDouble(2))))
+                .list();
+    }
+
     /**
      * The board as of a given date, for denormalizing adp_at_time onto historical
      * picks. Falls back to the closest earlier capture.

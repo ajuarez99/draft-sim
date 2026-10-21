@@ -507,7 +507,7 @@ public class PlayerSpotlightService {
     }
 
     /** Every week the date's rows belong to must have been fetched at or after the cutoff. */
-    private static boolean isComplete(LocalDate date, List<PlayerGameRepository.DateRow> dates,
+    static boolean isComplete(LocalDate date, List<PlayerGameRepository.DateRow> dates,
                                       Map<Integer, Instant> fetchedAtByWeek, Instant now) {
         Instant cutoff = date.plusDays(1).atTime(LocalTime.of(NIGHT_COMPLETE_HOUR_UTC, 0))
                 .toInstant(ZoneOffset.UTC);

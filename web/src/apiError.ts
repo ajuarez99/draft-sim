@@ -18,3 +18,15 @@ export class ApiError extends Error {
 export const isUnauthorized = (e: unknown): boolean => e instanceof ApiError && e.status === 401
 
 export const isNotFound = (e: unknown): boolean => e instanceof ApiError && e.status === 404
+
+/**
+ * A 403 `{"code":"admin_token_required"}` from an `/api/admin/**` route (specs/043): the token was
+ * missing, wrong, or the server has none configured. Its own class so the admin page can tell "ask
+ * for the token again" apart from any other 403.
+ */
+export class AdminTokenRequiredError extends ApiError {
+  constructor() {
+    super(403, 'The admin token was refused.')
+    this.name = 'AdminTokenRequiredError'
+  }
+}

@@ -25,6 +25,7 @@ import WeeklyReport from './pages/WeeklyReport'
 import Superlatives from './pages/Superlatives'
 import ManagerHistory from './pages/ManagerHistory'
 import ManagerComparison from './pages/ManagerComparison'
+import AdminDigest from './pages/AdminDigest'
 import AppShell from './components/AppShell'
 import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -172,6 +173,8 @@ export default function App() {
                 path="/leagues/:sleeperLeagueId/superlatives"
                 element={<KeyedByLeague page={Superlatives} gate="superlatives" />}
               />
+              {/* Spec 043: unlisted on purpose (no nav link anywhere); the backend's admin token is the gate. */}
+              <Route path="/admin/digest" element={<AdminDigest />} />
               {/* React Router's own fallback renders a bare "Not Found" with no
                   way back -- on a mistyped draft id that was the whole screen. */}
               <Route path="*" element={<NotFound what="page" />} />
