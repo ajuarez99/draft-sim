@@ -79,16 +79,9 @@ public class NextMatchupService {
             teamNameByManager.put(m.managerId(), m.teamName());
         }
         Map<Integer, RosterSeasonRepository.StandingRow> byRoster = new HashMap<>();
-        // The caller's roster: the lowest roster id when a manager holds two. A rule, not an accident
-        // (data-model, review F10).
-        Integer myRoster = null;
-        for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
-            byRoster.put(s.rosterId(), s);
-            if (callerManagerId != null && callerManagerId.equals(s.managerId())
-                    && (myRoster == null || s.rosterId() < myRoster)) {
-                myRoster = s.rosterId();
-            }
-        }
+        List<RosterSeasonRepository.StandingRow> standings = rosterSeasons.forLeague(league.id());
+        for (RosterSeasonRepository.StandingRow s : standings) byRoster.put(s.rosterId(), s);
+        Integer myRoster = myRosterId(standings, callerManagerId);
         if (myRoster == null) {
             return Optional.of(new Result(sport, league.season(), week, true, null, null, null));
         }
@@ -110,6 +103,22 @@ public class NextMatchupService {
         // Bye: absent from the fixtures (between() drops null matchup ids) or alone on its matchup id.
         Side opponent = partner == null ? null : side(partner, byRoster, teamNameByManager);
         return Optional.of(new Result(sport, league.season(), week, true, null, me, opponent));
+    }
+
+    /**
+     * The caller's roster: the lowest roster id when a manager holds two. A rule, not an accident
+     * (data-model, review F10). Package-visible so the lineup check picks "mine" the same way
+     * (specs/042 review F8); null when the caller holds none.
+     */
+    static Integer myRosterId(List<RosterSeasonRepository.StandingRow> standings, Long callerManagerId) {
+        Integer mine = null;
+        if (callerManagerId == null) return null;
+        for (RosterSeasonRepository.StandingRow s : standings) {
+            if (callerManagerId.equals(s.managerId()) && (mine == null || s.rosterId() < mine)) {
+                mine = s.rosterId();
+            }
+        }
+        return mine;
     }
 
     private static Side side(int rosterId, Map<Integer, RosterSeasonRepository.StandingRow> byRoster,

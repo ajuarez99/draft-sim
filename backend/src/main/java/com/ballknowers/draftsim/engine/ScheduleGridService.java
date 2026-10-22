@@ -17,6 +17,7 @@ import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 /**
  * Games per NBA team per week, from the stored Sleeper schedule (specs/017-nba-schedule-grid,
@@ -117,14 +118,7 @@ public class ScheduleGridService {
         LocalDate[] first = new LocalDate[order.size()];
         LocalDate[] last = new LocalDate[order.size()];
         Map<String, int[]> byTeam = new TreeMap<>();   // sorted by code: no server ranking
-        Map<String, Integer> seasonGames = new TreeMap<>();
-        for (SportSchedule.Game g : games) {
-            if (!SportSchedule.counts(g.status())) continue;
-            for (String t : new String[]{g.home(), g.away()}) {
-                if (t != null) seasonGames.merge(t, 1, Integer::sum);
-            }
-        }
-        double floor = EXHIBITION_SHARE * median(seasonGames.values());
+        Predicate<SportSchedule.Game> isExhibition = exhibitionGames(games);
         int postponed = 0;
         int canceled = 0;
         int exhibition = 0;
@@ -133,7 +127,7 @@ public class ScheduleGridService {
                 if ("postponed".equals(g.status())) postponed++; else canceled++;
                 continue;
             }
-            if (isExhibitionSide(g.home(), seasonGames, floor) || isExhibitionSide(g.away(), seasonGames, floor)) {
+            if (isExhibition.test(g)) {
                 exhibition++;
                 continue;
             }
@@ -155,6 +149,16 @@ public class ScheduleGridService {
         }
         return new Result(sport, league.season(), true, null, fetchedAt.orElse(null), currentWeek,
                 lastLeagueWeek, seasonOver, weeks, playoff, teams, new Excluded(postponed, canceled, exhibition));
+    }
+
+    /**
+     * Whether the stored schedule holds {@code week} at all. This is the guard {@link #teamsWithoutGame} applies
+     * to the grid ({@code grid.weeks()} is every week any stored game has, counted or not): a week the schedule
+     * doesn't hold is "not loaded", a different answer from "nobody plays". Public so {@code LineupCheckService}
+     * (specs/042 S3) asks the same question of the raw games rather than carrying its own copy.
+     */
+    public static boolean scheduleHoldsWeek(List<SportSchedule.Game> games, int week) {
+        return games != null && games.stream().anyMatch(g -> g.week() == week);
     }
 
     /**
@@ -188,6 +192,23 @@ public class ScheduleGridService {
             if (games == null || games[index] == 0) idle.add(code);
         }
         return Optional.of(idle);
+    }
+
+    /**
+     * Whether a game has a non-franchise side (the All-Star teams), judged against the season's counted
+     * games per team. Public so {@code NextGames} (specs/042, F5a) applies this one filter rather than a
+     * copy: a game with a postponed or canceled status is not counted toward a team's total.
+     */
+    public static Predicate<SportSchedule.Game> exhibitionGames(List<SportSchedule.Game> games) {
+        Map<String, Integer> seasonGames = new TreeMap<>();
+        for (SportSchedule.Game g : games) {
+            if (!SportSchedule.counts(g.status())) continue;
+            for (String t : new String[]{g.home(), g.away()}) {
+                if (t != null) seasonGames.merge(t, 1, Integer::sum);
+            }
+        }
+        double floor = EXHIBITION_SHARE * median(seasonGames.values());
+        return g -> isExhibitionSide(g.home(), seasonGames, floor) || isExhibitionSide(g.away(), seasonGames, floor);
     }
 
     private static boolean isExhibitionSide(String team, Map<String, Integer> seasonGames, double floor) {

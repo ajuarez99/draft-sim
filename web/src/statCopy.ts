@@ -349,3 +349,54 @@ export function shownSeason(b: StatLeaderboard): ShownSeason {
     scoringChanged: b.scoringMatchesRequested === false,
   }
 }
+
+// --- specs/042: the player header's status and next game --------------------------------------
+
+/**
+ * "Oct 21, 7:02 AM EDT": a refresh time printed from the instant itself, in Eastern time with its zone
+ * named so the same instant reads the same for everyone (11:00 UTC is 7 AM only until the clocks change,
+ * review F12). Null when the server has no time: the caller says "status time unknown", never "fresh".
+ */
+export function statusAsOfLabel(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short',
+  })
+}
+
+/**
+ * What to print for a player status. The server decides which statuses mean he will not play (`out`);
+ * this only words it: an out player shows the tag itself ("Out", "IR", or "SUS" for a suspension, whose tag
+ * is in `status`), anyone else with a tag is "Listed: <tag>", and no tag is null.
+ */
+export function injuryText(injuryStatus: string | null, status: string | null, out: boolean): string | null {
+  if (out) return injuryStatus ?? status ?? 'Out'
+  return injuryStatus ? `Listed: ${injuryStatus}` : null
+}
+
+/** "Wed Oct 21" from an ISO date. */
+export function gameDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return iso
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+/** "vs OKC" / "@ OKC"; just the opponent when home/away is unknown. */
+export function opponentText(opponent: string | null, isHome: boolean | null): string {
+  if (!opponent) return 'opponent unknown'
+  return isHome == null ? opponent : isHome ? `vs ${opponent}` : `@ ${opponent}`
+}
+
+/** One sentence per reason a player has no next game. */
+export function nextGameReasonSentence(code: 'NO_TEAM' | 'NO_GAMES_LEFT' | 'NO_SCHEDULE'): string {
+  switch (code) {
+    case 'NO_TEAM':
+      return 'He is not on a team right now, so there is no next game.'
+    case 'NO_GAMES_LEFT':
+      return 'No games left on this season’s schedule.'
+    case 'NO_SCHEDULE':
+      return 'This season’s schedule hasn’t been loaded yet.'
+  }
+}

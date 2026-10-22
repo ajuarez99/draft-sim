@@ -21,6 +21,34 @@
   - Clean up the scratch DB `draftsim_041` and the `bk041:*` images when done.
 - **If the Railway memory limit is ever lowered below ~1.5 GB, lower `-Xmx`** (Dockerfile comment).
 
+## UPDATE 2026-10-20: spec 043 (morning tweet digest, admin copy-and-paste page) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/043-tweet-digest-admin`, branch `043-tweet-digest-admin`
+  (from `origin/main` afc9b54). The docs are in `specs/043-tweet-digest-admin/`:
+  - spec (clarified: Sleeper default points; key players = top 15 by Sleeper search rank)
+  - plan (its "Amended after review" section overrides the body)
+  - research, data-model, contracts, quickstart
+  - plan-review (F1–F16), tasks (T001–T032), code-review (B1, S1–S4, L1–L11, with a
+    fixes-applied section), verification
+- **What it does:** `GET /api/admin/digest[?date=]` and `POST /api/admin/digest/refresh-stats`,
+  both behind the existing `/api/admin/**` gate. The page `/admin/digest` has no nav link. It
+  builds post cards with Copy, in-place edit and a weighted 280 counter. There is no migration.
+- **Measured:** every figure equals Sleeper's stored points (51/51), and the top 10 matches an
+  independent SQL ranking (30/30) on 2026-10-18, 10-19 and 04-12.
+- **Two traps found in review, both measured:**
+  - Sleeper **leaves out zero-valued stat fields**, so a missing `pts_std` means 0 points, not
+    "didn't play" (plan-review F1).
+  - **Nothing fetches the night's stat lines on a schedule.** The daily cron does players, board,
+    trending and projections only, so the page has a fetch button (F2).
+- **Owed:**
+  - On the morning of 10-21: press "Fetch latest stats" and check the trending card's points on
+    the first READY night.
+  - Paste a card into X's composer (V11) and confirm the real clipboard.
+  - Confirm `ADMIN_TOKEN` is set on the Railway backend.
+  - Commit, PR and deploy need Allan's go-ahead.
+- **Follow-up idea (not built):** add the `player_game` refresh to the daily cron so stats are
+  fresh without the button. It changes every page's freshness, so it needs its own decision.
+
 ## UPDATE 2026-10-20: spec 040 (awards: commissioner's list, every player, Embiid per week) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/040-superlatives-commissioner-ux`, branch `040-superlatives-commissioner-ux` (from `origin/main` 7736114). Docs are in `specs/040-superlatives-commissioner-ux/`: spec (clarified, with "amended after review" notes), plan (review amendments section), research, plan-review (F1–F12), tasks (T001–T030), code-review (M1, L1–L3 fixed), verification, `baseline/`.

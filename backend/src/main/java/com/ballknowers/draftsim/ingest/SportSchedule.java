@@ -81,6 +81,15 @@ public final class SportSchedule {
         return !POSTPONED.equals(status) && !CANCELED.equals(status);
     }
 
+    /**
+     * Whether a game with this status will not become "played" in its week (complete, postponed,
+     * canceled). A {@code null} status is not settled: Sleeper didn't say. Package-visible so
+     * {@link NextGames} shares this list (specs/042, F5a).
+     */
+    static boolean isSettled(String status) {
+        return status != null && SETTLED.contains(status);
+    }
+
     /** A side's team code from either payload shape; null if it has none. */
     static String sideTeam(Object side) {
         if (side instanceof Map<?, ?> m) return stringOrNull(m.get("team"));
@@ -172,7 +181,7 @@ public final class SportSchedule {
         if (gs == null || gs.isEmpty()) return false;
         LocalDate last = null;
         for (Game g : gs) {
-            if (g.status() == null || !SETTLED.contains(g.status())) return false;
+            if (!isSettled(g.status())) return false;
             if (g.date() == null) return false;
             if (last == null || g.date().isAfter(last)) last = g.date();
         }

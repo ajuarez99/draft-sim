@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom'
 import PlayerLink from './PlayerLink'
 import type { LeaderboardRow, PlayerWindowKind, StatLeaderboard as Board } from '../api'
 import { DASH } from '../statCells'
-import { hasKnownOwnership, ownershipOf, type Availability, type Filters, type StatMode } from '../statLeaderboard'
+import { hasKnownOwnership, hasMine, ownershipOf, type Availability, type Filters, type StatMode } from '../statLeaderboard'
 import { reasonSentence, seasonLabel } from '../statCopy'
 
 /**
@@ -77,10 +77,11 @@ export function Segmented<T extends string>({
 
 const availKey = (a: Availability) => (a.kind === 'roster' ? `roster:${a.rosterId}` : a.kind)
 const parseAvail = (k: string): Availability =>
-  k.startsWith('roster:') ? { kind: 'roster', rosterId: Number(k.slice(7)) } : k === 'free' ? { kind: 'free' } : k === 'rostered' ? { kind: 'rostered' } : { kind: 'all' }
+  k.startsWith('roster:') ? { kind: 'roster', rosterId: Number(k.slice(7)) } : k === 'free' ? { kind: 'free' } : k === 'rostered' ? { kind: 'rostered' } : k === 'mine' ? { kind: 'mine' } : { kind: 'all' }
 
 export function FilterBar({ rows, f, onChange, nowLabel }: { rows: LeaderboardRow[]; f: Filters; onChange: (f: Filters) => void; nowLabel: string | null }) {
   const known = useMemo(() => hasKnownOwnership(rows), [rows])
+  const mine = useMemo(() => hasMine(rows), [rows])
   const positions = useMemo(() => [...new Set(rows.flatMap((r) => r.positions))].sort(), [rows])
   const teams = useMemo(() => [...new Set(rows.map((r) => r.team).filter((t): t is string => !!t))].sort(), [rows])
   const rosters = useMemo(() => {
@@ -120,6 +121,7 @@ export function FilterBar({ rows, f, onChange, nowLabel }: { rows: LeaderboardRo
           <option value="all">All players</option>
           <option value="free">{nowLabel ? `Free agents (${nowLabel})` : 'Free agents'}</option>
           <option value="rostered">{nowLabel ? `Rostered (${nowLabel})` : 'Rostered'}</option>
+          {mine && <option value="mine">My roster</option>}
           {rosters.map(([id, name]) => <option key={id} value={`roster:${id}`}>{`${name}’s roster`}</option>)}
         </select>
       </label>

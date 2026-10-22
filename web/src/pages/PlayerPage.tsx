@@ -1,18 +1,19 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import Avatar from '../components/Avatar'
+import { useRef, useState, type KeyboardEvent } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import NotFound from '../components/NotFound'
+import OwnershipMark from '../components/OwnershipMark'
 import PageHeader from '../components/PageHeader'
 import PlayerFace from '../components/PlayerFace'
 import {
   getPlayerStats,
+  type NextGame,
   type Pct,
   type PctGroup,
   type PlayerCounting,
   type PlayerGameLogRow,
-  type PlayerOwnership,
   type PlayerRanks,
   type PlayerStatsPage,
+  type PlayerStatus,
   type PlayerWindow,
   type PlayerWindowKind,
   type Rate,
@@ -32,13 +33,18 @@ import {
   pctGroupLabel,
   REAL_STAT_LABEL,
   fallbackNote,
+  gameDay,
+  injuryText,
   longDate,
+  nextGameReasonSentence,
+  opponentText,
   ownershipAsOf,
   rankMoveSentence,
   reasonSentence,
   reasonShort,
   scoringKeyLabel,
   seasonLabel,
+  statusAsOfLabel,
   type AdvancedKey,
   type StatReason,
 } from '../statCopy'
@@ -106,25 +112,6 @@ function rateReasons(windows: PlayerWindow[]): StatReason[] {
   return [...out]
 }
 
-function OwnerChip({ o }: { o: PlayerOwnership }) {
-  switch (o.state) {
-    case 'ROSTERED':
-      return (
-        <span className="pp-owner">
-          <Avatar avatarId={o.avatarId} seed={o.ownerName ?? String(o.rosterId ?? '')} label={o.ownerName} isMe={o.isMe} />
-          <span className="pp-owner-name">{o.ownerName ?? 'A team in this league'}</span>
-          {o.isMe && <span className="lh-yours">Yours</span>}
-        </span>
-      )
-    case 'FREE_AGENT':
-      return <span className="lh-fa">Free agent</span>
-    case 'NOT_DRAFTED':
-      return <span className="muted small">{reasonSentence('NOT_DRAFTED')}</span>
-    case 'UNAVAILABLE':
-      return <span className="muted small">{reasonSentence('UNAVAILABLE')}</span>
-  }
-}
-
 function Header({ d }: { d: PlayerStatsPage }) {
   const p = d.player
   const name = p.name ?? 'Unknown player'
@@ -165,19 +152,82 @@ function Header({ d }: { d: PlayerStatsPage }) {
           {own && (
             <div className="pp-own">
               <span className="pp-own-label">{ownLabel}</span>
-              <OwnerChip o={own} />
+              <OwnershipMark o={own} verbose />
             </div>
           )}
           {d.currentOwnership && nowLabel && (
             <div className="pp-own pp-own-now">
               <span className="pp-own-label">{nowLabel}</span>
-              <OwnerChip o={d.currentOwnership} />
+              <OwnershipMark o={d.currentOwnership} verbose />
               {nowAsOf && <span className="muted small">{nowAsOf}</span>}
             </div>
           )}
         </div>
+        <HeaderFacts d={d} />
       </div>
     </section>
+  )
+}
+
+/** The status line: what Sleeper's tag says and when we last refreshed it. Never "7 AM": the time is printed. */
+function StatusFact({ s }: { s: PlayerStatus }) {
+  const text = injuryText(s.injuryStatus, s.status, s.out)
+  const when = statusAsOfLabel(s.asOf)
+  return (
+    <div className="pp-fact">
+      <dt>Status</dt>
+      <dd>
+        <span className={`pp-status${s.out ? ' out' : ''}`}>{text ?? 'No injury tag'}</span>
+        <span className="muted small pp-fact-sub">{when ? `as of ${when}` : 'status time unknown'}</span>
+      </dd>
+    </div>
+  )
+}
+
+/** Date, opponent and home/away. The stored schedule has no time of day, so none is shown. */
+function nextGameText(g: NextGame): string {
+  return `${gameDay(g.date)} · ${opponentText(g.opponent, g.isHome)}`
+}
+
+/** When the stored schedule was fetched: a game played earlier today can still read as upcoming until then. */
+function scheduleAsOfText(iso: string | null): string {
+  const when = statusAsOfLabel(iso)
+  return when ? `schedule as of ${when}` : 'schedule time unknown'
+}
+
+/** Owner, status, next game and the position rank the page already computes (`Ranks.positionRank`). */
+function HeaderFacts({ d }: { d: PlayerStatsPage }) {
+  const ranks = d.fantasy?.ranks
+  // The rank is the answered season's. On a fallback (requestedSeason set) the next game beside it is the URL
+  // season's, so the rank says which season it is from (review S1).
+  const posRank = ranks && ranks.positionRank != null && ranks.position
+    ? `#${ranks.positionRank} ${ranks.position}${d.requestedSeason != null ? ` (${seasonLabel(d.season)})` : ''}`
+    : null
+  return (
+    <dl className="pp-facts" aria-label="Player facts">
+      {d.status && <StatusFact s={d.status} />}
+      <div className="pp-fact">
+        <dt>Next game</dt>
+        <dd>
+          {d.nextGame ? (
+            <>
+              <span className="pp-next">{nextGameText(d.nextGame)}</span>
+              <span className="muted small pp-fact-sub">{scheduleAsOfText(d.scheduleAsOf)}</span>
+            </>
+          ) : (
+            <span className="muted small">{nextGameReasonSentence(d.nextGameReason ?? 'NO_GAMES_LEFT')}</span>
+          )}
+        </dd>
+      </div>
+      {posRank && (
+        <div className="pp-fact">
+          <dt>Position rank</dt>
+          <dd>
+            <span className="pp-strong">{posRank}</span>
+          </dd>
+        </div>
+      )}
+    </dl>
   )
 }
 
@@ -625,12 +675,103 @@ function GameLog({ d }: { d: PlayerStatsPage }) {
   )
 }
 
+// --- specs/042 US2: the body in URL-addressable tabs ---------------------------------------------
+
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'log', label: 'Game log' },
+  { id: 'schedule', label: 'Schedule' },
+] as const
+type TabId = (typeof TABS)[number]['id']
+const DEFAULT_TAB: TabId = 'overview'
+
+/** `?tab=` to a tab; a missing or unknown value is the default, never an empty page. */
+const parseTab = (v: string | null): TabId => TABS.find((t) => t.id === v)?.id ?? DEFAULT_TAB
+
+/**
+ * A real tablist: the selected tab is the one in the tab order, the arrow keys (and Home/End) move between
+ * tabs and select them, and each tab names its panel. Selecting writes `?tab=` (the default is left out).
+ */
+function PlayerTabs({ tab, onSelect }: { tab: TabId; onSelect: (t: TabId) => void }) {
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({})
+  const move = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    let next = -1
+    if (e.key === 'ArrowRight') next = (i + 1) % TABS.length
+    else if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length
+    else if (e.key === 'Home') next = 0
+    else if (e.key === 'End') next = TABS.length - 1
+    if (next < 0) return
+    e.preventDefault()
+    onSelect(TABS[next].id)
+    refs.current[TABS[next].id]?.focus()
+  }
+  return (
+    <div className="pp-tabs" role="tablist" aria-label="Player sections">
+      {TABS.map((t, i) => (
+        <button
+          key={t.id}
+          ref={(el) => {
+            refs.current[t.id] = el
+          }}
+          type="button"
+          role="tab"
+          id={`pp-tab-${t.id}`}
+          aria-selected={t.id === tab}
+          aria-controls={`pp-panel-${t.id}`}
+          tabIndex={t.id === tab ? 0 : -1}
+          className={`pp-tab${t.id === tab ? ' on' : ''}`}
+          onClick={() => onSelect(t.id)}
+          onKeyDown={(e) => move(e, i)}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** The team's next games, from the stored schedule: a date and an opponent, no tip-off time (there is none stored). */
+function ScheduleCard({ d }: { d: PlayerStatsPage }) {
+  return (
+    <section className="pp-card" aria-label="Schedule">
+      <h3 className="pp-h">Upcoming games</h3>
+      {d.upcoming.length === 0 ? (
+        <p className="muted small">{nextGameReasonSentence(d.nextGameReason ?? 'NO_GAMES_LEFT')}</p>
+      ) : (
+        <>
+          <p className="muted small pp-line">
+            {`His team’s next ${d.upcoming.length} ${d.upcoming.length === 1 ? 'game' : 'games'}, by date, ${scheduleAsOfText(d.scheduleAsOf)}. The schedule has dates only, no tip-off times.`}
+          </p>
+          <ol className="pp-sched">
+            {d.upcoming.map((g) => (
+              <li key={g.gameId}>
+                <span className="pp-strong">{gameDay(g.date)}</span>
+                <span>{opponentText(g.opponent, g.isHome)}</span>
+                <span className="muted small">{`Week ${g.week}`}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  )
+}
+
 export default function PlayerPage() {
   const { sleeperLeagueId, sleeperPlayerId } = useParams<{ sleeperLeagueId: string; sleeperPlayerId: string }>()
   const leagueId = sleeperLeagueId ?? ''
   const playerId = sleeperPlayerId ?? ''
   const version = useLeagueDataVersion(sleeperLeagueId)
   const block = useBlock(leagueId && playerId ? () => getPlayerStats(leagueId, playerId) : null, [leagueId, playerId, version])
+  const [params, setParams] = useSearchParams()
+  const tab = parseTab(params.get('tab'))
+  const selectTab = (t: TabId) => {
+    const next = new URLSearchParams(params)
+    if (t === DEFAULT_TAB) next.delete('tab')
+    else next.set('tab', t)
+    setParams(next, { replace: true })
+  }
 
   if (block.status === 'error' && block.notFound) return <NotFound what="page" />
 
@@ -674,13 +815,23 @@ export default function PlayerPage() {
             </section>
           ) : (
             <>
-              <SeasonLine d={d} />
-              <AdvancedCard d={d} />
-              <div className="pp-cols">
-                {d.fantasy && <RanksCard ranks={d.fantasy.ranks} />}
-                <BreakdownCard d={d} />
+              <PlayerTabs tab={tab} onSelect={selectTab} />
+              <div role="tabpanel" id={`pp-panel-${tab}`} aria-labelledby={`pp-tab-${tab}`} tabIndex={0} className="pp-panel">
+                {tab === 'overview' && (
+                  <div className="pp-cols">
+                    {d.fantasy && <RanksCard ranks={d.fantasy.ranks} />}
+                    <BreakdownCard d={d} />
+                  </div>
+                )}
+                {tab === 'stats' && (
+                  <>
+                    <SeasonLine d={d} />
+                    <AdvancedCard d={d} />
+                  </>
+                )}
+                {tab === 'log' && <GameLog d={d} />}
+                {tab === 'schedule' && <ScheduleCard d={d} />}
               </div>
-              <GameLog d={d} />
               {d.dataAsOf && <p className="muted small">{`Data refreshed ${longDate(d.dataAsOf)}.`}</p>}
             </>
           )}

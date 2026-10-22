@@ -99,11 +99,27 @@ function page(over: Partial<PlayerStatsPage> = {}): PlayerStatsPage {
     },
     gameLog: [game(), game({ gameId: 'g0', date: '2026-04-10', team: 'LAL', opponent: 'PHX', isHome: false, fantasyPoints: 20 })],
     qualification: { minGamesShare: 0.5, minGames: 42, maxTeamGames: 83, minMinutesPerGame: 15, recencyDays: 14 },
+    status: null,
+    nextGame: null,
+    nextGameReason: 'NO_GAMES_LEFT',
+    upcoming: [],
+    scheduleAsOf: '2026-10-20T09:00:00Z',
     ...over,
   }
 }
 
-function mount(url = '/leagues/L25/players/1350') {
+/**
+ * specs/042 T012: the body is in tabs now (`?tab=`), so a test about the season line or the advanced table opens
+ * the Stats tab first and one about the game log opens Game log. Declared at the top of the test; nothing else
+ * about those tests changed.
+ */
+let startTab: string | null = null
+const onTab = (t: 'overview' | 'stats' | 'log' | 'schedule') => {
+  startTab = t
+}
+
+function mount(base = '/leagues/L25/players/1350') {
+  const url = startTab ? `${base}${base.includes('?') ? '&' : '?'}tab=${startTab}` : base
   return render(
     <MemoryRouter initialEntries={[url]}>
       <LeagueDataVersionProvider>
@@ -122,22 +138,26 @@ function show(d: PlayerStatsPage, url?: string) {
 
 beforeEach(() => {
   getPlayerStats.mockReset()
+  startTab = null
 })
 
 describe('PlayerPage', () => {
   it('asks for the player in the league named by the URL', async () => {
+    onTab('stats')
     show(page())
     expect(await screen.findByRole('region', { name: 'Season line' })).toBeInTheDocument()
     expect(getPlayerStats).toHaveBeenCalledWith('L25', '1350')
   })
 
   it('labels real and fantasy figures apart, and shows rank, move and group sizes', async () => {
+    onTab('stats')
     show(page())
     const line = await screen.findByRole('region', { name: 'Season line' })
     expect(within(line).getByText('Real stat')).toBeInTheDocument()
     expect(within(line).getAllByText('This league’s fantasy').length).toBeGreaterThan(0)
     expect(within(line).getByText('22.56')).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('tab', { name: 'Overview' }))   // the ranks card is on the Overview tab
     const ranks = screen.getByRole('region', { name: 'Ranks' })
     expect(within(ranks).getByText('#40')).toBeInTheDocument()
     expect(within(ranks).getByText('of 299')).toBeInTheDocument()
@@ -150,6 +170,7 @@ describe('PlayerPage', () => {
   })
 
   it('shows a traded player with the team of each night, newest first, and his teams', async () => {
+    onTab('log')
     show(page({ teamsThisSeason: ['LAL', 'MIN'], teamGamesMissed: 6 }))
     const log = await screen.findByRole('region', { name: 'Game log' })
     const rows = within(log).getAllByRole('row').slice(1)
@@ -180,12 +201,14 @@ describe('PlayerPage', () => {
   })
 
   it('says why a percentage is a dash, once, under the season line', async () => {
+    onTab('stats')
     show(page())
     const line = await screen.findByRole('region', { name: 'Season line' })
     expect(within(line).getAllByText(/No attempts in these games, so there is no percentage\./)).toHaveLength(1)
   })
 
   it('shows makes and attempts beneath each shooting percentage', async () => {
+    onTab('stats')
     const totals: PlayerCounting = { ...zero, fgm: 348, fga: 510, ftm: 120.0, fta: 206 }
     show(page({ windows: { SEASON: win({ totals }) } }))
     const line = await screen.findByRole('region', { name: 'Season line' })
@@ -196,6 +219,7 @@ describe('PlayerPage', () => {
   })
 
   it('states NO_ATTEMPTS as words with the sentence as title, never 0 or a bare dash', async () => {
+    onTab('stats')
     const totals: PlayerCounting = { ...zero, fgm: 348, fga: 510, ftm: 120, fta: 206 }
     show(page({ windows: { SEASON: win({ totals }) } }))
     const line = await screen.findByRole('region', { name: 'Season line' })
@@ -243,6 +267,7 @@ describe('PlayerPage', () => {
   })
 
   it('writes game-log minutes with one decimal', async () => {
+    onTab('log')
     show(page({ gameLog: [game({ minutes: 34 }), game({ gameId: 'g0', minutes: 28.5 })] }))
     const log = await screen.findByRole('region', { name: 'Game log' })
     expect(within(log).getByText('34.0')).toBeInTheDocument()
@@ -370,6 +395,7 @@ function percentiles(over: Partial<Record<(typeof KEYS)[number], Pct[]>> = {}): 
 
 describe('PlayerPage advanced view', () => {
   it('shows season, last 10 and last 5 side by side with real counts and date spans', async () => {
+    onTab('stats')
     show(
       page({
         windows: {
@@ -392,6 +418,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('shows a zero-attempt rate as a short label with the sentence, never 0%', async () => {
+    onTab('stats')
     const advanced = { ...win().advanced, ts: rate(null, 'NO_ATTEMPTS'), efg: rate(null, 'NO_ATTEMPTS'), tpar: rate(0) }
     show(page({ windows: { SEASON: win({ advanced }) }, percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
@@ -405,12 +432,14 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('labels a small sample', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     expect(within(adv).getAllByText('small sample')).toHaveLength(1)
   })
 
   it('says he has not played since his last game when the percentile is stale', async () => {
+    onTab('stats')
     const stale: Pct[] = pctPair({ value: null, reason: 'NOT_QUALIFIED_STALE' }, { value: null, reason: 'NOT_QUALIFIED_STALE' })
     show(
       page({
@@ -425,6 +454,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('compares a free agent with rostered players and shows his value beside the percentile', async () => {
+    onTab('stats')
     show(
       page({
         ownership: { state: 'FREE_AGENT', rosterId: null, ownerName: null, avatarId: null, isMe: false, asOf: null },
@@ -445,6 +475,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('names the position group from his first position', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     expect(within(adv).getByRole('button', { name: 'vs Cs across the NBA' })).toHaveAttribute('aria-pressed', 'true')
@@ -452,6 +483,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('states OWNERSHIP_UNAVAILABLE on the rostered group instead of a number', async () => {
+    onTab('stats')
     show(
       page({
         percentiles: percentiles({
@@ -468,6 +500,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('has a definition for all 13 stats, the pooling note, and says turnover % is lower-is-better', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     const labels = [
@@ -486,6 +519,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('labels plus-minus as noisy', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     expect(await screen.findByRole('row', { name: /Plus-minus per game \(noisy\)/ })).toBeInTheDocument()
     expect(screen.getByText(/Plus-minus is noisy/, { selector: 'p' })).toBeInTheDocument()
@@ -502,6 +536,7 @@ describe('PlayerPage advanced view', () => {
     })
 
   it('shows per-36, game score and plus-minus for all three windows side by side', async () => {
+    onTab('stats')
     show(distinct())
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     const cells = (name: RegExp) =>
@@ -518,6 +553,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('writes every reason under the table with the windows it applies to', async () => {
+    onTab('stats')
     const advanced = { ...win().advanced, ts: rate(null, 'NO_ATTEMPTS') }
     const notQualified = Object.fromEntries(KEYS.map((k) => [k, pctPair({ value: null, reason: 'NOT_QUALIFIED' }, {})]))
     show(
@@ -533,6 +569,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('states the qualification rule from the page payload', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     expect(within(adv).getByText(/at least 42 games \(half of the most any team has played, 83\) and 15\+ minutes per game/)).toBeInTheDocument()
@@ -540,6 +577,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('dates the rostered group beside its toggle', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     expect(within(adv).queryByText(/Players rostered in this league ·/)).not.toBeInTheDocument()
@@ -548,6 +586,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('says the rostered group is last season’s rosters when the page fell back', async () => {
+    onTab('stats')
     show(page({ requestedSeason: 2026, percentiles: percentiles() }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     fireEvent.click(within(adv).getByRole('button', { name: 'vs players rostered in this league' }))
@@ -555,6 +594,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('uses a neutral bar for style stats and the colour bar for the rest; prints exact values', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles({ ftr: pctPair({ value: 94.2 }, {}), ts: pctPair({ value: 71.4 }, {}) }) }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     const fill = (name: RegExp) => within(adv).getByRole('row', { name }).querySelector('.pp-meter-fill')!
@@ -570,6 +610,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('never prints 100th or 0th percentile', async () => {
+    onTab('stats')
     show(page({ percentiles: percentiles({ ts: pctPair({ value: 99.69 }, {}), efg: pctPair({ value: 0.3 }, {}) }) }))
     const adv = await screen.findByRole('region', { name: 'Advanced' })
     expect(within(adv).queryByText(/100th|\b0th/)).not.toBeInTheDocument()
@@ -578,6 +619,7 @@ describe('PlayerPage advanced view', () => {
   })
 
   it('says there is no position on file, not that too few players qualify, for a player with none', async () => {
+    onTab('stats')
     const none = Object.fromEntries(KEYS.map((k) => [k, pctPair({ value: null, n: 0, reason: 'GROUP_TOO_SMALL' }, {})]))
     show(
       page({
@@ -590,5 +632,108 @@ describe('PlayerPage advanced view', () => {
     const notes = within(adv).getAllByRole('listitem').map((li) => li.textContent ?? '')
     expect(notes.some((n) => n.includes('group too small — He has no position on file'))).toBe(true)
     expect(notes.some((n) => n.includes('Too few other players'))).toBe(false)
+  })
+
+  // ---- specs/042 US2: header and tabs
+
+  const nextGame = (over: Partial<PlayerStatsPage['nextGame'] & object> = {}) => ({
+    gameId: 'g9', date: '2026-10-21', opponent: 'OKC', isHome: true, week: 1, ...over,
+  })
+
+  it('opens on Overview with the ranks card, and leaves the stats and the log behind their tabs', async () => {
+    show(page())
+    expect(await screen.findByRole('region', { name: 'Ranks' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByRole('region', { name: 'Season line' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Game log' })).not.toBeInTheDocument()
+  })
+
+  it('?tab=log opens the game log and ?tab=zzz falls back to Overview', async () => {
+    const { unmount } = show(page(), '/leagues/L25/players/1350?tab=log')
+    expect(await screen.findByRole('region', { name: 'Game log' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Game log' })).toHaveAttribute('aria-selected', 'true')
+    unmount()
+    show(page(), '/leagues/L25/players/1350?tab=zzz')
+    expect(await screen.findByRole('region', { name: 'Ranks' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('is a real tablist: arrows move and select, only the selected tab is in the tab order', async () => {
+    show(page())
+    const overview = await screen.findByRole('tab', { name: 'Overview' })
+    expect(screen.getByRole('tablist', { name: 'Player sections' })).toBeInTheDocument()
+    expect(overview).toHaveAttribute('tabindex', '0')
+    expect(screen.getByRole('tab', { name: 'Stats' })).toHaveAttribute('tabindex', '-1')
+    overview.focus()
+    fireEvent.keyDown(overview, { key: 'ArrowRight' })
+    const stats = await screen.findByRole('tab', { name: 'Stats' })
+    expect(stats).toHaveAttribute('aria-selected', 'true')
+    expect(stats).toHaveFocus()
+    expect(await screen.findByRole('region', { name: 'Season line' })).toBeInTheDocument()
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('aria-labelledby', 'pp-tab-stats')
+    fireEvent.keyDown(stats, { key: 'End' })
+    expect(await screen.findByRole('tab', { name: 'Schedule' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Schedule' }), { key: 'ArrowRight' })
+    expect(await screen.findByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('prints the status with the time it was refreshed, never a fixed hour', async () => {
+    show(page({
+      status: { injuryStatus: 'Questionable', status: 'ACT', out: false, asOf: '2026-10-21T11:02:00Z' },
+      nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()],
+    }))
+    expect(await screen.findByText('Listed: Questionable')).toBeInTheDocument()
+    expect(screen.getByText('as of Oct 21, 7:02 AM EDT')).toBeInTheDocument()
+    expect(screen.queryByText(/7 AM/)).not.toBeInTheDocument()
+  })
+
+  it('says the status time is unknown when the server has none, and words Out and a suspension as the tag', async () => {
+    const { unmount } = show(page({ status: { injuryStatus: 'Out', status: 'ACT', out: true, asOf: null } }))
+    expect(await screen.findByText('Out')).toBeInTheDocument()
+    expect(screen.getByText('status time unknown')).toBeInTheDocument()
+    unmount()
+    show(page({ status: { injuryStatus: null, status: 'SUS', out: true, asOf: null } }))
+    expect(await screen.findByText('SUS')).toBeInTheDocument()
+  })
+
+  it('shows the next game as a date, vs/@ and the opponent, with no time', async () => {
+    const { unmount } = show(page({ nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()] }))
+    expect(await screen.findByText('Wed Oct 21 · vs OKC')).toBeInTheDocument()
+    unmount()
+    show(page({ nextGame: nextGame({ isHome: false }), nextGameReason: null, upcoming: [nextGame({ isHome: false })] }))
+    expect(await screen.findByText('Wed Oct 21 · @ OKC')).toBeInTheDocument()
+    // The game itself has no time; the schedule's own fetched-at (a separate line) legitimately does.
+    expect(screen.getByText('Wed Oct 21 · @ OKC').textContent).not.toMatch(/\d:\d\d (AM|PM)/)
+  })
+
+  it('gives a sentence, not a blank, when there is no next game', async () => {
+    show(page({ nextGameReason: 'NO_TEAM' }))
+    expect(await screen.findByText('He is not on a team right now, so there is no next game.')).toBeInTheDocument()
+  })
+
+  it('shows his position rank in the header and the upcoming games on the Schedule tab', async () => {
+    show(page({
+      nextGame: nextGame(), nextGameReason: null,
+      upcoming: [nextGame(), nextGame({ gameId: 'g10', date: '2026-10-23', opponent: 'BOS', isHome: false, week: 1 })],
+    }), '/leagues/L25/players/1350?tab=schedule')
+    const sched = await screen.findByRole('region', { name: 'Schedule' })
+    expect(within(sched).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(sched).getByText('@ BOS')).toBeInTheDocument()
+    expect(within(sched).getByText(/dates only, no tip-off times/)).toBeInTheDocument()
+    expect(screen.getByText('#12 C')).toBeInTheDocument()
+    expect(within(sched).getByText(/schedule as of Oct 20/)).toBeInTheDocument()
+  })
+
+  it('labels the header position rank with its season when the page fell back to an earlier one (S1)', async () => {
+    show(page({ requestedSeason: 2026, nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()] }))
+    expect(await screen.findByText('#12 C (2025–26)')).toBeInTheDocument()
+  })
+
+  it('prints when the schedule was fetched beside the next game, or says it is unknown (S2)', async () => {
+    const { unmount } = show(page({ nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()] }))
+    expect(await screen.findByText(/^schedule as of Oct 20/)).toBeInTheDocument()
+    unmount()
+    show(page({ nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()], scheduleAsOf: null }))
+    expect(await screen.findByText('schedule time unknown')).toBeInTheDocument()
   })
 })

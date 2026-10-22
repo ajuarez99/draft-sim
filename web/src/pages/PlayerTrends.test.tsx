@@ -42,6 +42,7 @@ function row(over: Partial<TrendRow> = {}): TrendRow {
     missedTeamGames: 0,
     rostered: false,
     rosteredBy: null,
+    rosteredByMe: null,
     gamesThisWeek: 4,
     gamesNextWeek: 3,
     ...over,
