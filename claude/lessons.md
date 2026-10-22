@@ -1040,3 +1040,19 @@ ingest (record when), not the sport-wide state endpoint, and never the payload's
 is circular). When a verification runs against a copied DB, treat every time-dependent field as stale
 until re-ingested.
 
+
+## 48. A coarse metrics bucket can turn one deploy-overlap sample into hours of "sustained" memory
+
+Found 2026-10-20 planning spec 041. `railway metrics --raw` over 7–14 days returns 4-hour buckets.
+They showed the backend "ratcheting" to 675–983 MB and holding there for 8–12 hours, and the first
+plan was built on that. At minute resolution the 10-16 bucket was **one 912 MB sample at 23:00**,
+during the 23:00/23:02 deploy, when the old and new containers overlap and are counted together. The
+rest of the night was a flat 371 MB. The plan review caught it, not the planner.
+
+A real effect still turned up, but a different one. In a 2 GB container the old JVM settings held
+~760 MB committed for 10+ minutes after a load spike, with ~56 MB live, because nothing triggers a GC
+on an idle service. That was measured locally, never in the production graph that started the hunt.
+
+**How to apply:** before calling a memory or CPU number a *level*, read it at the finest resolution
+the source offers (narrow `--since/--until` windows) and line every spike up against
+`railway deployment list`. A bucket reading is a hint, not a measurement.

@@ -309,9 +309,24 @@ flag behaviour is stable. Verified locally, not yet on production.
 
 ## Things that will probably bite
 
-**Memory.** `POST /api/ingest/players` pulls Sleeper's ~5MB player dump and
-parses it into a map of maps; peak heap is well above the file size. 512MB is
-comfortable, 256MB may OOM. `JAVA_OPTS` sets `-XX:MaxRAMPercentage=75`.
+**Memory.** *(Amended 2026-10-20, spec 041. The old paragraph guessed that "512MB is comfortable,
+256MB may OOM" for the player ingest; measurement replaced the guess.)*
+- **Production** (Railway, 2 GB / 2 vCPU, minute-resolution metrics): it rests at ~300–420 MB and
+  peaked at 827 MB on draft night 2026-10-10. Spikes near 1.1–1.3 GB at deploy time are the old and
+  new containers overlapping, not load. Read metrics at minute resolution (lessons #48).
+- **The JVM flags live in the Dockerfile `ENTRYPOINT`, not in `JAVA_OPTS`:** `-XX:+UseG1GC -Xmx1024m
+  -XX:G1PeriodicGCInterval=60000`. `JAVA_OPTS` is empty by default and is for *extra* flags. A
+  Railway `JAVA_OPTS` variable adds to these, and for a repeated flag the last one wins, so it can
+  override one but can't drop them all. The backend logs `JVM settings: maxHeapMb=…` at startup;
+  check that line after any change.
+- **Why these values** (measured locally in a 2 GB / 2 CPU container, `specs/041-memory-footprint/`):
+  the old `MaxRAMPercentage=75` (1.5 GB heap) held ~760 MB for 10+ minutes after a load spike, with
+  ~56 MB live. With the periodic GC it falls to ~414 MB by +10 min. `-Xmx1024m` survived the worst
+  case (2 concurrent 5,000-iteration sims plus both player ingests, peak ~956 MB container) with no OOM.
+- **The player ingest** allocates ~90–155 MB (mostly garbage) and retains a few MB. 256 MB was not tested.
+- **If the Railway memory limit is ever lowered below ~1.5 GB, lower `-Xmx` with it.** Heap 1024 MB
+  plus ~250–380 MB of non-heap needs headroom under the limit, or the container is OOM-killed rather
+  than the JVM throwing.
 
 **Request timeouts on ingest.** `/api/ingest/all/...` does three sequential
 Sleeper crawls plus a board rebuild. If a platform timeout cuts it short, call

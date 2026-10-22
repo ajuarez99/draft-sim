@@ -1,0 +1,29 @@
+# MEASUREMENT ONLY (spec 041, review F2). Never deployed.
+#
+# The production image is a JRE and has no jcmd, so heap and native-memory readings
+# (GC.heap_info, GC.run, VM.native_memory, VM.flags, VM.set_flag) cannot be taken in it.
+# This file re-bases the /app of any built image onto eclipse-temurin:21-jdk-jammy, which adds
+# jcmd. The base differs from production (JDK vs JRE: a few MB of extra mapped files), so
+# container-MB figures are always read on the real JRE image, and heap/NMT figures here.
+#
+#   docker build -f scripts/memory/Dockerfile.jdk --build-arg APP_IMAGE=bk041:main \
+#       -t bk041:main-jdk scripts/memory
+#
+# ENTRY_CMD and JAVA_OPTS_DEFAULT must repeat the source image's ENTRYPOINT command and its
+# ENV JAVA_OPTS (a Dockerfile cannot inherit ENTRYPOINT from a build-arg image). The defaults
+# below are origin/main's (c987b92). For a later image, pass the new values.
+ARG APP_IMAGE
+FROM ${APP_IMAGE} AS app
+
+FROM eclipse-temurin:21-jdk-jammy
+ARG ENTRY_CMD='exec java $JAVA_OPTS -jar /app/app.jar'
+ARG JAVA_OPTS_DEFAULT='-XX:MaxRAMPercentage=75'
+RUN useradd --system --create-home --uid 10001 app
+WORKDIR /app
+COPY --from=app --chown=app:app /app /app
+ENV WEIGHTS_FILE=/app/config/weights.yml
+ENV JAVA_OPTS=${JAVA_OPTS_DEFAULT}
+ENV ENTRY_CMD=${ENTRY_CMD}
+USER app
+EXPOSE 8080
+ENTRYPOINT ["sh", "-c", "eval \"$ENTRY_CMD\""]

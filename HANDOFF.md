@@ -1,5 +1,26 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-21: spec 041 (memory: JVM settings) built, verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/041-memory-footprint`, branch `041-memory-footprint` (from `origin/main` c987b92; main has since merged 042 and 043, and neither touches these files, but sync before the PR). Docs are in `specs/041-memory-footprint/`: spec (rescoped, with amendment notes), plan, research, plan-review (F1–F16), tasks, baseline, verification, code-review. Scripts are in `scripts/memory/`.
+- **What it does:** the Dockerfile ENTRYPOINT now runs `java -XX:+UseG1GC -Xmx1024m -XX:G1PeriodicGCInterval=60000 $JAVA_OPTS`. `JAVA_OPTS` is empty and is for extra flags only. `config/JvmSettingsLogger` logs `JVM settings: maxHeapMb=… gc=… flags=[…]` at startup. `DEPLOY.md` "Memory" is rewritten, and lessons #48 is added.
+- **Scope cut (Allan, 2026-10-20):** JVM settings only. Not built: the streaming Monte Carlo fold, cache limits, and frontend (20 MB in prod). The plan review showed the "ratchet" that started this was a 4 h-bucket artefact (lessons #48).
+- **Measured (local 2 GB / 2 CPU container, median of 3):**
+  - after a stress spike: +1/+5/+10 min = 522/464/414 MB (new) vs 756/757/762 MB (old);
+  - at rest: 267 vs 245;
+  - worst case (2 × 5,000-iteration sims + both player ingests): 956 vs 1,044 MB, no OOM;
+  - resims no slower;
+  - 39/39 endpoints identical, including a fixed-seed sim.
+- **Failed, reported as failed:**
+  - SC-004′ (back within 20% of rest at +5 min): +74%, vs +209% old. Non-heap stays grown after load.
+  - SC-003′ stress peak: 834 vs 761, overlapping ranges.
+  - Backend suite: 2,058 tests, 1 failed + 1 skipped, both date/data drift that reproduces on untouched main (`BoardRepositoryLatestBeforeIT`, `PlayerStatsLeaderboardReadIT`). Not fixed; Allan to decide.
+- **Owed:**
+  - Allan's go-ahead to commit/PR/deploy.
+  - After deploy, SC-009: minute-resolution `railway metrics -s draft-sim --memory` over a normal day plus the first spike. Check the logger line in the deploy log. Code-review #8: one of 3 local runs hadn't recovered by +5 min, so look at individual spikes, not a median.
+  - Clean up the scratch DB `draftsim_041` and the `bk041:*` images when done.
+- **If the Railway memory limit is ever lowered below ~1.5 GB, lower `-Xmx`** (Dockerfile comment).
+
 ## UPDATE 2026-10-20: spec 040 (awards: commissioner's list, every player, Embiid per week) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/040-superlatives-commissioner-ux`, branch `040-superlatives-commissioner-ux` (from `origin/main` 7736114). Docs are in `specs/040-superlatives-commissioner-ux/`: spec (clarified, with "amended after review" notes), plan (review amendments section), research, plan-review (F1–F12), tasks (T001–T030), code-review (M1, L1–L3 fixed), verification, `baseline/`.

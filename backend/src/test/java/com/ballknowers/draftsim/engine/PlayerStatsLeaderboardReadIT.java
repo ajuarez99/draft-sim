@@ -282,15 +282,22 @@ class PlayerStatsLeaderboardReadIT {
         var l = league(NBA_2026);
         StatLeaderboard b = service.readLeaderboard(l, WindowKind.SEASON, MEMBER);
         Assumptions.assumeTrue(b.requestedSeason() != null, "2026 has stored games now, so it did not fall back");
-        Assumptions.assumeTrue("pre_draft".equals(drafts.forLeague(l.id()).orElseThrow().status()),
-                "the 2026 draft has been held since this was written");
-        assertEquals("NOT_HAPPENED", b.draft().state());
         assertEquals(2026, b.draft().draftSeason());
         assertNull(b.adp().reason());
-        assertEquals(java.time.LocalDate.of(2026, 9, 28), b.adp().capturedOn());
-        assertFalse(b.draftGrades().available());
-        assertTrue(b.rows().stream().allMatch(r -> r.draft() == null && r.draftValue() == null));
         assertTrue(b.rows().stream().anyMatch(r -> r.adp() != null));
+        if ("pre_draft".equals(drafts.forLeague(l.id()).orElseThrow().status())) {
+            assertEquals("NOT_HAPPENED", b.draft().state());
+            assertEquals(java.time.LocalDate.of(2026, 9, 28), b.adp().capturedOn());
+            assertFalse(b.draftGrades().available());
+            assertTrue(b.rows().stream().allMatch(r -> r.draft() == null && r.draftValue() == null));
+        } else {
+            // The 2026 draft was held on 2026-10-10, after this test was written. The stats still fall back to
+            // 2025, and the draft columns must still be 2026's, now filled in from the held draft.
+            assertEquals("COMPLETE", b.draft().state());
+            assertFalse(b.adp().capturedOn().isAfter(java.time.LocalDate.of(2026, 10, 10)),
+                    "ADP is the board as of the draft's date, never after it");
+            assertTrue(b.rows().stream().anyMatch(r -> r.draft() != null), "2026 picks fill the draft column");
+        }
         System.out.println("REPORT 2026 fallback draft=" + b.draft() + " adp=" + b.adp() + " grades=" + b.draftGrades());
     }
 
