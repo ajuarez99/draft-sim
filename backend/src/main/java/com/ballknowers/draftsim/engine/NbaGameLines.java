@@ -47,14 +47,41 @@ public record NbaGameLines(Map<String, List<Line>> byPlayer, Map<String, List<Te
     public record Line(String gameId, LocalDate date, int week, String team, String opponent, Boolean isHome,
                        double minutes, Map<String, Object> stats, TeamGame teamRow, TeamGame oppRow) {}
 
-    public static NbaGameLines of(List<SeasonGame> games, List<TeamGame> teamRows, Set<String> excludedGameIds) {
-        Map<String, List<TeamGame>> rowsByGame = new HashMap<>();
-        Map<String, List<TeamGame>> byTeam = new HashMap<>();
+    /**
+     * Every non-empty team code in the season's team rows: the set a game's opponent must belong to for it to be
+     * a team's game. The one definition of "a season team code", shared with spec 044's lock-in read so the two
+     * cannot disagree on what the All-Star game is.
+     */
+    public static Set<String> seasonTeamCodes(List<TeamGame> teamRows) {
+        return seasonTeamCodes(teamRows, Set.of());
+    }
+
+    /** As {@link #seasonTeamCodes(List)}, ignoring the team rows of {@code excludedGameIds} (a configured Cup final). */
+    public static Set<String> seasonTeamCodes(List<TeamGame> teamRows, Set<String> excludedGameIds) {
         Set<String> codes = new HashSet<>();
         for (TeamGame t : teamRows) {
             if (t.code() == null || t.code().isEmpty()) continue;       // the All-Star game's bare TEAM_ row
             if (excludedGameIds.contains(t.gameId())) continue;         // a configured Cup final
             codes.add(t.code());
+        }
+        return codes;
+    }
+
+    /**
+     * The All-Star rule: a game is a team's game only when its opponent is a season team code. The All-Star
+     * game's rows carry opponents such as {@code CHK} / {@code STR} that no team row has.
+     */
+    public static boolean isTeamGame(SeasonGame g, Set<String> codes) {
+        return g.opponent() != null && codes.contains(g.opponent());
+    }
+
+    public static NbaGameLines of(List<SeasonGame> games, List<TeamGame> teamRows, Set<String> excludedGameIds) {
+        Map<String, List<TeamGame>> rowsByGame = new HashMap<>();
+        Map<String, List<TeamGame>> byTeam = new HashMap<>();
+        Set<String> codes = seasonTeamCodes(teamRows, excludedGameIds);
+        for (TeamGame t : teamRows) {
+            if (t.code() == null || t.code().isEmpty()) continue;       // the All-Star game's bare TEAM_ row
+            if (excludedGameIds.contains(t.gameId())) continue;         // a configured Cup final
             rowsByGame.computeIfAbsent(t.gameId(), k -> new ArrayList<>()).add(t);
             byTeam.computeIfAbsent(t.code(), k -> new ArrayList<>()).add(t);
         }
@@ -64,7 +91,7 @@ public record NbaGameLines(Map<String, List<Line>> byPlayer, Map<String, List<Te
             if (g.sleeperPlayerId() == null
                     || g.sleeperPlayerId().startsWith(PlayerGameRepository.TEAM_ID_PREFIX)) continue;
             if (excludedGameIds.contains(g.gameId())) continue;                    // a configured Cup final
-            if (g.opponent() == null || !codes.contains(g.opponent())) continue;   // All-Star: not a team's game
+            if (!isTeamGame(g, codes)) continue;                                   // All-Star: not a team's game
             double sp = AdvancedStats.num(g.stats(), "sp");
             if (sp <= 0) continue;
             TeamGame teamRow = null;

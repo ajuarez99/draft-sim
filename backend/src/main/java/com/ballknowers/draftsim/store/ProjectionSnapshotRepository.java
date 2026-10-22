@@ -156,6 +156,23 @@ public class ProjectionSnapshotRepository {
                 sport, season);
     }
 
+    /** One frozen projected line, without the realized game or schedule joins {@link Sample} carries. */
+    public record Line(String sleeperPlayerId, String gameId, Map<String, Object> stats) {}
+
+    /**
+     * Every frozen projected line of the sport-season, and nothing else (spec 044: the lock-in read needs the
+     * line for a locked game and the union of the keys any line carries, to build spec 036's restricted scoring
+     * map). One statement over one table.
+     */
+    public List<Line> lines(String sport, int season) {
+        return jdbc.query("""
+                select sleeper_player_id, game_id, stats::text from projection_snapshot
+                where sport = ? and season = ?
+                """,
+                (rs, n) -> new Line(rs.getString(1), rs.getString(2), JsonUtil.readMap(rs.getString(3))),
+                sport, season);
+    }
+
     /**
      * A cheap fingerprint of everything {@link #forAccuracy} reads for the sport-season: when and how many
      * snapshots, realized games and schedule rows there are. Two equal stamps mean the same accuracy inputs

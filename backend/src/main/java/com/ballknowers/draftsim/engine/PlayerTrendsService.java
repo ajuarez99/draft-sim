@@ -530,7 +530,8 @@ public class PlayerTrendsService {
 
     /**
      * The share of multi-game starter-weeks whose credited points equal exactly one of that week's game
-     * scores; null when there are none (data-model "One-game note").
+     * scores; null when there are none (data-model "One-game note"). The match itself is
+     * {@link CreditedGames#match}; this keeps raw games and every stored week (spec 044 F9), unlike the lock-in read.
      */
     public static Double oneGameShare(List<RosterWeekPointsRepository.WeekBreakdown> weeks, List<SeasonGame> games,
                                       Map<String, Double> scoring) {
@@ -550,12 +551,9 @@ public class PlayerTrendsService {
                 List<Double> weekGames = scores.getOrDefault(pid, Map.of()).get(w.week());
                 if (weekGames == null || weekGames.size() < 2) continue;
                 total++;
-                for (double s : weekGames) {
-                    if (Math.abs(s - c.doubleValue()) < 0.005) {
-                        match++;
-                        break;
-                    }
-                }
+                // The one "which game was credited" rule (spec 044, plan review F9). The numerator stays "any game
+                // matches": a tie counts, and a credit of 0 with no 0-point game does not, exactly as before.
+                if (CreditedGames.match(c.doubleValue(), weekGames).kind().matchedAGame()) match++;
             }
         }
         return total == 0 ? null : (double) match / total;

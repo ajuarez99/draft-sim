@@ -537,4 +537,108 @@ class AdminDigestServiceTest {
         assertEquals(NIGHT, d.yesterday());
         assertEquals("Sleeper default points", nba(d).pointsBasis());
     }
+
+    // ---- Lock-in calls card (specs/044 US5) -------------------------------------------------------------
+
+    private static LockInService.LiveCall call(String pid, String name, LocalDate day, double points, double margin,
+                                               int left, String verdict) {
+        return new LockInService.LiveCall(1, 10L, "Mgr", pid, name, "DEN",
+                new LockInService.LatestGame("g-" + pid, day, points), 20.0, "STAND_IN", margin, left, 0.25, verdict);
+    }
+
+    private static LockInService.LiveCalls live(String status, LockInService.LiveCall... calls) {
+        return new LockInService.LiveCalls(1, NIGHT.plusDays(1), status, List.of(calls));
+    }
+
+    @Test
+    void theCardKeepsOnlyLockCallsFromTheNightByMarginDescending() {
+        LockInService.LiveCalls lc = live("OK",
+                call("a", "Alpha", NIGHT, 30, 0.30, 2, "LOCK"),
+                call("b", "Bravo", NIGHT, 41, 0.52, 1, "LOCK"),
+                call("c", "Charlie", NIGHT, 21, 0.20, 2, "WAIT"),                 // below its threshold: not a call
+                call("d", "Delta", NIGHT.minusDays(1), 50, 0.90, 2, "LOCK"),      // locked-worthy, but another night
+                call("e", "Echo", NIGHT, 5, 0.0, 2, "TOO_EARLY"));
+        AdminDigestService.LockInCard c = AdminDigestService.cardOf("League", "sl-1", lc, NIGHT);
+        assertEquals("OK", c.status());
+        assertEquals(List.of("b", "a"), c.entries().stream().map(LockInService.LiveCall::playerId).toList(),
+                "SC-008: exactly the starters whose margin met their threshold that night, best first");
+        assertTrue(c.tweet().length() <= 280);
+        assertTrue(c.tweet().contains("Bravo 41.0 pts, +52% vs season avg, 1 left"), c.tweet());
+        assertFalse(c.tweet().contains("Charlie"));
+    }
+
+    @Test
+    void theTweetNamesLastSeasonWhenThatIsTheBaseline() {
+        // P5: a margin against last season's average must not read as one against this season's.
+        LockInService.LiveCall c = new LockInService.LiveCall(1, 10L, "Mgr", "z", "Zed", "DEN",
+                new LockInService.LatestGame("g-z", NIGHT, 41.0), 14.4, "LAST_SEASON", 1.84, 1, 0.25, "LOCK");
+        String tweet = AdminDigestService.tweet(NIGHT, List.of(c));
+        assertTrue(tweet.contains("Zed 41.0 pts, +184% vs last season's avg, 1 left"), tweet);
+        assertTrue(tweet.length() <= 280);
+    }
+
+    @Test
+    void aNightWithNoQualifyingCallSaysSoInsteadOfDisappearing() {
+        AdminDigestService.LockInCard c = AdminDigestService.cardOf("League", "sl-1",
+                live("OK", call("c", "Charlie", NIGHT, 21, 0.20, 2, "WAIT")), NIGHT);
+        assertEquals("NONE_TONIGHT", c.status());
+        assertTrue(c.entries().isEmpty());
+        assertEquals("", c.tweet());
+    }
+
+    @Test
+    void aLeagueWithNoHistoryOrNoRostersGetsItsReasonAndNoCalls() {
+        assertEquals("NO_HISTORY", AdminDigestService.cardOf("L", "s", live("NO_HISTORY"), NIGHT).status());
+        AdminDigestService.LockInCard failed = AdminDigestService.cardOf("L", "s", live("ROSTERS_FAILED"), NIGHT);
+        assertEquals("ROSTERS_FAILED", failed.status());
+        assertTrue(failed.entries().isEmpty());
+        assertNull(AdminDigestService.cardOf("L", "s", live("NOT_LIVE"), NIGHT), "a league not being played has no card");
+    }
+
+    @Test
+    void theTweetIsCutByWholeEntriesAtTwoHundredEightyCharacters() {
+        List<LockInService.LiveCall> many = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            many.add(call("p" + i, "Player With A Fairly Long Name " + i, NIGHT, 40 + i, 0.60 - i * 0.001, 1, "LOCK"));
+        }
+        String tweet = AdminDigestService.tweet(NIGHT, many);
+        assertTrue(tweet.length() <= 280, "length " + tweet.length());
+        String[] lines = tweet.split("\n");
+        assertTrue(lines.length > 2 && lines.length < 41, "some entries fit, not all of them: " + lines.length);
+        for (int i = 1; i < lines.length; i++) {
+            assertTrue(lines[i].endsWith("1 left"), "no entry is cut in half: " + lines[i]);
+        }
+        assertTrue(lines[1].startsWith("Player With A Fairly Long Name 0 "), "highest margin first");
+    }
+
+    @Test
+    void theDigestCarriesTheCardsForBasketballOnlyAndFootballGetsAnEmptyList() {
+        AdminDigestService.LockInCard card = new AdminDigestService.LockInCard("L", "sl-1", 1, "NONE_TONIGHT",
+                List.of(), "");
+        AdminDigest d = new AdminDigestService(nbaNight(), SCORER, CLOCK, (season, night) -> {
+            assertEquals(2026, season);
+            assertEquals(NIGHT, night);
+            return List.of(card);
+        }).digest(null);
+        assertEquals(List.of(card), nba(d).lockInCalls());
+        assertEquals(List.of(), nfl(d).lockInCalls());
+    }
+
+    @Test
+    void aThrowingLockInSourceDoesNotFailTheDigest() {
+        AdminDigest d = new AdminDigestService(nbaNight(), SCORER, CLOCK, (season, night) -> {
+            throw new IllegalStateException("boom");
+        }).digest(null);
+        assertEquals("READY", nba(d).status());
+        assertFalse(nba(d).topPerformers().isEmpty(), "the other cards are untouched");
+        assertEquals(List.of(), nba(d).lockInCalls());
+    }
+
+    @Test
+    void aNightThatIsNotReadyHasNoLockInCardsAndNeverAsksForThem() {
+        AdminDigest d = new AdminDigestService(new Fake(), SCORER, CLOCK, (season, night) -> {
+            throw new AssertionError("not asked");
+        }).digest(null);
+        assertEquals(List.of(), nba(d).lockInCalls());
+    }
 }

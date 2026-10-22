@@ -146,6 +146,24 @@ public class RosterWeekPointsRepository {
     }
 
     /**
+     * A fingerprint of everything {@link #breakdownsFor} returns for a league: the row count, the sum of
+     * starters' points, and an md5 over the ordered per-player points and starters lists (spec 044 plan review
+     * F6). The table has no {@code updated_at}, so count and max week cannot see a week rewritten in place (a stat
+     * correction through spec 009's correction window); this can. One cheap aggregate (hundreds of rows).
+     */
+    public String digest(long leagueId) {
+        return db.sql("""
+                select concat_ws('|', count(*), coalesce(sum(starters_points), 0),
+                       coalesce(md5(string_agg(players_points::text || coalesce(starters::text, ''), ','
+                                               order by week, roster_id)), ''))
+                from roster_week_points where league_id = ?
+                """)
+                .param(leagueId)
+                .query(String.class)
+                .single();
+    }
+
+    /**
      * One roster's scored week, with the manager who owned that roster THAT
      * season. specs/002-league-history-record-book.
      *
