@@ -1,6 +1,6 @@
 # Ball Knowers — handoff
 
-## UPDATE 2026-10-21: spec 041 (memory: JVM settings) built, verified locally, NOT committed or deployed
+## UPDATE 2026-10-22: spec 041 (memory: JVM settings) built, verified locally, pushed on branch `041-memory-footprint` (PR to open), NOT deployed
 
 - **Where:** worktree `.claude/worktrees/041-memory-footprint`, branch `041-memory-footprint` (from `origin/main` c987b92; main has since merged 042 and 043, and neither touches these files, but sync before the PR). Docs are in `specs/041-memory-footprint/`: spec (rescoped, with amendment notes), plan, research, plan-review (F1–F16), tasks, baseline, verification, code-review. Scripts are in `scripts/memory/`.
 - **What it does:** the Dockerfile ENTRYPOINT now runs `java -XX:+UseG1GC -Xmx1024m -XX:G1PeriodicGCInterval=60000 $JAVA_OPTS`. `JAVA_OPTS` is empty and is for extra flags only. `config/JvmSettingsLogger` logs `JVM settings: maxHeapMb=… gc=… flags=[…]` at startup. `DEPLOY.md` "Memory" is rewritten, and lessons #48 is added.
@@ -14,9 +14,9 @@
 - **Failed, reported as failed:**
   - SC-004′ (back within 20% of rest at +5 min): +74%, vs +209% old. Non-heap stays grown after load.
   - SC-003′ stress peak: 834 vs 761, overlapping ranges.
-  - Backend suite: 2,058 tests, 1 failed + 1 skipped, both date/data drift that reproduces on untouched main (`BoardRepositoryLatestBeforeIT`, `PlayerStatsLeaderboardReadIT`). Not fixed; Allan to decide.
+  - Backend suite (merged with main 7064eb5, 2026-10-22): **2,141 tests, 0 failed, 6 skipped.** The two stale ITs were fixed: the NBA 2026 draft `start_time` pin (Sleeper replaced the scheduled 19:15:08Z with the actual 21:16:19Z), and the fallback-leaderboard draft/ADP test, which now asserts the post-draft state too. The 6 skips are every `PlayerStatsLeaderboardReadIT` fallback test. They skip by design now that the shared DB has NBA 2026 games (43 rows after the 10-20 tip-off). **That fallback path no longer has IT coverage against live data.** A follow-up should give it a fixture that doesn't depend on the season calendar.
 - **Owed:**
-  - Allan's go-ahead to commit/PR/deploy.
+  - Open the PR (gh is unauthenticated here), merge, and deploy (Allan).
   - After deploy, SC-009: minute-resolution `railway metrics -s draft-sim --memory` over a normal day plus the first spike. Check the logger line in the deploy log. Code-review #8: one of 3 local runs hadn't recovered by +5 min, so look at individual spikes, not a median.
   - Clean up the scratch DB `draftsim_041` and the `bk041:*` images when done.
 - **If the Railway memory limit is ever lowered below ~1.5 GB, lower `-Xmx`** (Dockerfile comment).

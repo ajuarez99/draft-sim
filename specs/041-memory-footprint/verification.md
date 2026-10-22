@@ -110,3 +110,10 @@ Environment: the ITs hardcode `jdbc:postgresql://localhost:5433/draftsim` and wr
 
 ## Tasks
 T012 and T013 done. T014's C2 half is done and passes; its suite half did not meet the 0-failed/0-skipped bar (above), so T014 is left unchecked in `tasks.md`.
+
+
+## Suite after fixing the stale ITs and merging main (2026-10-22, parent session)
+
+On the merged tree (`main` 7064eb5) against the shared `draftsim`: **2,141 tests, 0 failed, 6 skipped** (`./gradlew test`, counts from `build/test-results`).
+- Fixed: `BoardRepositoryLatestBeforeIT.theDraftRowCarriesTheScheduledStartTimeFromBothQueries` (dropped the pinned instant; Sleeper overwrote the scheduled start with the actual one) and `PlayerStatsLeaderboardReadIT.aSeasonThatFellBackReadsTheRequestedSeasonsDraftAndAdp` (now asserts both the pre-draft and the held-draft state).
+- Still skipped (6): every `PlayerStatsLeaderboardReadIT` fallback test, "2026 has stored games now, so it did not fall back". The NBA season tipped off on 10-20, and the DB has 43 NBA 2026 `player_game` rows. This is new since the T014 run, unrelated to spec 041, and left for a follow-up. SC-007′'s literal 0-skip bar is therefore still not met.
