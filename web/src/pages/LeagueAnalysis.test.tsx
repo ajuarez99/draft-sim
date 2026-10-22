@@ -17,6 +17,8 @@ vi.mock('../api', () => ({
   getLeagueAnalysis: (...args: unknown[]) => getLeagueAnalysis(...args),
   getProjectionAccuracy: (...args: unknown[]) => getProjectionAccuracy(...args),
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
+  // Spec 044: the page mounts the lock-in panel; not-applicable keeps it out of these tests.
+  fetchLockIns: () => Promise.resolve({ status: 'NOT_NBA' }),
 }))
 
 function player(slot: string, position: string, name: string, points: number,

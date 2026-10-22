@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PlayerPage from './PlayerPage'
 import { LeagueDataVersionProvider } from '../leagueDataVersion'
 import type {
+  LockInReport,
   Pct,
   PlayerCounting,
   PlayerGameLogRow,
@@ -14,9 +15,14 @@ import type {
 } from '../api'
 
 const getPlayerStats = vi.fn()
+const fetchLockIns = vi.fn()
 vi.mock('../api', () => ({
   getPlayerStats: (...args: unknown[]) => getPlayerStats(...args),
+  fetchLockIns: (...args: unknown[]) => fetchLockIns(...args),
 }))
+
+/** What the server answers for a league that is not a lock-in league: the tab is simply not there. */
+const NOT_LOCK_IN = { status: 'GAME_MODE', reason: 'not lock-in mode' } as unknown as LockInReport
 
 const zero: PlayerCounting = {
   pts: 0, reb: 0, oreb: 0, dreb: 0, ast: 0, stl: 0, blk: 0, tov: 0, pf: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0,
@@ -114,7 +120,7 @@ function page(over: Partial<PlayerStatsPage> = {}): PlayerStatsPage {
  * about those tests changed.
  */
 let startTab: string | null = null
-const onTab = (t: 'overview' | 'stats' | 'log' | 'schedule') => {
+const onTab = (t: 'overview' | 'stats' | 'log' | 'schedule' | 'lock-ins') => {
   startTab = t
 }
 
@@ -138,6 +144,8 @@ function show(d: PlayerStatsPage, url?: string) {
 
 beforeEach(() => {
   getPlayerStats.mockReset()
+  fetchLockIns.mockReset()
+  fetchLockIns.mockResolvedValue(NOT_LOCK_IN)
   startTab = null
 })
 
@@ -735,5 +743,102 @@ describe('PlayerPage advanced view', () => {
     unmount()
     show(page({ nextGame: nextGame(), nextGameReason: null, upcoming: [nextGame()], scheduleAsOf: null }))
     expect(await screen.findByText('schedule time unknown')).toBeInTheDocument()
+  })
+})
+
+// --- specs/044 US2: the lock-ins tab ---------------------------------------------------------------
+
+function lockInReport(over: Partial<LockInReport> = {}): LockInReport {
+  const fig = (n: number, median: number | null = null, q1: number | null = null, q3: number | null = null) => ({ n, median, q1, q3 })
+  return {
+    sport: 'nba', season: 2025, status: 'MEASURED', reason: null, minLocks: 10, minCell: 15, bands: [0, 0.1, 0.25, 0.5],
+    gamesLeftCap: 3, minPriorGames: 5, weeksCovered: 21,
+    totals: {
+      multiGame: 2168, lock: 1188, rodeOut: 894, rodeOutMissed: 14, tieNonLast: 10, tieWithLast: 62, unmatched: 0,
+      singleGame: 92, noGames: 1, noBaselineStandIn: 127, noSnapshot: 1188, nonPositiveProjection: 0,
+    },
+    managers: [],
+    players: [{ key: '1350', name: 'Rudy Gobert', avatarId: null, standIn: fig(12, 0.4, 0.2, 0.6), projection: fig(0), rodeOut: 9, tieNonLast: 0 }],
+    payoff: { STAND_IN: [], PROJECTION: [] },
+    locks: [
+      {
+        week: 3, playoff: false, managerId: 7, manager: 'popsharky', rosterId: 2, playerId: '1350', player: 'Rudy Gobert',
+        gameDate: '2025-11-05', gameId: 'g1', points: 33, standIn: { baseline: 22, margin: 0.5 }, projection: null,
+        laterGames: 2, lastGame: 25, bestLater: 30, beatenByLast: false, beatenLater: false,
+      },
+      {
+        week: 21, playoff: true, managerId: 9, manager: 'xonicboom', rosterId: 5, playerId: '1350', player: 'Rudy Gobert',
+        gameDate: '2026-03-20', gameId: 'g2', points: 20, standIn: { baseline: null, margin: null }, projection: null,
+        laterGames: 1, lastGame: 18, bestLater: 18, beatenByLast: false, beatenLater: false,
+      },
+    ],
+    excludedCategories: [], caveats: ['Locks are inferred: Sleeper does not publish which game a manager locked.'],
+    thresholds: null, live: null,
+    ...over,
+  }
+}
+
+describe('PlayerPage lock-ins tab (spec 044)', () => {
+  it('asks for only this player, without the live call, and adds the tab for a measured lock-in league', async () => {
+    fetchLockIns.mockResolvedValue(lockInReport())
+    show(page())
+    expect(await screen.findByRole('tab', { name: 'Lock-ins' })).toBeInTheDocument()
+    expect(fetchLockIns).toHaveBeenCalledWith('L25', { player: '1350', live: false })
+  })
+
+  it('has no such tab for a league that is not a lock-in league, and ?tab=lock-ins falls back to Overview', async () => {
+    onTab('lock-ins')
+    show(page())
+    await screen.findByRole('tab', { name: 'Overview' })
+    await waitFor(() => expect(fetchLockIns).toHaveBeenCalled())
+    expect(screen.queryByRole('tab', { name: 'Lock-ins' })).not.toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('does not ask for lock-ins on a football page', async () => {
+    show(page({ sport: 'nfl', available: false, reason: 'NOT_SUPPORTED' as PlayerStatsPage['reason'] }))
+    await waitFor(() => expect(getPlayerStats).toHaveBeenCalled())
+    await screen.findByRole('heading', { level: 1 })
+    expect(fetchLockIns).not.toHaveBeenCalled()
+  })
+
+  it('shows the median with its count and the individual locks, each with its baseline', async () => {
+    fetchLockIns.mockResolvedValue(lockInReport())
+    onTab('lock-ins')
+    show(page())
+    const card = await screen.findByRole('region', { name: 'Lock-ins' })
+    expect(within(card).getByRole('tab', { name: 'Season-average stand-in' })).toHaveAttribute('aria-selected', 'true')
+    expect(card).toHaveTextContent('Season-average stand-in: +40% median over 12 locks')
+    expect(card).toHaveTextContent('middle half +20% to +60%')
+    const rows = within(card).getAllByRole('row').slice(1)
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent('popsharky')
+    expect(rows[0]).toHaveTextContent('33.0')
+    expect(rows[0]).toHaveTextContent('22.0')
+    expect(rows[0]).toHaveTextContent('+50%')
+    expect(rows[1]).toHaveTextContent('xonicboom')
+    expect(rows[1]).toHaveTextContent('playoffs')
+    expect(rows[1]).toHaveTextContent('no margin')
+  })
+
+  it('says "too few" below the minimum and switches to the projection baseline on request', async () => {
+    const r = lockInReport()
+    r.players[0].standIn = { n: 2, median: null, q1: null, q3: null }
+    fetchLockIns.mockResolvedValue(r)
+    onTab('lock-ins')
+    show(page())
+    const card = await screen.findByRole('region', { name: 'Lock-ins' })
+    expect(card).toHaveTextContent('2 locks — too few for a median')
+    fireEvent.click(within(card).getByRole('tab', { name: 'Projection' }))
+    expect(card).toHaveTextContent('0 locks — too few for a median')
+    expect(card).toHaveTextContent('none frozen')
+  })
+
+  it('says there are no provable locks instead of showing 0%', async () => {
+    fetchLockIns.mockResolvedValue(lockInReport({ players: [], locks: [] }))
+    onTab('lock-ins')
+    show(page())
+    expect(await screen.findByText('No provable locks for this player in this league this season.')).toBeInTheDocument()
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument()
   })
 })

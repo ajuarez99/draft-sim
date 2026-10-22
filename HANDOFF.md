@@ -1,5 +1,37 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-22: spec 044 (lock-ins: margins, Lock/Wait calls, digest card) built, live-verified locally, NOT committed or deployed
+
+- **Where:** worktree `.claude/worktrees/044-lock-in-threshold`, branch `044-lock-in-threshold` (from
+  `origin/main` 7064eb5). The docs are in `specs/044-lock-in-threshold/`:
+  - spec, with two clarify sessions and amendments shown in place
+  - plan (its "Amended after plan review" section wins)
+  - research (R2 v2 / R8 / R11 supersede the first tables)
+  - data-model, contracts, quickstart
+  - plan-review (F1–F14), tasks (T001–T040), code-review (B1–B2, S1–S4, N1–N4, P1–P5, with fixes), verification
+- **What it does:** `GET /api/leagues/{id}/lock-ins[?player=&live=]`, a Lock-ins section on League analysis,
+  a `lock-ins` tab on the player page, and `lockInCalls` on the admin digest. There's no migration.
+- **Measured:**
+  - **The default is the last scheduled game.** Bench players, who can't lock, are credited their last game in
+    860/864 and 848/865 weeks.
+  - **Inference.** Real inference failures are 0. Every "unmatched" credit is a 0 from defaulting onto a missed
+    last game.
+  - **Margins.** Locks land at a median +36% (2024) / +39% (2025) above the player's season-to-date average.
+  - **Thresholds.** The 2024 + 2025 thresholds are +7 / +25 / +36 / +44% for 1 / 2 / 3 / 4+ games left.
+  - **Out-of-sample.** Fitted on 2024 and applied to 2025, the rule scores +0.33 points per starter-week over
+    what managers were credited.
+- **SC-002 amended and accepted (Allan, 2026-10-22):** the bar went from "≥95% unique match" (2024 measured
+  94.7%) to "real unmatched ≤ 1%".
+- **Assumed, not measured:**
+  - That `game_mode: 1` means lock-in. It's inferred from the settings and the data, with no Sleeper docs.
+  - That only the latest game can be locked. Allan stated this; it wasn't measured.
+- **Owed:**
+  - Check projection-baseline margins on prod after 2026 week 1 is final (~10-26).
+  - Paste the lock-in card into X.
+  - Commit, PR and deploy need Allan's go-ahead.
+- **Unrelated, pre-existing:** `BoardRepositoryLatestBeforeIT.theDraftRowCarriesTheScheduledStartTimeFromBothQueries`
+  fails on clean `origin/main` too (checked 2026-10-22).
+
 ## UPDATE 2026-10-20: spec 043 (morning tweet digest, admin copy-and-paste page) built, live-verified locally, NOT committed or deployed
 
 - **Where:** worktree `.claude/worktrees/043-tweet-digest-admin`, branch `043-tweet-digest-admin`

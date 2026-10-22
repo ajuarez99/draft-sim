@@ -4,7 +4,9 @@ import NotFound from '../components/NotFound'
 import OwnershipMark from '../components/OwnershipMark'
 import PageHeader from '../components/PageHeader'
 import PlayerFace from '../components/PlayerFace'
+import { PlayerLockInsView } from '../components/PlayerLockIns'
 import {
+  fetchLockIns,
   getPlayerStats,
   type NextGame,
   type Pct,
@@ -677,38 +679,43 @@ function GameLog({ d }: { d: PlayerStatsPage }) {
 
 // --- specs/042 US2: the body in URL-addressable tabs ---------------------------------------------
 
-const TABS = [
+const BASE_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'stats', label: 'Stats' },
   { id: 'log', label: 'Game log' },
   { id: 'schedule', label: 'Schedule' },
 ] as const
-type TabId = (typeof TABS)[number]['id']
+/** specs/044 US2: only an NBA lock-in league has this tab (the server says so; see `lockInReport` below). */
+const LOCK_INS_TAB = { id: 'lock-ins', label: 'Lock-ins' } as const
+type Tab = (typeof BASE_TABS)[number] | typeof LOCK_INS_TAB
+type TabId = Tab['id']
 const DEFAULT_TAB: TabId = 'overview'
 
+const tabsFor = (lockIns: boolean): readonly Tab[] => (lockIns ? [...BASE_TABS, LOCK_INS_TAB] : BASE_TABS)
+
 /** `?tab=` to a tab; a missing or unknown value is the default, never an empty page. */
-const parseTab = (v: string | null): TabId => TABS.find((t) => t.id === v)?.id ?? DEFAULT_TAB
+const parseTab = (v: string | null, tabs: readonly Tab[]): TabId => tabs.find((t) => t.id === v)?.id ?? DEFAULT_TAB
 
 /**
  * A real tablist: the selected tab is the one in the tab order, the arrow keys (and Home/End) move between
  * tabs and select them, and each tab names its panel. Selecting writes `?tab=` (the default is left out).
  */
-function PlayerTabs({ tab, onSelect }: { tab: TabId; onSelect: (t: TabId) => void }) {
+function PlayerTabs({ tabs, tab, onSelect }: { tabs: readonly Tab[]; tab: TabId; onSelect: (t: TabId) => void }) {
   const refs = useRef<Record<string, HTMLButtonElement | null>>({})
   const move = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
     let next = -1
-    if (e.key === 'ArrowRight') next = (i + 1) % TABS.length
-    else if (e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length
+    if (e.key === 'ArrowRight') next = (i + 1) % tabs.length
+    else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length
     else if (e.key === 'Home') next = 0
-    else if (e.key === 'End') next = TABS.length - 1
+    else if (e.key === 'End') next = tabs.length - 1
     if (next < 0) return
     e.preventDefault()
-    onSelect(TABS[next].id)
-    refs.current[TABS[next].id]?.focus()
+    onSelect(tabs[next].id)
+    refs.current[tabs[next].id]?.focus()
   }
   return (
     <div className="pp-tabs" role="tablist" aria-label="Player sections">
-      {TABS.map((t, i) => (
+      {tabs.map((t, i) => (
         <button
           key={t.id}
           ref={(el) => {
@@ -765,7 +772,18 @@ export default function PlayerPage() {
   const version = useLeagueDataVersion(sleeperLeagueId)
   const block = useBlock(leagueId && playerId ? () => getPlayerStats(leagueId, playerId) : null, [leagueId, playerId, version])
   const [params, setParams] = useSearchParams()
-  const tab = parseTab(params.get('tab'))
+  // specs/044: the lock-ins tab exists only when the server says this is an NBA lock-in league that was measured.
+  // The report (narrowed to this player, no live call) is fetched once the page is known to be basketball, and the
+  // tab appears when it arrives; until then (or on any refusal or failure) there is simply no such tab.
+  const d0 = block.status === 'ok' ? block.data : null
+  const wantsLockIns = !!d0 && d0.available && d0.sport === 'nba'
+  const lockInBlock = useBlock(
+    wantsLockIns && leagueId && playerId ? () => fetchLockIns(leagueId, { player: playerId, live: false }) : null,
+    [leagueId, playerId, version, wantsLockIns],
+  )
+  const lockInReport = lockInBlock.status === 'ok' && lockInBlock.data.status === 'MEASURED' ? lockInBlock.data : null
+  const tabs = tabsFor(lockInReport != null)
+  const tab = parseTab(params.get('tab'), tabs)
   const selectTab = (t: TabId) => {
     const next = new URLSearchParams(params)
     if (t === DEFAULT_TAB) next.delete('tab')
@@ -815,7 +833,7 @@ export default function PlayerPage() {
             </section>
           ) : (
             <>
-              <PlayerTabs tab={tab} onSelect={selectTab} />
+              <PlayerTabs tabs={tabs} tab={tab} onSelect={selectTab} />
               <div role="tabpanel" id={`pp-panel-${tab}`} aria-labelledby={`pp-tab-${tab}`} tabIndex={0} className="pp-panel">
                 {tab === 'overview' && (
                   <div className="pp-cols">
@@ -831,6 +849,7 @@ export default function PlayerPage() {
                 )}
                 {tab === 'log' && <GameLog d={d} />}
                 {tab === 'schedule' && <ScheduleCard d={d} />}
+                {tab === 'lock-ins' && lockInReport && <PlayerLockInsView r={lockInReport} />}
               </div>
               {d.dataAsOf && <p className="muted small">{`Data refreshed ${longDate(d.dataAsOf)}.`}</p>}
             </>

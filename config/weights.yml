@@ -290,3 +290,34 @@ draftsim:
       nba: "12:00"
       nfl: "09:00"
     lookahead-days: 7
+
+  # Lock-in threshold (spec 044). Every number here is ARBITRARY: hand-set, not fitted, and set
+  # before the payoff table was read (specs/044-lock-in-threshold research R7 / plan amendment item 9).
+  # The bands and minimums are not to be retuned to look decisive; if a cell is thin, the page says so.
+  # min-locks: provable locks a manager or player needs before a median margin is shown (below it
+  #   the row prints its count and "too few"). A guess; ~10 keeps a median from being one outlier.
+  # min-cell: payoff cells with fewer locks than this show their count, not a rate. A guess.
+  # min-prior-games: games a player must have played earlier in the season before his season average
+  #   is used as the stand-in baseline; below it the lock has no margin (counted, never guessed).
+  #   A guess: 5 games is ~a week and a half of NBA schedule.
+  # margin-bands: lower edges (fractions above baseline) of the 2nd..last band of the payoff grid
+  #   (read < 0, 0-10, 10-25, 25-50, 50+ percent). Hand-picked.
+  # games-left-cap: payoff columns are 1, 2 and "3 or more" later games. Weeks with more are too
+  #   rare for their own column.
+  # threshold-cap: how many games-left the Lock/Wait thresholds are fitted for (4 means "4 or more").
+  #   Separate from games-left-cap on purpose: a rare 4-game week is too thin for a payoff column but
+  #   cheap for the recursion.
+  # live-ttl-seconds: how long a live Lock/Wait call is cached, so the analysis page cannot hammer
+  #   Sleeper's rosters endpoint. A guess.
+  # live-failure-ttl-seconds: how long a FAILED roster read is remembered, so a Sleeper outage is not
+  #   one retry per page load. Hand-set, arbitrary: short enough that "try again" is nearly immediate.
+  # Delete this block and the app fails at startup (validated), so a missing key cannot bind to 0.
+  lock-in:
+    min-locks: 10
+    min-cell: 15
+    min-prior-games: 5
+    margin-bands: [0, 0.10, 0.25, 0.50]
+    games-left-cap: 3
+    threshold-cap: 4
+    live-ttl-seconds: 60
+    live-failure-ttl-seconds: 15

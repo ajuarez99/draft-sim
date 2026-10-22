@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import PageHeader from '../components/PageHeader'
-import { getAdminDigest, refreshDigestStats, type AdminDigest as Digest, type DigestKeyEntry, type SportDigest } from '../api'
+import {
+  getAdminDigest,
+  refreshDigestStats,
+  type AdminDigest as Digest,
+  type DigestKeyEntry,
+  type LockInCard,
+  type SportDigest,
+} from '../api'
 import { AdminTokenRequiredError } from '../apiError'
+import { signedPct } from '../components/LockInPanel'
 import {
   keyPlayersCard,
   positionLeadersCard,
@@ -169,6 +177,49 @@ function KeyNotes({ keys }: { keys: DigestKeyEntry[] }) {
   )
 }
 
+const lockInReason = (c: LockInCard, when: string): string => {
+  switch (c.status) {
+    case 'NONE_TONIGHT':
+      return `No starter in this league cleared his lock threshold in ${when === 'last night' ? "last night's games" : `the games ${when}`}, with games still left this week.`
+    case 'NO_HISTORY':
+      return 'This league has no completed lock-in season to learn thresholds from, so no calls were made.'
+    case 'ROSTERS_FAILED':
+      return "The current lineups couldn't be read from Sleeper, so no calls were made. Try again in a minute."
+    default:
+      return 'No lock-in calls for this league.'
+  }
+}
+
+/** One lock-in league: the server-built tweet when there are calls, otherwise the reason there are none (US5). */
+function LockInCardBox({ c, when }: { c: LockInCard; when: string }) {
+  const title = `Lock-in calls · ${c.leagueName}`
+  if (c.status !== 'OK' || c.tweet === '') {
+    return (
+      <div className="dg-card">
+        <h3>{title}</h3>
+        <p className="muted small">{lockInReason(c, when)}</p>
+      </div>
+    )
+  }
+  const card: PostCard = {
+    text: c.tweet,
+    weightedLength: weightedLength(c.tweet),
+    shown: c.tweet.split('\n').length - 1,
+    total: c.entries.length,
+  }
+  return (
+    <PostCardBox key={`li-${c.sleeperLeagueId}-${c.tweet}`} title={title} card={card}>
+      <ul className="dg-notes muted small">
+        {c.entries.map((e) => (
+          <li key={`${e.rosterId}-${e.playerId}`}>
+            {`${e.player ?? e.playerId} (${e.manager ?? 'unowned'}): ${e.latestGame.points.toFixed(1)} pts, ${e.margin != null ? `${signedPct(e.margin)} vs ${e.baselineKind === 'LAST_SEASON' ? "last season's avg" : 'season avg'}, ` : ''}${e.gamesLeft ?? 0} left, bar ${signedPct(e.threshold ?? 0)}`}
+          </li>
+        ))}
+      </ul>
+    </PostCardBox>
+  )
+}
+
 function SportSection({ sd, yesterday, target }: { sd: SportDigest; yesterday: string; target: string }) {
   const ready = sd.status === 'READY'
   const when = sd.date && sd.date !== yesterday ? `on ${friendlyDate(sd.date)}` : 'last night'
@@ -241,6 +292,9 @@ function SportSection({ sd, yesterday, target }: { sd: SportDigest; yesterday: s
         {spot && <PostCardBox key={`s-${spot.text}`} title="Best single line" card={spot} />}
         {ready && !leaders && (sd.positionLeaders?.length ?? 0) > 0 && <NothingToPost what="Position leaders" />}
         {leaders && <PostCardBox key={`l-${leaders.text}`} title="Position leaders" card={leaders} />}
+        {sd.lockInCalls.map((c) => (
+          <LockInCardBox key={c.sleeperLeagueId} c={c} when={when} />
+        ))}
       </div>
     </section>
   )

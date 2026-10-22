@@ -26,6 +26,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         NbaGameProperties.class,
         PreseasonProperties.class,
         ProjectionAccuracyProperties.class,
+        LockInProperties.class,
         RecapProperties.class,
         RivalryProperties.class
 })

@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AdminDigest from './AdminDigest'
 import { AdminTokenRequiredError } from '../apiError'
-import type { AdminDigest as Digest, DigestEntry, SportDigest } from '../api'
+import type { AdminDigest as Digest, DigestEntry, LiveCall, LockInCard, SportDigest } from '../api'
 
 const getAdminDigest = vi.fn()
 const refreshDigestStats = vi.fn()
@@ -50,6 +50,7 @@ function sport(over: Partial<SportDigest> = {}): SportDigest {
     topPerformers: [entry()],
     keyPlayers: [{ rank: 1, entry: entry(), played: true, expectation: 50, expectationBasis: 'THIS_SEASON', verdict: 'ABOVE' }],
     positionLeaders: null,
+    lockInCalls: [],
     ...over,
   }
 }
@@ -69,6 +70,7 @@ const NFL_IDLE = sport({
   topPerformers: [],
   keyPlayers: [],
   positionLeaders: [],
+  lockInCalls: [],
 })
 
 beforeEach(() => {
@@ -248,5 +250,72 @@ describe('AdminDigest', () => {
     await waitFor(() => expect(getAdminDigest).toHaveBeenCalledTimes(2))
     expect(refreshDigestStats).toHaveBeenCalledWith('secret')
     expect(await screen.findByText(/NBA: 1 week fetched, 61 games/)).toBeInTheDocument()
+  })
+})
+
+// --- specs/044 US5: the lock-in calls card -----------------------------------------------------------
+
+function lockCall(over: Partial<LiveCall> = {}): LiveCall {
+  return {
+    rosterId: 1, managerId: 7, manager: 'popsharky', playerId: 'p1', player: 'Paul George', team: 'BOS',
+    latestGame: { gameId: 'g1', gameDate: '2026-10-20', points: 37.5 }, baseline: 21.5, baselineKind: 'LAST_SEASON',
+    margin: 0.746, gamesLeft: 1, threshold: 0.068, call: 'LOCK', ...over,
+  }
+}
+
+function card(over: Partial<LockInCard> = {}): LockInCard {
+  return {
+    leagueName: 'Ball Knowers', sleeperLeagueId: 'L1', week: 1, status: 'OK', entries: [lockCall()],
+    tweet: "Lock-in calls after Oct 20:\nPaul George 37.5 pts, +75% vs last season's avg, 1 left", ...over,
+  }
+}
+
+describe('AdminDigest lock-in calls card (spec 044)', () => {
+  async function open(lockInCalls: LockInCard[]) {
+    sessionStorage.setItem('bk.adminToken', 'secret')
+    getAdminDigest.mockResolvedValue(digest([sport({ lockInCalls }), NFL_IDLE]))
+    render(<AdminDigest />)
+  }
+
+  it('shows the server-built tweet in an editable box with the counter and a Copy button', async () => {
+    await open([card()])
+    const box = await screen.findByLabelText('Lock-in calls · Ball Knowers text')
+    expect(box).toHaveValue("Lock-in calls after Oct 20:\nPaul George 37.5 pts, +75% vs last season's avg, 1 left")
+    const c = box.closest('.dg-card') as HTMLElement
+    expect(c.querySelector('.dg-count')).toHaveTextContent('/ 280')
+    expect(within(c).getByRole('button', { name: 'Copy' })).toBeInTheDocument()
+    expect(within(c).getByText(/Paul George \(popsharky\): 37.5 pts, \+75% vs last season's avg, 1 left, bar \+7%/)).toBeInTheDocument()
+  })
+
+  it('copies the text the same way the other cards do', async () => {
+    await open([card()])
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+    const box = await screen.findByLabelText('Lock-in calls · Ball Knowers text')
+    await user.click(within(box.closest('.dg-card') as HTMLElement).getByRole('button', { name: 'Copy' }))
+    expect(writeText).toHaveBeenCalledWith("Lock-in calls after Oct 20:\nPaul George 37.5 pts, +75% vs last season's avg, 1 left")
+  })
+
+  it.each([
+    ['NONE_TONIGHT', /No starter in this league cleared his lock threshold in last night's games/],
+    ['NO_HISTORY', /no completed lock-in season to learn thresholds from/],
+    ['ROSTERS_FAILED', /lineups couldn't be read from Sleeper/],
+  ])('says why there is no tweet for %s instead of disappearing', async (status, text) => {
+    await open([card({ status, entries: [], tweet: '' })])
+    expect(await screen.findByText(text)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Lock-in calls · Ball Knowers' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Lock-in calls · Ball Knowers text')).not.toBeInTheDocument()
+  })
+
+  it('draws one card per league and nothing when there are none', async () => {
+    await open([card(), card({ leagueName: 'Other League', sleeperLeagueId: 'L2' })])
+    expect(await screen.findByLabelText('Lock-in calls · Ball Knowers text')).toBeInTheDocument()
+    expect(screen.getByLabelText('Lock-in calls · Other League text')).toBeInTheDocument()
+  })
+
+  it('has no lock-in card when the list is empty', async () => {
+    await open([])
+    await screen.findByLabelText('Top fantasy scores text')
+    expect(screen.queryByText(/Lock-in calls/)).not.toBeInTheDocument()
   })
 })

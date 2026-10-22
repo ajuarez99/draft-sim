@@ -37,6 +37,7 @@ import { useLeagueDataVersion } from '../leagueDataVersion'
 import { extremes } from '../extremes'
 import { projectionNotes, reasonText } from '../projectionCopy'
 import ProjectionAccuracyPanel from '../components/ProjectionAccuracyPanel'
+import LockInPanel from '../components/LockInPanel'
 
 /**
  * claude/league-analysis.md: what each roster is MADE OF, as opposed to Power
@@ -1292,6 +1293,10 @@ export default function LeagueAnalysis() {
           {sleeperLeagueId && data.projections.available && (
             <ProjectionAccuracyPanel sleeperLeagueId={sleeperLeagueId} dataVersion={dataVersion} />
           )}
+
+          {/* Spec 044: retrospective (past weeks' credited points), so it does not wait on a projection being
+              available. It draws nothing for a league lock-ins don't apply to (football, another game mode). */}
+          {sleeperLeagueId && <LockInPanel sleeperLeagueId={sleeperLeagueId} dataVersion={dataVersion} />}
 
           {/* A per-game projection has no weeks to lay out: every week would draw the same line. */}
           {!perWeek && (

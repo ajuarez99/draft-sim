@@ -44,6 +44,7 @@ function digest(over: Partial<SportDigest> = {}): SportDigest {
     topPerformers: [],
     keyPlayers: [],
     positionLeaders: null,
+    lockInCalls: [],
     ...over,
   }
 }
