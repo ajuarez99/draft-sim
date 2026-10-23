@@ -308,7 +308,7 @@ public class PlayoffOddsService {
      * instead of becoming a new endpoint's zero.
      */
     public Optional<Forecast> forecast(String sleeperLeagueId) {
-        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
         int season = league.season();

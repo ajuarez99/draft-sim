@@ -79,11 +79,68 @@ class LeagueSeasonResolverTest {
         assertNull(r.requestedSeason());
     }
 
+    // ---- spec 045 T007: LIVE_WEEK ---------------------------------------------------------------
+
+    private LeagueRow live2026(String status) {
+        return new LeagueRow(3, Sport.NBA, "L26", "n", 2026, 12, List.of(), 0, "L25", status);
+    }
+
+    private void with2026(LeagueRow r, int leg) {
+        when(leagues.chainBySleeperId("L26")).thenReturn(List.of(r, y2025, y2024));
+        when(leagues.currentLeg(3L)).thenReturn(leg < 0 ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(leg));
+    }
+
     @Test
-    void legacyResolveIsPlayedWeeks() {
-        games(2026, 50);
-        when(weekPoints.storedWeeks(2L)).thenReturn(Set.of(1));
-        assertEquals(resolver.resolve("L26", Rule.PLAYED_WEEKS), resolver.resolve("L26"));
+    void liveWeek_qualifiesOnOpeningWeek_gamesInSeasonLegOneNoWeeks() {
+        when(weekPoints.storedWeeks(2L)).thenReturn(Set.of(1, 2, 3));   // 2025 played
+        games(2026, 350);
+        with2026(live2026("in_season"), 1);
+        var r = resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow();
+        assertEquals(2026, r.league().season());
+        assertNull(r.requestedSeason());
+        // ...and the same state under PLAYED_WEEKS still walks back (the bug this spec fixes is Matchups-only).
+        assertEquals(2025, resolver.resolve("L26", Rule.PLAYED_WEEKS).orElseThrow().league().season());
+    }
+
+    @Test
+    void liveWeek_qualifiesThroughStoredWeeksToo() {
+        when(weekPoints.storedWeeks(3L)).thenReturn(Set.of(1));
+        assertEquals(2026, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+    }
+
+    @Test
+    void liveWeek_doesNotQualify_whenAnyOneConditionFails() {
+        when(weekPoints.storedWeeks(2L)).thenReturn(Set.of(1, 2, 3));
+        games(2026, 350);
+
+        with2026(live2026(null), 1);                      // status unknown
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+
+        with2026(live2026("complete"), 1);                // complete
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+
+        with2026(live2026("in_season"), -1);              // leg absent
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+
+        with2026(live2026("in_season"), 0);               // leg 0
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+
+        with2026(live2026("pre_draft"), 1);               // not in season
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+
+        games(2026, 0);                                   // in_season, leg 1, drafted but no games (preseason)
+        with2026(live2026("in_season"), 1);
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
+    }
+
+    @Test
+    void liveWeek_doesNotQualifyAnEspnSeason() {
+        when(weekPoints.storedWeeks(2L)).thenReturn(Set.of(1, 2, 3));
+        games(2026, 350);
+        var espn = new LeagueRow(3, Sport.NBA, "L26", "n", 2026, 12, List.of(), 0, "L25", "in_season",
+                com.ballknowers.draftsim.domain.Platform.ESPN, "999", List.of(), List.of());
+        with2026(espn, 1);
+        assertEquals(2025, resolver.resolve("L26", Rule.LIVE_WEEK).orElseThrow().league().season());
     }
 
     @Test

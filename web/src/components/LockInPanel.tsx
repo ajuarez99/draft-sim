@@ -266,14 +266,15 @@ export function ThresholdStrip({ t, kind }: { t: LockInThresholds; kind?: LockBa
 
 export const BASELINE_NAME: Record<string, string> = { STAND_IN: 'season avg', LAST_SEASON: "last season's avg" }
 
-function CallRow({ c }: { c: LiveCall }) {
+/** `showManager` is false where the manager is already the heading above the row (the Matchups cards, spec 045). */
+export function CallRow({ c, showManager = true }: { c: LiveCall; showManager?: boolean }) {
   const name = c.player ?? `Player ${c.playerId}`
   const pill = c.call === 'LOCK' ? 'Lock' : c.call === 'WAIT' ? 'Wait' : 'Too early'
   return (
     <li className="lockin-call" aria-label={name}>
       <span className="lockin-call-who">
         <strong>{name}</strong>
-        <span className="muted small">{[c.team, c.manager].filter(Boolean).join(' · ')}</span>
+        <span className="muted small">{(showManager ? [c.team, c.manager] : [c.team]).filter(Boolean).join(' · ')}</span>
       </span>
       <span className="lockin-call-line mono small">
         {c.latestGame.points.toFixed(1)} pts

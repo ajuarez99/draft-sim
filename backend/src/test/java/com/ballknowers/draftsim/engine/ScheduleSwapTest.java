@@ -157,7 +157,7 @@ class ScheduleSwapTest {
         var scoredWeeks = org.mockito.Mockito.mock(ScoredWeeks.class);
         var league = new com.ballknowers.draftsim.store.LeagueRepository.LeagueRow(7L,
                 com.ballknowers.draftsim.domain.Sport.NFL, "L7", "x", 2025, 4, List.of(), 1.0, null, "complete");
-        org.mockito.Mockito.when(seasons.resolve("L7")).thenReturn(java.util.Optional.of(
+        org.mockito.Mockito.when(seasons.resolve(org.mockito.ArgumentMatchers.eq("L7"), org.mockito.ArgumentMatchers.eq(LeagueSeasonResolver.Rule.PLAYED_WEEKS))).thenReturn(java.util.Optional.of(
                 new LeagueSeasonResolver.Resolved(league, null)));
         org.mockito.Mockito.when(scoredWeeks.of(7L)).thenReturn(new ScoredWeeks.Snapshot(1, 1, java.util.Set.of(1)));
         org.mockito.Mockito.when(leagues.playoffFormat(7L)).thenReturn(java.util.Optional.empty());

@@ -144,6 +144,14 @@ describe('Top players of the week (football)', () => {
     expect(screen.getAllByText('RB · SEA · vs DAL')).toHaveLength(3)
   })
 
+  /** Spec 045 A3: a live week sends no ranking, and an empty list must not read as "nobody scored". */
+  it('says the week is in progress when the weekly report is live, instead of an empty top list', () => {
+    const w = { status: 'ok', data: { week: 1, live: true, topPerformers: [] } } as unknown as Block<WeeklyReport>
+    render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable()} weekly={w} />)
+    expect(screen.getByText(/Week 1 is in progress/)).toBeInTheDocument()
+    expect(screen.queryByText(/No scored performances yet/)).not.toBeInTheDocument()
+  })
+
   it('labels the week from the weekly report data it renders, not the spotlight week', () => {
     const w = { status: 'ok', data: { week: 2, topPerformers: [performer(1, 31.2)] } } as unknown as Block<WeeklyReport>
     render(<PlayerSpotlight sleeperLeagueId="L1" spotlight={applicable({ period: { kind: 'WEEK', week: 3, weekFinal: true } })} weekly={w} />)

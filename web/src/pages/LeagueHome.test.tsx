@@ -91,6 +91,9 @@ function weekly(over: Partial<WeeklyReport> = {}): WeeklyReport {
     ],
     awards: [],
     awardsOmitted: [],
+    live: false,
+    liveWeek: null,
+    sleeperLeagueId: 'L1',
     ...over,
   }
 }

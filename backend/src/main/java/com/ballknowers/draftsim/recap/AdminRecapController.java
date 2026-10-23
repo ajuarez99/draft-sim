@@ -42,7 +42,7 @@ public class AdminRecapController {
      */
     @PostMapping("/features/RECAP")
     public ResponseEntity<Void> grant(@PathVariable String sleeperId) {
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return ResponseEntity.notFound().build();
         features.grant(resolved.get().league().id(), LeagueFeatureRepository.RECAP, "admin grant");
         return ResponseEntity.noContent().build();
@@ -51,7 +51,7 @@ public class AdminRecapController {
     /** Idempotent; 404 for an unknown league. */
     @DeleteMapping("/features/RECAP")
     public ResponseEntity<Void> revoke(@PathVariable String sleeperId) {
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return ResponseEntity.notFound().build();
         features.revoke(resolved.get().league().id(), LeagueFeatureRepository.RECAP);
         return ResponseEntity.noContent().build();
@@ -63,7 +63,7 @@ public class AdminRecapController {
      */
     @PostMapping("/recap/{week}/regenerate")
     public ResponseEntity<Void> regenerate(@PathVariable String sleeperId, @PathVariable int week) {
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return ResponseEntity.notFound().build();
         recaps.clearAttempt(resolved.get().league().id(), week);
         return ResponseEntity.noContent().build();
@@ -76,7 +76,7 @@ public class AdminRecapController {
      */
     @PostMapping("/recap/{week}/reroll")
     public ResponseEntity<Void> reroll(@PathVariable String sleeperId, @PathVariable int week) {
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return ResponseEntity.notFound().build();
         recaps.reroll(resolved.get().league().id(), week);
         return ResponseEntity.noContent().build();

@@ -21,6 +21,7 @@ import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository.WeekBreakdown;
 import com.ballknowers.draftsim.store.SportScheduleRepository;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -166,7 +167,19 @@ public class LockInService {
                                Totals totals, List<LockSummary> managers, List<LockSummary> players,
                                Map<String, List<PayoffCell>> payoff, List<Lock> locks,
                                List<String> excludedCategories, List<String> caveats, LockInThresholds thresholds,
-                               LiveCalls live) {}
+                               LiveCalls live,
+                               @JsonInclude(JsonInclude.Include.NON_NULL) Boolean weekCovered) {
+        /** The pre-045 shape: no {@code weekCovered}, so the key is absent from the JSON (plan review A8). */
+        public LockInReport(String sport, int season, String status, String reason, int minLocks, int minCell,
+                            List<Double> bands, int gamesLeftCap, int minPriorGames, int weeksCovered,
+                            Totals totals, List<LockSummary> managers, List<LockSummary> players,
+                            Map<String, List<PayoffCell>> payoff, List<Lock> locks,
+                            List<String> excludedCategories, List<String> caveats, LockInThresholds thresholds,
+                            LiveCalls live) {
+            this(sport, season, status, reason, minLocks, minCell, bands, gamesLeftCap, minPriorGames, weeksCovered,
+                    totals, managers, players, payoff, locks, excludedCategories, caveats, thresholds, live, null);
+        }
+    }
 
     private static final Logger log = LoggerFactory.getLogger(LockInService.class);
 
@@ -238,9 +251,13 @@ public class LockInService {
     }
 
     /** A computation, and the lock list and threshold pool it came from (the report carries the locks only for one player). */
-    record Computed(LockInReport report, List<Lock> allLocks, Pool pool) {
+    record Computed(LockInReport report, List<Lock> allLocks, Pool pool, Set<Integer> weeks) {
         Computed(LockInReport report, List<Lock> allLocks) {
-            this(report, allLocks, Pool.EMPTY);
+            this(report, allLocks, Pool.EMPTY, Set.of());
+        }
+
+        Computed(LockInReport report, List<Lock> allLocks, Pool pool) {
+            this(report, allLocks, pool, Set.of());
         }
     }
 
@@ -276,7 +293,24 @@ public class LockInService {
      *                     league still being played has any
      */
     public LockInReport report(LeagueRow league, String playerFilter, boolean live) {
+        return report(league, playerFilter, null, live);
+    }
+
+    /**
+     * @param week when non-null (and no player filter), the past-week view: that week's provable locks, all rosters,
+     *             with thresholds and no live calls (spec 045 US4)
+     */
+    public LockInReport report(LeagueRow league, String playerFilter, Integer week, boolean live) {
         Computed c = computedOf(league);
+        if (week != null) {
+            LockInReport v = viewWeek(c, week);
+            String st = v.status();
+            if (!STATUS_MEASURED.equals(st) && !STATUS_NO_SCORED_WEEKS.equals(st)) return v;
+            return new LockInReport(v.sport(), v.season(), v.status(), v.reason(), v.minLocks(), v.minCell(),
+                    v.bands(), v.gamesLeftCap(), v.minPriorGames(), v.weeksCovered(), v.totals(), v.managers(),
+                    v.players(), v.payoff(), v.locks(), v.excludedCategories(), v.caveats(), thresholds(league),
+                    null, v.weekCovered());
+        }
         LockInReport base = view(c, playerFilter);
         String status = base.status();
         if (!STATUS_MEASURED.equals(status) && !STATUS_NO_SCORED_WEEKS.equals(status)) return base;
@@ -651,6 +685,19 @@ public class LockInService {
                 locks, r.excludedCategories(), r.caveats(), r.thresholds(), r.live());
     }
 
+    /**
+     * One past week's provable locks, every roster. {@code weekCovered} is true only for a MEASURED report whose
+     * computed (final, scorable) weeks include {@code week}; a refusal or an uncomputed week is false (plan review A7).
+     */
+    static LockInReport viewWeek(Computed c, int week) {
+        LockInReport r = c.report();
+        List<Lock> locks = c.allLocks().stream().filter(l -> l.week() == week).toList();
+        boolean covered = STATUS_MEASURED.equals(r.status()) && c.weeks().contains(week);
+        return new LockInReport(r.sport(), r.season(), r.status(), r.reason(), r.minLocks(), r.minCell(), r.bands(),
+                r.gamesLeftCap(), r.minPriorGames(), r.weeksCovered(), r.totals(), List.of(), List.of(),
+                emptyPayoff(), locks, r.excludedCategories(), r.caveats(), r.thresholds(), null, covered);
+    }
+
     // ---- the computation ----
 
     /**
@@ -947,14 +994,16 @@ public class LockInService {
         double[] margins = new double[candidates.size()];
         for (int i = 0; i < margins.length; i++) margins[i] = candidates.get(i);
         return new Computed(report, List.copyOf(namedLocks),
-                new Pool(margins, kinds[Kind.RODE_OUT.ordinal()], kinds[Kind.RODE_OUT_MISSED.ordinal()]));
+                new Pool(margins, kinds[Kind.RODE_OUT.ordinal()], kinds[Kind.RODE_OUT_MISSED.ordinal()]),
+                Set.copyOf(in.weeks()));
     }
 
     private static Computed withTotals(Computed c, Totals totals) {
         LockInReport r = c.report();
         return new Computed(new LockInReport(r.sport(), r.season(), r.status(), r.reason(), r.minLocks(), r.minCell(),
                 r.bands(), r.gamesLeftCap(), r.minPriorGames(), r.weeksCovered(), totals, r.managers(), r.players(),
-                r.payoff(), r.locks(), r.excludedCategories(), r.caveats(), r.thresholds(), r.live()), List.of());
+                r.payoff(), r.locks(), r.excludedCategories(), r.caveats(), r.thresholds(), r.live()), List.of(),
+                Pool.EMPTY, c.weeks());
     }
 
     // ---- payoff grid (US3) ----

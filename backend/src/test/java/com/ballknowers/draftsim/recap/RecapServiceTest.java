@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -284,10 +285,10 @@ class RecapServiceTest {
         features.granted.add(LEAGUE);
         current = RecapFixtures.nfl();
         weekly = mock(WeeklyReportService.class);
-        when(weekly.forWeek(anyString(), anyInt(), isNull())).thenAnswer(i -> Optional.of(current));
+        when(weekly.forWeek(anyString(), anyInt(), isNull(), eq(LeagueSeasonResolver.Rule.PLAYED_WEEKS))).thenAnswer(i -> Optional.of(current));
         var row = new LeagueRepository.LeagueRow(LEAGUE, Sport.NFL, "L1", "Test", 2026, 12, List.of(), 0.5, null, null);
         resolver = mock(LeagueSeasonResolver.class);
-        when(resolver.resolve(anyString())).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row, null)));
+        when(resolver.resolve(anyString(), eq(LeagueSeasonResolver.Rule.PLAYED_WEEKS))).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row, null)));
         refresh = mock(LeagueRefreshService.class);
         provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(client);
@@ -325,6 +326,18 @@ class RecapServiceTest {
     @Test
     void weekNotFinalCallsNothing() {
         current = withWeekFinal(current, false);
+        assertEquals(State.WEEK_NOT_FINAL, view().state());
+        assertEquals(0, client.calls.get());
+    }
+
+    /** Spec 045 T014/FR-015: a live (in-progress, unstored) result is refused even if it somehow claims to be final. */
+    @Test
+    void aLiveResultIsRefusedEvenWhenMarkedFinal() {
+        Result c = current;
+        current = new Result(c.available(), c.reason(), c.season(), c.requestedSeason(), c.week(), c.sport(),
+                c.playersPlayMultiplePerPeriod(), c.matchups(), c.topPerformers(), c.bestNights(), c.bestWeek(),
+                c.basis(), c.sectionsUnavailable(), c.awards(), c.awardsOmitted(), c.latestScoredWeek(),
+                c.latestFinalWeek(), true, true, c.week(), "L1");
         assertEquals(State.WEEK_NOT_FINAL, view().state());
         assertEquals(0, client.calls.get());
     }
@@ -689,7 +702,7 @@ class RecapServiceTest {
         long other = 212L;
         features.granted.add(other);
         var row2 = new LeagueRepository.LeagueRow(other, Sport.NFL, "L2", "Test2", 2026, 12, List.of(), 0.5, null, null);
-        when(resolver.resolve("L2")).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row2, null)));
+        when(resolver.resolve("L2", LeagueSeasonResolver.Rule.PLAYED_WEEKS)).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row2, null)));
         svc = service(props(MODEL, 10, 1));
         recaps.raceBarrier = new java.util.concurrent.CyclicBarrier(2);
 

@@ -1,3 +1,4 @@
+import { matchupWord } from '../lib/matchupResult'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
@@ -524,17 +525,7 @@ function MatchupBlock({
       const theirs = m.home.isMe ? m.away : m.home
       const final = block.data.weekFinal
       // A live game is not a result: Leading/Trailing/Level until the week is final.
-      const result = final
-        ? mine.points > theirs.points
-          ? 'Won'
-          : mine.points < theirs.points
-            ? 'Lost'
-            : 'Tied'
-        : mine.points > theirs.points
-          ? 'Leading'
-          : mine.points < theirs.points
-            ? 'Trailing'
-            : 'Level'
+      const result = matchupWord(mine.points, theirs.points, final)
       body = (
         <>
           <div className="lh-matchup">

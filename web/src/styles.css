@@ -5289,6 +5289,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .wr-result { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
 .wr-result.won { color: var(--up); }
 .wr-result.lost { color: var(--down); }
+.wr-result.leading, .wr-result.trailing, .wr-result.level { color: var(--muted); }
 .wr-score-result { grid-column: 1 / -1; margin: 0; text-align: center; }
 .wr-strip { margin-top: 12px; }
 @media (max-width: 640px) {
@@ -6563,3 +6564,14 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .dg-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
 .dg-count.over { color: var(--down); font-weight: 700; }
 .dg-notes { margin: 0; padding-left: 18px; }
+
+/* --- Lock-ins under each Matchups side (spec 045 US3/US4) --- */
+.wr-lockins { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.wr-lockins .lockin-call { grid-template-columns: 1fr auto; }
+.wr-lockins .lockin-call-line, .wr-lockins .lockin-call-left { grid-column: 1 / -1; }
+.wr-lockin-past { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 13px; margin: 4px 0 0; }
+.wr-lockin-kind { padding: 1px 7px; border-radius: 999px; font-size: 11px; box-shadow: inset 0 0 0 1px var(--line); }
+.wr-lockins-note { margin: 0 0 8px; }
+.wr-score-col { min-width: 0; display: grid; gap: 6px; align-content: start; }
+.wr-gside + .wr-gside { border-top: 1px solid var(--line); }
+.wr-gside .wr-lockins, .wr-gside .wr-lockin-past { margin: 0; padding: 0 12px 9px; }

@@ -80,6 +80,39 @@ public class LeagueMatchupRepository {
                              int aRosterId, Long aManagerId, String aManager, String aAvatarId, BigDecimal aPoints,
                              int bRosterId, Long bManagerId, String bManager, String bAvatarId, BigDecimal bPoints) {}
 
+    /** One roster's line in a week: {@code matchupId} null = unpaired. Input to {@link #pair}. */
+    public record ScoredRow(int rosterId, Integer matchupId, double points) {}
+
+    /** Two rosters that share a {@code matchup_id}; {@code a} has the lower {@code roster_id}. */
+    public record Pair(ScoredRow a, ScoredRow b) {}
+
+    /**
+     * The pairing rule of {@link #pairedWithScores}, as a pure function, so a week that is NOT in the
+     * database (the live week, spec 045 A12) pairs by the same rule rather than a second implementation of
+     * it. The rule, from the SQL's own join: two rows pair when they share a {@code matchup_id} and
+     * {@code a.roster_id < b.roster_id}; a null {@code matchup_id} pairs with nothing; output is ordered by
+     * the lower roster id (then the higher, which SQL leaves unspecified). A matchup_id shared by three
+     * rosters therefore yields all three pairs, exactly as the self-join does.
+     *
+     * <p>The two are fed the same rows by {@code LeagueMatchupPairingIT} (amended after code review S3), which
+     * asserts the same pairs and order. <b>One known difference:</b> the SQL's INNER join to
+     * {@code roster_week_points} drops a roster that has a {@code matchup_id} but no stored score (a future
+     * fixture), whereas live rows always carry points, so this function pairs whatever it is given.
+     */
+    public static List<Pair> pair(Collection<ScoredRow> rows) {
+        List<Pair> out = new java.util.ArrayList<>();
+        for (ScoredRow a : rows) {
+            if (a.matchupId() == null) continue;
+            for (ScoredRow b : rows) {
+                if (b.matchupId() == null || !b.matchupId().equals(a.matchupId())) continue;
+                if (b.rosterId() > a.rosterId()) out.add(new Pair(a, b));
+            }
+        }
+        out.sort(java.util.Comparator.comparingInt((Pair p) -> p.a().rosterId())
+                .thenComparingInt(p -> p.b().rosterId()));
+        return out;
+    }
+
     /**
      * Every PLAYED pairing across a set of league ids (the chain).
      *

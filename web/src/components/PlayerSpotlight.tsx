@@ -310,7 +310,10 @@ function TopOfWeek({
     body = <p className="muted small">{noPeriodText(spotlight)}</p>
   } else {
     const performers = weekly.data.topPerformers ?? []
-    body =
+    body = weekly.data.live ? (
+      // Spec 045 A3: a live week sends no ranking; an empty list would read as "nobody scored".
+      <p className="muted small">Week {weekly.data.week} is in progress. Top players come once it's final.</p>
+    ) : (
       performers.length === 0 ? (
         <p className="muted small">No scored performances yet this week.</p>
       ) : (
@@ -332,6 +335,7 @@ function TopOfWeek({
           ))}
         />
       )
+    )
   }
   return (
     <Section
