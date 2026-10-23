@@ -187,6 +187,50 @@ class WeeklyReportShapeTest {
         assertTrue(body.containsKey("playersPlayMultiplePerPeriod"));
     }
 
+    /**
+     * Spec 045 T013: {@code live}, {@code liveWeek} and {@code sleeperLeagueId} ride EVERY shape, including the
+     * unavailable one, and null values serialize (the controller builds a LinkedHashMap, never Map.of).
+     */
+    @Test
+    void liveLiveWeekAndSleeperLeagueIdRideEveryShape() {
+        for (WeeklyReportService.Result r : List.of(football(), basketball(),
+                new WeeklyReportService.Result(false, "no week has been scored for this league yet", 2026, null, 0,
+                        Sport.NFL, false, List.of(), List.of(), null, null, null, null, List.of(), List.of(),
+                        0, 0, false, false, null, null))) {
+            Map<String, Object> body = WeeklyReportController.body(r);
+            assertTrue(body.containsKey("live"), "live must be present");
+            assertTrue(body.containsKey("liveWeek"), "liveWeek must be present, null or not");
+            assertTrue(body.containsKey("sleeperLeagueId"), "sleeperLeagueId must be present, null or not");
+            assertEquals(false, body.get("live"));
+            assertNull(body.get("liveWeek"));
+        }
+    }
+
+    @Test
+    void aLiveResultCarriesTheThreeFieldsAndStillSendsEmptyRankings() {
+        WeeklyReportService.Result live = new WeeklyReportService.Result(
+                true, null, 2026, null, 1, Sport.NBA, true, List.of(), null,
+                List.of(), List.of(), WeeklyReportService.BASIS_ALL_GAMES, List.of(), List.of(), List.of(),
+                0, 0, false, true, 1, "1339351318115946496");
+        Map<String, Object> body = WeeklyReportController.body(live);
+        assertEquals(true, body.get("live"));
+        assertEquals(1, body.get("liveWeek"));
+        assertEquals("1339351318115946496", body.get("sleeperLeagueId"));
+        assertEquals(false, body.get("weekFinal"));
+        assertEquals(List.of(), body.get("bestNights"));
+        assertEquals(List.of(), body.get("awards"));
+    }
+
+    @Test
+    void theUnavailableLiveShapeKeepsItsLiveWeek() {
+        Map<String, Object> body = WeeklyReportController.body(new WeeklyReportService.Result(
+                false, "live scores unavailable from Sleeper right now", 2026, null, 1, Sport.NBA, false,
+                List.of(), List.of(), null, null, null, null, List.of(), List.of(), 0, 0, false, false, 1, "L26"));
+        assertEquals(false, body.get("available"));
+        assertEquals(1, body.get("liveWeek"));
+        assertEquals("L26", body.get("sleeperLeagueId"));
+    }
+
     private static WeeklyReportService.Result withMatchup(boolean homeMe, boolean awayMe) {
         return new WeeklyReportService.Result(
                 true, null, 2026, null, 1, Sport.NFL, false,

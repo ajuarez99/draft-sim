@@ -44,14 +44,28 @@ public class LeagueSeasonResolver {
     }
 
     /**
-     * What "has been played" means. A required argument everywhere, never defaulted: the two rules
-     * disagree on opening night, when a season has stored games but no scored fantasy week yet.
+     * What "has been played" means. A required argument everywhere, never defaulted: the rules
+     * disagree on opening night, when a season has stored games (and is live) but no scored fantasy week yet.
+     * The one-argument {@code resolve(String)} that used to default to {@link #PLAYED_WEEKS} is gone
+     * (spec 045 FR-006): it was the reason Matchups showed 2025 through 2026's opening week.
      */
     public enum Rule {
         /** The season has at least one stored scored week ({@code roster_week_points}). */
         PLAYED_WEEKS,
         /** The season has at least one stored {@code player_game} row (spec 022 R7). */
-        STORED_GAMES
+        STORED_GAMES,
+        /**
+         * Matchups' rule (spec 045 R1): {@link #PLAYED_WEEKS}, <b>or</b> all of: the season is not complete,
+         * its {@code status} is {@code in_season}, its stored {@code settings.leg} is at least 1, and it has
+         * stored games ({@link #STORED_GAMES}'s test).
+         *
+         * <p>Why the extra arm: Sleeper does not let the week being played be stored (the ingest walks
+         * {@code 1..last_scored_leg}, which is absent in opening week -- measured 2026-10-23), so a live
+         * season has no {@code roster_week_points} row for days. {@code in_season} alone is not enough,
+         * because Sleeper sets it at the draft, before any game; the stored games are what separate "drafted"
+         * from "played". A null status (a row not yet re-ingested) is unknown, so it does not qualify.
+         */
+        LIVE_WEEK
     }
 
     /** One season of a league's chain. {@code hasGames}: it has stored {@code player_game} rows. */
@@ -66,20 +80,12 @@ public class LeagueSeasonResolver {
     public record Resolved(LeagueRepository.LeagueRow league, Integer requestedSeason) {}
 
     /**
-     * The newest played season in {@code sleeperLeagueId}'s chain.
+     * The newest season in {@code sleeperLeagueId}'s chain that satisfies {@code rule}.
      *
-     * <p>Falls back to the requested season when no season in the chain has
-     * been played: a league that has never scored a week should still refuse
-     * with its own year rather than with an older league's.
-     */
-    public Optional<Resolved> resolve(String sleeperLeagueId) {
-        return resolve(sleeperLeagueId, Rule.PLAYED_WEEKS);
-    }
-
-    /**
-     * {@link #resolve(String)} under an explicit rule. {@code STORED_GAMES} walks back to the newest
-     * season whose stored {@code player_game} count is above 0 (the cache's own token, N17); same
-     * {@link Resolved} semantics and the same fall back to the requested season.
+     * <p>Falls back to the requested season when no season in the chain qualifies: a league that has never
+     * played should still refuse with its own year rather than with an older league's.
+     * {@code STORED_GAMES} walks back to the newest season whose stored {@code player_game} count is above 0
+     * (the cache's own token, N17); same {@link Resolved} semantics throughout.
      */
     public Optional<Resolved> resolve(String sleeperLeagueId, Rule rule) {
         List<LeagueRepository.LeagueRow> chain = leagues.chainBySleeperId(sleeperLeagueId);
@@ -99,7 +105,18 @@ public class LeagueSeasonResolver {
         return switch (rule) {
             case PLAYED_WEEKS -> !weekPoints.storedWeeks(row.id()).isEmpty();
             case STORED_GAMES -> hasGames(row);
+            case LIVE_WEEK -> !weekPoints.storedWeeks(row.id()).isEmpty() || isLiveSeason(row);
         };
+    }
+
+    /**
+     * {@link Rule#LIVE_WEEK}'s second arm. Sleeper only: {@code LiveWeekSource} has nothing to read for an
+     * ESPN season, so choosing one here would turn "show last season" into a refusal for no gain (an ESPN
+     * season with stored weeks still qualifies through the first arm).
+     */
+    private boolean isLiveSeason(LeagueRepository.LeagueRow row) {
+        return row.isSleeper() && !row.complete() && "in_season".equals(row.status())
+                && leagues.currentLeg(row.id()).orElse(0) >= 1 && hasGames(row);
     }
 
     private boolean hasGames(LeagueRepository.LeagueRow row) {

@@ -1,3 +1,4 @@
+import { matchupWord } from '../lib/matchupResult'
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import PageHeader from '../components/PageHeader'
@@ -7,6 +8,7 @@ import PlayerFace from '../components/PlayerFace'
 import PlayerLink from '../components/PlayerLink'
 import SeasonFallbackNote from '../components/SeasonFallbackNote'
 import RecapCard from '../components/RecapCard'
+import { LockInsNote, MatchupLockInsProvider, SideLockIns } from '../components/MatchupLockIns'
 import {
   getWeeklyReport,
   type WeeklyReport as Data,
@@ -67,25 +69,29 @@ export default function WeeklyReport() {
   }, [sleeperLeagueId, requestedWeek, dataVersion])
 
   const latest = data?.latestScoredWeek ?? 0
+  // Spec 045 A2: the newest week the reader can reach is the live one when it is ahead of the newest STORED
+  // week (Sleeper does not store the week being played). Every bound below uses this, not `latest`: a clamp
+  // on `latest` alone would pull the "Week N in progress" link straight back to the last stored week.
+  const top = Math.max(latest, data?.liveWeek ?? 0)
   // Links out of a row name the league of the season the data came from: the page can show an earlier
   // season than the route's (a requestedSeason fallback), and the player page opens that season's games.
   const dataLeagueId = data ? leagueIdForSeason(data.season) : (sleeperLeagueId ?? '')
 
-  // A link (or a stale bookmark) past the last scored week is pulled back to it rather
+  // A link (or a stale bookmark) past the last reachable week is pulled back to it rather
   // than left showing "week 99 has not been scored".
   useEffect(() => {
-    if (requestedWeek != null && latest > 0 && requestedWeek > latest) {
+    if (requestedWeek != null && top > 0 && requestedWeek > top) {
       const next = new URLSearchParams(searchParams)
-      next.set('week', String(latest))
+      next.set('week', String(top))
       setSearchParams(next, { replace: true })
     }
-  }, [requestedWeek, latest, searchParams, setSearchParams])
+  }, [requestedWeek, top, searchParams, setSearchParams])
 
   // The week on screen: what the server resolved, else the URL's, else the latest.
-  const shown = data?.week || requestedWeek || latest
+  const shown = data?.week || requestedWeek || top
 
   function goToWeek(n: number) {
-    const clamped = Math.min(latest, Math.max(1, n))
+    const clamped = Math.min(top, Math.max(1, n))
     const next = new URLSearchParams(searchParams)
     next.set('week', String(clamped))
     setSearchParams(next)
@@ -107,7 +113,7 @@ export default function WeeklyReport() {
         sub="Who won each matchup this week, and the awards nobody wants — read back from what actually happened."
         actions={
           // Nothing scored means no week to pick, so no stepper rather than a week 0.
-          latest > 0 ? (
+          top > 0 ? (
             <div className="wr-stepper" role="group" aria-label="Choose week">
               <button type="button" aria-label="Previous week" disabled={shown <= 1} onClick={() => goToWeek(shown - 1)}>
                 ‹
@@ -115,7 +121,7 @@ export default function WeeklyReport() {
               <span className="wr-stepper-label" aria-live="polite">
                 Week {shown}
               </span>
-              <button type="button" aria-label="Next week" disabled={shown >= latest} onClick={() => goToWeek(shown + 1)}>
+              <button type="button" aria-label="Next week" disabled={shown >= top} onClick={() => goToWeek(shown + 1)}>
                 ›
               </button>
             </div>
@@ -144,34 +150,44 @@ export default function WeeklyReport() {
 
       {data && data.available && (
         <>
-          {!data.weekFinal && (
+          {data.live ? (
+            // Spec 045: scores read live from Sleeper for a week that is not stored yet.
             <p className="wr-inprogress small" role="status">
-              <strong>In progress</strong> — scores can still change until the week closes.
+              <strong>In progress, live from Sleeper</strong> — scores are read live and can still change until
+              the week closes.
             </p>
+          ) : (
+            !data.weekFinal && (
+              <p className="wr-inprogress small" role="status">
+                <strong>In progress</strong> — scores can still change until the week closes.
+              </p>
+            )
           )}
           {/* Which week this is when the reader did not choose one: the server picked the newest
               FINAL week, and a later one may be under way. */}
           {requestedWeek == null && data.weekFinal && data.week === data.latestFinalWeek && (
             <p className="wr-weeknote small">
               <span>Week {data.week} · latest final week</span>
-              {data.latestScoredWeek > data.week && (
-                <Link className="lh-link" to={`?week=${data.latestScoredWeek}`}>
-                  Week {data.latestScoredWeek} in progress →
+              {top > data.week && (
+                <Link className="lh-link" to={`?week=${top}`}>
+                  Week {top} in progress →
                 </Link>
               )}
             </p>
           )}
-          {sleeperLeagueId && <RecapCard sleeperLeagueId={sleeperLeagueId} week={data.week} />}
+          {sleeperLeagueId && !data.live && <RecapCard sleeperLeagueId={sleeperLeagueId} week={data.week} />}
           <section className="section">
             <h3 className="section-title">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
+            <MatchupLockInsProvider data={data}>
+            <LockInsNote />
             {mine ? (
               <>
-                <Scoreboard game={mine} />
+                <Scoreboard game={mine} final={data.weekFinal} />
                 {others.length > 0 && (
                   <div className="wr-games wr-strip">
                     {others.map((m, i) => (
-                      <Game key={i} game={m} />
+                      <Game key={i} game={m} final={data.weekFinal} />
                     ))}
                   </div>
                 )}
@@ -179,13 +195,19 @@ export default function WeeklyReport() {
             ) : (
               <div className="wr-games">
                 {data.matchups.map((m, i) => (
-                  <Game key={i} game={m} />
+                  <Game key={i} game={m} final={data.weekFinal} />
                 ))}
               </div>
             )}
+            </MatchupLockInsProvider>
           </section>
 
-          {mine ? (
+          {data.live ? (
+            // Every ranking and award would claim a decided week; none is sent (spec 045 FR-003).
+            <section className="section">
+              <p className="muted small">Rankings and awards come once week {data.week} is final.</p>
+            </section>
+          ) : mine ? (
             <WeekInReview data={data} leagueId={dataLeagueId} />
           ) : (
             <>
@@ -222,7 +244,7 @@ export default function WeeklyReport() {
             </>
           )}
 
-          {data.playersPlayMultiplePerPeriod && <Rankings data={data} leagueId={dataLeagueId} />}
+          {data.playersPlayMultiplePerPeriod && !data.live && <Rankings data={data} leagueId={dataLeagueId} />}
         </>
       )}
     </div>
@@ -301,18 +323,25 @@ function PerformerLine({ p, sport, leagueId }: { p: WeeklyPerformer; sport: Data
 }
 
 /** The reader's own matchup, full width: both sides, big scores, and the result in words. */
-function Scoreboard({ game }: { game: WeeklyMatchup }) {
+function Scoreboard({ game, final }: { game: WeeklyMatchup; final: boolean }) {
   const me = game.home.isMe ? game.home : game.away
   const them = game.home.isMe ? game.away : game.home
-  const result = me.points > them.points ? 'Won' : me.points < them.points ? 'Lost' : 'Tied'
+  // Not final (a live or partial week) is Leading/Trailing/Level, never a result (spec 045 B1).
+  const result = matchupWord(me.points, them.points, final)
   const margin = Math.abs(me.points - them.points)
   return (
     <article className="wr-score" aria-label="Your matchup">
-      <ScoreSide side={me} isMe />
-      <ScoreSide side={them} right />
+      <div className="wr-score-col">
+        <ScoreSide side={me} isMe />
+        <SideLockIns rosterId={me.rosterId} />
+      </div>
+      <div className="wr-score-col">
+        <ScoreSide side={them} right />
+        <SideLockIns rosterId={them.rosterId} />
+      </div>
       <p className="wr-score-result small">
         <span className={`wr-result ${result.toLowerCase()}`}>{result}</span>
-        {result !== 'Tied' && <span className="muted"> by {margin.toFixed(2)}</span>}
+        {result !== 'Tied' && result !== 'Level' && <span className="muted"> by {margin.toFixed(2)}</span>}
       </p>
     </article>
   )
@@ -332,7 +361,7 @@ function ScoreSide({ side, isMe, right }: { side: WeeklySide; isMe?: boolean; ri
         <span className="wr-score-name" title={side.teamName}>
           <PersonName teamName={side.teamName} username={side.username} />
         </span>
-        <span className="wr-record muted">({side.record})</span>
+        {side.record ? <span className="wr-record muted">({side.record})</span> : null}
       </div>
       <span className="wr-score-pts">{side.points.toFixed(2)}</span>
     </div>
@@ -448,13 +477,20 @@ function whenLabel(date: string, opponent?: string | null, isAway?: boolean | nu
   return `${day} ${isAway ? '@' : 'vs'} ${opponent}`
 }
 
-function Game({ game }: { game: WeeklyMatchup }) {
-  const homeWon = game.home.points > game.away.points
-  const awayWon = game.away.points > game.home.points
+function Game({ game, final }: { game: WeeklyMatchup; final: boolean }) {
+  // No winner highlight until the week is final (spec 045 B1).
+  const homeWon = final && game.home.points > game.away.points
+  const awayWon = final && game.away.points > game.home.points
   return (
     <article className="wr-game">
-      <TeamLine side={game.home} won={homeWon} />
-      <TeamLine side={game.away} won={awayWon} />
+      <div className="wr-gside">
+        <TeamLine side={game.home} won={homeWon} />
+        <SideLockIns rosterId={game.home.rosterId} />
+      </div>
+      <div className="wr-gside">
+        <TeamLine side={game.away} won={awayWon} />
+        <SideLockIns rosterId={game.away.rosterId} />
+      </div>
     </article>
   )
 }
@@ -469,7 +505,7 @@ function TeamLine({ side, won }: { side: WeeklySide; won: boolean }) {
         className="wr-avatar"
       />
       <span className="wr-team"><PersonName teamName={side.teamName} username={side.username} /></span>
-      <span className="wr-record muted">({side.record})</span>
+      {side.record ? <span className="wr-record muted">({side.record})</span> : null}
       <span className="wr-points">{side.points.toFixed(2)}</span>
     </div>
   )

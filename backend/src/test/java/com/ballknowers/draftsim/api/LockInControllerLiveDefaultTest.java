@@ -33,21 +33,44 @@ class LockInControllerLiveDefaultTest {
     @Test
     void aPlayerRequestDefaultsToNoLiveBlock() {
         arrange();
-        controller.lockIns("s1", "p1", null, null);
-        verify(service).report(league, "p1", false);
+        controller.lockIns("s1", "p1", null, null, null);
+        verify(service).report(league, "p1", null, false);
     }
 
     @Test
     void aPlayerRequestStillGetsLiveWhenAskedForExplicitly() {
         arrange();
-        controller.lockIns("s1", "p1", true, null);
-        verify(service).report(league, "p1", true);
+        controller.lockIns("s1", "p1", null, true, null);
+        verify(service).report(league, "p1", null, true);
     }
 
     @Test
     void aLeagueRequestDefaultsToLive() {
         arrange();
-        controller.lockIns("s1", null, null, null);
-        verify(service).report(league, null, true);
+        controller.lockIns("s1", null, null, null, null);
+        verify(service).report(league, null, null, true);
+    }
+
+    @Test
+    void aWeekRequestDefaultsToNoLiveAndPassesTheWeekThrough() {
+        arrange();
+        controller.lockIns("s1", null, 5, null, null);
+        verify(service).report(league, null, 5, false);
+    }
+
+    @Test
+    void playerAndWeekTogetherAre400() {
+        arrange();
+        var res = controller.lockIns("s1", "p1", 5, null, null);
+        org.junit.jupiter.api.Assertions.assertEquals(400, res.getStatusCode().value());
+        org.mockito.Mockito.verifyNoInteractions(service);
+    }
+
+    @Test
+    void theNonMember404ComesBeforeThe400() {
+        when(leagues.bySleeperId("s1")).thenReturn(Optional.of(league));
+        when(membership.canSee(any(), anyLong())).thenReturn(false);
+        var res = controller.lockIns("s1", "p1", 5, null, "stranger");
+        org.junit.jupiter.api.Assertions.assertEquals(404, res.getStatusCode().value());
     }
 }

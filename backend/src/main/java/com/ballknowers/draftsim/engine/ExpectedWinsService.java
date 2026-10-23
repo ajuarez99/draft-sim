@@ -358,7 +358,7 @@ public class ExpectedWinsService {
      * that encode rules").
      */
     public Optional<Result> forLeague(String sleeperLeagueId, WeekBound bound) {
-        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (found.isEmpty()) return Optional.empty();
         return Optional.of(compute(found.get(), bound, false));
     }
@@ -370,7 +370,7 @@ public class ExpectedWinsService {
      * bound itself (contracts/superlatives-api.md T028/T029 discussion).
      */
     public Optional<Result> forLeagueRegularSeason(String sleeperLeagueId) {
-        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (found.isEmpty()) return Optional.empty();
         WeekBound bound = regularSeasonBound(found.get().league());
         return Optional.of(compute(found.get(), bound, true));

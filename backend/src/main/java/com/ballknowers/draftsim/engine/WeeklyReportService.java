@@ -43,6 +43,7 @@ public class WeeklyReportService {
     private final GameScoringService gameScoring;
     private final ScoredWeeks scoredWeeks;
     private final ManagerRepository managers;
+    private final LiveWeekSource liveWeeks;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
@@ -50,7 +51,8 @@ public class WeeklyReportService {
                                SportRulesRegistry rulesRegistry, RealizedLineupService realized,
                                LeagueSeasonResolver seasons, PlayerGameRepository playerGames,
                                GameScoringService gameScoring, ScoredWeeks scoredWeeks,
-                               ManagerRepository managers) {
+                               ManagerRepository managers, LiveWeekSource liveWeeks) {
+        this.liveWeeks = liveWeeks;
         this.managers = managers;
         this.scoredWeeks = scoredWeeks;
         this.leagues = leagues;
@@ -136,7 +138,25 @@ public class WeeklyReportService {
                          List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
                          String basis, List<SectionUnavailable> sectionsUnavailable,
                          List<Award> awards, List<OmittedAward> awardsOmitted,
-                         int latestScoredWeek, int latestFinalWeek, boolean weekFinal) {
+                         int latestScoredWeek, int latestFinalWeek, boolean weekFinal,
+                         boolean live, Integer liveWeek, String sleeperLeagueId) {
+
+        /**
+         * Spec 045 A9: today's 18-argument shape, defaulting {@code live=false, liveWeek=null,
+         * sleeperLeagueId=null}, so a construction that predates the live week (shape tests, recap fixtures)
+         * keeps compiling. The service itself always fills all three.
+         */
+        public Result(boolean available, String reason, int season, Integer requestedSeason,
+                      int week, Sport sport, boolean playersPlayMultiplePerPeriod,
+                      List<Matchup> matchups, List<Performer> topPerformers,
+                      List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
+                      String basis, List<SectionUnavailable> sectionsUnavailable,
+                      List<Award> awards, List<OmittedAward> awardsOmitted,
+                      int latestScoredWeek, int latestFinalWeek, boolean weekFinal) {
+            this(available, reason, season, requestedSeason, week, sport, playersPlayMultiplePerPeriod,
+                    matchups, topPerformers, bestNights, bestWeek, basis, sectionsUnavailable,
+                    awards, awardsOmitted, latestScoredWeek, latestFinalWeek, weekFinal, false, null, null);
+        }
 
         /** Shape-test convenience: the latest scored week is taken to be this one. */
         public Result(boolean available, String reason, int season, Integer requestedSeason,
@@ -150,11 +170,15 @@ public class WeeklyReportService {
                     awards, awardsOmitted, available ? week : 0, available ? week : 0, available);
         }
 
+        /**
+         * @param liveWeek        the unstored live week when one is known (spec 045), else null
+         * @param sleeperLeagueId the season actually answered about, so the page can name it
+         */
         static Result unavailable(String reason, int season, int week, Sport sport, int latestScoredWeek,
-                                  int latestFinalWeek) {
+                                  int latestFinalWeek, Integer liveWeek, String sleeperLeagueId) {
             return new Result(false, reason, season, null, week, sport, false,
                     List.of(), List.of(), null, null, null, null, List.of(), List.of(), latestScoredWeek,
-                    latestFinalWeek, false);
+                    latestFinalWeek, false, false, liveWeek, sleeperLeagueId);
         }
     }
 
@@ -179,22 +203,37 @@ public class WeeklyReportService {
      * while nothing is final yet (an in-progress week 1), so a caller with no week in hand (the page,
      * opened fresh) gets the most recent report and learns {@code latestScoredWeek} in one call.
      * With nothing scored the answer is the unavailable shape at week 0.
+     *
+     * <p><b>{@code rule} is required (spec 045 A1/FR-006).</b> The controller passes {@code LIVE_WEEK}, which is
+     * the only rule under which an unstored in-progress week can be shown; recap passes {@code PLAYED_WEEKS},
+     * so one request never resolves on two rules and a recap is never generated for a live week.
      */
-    public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek) {
-        return forWeek(sleeperLeagueId, requestedWeek, null);
-    }
-
-    public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek, String sleeperUserId) {
-        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+    public Optional<Result> forWeek(String sleeperLeagueId, int requestedWeek, String sleeperUserId,
+                                    LeagueSeasonResolver.Rule rule) {
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId, rule);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
         LeagueSettings settings = LeagueRepository.toSettings(league, league.rosterPositions().size());
         SportRules rules = rulesRegistry.get(settings.sport());
 
-        List<RosterWeekPointsRepository.WeekBreakdown> all =
-                weekPoints.breakdownsFor(league.id(), league.season());
         ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
         int latestScoredWeek = scored.latestStored();
+
+        // ---- the live week (spec 045): only under LIVE_WEEK, and never replaces a stored week
+        LiveDecision liveDecision = decideLive(rule, league, settings, scored, requestedWeek);
+        if (liveDecision.refusal() != null) {
+            return Optional.of(Result.unavailable(liveDecision.refusal(), league.season(),
+                    liveDecision.refusalWeek(), settings.sport(), latestScoredWeek, scored.latestFinal(),
+                    liveDecision.liveWeek(), league.sleeperId()));
+        }
+        if (liveDecision.useLive()) {
+            return Optional.of(liveResult(league, found.get().requestedSeason(), settings, rules,
+                    liveDecision.live(), scored, sleeperUserId));
+        }
+        Integer liveWeek = liveDecision.liveWeek();
+
+        List<RosterWeekPointsRepository.WeekBreakdown> all =
+                weekPoints.breakdownsFor(league.id(), league.season());
         final int week = defaultWeek(scored, requestedWeek);
         List<RosterWeekPointsRepository.WeekBreakdown> thisWeek = all.stream()
                 .filter(w -> w.week() == week).toList();
@@ -202,31 +241,20 @@ public class WeeklyReportService {
             return Optional.of(Result.unavailable(
                     week == 0 ? "no week has been scored for this league yet"
                             : "week " + week + " has not been scored for this league",
-                    league.season(), week, settings.sport(), latestScoredWeek, scored.latestFinal()));
+                    league.season(), week, settings.sport(), latestScoredWeek, scored.latestFinal(),
+                    liveWeek, league.sleeperId()));
         }
 
-        Map<Integer, String> nameByRoster = new HashMap<>();
-        Map<Integer, String> usernameByRoster = new HashMap<>();
-        Map<Integer, String> avatarByRoster = new HashMap<>();
+        Directory dir = directory(league, sleeperUserId);
+        Map<Integer, String> nameByRoster = dir.nameByRoster();
+        Map<Integer, String> usernameByRoster = dir.usernameByRoster();
+        Map<Integer, String> avatarByRoster = dir.avatarByRoster();
+        Set<Integer> myRosters = dir.myRosters();
         Map<Integer, String> recordByRoster = new HashMap<>();
-        Set<Integer> myRosters = new HashSet<>();
-        Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
-                : ManagerRepository.caller(managers, league.id(), sleeperUserId);
-        Map<Long, String> teamNameByManager = new HashMap<>();
-        for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
-            if (m.teamName() != null && !m.teamName().isBlank()) {
-                teamNameByManager.put(m.managerId(), m.teamName());
-            }
-        }
-        for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
-            String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
-            if (name == null) name = s.managerName();
-            nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
-            usernameByRoster.put(s.rosterId(), s.managerName());
-            if (callerManagerId != null && callerManagerId.equals(s.managerId())) myRosters.add(s.rosterId());
-            avatarByRoster.put(s.rosterId(), s.avatarId());
-            recordByRoster.put(s.rosterId(), recordAfter(all, league.season(), week, s.rosterId(),
-                    matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)));
+        List<LeagueMatchupRepository.PairedGame> paired =
+                matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS);
+        for (int rosterId : dir.rosterIds()) {
+            recordByRoster.put(rosterId, recordAfter(all, league.season(), week, rosterId, paired));
         }
 
         Map<Integer, Double> pointsByRoster = new HashMap<>();
@@ -236,7 +264,7 @@ public class WeeklyReportService {
 
         // ---- matchups (US5.1): both teams, their records, their final scores
         List<Matchup> games = new ArrayList<>();
-        for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS)) {
+        for (LeagueMatchupRepository.PairedGame p : paired) {
             if (p.season() != league.season() || p.week() != week) continue;
             games.add(new Matchup(
                     new Side(p.aRosterId(), nameByRoster.getOrDefault(p.aRosterId(), "Roster " + p.aRosterId()),
@@ -389,7 +417,165 @@ public class WeeklyReportService {
 
         return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
                 week, settings.sport(), multipleGames, games, topForResult,
-                bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted, latestScoredWeek, scored.latestFinal(), scored.isFinal(week)));
+                bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted, latestScoredWeek, scored.latestFinal(), scored.isFinal(week),
+                false, liveWeek, league.sleeperId()));
+    }
+
+    // ------------------------------------------------------------- the live week (spec 045)
+
+    /**
+     * What {@link LiveWeekSource} means for this request.
+     *
+     * @param liveWeek    the unstored, STARTED live week; null when there is none (or it is unknown). On the
+     *                    two refusals it is the REFUSED week instead (B2), so the page can reach it.
+     * @param useLive     answer from {@code live}'s rows rather than the stored path
+     * @param refusal     non-null: answer unavailable with this reason, for {@code refusalWeek}
+     */
+    private record LiveDecision(Integer liveWeek, LiveWeekSource.Live live, boolean useLive,
+                                String refusal, int refusalWeek) {
+        static final LiveDecision NONE = new LiveDecision(null, null, false, null, 0);
+    }
+
+    static final String LIVE_UNAVAILABLE = "live scores unavailable from Sleeper right now";
+
+    /**
+     * Whether this request is about the live week, and which week that is.
+     *
+     * <p>The live week {@code L} is Sleeper's {@code leg} now, and counts only if (a) it is NOT stored --
+     * a stored week, partial or not, keeps today's path so the reader never sees two "in progress" scores for
+     * one week -- and (b) it has STARTED (A11, FR-017): some roster has points above 0, or a {@code player_game}
+     * row is stored for the week. That second test reuses the week the game rows already carry ({@code
+     * PlayerGameRepository#forWeek}, the same call the ranking sections make); there is no second
+     * week-to-dates rule. It applies to NFL too: {@code player_game} holds NFL rows (checked 2026-10-23,
+     * amended after code review N1; an earlier draft of this comment said football stores none). Still
+     * unverified on a real NFL Tuesday/Wednesday.
+     *
+     * <p><b>When it waits on Sleeper (S4, amended after code review).</b> The blocking
+     * {@link LiveWeekSource#current} runs only when the answer depends on the live read: the default view with
+     * nothing stored, or an explicit week that is not stored. Otherwise (a stored week, or the mid-season
+     * default) it uses {@link LiveWeekSource#peek}, which never waits and refreshes in the background. The
+     * cost: {@code liveWeek} may be absent on the very first cold view of such a request, and present from the
+     * next one. That is accepted.
+     *
+     * <p>Both refusals carry the refused week as {@code liveWeek} (B2), so the page's upper bound includes it
+     * and an explicit request for that week is answered with the reason rather than clamped away.
+     *
+     * <p>The live week is the default only when nothing at all is stored (the opening week). Mid-season the
+     * default stays the latest final week and the live week is offered as {@code liveWeek}.
+     */
+    private LiveDecision decideLive(LeagueSeasonResolver.Rule rule, LeagueRepository.LeagueRow league,
+                                    LeagueSettings settings, ScoredWeeks.Snapshot scored, int requestedWeek) {
+        if (rule != LeagueSeasonResolver.Rule.LIVE_WEEK) return LiveDecision.NONE;
+        Set<Integer> stored = weekPoints.storedWeeks(league.id());
+        boolean defaultsToLive = requestedWeek <= 0 && scored.latestStored() == 0;
+        boolean dependsOnLive = defaultsToLive || (requestedWeek > 0 && !stored.contains(requestedWeek));
+        Optional<LiveWeekSource.Live> current = dependsOnLive ? liveWeeks.current(league) : liveWeeks.peek(league);
+        if (current.isEmpty()) return LiveDecision.NONE;
+        LiveWeekSource.Live live = current.get();
+
+        if (live.status() == LiveWeekSource.Status.FAILED) {
+            // Sleeper's week is unknown, so the stored leg is the best guess at what was being asked for. It
+            // is used to decide only whether to REFUSE; it rides as liveWeek on the refusal alone (B2), never on a normal answer.
+            int guess = leagues.currentLeg(league.id()).orElse(0);
+            if (guess >= 1 && !stored.contains(guess) && (defaultsToLive || requestedWeek == guess)) {
+                return new LiveDecision(guess, null, false, LIVE_UNAVAILABLE, guess);
+            }
+            return LiveDecision.NONE;
+        }
+
+        int week = live.week();
+        if (stored.contains(week)) return LiveDecision.NONE;
+        boolean started = live.rows().stream().anyMatch(r -> r.points() > 0)
+                || !playerGames.forWeek(settings.sport(), league.season(), week).isEmpty();
+        if (!started) {
+            return requestedWeek == week
+                    ? new LiveDecision(week, null, false, "week " + week + " hasn't started", week)
+                    : LiveDecision.NONE;
+        }
+        return new LiveDecision(week, live, defaultsToLive || requestedWeek == week, null, 0);
+    }
+
+    /**
+     * An in-progress week that is not stored, from Sleeper's own rows (research R4). Names, avatars and
+     * {@code isMe} come from the same {@link #directory} as the stored path; each side's record is the record
+     * BEFORE this week (a decided week it is not); pairing is {@link LeagueMatchupRepository#pair}, the
+     * stored pairing rule (A12). Rankings and awards are sent empty: they would all claim a decided week.
+     * The page replaces them with one note.
+     *
+     * <p>{@code requestedSeason} is passed through, not forced to null: when the chain's newest season is
+     * still unplayed and the live one is the season before it, the fallback note is true.
+     */
+    private Result liveResult(LeagueRepository.LeagueRow league, Integer requestedSeason, LeagueSettings settings,
+                              SportRules rules, LiveWeekSource.Live live, ScoredWeeks.Snapshot scored,
+                              String sleeperUserId) {
+        int week = live.week();
+        Directory dir = directory(league, sleeperUserId);
+        List<LeagueMatchupRepository.PairedGame> paired =
+                matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS);
+        Map<Integer, String> recordByRoster = new HashMap<>();
+        for (int rosterId : dir.rosterIds()) {
+            recordByRoster.put(rosterId, recordAfter(List.of(), league.season(), week - 1, rosterId, paired));
+        }
+
+        List<LeagueMatchupRepository.ScoredRow> rows = live.rows().stream()
+                .map(r -> new LeagueMatchupRepository.ScoredRow(r.rosterId(), r.matchupId(), r.points()))
+                .toList();
+        List<Matchup> games = new ArrayList<>();
+        for (LeagueMatchupRepository.Pair p : LeagueMatchupRepository.pair(rows)) {
+            games.add(new Matchup(side(p.a(), dir, recordByRoster), side(p.b(), dir, recordByRoster)));
+        }
+
+        boolean multipleGames = rules.playsMultipleGamesPerScoringPeriod();
+        return new Result(true, null, league.season(), requestedSeason, week, settings.sport(), multipleGames,
+                games,
+                multipleGames ? null : List.of(),
+                multipleGames ? List.of() : null,
+                multipleGames ? List.of() : null,
+                multipleGames ? BASIS_ALL_GAMES : null,
+                multipleGames ? List.of() : null,
+                List.of(), List.of(), scored.latestStored(), scored.latestFinal(), false,
+                true, week, league.sleeperId());
+    }
+
+    private static Side side(LeagueMatchupRepository.ScoredRow r, Directory dir, Map<Integer, String> records) {
+        int id = r.rosterId();
+        return new Side(id, dir.nameByRoster().getOrDefault(id, "Roster " + id), dir.usernameByRoster().get(id),
+                dir.avatarByRoster().get(id), records.get(id), r.points(), dir.myRosters().contains(id));
+    }
+
+    /**
+     * Who each roster is, for both the stored and the live path: team name (league_member.team_name, else the
+     * manager's name, else "Roster N"), username, avatar and which rosters are the caller's. Extracted from the
+     * stored path unchanged so the two paths cannot name a roster differently.
+     */
+    private record Directory(Map<Integer, String> nameByRoster, Map<Integer, String> usernameByRoster,
+                             Map<Integer, String> avatarByRoster, Set<Integer> myRosters,
+                             List<Integer> rosterIds) {}
+
+    private Directory directory(LeagueRepository.LeagueRow league, String sleeperUserId) {
+        Map<Integer, String> nameByRoster = new HashMap<>();
+        Map<Integer, String> usernameByRoster = new HashMap<>();
+        Map<Integer, String> avatarByRoster = new HashMap<>();
+        Set<Integer> myRosters = new HashSet<>();
+        List<Integer> rosterIds = new ArrayList<>();
+        Long callerManagerId = sleeperUserId == null || sleeperUserId.isBlank() ? null
+                : ManagerRepository.caller(managers, league.id(), sleeperUserId);
+        Map<Long, String> teamNameByManager = new HashMap<>();
+        for (LeagueMemberRepository.MemberRow m : members.forLeague(league.id())) {
+            if (m.teamName() != null && !m.teamName().isBlank()) {
+                teamNameByManager.put(m.managerId(), m.teamName());
+            }
+        }
+        for (RosterSeasonRepository.StandingRow s : rosterSeasons.forLeague(league.id())) {
+            String name = s.managerId() == null ? null : teamNameByManager.get(s.managerId());
+            if (name == null) name = s.managerName();
+            nameByRoster.put(s.rosterId(), name == null || name.isBlank() ? "Roster " + s.rosterId() : name);
+            usernameByRoster.put(s.rosterId(), s.managerName());
+            if (callerManagerId != null && callerManagerId.equals(s.managerId())) myRosters.add(s.rosterId());
+            avatarByRoster.put(s.rosterId(), s.avatarId());
+            rosterIds.add(s.rosterId());
+        }
+        return new Directory(nameByRoster, usernameByRoster, avatarByRoster, myRosters, rosterIds);
     }
 
     /**

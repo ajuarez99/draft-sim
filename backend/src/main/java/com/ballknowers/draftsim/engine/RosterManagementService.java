@@ -137,7 +137,7 @@ public class RosterManagementService {
      *                         caller and test unaffected by T033's hoist.
      */
     public Optional<Result> forLeague(String sleeperLeagueId, Map<String, Player> preloadedPlayers) {
-        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId);
+        Optional<LeagueSeasonResolver.Resolved> found = seasons.resolve(sleeperLeagueId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (found.isEmpty()) return Optional.empty();
         LeagueRepository.LeagueRow league = found.get().league();
 

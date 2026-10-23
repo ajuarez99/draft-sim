@@ -41,6 +41,11 @@ draftsim:
     # DISABLED and every admin-only route refuses (fail closed) -- unlike
     # `security.token` above, where blank turns the gate off. Never a VITE_ var.
     token: ${ADMIN_TOKEN:}
+  # Spec 045 A4: how long the live Matchups read (Sleeper /league/{id} + /matchups/{leg}, together) may take
+  # before it counts as "unavailable". ARBITRARY: hand-set, not measured against Sleeper's latency tail.
+  # Its cache TTLs are spec 044's draftsim.lock-in.live-ttl-seconds / live-failure-ttl-seconds.
+  live-week:
+    timeout-ms: 2500
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
   owner:

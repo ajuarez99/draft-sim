@@ -159,7 +159,9 @@ public class LeagueRefreshService {
             }
         }
 
-        LeagueRepository.LeagueRow shown = resolver.resolve(sleeperLeagueId)
+        // Spec 045 R8/A18: named PLAYED_WEEKS, as it always behaved. Matchups now shows the live season
+        // (LIVE_WEEK) while this pill can still name the last played one; accepted and noted, not unified.
+        LeagueRepository.LeagueRow shown = resolver.resolve(sleeperLeagueId, LeagueSeasonResolver.Rule.PLAYED_WEEKS)
                 .map(LeagueSeasonResolver.Resolved::league)
                 .orElse(chain.getFirst());
         LeagueRefreshRepository.Row shownRow = refreshes.find(shown.id()).orElse(null);

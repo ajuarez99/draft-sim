@@ -53,9 +53,9 @@ class AdminRecapControllerTest {
         when(provider.getIfAvailable()).thenReturn(client);
         var row = new LeagueRepository.LeagueRow(LEAGUE, Sport.NFL, "L1", "Test", 2026, 12, List.of(), 0.5, null, null);
         resolver = mock(LeagueSeasonResolver.class);
-        when(resolver.resolve(anyString())).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row, null)));
+        when(resolver.resolve(anyString(), eq(LeagueSeasonResolver.Rule.PLAYED_WEEKS))).thenReturn(Optional.of(new LeagueSeasonResolver.Resolved(row, null)));
         weekly = mock(WeeklyReportService.class);
-        when(weekly.forWeek(anyString(), anyInt(), isNull())).thenReturn(Optional.of(RecapFixtures.nfl()));
+        when(weekly.forWeek(anyString(), anyInt(), isNull(), eq(LeagueSeasonResolver.Rule.PLAYED_WEEKS))).thenReturn(Optional.of(RecapFixtures.nfl()));
     }
 
     private RecapService service(LeagueRecapRepository repo) {

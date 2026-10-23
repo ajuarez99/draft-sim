@@ -1873,11 +1873,19 @@ export type LockInReport = {
   caveats: string[]
   thresholds: LockInThresholds | null
   live: LiveCalls | null
+  /**
+   * Spec 045: only present when `?week=N` was asked for. True when the report is MEASURED and week N is one of the
+   * weeks it computed; false means "can't tell for this week" (not "no locks"). The server omits the key otherwise,
+   * so it is optional here.
+   */
+  weekCovered?: boolean
 }
 
-export const fetchLockIns = (sleeperLeagueId: string, opts?: { player?: string; live?: boolean }) => {
+/** `week` (spec 045) asks for that past week's provable locks for every roster; it can't be combined with `player`. */
+export const fetchLockIns = (sleeperLeagueId: string, opts?: { player?: string; live?: boolean; week?: number }) => {
   const q = new URLSearchParams()
   if (opts?.player) q.set('player', opts.player)
+  if (opts?.week != null) q.set('week', String(opts.week))
   if (opts?.live === false) q.set('live', 'false')
   const qs = q.toString()
   return apiFetch(`/api/leagues/${sleeperLeagueId}/lock-ins${qs ? `?${qs}` : ''}`).then(json<LockInReport>)
@@ -2326,6 +2334,20 @@ export type WeeklyReport = {
   sectionsUnavailable?: WeeklySectionUnavailable[]
   awards: WeeklyAward[]
   awardsOmitted: WeeklyOmittedAward[]
+  /**
+   * Spec 045: this response's scores were read live from Sleeper (an in-progress week that is not stored).
+   * Always `weekFinal: false`, with empty rankings and awards; the page labels it and says rankings and
+   * awards come once the week is final.
+   */
+  live: boolean
+  /**
+   * Spec 045: the in-progress week that is not stored yet, when one exists (null otherwise, and when the
+   * live read failed, because Sleeper's week is then unknown). The page offers it as "Week N in progress"
+   * and lets the stepper reach it, even though `latestScoredWeek` has not caught up.
+   */
+  liveWeek: number | null
+  /** Spec 045: the Sleeper league id of the season actually shown; differs from the route's after a fallback. */
+  sleeperLeagueId: string | null
 }
 
 /** `week` 0 asks for the latest scored week; the response's `week` says which that was. */

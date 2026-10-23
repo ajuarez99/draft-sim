@@ -110,7 +110,7 @@ public class RecapService {
         RecapClient client = clientProvider.getIfAvailable();
         if (client == null) return RecapView.bare(State.FEATURE_OFF, null, week);
 
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return RecapView.bare(State.NOT_ENTITLED, null, week);
         long leagueId = resolved.get().league().id();
         if (!features.has(leagueId, LeagueFeatureRepository.RECAP)) {
@@ -118,8 +118,12 @@ public class RecapService {
         }
 
         // One Result feeds both the finality check and the input (F7): no second snapshot.
-        WeeklyReportService.Result result = weeklyReport.forWeek(sleeperId, week, null).orElse(null);
-        if (result == null || !result.available() || !result.weekFinal()) {
+        // Spec 045 A1: PLAYED_WEEKS, the rule resolved above, so one request never resolves on two rules; a live
+        // (in-progress, unstored) result is refused outright as defence in depth (FR-015) -- a recap of a
+        // week that is still being played would be written, cached and shown as if it were decided.
+        WeeklyReportService.Result result = weeklyReport.forWeek(sleeperId, week, null,
+                LeagueSeasonResolver.Rule.PLAYED_WEEKS).orElse(null);
+        if (result == null || !result.available() || !result.weekFinal() || result.live()) {
             return RecapView.bare(State.WEEK_NOT_FINAL,
                     result == null ? resolved.get().league().season() : result.season(), week);
         }
@@ -202,10 +206,11 @@ public class RecapService {
     public Optional<Preview> preview(String sleeperId, int week, String model) {
         RecapClient client = clientProvider.getIfAvailable();
         if (client == null) throw new IllegalStateException("recap is disabled");
-        var resolved = resolver.resolve(sleeperId);
+        var resolved = resolver.resolve(sleeperId, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
         if (resolved.isEmpty()) return Optional.empty();
-        var result = weeklyReport.forWeek(sleeperId, week, null);
-        if (result.isEmpty() || !result.get().available()) return Optional.empty();
+        var result = weeklyReport.forWeek(sleeperId, week, null, LeagueSeasonResolver.Rule.PLAYED_WEEKS);
+        // A live week is refused here too (spec 045 FR-015), as in view().
+        if (result.isEmpty() || !result.get().available() || result.get().live()) return Optional.empty();
 
         RecapInput input = builder.build(result.get());
         String canonical = builder.canonicalJson(input);

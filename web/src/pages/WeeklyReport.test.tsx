@@ -28,10 +28,12 @@ function renderPage(url = '/leagues/L1/weekly-report') {
 const getWeeklyReport = vi.fn()
 const fetchRecap = vi.fn()
 const getDrafts = vi.fn()
+const fetchLockIns = vi.fn()
 vi.mock('../api', () => ({
   getDrafts: (...args: unknown[]) => getDrafts(...args),
   getWeeklyReport: (...args: unknown[]) => getWeeklyReport(...args),
   fetchRecap: (...args: unknown[]) => fetchRecap(...args),
+  fetchLockIns: (...args: unknown[]) => fetchLockIns(...args),
 }))
 
 const recapOff = {
@@ -44,6 +46,8 @@ beforeEach(() => {
   invalidateRailLeagues()
   getDrafts.mockReset()
   fetchRecap.mockReset()
+  fetchLockIns.mockReset()
+  fetchLockIns.mockResolvedValue({ status: 'NOT_NBA', locks: [], live: null })
   fetchRecap.mockResolvedValue(recapOff)
 })
 
@@ -74,6 +78,9 @@ function data(over: Partial<Data> = {}): Data {
       },
     ],
     awardsOmitted: [],
+    live: false,
+    liveWeek: null,
+    sleeperLeagueId: 'L1',
     ...over,
   }
 }
@@ -656,5 +663,322 @@ describe('Weekly report player links follow the season the data came from', () =
 
     const links = await screen.findAllByRole('link', { name: 'Nikola Jokić' })
     for (const l of links) expect(l).toHaveAttribute('href', '/leagues/L1/players/1658')
+  })
+})
+
+/*
+ * Spec 045 (T020): a week that is being played and not stored yet, read live from Sleeper. Sleeper does not let
+ * the current week be stored until it ends, so on opening week the server answers 2026 live instead of
+ * walking back to 2025.
+ */
+describe('Weekly report: the live week', () => {
+  beforeEach(() => {
+    getWeeklyReport.mockReset()
+    lastSearch = ''
+  })
+
+  const nbaSides = {
+    home: { rosterId: 1, teamName: 'Hoop Dreams', username: null, avatarId: null, record: '0-0', points: 201.5, isMe: false },
+    away: { rosterId: 7, teamName: 'Rim Reapers', username: null, avatarId: null, record: '0-0', points: 192.5, isMe: false },
+  }
+  const liveOpening = (over: Partial<Data> = {}) =>
+    data({
+      sport: 'nba',
+      playersPlayMultiplePerPeriod: true,
+      week: 1,
+      latestScoredWeek: 0,
+      latestFinalWeek: 0,
+      weekFinal: false,
+      live: true,
+      liveWeek: 1,
+      sleeperLeagueId: 'L1',
+      matchups: [nbaSides],
+      topPerformers: undefined,
+      bestNights: [],
+      bestWeek: [],
+      basis: 'ALL_GAMES_PLAYED',
+      sectionsUnavailable: [],
+      awards: [],
+      awardsOmitted: [],
+      ...over,
+    })
+
+  it('opening week: labelled live, scores shown, no rankings, awards or fallback note', async () => {
+    getWeeklyReport.mockResolvedValue(liveOpening())
+    renderPage()
+
+    expect(await screen.findByText(/In progress, live from Sleeper/)).toBeInTheDocument()
+    expect(screen.getByText('Hoop Dreams')).toBeInTheDocument()
+    expect(screen.getByText('201.50')).toBeInTheDocument()
+    expect(screen.getByText('Rankings and awards come once week 1 is final.')).toBeInTheDocument()
+    // not the empty ranking sections, and not a "nobody qualified" claim
+    expect(screen.queryByText('Best nights')).not.toBeInTheDocument()
+    expect(screen.queryByText('Best week')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Nobody qualified/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Weekly awards')).not.toBeInTheDocument()
+    expect(screen.queryByText(/showing|Showing/)).not.toBeInTheDocument()
+    // the stepper reaches the live week even though nothing is stored
+    expect(await screen.findByText('Week 1', { selector: '.wr-stepper-label' })).toBeInTheDocument()
+    expect(fetchRecap).not.toHaveBeenCalled()
+  })
+
+  it('mid-season: the in-progress link goes to the live week and is not clamped back to the stored one', async () => {
+    const finalWeek3 = data({ week: 3, latestScoredWeek: 3, latestFinalWeek: 3, weekFinal: true, liveWeek: 4 })
+    getWeeklyReport.mockImplementation((_id: string, w: number) =>
+      Promise.resolve(
+        w === 4
+          ? liveOpening({ week: 4, latestScoredWeek: 3, latestFinalWeek: 3, liveWeek: 4 })
+          : finalWeek3,
+      ),
+    )
+    renderPage()
+
+    const link = await screen.findByRole('link', { name: /Week 4 in progress/ })
+    expect(link.getAttribute('href')).toMatch(/[?]week=4$/)
+    fireEvent.click(link)
+
+    await waitFor(() => expect(getWeeklyReport).toHaveBeenLastCalledWith('L1', 4))
+    expect(await screen.findByText(/In progress, live from Sleeper/)).toBeInTheDocument()
+    // give the clamp effect every chance to fire; it must leave week 4 alone
+    await waitFor(() => expect(lastSearch).toBe('?week=4'))
+    expect((await screen.findByRole('button', { name: 'Next week' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('a bookmark to the live week is not pulled back to the last stored week', async () => {
+    getWeeklyReport.mockResolvedValue(liveOpening({ week: 4, latestScoredWeek: 3, latestFinalWeek: 3, liveWeek: 4 }))
+    renderPage('/leagues/L1/weekly-report?week=4')
+
+    expect(await screen.findByText(/In progress, live from Sleeper/)).toBeInTheDocument()
+    expect(lastSearch).toBe('?week=4')
+  })
+
+  it('a failed live read shows its reason, not last season', async () => {
+    getWeeklyReport.mockResolvedValue(
+      data({
+        available: false,
+        reason: 'live scores unavailable from Sleeper right now',
+        week: 1,
+        latestScoredWeek: 0,
+        latestFinalWeek: 0,
+        weekFinal: false,
+        matchups: [],
+        topPerformers: [],
+        awards: [],
+      }),
+    )
+    renderPage()
+
+    expect(await screen.findByText('live scores unavailable from Sleeper right now')).toBeInTheDocument()
+    expect(screen.queryByText(/In progress, live/)).not.toBeInTheDocument()
+  })
+
+  // ---- code review B1: a week that is not final never declares a winner ------------------------------
+
+  it('B1: a live scoreboard says Leading, with no "Won by" and no winner highlight', async () => {
+    getWeeklyReport.mockResolvedValue(
+      liveOpening({ matchups: [{ home: { ...nbaSides.home, isMe: true, points: 120.5 }, away: { ...nbaSides.away, points: 99 } }] }),
+    )
+    const { container } = renderPage()
+
+    const board = await screen.findByLabelText('Your matchup')
+    expect(within(board).getByText('Leading')).toBeInTheDocument()
+    expect(screen.queryByText(/Won/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Lost/)).not.toBeInTheDocument()
+    expect(container.querySelector('.wr-won')).toBeNull()
+  })
+
+  it('B1: a live game card (not yours) has no winner highlight', async () => {
+    getWeeklyReport.mockResolvedValue(liveOpening())
+    const { container } = renderPage()
+
+    expect(await screen.findByText('Hoop Dreams')).toBeInTheDocument()
+    expect(container.querySelector('.wr-won')).toBeNull()
+  })
+
+  it('B1: Trailing and Level on a live scoreboard', async () => {
+    getWeeklyReport.mockResolvedValue(
+      liveOpening({ matchups: [{ home: { ...nbaSides.home, isMe: true, points: 90 }, away: { ...nbaSides.away, points: 99 } }] }),
+    )
+    const first = renderPage()
+    expect(await within(await screen.findByLabelText('Your matchup')).findByText('Trailing')).toBeInTheDocument()
+    first.unmount()
+
+    getWeeklyReport.mockResolvedValue(
+      liveOpening({ matchups: [{ home: { ...nbaSides.home, isMe: true, points: 99 }, away: { ...nbaSides.away, points: 99 } }] }),
+    )
+    renderPage()
+    const board = await screen.findByLabelText('Your matchup')
+    expect(within(board).getByText('Level')).toBeInTheDocument()
+    expect(within(board).queryByText(/ by /)).not.toBeInTheDocument()
+  })
+
+  it('B1: a final week still highlights the winner', async () => {
+    getWeeklyReport.mockResolvedValue(data())
+    const { container } = renderPage()
+    expect(await screen.findByText('Dart has hit anotha Bower')).toBeInTheDocument()
+    expect(container.querySelectorAll('.wr-won')).toHaveLength(1)
+  })
+
+  // ---- code review B2: a refusal for an explicit live week is shown, not clamped away -----------------
+
+  it('B2: mid-season, ?week=4 answered with a refusal stays on week 4 and shows the reason', async () => {
+    getWeeklyReport.mockResolvedValue(
+      data({
+        available: false,
+        reason: 'live scores unavailable from Sleeper right now',
+        week: 4,
+        latestScoredWeek: 3,
+        latestFinalWeek: 3,
+        liveWeek: 4,
+        weekFinal: false,
+        matchups: [],
+        topPerformers: [],
+        awards: [],
+      }),
+    )
+    renderPage('/leagues/L1/weekly-report?week=4')
+
+    expect(await screen.findByText('live scores unavailable from Sleeper right now')).toBeInTheDocument()
+    await waitFor(() => expect(lastSearch).toBe('?week=4'))
+    expect(getWeeklyReport.mock.calls.every((c) => c[1] === 4)).toBe(true)
+  })
+
+  // ---- code review N5: no "()" for a roster without a record ------------------------------------------
+
+  it('N5: a side with no record renders no empty parentheses', async () => {
+    getWeeklyReport.mockResolvedValue(
+      liveOpening({ matchups: [{ home: { ...nbaSides.home, record: null as unknown as string }, away: { ...nbaSides.away, record: '' } }] }),
+    )
+    const { container } = renderPage()
+    expect(await screen.findByText('Hoop Dreams')).toBeInTheDocument()
+    expect(container.textContent).not.toContain('()')
+  })
+})
+
+/**
+ * Spec 045 US3/US4 (T023, T029): lock-ins under each side of an NBA card. Football has none; every state says what
+ * it is in words; margins always carry the name of their baseline.
+ */
+describe('Weekly report: lock-ins on the cards', () => {
+  const nba = (over: Partial<Data> = {}) =>
+    data({ sport: 'nba', playersPlayMultiplePerPeriod: true, topPerformers: undefined, awards: [], ...over })
+
+  const call = (rosterId: number, playerId: string, player: string, over: Record<string, unknown> = {}) => ({
+    rosterId, managerId: null, manager: 'Someone', playerId, player, team: 'BOS',
+    latestGame: { gameId: 'g', gameDate: '2026-10-22', points: 41.5 },
+    baseline: 30.2, baselineKind: 'STAND_IN', margin: 0.37, gamesLeft: 2, threshold: 0.25, call: 'LOCK', ...over,
+  })
+  const liveReport = (week: number | null, calls: unknown[], status = 'OK') => ({
+    sport: 'nba', season: 2026, status: 'NO_SCORED_WEEKS', reason: 'No final scored weeks are stored for this league yet.',
+    locks: [], caveats: [], thresholds: null, live: { week, asOf: '2026-10-22', status, calls },
+  })
+  const lock = (rosterId: number, playerId: string, player: string, over: Record<string, unknown> = {}) => ({
+    week: 5, playoff: false, managerId: null, manager: null, rosterId, playerId, player, gameDate: '2025-11-20', gameId: 'g',
+    points: 50, standIn: { baseline: 32, margin: 0.54 }, projection: null, laterGames: 2, lastGame: 10, bestLater: 12,
+    beatenByLast: false, beatenLater: false, ...over,
+  })
+  const pastReport = (locks: unknown[], over: Record<string, unknown> = {}) => ({
+    sport: 'nba', season: 2025, status: 'MEASURED', reason: null, locks, caveats: [], thresholds: null, live: null,
+    weekCovered: true, ...over,
+  })
+  const sidesOf = () => Array.from(document.querySelectorAll('.wr-gside, .wr-score-col')) as HTMLElement[]
+
+  it('live week: each call lands under its own side, with the baseline named and one caption', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ live: true, weekFinal: false, liveWeek: 1 }))
+    fetchLockIns.mockResolvedValue(liveReport(1, [call(1, 'p1', 'Jayson Tatum'), call(2, 'p2', 'Nikola Jokic', { call: 'WAIT', margin: 0.1 })]))
+    renderPage()
+
+    expect(await screen.findByText('Jayson Tatum')).toBeInTheDocument()
+    const sides = sidesOf()
+    expect(sides.length).toBe(2)
+    expect(within(sides[0]).getByText('Jayson Tatum')).toBeInTheDocument()
+    expect(within(sides[0]).queryByText('Nikola Jokic')).not.toBeInTheDocument()
+    expect(within(sides[1]).getByText('Nikola Jokic')).toBeInTheDocument()
+    expect(within(sides[0]).getByText('Lock')).toBeInTheDocument()
+    expect(within(sides[1]).getByText('Wait')).toBeInTheDocument()
+    expect(screen.getAllByText(/season avg/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/Locks are inferred from credited points; bars are learned from past weeks\./)).toHaveLength(1)
+    expect(fetchLockIns).toHaveBeenCalledWith('L1', undefined)
+  })
+
+  it('football renders no lock-in content and never asks', async () => {
+    getWeeklyReport.mockResolvedValue(data({ live: true, weekFinal: false, liveWeek: 1 }))
+    renderPage()
+    await screen.findByText(/In progress, live from Sleeper/)
+    expect(fetchLockIns).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Locks are inferred/)).not.toBeInTheDocument()
+  })
+
+  it('GAME_MODE hides the whole area', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ live: true, weekFinal: false, liveWeek: 1 }))
+    fetchLockIns.mockResolvedValue({ ...liveReport(1, []), status: 'GAME_MODE', live: null })
+    renderPage()
+    await screen.findByText(/In progress, live from Sleeper/)
+    await waitFor(() => expect(fetchLockIns).toHaveBeenCalled())
+    await waitFor(() => expect(screen.queryByText(/Loading lock-ins/)).not.toBeInTheDocument())
+    expect(screen.queryByText(/Locks are inferred/)).not.toBeInTheDocument()
+  })
+
+  it('ROSTERS_FAILED says why while the scores stay visible', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ live: true, weekFinal: false, liveWeek: 1 }))
+    fetchLockIns.mockResolvedValue(liveReport(1, [], 'ROSTERS_FAILED'))
+    renderPage()
+    expect(await screen.findByText(/lineups couldn't be read from Sleeper/)).toBeInTheDocument()
+    expect(screen.getByText('157.40')).toBeInTheDocument()
+  })
+
+  it('shows no calls when the lock-in week is not the card week', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ live: true, weekFinal: false, liveWeek: 1 }))
+    fetchLockIns.mockResolvedValue(liveReport(2, [call(1, 'p1', 'Jayson Tatum')]))
+    renderPage()
+    expect(await screen.findByText(/Lock-in calls are for week 2, not this week \(1\)/)).toBeInTheDocument()
+    expect(screen.queryByText('Jayson Tatum')).not.toBeInTheDocument()
+  })
+
+  it('a failed lock-ins read never takes the scores away', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ live: true, weekFinal: false, liveWeek: 1 }))
+    fetchLockIns.mockRejectedValue(new Error('boom'))
+    renderPage()
+    expect(await screen.findByText(/Lock-ins couldn't be loaded/)).toBeInTheDocument()
+    expect(screen.getByText('157.40')).toBeInTheDocument()
+  })
+
+  it('final week: locks grouped per side, labelled by baseline, with later games played', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ week: 5, latestScoredWeek: 5, latestFinalWeek: 5 }))
+    fetchLockIns.mockResolvedValue(
+      pastReport([
+        lock(1, 'p1', 'Donovan Mitchell'),
+        lock(2, 'p2', 'Luka Doncic', { standIn: { baseline: 40, margin: 0.2 }, projection: { projectedPoints: 35, actualRestricted: 50, margin: 0.43 }, laterGames: 1 }),
+      ]),
+    )
+    renderPage('/leagues/L1/weekly-report?week=5')
+
+    expect(await screen.findByText('Donovan Mitchell')).toBeInTheDocument()
+    expect(fetchLockIns).toHaveBeenCalledWith('L1', { week: 5 })
+    const [a, b] = sidesOf()
+    expect(within(a).getByText(/\+54%/)).toBeInTheDocument()
+    expect(within(a).getByText('stand-in')).toBeInTheDocument()
+    expect(within(a).getByText('(2 later games)')).toBeInTheDocument()
+    expect(within(b).getByText('Luka Doncic')).toBeInTheDocument()
+    expect(within(b).getByText(/\+43%/)).toBeInTheDocument()
+    expect(within(b).getByText('projection')).toBeInTheDocument()
+    expect(within(b).getByText('(1 later game)')).toBeInTheDocument()
+    expect(screen.getAllByText(/Locks are inferred from credited points/)).toHaveLength(1)
+  })
+
+  it('a side with no locks says so', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ week: 5, latestScoredWeek: 5, latestFinalWeek: 5 }))
+    fetchLockIns.mockResolvedValue(pastReport([lock(1, 'p1', 'Donovan Mitchell')]))
+    renderPage('/leagues/L1/weekly-report?week=5')
+    await screen.findByText('Donovan Mitchell')
+    expect(within(sidesOf()[1]).getByText('no locks')).toBeInTheDocument()
+  })
+
+  it('weekCovered false says it cannot tell, not no locks', async () => {
+    getWeeklyReport.mockResolvedValue(nba({ week: 5, latestScoredWeek: 5, latestFinalWeek: 5 }))
+    fetchLockIns.mockResolvedValue(pastReport([], { weekCovered: false }))
+    renderPage('/leagues/L1/weekly-report?week=5')
+    expect((await screen.findAllByText(/can't tell for this week/)).length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText('no locks')).not.toBeInTheDocument()
   })
 })

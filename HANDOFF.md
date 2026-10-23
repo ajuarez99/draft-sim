@@ -1,5 +1,42 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-23: spec 045 (Matchups shows the live season, then lock-ins on Matchups) built and live-verified locally; NOT committed
+
+The "NEXT UP" brief below is built.
+
+- **Where:** worktree `.claude/worktrees/045-matchups-live-season`, branch `045-matchups-live-season` (from
+  `origin/main` 5512cd7), all uncommitted. The docs are in `specs/045-matchups-live-season/`:
+  - spec (clarified: option (a) live scores; other pages name `PLAYED_WEEKS` and keep their behaviour)
+  - plan (its A1–A18 amendments win)
+  - research, data-model, contracts, quickstart
+  - plan-review (F1–F20), tasks (T001–T033), code-review (B1–B2, S1–S4, N1–N8, fixes applied)
+  - verification
+  - baseline/after captures, made with `scripts/045/`
+- **What it does:**
+  - The one-argument `LeagueSeasonResolver.resolve(String)` is gone; every caller names a rule.
+  - `Rule.LIVE_WEEK` is for Matchups only.
+  - `LiveWeekSource` reads Sleeper's live `leg` + `/matchups/{leg}`, with its own timed-out RestClient, single-flight
+    reads, and a 60 s / failure-TTL cache.
+  - Matchups shows the unstored live week, labelled in progress, with Leading/Trailing (never Won) and no rankings or awards.
+  - Per-side Lock/Wait calls on a live NBA week, and per-side provable locks on a final week.
+  - New `/lock-ins?week=N`. Without `week`, the response is byte-identical to main.
+  - Recap stays on `PLAYED_WEEKS` and refuses live weeks.
+  - There's no migration.
+- **Scope note (amended after plan review F3):** the league home's matchup block and the football spotlight follow
+  Matchups to the live week, because they read the same response. The NFL current week now also shows live (spec
+  assumption: both sports).
+- **Measured:**
+  - Backend 2269 tests, 0 failed, 6 skipped (the known `PlayerStatsLeaderboardReadIT`).
+  - Web: full vitest 2397 passed, `tsc` and build clean.
+  - Live, against Sleeper: NBA 2026 week 1 has 12/12 sides equal to `/matchups/1`, and NFL week 7 has 0 mismatches.
+  - `/lock-ins?week=5` (2025): 64 locks, matching the player form.
+  - The 121-endpoint before/after capture shows only the intended NBA 2026 `/0` change, plus a pre-existing float wobble.
+- **Owed:**
+  - Commit, PR and deploy need Allan's go-ahead.
+  - Not verified live: the NBA week 1→2 rollover (~10-26/27), the "week hasn't started" refusal (NFL Tue/Wed), and
+    true-cold `/lock-ins` latency.
+  - At the week-2 rollover, also measure whether NBA `last_scored_leg` tracks the current leg (spec "Owed").
+
 ## NEXT UP (written 2026-10-23): fix Matchups showing 2025, then add lock-ins to Matchups
 
 Allan asked for this order: **fix first, then add.** Nothing here is built yet. It's a brief for the next

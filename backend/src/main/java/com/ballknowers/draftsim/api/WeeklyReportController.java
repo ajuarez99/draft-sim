@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.engine.LeagueSeasonResolver;
 import com.ballknowers.draftsim.engine.WeeklyReportService;
 import com.ballknowers.draftsim.store.LeagueMembership;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,7 @@ public class WeeklyReportController {
         // this league, is the same 404 as a league that does not exist. This route had no
         // scoping at all before claude/audit-2026-09-28/01, so ANY caller could read it.
         if (membership.visibleLeague(sleeperId, sleeperUserId).isEmpty()) return ResponseEntity.notFound().build();
-        return weeklyReport.forWeek(sleeperId, week, sleeperUserId)
+        return weeklyReport.forWeek(sleeperId, week, sleeperUserId, LeagueSeasonResolver.Rule.LIVE_WEEK)
                 .map(r -> ResponseEntity.ok(body(r)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -61,6 +62,13 @@ public class WeeklyReportController {
         // Stated rather than inferred: the client renders from a fact the server
         // asserts, not by guessing the sport's rules from which arrays it finds.
         out.put("playersPlayMultiplePerPeriod", r.playersPlayMultiplePerPeriod());
+        // Spec 045, on EVERY shape (before the unavailable early return), each possibly null -- hence this
+        // LinkedHashMap and no Map.of: live = these scores were read live from Sleeper (an unstored,
+        // in-progress week); liveWeek = the unstored live week when one is known; sleeperLeagueId = the
+        // season actually shown, which differs from the route id when the page fell back.
+        out.put("live", r.live());
+        out.put("liveWeek", r.liveWeek());
+        out.put("sleeperLeagueId", r.sleeperLeagueId());
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("matchups", List.of());
