@@ -1703,6 +1703,186 @@ export const getLeagueAnalysis = (sleeperLeagueId: string, week?: number) =>
 export const getProjectionAccuracy = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/projection-accuracy`).then(json<ProjectionAccuracy>)
 
+// --- specs/044: lock-in margins (contracts/lock-in-api.md) ---
+// Mirrors LockInService's records field-for-field. thresholds, live and payoff are carried now and filled by later
+// stories (US4 / US3): until then thresholds and live are null and payoff holds empty lists.
+
+export type LockInStatus =
+  | 'MEASURED'
+  | 'NOT_SLEEPER'
+  | 'NOT_NBA'
+  | 'GAME_MODE'
+  | 'NO_SCORING'
+  | 'NO_SCORED_WEEKS'
+  | 'SHARE_BELOW_THRESHOLD'
+
+/** STAND_IN is the player's own season average before the locked game; PROJECTION is the frozen pre-game line. */
+export type LockBaselineKind = 'STAND_IN' | 'PROJECTION'
+
+/** Counts of starter-weeks in final weeks. multiGame is the sum of the six multi-game classes. */
+export type LockInTotals = {
+  multiGame: number
+  lock: number
+  rodeOut: number
+  rodeOutMissed: number
+  tieNonLast: number
+  tieWithLast: number
+  unmatched: number
+  singleGame: number
+  noGames: number
+  /** Locks with no stand-in margin (too few prior games, or an average of 0 or less). */
+  noBaselineStandIn: number
+  /** Locks with no frozen projection. */
+  noSnapshot: number
+  /** Locks whose projection scored 0 or less on the restricted map, so no margin was formed. */
+  nonPositiveProjection: number
+}
+
+/** n is always the margin count; the quartiles are null below minLocks margins. */
+export type LockBaselineFigure = {
+  n: number
+  median: number | null
+  q1: number | null
+  q3: number | null
+}
+
+/** One manager (key = manager id, or "roster-N" when unowned) or one player (key = Sleeper player id). */
+export type LockSummary = {
+  key: string
+  name: string | null
+  /** A manager's Sleeper avatar; null for a player. */
+  avatarId: string | null
+  standIn: LockBaselineFigure
+  projection: LockBaselineFigure
+  rodeOut: number
+  tieNonLast: number
+}
+
+/** rateLast: riding it out beat the lock; rateAny: any later game did. Null below minCell. (US3) */
+export type LockPayoffCell = {
+  band: string
+  gamesLeft: number
+  n: number
+  rateLast: number | null
+  rateAny: number | null
+}
+
+export type LockStandIn = {
+  /** Null with too few prior games. */
+  baseline: number | null
+  /** Null when baseline is null or 0 or less. */
+  margin: number | null
+}
+
+/** Both points are on spec 036's restricted scoring map. margin is null when the projection scored 0 or less. */
+export type LockProjection = {
+  projectedPoints: number
+  actualRestricted: number
+  margin: number | null
+}
+
+export type ProvableLock = {
+  week: number
+  playoff: boolean
+  managerId: number | null
+  manager: string | null
+  rosterId: number
+  playerId: string
+  player: string | null
+  gameDate: string
+  gameId: string
+  /** The credited value under full league scoring. */
+  points: number
+  standIn: LockStandIn
+  projection: LockProjection | null
+  laterGames: number
+  lastGame: number
+  bestLater: number
+  beatenByLast: boolean
+  beatenLater: boolean
+}
+
+export type LockThresholdPoint = {
+  gamesLeft: number
+  /** A margin as a fraction (0.25 is +25%). */
+  threshold: number
+  n: number
+}
+
+export type LockInThresholds = {
+  status: 'OK' | 'NO_HISTORY' | string
+  from: number[]
+  pMissed: number | null
+  byGamesLeft: LockThresholdPoint[]
+}
+
+export type LockLatestGame = {
+  gameId: string
+  gameDate: string
+  points: number
+}
+
+export type LiveCallKind = 'LOCK' | 'WAIT' | 'TOO_EARLY'
+
+export type LiveCall = {
+  rosterId: number
+  managerId: number | null
+  manager: string | null
+  playerId: string
+  player: string | null
+  team: string | null
+  latestGame: LockLatestGame
+  baseline: number | null
+  baselineKind: 'STAND_IN' | 'LAST_SEASON' | string | null
+  margin: number | null
+  gamesLeft: number | null
+  threshold: number | null
+  call: LiveCallKind | string
+}
+
+export type LiveCalls = {
+  week: number | null
+  asOf: string | null
+  status: 'OK' | 'NOT_LIVE' | 'ROSTERS_FAILED' | 'NO_HISTORY' | string
+  calls: LiveCall[]
+}
+
+/** Mirrors LockInService.LockInReport (GET /api/leagues/{id}/lock-ins). */
+export type LockInReport = {
+  sport: string
+  season: number
+  status: LockInStatus
+  /** The refusal in words; null when MEASURED. */
+  reason: string | null
+  minLocks: number
+  minCell: number
+  /** Lower edges, as fractions above baseline, of the 2nd..last payoff band. */
+  bands: number[]
+  gamesLeftCap: number
+  minPriorGames: number
+  weeksCovered: number
+  totals: LockInTotals
+  managers: LockSummary[]
+  /** With ?player= set, only that player (or none). */
+  players: LockSummary[]
+  payoff: Record<LockBaselineKind, LockPayoffCell[]>
+  /** Only when ?player= is given. */
+  locks: ProvableLock[]
+  /** Scored categories no projection line carries; graded on neither side of a projection margin. */
+  excludedCategories: string[]
+  caveats: string[]
+  thresholds: LockInThresholds | null
+  live: LiveCalls | null
+}
+
+export const fetchLockIns = (sleeperLeagueId: string, opts?: { player?: string; live?: boolean }) => {
+  const q = new URLSearchParams()
+  if (opts?.player) q.set('player', opts.player)
+  if (opts?.live === false) q.set('live', 'false')
+  const qs = q.toString()
+  return apiFetch(`/api/leagues/${sleeperLeagueId}/lock-ins${qs ? `?${qs}` : ''}`).then(json<LockInReport>)
+}
+
 export const computePowerRankings = (sleeperLeagueId: string, season: number, week: number) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/power/compute?season=${season}&week=${week}`, {
     method: 'POST',
@@ -3744,6 +3924,20 @@ export type SportDigest = {
   keyPlayers: DigestKeyEntry[]
   /** NFL only; null for basketball. */
   positionLeaders: DigestEntry[] | null
+  /** specs/044 US5: NBA lock-in leagues only; empty for football and for a night that is not READY. */
+  lockInCalls: LockInCard[]
+}
+
+export type LockInCardStatus = 'OK' | 'NONE_TONIGHT' | 'NO_HISTORY' | 'ROSTERS_FAILED'
+
+/** Mirrors AdminDigestService.LockInCard. tweet is empty unless status is OK and is at most 280 characters. */
+export type LockInCard = {
+  leagueName: string
+  sleeperLeagueId: string
+  week: number | null
+  status: LockInCardStatus | string
+  entries: LiveCall[]
+  tweet: string
 }
 
 export type AdminDigest = {

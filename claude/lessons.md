@@ -1040,8 +1040,29 @@ ingest (record when), not the sport-wide state endpoint, and never the payload's
 is circular). When a verification runs against a copied DB, treat every time-dependent field as stale
 until re-ingested.
 
+## 48. An exclusion list belongs to the question it was made for: the NBA Cup final is a basketball exclusion, not a fantasy one
 
-## 48. A coarse metrics bucket can turn one deploy-overlap sample into hours of "sustained" memory
+Found 2026-10-22 in spec 044's plan review (F1, F2). The plan said to read `player_game` "minus the
+excluded-game-ids, the same filter as other readers". That is wrong twice for a fantasy question:
+
+- `weights.yml` excludes the Cup final because the **NBA** doesn't count it in regular-season stats. Sleeper's
+  **fantasy** week does credit it: one starter's credit per season uniquely matched only the Cup final.
+  Applying the filter would have turned a real lock into "unmatched".
+- The All-Star game is the reverse. It's never credited (0/30), but it isn't on the exclusion list: only
+  `NbaGameLines`' "opponent isn't a season team code" rule drops it. Raw rows would have created fake
+  "later games".
+
+A second finding from the same review: the unlocked default was "unknown" until someone looked at **bench
+players, who can't lock**. They're credited their last game in 99% of weeks, and every "unmatched" starter credit
+was exactly 0, a default onto a missed last game. A population that can't make the choice shows you what the
+default is.
+
+**How to apply:** before reusing a filter, ask which question it was written to answer (real-basketball stats vs
+what the fantasy platform scored). Build the game set from what the platform counted. When a platform's default
+behaviour is undocumented, look for a group that can't exercise the choice, and measure what happens to it.
+
+
+## 49. A coarse metrics bucket can turn one deploy-overlap sample into hours of "sustained" memory
 
 Found 2026-10-20 planning spec 041. `railway metrics --raw` over 7–14 days returns 4-hour buckets.
 They showed the backend "ratcheting" to 675–983 MB and holding there for 8–12 hours, and the first

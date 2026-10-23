@@ -403,6 +403,23 @@ public class LeagueRepository {
     }
 
     /**
+     * Sleeper's {@code settings_json->>'game_mode'}; empty when the key is absent (every football row, and any
+     * league row not yet ingested with settings). Never defaulted: a defaulted mode would assert a rule nobody
+     * reported (spec 044 plan review F8; memory: optional params that encode rules). Spec 044 reads 1 as "one
+     * locked game per starter per week" and treats it as an inference, not a documented Sleeper meaning (R1).
+     */
+    public java.util.OptionalInt gameMode(long leagueId) {
+        return db.sql("select (settings_json->>'game_mode')::int from league where id = ?")
+                .param(leagueId)
+                .query((rs, i) -> {
+                    int mode = rs.getInt(1);
+                    return rs.wasNull() ? java.util.OptionalInt.empty() : java.util.OptionalInt.of(mode);
+                })
+                .optional()
+                .orElse(java.util.OptionalInt.empty());
+    }
+
+    /**
      * A season's waiver format, read straight out of {@code settings_json}
      * (specs/006-deeper-history-both-sports research R8). {@code waiverType}
      * 2 is FAAB bidding; 0 (and, per Sleeper's own docs, 1) is waiver

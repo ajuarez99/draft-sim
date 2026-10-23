@@ -12,11 +12,14 @@ import com.ballknowers.draftsim.ingest.NextGames;
 import com.ballknowers.draftsim.ingest.SportSchedule;
 import com.ballknowers.draftsim.store.BoardRepository;
 import com.ballknowers.draftsim.store.JsonUtil;
+import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
 import com.ballknowers.draftsim.store.SportScheduleRepository;
 import com.ballknowers.draftsim.store.SportTrendingRepository;
 import com.ballknowers.draftsim.store.SportWeekStatsRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +53,8 @@ import java.util.Set;
  */
 @Service
 public class AdminDigestService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminDigestService.class);
 
     // ---- Hand-set constants. Every one is arbitrary: a taste call, not a measurement. -----------
 
@@ -99,7 +104,17 @@ public class AdminDigestService {
                               Instant statsFetchedAt, LocalDate date, Integer week, Integer gamesCount,
                               LocalDate lastSlateDate, LocalDate inProgressDate, LocalDate nextGameDate,
                               TrendingCard trending, List<DigestEntry> topPerformers,
-                              List<KeyEntry> keyPlayers, List<DigestEntry> positionLeaders) {}
+                              List<KeyEntry> keyPlayers, List<DigestEntry> positionLeaders,
+                              List<LockInCard> lockInCalls) {}
+
+    /**
+     * One current-season NBA lock-in league's lock-in calls for the covered night (specs/044 US5). {@code status}
+     * is OK | NONE_TONIGHT | NO_HISTORY | ROSTERS_FAILED; {@code entries} are LOCK calls whose latest game is on the
+     * night, by margin descending, only when OK; {@code tweet} is empty unless OK and at most
+     * {@link #TWEET_LIMIT} characters.
+     */
+    public record LockInCard(String leagueName, String sleeperLeagueId, Integer week, String status,
+                             List<LockInService.LiveCall> entries, String tweet) {}
 
     /** {@code points} and {@code line} are null unless the player played; {@code line} holds non-zero headline keys only. */
     public record DigestEntry(String playerId, String name, String position, String team,
@@ -138,23 +153,43 @@ public class AdminDigestService {
         List<PlayerGameRepository.Row> gamesOf(Sport sport, int season, Collection<String> sleeperIds);
     }
 
+    /** A tweet's length limit. Fixed by the platform, not tunable. */
+    static final int TWEET_LIMIT = 280;
+
+    public static final String CARD_OK = "OK";
+    public static final String CARD_NONE_TONIGHT = "NONE_TONIGHT";
+    public static final String CARD_NO_HISTORY = "NO_HISTORY";
+    public static final String CARD_ROSTERS_FAILED = "ROSTERS_FAILED";
+
+    /** Seam for the lock-in cards: the cards of the season's lock-in leagues for one night. */
+    interface LockInCards {
+        List<LockInCard> forNight(int season, LocalDate night);
+    }
+
     private final Data data;
     private final GameScoringService gameScoring;
     private final Clock clock;
+    private final LockInCards lockIns;
 
     @Autowired
     public AdminDigestService(PlayerGameRepository playerGames, SportWeekStatsRepository weekStats,
                               SportScheduleRepository schedules, SportLeagueSeasonSource currentSeason,
                               SportTrendingRepository trending, PlayerRepository players,
-                              BoardRepository board, GameScoringService gameScoring, Clock clock) {
+                              BoardRepository board, GameScoringService gameScoring, Clock clock,
+                              LockInService lockInService, LeagueRepository leagues) {
         this(new RepoData(playerGames, weekStats, schedules, currentSeason, trending, players, board),
-                gameScoring, clock);
+                gameScoring, clock, repoCards(lockInService, leagues));
     }
 
     AdminDigestService(Data data, GameScoringService gameScoring, Clock clock) {
+        this(data, gameScoring, clock, (season, night) -> List.of());
+    }
+
+    AdminDigestService(Data data, GameScoringService gameScoring, Clock clock, LockInCards lockIns) {
         this.data = data;
         this.gameScoring = gameScoring;
         this.clock = clock;
+        this.lockIns = lockIns;
     }
 
     /**
@@ -209,7 +244,7 @@ public class AdminDigestService {
                         data.players(sport, tids), basis, now);
             }
             return new SportDigest(sport.code(), null, basis.label(), NO_SEASON, null, null, null, null,
-                    null, null, null, noSeasonTrending, List.of(), List.of(), leadersOrNull(sport));
+                    null, null, null, noSeasonTrending, List.of(), List.of(), leadersOrNull(sport), List.of());
         }
 
         List<PlayerGameRepository.DateRow> dates = data.dates(sport, season);
@@ -303,9 +338,92 @@ public class AdminDigestService {
             if (sport == Sport.NFL) leaders = positionLeaders(played);
         }
 
+        // Lock-in calls (specs/044 US5): NBA only, and only for a night that is READY. A broken card source must
+        // not take the rest of the digest with it, so it is isolated here, like the trending read above.
+        List<LockInCard> lockInCalls = List.of();
+        if (ready && sport == Sport.NBA) {
+            try {
+                lockInCalls = lockIns.forNight(season, target);
+            } catch (RuntimeException e) {
+                log.warn("digest: lock-in cards for {} failed: {}", target, e.toString());
+            }
+        }
+
         return new SportDigest(sport.code(), season, basis.label(), status, statsFetchedAt,
                 ready ? target : null, week, gamesCount, lastSlate, choice.laterNightInProgress(), nextGame,
-                trending, top, key, leaders);
+                trending, top, key, leaders, lockInCalls);
+    }
+
+    // ---- Lock-in cards (specs/044 US5) -----------------------------------------------------------------
+
+    private static LockInCards repoCards(LockInService lockInService, LeagueRepository leagues) {
+        return (season, night) -> {
+            List<LockInCard> out = new ArrayList<>();
+            for (LeagueRepository.LeagueRow l : leagues.all()) {
+                if (l.sport() != Sport.NBA || !l.isSleeper() || l.season() != season || l.complete()) continue;
+                try {
+                    if (!lockInService.isLockInLeague(l)) continue;
+                    // Judged through the night; games left counted from the next day on.
+                    LockInService.LiveCalls live = lockInService.liveCalls(l, night.plusDays(1), night);
+                    LockInCard card = cardOf(l.name(), l.sleeperId(), live, night);
+                    if (card != null) out.add(card);
+                } catch (RuntimeException e) {
+                    log.warn("digest: lock-in card for league {} failed: {}", l.sleeperId(), e.toString());
+                }
+            }
+            return out;
+        };
+    }
+
+    /**
+     * The card for one league's live calls and a night, or null when the league is not being played (no card).
+     * The entries are the LOCK calls whose latest game is on {@code night}, by margin descending (SC-008).
+     */
+    static LockInCard cardOf(String leagueName, String sleeperLeagueId, LockInService.LiveCalls live, LocalDate night) {
+        switch (live.status()) {
+            case LockInService.LIVE_NOT_LIVE:
+                return null;
+            case LockInService.LIVE_NO_HISTORY:
+                return new LockInCard(leagueName, sleeperLeagueId, live.week(), CARD_NO_HISTORY, List.of(), "");
+            case LockInService.LIVE_ROSTERS_FAILED:
+                return new LockInCard(leagueName, sleeperLeagueId, live.week(), CARD_ROSTERS_FAILED, List.of(), "");
+            default:
+                break;
+        }
+        List<LockInService.LiveCall> entries = live.calls().stream()
+                .filter(c -> LockInService.CALL_LOCK.equals(c.call()) && night.equals(c.latestGame().gameDate()))
+                .sorted(Comparator.comparing((LockInService.LiveCall c) -> c.margin(),
+                        Comparator.nullsLast(Comparator.<Double>reverseOrder()))
+                        .thenComparing(LockInService.LiveCall::playerId))
+                .toList();
+        if (entries.isEmpty()) {
+            return new LockInCard(leagueName, sleeperLeagueId, live.week(), CARD_NONE_TONIGHT, List.of(), "");
+        }
+        return new LockInCard(leagueName, sleeperLeagueId, live.week(), CARD_OK, entries, tweet(night, entries));
+    }
+
+    /**
+     * Ready-to-paste text of at most {@link #TWEET_LIMIT} characters: a header line and as many whole entries
+     * (highest margin first) as fit. Never cuts an entry in half.
+     */
+    static String tweet(LocalDate night, List<LockInService.LiveCall> entries) {
+        StringBuilder sb = new StringBuilder("Lock-in calls after ")
+                .append(night.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH))
+                .append(' ').append(night.getDayOfMonth()).append(':');
+        for (LockInService.LiveCall c : entries) {
+            String name = c.player() != null ? c.player() : "Player " + c.playerId();
+            long pct = Math.round(c.margin() * 100);
+            String line = "\n" + name + " " + String.format(java.util.Locale.ROOT, "%.1f", c.latestGame().points())
+                    + " pts, " + (pct > 0 ? "+" : "") + pct + "% vs " + baselineWords(c.baselineKind()) + ", " + c.gamesLeft() + " left";
+            if (sb.length() + line.length() > TWEET_LIMIT) break;
+            sb.append(line);
+        }
+        return sb.toString();
+    }
+
+    /** Which average a margin was measured against, in tweet-sized words. */
+    private static String baselineWords(String kind) {
+        return LockInService.BASELINE_LAST_SEASON.equals(kind) ? "last season's avg" : "season avg";
     }
 
     private static TrendingCard notHistorical() {

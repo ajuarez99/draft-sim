@@ -34,6 +34,16 @@ Built so far:
   and their likely next pick, re-projected in the background after every pick. A position
   scarcity meter (starter pool = the board's top teams × starters) and a per-manager
   "Room read" sit beside it.
+- **Lock-ins** (specs/044-lock-in-threshold). This is for NBA leagues in Sleeper's lock-in mode
+  (`game_mode: 1`, one credited game per starter per week). Sleeper doesn't publish which game a manager
+  locked, so it's inferred: a starter credited a game other than his last one that week locked it.
+  - League analysis shows, per manager and per player, how far above the player's season average
+    those locks were. Margins against frozen pre-game projections are shown separately, never pooled.
+  - A payoff grid shows how often riding it out would have scored more.
+  - During a live week, each starter's latest game gets a **Lock / Wait** call against thresholds
+    fitted by optimal stopping on the league's completed seasons.
+  - The admin digest gets a "Lock-in calls" tweet card.
+  - Read-only, with no migration.
 - **Morning tweet digest** (specs/043-tweet-digest-admin). An unlinked admin page,
   `/admin/digest`, asks for the operator's `X-Admin-Token`. It turns last night's stored games
   into copyable posts of 280 characters or fewer: Sleeper's most-added players and how they did,

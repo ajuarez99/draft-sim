@@ -313,7 +313,7 @@ flag behaviour is stable. Verified locally, not yet on production.
 256MB may OOM" for the player ingest; measurement replaced the guess.)*
 - **Production** (Railway, 2 GB / 2 vCPU, minute-resolution metrics): it rests at ~300–420 MB and
   peaked at 827 MB on draft night 2026-10-10. Spikes near 1.1–1.3 GB at deploy time are the old and
-  new containers overlapping, not load. Read metrics at minute resolution (lessons #48).
+  new containers overlapping, not load. Read metrics at minute resolution (lessons #49).
 - **The JVM flags live in the Dockerfile `ENTRYPOINT`, not in `JAVA_OPTS`:** `-XX:+UseG1GC -Xmx1024m
   -XX:G1PeriodicGCInterval=60000`. `JAVA_OPTS` is empty by default and is for *extra* flags. A
   Railway `JAVA_OPTS` variable adds to these, and for a repeated flag the last one wins, so it can

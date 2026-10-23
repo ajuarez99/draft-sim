@@ -734,6 +734,57 @@ class PlayerTrendsServiceTest {
                 List.of(new WeekBreakdown(1, 1, 40, "{\"p3\": 40.0}", "[\"p3\"]")), games, scoring));
     }
 
+    // Spec 044 T004 / plan review F9: guards for the CreditedGames rewrite. Each pins what oneGameShare returns TODAY
+    // on a shape the single test above does not cover, so a rewrite that counted only unique matches, dropped the
+    // All-Star row, or read a zero credit differently fails here instead of moving the prod figure.
+
+    @Test
+    void oneGameShareCountsATieAsMatchedWhateverGameTheCreditCameFrom() {
+        Map<String, Double> scoring = Map.of("pts", 1.0);
+        List<SeasonGame> games = new ArrayList<>();
+        games.add(g("p1", "g1", 1, 20));      // two games score the credited 20: a tie, still "credited one game"
+        games.add(g("p1", "g2", 1, 20));
+        games.add(g("p2", "g3", 1, 10));
+        games.add(g("p2", "g4", 1, 15));
+        List<WeekBreakdown> weeks = List.of(
+                new WeekBreakdown(1, 1, 20, "{\"p1\": 20.0}", "[\"p1\"]"),
+                new WeekBreakdown(1, 2, 25, "{\"p2\": 25.0}", "[\"p2\"]"));
+        assertEquals(0.5, PlayerTrendsService.oneGameShare(weeks, games, scoring), 1e-12,
+                "the tie counts as matched; the sum (25) matches no game");
+        assertEquals(1.0, PlayerTrendsService.oneGameShare(weeks.subList(0, 1), games, scoring), 1e-12);
+    }
+
+    @Test
+    void oneGameShareReadsTheAllStarRowAsAnOrdinaryGame() {
+        Map<String, Double> scoring = Map.of("pts", 1.0);
+        List<SeasonGame> games = new ArrayList<>();
+        games.add(g("p1", "g1", 1, 20));
+        // an All-Star game row (opponent is not a season team code). oneGameShare keeps raw games, so it counts
+        // as a second game of the week and as a match; the lock-in feature drops it, this measure must not.
+        games.add(new SeasonGame("p1", "allstar", BASE.plusDays(1), "STR", Map.of("sp", 1800, "pts", 30.0), 1, null));
+        List<WeekBreakdown> weeks = List.of(new WeekBreakdown(1, 1, 30, "{\"p1\": 30.0}", "[\"p1\"]"));
+        assertEquals(1.0, PlayerTrendsService.oneGameShare(weeks, games, scoring), 1e-12,
+                "one real game plus the All-Star row is a multi-game week, and 30 matches the All-Star row");
+        assertEquals(0.0, PlayerTrendsService.oneGameShare(
+                List.of(new WeekBreakdown(1, 1, 99, "{\"p1\": 99.0}", "[\"p1\"]")), games, scoring), 1e-12);
+    }
+
+    @Test
+    void oneGameShareLeavesAZeroCreditWithNoZeroGameUnmatched() {
+        Map<String, Double> scoring = Map.of("pts", 1.0);
+        List<SeasonGame> games = new ArrayList<>();
+        games.add(g("p1", "g1", 1, 20));      // credited 0.0 and no 0-point game: the default fell on a missed game
+        games.add(g("p1", "g2", 1, 30));
+        games.add(g("p2", "g3", 1, 10));      // credited 0.0 and a 0-point game exists: matched
+        games.add(g("p2", "g4", 1, 0));
+        List<WeekBreakdown> weeks = List.of(
+                new WeekBreakdown(1, 1, 0, "{\"p1\": 0.0}", "[\"p1\"]"),
+                new WeekBreakdown(1, 2, 0, "{\"p2\": 0.0}", "[\"p2\"]"));
+        assertEquals(0.5, PlayerTrendsService.oneGameShare(weeks, games, scoring), 1e-12);
+        assertEquals(0.0, PlayerTrendsService.oneGameShare(weeks.subList(0, 1), games, scoring), 1e-12);
+        assertEquals(1.0, PlayerTrendsService.oneGameShare(weeks.subList(1, 2), games, scoring), 1e-12);
+    }
+
     private static SeasonGame g(String pid, String gid, int week, double pts) {
         return new SeasonGame(pid, gid, BASE.plusDays(week), "OPP", Map.of("sp", 1800, "pts", pts), week, true);
     }

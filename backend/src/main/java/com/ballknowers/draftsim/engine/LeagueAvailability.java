@@ -73,7 +73,9 @@ public class LeagueAvailability {
         m.put("draftRoom", List.of());
         m.put("draftGrades", List.of());
         // "projection-accuracy" (spec 036, merged in after 035) grades projections against league scoring.
-        m.put("stats", List.of("stats", "players", "player-spotlight", "player-trends", "projection-accuracy"));
+        // "lock-ins" (spec 044) reads Sleeper's per-game credit; its service also answers NOT_SLEEPER on its own.
+        m.put("stats", List.of("stats", "players", "player-spotlight", "player-trends", "projection-accuracy",
+                "lock-ins"));
         m.put("schedule", List.of("schedule", "next-matchup"));
         m.put("superlatives", List.of("superlatives", "conduct-list"));
         m.put("weeklyReport", List.of("weekly-report"));
