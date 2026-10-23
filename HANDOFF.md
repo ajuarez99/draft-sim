@@ -1,6 +1,90 @@
 # Ball Knowers — handoff
 
-## UPDATE 2026-10-22: spec 044 (lock-ins: margins, Lock/Wait calls, digest card) built, live-verified locally, NOT committed or deployed
+## NEXT UP (written 2026-10-23): fix Matchups showing 2025, then add lock-ins to Matchups
+
+Allan asked for this order: **fix first, then add.** Nothing here is built yet. It's a brief for the next
+session, and a candidate for `/speckit-specify` (spec 045).
+
+### 1. FIX FIRST: Matchups & awards still shows 2025 while the 2026 NBA season is live
+
+**Reproduced 2026-10-23** on the spec-044 local backend, as a member of the NBA league:
+
+- `GET /api/leagues/1339351318115946496/weekly-report/0` (the 2026 league) returns `season: 2025`,
+  `requestedSeason: 2026`, `week: 21`.
+- Asking for week 1 explicitly (`/weekly-report/1`) returns **2025's** week 1.
+- Allan sees the same on prod.
+
+**Cause (read, not a crash):** it's a deliberate fallback that has outlived its moment.
+
+- `WeeklyReportService.java:188` calls `seasons.resolve(sleeperLeagueId)`.
+- That one-argument overload (`LeagueSeasonResolver.java:75`) **defaults** to `Rule.PLAYED_WEEKS`, which means
+  "at least one stored `roster_week_points` week".
+- 2026 has games played since 10-20 but no stored fantasy week yet, so the resolver walks back to 2025.
+- The page does show a `SeasonFallbackNote` (`WeeklyReport.tsx:167`), but in a live week that's the wrong answer,
+  not a disclosure.
+- The resolver's own javadoc says the rule is "a required argument everywhere, never defaulted", yet the
+  one-argument overload defaults it. That is the "optional params that encode rules" class (memory).
+
+**Same rule, other pages.** Each of these calls the defaulted `resolve(String)` and will show 2025 until 2026's
+first week is stored:
+
+- `ExpectedWinsService` (`:361`, `:373`)
+- `PlayoffOddsService:311`
+- `RosterManagementService:140`
+- `SeasonSuperlativesService:254`
+- `SuperlativesController`
+- `DraftGrades`, `ManagerCareer`, `NextMatchup`, `PlayerSpotlight`, `Rivalry`, `ScheduleGrid` (grep
+  `LeagueSeasonResolver`)
+
+`PlayerStatsService` (`:305`, `:471`) already passes `Rule.STORED_GAMES` explicitly. Decide per page. Don't flip
+them all blindly: some (Superlatives, Expected wins) honestly have nothing to say before a week is scored.
+
+**Open design question for Matchups (decide before building):**
+
+- (a) Treat a season whose current week is in progress (league not complete, `currentLeg` ≥ 1, games stored) as
+  the one to show, with a "week 1 in progress" state built from Sleeper's live `/matchups/{week}`. This is the
+  honest "this week" view.
+- (b) Show 2026 with "no week scored yet" until week 1 is final (~10-26).
+- (c) Keep the fallback but let an explicit rail pick of 2026 stick.
+
+(a) is the one that makes "Matchups" mean *this* week. Note that the current week has no `roster_week_points`
+row, so in-progress points must come live from Sleeper (`SleeperClient` `/league/{id}/matchups/{week}`, the way
+`LineupCheckService` reads rosters live).
+
+**Done when:**
+
+- The 2026 league's Matchups page shows 2026 during a live week.
+- Past seasons are unchanged.
+- The fallback note only appears when it's actually true.
+- One-argument `resolve(String)` is gone or no longer defaults; every caller names its rule.
+- A test pins opening-week behaviour, with games stored and no scored week.
+
+### 2. THEN ADD: lock-ins on the Matchups page (from spec 044)
+
+Spec 044 (merged as PR #42, deployed) has all the data. Matchups just needs to read it per matchup:
+
+- **This week (live):** in each matchup card, both sides' starters' **Lock / Wait** calls. Use
+  `GET /api/leagues/{id}/lock-ins` → `live.calls[]`, which is keyed by `rosterId`, so pair it to the matchup's two
+  rosters. Show the latest game, the margin, the baseline label, games left, and the bar for that many games left.
+  The calls already omit games still in progress or no longer lockable (044 code review B1, B2, P4).
+  - Reuse the 60 s live TTL cache and **one** Sleeper rosters call per page load. Don't make one per matchup.
+- **Past weeks:** for the week on screen, which games each manager locked and at what margin, e.g.
+  "Mitchell +54% (2 left)". `/lock-ins` today narrows only by `?player=`, so add a `?week=` filter that returns
+  that week's provable locks with manager attribution. Keep the 044 rules: provable locks only, the baseline kind
+  named, no pooling with projections.
+- **Depends on item 1.** Until Matchups shows 2026, there's no live week on the page to attach calls to.
+- **Honesty rules carry over from 044:**
+  - Locks are inferred; say so.
+  - The thresholds are a rule learned from past weeks.
+  - A STAND_IN or LAST_SEASON baseline is labelled as such, in the tweet and the card alike (044 P5).
+  - NBA lock-in leagues only (`game_mode` 1 plus the share gate). Football's Matchups page is unchanged.
+
+**Owed from 044, still open:**
+
+- Check projection-baseline margins on prod after 2026 week 1 is final (~10-26).
+- Paste the digest lock-in card into X.
+
+## UPDATE 2026-10-22: spec 044 (lock-ins: margins, Lock/Wait calls, digest card) built and live-verified locally; since merged (PR #42, bff7640) and deployed (prod bundle and API route checked 2026-10-23)
 
 - **Where:** worktree `.claude/worktrees/044-lock-in-threshold`, branch `044-lock-in-threshold` (from
   `origin/main` 7064eb5). The docs are in `specs/044-lock-in-threshold/`:
