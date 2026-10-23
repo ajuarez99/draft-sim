@@ -11,7 +11,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -128,7 +127,9 @@ class BoardRepositoryLatestBeforeIT {
         Assumptions.assumeTrue(stored != null, "the 2026 draft has no stored start_time");
         System.out.println("REPORT 2026 NBA draft start_time = " + d.startTime());
         assertEquals(stored.toInstant(), d.startTime());
-        assertEquals(Instant.parse("2026-10-10T19:15:08Z"), d.startTime());
+        // No exact instant here: Sleeper replaces the scheduled start (19:15:08Z when this was written) with
+        // the actual one once the draft runs (21:16:19Z, it started two hours late), so pinning either is
+        // pinning live data. The date and the two queries agreeing are the claims that hold.
         assertEquals(d.startTime(), drafts.bySleeperId(d.sleeperDraftId()).orElseThrow().startTime());
         assertEquals(LocalDate.of(2026, 10, 10), d.startTime().atZone(ZoneOffset.UTC).toLocalDate());
     }
