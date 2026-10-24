@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.BoardProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
@@ -102,7 +103,7 @@ class SimulationServiceReversalRoundTest {
         // Knowers NBA draft (Sport.NFL here only because FootballRules is the
         // simplest real SportRules to run a live simulation against; the
         // reversal-round plumbing itself is sport-agnostic).
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 10L, "sleeper-draft-reversal", 2026, ROUNDS, TEAMS, "pre_draft", Map.of(), REVERSAL_ROUND);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 10L, Sport.NFL, "sleeper-league-reversal", "Reversal League", 2026, TEAMS, SLOTS, 1.0, null, null);
@@ -160,7 +161,7 @@ class SimulationServiceReversalRoundTest {
     void aZeroReversalRoundStaysPlainSnakeEndToEnd() {
         SimulationService service = realService();
 
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 10L, "sleeper-draft-plain", 2026, ROUNDS, TEAMS, "pre_draft", Map.of(), 0);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 10L, Sport.NFL, "sleeper-league-plain", "Plain League", 2026, TEAMS, SLOTS, 1.0, null, null);

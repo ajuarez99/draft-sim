@@ -4,6 +4,7 @@ import { crestLetter, hueForName } from '../hue'
 import {
   DESTINATION_GROUPS,
   destinationFromPath,
+  railKeyFor,
   destinationsFor,
   destinationsInGroup,
   playerIdFromPath,
@@ -186,6 +187,8 @@ export function switchTarget(
   search?: string,
 ): string {
   const offered = destinationsFor(target).filter((d) => !d.isAction)
+  // Spec 046 C9: on an auction league's ADP page the "here" row is the board row (there is no separate adp row).
+  current = railKeyFor(current, offered)
   const same = current ? offered.find((d) => d.key === current) : undefined
   if (same) {
     // The player page is addressed by a league AND a player; the league context
@@ -349,7 +352,7 @@ export default function LeagueRailSection({
     lane.querySelector<HTMLElement>('.app-rail-row.on')?.scrollIntoView?.({ inline: 'nearest', block: 'nearest' })
   }, [pathname])
 
-  const currentKey: DestinationKey | null = destinationFromPath(pathname)
+  const currentKey: DestinationKey | null = railKeyFor(destinationFromPath(pathname), destinationsFor(league))
   const others = allLeagues.filter((l) => l.current.sleeperLeagueId !== d.sleeperLeagueId)
   const multiSeason = lineage.seasons.length > 1
   // The flyout earns its place only if it has something to offer.

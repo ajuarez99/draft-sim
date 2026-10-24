@@ -52,6 +52,8 @@ public class DraftGradesService {
     public static final String NOT_CONFIGURED = "NOT_CONFIGURED";
     public static final String DRAFT_NOT_COMPLETE = "DRAFT_NOT_COMPLETE";
     public static final String NO_SCORED_WEEKS = "NO_SCORED_WEEKS";
+    /** Spec 046 US4: grades compare a pick with its draft slot, and an auction has no slots. */
+    public static final String AUCTION_DRAFT = "AUCTION_DRAFT";
 
     private static final int LIST_SIZE = 5;
 
@@ -172,6 +174,11 @@ public class DraftGradesService {
         ProductionBasis basis = multiGame
                 ? ProductionBasis.WEEKLY_AVERAGE_GAME : ProductionBasis.WEEKLY_GAME;
 
+        // Spec 046 US4, first and before any expensive work: it is a property of the draft, so it answers
+        // the same whether or not grades are configured or the draft has finished. Rule: modelsSnakeOrder.
+        if (!DraftRepository.modelsSnakeOrder(draft.draftType())) {
+            return unavailable(draft, sport, basis, AUCTION_DRAFT, List.of());
+        }
         if (!props.loaded()) return unavailable(draft, sport, basis, NOT_CONFIGURED, List.of());
         if (!"complete".equals(draft.status())) {
             return unavailable(draft, sport, basis, DRAFT_NOT_COMPLETE, List.of());

@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import com.ballknowers.draftsim.engine.AuctionGuard;
 import com.ballknowers.draftsim.engine.SimulationCancelledException;
 
 import java.util.Map;
@@ -32,6 +33,17 @@ public class ErrorHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                 .body(Map.of("error", e.code(), "message", e.getMessage()));
+    }
+
+    /**
+     * Spec 046 US4: the simulator, fork-to-mock and manual pick all refuse an auction draft through
+     * {@link AuctionGuard}. Explicit JSON content type for the same reason as {@link #busy}.
+     */
+    @ExceptionHandler(AuctionGuard.AuctionDraft.class)
+    public ResponseEntity<Map<String, String>> auctionDraft(AuctionGuard.AuctionDraft e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(Map.of("error", AuctionGuard.CODE, "message", e.getMessage()));
     }
 
     /** Every simulation permit is taken. Fast refusal, not a queue: see {@link SimulationPermits}. */

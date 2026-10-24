@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.PreseasonProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueAnalysisService.RosterProjection;
@@ -78,7 +79,7 @@ class SeasonStartServiceTest {
     @Test
     void aFailedGradesReadLeavesGradesNullAndKeepsTheState() {
         when(state.stateOf(league)).thenReturn(SeasonState.IN_SEASON);
-        when(drafts.forLeague(anyLong())).thenReturn(Optional.of(new DraftRepository.DraftRow(
+        when(drafts.forLeague(anyLong())).thenReturn(Optional.of(DraftFixtures.draftRow(
                 1, 7, "D1", 2026, 13, 12, "complete", Map.of(), 0, null)));
         when(grades.read(any())).thenThrow(new IllegalStateException("db down"));
 

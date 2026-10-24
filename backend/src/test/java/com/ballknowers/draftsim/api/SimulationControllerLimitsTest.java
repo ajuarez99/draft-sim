@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.engine.SimulationRequest;
 import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.engine.SimulationService;
@@ -34,7 +35,7 @@ class SimulationControllerLimitsTest {
         sims = mock(SimulationService.class);
         LeagueMembership membership = mock(LeagueMembership.class);
         when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
-                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+                DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
         permits = new SimulationPermits(1);
         mvc = MockMvcBuilders.standaloneSetup(new SimulationController(sims, membership, permits))
                 .setControllerAdvice(new ErrorHandler())
@@ -105,7 +106,7 @@ class SimulationControllerLimitsTest {
         SimulationPermits two = new SimulationPermits(2, 3000, 8);
         LeagueMembership membership = mock(LeagueMembership.class);
         when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
-                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+                DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
         when(sims.simulate(any(SimulationRequest.class), any(), any())).thenAnswer(inv -> {
             Thread.sleep(200);   // stands in for a short run
             return mock(SimulationResult.class);
@@ -136,7 +137,7 @@ class SimulationControllerLimitsTest {
         SimulationPermits tight = new SimulationPermits(1, 30_000, 1);   // 1 permit, 1 waiter
         LeagueMembership membership = mock(LeagueMembership.class);
         when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
-                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+                DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
         MockMvc m = MockMvcBuilders.standaloneSetup(new SimulationController(sims, membership, tight))
                 .setControllerAdvice(new ErrorHandler()).build();
         SimulationPermits.Lease held = tight.acquire("holder", "d1");

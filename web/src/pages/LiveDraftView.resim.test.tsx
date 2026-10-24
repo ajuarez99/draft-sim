@@ -208,6 +208,20 @@ describe('per-pick re-projection', () => {
     expect(streamSimulationQuietly).toHaveBeenCalledTimes(2)
   })
 
+  // Spec 046 C10: a football auction stays in this room and the simulator answers 409 on every landed pick.
+  // The banner must show the server's sentence, not swallow it.
+  it('a 409 auction_draft shows the server message in the page error', async () => {
+    await renderRoom(4)
+    await settleFirstRun()
+    streamSimulationQuietly.mockRejectedValueOnce(
+      new ApiError(409, 'This is an auction draft. The simulator models snake pick order, which an auction doesn’t have.'),
+    )
+    pushLive(draftThrough(5))
+    await advance(DEBOUNCE + 100)
+    await flush()
+    expect(document.querySelector('.error')?.textContent).toContain('This is an auction draft')
+  })
+
   it('any other failure still raises the page error', async () => {
     await renderRoom(4)
     await settleFirstRun()

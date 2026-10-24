@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.LiveDraftPoller;
@@ -62,7 +63,7 @@ class LeagueControllerTrackTest {
     }
 
     private static DraftRepository.DraftRow row(String status) {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, status, Map.of());
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, status, Map.of());
     }
 
     @Test

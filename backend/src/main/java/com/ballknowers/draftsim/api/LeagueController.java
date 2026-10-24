@@ -5,6 +5,7 @@ import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.DraftSlot;
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.AuctionGuard;
 import com.ballknowers.draftsim.engine.SimulationResult;
 import com.ballknowers.draftsim.ingest.BoardService;
 import com.ballknowers.draftsim.ingest.DraftOrderMapper;
@@ -623,6 +624,8 @@ public class LeagueController {
         Optional<DraftRepository.DraftRow> found = membership.visibleDraft(sleeperUserId, sleeperDraftId);
         if (found.isEmpty()) return ResponseEntity.notFound().build();
         DraftRepository.DraftRow draft = found.get();
+        // Spec 046 US4: an auction has no pick slots to fill by number.
+        AuctionGuard.requireSnake(draft);
 
         if (draft.status() == null || !MANUAL_PICK_STATUSES.contains(draft.status())) {
             return ResponseEntity.status(409).body(Map.of("message",
@@ -684,7 +687,9 @@ public class LeagueController {
         Long managerId = DraftOrderMapper.normalize(draft.slotToManager()).get(String.valueOf(slot));
 
         drafts.upsertPicks(draft.id(), List.of(new DraftRepository.PickRow(
-                draft.id(), pickNo, round, slot, managerId, playerId, null)));
+                // Spec 046: a manual pick is a snake-draft pick (auctions are refused above), so it has no
+                // price, no Sleeper name and no Sleeper player id.
+                draft.id(), pickNo, round, slot, managerId, playerId, null, null, null, null)));
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("draftId", sleeperDraftId);

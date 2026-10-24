@@ -3,6 +3,17 @@
 Status: **reconciliation doc. Recommendation: don't build.** 2026-10-05.
 Gap #12 in [competitor-gap-research.md](competitor-gap-research.md).
 
+> **Amended 2026-10-23: the trigger below has happened.** "Legacy Ball
+> Knowers" (Sleeper NBA 2026) ran a 10-team, $200 auction on 2026-10-21. A
+> standalone price/ADP board was used live and Allan wants it in the site.
+> The plan is in [adp-compare-and-auction-board.md](adp-compare-and-auction-board.md).
+> It follows this doc's own advice: start with values, and model no one.
+> Items 2–3 below (manager bid models, auction engine) are still not
+> justified. There's one auction in history now, not zero, and one is still
+> pure prior. Item 4 (`metadata.amount` → price column) is confirmed on the
+> real 230-pick draft. The 2026-10-05 measurement ("every ingested draft is
+> `snake`") was true then and is left as written.
+
 Competitors: Hashtag Basketball "Auction Values", FanScout "ADP & Auction
 Values", DraftSharks War Room (auction mode), and Sleeper itself supports
 auction drafts.

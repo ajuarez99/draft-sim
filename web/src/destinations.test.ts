@@ -5,6 +5,8 @@ import appSource from './App.tsx?raw'
 import {
   DESTINATION_GROUPS,
   LEAGUE_DESTINATIONS,
+  auctionAdpRoute,
+  railKeyFor,
   destinationFromPath,
   destinationsFor,
   labelOf,
@@ -26,7 +28,7 @@ import type { DraftSummary, Sport } from './api'
 
 function draft(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
-    platform: 'SLEEPER',
+    platform: 'SLEEPER', draftType: 'snake',
     id: 1,
     sleeperDraftId: 'd100',
     leagueId: 1,
@@ -303,6 +305,43 @@ describe('schedule grid destination', () => {
   })
 })
 
+// specs/046-adp-compare-auction-board T027: a basketball page, season-scoped, in the Draft group.
+describe('adp destination', () => {
+  const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'adp')!
+
+  it('is offered to basketball and not football, and sits in the rail under Draft', () => {
+    expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('adp')
+    expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('adp')
+    expect(row().inRail).toBe(true)
+    expect(row().group).toBe('draft')
+    expect(labelOf(row(), draft())).toBe('ADP & prices')
+  })
+
+  it('is offered whatever the draft is doing: it is not a draft-status page', () => {
+    for (const status of ['pre_draft', 'drafting', 'complete', null]) {
+      expect(destinationsFor(ctx({ sport: 'nba', status })).map((d) => d.key), String(status)).toContain('adp')
+    }
+  })
+
+  it('is recognised from its own path and carries the league id', () => {
+    expect(destinationFromPath('/leagues/x/adp')).toBe('adp')
+    expect(destinationFromPath('/leagues/x/adp/')).toBe('adp')
+    expect(leagueIdFromPath('/leagues/x/adp')).toEqual({ idKind: 'league', id: 'x' })
+  })
+
+  it('follows the season being viewed, like every one-season page', () => {
+    const older = draft({ sleeperLeagueId: 'L_OLD', season: 2025 })
+    const current = draft({ sleeperLeagueId: 'L_NEW', season: 2026 })
+    expect(row().href({ lineage: { current, seasons: [current, older] }, season: older })).toBe('/leagues/L_OLD/adp')
+  })
+
+  it('has no platform gate in App.tsx: the ADP sources are sport-wide', () => {
+    const line = appSource.split(/\r?\n/).find((l) => l.includes('/leagues/:sleeperLeagueId/adp"'))
+    expect(line, 'the adp route is missing from App.tsx').toBeDefined()
+    expect(line).not.toContain('gate=')
+  })
+})
+
 // specs/019-minutes-streaming T016: a basketball tool, season-scoped.
 describe('trends destination', () => {
   it('is offered to basketball and not football', () => {
@@ -389,5 +428,77 @@ describe('rivalries destination', () => {
     expect(leagueIdFromPath('/leagues/x/rivalries')).toEqual({ idKind: 'league', id: 'x' })
     const d = LEAGUE_DESTINATIONS.find((r) => r.key === 'rivalries')!
     expect(d.href(ctx())).toBe('/leagues/L100/rivalries')
+  })
+})
+
+// specs/046 FR-015: an auction goes to the ADP page; a snake draft is exactly as it was.
+describe('auction routing (spec 046 FR-015)', () => {
+  const nbaAuction = { sport: 'nba' as Sport, draftType: 'auction', status: 'drafting' }
+  const board = () => LEAGUE_DESTINATIONS.find((r) => r.key === 'board')!
+  const live = () => LEAGUE_DESTINATIONS.find((r) => r.key === 'live')!
+
+  it('sends an NBA auction\'s Draft room and Follow live to the league ADP page', () => {
+    expect(board().href(ctx(nbaAuction))).toBe('/leagues/L100/adp')
+    expect(live().href(ctx(nbaAuction))).toBe('/leagues/L100/adp')
+    expect(board().href(ctx({ ...nbaAuction, status: 'complete' }))).toBe('/leagues/L100/adp')
+  })
+
+  it('names the auction board for what it is', () => {
+    expect(labelOf(board(), draft(nbaAuction))).toBe('Auction board')
+    expect(labelOf(board(), draft({ ...nbaAuction, status: 'complete' }))).toBe('Auction board')
+  })
+
+  it('offers no "Mock it" for an auction league, and still offers it for a snake league', () => {
+    expect(destinationsFor(ctx(nbaAuction)).map((d) => d.key)).not.toContain('mock')
+    expect(destinationsFor(ctx({ sport: 'nba', draftType: 'snake' })).map((d) => d.key)).toContain('mock')
+    expect(destinationsFor(ctx({ sport: 'nfl', draftType: 'snake' })).map((d) => d.key)).toContain('mock')
+  })
+
+  it('leaves a snake draft\'s routes and labels exactly as they were', () => {
+    expect(board().href(ctx({ sport: 'nba', draftType: 'snake', status: 'complete' }))).toBe('/drafts/d100/board')
+    expect(board().href(ctx({ sport: 'nba', draftType: 'snake', status: 'drafting' }))).toBe('/drafts/d100')
+    expect(live().href(ctx({ sport: 'nba', draftType: 'snake', status: 'drafting' }))).toBe('/drafts/d100/live')
+    expect(labelOf(board(), draft({ status: 'drafting' }))).toBe('Draft room')
+    expect(labelOf(board(), draft({ status: 'complete' }))).toBe('Draft board')
+  })
+
+  // Spec 046 C9: board, live and adp all resolve to the ADP page for an auction; the rail must show it once.
+  it('shows ONE rail row to the ADP page for an auction league, and it is the Auction board row', () => {
+    const offered = destinationsFor(ctx(nbaAuction))
+    const toAdp = offered.filter((d) => d.href(ctx(nbaAuction)) === '/leagues/L100/adp')
+    expect(toAdp.map((d) => d.key)).toEqual(['board'])
+    expect(labelOf(toAdp[0], draft(nbaAuction))).toBe('Auction board')
+    expect(offered.map((d) => d.key)).not.toContain('live')
+    expect(offered.map((d) => d.key)).not.toContain('adp')
+  })
+
+  it('still offers a snake NBA league both its live row and its ADP row', () => {
+    const keys = destinationsFor(ctx({ sport: 'nba', draftType: 'snake', status: 'drafting' })).map((d) => d.key)
+    expect(keys).toContain('live')
+    expect(keys).toContain('adp')
+  })
+
+  it('lights the board row on the ADP page when the league offers no adp row of its own', () => {
+    const auction = destinationsFor(ctx(nbaAuction))
+    expect(railKeyFor('adp', auction)).toBe('board')
+    const snake = destinationsFor(ctx({ sport: 'nba', draftType: 'snake' }))
+    expect(railKeyFor('adp', snake)).toBe('adp')
+    expect(railKeyFor('power', auction)).toBe('power')
+    expect(railKeyFor(null, auction)).toBeNull()
+  })
+
+  it('keeps a football auction on the old routes: the ADP page is basketball-only', () => {
+    expect(auctionAdpRoute('auction', 'nfl', 'L100')).toBeNull()
+    expect(board().href(ctx({ sport: 'nfl', draftType: 'auction', status: 'drafting' }))).toBe('/drafts/d100')
+    expect(destinationsFor(ctx({ sport: 'nfl', draftType: 'auction' })).map((d) => d.key)).toContain('mock')
+  })
+
+  it('answers null for anything that is not a known auction', () => {
+    expect(auctionAdpRoute('snake', 'nba', 'L1')).toBeNull()
+    expect(auctionAdpRoute('linear', 'nba', 'L1')).toBeNull()
+    expect(auctionAdpRoute(null, 'nba', 'L1')).toBeNull()
+    expect(auctionAdpRoute(undefined, 'nba', 'L1')).toBeNull()
+    expect(auctionAdpRoute('auction', 'nba', null)).toBeNull()
+    expect(auctionAdpRoute('auction', 'nba', 'L1')).toBe('/leagues/L1/adp')
   })
 })

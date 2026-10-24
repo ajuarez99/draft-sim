@@ -72,8 +72,12 @@ public class DraftAndAdpJoin {
     /** What Draft Grades said about this draft, so a null {@code draftValue} is never ambiguous (F12). */
     public record DraftGradesState(boolean available, String reason, boolean gradesEarly, int weeksCounted) {}
 
-    /** The drafting pick of one player; {@code managerName} is null for a slot with no known manager. */
-    public record DraftPick(int pickNo, int round, String managerName) {}
+    /**
+     * The drafting pick of one player; {@code managerName} is null for a slot with no known manager.
+     * Spec 046 US4: {@code pickNo} and {@code round} are null for a pick from an auction draft -- the number
+     * is nomination order, which is not a draft position and must not be shown as one.
+     */
+    public record DraftPick(Integer pickNo, Integer round, String managerName) {}
 
     /** Everything the leaderboard rows read, keyed by sleeper player id. */
     public record Joined(DraftState draft, AdpState adp, DraftGradesState draftGrades,
@@ -153,10 +157,12 @@ public class DraftAndAdpJoin {
             if (dg.available()) {
                 for (PickGrade pg : dg.picks()) if (pg.valueOverSlot() != null) valueByPick.put(pg.pickNo(), pg.valueOverSlot());
             }
+            boolean snake = DraftRepository.modelsSnakeOrder(draft.draftType());
             for (DraftRepository.PickRow pr : stored) {
                 String sleeperId = pr.playerId() == null ? null : sleeperIdByLocalId.get(pr.playerId());
                 if (sleeperId == null) continue;
-                picks.putIfAbsent(sleeperId, new DraftPick(pr.pickNo(), pr.round(), names.get(pr.draftSlot())));
+                picks.putIfAbsent(sleeperId, new DraftPick(snake ? pr.pickNo() : null, snake ? pr.round() : null,
+                        names.get(pr.draftSlot())));
                 Double v = valueByPick.get(pr.pickNo());
                 if (v != null) value.putIfAbsent(sleeperId, v);
             }

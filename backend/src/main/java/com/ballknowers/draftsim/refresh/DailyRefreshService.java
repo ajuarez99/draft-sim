@@ -2,11 +2,15 @@ package com.ballknowers.draftsim.refresh;
 
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardRefresh;
+import com.ballknowers.draftsim.engine.AdpSeason;
 import com.ballknowers.draftsim.engine.ProjectionSeason;
 import com.ballknowers.draftsim.engine.SeasonStateService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
+import com.ballknowers.draftsim.ingest.SleeperAdpCaptureService;
+import com.ballknowers.draftsim.ingest.YahooAdpService;
+import com.ballknowers.draftsim.store.BoardRepository;
 import com.ballknowers.draftsim.store.DailyCaptureRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import org.slf4j.Logger;
@@ -36,6 +40,10 @@ import java.util.OptionalInt;
  *
  * <p>{@code SEASON_PROJECTIONS} (spec 030) is best-effort too: see {@link #seasonProjections}.
  *
+ * <p>{@code ADP_CAPTURE} and {@code YAHOO_ADP} (spec 046) are best-effort, basketball only, and gated by
+ * {@code latestCapture(source) == today} rather than a {@code daily_capture} row (that table's check constraint
+ * allows only PLAYERS/BOARD): see {@link #adpCapture} and {@link #yahooAdp}.
+ *
  * <p>{@code PROJECTION_SNAPSHOT} (spec 036) is best-effort and runs for both sports, after the
  * steps above it so the NBA season-average line it copies is that morning's: see {@link #projectionSnapshot}.
  *
@@ -54,6 +62,8 @@ public class DailyRefreshService {
     static final String KIND_TRENDING = "TRENDING";
     static final String KIND_SEASON_PROJECTIONS = "SEASON_PROJECTIONS";
     static final String KIND_PROJECTION_SNAPSHOT = "PROJECTION_SNAPSHOT";
+    static final String KIND_ADP_CAPTURE = "ADP_CAPTURE";
+    static final String KIND_YAHOO_ADP = "YAHOO_ADP";
 
     public enum Outcome {
         DONE, DONE_ADP_FAILED_BEST_EFFORT,
@@ -69,6 +79,10 @@ public class DailyRefreshService {
          * must not make the run answer 500. Stored snapshots are untouched by a failed run.
          */
         DONE_PROJECTION_SNAPSHOT_FAILED_BEST_EFFORT,
+        /** Spec 046: Sleeper's undocumented season endpoint; a wobble keeps the stored captures and is reported only. */
+        DONE_ADP_CAPTURE_FAILED_BEST_EFFORT,
+        /** Spec 046: Yahoo's undocumented public feed; a wobble keeps the stored capture and is reported only. */
+        DONE_YAHOO_ADP_FAILED_BEST_EFFORT,
         SKIPPED_ALREADY_TODAY, FAILED
     }
 
@@ -90,12 +104,20 @@ public class DailyRefreshService {
     private final LeagueRepository leagues;
     private final SeasonStateService seasonState;
     private final ProjectionSnapshotService projectionSnapshots;
+    private final SleeperAdpCaptureService adpCapture;
+    private final YahooAdpService yahooAdp;
+    private final BoardRepository boards;
 
     public DailyRefreshService(PlayerIngestService playerIngest, BoardRefresh boardRefresh,
                                DailyCaptureRepository captures, TrendingRefresh trendingRefresh,
                                SeasonProjectionIngestService seasonProjectionIngest,
                                LeagueRepository leagues, SeasonStateService seasonState,
-                               ProjectionSnapshotService projectionSnapshots) {
+                               ProjectionSnapshotService projectionSnapshots,
+                               SleeperAdpCaptureService adpCapture, YahooAdpService yahooAdp,
+                               BoardRepository boards) {
+        this.adpCapture = adpCapture;
+        this.yahooAdp = yahooAdp;
+        this.boards = boards;
         this.projectionSnapshots = projectionSnapshots;
         this.seasonProjectionIngest = seasonProjectionIngest;
         this.leagues = leagues;
@@ -115,6 +137,12 @@ public class DailyRefreshService {
             steps.add(trending(sport));
             // Basketball only for now: football's projections are weekly and refreshed by hand.
             if (sport == Sport.NBA) steps.add(seasonProjections(sport));
+            // After SEASON_PROJECTIONS: when that step fetched today it already captured the ADP, and
+            // adpCapture sees it and skips instead of fetching a second 1.5 MB payload.
+            if (sport == Sport.NBA) {
+                steps.add(adpCapture(sport));
+                steps.add(yahooAdp(sport));
+            }
             steps.add(projectionSnapshot(sport));
         }
         return new DailyResult(today, steps);
@@ -197,6 +225,61 @@ public class DailyRefreshService {
             return new StepResult(sport, KIND_SEASON_PROJECTIONS, Outcome.DONE_SEASON_PROJECTIONS_FAILED_BEST_EFFORT,
                     "season projections fetch failed; the stored set, if any, is unchanged");
         }
+    }
+
+    /**
+     * Spec 046 R1 (amended F11): Sleeper's dynasty and redraft ADP. Gated on "any NBA league exists", NOT on
+     * {@link ProjectionSeason#current}: dynasty drafts happen in the offseason, when no season is in progress and
+     * the projection step has nothing to do. Skipped when both captures are already today's (the projection
+     * step captured them from its own fetch). The season fetched is the newest NBA league's. Best-effort.
+     */
+    StepResult adpCapture(Sport sport) {
+        try {
+            // Spec 046 C3: AdpSeason is the one rule the capture itself also enforces.
+            OptionalInt season = AdpSeason.current(leagues, sport);
+            if (season.isEmpty()) {
+                return new StepResult(sport, KIND_ADP_CAPTURE, Outcome.DONE, "no NBA league exists");
+            }
+            LocalDate today = today();
+            if (capturedToday(sport, BoardRepository.SOURCE_SLEEPER_DYNASTY, today)
+                    && capturedToday(sport, BoardRepository.SOURCE_SLEEPER_REDRAFT, today)) {
+                return new StepResult(sport, KIND_ADP_CAPTURE, Outcome.SKIPPED_ALREADY_TODAY, null);
+            }
+            SleeperAdpCaptureService.Result r = adpCapture.fetchAndCapture(sport, season.getAsInt());
+            if (r.rejectedReason() != null) {
+                return new StepResult(sport, KIND_ADP_CAPTURE, Outcome.DONE_ADP_CAPTURE_FAILED_BEST_EFFORT,
+                        r.rejectedReason());
+            }
+            return new StepResult(sport, KIND_ADP_CAPTURE, Outcome.DONE,
+                    "dynastyRows=" + r.dynastyRows() + " redraftRows=" + r.redraftRows() + " unmapped=" + r.unmapped());
+        } catch (Exception e) {
+            log.warn("daily refresh {} {} failed: {}", sport.code(), KIND_ADP_CAPTURE, e.toString());
+            return new StepResult(sport, KIND_ADP_CAPTURE, Outcome.DONE_ADP_CAPTURE_FAILED_BEST_EFFORT,
+                    "sleeper ADP capture failed; the stored captures, if any, are unchanged");
+        }
+    }
+
+    /** Spec 046 R2: Yahoo's public-league draft analysis. Skipped when today's capture exists; best-effort. */
+    StepResult yahooAdp(Sport sport) {
+        try {
+            if (capturedToday(sport, BoardRepository.SOURCE_YAHOO, today())) {
+                return new StepResult(sport, KIND_YAHOO_ADP, Outcome.SKIPPED_ALREADY_TODAY, null);
+            }
+            YahooAdpService.Result r = yahooAdp.ingest(sport);
+            if (r.rejectedReason() != null) {
+                return new StepResult(sport, KIND_YAHOO_ADP, Outcome.DONE_YAHOO_ADP_FAILED_BEST_EFFORT, r.rejectedReason());
+            }
+            return new StepResult(sport, KIND_YAHOO_ADP, Outcome.DONE,
+                    "fetched=" + r.fetched() + " rows=" + r.rows() + " unmatched=" + r.unmatched());
+        } catch (Exception e) {
+            log.warn("daily refresh {} {} failed: {}", sport.code(), KIND_YAHOO_ADP, e.toString());
+            return new StepResult(sport, KIND_YAHOO_ADP, Outcome.DONE_YAHOO_ADP_FAILED_BEST_EFFORT,
+                    "yahoo ADP capture failed; the stored capture, if any, is unchanged");
+        }
+    }
+
+    private boolean capturedToday(Sport sport, String source, LocalDate today) {
+        return boards.latestCapture(sport, source).filter(today::equals).isPresent();
     }
 
     /**

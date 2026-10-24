@@ -84,14 +84,14 @@ class DraftRepositoryAllWithLeagueForIT {
                 "insert into league (sport, season, sleeper_id, name, total_rosters) values (?, ?, ?, ?, ?) returning id",
                 Long.class, "nfl", 2026, "it-league-scope-unrelated", "Neither Path", 12);
 
-        predecessorDraftId = drafts.upsert(predecessorLeagueId, "it-draft-scope-predecessor", 2025, 15, 12,
+        predecessorDraftId = DraftFixtures.upsert(drafts, predecessorLeagueId, "it-draft-scope-predecessor", 2025, 15, 12,
                 "snake", "complete", java.time.Instant.parse("2025-08-01T00:00:00Z"), "{}");
-        rosterSeasonDraftId = drafts.upsert(rosterSeasonLeagueId, "it-draft-scope-roster", 2026, 15, 12,
+        rosterSeasonDraftId = DraftFixtures.upsert(drafts, rosterSeasonLeagueId, "it-draft-scope-roster", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-01T00:00:00Z"), "{}");
-        slotOnlyDraftId = drafts.upsert(slotOnlyLeagueId, "it-draft-scope-slot-only", 2026, 15, 12,
+        slotOnlyDraftId = DraftFixtures.upsert(drafts, slotOnlyLeagueId, "it-draft-scope-slot-only", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-02T00:00:00Z"),
                 "{\"1\": " + managerA + "}");
-        unrelatedDraftId = drafts.upsert(unrelatedLeagueId, "it-draft-scope-unrelated", 2026, 15, 12,
+        unrelatedDraftId = DraftFixtures.upsert(drafts, unrelatedLeagueId, "it-draft-scope-unrelated", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-03T00:00:00Z"), "{}");
 
         // managerA is a member of rosterSeasonLeagueId only via roster_season (no

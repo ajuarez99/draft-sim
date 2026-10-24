@@ -16,6 +16,7 @@ import HowThisWorks from '../components/HowThisWorks'
 import HomeSpotlight from '../components/HomeSpotlight'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
+import { auctionAdpRoute } from '../destinations'
 import {
   getDrafts,
   getMockSessions,
@@ -231,7 +232,12 @@ export default function DraftPicker() {
     nba: lineages.filter((l) => l.current.sport === 'nba').length,
   }
   const visibleLineages = lineages.filter((l) => sportFilter === 'all' || l.current.sport === sportFilter)
-  const mockableLeagues: MockableLeague[] = lineages.filter((l) => l.current.platform !== 'ESPN').map((l) => ({
+  // Spec 046 C8 (FR-015): a mock forks a snake-order simulation, which an auction league doesn't have, so the
+  // modal doesn't offer it. (A snake or football league is unaffected; the card button is hidden the same way.)
+  const isAuctionLeague = (d: DraftSummary) => auctionAdpRoute(d.draftType, d.sport, d.sleeperLeagueId) != null
+  const mockableLeagues: MockableLeague[] = lineages
+    .filter((l) => l.current.platform !== 'ESPN' && !isAuctionLeague(l.current))
+    .map((l) => ({
     sleeperLeagueId: l.current.sleeperLeagueId,
     leagueName: l.current.leagueName,
     sport: l.current.sport,
@@ -259,7 +265,8 @@ export default function DraftPicker() {
   // league that is "the" league, and drafts[0] could be a football league while
   // the NBA filter is on, so the newest draft IN the filtered sport is used.
   const recentLeague =
-    drafts && sportFilter !== 'all' ? (drafts.find((d) => d.sport === sportFilter) ?? null) : null
+    // Spec 046 C8: never an auction league -- the hero invites a practice draft, which that league can't have.
+    drafts && sportFilter !== 'all' ? (drafts.find((d) => d.sport === sportFilter && !isAuctionLeague(d)) ?? null) : null
 
   return (
     <>
@@ -362,6 +369,8 @@ export default function DraftPicker() {
                 const hue = hueForName(d.leagueName)
                 const crest = crestLetter(d.leagueName)
                 const home = `/leagues/${d.sleeperLeagueId}`
+                // Spec 046 FR-015: an auction goes to the ADP page, never the snake simulator, and can't be mocked.
+                const auctionRoute = isEspn ? null : auctionAdpRoute(d.draftType, d.sport, d.sleeperLeagueId)
                 return (
                   <li key={d.sleeperLeagueId} className={`league-row${live ? ' live' : ''}`}>
                     <span
@@ -388,7 +397,7 @@ export default function DraftPicker() {
                         quietly; one that is live or about to be is the only
                         thing on this row worth an accent. */}
                     {live ? (
-                      <Link className="league-card-live" to={`/drafts/${d.sleeperDraftId}/live`}>
+                      <Link className="league-card-live" to={auctionRoute ?? `/drafts/${d.sleeperDraftId}/live`}>
                         <span className="league-live-dot" />
                         {status === 'drafting' ? 'Drafting now — follow live' : 'Draft not started — follow live'}
                       </Link>
@@ -408,7 +417,7 @@ export default function DraftPicker() {
                           its sport and itself -- design_handoff_multisport_
                           mock_drafts's "fastest correct path" for starting a
                           mock. */}
-                      {!isEspn && (
+                      {!isEspn && !auctionRoute && (
                         <button
                           type="button"
                           className="league-card-mockit"

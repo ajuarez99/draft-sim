@@ -39,7 +39,7 @@ import {
   type SuperlativesResponse,
   type WeeklyReport,
 } from '../api'
-import { destinationsFor, labelOf } from '../destinations'
+import { auctionAdpRoute, destinationsFor, labelOf } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock, type Block } from '../useBlock'
 import { isSettled, unavailableReason, useLeagueAvailability } from '../useLeagueAvailability'
@@ -220,6 +220,8 @@ export default function LeagueHome() {
   const leagueName = draft?.leagueName ?? season?.name ?? 'League home'
   const seasonYear = draft?.season ?? season?.season ?? null
   const draftBoardId = start?.draft.sleeperDraftId ?? draft?.sleeperDraftId ?? null
+  // Spec 046 FR-015: an auction has no pick order to open a simulator or board on; its draft links go to the ADP page.
+  const auctionRoute = draft ? auctionAdpRoute(draft.draftType, draft.sport, draft.sleeperLeagueId) : null
   // DRAFTED_UNSCORED shows the latest-matchup block only if it holds a week of THIS season.
   const scoredThisSeason =
     weekly.status === 'ok' &&
@@ -263,7 +265,7 @@ export default function LeagueHome() {
         <UnmatchedPlayersNote count={availability.data.unmatchedPlayers} players={availability.data.unmatched} />
       )}
 
-      {preSeason && draft && reasonFor('draftRoom') == null && <DraftBlock draft={draft} />}
+      {preSeason && draft && reasonFor('draftRoom') == null && <DraftBlock draft={draft} auctionRoute={auctionRoute} />}
 
       <div className="lh-grid">
         {/* "You" first: record, then your latest matchup, then what's next, so all
@@ -281,7 +283,7 @@ export default function LeagueHome() {
 
         {lineupCheck.status === 'ok' && sport && <LineupCheckSection check={lineupCheck.data} leagueId={id} sport={sport} />}
 
-        {unscored && reasonFor('draftRoom') == null && <DraftDoneBlock draftId={draftBoardId} />}
+        {unscored && reasonFor('draftRoom') == null && <DraftDoneBlock draftId={draftBoardId} auctionRoute={auctionRoute} />}
 
         {showSeasonBlocks && (
           <>
@@ -294,7 +296,7 @@ export default function LeagueHome() {
         )}
 
         {start?.state === 'IN_SEASON' && start.draft.grades && draftBoardId && reasonFor('draftGrades') == null && (
-          <GradesSummaryBlock grades={start.draft.grades} draftId={draftBoardId} />
+          <GradesSummaryBlock grades={start.draft.grades} draftId={draftBoardId} auctionRoute={auctionRoute} />
         )}
       </div>
 
@@ -337,7 +339,7 @@ function SpotlightArea({ id, block, weekly }: { id: string; block: Block<PlayerS
   return <PlayerSpotlight sleeperLeagueId={id} spotlight={block.data} weekly={weekly} />
 }
 
-function DraftBlock({ draft }: { draft: DraftSummary }) {
+function DraftBlock({ draft, auctionRoute }: { draft: DraftSummary; auctionRoute: string | null }) {
   const status = draft.status ?? 'unknown'
   const text =
     status === 'drafting'
@@ -353,10 +355,10 @@ function DraftBlock({ draft }: { draft: DraftSummary }) {
       <p>{text}</p>
       <div className="lh-actions">
         {/* The page's one primary action: before the draft there is nothing else to do here. */}
-        <Link className="home-hero-cta" to={`/drafts/${draft.sleeperDraftId}`}>
-          Open the draft room
+        <Link className="home-hero-cta" to={auctionRoute ?? `/drafts/${draft.sleeperDraftId}`}>
+          {auctionRoute ? 'Open the auction board' : 'Open the draft room'}
         </Link>
-        {(status === 'pre_draft' || status === 'drafting') && (
+        {!auctionRoute && (status === 'pre_draft' || status === 'drafting') && (
           <Link className="lh-link" to={`/drafts/${draft.sleeperDraftId}/live`}>
             Follow live
           </Link>
@@ -367,7 +369,7 @@ function DraftBlock({ draft }: { draft: DraftSummary }) {
 }
 
 /** After the draft, before week 1 (spec 030): the draft is done, so say so and link the board. */
-function DraftDoneBlock({ draftId }: { draftId: string | null }) {
+function DraftDoneBlock({ draftId, auctionRoute }: { draftId: string | null; auctionRoute: string | null }) {
   return (
     <section className="section lh-draft-done" aria-labelledby="lh-draft-done-h">
       <h2 className="section-title" id="lh-draft-done-h">
@@ -375,8 +377,8 @@ function DraftDoneBlock({ draftId }: { draftId: string | null }) {
       </h2>
       <p>The draft is complete.</p>
       {draftId && (
-        <Link className="lh-link" to={`/drafts/${draftId}/board`}>
-          View the draft board
+        <Link className="lh-link" to={auctionRoute ?? `/drafts/${draftId}/board`}>
+          {auctionRoute ? 'See what everyone paid' : 'View the draft board'}
         </Link>
       )}
     </section>
@@ -384,7 +386,7 @@ function DraftDoneBlock({ draftId }: { draftId: string | null }) {
 }
 
 /** Once weeks are scored (spec 030 FR-010): the draft's best and worst grade, early-flagged like everywhere else. */
-function GradesSummaryBlock({ grades, draftId }: { grades: DraftGradeSummary; draftId: string }) {
+function GradesSummaryBlock({ grades, draftId, auctionRoute }: { grades: DraftGradeSummary; draftId: string; auctionRoute: string | null }) {
   const line = (tag: string, t: DraftGradeSummary['best']) => (
     <li className="lh-grades-row">
       <span className="lh-grades-tag">{tag}</span>
@@ -407,7 +409,7 @@ function GradesSummaryBlock({ grades, draftId }: { grades: DraftGradeSummary; dr
       <p className="small">
         <GradesEarlyBadge early={grades.gradesEarly} />
       </p>
-      <Link className="lh-link" to={`/drafts/${draftId}/board`}>
+      <Link className="lh-link" to={auctionRoute ?? `/drafts/${draftId}/board`}>
         Draft board and grades
       </Link>
     </section>

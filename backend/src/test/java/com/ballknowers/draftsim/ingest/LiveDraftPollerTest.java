@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.ingest;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.JsonUtil;
@@ -51,7 +52,7 @@ class LiveDraftPollerTest {
     }
 
     private static DraftRepository.DraftRow draftRow(String status, Map<String, Object> slotToManager) {
-        return new DraftRepository.DraftRow(1L, 10L, "sleeper-draft-123", 2026, 15, 14,
+        return DraftFixtures.draftRow(1L, 10L, "sleeper-draft-123", 2026, 15, 14,
                 status, slotToManager);
     }
 

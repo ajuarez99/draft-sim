@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.engine.SimulationRequest;
 import com.ballknowers.draftsim.engine.SimulationService;
 import com.ballknowers.draftsim.store.DraftRepository;
@@ -46,7 +47,7 @@ class SimulationControllerScopingTest {
     }
 
     private static DraftRepository.DraftRow row() {
-        return new DraftRepository.DraftRow(1L, 10L, "someone-elses-draft", 2026, 15, 14,
+        return DraftFixtures.draftRow(1L, 10L, "someone-elses-draft", 2026, 15, 14,
                 "complete", Map.of());
     }
 
