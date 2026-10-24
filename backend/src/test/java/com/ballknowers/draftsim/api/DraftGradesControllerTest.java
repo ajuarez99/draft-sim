@@ -1,5 +1,8 @@
 package com.ballknowers.draftsim.api;
 
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.DraftGradeProperties;
 import com.ballknowers.draftsim.config.GradeProperties;
 import com.ballknowers.draftsim.domain.Player;
@@ -90,7 +93,7 @@ class DraftGradesControllerTest {
     }
 
     private static DraftRepository.DraftRow draft(String status) {
-        return new DraftRepository.DraftRow(1L, LEAGUE_ID, "d1", 2025, 3, 2, status, Map.of());
+        return DraftFixtures.draftRow(1L, LEAGUE_ID, "d1", 2025, 3, 2, status, Map.of());
     }
 
     private static void assertEmptyUnavailable(DraftGrades g, String reason) {
@@ -162,10 +165,10 @@ class DraftGradesControllerTest {
                 new SportWeekStatsRepository.Row(Sport.NFL, 2025, 2, Instant.EPOCH, true),
                 new SportWeekStatsRepository.Row(Sport.NFL, 2025, 9, Instant.EPOCH, true)));   // not a final league week
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 1, 1, 1, null, 101L, null),
-                new DraftRepository.PickRow(1L, 2, 1, 2, null, 102L, null),
-                new DraftRepository.PickRow(1L, 3, 2, 2, null, null, null),      // no player id
-                new DraftRepository.PickRow(1L, 4, 2, 1, null, 999L, null)));    // player row is gone
+                DraftFixtures.pickRow(1L, 1, 1, 1, null, 101L, null),
+                DraftFixtures.pickRow(1L, 2, 1, 2, null, 102L, null),
+                DraftFixtures.pickRow(1L, 3, 2, 2, null, null, null),      // no player id
+                DraftFixtures.pickRow(1L, 4, 2, 1, null, 999L, null)));    // player row is gone
         when(players.findAll(Sport.NFL)).thenReturn(List.of(
                 new Player(101L, Sport.NFL, "a", "Alpha", List.of(Position.WR), "SEA", null, null, null, null),
                 new Player(102L, Sport.NFL, "b", "Bravo", List.of(Position.WR), "SEA", null, null, null, null)));
@@ -201,8 +204,8 @@ class DraftGradesControllerTest {
                 new SportWeekStatsRepository.Row(Sport.NFL, 2025, 2, Instant.EPOCH, true),
                 new SportWeekStatsRepository.Row(Sport.NFL, 2025, 3, Instant.EPOCH, true)));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 1, 1, 1, 7L, 101L, null),
-                new DraftRepository.PickRow(1L, 2, 1, 2, 8L, 102L, null)));
+                DraftFixtures.pickRow(1L, 1, 1, 1, 7L, 101L, null),
+                DraftFixtures.pickRow(1L, 2, 1, 2, 8L, 102L, null)));
         when(players.findAll(Sport.NFL)).thenReturn(List.of(
                 new Player(101L, Sport.NFL, "a", "Alpha", List.of(Position.WR), "SEA", null, null, null, null),
                 new Player(102L, Sport.NFL, "b", "Bravo", List.of(Position.WR), "SEA", null, null, null, null)));
@@ -312,5 +315,24 @@ class DraftGradesControllerTest {
         assertNotNull(body);
         assertEquals("d1", body.draftId());
         assertEquals("DRAFT_NOT_COMPLETE", body.reason());
+    }
+
+    // ---------------------------------------------------------------- spec 046: auctions are not graded
+
+    @Test
+    void anAuctionDraftIsNotGradedAndNothingExpensiveIsRead() {
+        DraftRepository.DraftRow auction = DraftFixtures.auctionDraftRow(1L, LEAGUE_ID, "d1", 2025, 3, 2, "complete", 200);
+        DraftGrades g = service(3).read(auction);
+        assertEmptyUnavailable(g, "AUCTION_DRAFT");
+        verifyNoInteractions(scoredWeeks, weekStats, playerGames, players);
+        verify(drafts, never()).picks(anyLong());
+    }
+
+    @Test
+    void anAuctionDraftIsNotGradedEvenBeforeItFinishesOrWhenGradesAreNotConfigured() {
+        assertEmptyUnavailable(service(3).read(
+                DraftFixtures.auctionDraftRow(1L, LEAGUE_ID, "d1", 2025, 3, 2, "drafting", 200)), "AUCTION_DRAFT");
+        assertEmptyUnavailable(service(null).read(
+                DraftFixtures.auctionDraftRow(1L, LEAGUE_ID, "d1", 2025, 3, 2, "complete", 200)), "AUCTION_DRAFT");
     }
 }

@@ -36,12 +36,13 @@ class SeasonProjectionIngestServiceTest {
 
     @Mock private SleeperProjectionClient client;
     @Mock private PlayerSeasonProjectionRepository repo;
+    @Mock private SleeperAdpCaptureService adpCapture;
 
     private SeasonProjectionIngestService service;
 
     @BeforeEach
     void setUp() {
-        service = new SeasonProjectionIngestService(client, repo);
+        service = new SeasonProjectionIngestService(client, repo, adpCapture);
         when(repo.provenance(anyString(), anyInt())).thenReturn(Optional.empty());
         when(repo.replaceAll(anyString(), anyInt(), anyList())).thenAnswer(inv ->
                 new ReplaceResult(((List<?>) inv.getArgument(2)).size(), 0));
@@ -83,6 +84,53 @@ class SeasonProjectionIngestServiceTest {
         assertEquals(0, r.rowsStored());
         assertTrue(r.fetched());
         assertNotNull(r.rejectedReason());
+    }
+
+    /** Spec 046 F11: the gp rejection returns mid-loop; the ADP capture is its own pass over the RAW payload and must survive it. */
+    @Test
+    void aProjectionFetchRejectedForGpStillCapturesAdp() {
+        List<Map<String, Object>> raw = List.of(
+                row("1", Map.of("pts", 20.0, "gp", 1.0, "adp_dynasty", 12.0, "adp_std", 15.0)),
+                row("2", Map.of("pts", 1600.0, "gp", 3.0, "adp_dynasty", 40.0)),
+                row("3", Map.of("adp_dynasty", 130.0)));   // an ADP-only stub, which the line loop skips
+        when(client.season("nba", 2026)).thenReturn(raw);
+        when(adpCapture.capture(Sport.NBA, 2026, raw)).thenReturn(new SleeperAdpCaptureService.Result(3, 1, 0, null));
+
+        var r = service.refresh(Sport.NBA, 2026, false);
+
+        verify(repo, never()).replaceAll(anyString(), anyInt(), anyList());
+        assertEquals(0, r.rowsStored());
+        assertNotNull(r.rejectedReason(), "the projections are still rejected");
+        verify(adpCapture).capture(Sport.NBA, 2026, raw);
+        assertEquals(4, r.adpRows(), "but the ADP rows landed and are reported");
+    }
+
+    /** Spec 046 C3: a backfill of another season hands the capture THAT season, so it is the capture that refuses. */
+    @Test
+    void theCaptureIsHandedTheSeasonBeingRefreshed() {
+        List<Map<String, Object>> raw = List.of(row("2", Map.of("pts", 20.0, "reb", 5.0, "gp", 1.0)));
+        when(client.season("nba", 2025)).thenReturn(raw);
+        when(adpCapture.capture(Sport.NBA, 2025, raw)).thenReturn(
+                new SleeperAdpCaptureService.Result(0, 0, 0, "season 2025 is not the ADP compare page's season (2026)"));
+
+        var r = service.refresh(Sport.NBA, 2025, false);
+
+        verify(adpCapture).capture(Sport.NBA, 2025, raw);
+        assertEquals(1, r.rowsStored(), "the projections backfill itself is unaffected");
+        assertEquals(0, r.adpRows());
+    }
+
+    @Test
+    void anAdpCaptureFailureDoesNotCostTheProjections() {
+        List<Map<String, Object>> raw = List.of(row("2", Map.of("pts", 20.0, "reb", 5.0, "gp", 1.0)));
+        when(client.season("nba", 2026)).thenReturn(raw);
+        when(adpCapture.capture(Sport.NBA, 2026, raw)).thenThrow(new IllegalStateException("db down"));
+
+        var r = service.refresh(Sport.NBA, 2026, false);
+
+        assertEquals(1, r.rowsStored());
+        assertNull(r.rejectedReason());
+        assertEquals(0, r.adpRows());
     }
 
     @Test

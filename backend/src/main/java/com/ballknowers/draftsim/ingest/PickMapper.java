@@ -1,6 +1,8 @@
 package com.ballknowers.draftsim.ingest;
 
 import com.ballknowers.draftsim.store.DraftRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
@@ -9,8 +11,12 @@ import java.util.Map;
  * {@link LiveDraftPoller}'s live ticks: picked_by preferred, falls back to draft_slot
  * on autopick, an unmatched Sleeper player id resolves to null (never guessed).
  * adp_at_time is always null from this path — BoardService backfills it later.
+ * Spec 046: also reads the auction price ({@code metadata.amount}), the Sleeper name and the raw
+ * player id, so a sale whose player never resolved is still named and still resolvable later.
  */
 public final class PickMapper {
+
+    private static final Logger log = LoggerFactory.getLogger(PickMapper.class);
 
     private PickMapper() {}
 
@@ -19,6 +25,7 @@ public final class PickMapper {
             Map<String, Long> playerIdsBySleeperId) {
 
         String sleeperPlayerId = str(rawPick.get("player_id"));
+        Map<String, Object> metadata = metadataOf(rawPick);
         int slot = asInt(rawPick.get("draft_slot"), 0);
 
         // picked_by is empty on autopicked picks; the slot is authoritative.
@@ -35,7 +42,43 @@ public final class PickMapper {
                 slot,
                 managerId,
                 sleeperPlayerId == null ? null : playerIdsBySleeperId.get(sleeperPlayerId),
-                null);   // adp_at_time filled in by BoardService after the board exists
+                null,    // adp_at_time filled in by BoardService after the board exists
+                amountOf(rawPick, metadata),
+                nameOf(metadata),
+                sleeperPlayerId);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> metadataOf(Map<String, Object> rawPick) {
+        return rawPick.get("metadata") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    /**
+     * {@code metadata.amount} is a string on the wire ("22"). Missing, blank, unparseable and negative all
+     * become null -- never 0, which would read as a free player -- and a negative one is logged.
+     */
+    private static Integer amountOf(Map<String, Object> rawPick, Map<String, Object> metadata) {
+        String raw = str(metadata.get("amount"));
+        if (raw == null || raw.isBlank()) return null;
+        int amount;
+        try {
+            amount = Integer.parseInt(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+        if (amount < 0) {
+            log.warn("pick {} reports a negative auction amount ({}); stored as null", rawPick.get("pick_no"), amount);
+            return null;
+        }
+        return amount;
+    }
+
+    /** "first last" off the pick metadata, trimmed; null when both are blank. */
+    private static String nameOf(Map<String, Object> metadata) {
+        String first = str(metadata.get("first_name"));
+        String last = str(metadata.get("last_name"));
+        String name = ((first == null ? "" : first.trim()) + " " + (last == null ? "" : last.trim())).trim();
+        return name.isEmpty() ? null : name;
     }
 
     private static String str(Object o) {

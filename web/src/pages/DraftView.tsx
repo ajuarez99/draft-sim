@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   getSeats,
   setReversalRound,
@@ -16,6 +16,7 @@ import NotFound from '../components/NotFound'
 import DraftBoard from '../components/DraftBoard'
 import AvailabilityPanel from '../components/AvailabilityPanel'
 import { useTargets } from '../useTargets'
+import { adpPath, auctionAdpRoute } from '../destinations'
 import { markTaken, survivalFor } from '../targets'
 import TargetStrip from '../components/TargetStrip'
 import { useStatsPool } from '../useStatsPool'
@@ -72,6 +73,13 @@ export default function DraftView() {
   const [temperature, setTemperature] = useState(1.0)
 
   const [seats, setSeats] = useState<SeatsResponse | null>(null)
+  // Spec 046 FR-015: an auction draft has no pick order to simulate, so this page sends it to the ADP page
+  // as soon as the seats say so -- before any run() can start a simulation (run() also refuses, below).
+  const navigate = useNavigate()
+  const auctionRoute = seats ? auctionAdpRoute(seats.draftType, seats.sport, seats.sleeperLeagueId) : null
+  useEffect(() => {
+    if (auctionRoute) navigate(auctionRoute, { replace: true })
+  }, [auctionRoute, navigate])
   const [result, setResult] = useState<SimulationResult | null>(null)
   const [progress, setProgress] = useState(0)
   const [running, setRunning] = useState(false)
@@ -294,6 +302,7 @@ export default function DraftView() {
   }
 
   async function run() {
+    if (auctionRoute) return
     const seq = ++requestSeqRef.current
     setRunning(true)
     setError(null)
@@ -487,6 +496,7 @@ export default function DraftView() {
       pickTimerSeconds={seats.pickTimerSeconds}
       draftType={seats.draftType}
       reversalRound={seats.reversalRound}
+      adpHref={seats.sport === 'nba' && seats.sleeperLeagueId ? adpPath(seats.sleeperLeagueId) : null}
     />
   ) : null
 

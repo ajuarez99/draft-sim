@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.engine.AuctionGuard;
 import com.ballknowers.draftsim.engine.SimulationCancelledException;
 import com.ballknowers.draftsim.engine.SimulationRequest;
 import com.ballknowers.draftsim.engine.SimulationResult;
@@ -48,9 +49,13 @@ public class SimulationController {
     private void requireVisible(SimulationRequest request, String sleeperUserId) {
         // Spec 035 F4: a body-keyed route, so it is not behind PlatformGuard's path interceptor.
         PlatformGuard.requireSleeperDraft(membership, sleeperUserId, request.draftSleeperId());
-        if (membership.visibleDraft(sleeperUserId, request.draftSleeperId()).isEmpty()) {
+        var draft = membership.visibleDraft(sleeperUserId, request.draftSleeperId());
+        if (draft.isEmpty()) {
             throw new IllegalArgumentException("draft " + request.draftSleeperId() + " isn't loaded yet");
         }
+        // Spec 046 US4: after the visibility check, so a stranger still cannot tell an auction draft from
+        // a missing one. An auction has no snake order to simulate.
+        AuctionGuard.requireSnake(draft.get());
     }
 
     /** Blocking. Fine for a few hundred iterations; use the stream for more. */

@@ -305,7 +305,7 @@ describe('league routes remount on a league change', () => {
     const summary = (key: string, platform: 'SLEEPER' | 'ESPN') =>
       ({
         id: 1, sleeperDraftId: `${key}-d`, leagueId: 1, leagueName: `League ${key}`, season: 2026, teams: 12, rounds: 15,
-        status: 'complete', startTime: null, sleeperLeagueId: key, previousLeagueId: null, sport: 'nba', platform,
+        status: 'complete', startTime: null, sleeperLeagueId: key, previousLeagueId: null, sport: 'nba', platform, draftType: 'snake',
       }) satisfies api.DraftSummary
     vi.mocked(api.getDrafts).mockResolvedValue([summary('espn-1', 'ESPN'), summary('sleeper-1', 'SLEEPER')])
     vi.mocked(api.getLeagueAvailability).mockImplementation(async (key: string) =>

@@ -49,12 +49,45 @@ class IngestControllerTest {
     @Mock private com.ballknowers.draftsim.ingest.BracketIngestService bracketIngest;
     @Mock private com.ballknowers.draftsim.ingest.ProjectionSnapshotService projectionSnapshots;
     @Mock private com.ballknowers.draftsim.engine.ProjectionParityService projectionParity;
+    @Mock private com.ballknowers.draftsim.ingest.SleeperAdpCaptureService sleeperAdpCapture;
+    @Mock private com.ballknowers.draftsim.ingest.YahooAdpService yahooAdp;
 
     private IngestController controller() {
         return new IngestController(playerIngest, leagueIngest, leagueHistoryIngest, ffcAdp, boards, profiles,
                 projectionIngest, transactionIngest, playerGameIngest,
                 new com.ballknowers.draftsim.ingest.BoardRefresh(ffcAdp, boards, profiles), seasonProjectionIngest,
-                bracketIngest, projectionSnapshots, projectionParity);
+                bracketIngest, projectionSnapshots, projectionParity, sleeperAdpCapture, yahooAdp);
+    }
+
+    // ---- POST /api/ingest/adp/yahoo and /adp/sleeper (spec 046) ----
+
+    @Test
+    void yahooAdpRouteRunsTheCaptureForTheRequestedSport() {
+        var stub = new com.ballknowers.draftsim.ingest.YahooAdpService.Result(186, 184, 184, 2, null);
+        when(yahooAdp.ingest(Sport.NBA, false)).thenReturn(stub);
+
+        assertSame(stub, controller().yahooAdp("nba", false));
+    }
+
+    @Test
+    void sleeperAdpRouteFetchesAndCapturesTheNamedSeason() {
+        var stub = new com.ballknowers.draftsim.ingest.SleeperAdpCaptureService.Result(817, 903, 1, null);
+        when(sleeperAdpCapture.fetchAndCapture(Sport.NBA, 2026, false)).thenReturn(stub);
+
+        assertSame(stub, controller().sleeperAdp("nba", 2026, false));
+    }
+
+    /** Spec 046 C11: force reaches the services, which is where the shrink guard lives. */
+    @Test
+    void forceIsPassedThroughToBothAdpCaptures() {
+        var y = new com.ballknowers.draftsim.ingest.YahooAdpService.Result(186, 184, 184, 2, null);
+        var s = new com.ballknowers.draftsim.ingest.SleeperAdpCaptureService.Result(817, 903, 1, null);
+        when(yahooAdp.ingest(Sport.NBA, true)).thenReturn(y);
+        when(sleeperAdpCapture.fetchAndCapture(Sport.NBA, 2026, true)).thenReturn(s);
+
+        assertSame(y, controller().yahooAdp("nba", true));
+        assertSame(s, controller().sleeperAdp("nba", 2026, true));
+        verify(yahooAdp, org.mockito.Mockito.never()).ingest(Sport.NBA, false);
     }
 
     // ---- POST /api/ingest/projection-snapshot (spec 036) ----
@@ -195,7 +228,7 @@ class IngestControllerTest {
     @Test
     void seasonProjectionsWithNbaReachesTheIngestService() {
         var stub = new com.ballknowers.draftsim.ingest.SeasonProjectionIngestService.Result(
-                true, false, 529, 0, 1591, "rotowire", java.time.Instant.parse("2026-10-11T00:00:00Z"), null);
+                true, false, 529, 0, 1591, "rotowire", java.time.Instant.parse("2026-10-11T00:00:00Z"), null, 0);
         when(seasonProjectionIngest.refresh(Sport.NBA, 2026, false)).thenReturn(stub);
 
         assertSame(stub, controller().seasonProjections("nba", 2026, false));

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.SeasonStateService.SeasonState;
 import com.ballknowers.draftsim.store.DraftRepository;
@@ -43,7 +44,7 @@ class SeasonStateServiceTest {
 
     private void draft(String status) {
         when(drafts.forLeague(LEAGUE_ID)).thenReturn(Optional.of(
-                new DraftRepository.DraftRow(1L, LEAGUE_ID, "D1", 2026, 15, 12, status, Map.of())));
+                DraftFixtures.draftRow(1L, LEAGUE_ID, "D1", 2026, 15, 12, status, Map.of())));
     }
 
     private void weeks(int stored, int latestFinal) {

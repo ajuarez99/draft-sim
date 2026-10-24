@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
@@ -26,7 +27,7 @@ class OwnerSlotTest {
     @Mock private ManagerRepository managers;
 
     private static DraftRepository.DraftRow draft(Map<String, Object> slotToManager) {
-        return new DraftRepository.DraftRow(1L, 1L, "sleeper-draft", 2026, 15, 8, "pre_draft", slotToManager);
+        return DraftFixtures.draftRow(1L, 1L, "sleeper-draft", 2026, 15, 8, "pre_draft", slotToManager);
     }
 
     @Test

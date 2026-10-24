@@ -73,7 +73,7 @@ class ManualPickGuardsIT {
     }
 
     private long insertDraft(String status) {
-        return drafts.upsert(leagueId, DRAFT, 2026, 15, 12, "snake", status, null,
+        return DraftFixtures.upsert(drafts, leagueId, DRAFT, 2026, 15, 12, "snake", status, null,
                 "{\"1\": " + managerId + ", \"2\": " + managerId + "}");
     }
 

@@ -71,6 +71,9 @@ class RefreshControllerDailyIT {
     // Spec 036: keeps PROJECTION_SNAPSHOT off the network and off the snapshot table. A Result with no
     // season is what the step reports as a plain DONE.
     @MockitoBean private com.ballknowers.draftsim.ingest.ProjectionSnapshotService projectionSnapshots;
+    // Spec 046: keeps ADP_CAPTURE and YAHOO_ADP off the network and off the shared adp_snapshot table.
+    @MockitoBean private com.ballknowers.draftsim.ingest.SleeperAdpCaptureService adpCapture;
+    @MockitoBean private com.ballknowers.draftsim.ingest.YahooAdpService yahooAdp;
     @Autowired private RefreshController controller;
     @Autowired private ApiSecurityProperties security;
     @Autowired private JdbcTemplate jdbc;
@@ -114,8 +117,8 @@ class RefreshControllerDailyIT {
         assertEquals(LocalDate.now(ZoneOffset.UTC).toString(), body.get("date"));
         List<Map<String, Object>> steps = (List<Map<String, Object>>) body.get("steps");
         // Three steps per sport, plus spec 030's SEASON_PROJECTIONS for basketball only, plus spec 036's
-        // PROJECTION_SNAPSHOT for every sport.
-        assertEquals(Sport.values().length * 4 + 1, steps.size());
+        // PROJECTION_SNAPSHOT for every sport, plus spec 046's ADP_CAPTURE and YAHOO_ADP for basketball only.
+        assertEquals(Sport.values().length * 4 + 3, steps.size());
         assertEquals(Sport.values()[0].code(), steps.get(0).get("sport"));
         assertEquals("PLAYERS", steps.get(0).get("kind"));
         assertEquals("DONE", steps.get(0).get("outcome"));

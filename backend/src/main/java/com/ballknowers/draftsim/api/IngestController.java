@@ -14,6 +14,8 @@ import com.ballknowers.draftsim.ingest.ProjectionIngestService;
 import com.ballknowers.draftsim.engine.ProjectionParityService;
 import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
+import com.ballknowers.draftsim.ingest.SleeperAdpCaptureService;
+import com.ballknowers.draftsim.ingest.YahooAdpService;
 import com.ballknowers.draftsim.profile.ProfileService;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,6 +44,8 @@ public class IngestController {
     private final BracketIngestService bracketIngest;
     private final ProjectionSnapshotService projectionSnapshots;
     private final ProjectionParityService projectionParity;
+    private final SleeperAdpCaptureService sleeperAdpCapture;
+    private final YahooAdpService yahooAdp;
 
     public IngestController(PlayerIngestService playerIngest, LeagueIngestService leagueIngest,
                             LeagueHistoryIngestService leagueHistoryIngest,
@@ -53,7 +57,11 @@ public class IngestController {
                             SeasonProjectionIngestService seasonProjectionIngest,
                             BracketIngestService bracketIngest,
                             ProjectionSnapshotService projectionSnapshots,
-                            ProjectionParityService projectionParity) {
+                            ProjectionParityService projectionParity,
+                            SleeperAdpCaptureService sleeperAdpCapture,
+                            YahooAdpService yahooAdp) {
+        this.sleeperAdpCapture = sleeperAdpCapture;
+        this.yahooAdp = yahooAdp;
         this.projectionSnapshots = projectionSnapshots;
         this.projectionParity = projectionParity;
         this.playerIngest = playerIngest;
@@ -75,6 +83,29 @@ public class IngestController {
     public FfcAdpService.Result adp(@RequestParam(defaultValue = "nfl") String sport) {
         Sport s = Sport.fromCode(sport);
         return ffcAdp.ingest(s);
+    }
+
+    /**
+     * Spec 046: one Yahoo ADP capture now (the daily YAHOO_ADP step's work). Admin-gated with the rest of
+     * {@code /api/ingest/**}. Basketball only; {@code sport} is required so a default can't become a rule.
+     */
+    @PostMapping("/adp/yahoo")
+    public YahooAdpService.Result yahooAdp(@RequestParam String sport,
+                                           @RequestParam(defaultValue = "false") boolean force) {
+        // Spec 046 C11: force bypasses the shrink guard (admin only, like every route here).
+        return yahooAdp.ingest(Sport.fromCode(sport), force);
+    }
+
+    /**
+     * Spec 046: one Sleeper dynasty/redraft ADP capture now, from its own fetch of that season's payload.
+     * {@code season} is required (the daily step picks the newest NBA league's; a route shouldn't guess it).
+     */
+    @PostMapping("/adp/sleeper")
+    public SleeperAdpCaptureService.Result sleeperAdp(@RequestParam String sport, @RequestParam int season,
+                                                      @RequestParam(defaultValue = "false") boolean force) {
+        // Spec 046 C3: a season other than the compare page's is refused in the result (nothing written).
+        // C11: force bypasses the shrink guard only.
+        return sleeperAdpCapture.fetchAndCapture(Sport.fromCode(sport), season, force);
     }
 
     /** ~5MB from Sleeper. Once a day is plenty. */

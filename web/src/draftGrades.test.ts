@@ -10,9 +10,12 @@ describe('reasonSentence', () => {
     expect(reasonSentence('NO_SCORED_WEEKS', [1, 2])).toBe(
       "Weeks 1, 2 are scored, but their game-by-game stats aren't loaded yet, so there's nothing to grade.",
     )
+    expect(reasonSentence('AUCTION_DRAFT')).toBe(
+      "Auction drafts aren't graded. Grades compare each pick with its draft slot, and an auction has no slots.",
+    )
     expect(reasonSentence('NO_SCORED_WEEKS', [4])).not.toContain('No weeks have been scored')
     expect(reasonSentence('NO_SCORED_WEEKS', [1, 2])).not.toMatch(/ingest|\/api\//i)
-    for (const r of ['NOT_CONFIGURED', 'DRAFT_NOT_COMPLETE', 'NO_SCORED_WEEKS', null] as const) {
+    for (const r of ['NOT_CONFIGURED', 'DRAFT_NOT_COMPLETE', 'NO_SCORED_WEEKS', 'AUCTION_DRAFT', null] as const) {
       const s = reasonSentence(r)
       expect(s).not.toMatch(/ingest/i)
       expect(s).not.toContain('/api/')

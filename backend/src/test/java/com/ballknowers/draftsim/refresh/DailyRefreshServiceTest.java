@@ -8,6 +8,9 @@ import com.ballknowers.draftsim.engine.SeasonStateService;
 import com.ballknowers.draftsim.ingest.PlayerIngestService;
 import com.ballknowers.draftsim.ingest.ProjectionSnapshotService;
 import com.ballknowers.draftsim.ingest.SeasonProjectionIngestService;
+import com.ballknowers.draftsim.ingest.SleeperAdpCaptureService;
+import com.ballknowers.draftsim.ingest.YahooAdpService;
+import com.ballknowers.draftsim.store.BoardRepository;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.DailyResult;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.Outcome;
 import com.ballknowers.draftsim.refresh.DailyRefreshService.StepResult;
@@ -46,6 +49,9 @@ class DailyRefreshServiceTest {
     @Mock private LeagueRepository leagues;
     @Mock private SeasonStateService seasonState;
     @Mock private ProjectionSnapshotService projectionSnapshots;
+    @Mock private SleeperAdpCaptureService adpCapture;
+    @Mock private YahooAdpService yahooAdp;
+    @Mock private BoardRepository boards;
 
     private DailyRefreshService service;
 
@@ -69,7 +75,9 @@ class DailyRefreshServiceTest {
     @BeforeEach
     void setUp() {
         service = new DailyRefreshService(players, boardRefresh, captures, trending, seasonProjections, leagues, seasonState,
-                projectionSnapshots);
+                projectionSnapshots, adpCapture, yahooAdp, boards);
+        when(adpCapture.fetchAndCapture(any(), anyInt())).thenReturn(new SleeperAdpCaptureService.Result(800, 900, 2, null));
+        when(yahooAdp.ingest(any())).thenReturn(new YahooAdpService.Result(186, 186, 186, 0, null));
         when(trending.refreshIfStale(any(), any())).thenReturn(TrendingRefresh.Outcome.DONE);
         when(players.ingest(any())).thenReturn(new PlayerIngestService.Result(2091, 300, true, 0));
         when(boardRefresh.run(any())).thenReturn(board(ffcOk()));
@@ -78,7 +86,7 @@ class DailyRefreshServiceTest {
         when(projectionSnapshots.capture(any(), any())).thenReturn(
                 new ProjectionSnapshotService.Result("nba", 2026, List.of(1), 936, 0, 0));
         when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
-                new SeasonProjectionIngestService.Result(true, false, 529, 3, 1591, "rotowire", null, null));
+                new SeasonProjectionIngestService.Result(true, false, 529, 3, 1591, "rotowire", null, null, 0));
     }
 
     private static LeagueRepository.LeagueRow nbaLeague(int season) {
@@ -230,7 +238,7 @@ class DailyRefreshServiceTest {
     @Test
     void aFreshSeasonProjectionSetReportsDoneWithFreshDetail() {
         when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
-                new SeasonProjectionIngestService.Result(false, true, 0, 0, 0, "rotowire", null, null));
+                new SeasonProjectionIngestService.Result(false, true, 0, 0, 0, "rotowire", null, null, 0));
 
         StepResult nba = step(service.runAll(), Sport.NBA, "SEASON_PROJECTIONS");
 
@@ -241,7 +249,7 @@ class DailyRefreshServiceTest {
     @Test
     void aRejectedSeasonProjectionFetchIsBestEffortFailedWithTheReason() {
         when(seasonProjections.refresh(any(), anyInt(), anyBoolean())).thenReturn(
-                new SeasonProjectionIngestService.Result(true, false, 0, 0, 0, null, null, "player 9 has gp=3.0"));
+                new SeasonProjectionIngestService.Result(true, false, 0, 0, 0, null, null, "player 9 has gp=3.0", 0));
 
         DailyResult r = service.runAll();
 
@@ -271,6 +279,98 @@ class DailyRefreshServiceTest {
 
         assertEquals(Outcome.DONE, nba.outcome());
         verify(seasonProjections, never()).refresh(any(), anyInt(), anyBoolean());
+    }
+
+    // ---- spec 046 US1: the ADP_CAPTURE and YAHOO_ADP steps ----
+
+    @Test
+    void adpCaptureAndYahooRunForNbaOnlyAndFetchTheNewestNbaSeason() {
+        DailyResult r = service.runAll();
+
+        StepResult adp = step(r, Sport.NBA, "ADP_CAPTURE");
+        assertEquals(Outcome.DONE, adp.outcome());
+        assertEquals("dynastyRows=800 redraftRows=900 unmapped=2", adp.detail());
+        verify(adpCapture).fetchAndCapture(Sport.NBA, 2026);
+        StepResult yahoo = step(r, Sport.NBA, "YAHOO_ADP");
+        assertEquals(Outcome.DONE, yahoo.outcome());
+        assertEquals("fetched=186 rows=186 unmatched=0", yahoo.detail());
+        assertTrue(r.steps().stream().noneMatch(s -> s.sport() == Sport.NFL
+                && (s.kind().equals("ADP_CAPTURE") || s.kind().equals("YAHOO_ADP"))));
+        // The gate is latestCapture == today, never a daily_capture row (its check constraint is PLAYERS/BOARD only).
+        verify(captures, never()).record(any(), any(), eq("ADP_CAPTURE"), any(), any());
+        verify(captures, never()).record(any(), any(), eq("YAHOO_ADP"), any(), any());
+    }
+
+    @Test
+    void adpCaptureIsGatedOnAnNbaLeagueExistingNotOnAnInProgressSeason() {
+        // A completed season: SEASON_PROJECTIONS has nothing to do, but dynasty drafts happen in the offseason.
+        when(seasonState.stateOf(any())).thenReturn(SeasonStateService.SeasonState.COMPLETE);
+
+        DailyResult r = service.runAll();
+
+        verify(seasonProjections, never()).refresh(any(), anyInt(), anyBoolean());
+        assertEquals(Outcome.DONE, step(r, Sport.NBA, "ADP_CAPTURE").outcome());
+        verify(adpCapture).fetchAndCapture(Sport.NBA, 2026);
+    }
+
+    @Test
+    void adpCaptureWithNoNbaLeagueDoesNothing() {
+        when(leagues.all()).thenReturn(List.of());
+
+        StepResult adp = step(service.runAll(), Sport.NBA, "ADP_CAPTURE");
+
+        assertEquals(Outcome.DONE, adp.outcome());
+        verifyNoInteractions(adpCapture);
+    }
+
+    @Test
+    void bothStepsSkipWhenTodaysCaptureAlreadyExists() {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        when(boards.latestCapture(Sport.NBA, BoardRepository.SOURCE_SLEEPER_DYNASTY)).thenReturn(java.util.Optional.of(today));
+        when(boards.latestCapture(Sport.NBA, BoardRepository.SOURCE_SLEEPER_REDRAFT)).thenReturn(java.util.Optional.of(today));
+        when(boards.latestCapture(Sport.NBA, BoardRepository.SOURCE_YAHOO)).thenReturn(java.util.Optional.of(today));
+
+        DailyResult r = service.runAll();
+
+        assertEquals(Outcome.SKIPPED_ALREADY_TODAY, step(r, Sport.NBA, "ADP_CAPTURE").outcome());
+        assertEquals(Outcome.SKIPPED_ALREADY_TODAY, step(r, Sport.NBA, "YAHOO_ADP").outcome());
+        verifyNoInteractions(adpCapture, yahooAdp);
+    }
+
+    @Test
+    void anEarlierCaptureDoesNotSkipTheStep() {
+        LocalDate yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1);
+        when(boards.latestCapture(Sport.NBA, BoardRepository.SOURCE_YAHOO)).thenReturn(java.util.Optional.of(yesterday));
+
+        service.runAll();
+
+        verify(yahooAdp).ingest(Sport.NBA);
+    }
+
+    @Test
+    void aRejectedOrThrownAdpStepIsBestEffortAndNeverFailsTheRun() {
+        when(adpCapture.fetchAndCapture(any(), anyInt()))
+                .thenReturn(new SleeperAdpCaptureService.Result(0, 0, 0, "sleeper_dynasty had 3 rows against 800 stored; kept the stored capture"));
+        when(yahooAdp.ingest(any())).thenThrow(new IllegalStateException("yahoo 503"));
+
+        DailyResult r = service.runAll();
+
+        StepResult adp = step(r, Sport.NBA, "ADP_CAPTURE");
+        assertEquals(Outcome.DONE_ADP_CAPTURE_FAILED_BEST_EFFORT, adp.outcome());
+        assertTrue(adp.detail().contains("kept the stored capture"));
+        assertEquals(Outcome.DONE_YAHOO_ADP_FAILED_BEST_EFFORT, step(r, Sport.NBA, "YAHOO_ADP").outcome());
+        assertFalse(r.failed());
+        assertEquals(Outcome.DONE, step(r, Sport.NBA, "PROJECTION_SNAPSHOT").outcome());
+    }
+
+    @Test
+    void aYahooRejectionIsReportedWithItsReason() {
+        when(yahooAdp.ingest(any())).thenReturn(new YahooAdpService.Result(0, 0, 0, 0, "Yahoo fetch failed: timeout"));
+
+        StepResult yahoo = step(service.runAll(), Sport.NBA, "YAHOO_ADP");
+
+        assertEquals(Outcome.DONE_YAHOO_ADP_FAILED_BEST_EFFORT, yahoo.outcome());
+        assertEquals("Yahoo fetch failed: timeout", yahoo.detail());
     }
 
     // ---- spec 036 US1: the PROJECTION_SNAPSHOT step ----

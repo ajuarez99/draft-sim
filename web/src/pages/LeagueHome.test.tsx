@@ -25,7 +25,7 @@ import LeagueHome from './LeagueHome'
 
 function draft(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
-    platform: 'SLEEPER',
+    platform: 'SLEEPER', draftType: 'snake',
     id: 1,
     sleeperDraftId: 'D1',
     leagueId: 1,
@@ -470,6 +470,20 @@ describe('League home', () => {
     expect(within(block).getByRole('link', { name: 'Open the draft room' })).toHaveAttribute('href', '/drafts/D1')
     expect(within(block).getByRole('link', { name: 'Follow live' })).toHaveAttribute('href', '/drafts/D1/live')
     expect(screen.queryByRole('heading', { name: 'Latest matchup' })).toBeNull()
+  })
+
+  it('sends an NBA auction to the ADP page instead of the snake room, with no Follow live', async () => {
+    arrange({
+      drafts: () => Promise.resolve([draft({ status: 'drafting', sport: 'nba', draftType: 'auction' })]),
+      history: () => Promise.resolve(history([])),
+      seasonStart: () => Promise.resolve(seasonStart({ state: 'PRE_DRAFT', draft: { sleeperDraftId: 'D1', grades: null } })),
+    })
+    renderHome()
+
+    const block = await waitFor(() => section('Draft'))
+    expect(within(block).getByRole('link', { name: 'Open the auction board' })).toHaveAttribute('href', '/leagues/L1/adp')
+    expect(within(block).queryByRole('link', { name: 'Follow live' })).toBeNull()
+    expect(within(block).queryByRole('link', { name: 'Open the draft room' })).toBeNull()
   })
 
   it('says so when no week has been scored', async () => {

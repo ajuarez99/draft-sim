@@ -37,6 +37,55 @@ The "NEXT UP" brief below is built.
     true-cold `/lock-ins` latency.
   - At the week-2 rollover, also measure whether NBA `last_scored_leg` tracks the current leg (spec "Owed").
 
+## BUILT + LIVE-VERIFIED LOCALLY (2026-10-23): spec 046, ADP compare + live auction board. NOT committed
+
+**Worktree** `.claude/worktrees/046-adp-compare-auction-board`, branch `046-adp-compare-auction-board`,
+fast-forwarded to main `48371dd` (spec 045) with all 046 work on top, uncommitted. Commit, PR and deploy need
+Allan's go-ahead.
+
+- **What it is.** A league page at `/leagues/:id/adp`:
+  - It compares Sleeper dynasty ADP, Sleeper redraft ADP, Yahoo ADP, and Yahoo average auction price.
+  - Rows are tinted green or red when Yahoo and Sleeper disagree by a big gap.
+  - Trust-Yahoo sliders give a "Blend $" price, rescaled to the league's shape.
+  - For auction drafts it adds a live mode: team budgets, max bid, a sales feed.
+  - Auction picks are also excluded from every snake-order model (profiles, `adp_at_time`, grades,
+    the simulator). Nothing filters by `draft_type` today.
+- **Why.** Allan used a standalone prototype live in "Legacy Ball Knowers"' $200 dynasty auction on
+  2026-10-21 and asked for it in the site.
+- **Read.**
+  - The brief: `claude/adp-compare-and-auction-board.md`
+  - The prototype: `claude/prototypes/auction-board.html`
+  - The spec and plan: `specs/046-adp-compare-auction-board/`
+- **State.** The whole pipeline ran: spec, plan, plan review (17 findings), tasks and analyze, build (Sonnet), code
+  review (13 findings, all fixed), and live verification. Details are in `specs/046-.../verification.md`.
+  - **Measured with the old code** (`baseline/README.md`): ingesting the auction changed **all 47** NBA profiles.
+  - **With the new code:** 44/44 real profiles are identical, and the two auction-only managers are NEUTRAL with 0
+    drafts.
+  - **Live:** budgets sum to $18 left (matches Sleeper), sale-to-screen median 1.55s and max 2.15s over 12 sales
+    (stub Sleeper), refusals return 409, and routing redirects. The page was checked at desktop and 375px.
+  - **Live verification also found and fixed 4 bugs:**
+    1. The season rule picked a stray 2099 IT league.
+    2. The green/red tints rendered teal/purple (`color-mix in oklch`; lessons #51).
+    3. The legend wrapped wrong.
+    4. The phone budget grid ran one card per row.
+- **Not covered:** a real in-progress Sleeper auction, production, and an ESPN NBA league's page (IT only).
+- **Not checked:** whether production ever ingested Legacy Ball Knowers. If it did, production NBA profiles are
+  polluted until this ships and the league is re-ingested.
+- **Scratch DB:** docker container `draftsim-pg-046` on 5436 (a copy of 5433 plus test residue). Delete it when
+  done: `docker rm -f draftsim-pg-046`.
+- **Migration.** V39 is still free on main `48371dd` (2026-10-23); re-check before merging.
+- **POST-DEPLOY STEP (code review C2): re-ingest "Legacy Ball Knowers".** Run
+  `POST /api/ingest/all/1415422393706455040` (admin token) after V39 + the code are live. Until then the completed
+  230-pick auction has `draft.budget = NULL` and every `draft_pick.amount = NULL` (ingested before this spec), so the
+  page shows one "prices haven't been ingested yet" line, no budgets and no Blend $. Nothing in the daily refresh
+  re-ingests a complete draft. `/all` also refits the NBA profiles (`profilesWritten`): check they are unchanged for
+  managers with snake history, and that the auction draft contributes nothing. **Do not run it during a live draft**
+  (the warning in the 2026-10 draft-night notes below: `/ingest/all` calls `replacePicks` and the board rebuild stalls
+  the poller). It is safe here only because this draft is complete and no NBA draft is running; check first.
+- **Review fixes applied 2026-10-23:** see "Fixes applied" at the end of `specs/046-adp-compare-auction-board/code-review.md`.
+
+---
+
 ## NEXT UP (written 2026-10-23): fix Matchups showing 2025, then add lock-ins to Matchups
 
 Allan asked for this order: **fix first, then add.** Nothing here is built yet. It's a brief for the next

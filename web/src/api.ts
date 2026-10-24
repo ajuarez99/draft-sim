@@ -181,9 +181,13 @@ async function apiError(res: Response): Promise<ApiError> {
   // Several controllers answer 404 with an empty body, so a parse failure is normal.
   const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
   const retryAfter = Number(res.headers?.get?.('Retry-After'))
+  // Spec 046 C10: a 409 auction_draft carries a CODE in `error` and the sentence in `message`; the sentence is
+  // what a reader should see (a football auction's live room shows the thrown message in its banner). Other
+  // routes put their sentence in `error`, so this is not a general swap.
+  const text = body.error === 'auction_draft' ? body.message ?? body.error : body.error ?? body.message
   return new ApiError(
     res.status,
-    body.error ?? body.message ?? undefined,
+    text ?? undefined,
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
   )
 }
@@ -257,7 +261,7 @@ export const getRealDraftBoard = (draftId: string) =>
 
 // Mirrors DraftGradesService's records (spec 018, contracts/api.md C1), field for field.
 export type ProductionBasis = 'WEEKLY_GAME' | 'WEEKLY_AVERAGE_GAME'
-export type DraftGradesReason = 'NOT_CONFIGURED' | 'DRAFT_NOT_COMPLETE' | 'NO_SCORED_WEEKS'
+export type DraftGradesReason = 'NOT_CONFIGURED' | 'DRAFT_NOT_COMPLETE' | 'NO_SCORED_WEEKS' | 'AUCTION_DRAFT'
 
 export type PickGrade = {
   pickNo: number
@@ -347,6 +351,9 @@ export type DraftSummary = {
   // Spec 035: where the league came from (draft.platform). Mirrors DraftSummary.platform in
   // DraftRepository.java. 'ESPN' leagues have no draft room: the picker links them to the league home.
   platform: Platform
+  // Spec 046: draft.draft_type ('snake', 'auction', 'linear'). Mirrors DraftSummary.draftType. The web app
+  // routes an 'auction' draft to the ADP page instead of the snake simulator (FR-015).
+  draftType: string
 }
 
 /** Mirrors com.ballknowers.draftsim.domain.Platform. */
@@ -3045,6 +3052,96 @@ export type LeagueSchedule = {
 export const getLeagueSchedule = (id: string) =>
   apiFetch(`/api/leagues/${id}/schedule`).then(json<LeagueSchedule>)
 
+/*
+ * specs/046-adp-compare-auction-board US1. Mirrors the Java records AdpCompareService.Response / Source /
+ * Player / Draft field for field (contracts/adp-compare-api.md, amended). Every ADP value is nullable: a
+ * source that doesn't rank a player sends null, and a stale type here would not warn (AGENTS.md hard rule).
+ * US3 (the live auction) extends AdpDraft with teamsState/sales and AdpPlayer with `sale`.
+ */
+export type AdpSourceKey = 'sleeper_dynasty' | 'sleeper_redraft' | 'yahoo'
+export type AdpSource = {
+  key: AdpSourceKey
+  label: string
+  /** ISO date of the newest capture; null = no capture, which the page words as "unavailable". */
+  capturedOn: string | null
+  /** Players the source ranked (Yahoo: matched plus unmatched); 0 with no capture. */
+  ranked: number
+  scoring: 'dynasty' | 'redraft'
+  /** Yahoo only: ranked players no local player matched. Null for the Sleeper sources. */
+  unmatched: number | null
+  /** Yahoo only: the deepest ADP it ranks, context for the reader (not a tint rule). */
+  deepestAdp: number | null
+  /** Yahoo only: share of leagues below which a Yahoo value isn't trusted (0.5, hand-set and arbitrary). */
+  minPercentDrafted: number | null
+}
+export type AdpPlayer = {
+  /** Null for a Yahoo player no local player matched; such a row carries only Yahoo fields. */
+  playerId: number | null
+  sleeperId: string | null
+  name: string
+  team: string | null
+  positions: string[]
+  yearsExp: number | null
+  dynasty: number | null
+  redraft: number | null
+  yahooAdp: number | null
+  yahooCost: number | null
+  /** 0..1: the share of Yahoo's leagues that drafted him. */
+  yahooPctDrafted: number | null
+  /** What he sold for in this league's auction; null on a row nobody has bought (and for every snake draft). */
+  sale: AdpSale | null
+}
+export type AdpSale = { amount: number | null; managerId: number | null; pickNo: number }
+/** One draft slot's money. Manager fields are null while the slot has no manager; left/maxBid only when no budget. */
+export type AdpTeamState = {
+  managerId: number | null
+  name: string | null
+  avatar: string | null
+  slot: number
+  spent: number
+  filled: number
+  spotsLeft: number
+  left: number | null
+  maxBid: number | null
+  /** Picks Sleeper sent no price for: `spent` is a floor when this is above 0. */
+  priceMissing: number
+  /** The caller (X-Sleeper-User) is this slot's manager; false when signed out or the slot has no manager. */
+  mine: boolean
+}
+export type AdpSaleRow = {
+  pickNo: number
+  amount: number | null
+  managerId: number | null
+  playerId: number | null
+  /** Never blank: the player, else Sleeper's name for him, else "Unknown player". */
+  name: string
+  priceMissing: boolean
+}
+export type AdpDraft = {
+  sleeperDraftId: string
+  type: string
+  /** Nullable column, passed through (spec 046 C7). */
+  status: string | null
+  teams: number
+  rounds: number
+  budget: number | null
+  /** Auction drafts only: the server OMITS both for a snake draft (not empty arrays). */
+  teamsState?: AdpTeamState[]
+  /** Newest sale first. */
+  sales?: AdpSaleRow[]
+}
+export type AdpCompareResponse = {
+  sport: Sport
+  sources: AdpSource[]
+  players: AdpPlayer[]
+  /** Yahoo's average prices, each floored at 1, descending. Empty without a Yahoo capture. */
+  costCurve: number[]
+  /** Null when the league has no Sleeper draft row (and always for ESPN leagues). */
+  draft: AdpDraft | null
+}
+export const getAdpCompare = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${encodeURIComponent(sleeperLeagueId)}/adp-compare`).then(json<AdpCompareResponse>)
+
 export type TrendRole = 'RISER' | 'FALLER' | 'STEADY'
 export type PlayerTrendsReason = 'NOT_CONFIGURED' | 'NOT_BASKETBALL' | 'NO_GAMES'
 export type StreamingReason = 'SEASON_COMPLETE' | 'NOT_DRAFTED' | 'ROSTERS_NOT_LOADED'
@@ -3409,7 +3506,8 @@ export type Replacement = {
   /** The starting slots in fill order (BN, IR, TAXI removed; singles, then G/F, then UTIL). */
   slots: string[]
 }
-export type LeaderboardDraftPick = { pickNo: number; round: number; managerName: string | null }
+/** `pickNo` and `round` are null for a pick from an auction draft (spec 046): nomination order is not a slot. */
+export type LeaderboardDraftPick = { pickNo: number | null; round: number | null; managerName: string | null }
 export type LeaderboardRow = {
   sleeperPlayerId: string
   /** Null when there are games but no player row. */

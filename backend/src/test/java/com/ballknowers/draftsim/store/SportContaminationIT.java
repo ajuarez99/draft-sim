@@ -102,11 +102,11 @@ class SportContaminationIT {
         // target manager reaches (adpAtTime - pickNo = +4); the leaguemate does
         // not (0) -- a nonzero league mean is what makes shrinkage-toward-target
         // move visibly once observed changes, which is the whole point.
-        nflDraftId = drafts.upsert(nflLeagueId, "it-draft-sport-contamination-nfl", 2026, 15, 8,
+        nflDraftId = DraftFixtures.upsert(drafts, nflLeagueId, "it-draft-sport-contamination-nfl", 2026, 15, 8,
                 "snake", "complete", null, "{}");
         drafts.upsertPicks(nflDraftId, List.of(
-                new DraftRepository.PickRow(nflDraftId, 1, 1, 1, managerId, player1Id, 5.0),
-                new DraftRepository.PickRow(nflDraftId, 2, 1, 2, otherManagerId, player2Id, 2.0)));
+                DraftFixtures.pickRow(nflDraftId, 1, 1, 1, managerId, player1Id, 5.0),
+                DraftFixtures.pickRow(nflDraftId, 2, 1, 2, otherManagerId, player2Id, 2.0)));
     }
 
     @AfterEach
@@ -125,10 +125,10 @@ class SportContaminationIT {
         // adp_at_time (no contemporaneous NBA board), so this contributes zero
         // scoreable picks and, if allCompletedPicks() were sport-filtered,
         // zero effect of any kind on an nfl-scoped fit.
-        nbaDraftId = drafts.upsert(nbaLeagueId, "it-draft-sport-contamination-nba", 2026, 14, 8,
+        nbaDraftId = DraftFixtures.upsert(drafts, nbaLeagueId, "it-draft-sport-contamination-nba", 2026, 14, 8,
                 "snake", "complete", null, "{}");
         drafts.upsertPicks(nbaDraftId, List.of(
-                new DraftRepository.PickRow(nbaDraftId, 1, 1, 1, managerId, null, null)));
+                DraftFixtures.pickRow(nbaDraftId, 1, 1, 1, managerId, null, null)));
 
         ProfileService.Fit after = profiles.fit(Sport.NFL);
         var afterProfile = after.profiles().get(managerId);

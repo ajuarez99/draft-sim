@@ -14,6 +14,7 @@ export const GRADES_REASONS: Record<string, string> = {
   NOT_CONFIGURED: 'Draft Grades aren’t set up on this server, so there is no draft value.',
   DRAFT_NOT_COMPLETE: 'Draft value appears once the draft is complete and games are scored.',
   NO_SCORED_WEEKS: 'Draft value appears once games are scored.',
+  AUCTION_DRAFT: 'Auction drafts aren’t graded, so there is no draft value.',
   NO_DRAFT: 'This league has no draft, so there is no draft value.',
 }
 
@@ -92,6 +93,11 @@ export function Cell({ col, row, d, mode }: { col: StatColumn; row: LeaderboardR
     const code = missingReason(col, row, mode)
     const s = reasonSentence(code)
     return <span className="pp-rate-none" title={s} aria-label={s}>{reasonShort(code)}</span>
+  }
+  if ((col.id === 'pick' || col.id === 'round') && row.draft && row.draft.pickNo == null) {
+    // Spec 046 US4: drafted in an auction -- there is a buyer but no pick slot.
+    const s = 'Auction draft: players were bought, so there is no pick number or round.'
+    return <span className="pp-rate-none" title={s} aria-label={s}>{col.id === 'pick' ? 'auction' : DASH}</span>
   }
   if (col.id === 'pick' || col.id === 'round' || col.id === 'manager') {
     const t = noPickText(d)
