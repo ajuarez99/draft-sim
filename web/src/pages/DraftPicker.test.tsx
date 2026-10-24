@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -153,7 +153,7 @@ describe('DraftPicker hero subtitle', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', draftType: 'snake', ...over,
   })
   const drafts = [
     draftRow({}),
@@ -184,7 +184,7 @@ describe('DraftPicker league rows', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', draftType: 'snake', ...over,
   })
 
   beforeEach(() => {
@@ -244,6 +244,65 @@ describe('DraftPicker league rows', () => {
     // StartMockModal opens seeded with this league
     expect(await screen.findByRole('dialog')).toBeInTheDocument()
   })
+
+  // Spec 046 FR-015: an auction has no pick order to follow or mock.
+  it('sends an NBA auction live link to the ADP page and offers no Mock it', async () => {
+    getDrafts.mockResolvedValue([draftRow({ status: 'drafting', sport: 'nba', draftType: 'auction' })])
+    render(<DraftPicker />)
+
+    expect(await screen.findByRole('link', { name: /follow live/ })).toHaveAttribute('href', '/leagues/L1/adp')
+    expect(screen.queryByRole('button', { name: 'Mock it' })).not.toBeInTheDocument()
+  })
+
+  // Spec 046 C8: the card button was hidden but the modal and the hero still offered the auction league.
+  it('does not offer an NBA auction league in the new-mock modal, and offers a snake one', async () => {
+    const user = userEvent.setup()
+    getDrafts.mockResolvedValue([
+      draftRow({ status: 'drafting', sport: 'nba', draftType: 'auction', leagueName: 'Legacy Auction' }),
+      draftRow({ id: 2, sleeperDraftId: 'd2', leagueId: 2, sleeperLeagueId: 'L2', leagueName: 'Hoops Snake', sport: 'nba', draftType: 'snake' }),
+    ])
+    render(<DraftPicker />)
+
+    await user.click(await screen.findByRole('button', { name: 'Start a mock draft' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'NBA' }))
+
+    const list = within(dialog).getByRole('radiogroup', { name: 'League settings to use' })
+    expect(within(list).getByText('Hoops Snake')).toBeInTheDocument()
+    expect(within(list).queryByText('Legacy Auction')).not.toBeInTheDocument()
+  })
+
+  it('says there is nothing to clone when the only NBA league is an auction', async () => {
+    const user = userEvent.setup()
+    getDrafts.mockResolvedValue([draftRow({ status: 'drafting', sport: 'nba', draftType: 'auction', leagueName: 'Legacy Auction' })])
+    render(<DraftPicker />)
+
+    await user.click(await screen.findByRole('button', { name: 'Start a mock draft' }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'NBA' }))
+
+    expect(within(dialog).queryByText('Legacy Auction')).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/No NBA leagues to clone/)).toBeInTheDocument()
+  })
+
+  it('never names an auction league in the hero as a league to practise for', async () => {
+    localStorage.setItem('bk-sport-filter', 'nba')
+    getDrafts.mockResolvedValue([
+      draftRow({ status: 'drafting', sport: 'nba', draftType: 'auction', leagueName: 'Legacy Auction' }),
+      draftRow({ id: 2, sleeperDraftId: 'd2', leagueId: 2, sleeperLeagueId: 'L2', leagueName: 'Hoops Snake', sport: 'nba', draftType: 'snake' }),
+    ])
+    render(<DraftPicker />)
+
+    await waitFor(() => expect(document.querySelector('.page-head strong')?.textContent).toBe('Hoops Snake'))
+  })
+
+  it('leaves an NBA snake draft live link and Mock it as they were', async () => {
+    getDrafts.mockResolvedValue([draftRow({ status: 'drafting', sport: 'nba', draftType: 'snake' })])
+    render(<DraftPicker />)
+
+    expect(await screen.findByRole('link', { name: /follow live/ })).toHaveAttribute('href', '/drafts/d1/live')
+    expect(screen.getByRole('button', { name: 'Mock it' })).toBeInTheDocument()
+  })
 })
 
 // specs/015: the player spotlight sits between From Sleeper and Mock drafts.
@@ -251,7 +310,7 @@ describe('DraftPicker player spotlight', () => {
   const draftRow = (over: Partial<DraftSummary>): DraftSummary => ({
     id: 1, sleeperDraftId: 'd1', leagueId: 1, leagueName: 'Football League', season: 2026,
     teams: 12, rounds: 15, status: 'complete', startTime: null, sleeperLeagueId: 'L1',
-    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', ...over,
+    previousLeagueId: null, sport: 'nfl', platform: 'SLEEPER', draftType: 'snake', ...over,
   })
 
   beforeEach(() => {

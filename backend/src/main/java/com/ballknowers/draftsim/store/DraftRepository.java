@@ -25,41 +25,39 @@ public class DraftRepository {
         this.jdbc = jdbc;
     }
 
-    /** Back-compat overload: {@code reversal_round} defaults to 0 (no reversal). */
-    public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
-                       String type, String status, Instant startTime, String slotToManagerJson) {
-        return upsert(leagueId, sleeperDraftId, season, rounds, teams, type, status, startTime,
-                slotToManagerJson, 0);
+    /**
+     * Spec 046 F1: THE one rule for "does this draft have a snake pick order the simulator and the
+     * draft models can read". An auction's pick numbers are nomination order, not a draft order, so
+     * nothing that models pick position may read one. SQL filters spell it as
+     * {@code d.draft_type <> 'auction'} and point here; {@code linear} is deliberately unchanged
+     * (research R5 amended), as it was before this feature.
+     */
+    public static boolean modelsSnakeOrder(String draftType) {
+        return !"auction".equals(draftType);
     }
 
     /**
+     * No overload defaults a trailing column: an overload that passed {@code null} for
+     * {@code pickTimerSeconds} or {@code budget} would, on conflict, WRITE null over a stored value
+     * (spec 024 A2, spec 046 F12 -- the "optional param that encodes a rule" trap). Tests use
+     * {@code DraftFixtures.upsert}.
+     *
      * @param reversalRound Sleeper's {@code settings.reversal_round}, read by
      *                      {@link com.ballknowers.draftsim.ingest.LeagueIngestService}
      *                      off the draft object (multi-sport-and-rebrand.md Phase 5).
      *                      0 means plain snake for the whole draft.
-     */
-    public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
-                       String type, String status, Instant startTime, String slotToManagerJson,
-                       int reversalRound) {
-        // Test-fixture convenience only. On conflict this WRITES pick_timer_seconds = NULL,
-        // wiping a stored timer -- so production ingest must call the 11-arg form with
-        // Sleeper's actual value (spec 024 A2; the "optional param that encodes a rule" trap).
-        return upsert(leagueId, sleeperDraftId, season, rounds, teams, type, status, startTime,
-                slotToManagerJson, reversalRound, null);
-    }
-
-    /**
      * @param pickTimerSeconds Sleeper's {@code settings.pick_timer}; null when Sleeper did not send one
      *                         (never defaulted to a number). Spec 024 A2.
+     * @param budget Sleeper's {@code settings.budget}; null when absent (every snake draft). Spec 046.
      */
     public long upsert(long leagueId, String sleeperDraftId, int season, int rounds, int teams,
                        String type, String status, Instant startTime, String slotToManagerJson,
-                       int reversalRound, Integer pickTimerSeconds) {
+                       int reversalRound, Integer pickTimerSeconds, Integer budget) {
         return db.sql("""
                 insert into draft (league_id, sleeper_draft_id, season, rounds, teams,
                                    draft_type, status, start_time, slot_to_manager, reversal_round,
-                                   pick_timer_seconds)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?)
+                                   pick_timer_seconds, budget)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)
                 on conflict (sleeper_draft_id) do update set
                     rounds = excluded.rounds,
                     teams = excluded.teams,
@@ -68,6 +66,7 @@ public class DraftRepository {
                     slot_to_manager = excluded.slot_to_manager,
                     reversal_round = excluded.reversal_round,
                     pick_timer_seconds = excluded.pick_timer_seconds,
+                    budget = excluded.budget,
                     draft_type = excluded.draft_type
                 returning id
                 """)
@@ -77,6 +76,7 @@ public class DraftRepository {
                 .param(9, slotToManagerJson)
                 .param(10, reversalRound)
                 .param(11, pickTimerSeconds, Types.INTEGER)
+                .param(12, budget, Types.INTEGER)
                 .query(Long.class)
                 .single();
     }
@@ -106,8 +106,14 @@ public class DraftRepository {
                 .single();
     }
 
+    /**
+     * @param amount          auction price ({@code metadata.amount}); null for a snake pick or when Sleeper sent none
+     * @param playerName      what Sleeper called the player, so a sale whose player never resolved can still be named
+     * @param sleeperPlayerId the raw pick {@code player_id}, so a later player ingest can resolve it
+     */
     public record PickRow(long draftId, int pickNo, int round, int draftSlot,
-                          Long managerId, Long playerId, Double adpAtTime) {}
+                          Long managerId, Long playerId, Double adpAtTime,
+                          Integer amount, String playerName, String sleeperPlayerId) {}
 
     /**
      * Makes {@code draft_pick} match {@code picks} exactly, without destroying
@@ -156,14 +162,20 @@ public class DraftRepository {
     public void upsertPicks(long draftId, List<PickRow> picks) {
         if (picks == null || picks.isEmpty()) return;
         jdbc.batchUpdate("""
-                insert into draft_pick (draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time)
-                values (?, ?, ?, ?, ?, ?, ?)
+                insert into draft_pick (draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time,
+                                        amount, player_name, sleeper_player_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict (draft_id, pick_no) do update set
                     round = excluded.round,
                     draft_slot = excluded.draft_slot,
                     manager_id = excluded.manager_id,
                     player_id = excluded.player_id,
-                    adp_at_time = coalesce(draft_pick.adp_at_time, excluded.adp_at_time)
+                    adp_at_time = coalesce(draft_pick.adp_at_time, excluded.adp_at_time),
+                    -- Spec 046 F12: Sleeper sends these on every tick and they are the truth, so a
+                    -- changed (or removed) value overwrites. Never coalesced, unlike adp_at_time.
+                    amount = excluded.amount,
+                    player_name = excluded.player_name,
+                    sleeper_player_id = excluded.sleeper_player_id
                 """,
                 picks, 500, DraftRepository::bindPickRow);
     }
@@ -176,6 +188,9 @@ public class DraftRepository {
         if (p.managerId() == null) ps.setNull(5, Types.BIGINT); else ps.setLong(5, p.managerId());
         if (p.playerId() == null) ps.setNull(6, Types.BIGINT); else ps.setLong(6, p.playerId());
         if (p.adpAtTime() == null) ps.setNull(7, Types.NUMERIC); else ps.setDouble(7, p.adpAtTime());
+        if (p.amount() == null) ps.setNull(8, Types.INTEGER); else ps.setInt(8, p.amount());
+        ps.setString(9, p.playerName());
+        ps.setString(10, p.sleeperPlayerId());
     }
 
     /** How many picks are stored for this draft. Cheap guard so a pre_draft poller only asks Sleeper about picks when there is something to clear. */
@@ -207,6 +222,18 @@ public class DraftRepository {
             if (seconds == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, seconds);
             ps.setLong(2, draftId);
             if (seconds == null) ps.setNull(3, Types.INTEGER); else ps.setInt(3, seconds);
+        });
+    }
+
+    /**
+     * Refreshes only the auction budget (null = Sleeper sent none), same shape and reason as
+     * {@link #updatePickTimer}: the poller does not carry the fields {@link #upsert} demands (spec 046 F12).
+     */
+    public void updateBudget(long draftId, Integer budget) {
+        jdbc.update("update draft set budget = ? where id = ? and budget is distinct from ?", ps -> {
+            if (budget == null) ps.setNull(1, Types.INTEGER); else ps.setInt(1, budget);
+            ps.setLong(2, draftId);
+            if (budget == null) ps.setNull(3, Types.INTEGER); else ps.setInt(3, budget);
         });
     }
 
@@ -243,20 +270,9 @@ public class DraftRepository {
      */
     public record DraftRow(long id, long leagueId, String sleeperDraftId, int season,
                            int rounds, int teams, String status, Map<String, Object> slotToManager,
-                           int reversalRound, Instant startTime) {
-
-        /** Back-compat for callers/tests built before {@link #reversalRound} existed -- plain snake. */
-        public DraftRow(long id, long leagueId, String sleeperDraftId, int season,
-                        int rounds, int teams, String status, Map<String, Object> slotToManager) {
-            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, 0, null);
-        }
-
-        /** Back-compat for callers built before {@link #startTime} existed -- no scheduled start. */
-        public DraftRow(long id, long leagueId, String sleeperDraftId, int season,
-                        int rounds, int teams, String status, Map<String, Object> slotToManager,
-                        int reversalRound) {
-            this(id, leagueId, sleeperDraftId, season, rounds, teams, status, slotToManager, reversalRound, null);
-        }
+                           int reversalRound, Instant startTime, String draftType, Integer budget) {
+        // Spec 046: no back-compat constructors. A defaulted draftType would assert "snake" -- a rule,
+        // not a value -- for any caller that forgot to pass it. Tests use DraftFixtures.draftRow.
     }
 
     private static Instant startTimeOf(java.sql.ResultSet rs, int column) throws java.sql.SQLException {
@@ -267,13 +283,14 @@ public class DraftRepository {
     public Optional<DraftRow> bySleeperId(String sleeperDraftId) {
         return db.sql("""
                 select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
-                       coalesce(reversal_round_override, reversal_round), start_time
+                       coalesce(reversal_round_override, reversal_round), start_time, draft_type, budget
                 from draft where sleeper_draft_id = ?
                 """)
                 .param(sleeperDraftId)
                 .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
-                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10)))
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10),
+                        rs.getString(11), rs.getObject(12) == null ? null : rs.getInt(12)))
                 .optional();
     }
 
@@ -293,13 +310,16 @@ public class DraftRepository {
     public Optional<DraftRow> forLeague(long leagueId) {
         return db.sql("""
                 select id, league_id, sleeper_draft_id, season, rounds, teams, status, slot_to_manager::text,
-                       coalesce(reversal_round_override, reversal_round), start_time
-                from draft where league_id = ? order by season desc limit 1
+                       coalesce(reversal_round_override, reversal_round), start_time, draft_type, budget
+                from draft where league_id = ?
+                -- Spec 046 C12: two drafts in one league-season (a re-created draft) must not tie on season alone.
+                order by season desc, start_time desc nulls last, id desc limit 1
                 """)
                 .param(leagueId)
                 .query((rs, i) -> new DraftRow(rs.getLong(1), rs.getLong(2), rs.getString(3),
                         rs.getInt(4), rs.getInt(5), rs.getInt(6), rs.getString(7),
-                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10)))
+                        JsonUtil.readMap(rs.getString(8)), rs.getInt(9), startTimeOf(rs, 10),
+                        rs.getString(11), rs.getObject(12) == null ? null : rs.getInt(12)))
                 .optional();
     }
 
@@ -394,14 +414,17 @@ public class DraftRepository {
     /** Completed picks for a draft, ordered. Used both for profiles and for resume-from-state. */
     public List<PickRow> picks(long draftId) {
         return db.sql("""
-                select draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time
+                select draft_id, pick_no, round, draft_slot, manager_id, player_id, adp_at_time,
+                       amount, player_name, sleeper_player_id
                 from draft_pick where draft_id = ? order by pick_no
                 """)
                 .param(draftId)
                 .query((rs, i) -> new PickRow(rs.getLong(1), rs.getInt(2), rs.getInt(3), rs.getInt(4),
                         rs.getObject(5) == null ? null : rs.getLong(5),
                         rs.getObject(6) == null ? null : rs.getLong(6),
-                        rs.getObject(7) == null ? null : rs.getDouble(7)))
+                        rs.getObject(7) == null ? null : rs.getDouble(7),
+                        rs.getObject(8) == null ? null : rs.getInt(8),
+                        rs.getString(9), rs.getString(10)))
                 .list();
     }
 
@@ -420,11 +443,12 @@ public class DraftRepository {
     public record DraftSummary(long id, String sleeperDraftId, long leagueId, String leagueName,
                                int season, int teams, int rounds, String status, Instant startTime,
                                String sleeperLeagueId, String previousLeagueId, Sport sport,
-                               Platform platform) {}
+                               Platform platform, String draftType) {}
 
     private static final String DRAFT_SUMMARY_COLUMNS = """
             d.id, d.sleeper_draft_id, d.league_id, l.name, d.season, d.teams, d.rounds,
-            d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport, d.platform
+            d.status, d.start_time, l.sleeper_id, l.previous_league_id, l.sport, d.platform,
+            d.draft_type
             """;
 
     private static DraftSummary mapDraftSummary(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
@@ -432,7 +456,7 @@ public class DraftRepository {
                 rs.getString(4), rs.getInt(5), rs.getInt(6), rs.getInt(7), rs.getString(8),
                 rs.getTimestamp(9) == null ? null : rs.getTimestamp(9).toInstant(),
                 rs.getString(10), rs.getString(11), Sport.fromCode(rs.getString(12)),
-                Platform.fromCode(rs.getString(13)));
+                Platform.fromCode(rs.getString(13)), rs.getString(14));
     }
 
     /** Every draft in the DB, joined to its league, newest first. Backs the app-shell picker screen. */
@@ -523,6 +547,9 @@ public class DraftRepository {
                   -- Spec 035 F1: an ESPN draft never feeds the draft model. Its picks carry no
                   -- adp_at_time and its seats are never simulated; the filter is the rule.
                   and l.platform = 'SLEEPER'
+                  -- Spec 046 US4: an auction's pick numbers are nomination order, not a draft order, so it
+                  -- never feeds reach/tilt/shrinkage. The rule is DraftRepository.modelsSnakeOrder.
+                  and d.draft_type <> 'auction'
                 order by p.draft_id, p.pick_no
                 """)
                 .param(sport.code())

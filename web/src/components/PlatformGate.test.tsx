@@ -14,7 +14,7 @@ import PlatformGate from './PlatformGate'
 function summary(draftId: string, leagueKey: string, platform: 'SLEEPER' | 'ESPN'): api.DraftSummary {
   return {
     id: 1, sleeperDraftId: draftId, leagueId: 1, leagueName: 'L', season: 2026, teams: 12, rounds: 15,
-    status: 'complete', startTime: null, sleeperLeagueId: leagueKey, previousLeagueId: null, sport: 'nba', platform,
+    status: 'complete', startTime: null, sleeperLeagueId: leagueKey, previousLeagueId: null, sport: 'nba', platform, draftType: 'snake',
   }
 }
 

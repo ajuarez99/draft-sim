@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.BoardProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
@@ -58,7 +59,7 @@ class SimulationServiceTest {
                 new BoardProperties(0.5, Map.of(), 14, 30), runner,
                 new DraftContextFactory(new SportRulesRegistry(List.of(rules)), new ScoringProperties(CFG, null)));
 
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 10L, "sleeper-draft-xyz", 2026, 1, 2, "pre_draft", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 10L, Sport.NFL, "sleeper-league", "Test League", 2026, 2, List.of("QB", "BN"), 0.5, null, null);

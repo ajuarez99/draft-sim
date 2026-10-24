@@ -239,6 +239,12 @@ public class BoardService {
                 continue;
             }
             DraftRepository.DraftRow d = maybe.get();
+            // Spec 046 US4: config-driven, so this is a guard rather than a live leak -- but an auction's
+            // pick numbers are nomination order and must never be read as a draft order.
+            if (!DraftRepository.modelsSnakeOrder(d.draftType())) {
+                log.warn("observed draft {} is an auction draft (pick order is nomination order) — skipping", sleeperDraftId);
+                continue;
+            }
             double scale = (double) cfg.referenceTeams() / d.teams();
             for (DraftRepository.PickRow p : drafts.picks(d.id())) {
                 if (p.playerId() == null) continue;
@@ -311,6 +317,9 @@ public class BoardService {
                       and l.sport = ?
                       -- Spec 035 F1: ESPN drafts never feed the model and carry no start_time anyway.
                       and l.platform = 'SLEEPER'
+                      -- Spec 046 US4: an auction pick's "position" is nomination order, so its adp_at_time
+                      -- would be meaningless. The rule is DraftRepository.modelsSnakeOrder.
+                      and d.draft_type <> 'auction'
                 """ + draftFilter + """
 
                     order by d.id, abs(s2.captured_on - d.start_time::date), s2.captured_on

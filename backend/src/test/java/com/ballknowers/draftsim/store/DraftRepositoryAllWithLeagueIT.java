@@ -60,9 +60,9 @@ class DraftRepositoryAllWithLeagueIT {
                 "insert into league (sport, season, sleeper_id, name, total_rosters) values (?, ?, ?, ?, ?) returning id",
                 Long.class, "nfl", 2026, "it-league-all-with-league", "IT Summary League", 12);
 
-        olderDraftId = drafts.upsert(leagueId, "it-draft-all-with-league-older", 2025, 15, 12,
+        olderDraftId = DraftFixtures.upsert(drafts, leagueId, "it-draft-all-with-league-older", 2025, 15, 12,
                 "snake", "complete", java.time.Instant.parse("2025-08-01T00:00:00Z"), "{}");
-        newerDraftId = drafts.upsert(leagueId, "it-draft-all-with-league-newer", 2026, 15, 12,
+        newerDraftId = DraftFixtures.upsert(drafts, leagueId, "it-draft-all-with-league-newer", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-01T00:00:00Z"), "{}");
     }
 

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom'
+
 type Props = {
   teams: number
   rounds: number
@@ -7,6 +9,8 @@ type Props = {
   draftType?: string | null
   /** A mock with a third-round reversal says so (spec 024 FR-017); 0/undefined is plain snake. */
   reversalRound?: number
+  /** Where this league's ADP & prices page is (spec 046 FR-014); left out for football and unknown leagues. */
+  adpHref?: string | null
 }
 
 /** 90 -> "1 min 30 s", 120 -> "2 min", 28800 -> "8 h", 45 -> "45 s". */
@@ -36,7 +40,7 @@ function draftTypeText(draftType: string): string {
  * "4 teams · 14 rounds · 2 min · snake" (spec 024 FR-017). A missing timer or
  * type is left out, not printed as "unknown": the line states what is known.
  */
-export default function FormatSummary({ teams, rounds, pickTimerSeconds, draftType, reversalRound }: Props) {
+export default function FormatSummary({ teams, rounds, pickTimerSeconds, draftType, reversalRound, adpHref }: Props) {
   if (teams <= 0 || rounds <= 0) return null
   const parts = [
     `${teams} ${teams === 1 ? 'team' : 'teams'}`,
@@ -45,5 +49,15 @@ export default function FormatSummary({ teams, rounds, pickTimerSeconds, draftTy
     ...(draftType ? [draftTypeText(draftType)] : []),
     ...(reversalRound != null && reversalRound > 0 ? [`order reverses from round ${reversalRound}`] : []),
   ]
-  return <span className="format-summary muted small">{parts.join(' · ')}</span>
+  return (
+    <span className="format-summary muted small">
+      {parts.join(' · ')}
+      {adpHref && (
+        <>
+          {' · '}
+          <Link to={adpHref}>ADP &amp; prices</Link>
+        </>
+      )}
+    </span>
+  )
 }

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.mock;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.config.ScoringProperties;
 import com.ballknowers.draftsim.domain.*;
@@ -381,7 +382,7 @@ class MockDraftServiceTest {
     void createSessionFromDraftSeedsLivePicksAndContinuesPastThem() {
         long managerA = 501L, managerB = 502L;
         Map<String, Object> slotToManager = Map.of("1", managerA, "2", managerB);
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 77L, 9L, "sleeper-draft-fork", 2026, 15, 8, "drafting", slotToManager);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-fork", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
@@ -389,7 +390,7 @@ class MockDraftServiceTest {
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         // board(400)'s first entry has player id 1 -- already drafted by slot 1 (managerA).
         when(drafts.picks(77L)).thenReturn(List.of(
-                new DraftRepository.PickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
+                DraftFixtures.pickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
 
         MockSessionState state = service.createSessionFromDraft("sleeper-draft-fork", 2, null);
 
@@ -424,14 +425,14 @@ class MockDraftServiceTest {
     void twoUsersForkingTheSameLiveDraftGetIndependentSessions() {
         long managerA = 501L, managerB = 502L;
         Map<String, Object> slotToManager = Map.of("1", managerA, "2", managerB);
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 77L, 9L, "sleeper-draft-fork", 2026, 15, 8, "drafting", slotToManager);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-fork", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
         when(drafts.bySleeperId("sleeper-draft-fork")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         when(drafts.picks(77L)).thenReturn(List.of(
-                new DraftRepository.PickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
+                DraftFixtures.pickRow(77L, 1, 1, 1, managerA, 1L, 1.0)));
 
         MockSessionState alice = service.createSessionFromDraft("sleeper-draft-fork", 2, "user-alice");
         MockSessionState bob = service.createSessionFromDraft("sleeper-draft-fork", 3, "user-bob");
@@ -486,15 +487,15 @@ class MockDraftServiceTest {
         // report 2, not 4 (max(completed)+1), since pick 2 is what actually
         // gets engine-decided as speculative during this same fork call.
         Map<String, Object> slotToManager = Map.of("1", 501L, "2", 502L, "3", 503L);
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 77L, 9L, "sleeper-draft-fork-gap", 2026, 15, 8, "drafting", slotToManager);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-fork-gap", "Fork League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
         when(drafts.bySleeperId("sleeper-draft-fork-gap")).thenReturn(Optional.of(draft));
         when(leagues.byId(9L)).thenReturn(Optional.of(league));
         when(drafts.picks(77L)).thenReturn(List.of(
-                new DraftRepository.PickRow(77L, 1, 1, 1, 501L, 1L, 1.0),
-                new DraftRepository.PickRow(77L, 3, 1, 3, 503L, 3L, 3.0)));   // pick 2's player_id is null: unresolved
+                DraftFixtures.pickRow(77L, 1, 1, 1, 501L, 1L, 1.0),
+                DraftFixtures.pickRow(77L, 3, 1, 3, 503L, 3L, 3.0)));   // pick 2's player_id is null: unresolved
 
         // mySlot=5 (unmapped, so a bare USER seat) rather than 2 -- if the user's
         // own seat sat at slot 2, the engine would stop there for input rather
@@ -508,7 +509,7 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionFromDraftRejectsANonDraftingStatus() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-not-live", 2026, 15, 8, "pre_draft", Map.of());
         when(drafts.bySleeperId("sleeper-draft-not-live")).thenReturn(Optional.of(draft));
 
@@ -522,7 +523,7 @@ class MockDraftServiceTest {
      */
     @Test
     void createSessionFromDraftForksAnNbaDraftAndDraftsOffTheNbaBoard() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-nba", 2026, 14, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null, null);
@@ -549,7 +550,7 @@ class MockDraftServiceTest {
      */
     @Test
     void anNbaForkKeepsTheRealDraftsReversalRoundInsteadOfPlainSnake() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-nba-rev", 2026, 14, 8, "drafting", Map.of(), 3);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null, null);
@@ -631,7 +632,7 @@ class MockDraftServiceTest {
     void createSessionClonesTheSourceLeaguesRosterRoundsAndReversalRound() {
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NBA, "sleeper-league-nba", "Ball Knowers", 2026, 12, LeagueShape.NBA_ROSTER, 0.0, null, null);
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-nba", 2026, 14, 12, "pre_draft", Map.of(), 3);
         when(leagues.bySleeperId("sleeper-league-nba")).thenReturn(Optional.of(league));
         when(drafts.forLeague(9L)).thenReturn(Optional.of(draft));
@@ -647,7 +648,7 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionFromDraftRejectsAnUnsupportedTeamCount() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-odd-size", 2026, 15, 9, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-odd-size", "League", 2026, 9, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
@@ -660,7 +661,7 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionFromDraftThrowsWhenNoMySlotCanBeResolved() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-no-slot", 2026, 15, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-no-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
@@ -674,7 +675,7 @@ class MockDraftServiceTest {
 
     @Test
     void createSessionFromDraftRejectsAnOutOfRangeMySlotOverride() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-bad-slot", 2026, 15, 8, "drafting", Map.of());
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NFL, "sleeper-league-bad-slot", "League", 2026, 8, LeagueShape.STANDARD_ROSTER, 1.0, null, null);
@@ -799,7 +800,7 @@ class MockDraftServiceTest {
      */
     @Test
     void autoUnderAReversalRoundPicksTheRightSlotAndFinishMarksExactlyTheUsersSeatAuto() {
-        DraftRepository.DraftRow draft = new DraftRepository.DraftRow(
+        DraftRepository.DraftRow draft = DraftFixtures.draftRow(
                 1L, 9L, "sleeper-draft-nba-auto", 2026, 14, 8, "drafting", Map.of(), 3);
         LeagueRepository.LeagueRow league = new LeagueRepository.LeagueRow(
                 9L, Sport.NBA, "sleeper-league-nba", "NBA League", 2026, 8, LeagueShape.NBA_ROSTER, 0.0, null, null);
@@ -1012,5 +1013,17 @@ class MockDraftServiceTest {
                             r.sourceSleeperLeagueId()))
                     .toList();
         }
+    }
+
+    /** Spec 046 US4: an auction's pick numbers are nomination order, so forking one into a snake mock is refused. */
+    @Test
+    void createSessionFromDraftRefusesAnAuctionDraft() {
+        DraftRepository.DraftRow auction = DraftFixtures.auctionDraftRow(
+                78L, 9L, "sleeper-draft-auction", 2026, 23, 10, "drafting", 200);
+        when(drafts.bySleeperId("sleeper-draft-auction")).thenReturn(Optional.of(auction));
+
+        assertThrows(com.ballknowers.draftsim.engine.AuctionGuard.AuctionDraft.class,
+                () -> service.createSessionFromDraft("sleeper-draft-auction", 2, null));
+        verify(drafts, never()).picks(78L);
     }
 }

@@ -17,6 +17,8 @@ export function reasonSentence(reason: DraftGradesReason | null, weeksMissingGam
         } game-by-game stats aren't loaded yet, so there's nothing to grade.`
       }
       return 'No weeks have been scored yet, so there is nothing to grade yet.'
+    case 'AUCTION_DRAFT':
+      return "Auction drafts aren't graded. Grades compare each pick with its draft slot, and an auction has no slots."
     case 'NOT_CONFIGURED':
     default:
       return "Draft grades aren't available for this draft."

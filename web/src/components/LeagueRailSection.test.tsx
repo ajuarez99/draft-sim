@@ -181,6 +181,19 @@ describe('what a league is offered', () => {
     expect(rowLabels()).toContain('Matchups & awards')
   })
 
+  // Spec 046: the ADP compare page is basketball-only, and offered to a basketball league whatever its draft is doing.
+  it('offers ADP & prices to a basketball league and not a football one', async () => {
+    const nba = renderAtPath('/leagues/L_NBA/history', { drafts: [NBA] })
+    await waitFor(() => expect(nba.leagueSection()).not.toBeNull())
+    expect(nba.rowLabels()).toContain('ADP & prices')
+  })
+
+  it('does not list ADP & prices for a football league', async () => {
+    const nfl = renderAtPath('/leagues/L_NFL/history', { drafts: [NFL] })
+    await waitFor(() => expect(nfl.leagueSection()).not.toBeNull())
+    expect(nfl.rowLabels()).not.toContain('ADP & prices')
+  })
+
   it('offers Follow live only while a draft is running', async () => {
     const drafting = draftSummary({ sleeperDraftId: 'D_LIVE', sleeperLeagueId: 'L_LIVE', status: 'drafting' })
     const { leagueSection, rowLabels } = renderAtPath('/drafts/D_LIVE', { drafts: [drafting] })
@@ -492,6 +505,15 @@ describe('year links keep the page', () => {
     const nflLineage: LeagueLineage = { current: nfl26, seasons: [nfl26, nfl25] }
     const nflCtx: LeagueContext = { lineage: nflLineage, season: nfl26 }
     expect(switchTarget('schedule', nflCtx)).toBe('/leagues/L_NFL26')
+  })
+
+  // Spec 046 C9: an auction league offers no `adp` row (its board row IS that page), so a year link on the ADP
+  // page must still stay on the ADP page rather than dropping to League home.
+  it('a year link on an auction league ADP page stays on the ADP page', () => {
+    const a25 = draftSummary({ sleeperDraftId: 'D_A25', sleeperLeagueId: 'L_A25', sport: 'nba', season: 2025, draftType: 'auction' })
+    const a26 = draftSummary({ sleeperDraftId: 'D_A26', sleeperLeagueId: 'L_A26', previousLeagueId: 'L_A25', sport: 'nba', season: 2026, draftType: 'auction' })
+    const ctx: LeagueContext = { lineage: { current: a26, seasons: [a26, a25] }, season: a25 }
+    expect(switchTarget('adp', ctx, '/leagues/L_A26/adp')).toBe('/leagues/L_A25/adp')
   })
 
   // specs/022 T027: the player page lives at /leagues/:league/players/:player, and

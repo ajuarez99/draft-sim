@@ -39,6 +39,8 @@ public final class PlayerMatcher {
     private final Map<String, List<Long>> strictByNameAndPosition = new HashMap<>();
     private final Map<String, List<Long>> strictByTeamForDefense = new HashMap<>();
     private Map<Long, Long> espnIdByPlayerId = Map.of();
+    /** Spec 046 C4: player id to upper-cased team, strict builds only; used by {@link #matchStrictWithTeam}. */
+    private final Map<Long, String> teamByPlayerId = new HashMap<>();
 
     private PlayerMatcher(Sport sport, Map<String, Long> alias) {
         this.sport = sport;
@@ -145,6 +147,7 @@ public final class PlayerMatcher {
                 if (!ids.contains(p.id())) ids.add(p.id());
             }
             m.byNameOnly.computeIfAbsent(name, k -> new ArrayList<>()).add(p.id());
+            if (p.team() != null && !p.team().isBlank()) m.teamByPlayerId.put(p.id(), p.team().toUpperCase(Locale.ROOT));
             if (p.sport() == Sport.NFL && positions.contains(Position.DEF)
                     && p.team() != null && !p.team().isBlank()) {
                 m.strictByTeamForDefense.computeIfAbsent(p.team().toUpperCase(Locale.ROOT), k -> new ArrayList<>()).add(p.id());
@@ -186,6 +189,24 @@ public final class PlayerMatcher {
         }
         // No position given at all: the name alone, through the same ambiguity rule.
         return resolve(byNameOnly.get(name), hint);
+    }
+
+    /**
+     * Spec 046 C4: {@link #matchStrict} with the source's team as a tie-break among same-name candidates (Yahoo's
+     * team is current, Sleeper's is current too; a stale or differently spelled team just leaves it AMBIGUOUS,
+     * never a guess). Kept apart from {@link #matchStrict} so ESPN's spec-035 behaviour is untouched.
+     */
+    public Outcome matchStrictWithTeam(String rawName, String rawPosition, String rawTeam) {
+        Outcome o = matchStrict(rawName, rawPosition, rawTeam, null);
+        if (o.kind() != Outcome.Kind.AMBIGUOUS || rawTeam == null || rawTeam.isBlank()) return o;
+        boolean positionGiven = rawPosition != null && !rawPosition.isBlank();
+        Position pos = positionGiven ? Position.fromSleeper(rawPosition, sport).orElse(null) : null;
+        String name = normalize(rawName);
+        List<Long> candidates = pos != null ? strictByNameAndPosition.get(name + "|" + pos.name()) : byNameOnly.get(name);
+        if (candidates == null) return o;
+        String team = rawTeam.toUpperCase(Locale.ROOT);
+        List<Long> sameTeam = candidates.stream().filter(id -> team.equals(teamByPlayerId.get(id))).toList();
+        return sameTeam.size() == 1 ? Outcome.matched(sameTeam.get(0)) : o;
     }
 
     private Outcome resolve(List<Long> candidates, Long hint) {

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.api.ErrorHandler;
 import com.ballknowers.draftsim.api.SimulationController;
 import com.ballknowers.draftsim.api.SimulationPermits;
@@ -37,7 +38,7 @@ class SimulationReplacementHttpTest {
         });
         LeagueMembership membership = mock(LeagueMembership.class);
         when(membership.visibleDraft(any(), any())).thenReturn(Optional.of(
-                new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
+                DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "complete", Map.of())));
         MockMvc mvc = MockMvcBuilders.standaloneSetup(
                         new SimulationController(sims, membership, new SimulationPermits(1, 200)))
                 .setControllerAdvice(new ErrorHandler()).build();

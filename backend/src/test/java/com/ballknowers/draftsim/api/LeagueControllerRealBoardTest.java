@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.Player;
@@ -64,7 +65,7 @@ class LeagueControllerRealBoardTest {
     }
 
     private static DraftRepository.DraftRow row() {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "complete",
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "complete",
                 Map.of("1", 101, "3", 103));
     }
 
@@ -91,7 +92,7 @@ class LeagueControllerRealBoardTest {
     void aPickIsJoinedToItsPlayerAndManager() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 1, 1, 1, 101L, 55L, 1.0)));
+                DraftFixtures.pickRow(1L, 1, 1, 1, 101L, 55L, 1.0)));
         Player bijan = player(55L, "4046", "Bijan Robinson", Position.RB);
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(bijan, 1.4, 1)));
         when(players.findAll(Sport.NFL)).thenReturn(List.of(bijan));
@@ -116,7 +117,7 @@ class LeagueControllerRealBoardTest {
     void anUnmappedManagerFallsBackToASlotLabel() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 5, 1, 5, null, 55L, null)));
+                DraftFixtures.pickRow(1L, 5, 1, 5, null, 55L, null)));
         Player p = player(55L, "4046", "Someone", Position.WR);
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(p, 10.0, 3)));
         when(players.findAll(Sport.NFL)).thenReturn(List.of(p));
@@ -135,7 +136,7 @@ class LeagueControllerRealBoardTest {
     void aPlayerNoLongerOnTheCurrentBoardStillRendersViaTheFallback() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 8, 1, 8, 103L, 99L, null)));
+                DraftFixtures.pickRow(1L, 8, 1, 8, 103L, 99L, null)));
         Player gone = player(99L, "1234", "Long Retired", Position.TE);
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of()); // not on today's board
         when(players.findAll(Sport.NFL)).thenReturn(List.of(gone));
@@ -153,7 +154,7 @@ class LeagueControllerRealBoardTest {
     void aPickWithNoPlayerIdIsOmitted() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 9, 1, 9, 101L, null, null)));
+                DraftFixtures.pickRow(1L, 9, 1, 9, 101L, null, null)));
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of());
         when(players.findAll(Sport.NFL)).thenReturn(List.of());
         when(managers.names()).thenReturn(Map.of());
@@ -170,7 +171,7 @@ class LeagueControllerRealBoardTest {
     void adpAtDraftComesFromTheStoredPickNotTheCurrentBoard() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 1, 1, 1, 101L, 55L, 23.4)));
+                DraftFixtures.pickRow(1L, 1, 1, 1, 101L, 55L, 23.4)));
         Player bijan = player(55L, "4046", "Bijan Robinson", Position.RB);
         // today's board says 1.4; the draft-time value stored on the pick says 23.4
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(bijan, 1.4, 1)));
@@ -184,7 +185,7 @@ class LeagueControllerRealBoardTest {
     void adpAtDraftIsAPresentNullWhenNeverCaptured() {
         when(drafts.bySleeperId("d1")).thenReturn(Optional.of(row()));
         when(drafts.picks(1L)).thenReturn(List.of(
-                new DraftRepository.PickRow(1L, 1, 1, 1, 101L, 55L, null)));
+                DraftFixtures.pickRow(1L, 1, 1, 1, 101L, 55L, null)));
         Player bijan = player(55L, "4046", "Bijan Robinson", Position.RB);
         when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(bijan, 1.4, 1)));
         when(players.findAll(Sport.NFL)).thenReturn(List.of(bijan));
@@ -193,5 +194,23 @@ class LeagueControllerRealBoardTest {
         Map<String, Object> pick = onlyPick(controller().realBoard("d1", null));
         assertTrue(pick.containsKey("adpAtDraft"));
         assertNull(pick.get("adpAtDraft"));
+    }
+
+    /**
+     * Spec 046 F1: this endpoint is the real completed board, not the simulator, so an auction draft must
+     * keep answering 200. The first version of the plan refused it and broke the board for any auction league.
+     */
+    @Test
+    void anAuctionDraftStillAnswers200() {
+        when(drafts.bySleeperId("a1")).thenReturn(Optional.of(
+                DraftFixtures.auctionDraftRow(1L, 10L, "a1", 2026, 23, 10, "complete", 200)));
+        when(drafts.picks(1L)).thenReturn(List.of(
+                DraftFixtures.pickRow(1L, 1, 1, 1, 101L, 55L, null)));
+        Player p = player(55L, "4046", "Someone", Position.WR);
+        when(boards.currentBoard(Sport.NFL)).thenReturn(List.of(new BoardEntry(p, 10.0, 3)));
+        when(players.findAll(Sport.NFL)).thenReturn(List.of(p));
+        when(managers.names()).thenReturn(Map.of());
+
+        assertEquals(200, controller().realBoard("a1", null).getStatusCode().value());
     }
 }

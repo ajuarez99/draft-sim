@@ -136,8 +136,8 @@ class BoardRepositoryLatestBeforeIT {
 
     @Test
     void aDraftRowBuiltWithoutAStartTimeHasNone() {
-        var d = new DraftRepository.DraftRow(1L, 1L, "x", 2026, 3, 12, "pre_draft", java.util.Map.of());
+        var d = DraftFixtures.draftRow(1L, 1L, "x", 2026, 3, 12, "pre_draft", java.util.Map.of());
         assertNull(d.startTime());
-        assertNull(new DraftRepository.DraftRow(1L, 1L, "x", 2026, 3, 12, "pre_draft", java.util.Map.of(), 3).startTime());
+        assertNull(DraftFixtures.draftRow(1L, 1L, "x", 2026, 3, 12, "pre_draft", java.util.Map.of(), 3).startTime());
     }
 }

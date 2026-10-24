@@ -475,6 +475,11 @@ public class LiveDraftPoller {
         // pick_timer INSIDE a present settings map does mean "no timer" (null).
         if (rawSettings instanceof Map<?, ?> sm) {
             drafts.updatePickTimer(draft.id(), LeagueIngestService.asNullableInt(sm.get("pick_timer")));
+            // Spec 046 F12: unlike the timer, only written when Sleeper actually sent a budget -- a pre-draft
+            // budget edit shows up, but a tick without one never blanks what the ingest stored. This is an
+            // update, not a draft upsert: the poller does not carry the fields upsert demands.
+            Integer budget = LeagueIngestService.asNullableInt(sm.get("budget"));
+            if (budget != null && budget >= 0) drafts.updateBudget(draft.id(), budget);
         }
 
         // Fetched once per tick and shared by both consumers below: the seat-map

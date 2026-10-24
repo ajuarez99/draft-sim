@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.DraftAndAdpJoin.Joined;
 import com.ballknowers.draftsim.engine.DraftGradesService.DraftGrades;
@@ -66,15 +67,15 @@ class DraftAndAdpJoinTest {
     }
 
     private static DraftRow draft(String status, Instant start) {
-        return new DraftRow(70L, 7L, "D70", 2025, 3, 12, status, Map.of(), 0, start);
+        return DraftFixtures.draftRow(70L, 7L, "D70", 2025, 3, 12, status, Map.of(), 0, start);
     }
 
     private void givenDraft(String status, Instant start) {
         DraftRow d = draft(status, start);
         when(drafts.forLeague(7L)).thenReturn(Optional.of(d));
         when(drafts.picks(70L)).thenReturn(List.of(
-                new PickRow(70L, 1, 1, 1, 11L, 1L, null),
-                new PickRow(70L, 14, 2, 2, 12L, 2L, null)));
+                DraftFixtures.pickRow(70L, 1, 1, 1, 11L, 1L, null),
+                DraftFixtures.pickRow(70L, 14, 2, 2, 12L, 2L, null)));
         when(grades.managerNamesBySlot(any(), any())).thenReturn(Map.of(1, "Alice", 2, "Bob"));
     }
 
@@ -252,7 +253,7 @@ class DraftAndAdpJoinTest {
         // date and the draft season are the requested season's.
         LeagueRow requested = new LeagueRow(8L, Sport.NBA, "L8", "Ball Knowers", 2026, 12,
                 List.of("PG", "BN"), 0.0, null, "pre_draft");
-        DraftRow d = new DraftRow(80L, 8L, "D80", 2026, 3, 12, "pre_draft", Map.of(), 0,
+        DraftRow d = DraftFixtures.draftRow(80L, 8L, "D80", 2026, 3, 12, "pre_draft", Map.of(), 0,
                 Instant.parse("2026-10-10T19:15:00Z"));
         when(drafts.forLeague(8L)).thenReturn(Optional.of(d));
         when(leagues.scoringOf(8L)).thenReturn(Map.of("pts", 1.0));

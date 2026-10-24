@@ -1077,3 +1077,38 @@ on an idle service. That was measured locally, never in the production graph tha
 **How to apply:** before calling a memory or CPU number a *level*, read it at the finest resolution
 the source offers (narrow `--since/--until` windows) and line every spike up against
 `railway deployment list`. A bucket reading is a hint, not a measurement.
+
+
+## 50. An auction's pick order is nomination order, and `draft_type` is a model rule, like `platform`
+
+Found 2026-10-23 building spec 046. Nothing filtered drafts by `draft_type`. Measured on a scratch copy with the
+old code: ingesting one real $200 auction ("Legacy Ball Knowers", 230 picks) changed **all 47** NBA manager
+profiles (a 4th "draft" each, reach bias swings like +4.36 → −6.22) and gave two auction-only managers FITTED
+profiles built from nomination order. The fix is one rule, `DraftRepository.modelsSnakeOrder`, with SQL filters
+pointing at it and one 409 helper for the simulator, fork-to-mock and manual pick. After it: 44/44 real profiles
+identical to the pre-auction baseline.
+
+**How to apply:** a new value of an existing enum-like column (`draft_type`, `platform`, `status`) is a new rule
+until proven otherwise. Grep every reader of the rows it describes, and decide per reader before ingesting real
+data of the new kind.
+
+## 51. `color-mix(in oklch, <hue>, var(--panel))` drags the hue toward the panel's blue
+
+Found 2026-10-23 in spec 046's live verification. The page's legend said "green" and "red", and the computed
+colours were teal (hue 197), blue (hue 236, the gap pill) and purple (hue 307). OKLCH interpolates **hue**, so a
+saturated colour mixed with the low-chroma blue panel (hue 255) rotates toward blue even at 18–55%. `in oklab`
+has no hue to interpolate and keeps it. No unit test catches it; only reading the computed colour does.
+The ADP block is fixed. About 229 other `in oklch` mixes across `styles.css` have the same drift; not audited.
+
+**How to apply:** tint with `color-mix(in oklab, …)`. When a UI names a colour in words, read
+`getComputedStyle(...).backgroundColor` in the browser and check the hue says the same thing.
+
+## 52. "Newest league season" is one stray row away from 2099
+
+Found 2026-10-23 in spec 046's live verification. "The ADP page's season = the newest NBA league's season"
+passed every unit test, then refused every real capture on the scratch DB, because an IT fixture league
+("IT 014 NBA", season 2099) was the newest. ITs leave fixture rows in whatever DB `DB_URL` points at. Fixed by
+ignoring seasons past next calendar year.
+
+**How to apply:** a max/newest over user-supplied rows needs a plausibility bound. Run live checks against a DB
+the full test suite has also run against; that's where fixture residue shows up.

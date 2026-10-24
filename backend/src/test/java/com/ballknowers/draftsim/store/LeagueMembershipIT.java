@@ -82,14 +82,14 @@ class LeagueMembershipIT {
                 "insert into league (sport, season, sleeper_id, name, total_rosters) values (?, ?, ?, ?, ?) returning id",
                 Long.class, "nfl", 2026, "it-league-mem-unrelated", "Neither Path", 12);
 
-        drafts.upsert(predecessorLeagueId, "it-draft-mem-predecessor", 2025, 15, 12,
+        DraftFixtures.upsert(drafts, predecessorLeagueId, "it-draft-mem-predecessor", 2025, 15, 12,
                 "snake", "complete", java.time.Instant.parse("2025-08-01T00:00:00Z"), "{}");
-        drafts.upsert(rosterSeasonLeagueId, "it-draft-mem-roster", 2026, 15, 12,
+        DraftFixtures.upsert(drafts, rosterSeasonLeagueId, "it-draft-mem-roster", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-01T00:00:00Z"), "{}");
-        drafts.upsert(slotOnlyLeagueId, "it-draft-mem-slot-only", 2026, 15, 12,
+        DraftFixtures.upsert(drafts, slotOnlyLeagueId, "it-draft-mem-slot-only", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-02T00:00:00Z"),
                 "{\"1\": " + managerA + "}");
-        drafts.upsert(unrelatedLeagueId, "it-draft-mem-unrelated", 2026, 15, 12,
+        DraftFixtures.upsert(drafts, unrelatedLeagueId, "it-draft-mem-unrelated", 2026, 15, 12,
                 "snake", "pre_draft", java.time.Instant.parse("2026-08-03T00:00:00Z"),
                 "{\"1\": " + managerB + "}");
 

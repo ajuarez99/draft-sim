@@ -92,4 +92,71 @@ class PickMapperTest {
 
         assertEquals(200L, row.managerId());
     }
+
+    // ---- Spec 046: auction price, Sleeper name, raw player id -------------------------------
+
+    private static DraftRepository.PickRow mapWithMetadata(Map<String, Object> metadata) {
+        Map<String, Object> raw = rawPick("p1", "u1", 3, 15, 2);
+        if (metadata != null) raw.put("metadata", metadata);
+        return PickMapper.toPickRow(9L, raw, Map.of("u1", 100L), Map.of(3, 200L), Map.of("p1", 1L));
+    }
+
+    private static Map<String, Object> metadata(Object amount) {
+        Map<String, Object> m = new HashMap<>();
+        m.put("first_name", "Trae");
+        m.put("last_name", "Young");
+        if (amount != null) m.put("amount", amount);
+        return m;
+    }
+
+    @Test
+    void amountIsAStringOnTheWireAndParsesToAnInt() {
+        assertEquals(22, mapWithMetadata(metadata("22")).amount());
+        assertEquals(0, mapWithMetadata(metadata("0")).amount(), "a $0 sale is a real price, not a missing one");
+    }
+
+    @Test
+    void aMissingBlankOrGarbageAmountIsNullNeverZero() {
+        assertNull(mapWithMetadata(metadata(null)).amount());
+        assertNull(mapWithMetadata(metadata("")).amount());
+        assertNull(mapWithMetadata(metadata("  ")).amount());
+        assertNull(mapWithMetadata(metadata("abc")).amount());
+        assertNull(mapWithMetadata(null).amount(), "a snake pick has no metadata at all");
+    }
+
+    @Test
+    void aNegativeAmountIsNull() {
+        assertNull(mapWithMetadata(metadata("-5")).amount());
+    }
+
+    @Test
+    void nameIsBuiltFromTheMetadataAndTheRawPlayerIdIsKept() {
+        DraftRepository.PickRow row = mapWithMetadata(metadata("22"));
+        assertEquals("Trae Young", row.playerName());
+        assertEquals("p1", row.sleeperPlayerId());
+    }
+
+    @Test
+    void aSingleNameIsTrimmedAndABlankOneIsNull() {
+        Map<String, Object> only = new HashMap<>();
+        only.put("first_name", "Nene");
+        assertEquals("Nene", mapWithMetadata(only).playerName());
+
+        Map<String, Object> blank = new HashMap<>();
+        blank.put("first_name", " ");
+        blank.put("last_name", "");
+        assertNull(mapWithMetadata(blank).playerName());
+        assertNull(mapWithMetadata(null).playerName());
+    }
+
+    @Test
+    void anUnresolvedPlayerStillKeepsItsNameAndSleeperId() {
+        Map<String, Object> raw = rawPick("unknown-player", "u1", 3, 15, 2);
+        raw.put("metadata", metadata("7"));
+        DraftRepository.PickRow row = PickMapper.toPickRow(9L, raw, Map.of("u1", 100L), Map.of(3, 200L), Map.of("p1", 1L));
+        assertNull(row.playerId());
+        assertEquals("Trae Young", row.playerName());
+        assertEquals("unknown-player", row.sleeperPlayerId());
+        assertEquals(7, row.amount());
+    }
 }

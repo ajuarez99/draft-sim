@@ -6,6 +6,7 @@ import com.ballknowers.draftsim.domain.DraftSlot;
 import com.ballknowers.draftsim.domain.LeagueSettings;
 import com.ballknowers.draftsim.domain.RosterState;
 import com.ballknowers.draftsim.domain.Sport;
+import com.ballknowers.draftsim.engine.AuctionGuard;
 import com.ballknowers.draftsim.engine.DraftContext;
 import com.ballknowers.draftsim.engine.DraftContextFactory;
 import com.ballknowers.draftsim.engine.LeagueShape;
@@ -244,6 +245,8 @@ public class MockDraftService {
         if (!membership.canSee(sleeperUserId, draft.leagueId())) {
             throw new IllegalArgumentException("draft " + sleeperDraftId + " isn't loaded yet");
         }
+        // Spec 046 US4: forking copies the picks as a snake order, which an auction's are not.
+        AuctionGuard.requireSnake(draft);
 
         if (!"drafting".equals(draft.status())) {
             throw new IllegalArgumentException("draft " + sleeperDraftId + " is "

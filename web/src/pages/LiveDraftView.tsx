@@ -18,6 +18,7 @@ import { ApiError } from '../apiError'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import AvailabilityPanel from '../components/AvailabilityPanel'
+import { adpPath, auctionAdpRoute } from '../destinations'
 import { useTargets } from '../useTargets'
 import { markTaken, survivalFor } from '../targets'
 import TargetStrip from '../components/TargetStrip'
@@ -130,6 +131,12 @@ export default function LiveDraftView() {
   const targets = useTargets(useMemo(() => ({ sleeperDraftId: draftId }), [draftId]))
 
   const [seats, setSeats] = useState<SeatsResponse | null>(null)
+  // Spec 046 FR-015: an auction draft has no pick order to simulate; send it to the ADP page as soon as the
+  // seats say so. resimulate() and its effect check this first, so no simulation starts for an auction.
+  const auctionRoute = seats ? auctionAdpRoute(seats.draftType, seats.sport, seats.sleeperLeagueId) : null
+  useEffect(() => {
+    if (auctionRoute) navigate(auctionRoute, { replace: true })
+  }, [auctionRoute, navigate])
   // Every pick that has landed, from GET /drafts/{id}/board -- null until that
   // fetch succeeds (or forever, against a backend that cannot answer it), in
   // which case landedPicks falls back to the projection's prefix. See
@@ -290,6 +297,7 @@ export default function LiveDraftView() {
   }, [connected])
 
   async function resimulate() {
+    if (auctionRoute) return
     if (resimmingRef.current) {
       pendingRef.current = true
       return
@@ -476,7 +484,7 @@ export default function LiveDraftView() {
   // worth something when the stream is down: the engine reads the completed
   // picks out of the DB either way.
   useEffect(() => {
-    if (!seats) return
+    if (!seats || auctionRoute) return
     const id = window.setTimeout(() => void resimulate(), RESIM_DEBOUNCE_MS)
     return () => window.clearTimeout(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -899,6 +907,7 @@ export default function LiveDraftView() {
                     pickTimerSeconds={seats.pickTimerSeconds}
                     draftType={seats.draftType}
                     reversalRound={seats.reversalRound}
+                    adpHref={seats.sport === 'nba' && seats.sleeperLeagueId ? adpPath(seats.sleeperLeagueId) : null}
                   />
                 ) : undefined
               }

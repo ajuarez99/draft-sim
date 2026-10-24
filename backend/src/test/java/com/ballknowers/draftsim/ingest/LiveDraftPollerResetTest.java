@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.ingest;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.store.DraftRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerRepository;
@@ -42,7 +43,7 @@ class LiveDraftPollerResetTest {
     }
 
     private static DraftRepository.DraftRow row(String status) {
-        return new DraftRepository.DraftRow(1L, 10L, "sd-1", 2026, 15, 14, status, Map.of());
+        return DraftFixtures.draftRow(1L, 10L, "sd-1", 2026, 15, 14, status, Map.of());
     }
 
     // ---- the decision rule, in isolation -------------------------------------------------

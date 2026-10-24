@@ -78,10 +78,10 @@ class MockDraftContaminationIT {
 
         // Real, completed draft: this manager has genuine history, so the guard
         // below is checking "unaffected by the mock rows," not "no data at all."
-        realDraftId = drafts.upsert(leagueId, "it-draft-mock-contamination", 2026, 15, 8,
+        realDraftId = DraftFixtures.upsert(drafts, leagueId, "it-draft-mock-contamination", 2026, 15, 8,
                 "snake", "complete", null, "{}");
         drafts.upsertPicks(realDraftId, List.of(
-                new DraftRepository.PickRow(realDraftId, 1, 1, 1, managerId, playerId, 1.0)));
+                DraftFixtures.pickRow(realDraftId, 1, 1, 1, managerId, playerId, 1.0)));
 
         // A mock session, with the SAME manager id recorded on one of its picks
         // (a MANAGER seat) -- the scenario that would expose a leak if

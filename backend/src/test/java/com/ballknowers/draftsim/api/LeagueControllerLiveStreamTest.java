@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.Player;
@@ -78,7 +79,7 @@ class LeagueControllerLiveStreamTest {
     }
 
     private static DraftRepository.DraftRow row(String status) {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, status,
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, status,
                 Map.of("1", 101, "2", 102));
     }
 
@@ -208,7 +209,7 @@ class LeagueControllerLiveStreamTest {
         List<Player> pool = new ArrayList<>();
         for (int i = 1; i <= n; i++) {
             int slot = i % 2 == 1 ? 1 : 2;
-            rows.add(new DraftRepository.PickRow(1L, i, 1, slot, slot == 1 ? 101L : 102L, (long) i, null));
+            rows.add(DraftFixtures.pickRow(1L, i, 1, slot, slot == 1 ? 101L : 102L, (long) i, null));
             pool.add(player(i, "Player " + i, Position.RB));
         }
         List<BoardEntry> board = new ArrayList<>();

@@ -68,7 +68,7 @@ class DraftRepositoryUpsertPicksIT {
                 "insert into league (sport, season, sleeper_id, name, total_rosters) values (?, ?, ?, ?, ?) returning id",
                 Long.class, "nfl", 2026, "it-league-upsert-picks", "IT League", 14);
 
-        draftId = drafts.upsert(leagueId, "it-draft-upsert-picks", 2026, 15, 14, "snake", "drafting", null, "{}");
+        draftId = DraftFixtures.upsert(drafts, leagueId, "it-draft-upsert-picks", 2026, 15, 14, "snake", "drafting", null, "{}");
     }
 
     @AfterEach
@@ -80,8 +80,8 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void upsertPicksCalledTwiceWithIdenticalRowsStaysIdempotent() {
         List<DraftRepository.PickRow> rows = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
-                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null),
+                DraftFixtures.pickRow(draftId, 2, 1, 2, managerId2, null, null));
 
         drafts.upsertPicks(draftId, rows);
         drafts.upsertPicks(draftId, rows);   // same tick data reapplied, as the poller does every 10s
@@ -92,7 +92,7 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void adpAtTimeIsCoalescedNotClobberedByALaterPollTick() {
         List<DraftRepository.PickRow> rows = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null));
         drafts.upsertPicks(draftId, rows);
 
         // Simulate /api/ingest/board's backfill writing a real adp_at_time onto this pick.
@@ -110,12 +110,12 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void upsertPicksWithChangedManagerIdUpdatesInPlace() {
         List<DraftRepository.PickRow> initial = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null));
         drafts.upsertPicks(draftId, initial);
 
         // A late-resolved picked_by, or a draft-day trade reassigning the slot.
         List<DraftRepository.PickRow> resolved = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId2, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId2, null, null));
         drafts.upsertPicks(draftId, resolved);
 
         List<DraftRepository.PickRow> result = drafts.picks(draftId);
@@ -134,8 +134,8 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void replacePicksPreservesABackfilledAdpAtTime() {
         List<DraftRepository.PickRow> rows = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
-                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null),
+                DraftFixtures.pickRow(draftId, 2, 1, 2, managerId2, null, null));
         drafts.replacePicks(draftId, rows);
 
         // BoardService.backfillAdpAtTime, at the end of a board rebuild.
@@ -161,11 +161,11 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void replacePicksStillDropsPicksMissingFromTheIncomingList() {
         drafts.replacePicks(draftId, List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
-                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null),
+                DraftFixtures.pickRow(draftId, 2, 1, 2, managerId2, null, null)));
 
         drafts.replacePicks(draftId, List.of(
-                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+                DraftFixtures.pickRow(draftId, 2, 1, 2, managerId2, null, null)));
 
         List<DraftRepository.PickRow> after = drafts.picks(draftId);
         assertEquals(1, after.size(), "pick 1 was not in the incoming list and should be gone");
@@ -184,7 +184,7 @@ class DraftRepositoryUpsertPicksIT {
     @Test
     void allCompletedPicksExcludesPicksFromANonCompleteDraft() {
         List<DraftRepository.PickRow> rows = List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null));
         drafts.upsertPicks(draftId, rows);
 
         boolean leaked = drafts.allCompletedPicks(Sport.NFL).stream().anyMatch(p -> p.draftId() == draftId);
@@ -194,12 +194,12 @@ class DraftRepositoryUpsertPicksIT {
     /** Spec 028: clearPicks deletes only this draft's rows and reports the count (SQL executed for real). */
     @Test
     void clearPicksDeletesOnlyThisDraftsPicksAndReturnsTheCount() {
-        long otherDraft = drafts.upsert(leagueId, "it-draft-clear-other", 2026, 15, 14, "snake", "drafting", null, "{}");
+        long otherDraft = DraftFixtures.upsert(drafts, leagueId, "it-draft-clear-other", 2026, 15, 14, "snake", "drafting", null, "{}");
         drafts.upsertPicks(draftId, List.of(
-                new DraftRepository.PickRow(draftId, 1, 1, 1, managerId, null, null),
-                new DraftRepository.PickRow(draftId, 2, 1, 2, managerId2, null, null)));
+                DraftFixtures.pickRow(draftId, 1, 1, 1, managerId, null, null),
+                DraftFixtures.pickRow(draftId, 2, 1, 2, managerId2, null, null)));
         drafts.upsertPicks(otherDraft, List.of(
-                new DraftRepository.PickRow(otherDraft, 1, 1, 1, managerId, null, null)));
+                DraftFixtures.pickRow(otherDraft, 1, 1, 1, managerId, null, null)));
         assertEquals(2, drafts.countPicks(draftId));
 
         assertEquals(2, drafts.clearPicks(draftId));

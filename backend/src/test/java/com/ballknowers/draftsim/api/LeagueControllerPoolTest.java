@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.Player;
@@ -54,7 +55,7 @@ class LeagueControllerPoolTest {
     }
 
     private static DraftRepository.DraftRow row() {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "drafting", Map.of());
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "drafting", Map.of());
     }
 
     private void league(Sport sport) {

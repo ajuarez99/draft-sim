@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.store.DraftFixtures;
 import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.ingest.BoardService;
@@ -75,7 +76,7 @@ class LeagueControllerManualPickTest {
 
     /** 14 teams, slots 1 and 3 mapped; slot 12 deliberately is not. */
     private static DraftRepository.DraftRow row() {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, "drafting",
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, "drafting",
                 Map.of("1", 101, "3", 103, "12", 112));
     }
 
@@ -291,7 +292,7 @@ class LeagueControllerManualPickTest {
     }
 
     private static DraftRepository.DraftRow rowWithStatus(String status) {
-        return new DraftRepository.DraftRow(1L, 10L, "d1", 2026, 15, 14, status,
+        return DraftFixtures.draftRow(1L, 10L, "d1", 2026, 15, 14, status,
                 Map.of("1", 101, "3", 103, "12", 112));
     }
 
@@ -419,5 +420,16 @@ class LeagueControllerManualPickTest {
                 .setReversalRound("d1", new LeagueController.ReversalRoundBody(3), "u-alice")
                 .getStatusCode().value());
         verify(drafts).setReversalRoundOverride(1L, 3);
+    }
+
+    /** Spec 046 US4: an auction has no pick slots to fill by number. Nothing may be written. */
+    @Test
+    void aManualPickOnAnAuctionDraftIsRefused() {
+        when(drafts.bySleeperId("d1")).thenReturn(Optional.of(
+                DraftFixtures.auctionDraftRow(1L, 10L, "d1", 2026, 23, 10, "drafting", 200)));
+
+        assertThrows(com.ballknowers.draftsim.engine.AuctionGuard.AuctionDraft.class,
+                () -> controllerAsOperator().recordPick("d1", new LeagueController.ManualPick(3, "4046"), null));
+        verify(drafts, never()).upsertPicks(anyLong(), any());
     }
 }

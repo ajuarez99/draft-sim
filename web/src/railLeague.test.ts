@@ -96,7 +96,7 @@ describe('useRailLeague on an older season league page', () => {
 
   function draft(over: Partial<DraftSummary>): DraftSummary {
     return {
-      platform: 'SLEEPER',
+      platform: 'SLEEPER', draftType: 'snake',
       id: 1,
       sleeperDraftId: 'D1',
       leagueId: 1,

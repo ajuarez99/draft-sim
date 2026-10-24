@@ -43,7 +43,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries' | 'adp'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -101,15 +101,39 @@ export type LeagueDestination = {
   inRail: boolean
 }
 
+/** The ADP & prices page of a league (spec 046). Also where an auction draft lives. */
+export function adpPath(sleeperLeagueId: string): string {
+  return `/leagues/${sleeperLeagueId}/adp`
+}
+
+/**
+ * Spec 046 FR-015: where an auction draft goes instead of the snake simulator, or null for a draft that
+ * isn't one. The ADP page is basketball-only (football has no compare sources and answers 404), so a football
+ * auction keeps its old routes, where the simulator refuses it with a clear message (FR-016). This is the ONE
+ * place the rule is written; every entry point (rail, league home, picker, the old /drafts URLs) asks it.
+ */
+export function auctionAdpRoute(
+  draftType: string | null | undefined,
+  sport: Sport | null | undefined,
+  sleeperLeagueId: string | null | undefined,
+): string | null {
+  if (draftType !== 'auction' || sport !== 'nba' || !sleeperLeagueId) return null
+  return adpPath(sleeperLeagueId)
+}
+
 /** The same rule the home card uses: a complete draft has real picks to show,
- *  anything else opens the simulator instead of an empty "come back later". */
+ *  anything else opens the simulator instead of an empty "come back later".
+ *  An auction has no pick order to simulate or show, so it goes to the ADP page (FR-015). */
 function draftRoute(d: DraftSummary): string {
+  const auction = auctionAdpRoute(d.draftType, d.sport, d.sleeperLeagueId)
+  if (auction) return auction
   return (d.status ?? 'unknown') === 'complete'
     ? `/drafts/${d.sleeperDraftId}/board`
     : `/drafts/${d.sleeperDraftId}`
 }
 
 function draftLabel(d: DraftSummary): string {
+  if (auctionAdpRoute(d.draftType, d.sport, d.sleeperLeagueId)) return 'Auction board'
   const status = d.status ?? 'unknown'
   if (status === 'pre_draft' || status === 'drafting') return 'Draft room'
   return status === 'complete' ? 'Draft board' : 'Mock draft'
@@ -364,10 +388,28 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     glyph: '',
     sports: ALL_SPORTS,
     label: 'Follow live',
-    href: (ctx) => `/drafts/${ctx.season.sleeperDraftId}/live`,
+    // An auction has no live simulation; its live view is the ADP page (spec 046 FR-015).
+    href: (ctx) => auctionAdpRoute(ctx.season.draftType, ctx.season.sport, ctx.season.sleeperLeagueId)
+      ?? `/drafts/${ctx.season.sleeperDraftId}/live`,
     match: /^\/drafts\/([^/]+)\/live\/?$/,
     idKind: 'draft',
     requiresStatus: ['pre_draft', 'drafting'],
+    isAction: false,
+    inRail: true,
+  },
+  {
+    key: 'adp',
+    group: 'draft',
+    glyph: '≈',
+    // Basketball only (spec 046): the Sleeper dynasty/redraft captures and Yahoo's feed are NBA sources, and
+    // the compare page has no football counterpart. This is the ONE place that says so.
+    sports: ['nba'],
+    label: 'ADP & prices',
+    // one season: the page is addressed by a league id, so the rail's year links keep you on it
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/adp`,
+    match: /^\/leagues\/([^/]+)\/adp\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
     isAction: false,
     inRail: true,
   },
@@ -456,9 +498,31 @@ export function labelOf(d: LeagueDestination, season: DraftSummary): string {
 export function destinationsFor(ctx: LeagueContext): LeagueDestination[] {
   const sport = ctx.lineage.current.sport
   const status = ctx.season.status ?? 'unknown'
+  // Spec 046 FR-015: a mock would fork a snake-order simulation, which an auction doesn't have.
+  // Spec 046 C9: for an auction `board`, `live` and `adp` all resolve to the same URL (the ADP page), so the
+  // rail would show three rows to one page. Keep ONE: `board`, labelled "Auction board". It is the row other
+  // code falls back to (switchTarget, the rail's board link), so it stays; `live` is the same page, and `adp`
+  // is the same page under a second name. The rail still lights `board` on the ADP page via railKeyFor.
+  const auction = auctionAdpRoute(ctx.season.draftType, ctx.season.sport, ctx.season.sleeperLeagueId) != null
+  const dropped: DestinationKey[] = auction ? ['mock', 'live', 'adp'] : []
   return LEAGUE_DESTINATIONS.filter(
-    (d) => d.sports.includes(sport) && (d.requiresStatus == null || d.requiresStatus.includes(status)),
+    (d) =>
+      d.sports.includes(sport) &&
+      (d.requiresStatus == null || d.requiresStatus.includes(status)) &&
+      !dropped.includes(d.key),
   )
+}
+
+/**
+ * Spec 046 C9: the row the rail should treat as "here". Path matching says `adp` on /leagues/:id/adp, but an
+ * auction league offers no `adp` row (its `board` row IS that page), so without this nothing would light up and
+ * the year links would fall back to league home instead of staying on the page.
+ */
+export function railKeyFor(current: DestinationKey | null, offered: LeagueDestination[]): DestinationKey | null {
+  if (current === 'adp' && !offered.some((d) => d.key === 'adp') && offered.some((d) => d.key === 'board')) {
+    return 'board'
+  }
+  return current
 }
 
 /** Which destination a pathname is, if any. Table order decides ties; there

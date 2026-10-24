@@ -67,7 +67,7 @@ class DraftRepositoryReversalOverrideIT {
     }
 
     private long ingest(int reversalRoundFromSleeper) {
-        return drafts.upsert(leagueId, SLEEPER_ID, 2026, 14, 12, "snake", "pre_draft",
+        return DraftFixtures.upsert(drafts, leagueId, SLEEPER_ID, 2026, 14, 12, "snake", "pre_draft",
                 java.time.Instant.parse("2026-10-01T00:00:00Z"), "{}", reversalRoundFromSleeper);
     }
 

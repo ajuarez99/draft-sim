@@ -177,6 +177,13 @@ public class LeagueIngestService {
         int reversalRound = asInt(settings.get("reversal_round"), 0);
         // Nullable on purpose: absent means Sleeper sent no timer, never a default (spec 024 A2).
         Integer pickTimerSeconds = asNullableInt(settings.get("pick_timer"));
+        // Spec 046: the auction budget. Nullable for the same reason -- absent (every snake draft) is
+        // null, never a default number, and a negative one is not a budget.
+        Integer budget = asNullableInt(settings.get("budget"));
+        if (budget != null && budget < 0) {
+            log.warn("draft {} reports a negative budget ({}); stored as null", draftId, budget);
+            budget = null;
+        }
 
         // draft_order maps sleeper user id -> slot. Invert it to slot -> manager.id.
         // Shared with LiveDraftPoller, which has to redo this on every tick — see
@@ -195,7 +202,7 @@ public class LeagueIngestService {
         long id = drafts.upsert(leagueId, draftId,
                 Integer.parseInt(str(draft.get("season"))), rounds, teams,
                 str(draft.get("type")), str(draft.get("status")), start,
-                JsonUtil.write(slotToManager), reversalRound, pickTimerSeconds);
+                JsonUtil.write(slotToManager), reversalRound, pickTimerSeconds, budget);
 
         List<Map<String, Object>> raw = sleeper.draftPicks(draftId);
         // Spec 028: a reset Sleeper draft (pre_draft + empty list) must drop what we

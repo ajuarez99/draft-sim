@@ -83,4 +83,21 @@ describe('Cell uses missingReason', () => {
     render(<Cell col={COLUMNS.leagueRank} row={r} d={d} mode="perGame" />)
     expect(screen.getByLabelText('Hasn’t played enough games or minutes to be ranked.')).toBeTruthy()
   })
+
+  // Spec 046 US4: a pick from an auction has a buyer but no pick slot. "Undrafted" would be a lie.
+  it('an auction pick (null pickNo and round) says "auction" in the pick cell, and a dash in the round cell', () => {
+    const r = row('a', { draft: { pickNo: null, round: null, managerName: 'Dunk Tank' } })
+    const { container } = render(<Cell col={COLUMNS.pick} row={r} d={d} mode="perGame" />)
+    expect(container.textContent).toBe('auction')
+    expect(screen.getByLabelText(/no pick number or round/)).toBeTruthy()
+    render(<Cell col={COLUMNS.round} row={r} d={d} mode="perGame" />)
+    expect(screen.getAllByLabelText(/no pick number or round/)).toHaveLength(2)
+    expect(screen.queryByText('undrafted')).toBeNull()
+  })
+
+  it('a player with no pick in a completed snake draft is still "undrafted"', () => {
+    const r = row('a', { draft: null })
+    const { container } = render(<Cell col={COLUMNS.pick} row={r} d={d} mode="perGame" />)
+    expect(container.textContent).toBe('undrafted')
+  })
 })

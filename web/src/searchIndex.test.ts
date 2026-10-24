@@ -4,7 +4,7 @@ import type { DraftSummary, ManagerSummary, Sport } from './api'
 
 function draft(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
-    platform: 'SLEEPER',
+    platform: 'SLEEPER', draftType: 'snake',
     id: 1,
     sleeperDraftId: 'D1',
     leagueId: 1,

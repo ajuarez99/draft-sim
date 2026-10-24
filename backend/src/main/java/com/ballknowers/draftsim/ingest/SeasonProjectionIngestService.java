@@ -51,11 +51,14 @@ public class SeasonProjectionIngestService {
 
     private final SleeperProjectionClient client;
     private final PlayerSeasonProjectionRepository projections;
+    private final SleeperAdpCaptureService adpCapture;
 
     public SeasonProjectionIngestService(SleeperProjectionClient client,
-                                         PlayerSeasonProjectionRepository projections) {
+                                         PlayerSeasonProjectionRepository projections,
+                                         SleeperAdpCaptureService adpCapture) {
         this.client = client;
         this.projections = projections;
+        this.adpCapture = adpCapture;
     }
 
     /**
@@ -64,9 +67,11 @@ public class SeasonProjectionIngestService {
      * @param rowsStored rows written; 0 when the fetch was rejected or empty
      * @param rejectedReason null when fine; otherwise why nothing was stored (gp basis, no body, no rows
      *                       with points, or a shrink beyond {@link #MIN_KEPT_SHARE_OF_STORED}). Amended after code review (R4).
+     * @param adpRows        Sleeper dynasty + redraft ADP rows captured from the same payload (spec 046); counted
+     *                       even when the projection lines themselves were rejected, because the ADP capture is its own pass
      */
     public record Result(boolean fetched, boolean fresh, int rowsStored, int rowsDeleted, int skippedNoStats,
-                         String source, Instant sourceModifiedAt, String rejectedReason) {}
+                         String source, Instant sourceModifiedAt, String rejectedReason, int adpRows) {}
 
     public Result refresh(Sport sport, int season, boolean force) {
         if (sport != Sport.NBA) {
@@ -76,13 +81,24 @@ public class SeasonProjectionIngestService {
         Optional<PlayerSeasonProjectionRepository.Provenance> stored = projections.provenance(sport.code(), season);
         if (!force && stored.isPresent() && stored.get().fetchedAt() != null
                 && stored.get().fetchedAt().isAfter(Instant.now().minus(ProjectionIngestService.STALE_AFTER))) {
-            return new Result(false, true, 0, 0, 0, stored.get().source(), stored.get().sourceModifiedAt(), null);
+            return new Result(false, true, 0, 0, 0, stored.get().source(), stored.get().sourceModifiedAt(), null, 0);
         }
 
         List<Map<String, Object>> raw = client.season(sport.code(), season);
         if (raw == null) {
             log.warn("season projections: {} {} returned no body, keeping the stored rows", sport.code(), season);
-            return new Result(true, false, 0, 0, 0, null, null, "Sleeper returned no body");
+            return new Result(true, false, 0, 0, 0, null, null, "Sleeper returned no body", 0);
+        }
+
+        // Spec 046 F11: capture ADP from the RAW payload before any line is filtered or the gp check can
+        // return. Best-effort: the ADP pass failing must not cost the projections they came for.
+        int adpRows = 0;
+        try {
+            SleeperAdpCaptureService.Result adp = adpCapture.capture(sport, season, raw);
+            adpRows = adp.dynastyRows() + adp.redraftRows();
+        } catch (Exception e) {
+            log.warn("season projections: {} {} ADP capture failed, projections continue: {}",
+                    sport.code(), season, e.toString());
         }
 
         List<PlayerSeasonProjectionRepository.Row> rows = new ArrayList<>();
@@ -101,7 +117,7 @@ public class SeasonProjectionIngestService {
                 log.warn("season projections: {} {} rejected -- player {} has gp={} (expected 1.0, per-game); "
                         + "the basis may have changed, nothing stored", sport.code(), season, playerId, gp);
                 return new Result(true, false, 0, 0, skipped, null, null,
-                        "player " + playerId + " has gp=" + gp + " (expected 1.0, per-game); the basis may have changed");
+                        "player " + playerId + " has gp=" + gp + " (expected 1.0, per-game); the basis may have changed", adpRows);
             }
 
             Map<String, Object> line = new LinkedHashMap<>();
@@ -122,7 +138,7 @@ public class SeasonProjectionIngestService {
             // An empty set is a no-op, never a wipe: replaceAll would delete every stored line.
             log.warn("season projections: {} {} had no row with a points projection, keeping the stored rows",
                     sport.code(), season);
-            return new Result(true, false, 0, 0, skipped, source, modified, "no row had a points projection");
+            return new Result(true, false, 0, 0, skipped, source, modified, "no row had a points projection", adpRows);
         }
 
         if (stored.isPresent() && stored.get().rows() > 0
@@ -130,12 +146,13 @@ public class SeasonProjectionIngestService {
             log.warn("season projections: {} {} would shrink the stored set from {} to {} rows, keeping the stored rows",
                     sport.code(), season, stored.get().rows(), rows.size());
             return new Result(true, false, 0, 0, skipped, source, modified,
-                    "fetch had " + rows.size() + " rows against " + stored.get().rows() + " stored; kept the stored set");
+                    "fetch had " + rows.size() + " rows against " + stored.get().rows() + " stored; kept the stored set",
+                    adpRows);
         }
 
         PlayerSeasonProjectionRepository.ReplaceResult res = projections.replaceAll(sport.code(), season, rows);
         log.info("season projections: {} {} -- {} stored, {} dropped, {} without a stat line",
                 sport.code(), season, res.rowsStored(), res.rowsDeleted(), skipped);
-        return new Result(true, false, res.rowsStored(), res.rowsDeleted(), skipped, source, modified, null);
+        return new Result(true, false, res.rowsStored(), res.rowsDeleted(), skipped, source, modified, null, adpRows);
     }
 }

@@ -588,7 +588,8 @@ public class EspnLeagueIngestService {
         for (EspnSeason.DraftPick p : d.picks()) {
             int slot = slotOfTeam.getOrDefault(p.teamId(), ((p.overall() - 1) % Math.max(1, d.teams())) + 1);
             rows.add(new DraftRepository.PickRow(draftId, p.overall(), p.round(), slot, managerByTeam.get(p.teamId()),
-                    rp.playerIdByExternalId().get(p.playerId()), null));
+                    // Spec 046: the ESPN ingest reads no auction price and keeps no Sleeper name/id.
+                    rp.playerIdByExternalId().get(p.playerId()), null, null, null, null));
         }
         drafts.replacePicks(draftId, rows);
     }

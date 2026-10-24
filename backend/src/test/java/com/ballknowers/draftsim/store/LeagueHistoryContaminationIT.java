@@ -75,10 +75,10 @@ class LeagueHistoryContaminationIT {
                 "insert into player (sport, sleeper_id, name, positions) values ('nfl', ?, ?, '{RB}') returning id",
                 Long.class, "it-player-history-contamination", "IT Player");
 
-        realDraftId = drafts.upsert(leagueId, "it-draft-history-contamination", 2026, 15, 8,
+        realDraftId = DraftFixtures.upsert(drafts, leagueId, "it-draft-history-contamination", 2026, 15, 8,
                 "snake", "complete", null, "{}");
         drafts.upsertPicks(realDraftId, java.util.List.of(
-                new DraftRepository.PickRow(realDraftId, 1, 1, 1, managerId, playerId, 1.0)));
+                DraftFixtures.pickRow(realDraftId, 1, 1, 1, managerId, playerId, 1.0)));
     }
 
     @AfterEach
