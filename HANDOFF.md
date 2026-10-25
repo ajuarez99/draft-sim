@@ -1,5 +1,34 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-24: spec 047 (Hall of fame) built; backend + vitest verified, browser check owed; NOT committed
+
+- **Where:** worktree `.claude/worktrees/047-hall-of-fame`, branch `047-hall-of-fame` (from `origin/main` ebf4ee8),
+  uncommitted. Docs in `specs/047-hall-of-fame/` (spec, plan with A1–A16, research R2 amended, data-model, contracts,
+  plan-review, tasks T001–T036, `verification.md`, `baseline/`). Commit, PR and deploy need Allan's go-ahead.
+- **What it does:**
+  - `GET /api/leagues/{id}/trophy-case`: one row per completed season (champion, runner-up, points leader(s), last
+    place). Champion is now `engine/ChampionRule`, called by History, careers and the trophy case.
+  - `Rivalries.discovery` (always present, optional in `api.ts` for deploy skew): mostPlayed / closest / lopsided /
+    playoff, built from the matrix's own `calc` map. `RivalryService.chainGames` + `pairCalc` are package-visible so
+    the hall of fame reuses them.
+  - `GET /api/managers/{id}/rivals`: nemesis and victim per league chain, restricted to the caller's leagues (the
+    chain is walked backward from the manager's newest *visible* season; an operator sees all).
+  - **V40 `league_losers_bracket_match`** (same columns as V33) and `SleeperClient.losersBracket`;
+    `BracketIngestService` now writes both brackets in its one write path.
+  - `AwardWinners` extracted from `Superlatives.tsx` (no visual change), reused by the trophy case's Awards toggle.
+- **Last place is built, and refuses on doubt** (`engine/LastPlaceRule`): the losers bracket's direction is read from
+  stored week scores. Measured on the scratch DB after the backfill: "(Foot) Ball Knowers" 2025 → roster 2
+  (TOILET_BOWL), West Coast 2025 → roster 10 (CONSOLATION), both NBA seasons → MIXED_DIRECTION (refused).
+  West Coast 2026's 14-team shape is unmeasured; the rule's arithmetic refuses anything it doesn't fit.
+- **Post-deploy step (do not skip):** after V40 ships, run the bracket backfill once per chain —
+  `POST /api/ingest/brackets/{sleeperLeagueId}` with `X-Admin-Token`, for "(Foot) Ball Knowers", "Ball Knowers" (NBA),
+  West Coast and fantasy. Never during a live draft. Until then finished seasons show runner-up "not available" and
+  last place "not reported" (FBK 2025 has no stored bracket in prod either).
+- **Owed:** the browser check (T035) at desktop and 375px, for one NFL and one NBA league; reading
+  `specs/047-hall-of-fame/verification.md` for what was and wasn't run.
+- **Amendments to the tasks** are in `specs/047-hall-of-fame/tasks.md` under "Amended during build" (the playoff
+  list has no meetings floor; `NO_SCORES` is a seventh last-place reason).
+
 ## UPDATE 2026-10-23: spec 045 (Matchups shows the live season, then lock-ins on Matchups) built and live-verified locally; NOT committed
 
 The "NEXT UP" brief below is built.

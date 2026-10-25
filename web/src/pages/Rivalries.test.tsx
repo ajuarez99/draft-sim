@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import Rivalries from './Rivalries'
 import { indexPairs, viewFrom, kindSplit } from '../rivalries'
 import type {
+  DiscoveredPair,
   Rivalries as RivalriesData,
+  RivalryDiscovery,
   RivalryPair,
   RivalryRow,
   RivalryWeekOption,
@@ -443,5 +445,151 @@ describe('rivalry week pick (spec 037)', () => {
     expect(screen.getByText('One-sided so far.')).toBeInTheDocument()
     expect(screen.queryByText(/Recommended: Week/)).toBeNull()
     expect(screen.getByText(/doesn't change your Sleeper schedule/)).toBeInTheDocument()
+  })
+})
+
+describe('notable rivalries (spec 047)', () => {
+  beforeEach(() => getRivalries.mockReset())
+
+  const dp = (a: number, b: number, aWins: number, bWins: number, over: Partial<DiscoveredPair> = {}): DiscoveredPair => ({
+    ...pair(a, b, { meetings: aWins + bWins, aWins, bWins, status: 'MET' }),
+    playoffMatches: 0,
+    ...over,
+  })
+  const discovery = (over: Partial<RivalryDiscovery> = {}): RivalryDiscovery => ({
+    minMeetings: 3,
+    minMeetingsLabel: 'hand-set',
+    mostPlayed: [],
+    closest: [],
+    lopsided: [],
+    playoff: [],
+    playoffUnsplitSeasons: [],
+    ...over,
+  })
+  const card = (title: string) => screen.getByRole('heading', { name: title }).closest('.rvd-card') as HTMLElement
+
+  it('renders nothing when the backend omits discovery (deploy skew)', async () => {
+    getRivalries.mockResolvedValue(data())
+    render(<Rivalries />)
+    await screen.findByText('All-time head-to-head')
+    expect(screen.queryByText('Notable rivalries')).toBeNull()
+  })
+
+  it('renders nothing when N did not load', async () => {
+    getRivalries.mockResolvedValue(data({ discovery: discovery({ minMeetings: null, minMeetingsLabel: null }) }))
+    render(<Rivalries />)
+    await screen.findByText('All-time head-to-head')
+    expect(screen.queryByText('Notable rivalries')).toBeNull()
+  })
+
+  it('prints each entry as names, the record (left name first), meetings and a versus link', async () => {
+    getRivalries.mockResolvedValue(data({
+      discovery: discovery({
+        mostPlayed: [dp(1, 2, 5, 2)],
+        closest: [dp(2, 3, 2, 2)],
+        lopsided: [dp(1, 3, 4, 0)],
+        playoff: [dp(1, 2, 5, 2, { playoffMatches: 2 })],
+      }),
+    }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    const most = within(card('Most played'))
+    const link = most.getByRole('link')
+    expect(link).toHaveAttribute('href', '/managers/1/versus/2')
+    expect(link).toHaveTextContent('Alpha')
+    expect(link).toHaveTextContent('5-2')
+    expect(link).toHaveTextContent('7 met')
+    expect(link).toHaveTextContent('Bravo')
+    expect(within(card('Closest')).getByRole('link')).toHaveAttribute('href', '/managers/2/versus/3')
+    expect(within(card('Closest')).getByRole('link')).toHaveTextContent('2-2')
+    expect(within(card('Most one-sided')).getByRole('link')).toHaveTextContent('4-0')
+    expect(within(card('Playoff meetings')).getByRole('link')).toHaveTextContent('2 playoff matches')
+  })
+
+  it('says a single playoff match in the singular', async () => {
+    getRivalries.mockResolvedValue(data({ discovery: discovery({ playoff: [dp(1, 2, 1, 0, { playoffMatches: 1 })] }) }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    expect(within(card('Playoff meetings')).getByRole('link')).toHaveTextContent('1 playoff match')
+    expect(within(card('Playoff meetings')).getByRole('link')).not.toHaveTextContent('matches')
+  })
+
+  it('names N and calls it hand-set when no pair has met N times', async () => {
+    getRivalries.mockResolvedValue(data({ discovery: discovery() }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    for (const t of ['Most played', 'Closest', 'Most one-sided']) {
+      expect(within(card(t)).getByText('No pair has met 3 times yet (3 is hand-set).')).toBeInTheDocument()
+    }
+    expect(within(card('Playoff meetings')).getByText('No playoff meetings yet.')).toBeInTheDocument()
+  })
+
+  it('says no pair is one-sided yet when pairs qualified but none stands out', async () => {
+    getRivalries.mockResolvedValue(data({
+      discovery: discovery({ mostPlayed: [dp(1, 2, 2, 1)], closest: [dp(1, 2, 2, 1)] }),
+    }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    expect(within(card('Most one-sided')).getByText('No pair is one-sided yet.')).toBeInTheDocument()
+  })
+
+  it('never says "no playoff meetings" when seasons could not be split: it names them instead', async () => {
+    // S1 (code review): the note carries each season's TRUE reason from the matrix split notes, never a blanket
+    // "the bracket isn't stored"; a season with no note falls back to a reason-free sentence.
+    const base = data()
+    getRivalries.mockResolvedValue(data({
+      matrix: {
+        ...base.matrix,
+        splitNotes: [{ season: 2025, reason: 'BRACKET_PENDING', text: 'The 2025 bracket for that round is not settled yet.' }],
+      },
+      discovery: discovery({ playoffUnsplitSeasons: [2025, 2024] }),
+    }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    const playoff = within(card('Playoff meetings'))
+    expect(playoff.getByText(/The 2025 bracket for that round is not settled yet\./)).toBeInTheDocument()
+    expect(playoff.getByText(/The 2024 playoff weeks couldn't be split/)).toBeInTheDocument()
+    expect(playoff.queryByText(/isn't stored/)).toBeNull()
+    expect(playoff.queryByText('No playoff meetings yet.')).toBeNull()
+  })
+
+  it('keeps the unsplit note under a partial playoff list', async () => {
+    getRivalries.mockResolvedValue(data({
+      discovery: discovery({ playoff: [dp(1, 2, 1, 0, { playoffMatches: 1 })], playoffUnsplitSeasons: [2025] }),
+    }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    const playoff = within(card('Playoff meetings'))
+    expect(playoff.getByRole('link')).toBeInTheDocument()
+    expect(playoff.getByText('The 2025 playoff weeks cannot be split.')).toBeInTheDocument()
+  })
+
+  it('collapses more than three ties to a count with an expander that still reaches every pair', async () => {
+    const level = [dp(1, 2, 2, 2), dp(1, 3, 2, 2), dp(2, 3, 2, 2), dp(1, 4, 2, 2)]
+    getRivalries.mockResolvedValue(data({ discovery: discovery({ closest: level }) }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    const closest = card('Closest')
+    expect(within(closest).getByText('4 pairs are level at 2-2')).toBeInTheDocument()
+    expect(closest.querySelector('details')).not.toHaveAttribute('open')
+    // every entry is in the DOM, behind the expander
+    expect(within(closest).getAllByRole('link', { hidden: true })).toHaveLength(4)
+  })
+
+  it('shows up to three ties inline, with no expander', async () => {
+    const three = [dp(1, 2, 2, 2), dp(1, 3, 2, 2), dp(2, 3, 2, 2)]
+    getRivalries.mockResolvedValue(data({ discovery: discovery({ closest: three }) }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    expect(card('Closest').querySelector('details')).toBeNull()
+    expect(within(card('Closest')).getAllByRole('link')).toHaveLength(3)
+  })
+
+  it('states the threshold as hand-set in the intro', async () => {
+    getRivalries.mockResolvedValue(data({ discovery: discovery() }))
+    render(<Rivalries />)
+    await screen.findByText('Notable rivalries')
+    expect(screen.getByText(/at least 3 times/)).toBeInTheDocument()
+    expect(screen.getByText(/3 is a hand-set threshold/)).toBeInTheDocument()
   })
 })

@@ -167,7 +167,7 @@ public class IngestController {
     /**
      * specs/034-rivalry-schedule-grid C2: store each season's Sleeper winners bracket for a stored chain.
      *
-     * <p>Fetches {@code winners_bracket} only -- never {@code /matchups}, so it cannot move a score. That
+     * <p>Fetches {@code winners_bracket} and {@code losers_bracket} (spec 047) -- never {@code /matchups}, so it cannot move a score. That
      * is why it exists beside {@code /league-history}: a full re-ingest of a finished NBA season would
      * re-read Sleeper's degraded live {@code /matchups} (research R10). A fully-played stored bracket is
      * skipped unless {@code force=true} (plan.md F5); an empty Sleeper answer never deletes rows.

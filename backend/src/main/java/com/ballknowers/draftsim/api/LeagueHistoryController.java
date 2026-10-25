@@ -315,7 +315,7 @@ public class LeagueHistoryController {
         // resurface here as a trophy -- the exact defect baseline.md T003
         // measured: popsharky and gregmullen, both "champion" of a 2026
         // season one week old.
-        m.put("champion", r.finalPlacement() != null && r.finalPlacement() == 1 && seasonComplete);
+        m.put("champion", com.ballknowers.draftsim.engine.ChampionRule.isChampion(r.finalPlacement(), seasonComplete));
         // Null from history()'s per-league call (the page already knows all
         // five of these); populated from managerHistory(), which spans
         // several leagues/seasons/sports and has no other way to tell its

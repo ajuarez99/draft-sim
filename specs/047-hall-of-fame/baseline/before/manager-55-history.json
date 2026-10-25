@@ -1,0 +1,223 @@
+{
+ "managerId": 55,
+ "manager": "wags707",
+ "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+ "draftHistory": [
+  {
+   "sport": "nfl",
+   "reachBias": 10.13,
+   "relativeReachBias": null,
+   "relativeReachStdErr": null,
+   "positionalTilt": {
+    "QB": 1.4095238095238096,
+    "RB": 0.921904761904762,
+    "WR": 1.0285714285714287,
+    "TE": 0.8
+   },
+   "draftsObserved": 1,
+   "picksScored": 0,
+   "provenance": "NEUTRAL"
+  },
+  {
+   "sport": "nba",
+   "reachBias": -0.02,
+   "relativeReachBias": -17.63,
+   "relativeReachStdErr": 8.08,
+   "positionalTilt": {
+    "PG": 0.9360465116279071,
+    "SG": 0.9424603174603174,
+    "SF": 1.0803571428571428,
+    "PF": 1.390625,
+    "C": 0.8231981981981983
+   },
+   "draftsObserved": 2,
+   "picksScored": 14,
+   "provenance": "FITTED"
+  }
+ ],
+ "careers": [
+  {
+   "sport": "nba",
+   "seasonsCounted": 1,
+   "seasons": [
+    {
+     "leagueId": 210,
+     "rosterId": 9,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "pointsFor": 0,
+     "pointsAgainst": null,
+     "champion": false,
+     "season": 2026,
+     "sleeperLeagueId": "1339351318115946496",
+     "sport": "nba",
+     "leagueName": "Ball Knowers",
+     "complete": false,
+     "counted": false
+    },
+    {
+     "leagueId": 211,
+     "rosterId": 9,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "wins": 10,
+     "losses": 8,
+     "ties": 0,
+     "pointsFor": 4398,
+     "pointsAgainst": 4281.5,
+     "champion": false,
+     "season": 2025,
+     "sleeperLeagueId": "1229352720222134272",
+     "sport": "nba",
+     "leagueName": "Ball Knowers",
+     "complete": true,
+     "counted": true
+    }
+   ],
+   "wins": 10,
+   "losses": 8,
+   "ties": 0,
+   "winRate": 0.5556,
+   "pointsFor": 4398,
+   "pointsAgainst": 4281.5,
+   "pointsPerSeason": 4398,
+   "averageEfficiency": 0.9605,
+   "weeksCounted": 21,
+   "weeksExcluded": 0,
+   "winsAboveExpected": -0.23,
+   "titles": 0,
+   "unavailable": [
+    {
+     "figure": "playoffAppearances",
+     "reason": "only the champion's placement is stored; the bracket is not parsed"
+    },
+    {
+     "figure": "tradesPerSeason",
+     "reason": "trades are not attributed to a manager (a trade names several rosters)"
+    }
+   ],
+   "ranks": [
+    {
+     "figure": "winRate",
+     "position": 4,
+     "population": 13,
+     "leagueName": "Ball Knowers",
+     "sleeperLeagueId": "1229352720222134272"
+    },
+    {
+     "figure": "pointsPerSeason",
+     "position": 12,
+     "population": 13,
+     "leagueName": "Ball Knowers",
+     "sleeperLeagueId": "1229352720222134272"
+    },
+    {
+     "figure": "averageEfficiency",
+     "position": 6,
+     "population": 13,
+     "leagueName": "Ball Knowers",
+     "sleeperLeagueId": "1229352720222134272"
+    }
+   ],
+   "waivers": {
+    "movesPerSeason": 60,
+    "seasonsCounted": 1,
+    "faab": {
+     "typicalBidPct": 0.1057,
+     "largestBidPct": 0.3001,
+     "spentPerSeasonPct": 0.2405,
+     "claimsPerSeason": 9,
+     "bidSuccessRate": 0.6667
+    },
+    "faabExcludedSeasons": []
+   }
+  },
+  {
+   "sport": "nfl",
+   "seasonsCounted": 1,
+   "seasons": [
+    {
+     "leagueId": 5,
+     "rosterId": 6,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "wins": 5,
+     "losses": 9,
+     "ties": 0,
+     "pointsFor": 1868.98,
+     "pointsAgainst": 1888.36,
+     "champion": false,
+     "season": 2025,
+     "sleeperLeagueId": "1254190892974084096",
+     "sport": "nfl",
+     "leagueName": "(Foot) Ball Knowers",
+     "complete": true,
+     "counted": true
+    }
+   ],
+   "wins": 5,
+   "losses": 9,
+   "ties": 0,
+   "winRate": 0.3571,
+   "pointsFor": 1868.98,
+   "pointsAgainst": 1888.36,
+   "pointsPerSeason": 1868.98,
+   "averageEfficiency": 0.8766,
+   "weeksCounted": 17,
+   "weeksExcluded": 0,
+   "winsAboveExpected": -2.73,
+   "titles": 0,
+   "unavailable": [
+    {
+     "figure": "playoffAppearances",
+     "reason": "only the champion's placement is stored; the bracket is not parsed"
+    },
+    {
+     "figure": "tradesPerSeason",
+     "reason": "trades are not attributed to a manager (a trade names several rosters)"
+    }
+   ],
+   "ranks": [
+    {
+     "figure": "winRate",
+     "position": 9,
+     "population": 12,
+     "leagueName": "(Foot) Ball Knowers",
+     "sleeperLeagueId": "1254190892974084096"
+    },
+    {
+     "figure": "pointsPerSeason",
+     "position": 3,
+     "population": 12,
+     "leagueName": "(Foot) Ball Knowers",
+     "sleeperLeagueId": "1254190892974084096"
+    },
+    {
+     "figure": "averageEfficiency",
+     "position": 11,
+     "population": 12,
+     "leagueName": "(Foot) Ball Knowers",
+     "sleeperLeagueId": "1254190892974084096"
+    }
+   ],
+   "waivers": {
+    "movesPerSeason": 37,
+    "seasonsCounted": 1,
+    "faab": null,
+    "faabExcludedSeasons": [
+     {
+      "season": 2025,
+      "leagueName": "(Foot) Ball Knowers",
+      "reason": "used waiver priority, not FAAB"
+     }
+    ]
+   }
+  }
+ ]
+}

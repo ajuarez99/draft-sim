@@ -3963,6 +3963,27 @@ export type RivalryRecommendation = {
   /** Null whenever `status` is not OK. An older backend omits it (undefined); the page treats both alike. */
   week?: RivalryWeekRecommendation | null
 }
+/**
+ * Spec 047 US2: one notable pair. Every field up to `games` is the pair's own matrix cell (RivalryPair), copied by the
+ * server, so an entry equals its cell. `playoffMatches` counts playoff MATCHES (a two-week final is one), not weeks.
+ */
+export type DiscoveredPair = RivalryPair & { playoffMatches: number }
+/**
+ * Spec 047 US2: notable rivalries, from the matrix's own pairs (current managers). `minMeetings` is N and
+ * `minMeetingsLabel` says it is hand-set; both are null only when the rivalry settings didn't load, and then every
+ * list is empty. Each list holds EVERY tied entry. `mostPlayed`, `closest` and `lopsided` only consider pairs with
+ * at least N meetings; `playoff` has no floor. `playoffUnsplitSeasons`: seasons whose playoff weeks couldn't be
+ * split, so an empty or partial `playoff` list can say what it can't tell.
+ */
+export type RivalryDiscovery = {
+  minMeetings: number | null
+  minMeetingsLabel: string | null
+  mostPlayed: DiscoveredPair[]
+  closest: DiscoveredPair[]
+  lopsided: DiscoveredPair[]
+  playoff: DiscoveredPair[]
+  playoffUnsplitSeasons: number[]
+}
 export type Rivalries = {
   sport: Sport
   season: number
@@ -3970,9 +3991,104 @@ export type Rivalries = {
   matrix: RivalryMatrix
   seasonGrid: RivalrySeasonGrid
   recommendation: RivalryRecommendation
+  /** Spec 047. Optional on purpose: an older backend omits it (deploy skew, plan A11), and nothing renders then. */
+  discovery?: RivalryDiscovery
 }
 export const getRivalries = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/rivalries`).then(json<Rivalries>)
+
+// ---- Hall of fame (spec 047). Mirrors HallOfFameService's records field for field. ----
+
+/**
+ * Who a cell names. `managerId` is null for a roster with no manager (an orphan roster, plan A14); such a name has
+ * no link. `name` is the manager's display name, `teamName` that season's Sleeper team name (null when none).
+ */
+export type HofManagerRef = {
+  managerId: number | null
+  name: string
+  teamName: string | null
+  avatarId: string | null
+  rosterId: number
+}
+/** A HofManagerRef's fields (flattened, as Jackson sends the record) plus the points_for that made them the leader. */
+export type HofPointsLeader = HofManagerRef & { pointsFor: number }
+export type TrophyRunnerUpReason = 'NO_BRACKET' | 'NO_LOSER' | 'SOURCES_DISAGREE'
+export type TrophyLastPlaceReason =
+  | 'NO_LOSERS_BRACKET'
+  | 'NO_WINNERS_BRACKET'
+  | 'INCOMPLETE'
+  | 'UNCOVERED_ROSTERS'
+  | 'MIXED_DIRECTION'
+  | 'NO_SCORES'
+  | 'UNSUPPORTED_SHAPE'
+/**
+ * One completed season. `runnerUpReason` is non-null exactly when `runnerUp` is null and a champion exists;
+ * `lastPlaceReason` exactly when `lastPlace` is null. `lastPlaceBracket` says how last place was read.
+ */
+export type TrophySeason = {
+  season: number
+  /** That season's own Sleeper league id: the Awards fetch and the links use it. */
+  sleeperLeagueId: string
+  champion: HofManagerRef | null
+  runnerUp: HofManagerRef | null
+  runnerUpReason: TrophyRunnerUpReason | null
+  /** The stored game scores contradict Sleeper's bracket result for the final (the Rivalries page's "final disputed"). */
+  finalDisputed: boolean
+  pointsLeaders: HofPointsLeader[]
+  lastPlace: HofManagerRef | null
+  lastPlaceReason: TrophyLastPlaceReason | null
+  lastPlaceBracket: 'TOILET_BOWL' | 'CONSOLATION' | null
+}
+export type TrophyCase = {
+  sport: Sport
+  status: 'OK' | 'NO_COMPLETED_SEASON'
+  /** Newest first. */
+  seasons: TrophySeason[]
+}
+/**
+ * One opponent, from the manager's own side: `wins`/`losses`/`ties` are the manager's. `former`: the opponent has no
+ * roster in the chain's newest season the manager played.
+ */
+export type RivalEntry = {
+  opponent: HofManagerRef
+  meetings: number
+  wins: number
+  losses: number
+  ties: number
+  former: boolean
+}
+/**
+ * One league chain (never merged across chains or sports). `status` is NONE_QUALIFY when no opponent has met the
+ * manager `minMeetings` times; under OK, `nemesis` / `victim` can each still be empty (no losing / winning
+ * record). `minMeetings` is null only when the rivalry settings didn't load. `headSleeperLeagueId` is the chain's
+ * newest season the manager played in and the caller may see.
+ */
+export type ChainRivals = {
+  sport: Sport
+  leagueName: string
+  headSleeperLeagueId: string
+  status: 'OK' | 'NONE_QUALIFY'
+  minMeetings: number | null
+  nemesis: RivalEntry[]
+  victim: RivalEntry[]
+}
+export type ManagerRivals = { managerId: number; chains: ChainRivals[] }
+/** Null on a 404 (unknown manager, not one the caller shares a league with, or an older backend): the block is hidden. */
+export const getManagerRivals = (managerId: number) =>
+  apiFetch(`/api/managers/${managerId}/rivals`)
+    .then(json<ManagerRivals>)
+    .catch((e: unknown): ManagerRivals | null => {
+      if (isNotFound(e)) return null
+      throw e
+    })
+/** Null on a 404 (league unknown, out of scope, or an older backend without the route): the section is hidden, not an error. */
+export const getTrophyCase = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/trophy-case`)
+    .then(json<TrophyCase>)
+    .catch((e: unknown): TrophyCase | null => {
+      if (isNotFound(e)) return null
+      throw e
+    })
 
 // ---- Morning tweet digest (spec 043). Mirrors AdminDigestService's records field for field. ----
 

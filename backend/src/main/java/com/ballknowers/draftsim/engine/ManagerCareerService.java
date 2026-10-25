@@ -125,7 +125,7 @@ public class ManagerCareerService {
     /** T039. Identical for every profile -- these two gaps are structural, not per-manager. */
     private static final List<Unavailable> UNAVAILABLE = List.of(
             new Unavailable("playoffAppearances",
-                    "only the champion's placement is stored; the bracket is not parsed"),
+                    "the bracket is stored, but appearances aren't derived from it yet"),
             new Unavailable("tradesPerSeason",
                     "trades are not attributed to a manager (a trade names several rosters)"));
 
@@ -200,7 +200,7 @@ public class ManagerCareerService {
             // pre-V21 row that has not been re-ingested can still hold a
             // stale placement=1 next to a null/incomplete status, so this
             // check stays here too rather than trusting the column alone.
-            if (Boolean.TRUE.equals(s.complete()) && s.finalPlacement() != null && s.finalPlacement() == 1) {
+            if (ChampionRule.isChampion(s.finalPlacement(), Boolean.TRUE.equals(s.complete()))) {
                 titles++;
             }
 

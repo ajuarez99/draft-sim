@@ -299,7 +299,7 @@ public class RosterSeasonRepository {
                 join league l on l.id = rs.league_id
                 left join manager m on m.id = rs.manager_id
                 where rs.manager_id = ?
-                order by l.season desc
+                order by l.season desc, l.id
                 """)
                 .param(managerId)
                 .query((rs, i) -> mapRow(rs, true))

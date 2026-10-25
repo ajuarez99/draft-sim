@@ -22,11 +22,14 @@ const getLeagueHistory = vi.fn()
 const ingestLeagueHistory = vi.fn()
 const backfillFinalRanks = vi.fn()
 const getExpectedWins = vi.fn()
+// Spec 047: the Hall of fame section fetches its own block; these tests are about the standings, so it is absent (null = hidden).
+const getTrophyCase = vi.fn()
 vi.mock('../api', () => ({
   getLeagueHistory: (...args: unknown[]) => getLeagueHistory(...args),
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
   backfillFinalRanks: (...args: unknown[]) => backfillFinalRanks(...args),
   getExpectedWins: (...args: unknown[]) => getExpectedWins(...args),
+  getTrophyCase: (...args: unknown[]) => getTrophyCase(...args),
 }))
 
 function score(season: number, week: number, rosterId: number, points: number,
@@ -112,6 +115,8 @@ beforeEach(() => {
   backfillFinalRanks.mockReset()
   getExpectedWins.mockReset()
   getExpectedWins.mockRejectedValue(new Error('no expected wins in this test'))
+  getTrophyCase.mockReset()
+  getTrophyCase.mockResolvedValue(null)
 })
 
 describe('record book', () => {

@@ -23,6 +23,7 @@ import Avatar from '../components/Avatar'
 import { useLeagueLinkState } from '../railLeague'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { extremes, type Extremes } from '../extremes'
+import TrophyCase from '../components/TrophyCase'
 
 /**
  * claude/league-suite.md Phase A: standings across every ingested season for
@@ -666,6 +667,7 @@ export default function LeagueHistory() {
         )}
       </section>
 
+      {history && sleeperLeagueId && <TrophyCase sleeperLeagueId={sleeperLeagueId} />}
       {history && <RecordBook records={history.records} />}
       {history && <MatchupMargins records={history.records} />}
       {history && <PointsLeaders records={history.records} />}

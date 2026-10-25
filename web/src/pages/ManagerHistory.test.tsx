@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ManagerHistory from './ManagerHistory'
 import type {
   CareerProfile,
+  ChainRivals,
+  ManagerRivals,
+  RivalEntry,
   CareerSeason,
   ManagerHistory as ManagerHistoryData,
   StandingRow,
@@ -14,8 +17,11 @@ vi.mock('react-router-dom', () => ({
 }))
 
 const getManagerHistory = vi.fn()
+// Spec 047: the rivals block is its own fetch; most tests here are about the career, so it answers null (hidden).
+const getManagerRivals = vi.fn()
 vi.mock('../api', () => ({
   getManagerHistory: (...args: unknown[]) => getManagerHistory(...args),
+  getManagerRivals: (...args: unknown[]) => getManagerRivals(...args),
 }))
 
 /**
@@ -123,7 +129,7 @@ function careerProfile(overrides: Partial<CareerProfile> = {}): CareerProfile {
     unavailable: [
       {
         figure: 'playoffAppearances',
-        reason: "only the champion's placement is stored; the bracket is not parsed",
+        reason: "the bracket is stored, but appearances aren't derived from it yet",
       },
       {
         figure: 'tradesPerSeason',
@@ -175,6 +181,8 @@ function historyWithCareer(overrides: Partial<CareerProfile> = {}): ManagerHisto
 }
 
 beforeEach(() => {
+  getManagerRivals.mockReset()
+  getManagerRivals.mockResolvedValue(null)
   getManagerHistory.mockReset()
 })
 
@@ -326,7 +334,7 @@ describe('career profile panel (US3)', () => {
 
     expect(
       await screen.findByText(
-        "Playoff appearances: only the champion's placement is stored; the bracket is not parsed",
+        "Playoff appearances: the bracket is stored, but appearances aren't derived from it yet",
       ),
     ).toBeTruthy()
     expect(
@@ -548,5 +556,105 @@ describe('player card header', () => {
     expect(await screen.findByText('C early')).toBeTruthy()
     expect(screen.queryByText('Reacher')).toBeNull()
     expect(screen.queryByText('Waits')).toBeNull()
+  })
+})
+
+describe('rivals (spec 047 US3)', () => {
+  const opp = (id: number, name: string, over: Partial<RivalEntry> = {}): RivalEntry => ({
+    opponent: { managerId: id, name, teamName: null, avatarId: null, rosterId: id },
+    meetings: 3, wins: 0, losses: 3, ties: 0, former: false,
+    ...over,
+  })
+  const chain = (over: Partial<ChainRivals> = {}): ChainRivals => ({
+    sport: 'nfl', leagueName: '(Foot) Ball Knowers', headSleeperLeagueId: 'L-fbk-26', status: 'OK',
+    minMeetings: 3, nemesis: [], victim: [], ...over,
+  })
+  const rivals = (...chains: ChainRivals[]): ManagerRivals => ({ managerId: 7, chains })
+
+  async function open(r: ManagerRivals | null) {
+    getManagerHistory.mockResolvedValue(twoSportHistory())
+    getManagerRivals.mockResolvedValue(r)
+    render(<ManagerHistory />)
+    await screen.findByText('Career profile')
+  }
+
+  it('shows the nemesis and the victim with their records, meetings and a versus link', async () => {
+    await open(rivals(chain({
+      nemesis: [opp(2, 'Bravo', { wins: 0, losses: 3 })],
+      victim: [opp(3, 'Charlie', { wins: 3, losses: 1, meetings: 4 })],
+    })))
+    const block = await screen.findByText('Rivals · (Foot) Ball Knowers')
+    const scope = within(block.closest('.mrv-chain') as HTMLElement)
+    expect(scope.getByText('Nemesis')).toBeInTheDocument()
+    // (the test's Link mock renders its children only, so the link's accessible name is its visible text)
+    const bravo = scope.getByRole('link', { name: /Bravo/ })
+    expect(bravo).toHaveTextContent('0-3')
+    expect(bravo).toHaveTextContent('3 met')
+    const charlie = scope.getByRole('link', { name: /Charlie/ })
+    expect(charlie).toHaveTextContent('3-1')
+    expect(charlie).toHaveTextContent('4 met')
+  })
+
+  it('files each chain under its own sport and never merges chains', async () => {
+    await open(rivals(
+      chain({ leagueName: '(Foot) Ball Knowers', headSleeperLeagueId: 'a', nemesis: [opp(2, 'Bravo')] }),
+      chain({ leagueName: 'West Coast Fantasy Football', headSleeperLeagueId: 'b', nemesis: [opp(5, 'Echo')] }),
+      chain({ sport: 'nba', leagueName: 'Ball Knowers', headSleeperLeagueId: 'c', nemesis: [opp(6, 'Foxtrot')] }),
+    ))
+    expect(await screen.findByText('Rivals · (Foot) Ball Knowers')).toBeInTheDocument()
+    expect(screen.getByText('Rivals · West Coast Fantasy Football')).toBeInTheDocument()
+    const nba = screen.getByText('Rivals · Ball Knowers').closest('.manager-sport-block') as HTMLElement
+    expect(within(nba).getByRole('link', { name: /Foxtrot/ })).toBeInTheDocument()
+    expect(within(nba).queryByRole('link', { name: /Bravo/ })).toBeNull()
+    expect(within(nba).queryByText('Rivals · West Coast Fantasy Football')).toBeNull()
+  })
+
+  it('tags a former opponent', async () => {
+    await open(rivals(chain({ nemesis: [opp(4, 'Gone', { former: true })] })))
+    expect(await screen.findByText('former')).toBeInTheDocument()
+  })
+
+  it('lists every tied opponent', async () => {
+    await open(rivals(chain({ nemesis: [opp(2, 'Bravo'), opp(5, 'Echo')] })))
+    expect(await screen.findByRole('link', { name: /Bravo/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Echo/ })).toBeInTheDocument()
+  })
+
+  it('keys two tied opponents that share a roster id by manager, not by roster (code review S4)', async () => {
+    // Sleeper hands a departed manager's roster id to the replacement: a former and a current opponent can tie.
+    const warn = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await open(rivals(chain({
+      nemesis: [
+        opp(2, 'Bravo', { opponent: { managerId: 23, name: 'Aerie', teamName: null, avatarId: null, rosterId: 7 }, former: true }),
+        opp(2, 'Bravo', { opponent: { managerId: 7, name: 'Popsharky', teamName: null, avatarId: null, rosterId: 7 } }),
+      ],
+    })))
+    expect(await screen.findByRole('link', { name: /Aerie/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Popsharky/ })).toBeInTheDocument()
+    const dupKey = warn.mock.calls.some((c) => String(c[0]).includes('same key'))
+    warn.mockRestore()
+    expect(dupKey).toBe(false)
+  })
+
+  it('says no opponent has met them N times, labelling N hand-set (NONE_QUALIFY)', async () => {
+    await open(rivals(chain({ status: 'NONE_QUALIFY' })))
+    expect(await screen.findByText('No opponent has met them 3 times yet (3 is hand-set).')).toBeInTheDocument()
+  })
+
+  it('says why a nemesis or victim is absent when others qualified', async () => {
+    await open(rivals(chain({ nemesis: [], victim: [opp(3, 'Charlie', { wins: 3, losses: 0 })] })))
+    expect(await screen.findByText(/No nemesis: nobody they have met 3\+ times has a losing record/)).toBeInTheDocument()
+    expect(screen.queryByText(/No victim:/)).toBeNull()
+  })
+
+  it('renders nothing for a chain whose N did not load', async () => {
+    await open(rivals(chain({ minMeetings: null, status: 'NONE_QUALIFY' })))
+    expect(screen.queryByText(/Rivals ·/)).toBeNull()
+  })
+
+  it('is hidden when the fetch answers null (a 404), and the page still renders', async () => {
+    await open(null)
+    expect(screen.queryByText(/Rivals ·/)).toBeNull()
+    expect(screen.getByText('Career profile')).toBeInTheDocument()
   })
 })

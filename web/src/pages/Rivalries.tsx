@@ -4,6 +4,7 @@ import NotFound from '../components/NotFound'
 import Avatar from '../components/Avatar'
 import {
   getRivalries,
+  type DiscoveredPair,
   type Rivalries as RivalriesData,
   type RivalryCell,
   type RivalryDisplaced,
@@ -15,7 +16,8 @@ import {
 } from '../api'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { useBlock } from '../useBlock'
-import { indexPairs, kindSplit, recordText, tallyText, viewFrom, winShareBucket, type PairView } from '../rivalries'
+import { indexPairs, kindSplit, recordText, tallyText, viewFrom, winShareBucket } from '../rivalries'
+import { finalDisagreeText } from '../rivalryText'
 
 /**
  * specs/034-rivalry-schedule-grid: three panels on one page.
@@ -72,12 +74,144 @@ export default function Rivalries() {
       {block.status === 'error' && <p className="muted small">Couldn't load the rivalries.</p>}
       {data && (
         <>
+          <NotableRivalries data={data} />
           <MatrixPanel data={data} />
           <SeasonPanel data={data} />
           <RivalryWeekPanel data={data} />
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * specs/047-hall-of-fame US2: the notable rivalries, already picked out above the grid. Four short lists, because
+ * the content is four different questions with a few answers each, not a table. Every entry prints its record (the
+ * left name's wins first), how many times they met, and links to the versus page. A list that has nothing says
+ * why in words, naming N and labelling it hand-set; more than three tied entries collapse to a count with an
+ * expander so every entry stays reachable.
+ */
+const TIE_LIMIT = 3
+
+type DiscoveryKind = 'mostPlayed' | 'closest' | 'lopsided' | 'playoff'
+
+const levelRecord = (p: DiscoveredPair) =>
+  recordText(Math.max(p.aWins, p.bWins), Math.min(p.aWins, p.bWins), p.ties)
+
+/** "16 pairs are level at 2-2": one record when every tied pair shares it, otherwise just the count. */
+function tieSummary(list: DiscoveredPair[], kind: DiscoveryKind): string {
+  const n = list.length
+  if (kind === 'mostPlayed') return `${n} pairs have met ${list[0].meetings} times`
+  if (kind === 'playoff') return `${n} pairs have met in the playoffs`
+  const records = new Set(list.map(levelRecord))
+  if (records.size !== 1) return `${n} pairs are tied`
+  const gap = Math.abs(list[0].aWins - list[0].bWins)
+  return `${n} pairs are ${gap === 0 ? 'level at' : 'tied at'} ${[...records][0]}`
+}
+
+function DiscoveredRow({ p, rows, kind }: { p: DiscoveredPair; rows: Map<number, RivalryRow>; kind: DiscoveryKind }) {
+  const a = rows.get(p.aManagerId)
+  const b = rows.get(p.bManagerId)
+  const nameA = a?.teamName ?? `Manager ${p.aManagerId}`
+  const nameB = b?.teamName ?? `Manager ${p.bManagerId}`
+  return (
+    <li className="rvd-row">
+      <Link
+        to={`/managers/${p.aManagerId}/versus/${p.bManagerId}`}
+        className="rvd-link"
+        aria-label={`${nameA} versus ${nameB}: ${recordText(p.aWins, p.bWins, p.ties)}, ${p.meetings} met`}>
+        <span className="rvd-side">
+          <Avatar avatarId={a?.avatarId ?? null} seed={String(p.aManagerId)} label={nameA} isMe={a?.isMe} className="rv-avatar" />
+          <span className="rv-name">{nameA}</span>
+        </span>
+        <span className="rvd-rec">
+          <span className="rvd-score">{recordText(p.aWins, p.bWins, p.ties)}</span>
+          <span className="rvd-met">{p.meetings} met</span>
+          {kind === 'playoff' && (
+            <span className="rvd-po">{p.playoffMatches} playoff {p.playoffMatches === 1 ? 'match' : 'matches'}</span>
+          )}
+        </span>
+        <span className="rvd-side rvd-side-b">
+          <span className="rv-name">{nameB}</span>
+          <Avatar avatarId={b?.avatarId ?? null} seed={String(p.bManagerId)} label={nameB} isMe={b?.isMe} className="rv-avatar" />
+        </span>
+      </Link>
+    </li>
+  )
+}
+
+function DiscoveryList({ title, kind, list, empty, rows, note }: {
+  title: string
+  kind: DiscoveryKind
+  list: DiscoveredPair[]
+  empty: string
+  rows: Map<number, RivalryRow>
+  note?: string | null
+}) {
+  const entries = list.map((p) => <DiscoveredRow key={`${p.aManagerId}-${p.bManagerId}`} p={p} rows={rows} kind={kind} />)
+  return (
+    <div className={`rvd-card rvd-${kind}`}>
+      <h3 className="rvd-title">{title}</h3>
+      {list.length === 0 ? (
+        <p className="muted small rvd-empty">{empty}</p>
+      ) : list.length > TIE_LIMIT ? (
+        <details className="rvd-more">
+          <summary>{tieSummary(list, kind)}</summary>
+          <ul className="rvd-list">{entries}</ul>
+        </details>
+      ) : (
+        <ul className="rvd-list">{entries}</ul>
+      )}
+      {note && <p className="muted small rvd-note">{note}</p>}
+    </div>
+  )
+}
+
+export function NotableRivalries({ data }: { data: RivalriesData }) {
+  const d = data.discovery
+  // An older backend omits `discovery`, and an unloaded rivalry config sends no N: either way there is nothing to claim.
+  if (!d || d.minMeetings == null) return null
+  const rows = new Map(data.matrix.rows.map((r) => [r.managerId, r]))
+  const n = d.minMeetings
+  const unmet = `No pair has met ${n} times yet (${n} is hand-set).`
+  // The true reason per season is already on the payload (the matrix's split notes, the same text the grid prints).
+  // Never name a cause here that the server didn't send: a season can be unsplit for five different reasons.
+  const unsplit =
+    d.playoffUnsplitSeasons.length > 0
+      ? d.playoffUnsplitSeasons
+          .map((season) => {
+            const note = data.matrix.splitNotes.find((x) => x.season === season)
+            return note ? note.text : `The ${season} playoff weeks couldn't be split into playoff and consolation games.`
+          })
+          .join(' ')
+      : null
+  return (
+    <section className="section rv-section" aria-labelledby="rv-notable-h">
+      <h2 id="rv-notable-h" className="rv-h">Notable rivalries</h2>
+      <p className="muted small">
+        Picked out of the grid below. Most played, closest and most one-sided only count pairs that have met at least {n} times
+        ({n} is a hand-set threshold, not a measured one). The left name's wins are printed first.
+      </p>
+      <div className="rvd-grid">
+        <DiscoveryList title="Most played" kind="mostPlayed" list={d.mostPlayed} empty={unmet} rows={rows} />
+        <DiscoveryList title="Closest" kind="closest" list={d.closest} empty={unmet} rows={rows} />
+        <DiscoveryList
+          title="Most one-sided"
+          kind="lopsided"
+          list={d.lopsided}
+          empty={d.closest.length === 0 ? unmet : 'No pair is one-sided yet.'}
+          rows={rows}
+        />
+        <DiscoveryList
+          title="Playoff meetings"
+          kind="playoff"
+          list={d.playoff}
+          empty={unsplit ?? 'No playoff meetings yet.'}
+          rows={rows}
+          note={d.playoff.length > 0 ? unsplit : null}
+        />
+      </div>
+    </section>
   )
 }
 
@@ -171,12 +305,6 @@ function disagreeText(c: RivalryCell, rows: Map<number, RivalryRow>): string {
     : out === 'L' ? (rows.get(c.managerId)?.teamName ?? `Manager ${c.managerId}`)
     : 'the other side'
   return `Sleeper's bracket gives this final to ${winner}; the stored scores say otherwise.`
-}
-
-function finalDisagreeText(season: number, winner: 'A' | 'B' | null, v: PairView, r: RivalryRow, c: RivalryRow): string {
-  const rowWon = winner != null && (winner === 'A') === v.rowIsA
-  const who = winner == null ? 'one side' : rowWon ? r.teamName : c.teamName
-  return `${season}: Sleeper's bracket gives the final to ${who}; the stored scores say otherwise.`
 }
 
 function cellText(c: RivalryCell, rows: Map<number, RivalryRow>) {
