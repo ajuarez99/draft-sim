@@ -1,0 +1,8421 @@
+{
+ "sport": "nfl",
+ "season": 2026,
+ "seasonsCovered": [
+  2026,
+  2025
+ ],
+ "matrix": {
+  "rows": [
+   {
+    "managerId": 44,
+    "managerName": "kieriskash",
+    "teamName": "Master Bates",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 10,
+     "losses": 10,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 2
+   },
+   {
+    "managerId": 51,
+    "managerName": "xonicboom",
+    "teamName": "Play with the Klittle",
+    "avatarId": "c7601f667f04b29a3c4324e4f2fb1865",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 3,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 4
+    },
+    "formerOpponentMeetings": 0
+   },
+   {
+    "managerId": 7,
+    "managerName": "popsharky",
+    "teamName": "Dart has hit anotha Bower",
+    "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+    "isMe": true,
+    "allOpponents": {
+     "wins": 15,
+     "losses": 5,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 1
+   },
+   {
+    "managerId": 43,
+    "managerName": "jpelwell",
+    "teamName": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 14,
+     "losses": 7,
+     "ties": 0,
+     "meetings": 21
+    },
+    "formerOpponentMeetings": 1
+   },
+   {
+    "managerId": 48,
+    "managerName": "BamAddABio",
+    "teamName": "Hunter? I Barkley Goedert",
+    "avatarId": "a669fc23016821e781e053b4c370a525",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 5,
+     "losses": 15,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 2
+   },
+   {
+    "managerId": 41,
+    "managerName": "GrandmasBeefRagu",
+    "teamName": "Torta Pounder with Cheese",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 8,
+     "losses": 12,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 2
+   },
+   {
+    "managerId": 50,
+    "managerName": "ImReallyHarry",
+    "teamName": "Khatt Stafford",
+    "avatarId": "e9a48a9868067128e57699eb1375c266",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 10,
+     "losses": 10,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 1
+   },
+   {
+    "managerId": 52,
+    "managerName": "GraftonCarlson",
+    "teamName": "inJustice for Wags",
+    "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 9,
+     "losses": 11,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 3
+   },
+   {
+    "managerId": 49,
+    "managerName": "theadambomb98",
+    "teamName": "Puka-Boo",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 10,
+     "losses": 10,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 1
+   },
+   {
+    "managerId": 32,
+    "managerName": "njerickson",
+    "teamName": "Likely Have Downs",
+    "avatarId": "4b497865b72cac32f7c250f948326a9c",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 11,
+     "losses": 9,
+     "ties": 0,
+     "meetings": 20
+    },
+    "formerOpponentMeetings": 2
+   },
+   {
+    "managerId": 46,
+    "managerName": "ChedddaBob",
+    "teamName": "Osama Bin Loveland",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 11,
+     "losses": 10,
+     "ties": 0,
+     "meetings": 21
+    },
+    "formerOpponentMeetings": 1
+   },
+   {
+    "managerId": 45,
+    "managerName": "jstrobe",
+    "teamName": "Pickens you off",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "isMe": false,
+    "allOpponents": {
+     "wins": 9,
+     "losses": 12,
+     "ties": 0,
+     "meetings": 21
+    },
+    "formerOpponentMeetings": 1
+   }
+  ],
+  "pairs": [
+   {
+    "aManagerId": 7,
+    "bManagerId": 32,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 5,
+      "aPoints": 182.82,
+      "bPoints": 143.66,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 147.54,
+      "bPoints": 114.9,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 41,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 10,
+      "aPoints": 128.72,
+      "bPoints": 123.6,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 43,
+    "meetings": 3,
+    "aWins": 2,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 9,
+      "aPoints": 140.3,
+      "bPoints": 114.5,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 128.42,
+      "bPoints": 114.88,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 59.6,
+      "bPoints": 159.28,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 44,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 6,
+      "aPoints": 176.58,
+      "bPoints": 88.3,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 45,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 3,
+      "aPoints": 126.16,
+      "bPoints": 132.8,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 14,
+      "aPoints": 143.8,
+      "bPoints": 91.24,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 46,
+    "meetings": 3,
+    "aWins": 2,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 1,
+      "aPoints": 119.62,
+      "bPoints": 154.86,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 12,
+      "aPoints": 147.38,
+      "bPoints": 104.62,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 17,
+      "aPoints": 132.58,
+      "bPoints": 132.42,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 48,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 8,
+      "aPoints": 153.86,
+      "bPoints": 131.36,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 49,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 157.18,
+      "bPoints": 119.1,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 130.34,
+      "bPoints": 191.38,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 50,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 7,
+      "aPoints": 163.74,
+      "bPoints": 94.44,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 167.46,
+      "bPoints": 151.68,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 52,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 4,
+      "aPoints": 132.4,
+      "bPoints": 107.68,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 157.4,
+      "bPoints": 147.9,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 41,
+    "meetings": 3,
+    "aWins": 2,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 3,
+      "aPoints": 117.72,
+      "bPoints": 115.12,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 14,
+      "aPoints": 137.84,
+      "bPoints": 153.76,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 118.32,
+      "bPoints": 99.12,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 43,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 10,
+      "aPoints": 101.84,
+      "bPoints": 120.7,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 17,
+      "aPoints": 95.08,
+      "bPoints": 117.64,
+      "winner": "B",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 44,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 9,
+      "aPoints": 146.22,
+      "bPoints": 124.68,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 134.46,
+      "bPoints": 164.96,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 45,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 6,
+      "aPoints": 129.86,
+      "bPoints": 121.24,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 46,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 4,
+      "aPoints": 134.16,
+      "bPoints": 116.58,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 92.9,
+      "bPoints": 104.44,
+      "winner": "B",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 48,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 11,
+      "aPoints": 125.38,
+      "bPoints": 86.7,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 49,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 7,
+      "aPoints": 122.22,
+      "bPoints": 169.28,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 50,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 8,
+      "aPoints": 163.82,
+      "bPoints": 151.66,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 136.68,
+      "bPoints": 162.48,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 52,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 1,
+      "aPoints": 130.78,
+      "bPoints": 115.5,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 12,
+      "aPoints": 140.52,
+      "bPoints": 104.72,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 43,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 7,
+      "aPoints": 87.34,
+      "bPoints": 96.3,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 112.42,
+      "bPoints": 126.84,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 44,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 4,
+      "aPoints": 159.72,
+      "bPoints": 152.54,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 45,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 9,
+      "aPoints": 79.16,
+      "bPoints": 99.52,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 15,
+      "aPoints": 184.42,
+      "bPoints": 107.34,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 46,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 11,
+      "aPoints": 97.4,
+      "bPoints": 130.82,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 48,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 6,
+      "aPoints": 130.42,
+      "bPoints": 125.9,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 157.12,
+      "bPoints": 92.56,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 49,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 8,
+      "aPoints": 160.16,
+      "bPoints": 112.28,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 50,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 5,
+      "aPoints": 77.02,
+      "bPoints": 122.1,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 41,
+    "bManagerId": 52,
+    "meetings": 4,
+    "aWins": 2,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 163.86,
+      "bPoints": 146.48,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 121.54,
+      "bPoints": 128.02,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 144.86,
+      "bPoints": 162.1,
+      "winner": "B",
+      "kind": "POSTSEASON_UNSPLIT"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 147.86,
+      "bPoints": 124.38,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 44,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 3,
+      "aPoints": 111,
+      "bPoints": 147.22,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 14,
+      "aPoints": 101.38,
+      "bPoints": 113,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 45,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 4,
+      "aPoints": 135.52,
+      "bPoints": 127.28,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 46,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 8,
+      "aPoints": 128.18,
+      "bPoints": 73.82,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 71.4,
+      "bPoints": 166.54,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 48,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 1,
+      "aPoints": 142.98,
+      "bPoints": 126.46,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 12,
+      "aPoints": 123.58,
+      "bPoints": 82.52,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 49,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 5,
+      "aPoints": 100.64,
+      "bPoints": 82.62,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 15,
+      "aPoints": 140.28,
+      "bPoints": 134.6,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 50,
+    "meetings": 3,
+    "aWins": 2,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 103.28,
+      "bPoints": 73.14,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 77.24,
+      "bPoints": 107.1,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 146.16,
+      "bPoints": 119.9,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 43,
+    "bManagerId": 52,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 11,
+      "aPoints": 106.84,
+      "bPoints": 111.6,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 45,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 11,
+      "aPoints": 115.92,
+      "bPoints": 84.76,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 116.62,
+      "bPoints": 109.7,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 46,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 7,
+      "aPoints": 114.84,
+      "bPoints": 142.48,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 48,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 118.08,
+      "bPoints": 104.02,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 88.84,
+      "bPoints": 98.32,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 49,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 10,
+      "aPoints": 109.9,
+      "bPoints": 116.7,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 135.28,
+      "bPoints": 120.4,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 50,
+    "meetings": 3,
+    "aWins": 1,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 1,
+      "aPoints": 110.14,
+      "bPoints": 122.38,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 12,
+      "aPoints": 78.14,
+      "bPoints": 162.36,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 188.48,
+      "bPoints": 120.9,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 51,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 154.52,
+      "bPoints": 141.62,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 52,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 8,
+      "aPoints": 86.18,
+      "bPoints": 205.04,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 46,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 121.3,
+      "bPoints": 157.8,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 110.96,
+      "bPoints": 117.14,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 48,
+    "meetings": 3,
+    "aWins": 1,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 5,
+      "aPoints": 130.34,
+      "bPoints": 154.02,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 17,
+      "aPoints": 111.98,
+      "bPoints": 109.86,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     },
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 108.76,
+      "bPoints": 113.78,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 49,
+    "meetings": 3,
+    "aWins": 2,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 1,
+      "aPoints": 121.22,
+      "bPoints": 111.38,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 12,
+      "aPoints": 192.46,
+      "bPoints": 155.76,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 97.22,
+      "bPoints": 154.16,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 50,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 10,
+      "aPoints": 147.26,
+      "bPoints": 120.42,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 51,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 85.42,
+      "bPoints": 148.32,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 52,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 7,
+      "aPoints": 203.24,
+      "bPoints": 151.26,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 129.58,
+      "bPoints": 116.82,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 46,
+    "bManagerId": 48,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 9,
+      "aPoints": 134.86,
+      "bPoints": 132.4,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 82.62,
+      "bPoints": 118.96,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 46,
+    "bManagerId": 49,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 3,
+      "aPoints": 122.42,
+      "bPoints": 149.12,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 14,
+      "aPoints": 108.56,
+      "bPoints": 98.64,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 46,
+    "bManagerId": 50,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 6,
+      "aPoints": 112.94,
+      "bPoints": 137.12,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 15,
+      "aPoints": 134.5,
+      "bPoints": 124.1,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 46,
+    "bManagerId": 51,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2026,
+      "week": 1,
+      "aPoints": 90.76,
+      "bPoints": 158.36,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 46,
+    "bManagerId": 52,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 5,
+      "aPoints": 127.16,
+      "bPoints": 132.38,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 88.9,
+      "bPoints": 134.68,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 48,
+    "bManagerId": 49,
+    "meetings": 2,
+    "aWins": 1,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 4,
+      "aPoints": 117.76,
+      "bPoints": 118.12,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2026,
+      "week": 4,
+      "aPoints": 149.38,
+      "bPoints": 121.88,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 48,
+    "bManagerId": 50,
+    "meetings": 2,
+    "aWins": 0,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 2,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 3,
+      "aPoints": 86.22,
+      "bPoints": 98.64,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 14,
+      "aPoints": 127.74,
+      "bPoints": 130.2,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 48,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 48,
+    "bManagerId": 52,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 10,
+      "aPoints": 125.22,
+      "bPoints": 173,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 49,
+    "bManagerId": 50,
+    "meetings": 2,
+    "aWins": 2,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 11,
+      "aPoints": 105.84,
+      "bPoints": 93.5,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 190,
+      "bPoints": 150.4,
+      "winner": "A",
+      "kind": "POSTSEASON_UNSPLIT"
+     }
+    ]
+   },
+   {
+    "aManagerId": 49,
+    "bManagerId": 51,
+    "meetings": 1,
+    "aWins": 0,
+    "bWins": 1,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2026,
+      "week": 3,
+      "aPoints": 111.84,
+      "bPoints": 155.16,
+      "winner": "B",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 49,
+    "bManagerId": 52,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 6,
+      "aPoints": 136.14,
+      "bPoints": 119.88,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 50,
+    "bManagerId": 51,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   },
+   {
+    "aManagerId": 50,
+    "bManagerId": 52,
+    "meetings": 1,
+    "aWins": 1,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 1,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 9,
+      "aPoints": 169.3,
+      "bPoints": 117.22,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ]
+   },
+   {
+    "aManagerId": 51,
+    "bManagerId": 52,
+    "meetings": 0,
+    "aWins": 0,
+    "bWins": 0,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     }
+    },
+    "status": "NOT_YET_MET",
+    "finals": [],
+    "games": []
+   }
+  ],
+  "splitNotes": [
+   {
+    "season": 2025,
+    "reason": "NO_BRACKET",
+    "text": "The 2025 playoff weeks can't be split into playoff and consolation games because that season's bracket isn't stored; those games are counted in the totals as unsplit."
+   }
+  ]
+ },
+ "seasonGrid": {
+  "scheduleStatus": "OK",
+  "currentWeek": 7,
+  "weeks": [
+   {
+    "week": 1,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 2,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 3,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 4,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 5,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 6,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 7,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 8,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 9,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 10,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 11,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 12,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 13,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 14,
+    "isPlayoffWeek": false
+   },
+   {
+    "week": 15,
+    "isPlayoffWeek": true
+   },
+   {
+    "week": 16,
+    "isPlayoffWeek": true
+   },
+   {
+    "week": 17,
+    "isPlayoffWeek": true
+   }
+  ],
+  "playoffWindowNote": null,
+  "tbdNote": "Playoff pairings appear once the week has been scored. Until then only winners-bracket opponents that the bracket already names are shown.",
+  "medianNote": null,
+  "rosterNote": null,
+  "cells": [
+   {
+    "managerId": 44,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 164.96,
+     "opponentPoints": 134.46,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 44,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 135.28,
+     "opponentPoints": 120.4,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 44,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 188.48,
+     "opponentPoints": 120.9,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 44,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 154.52,
+     "opponentPoints": 141.62,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 44,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 44,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 158.36,
+     "opponentPoints": 90.76,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 51,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 148.32,
+     "opponentPoints": 85.42,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 51,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 155.16,
+     "opponentPoints": 111.84,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 51,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 141.62,
+     "opponentPoints": 154.52,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 51,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 51,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 157.4,
+     "opponentPoints": 147.9,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 7,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 59.6,
+     "opponentPoints": 159.28,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 7,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 147.54,
+     "opponentPoints": 114.9,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 7,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 167.46,
+     "opponentPoints": 151.68,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 7,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 7,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 146.16,
+     "opponentPoints": 119.9,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 43,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 159.28,
+     "opponentPoints": 59.6,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 43,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 126.84,
+     "opponentPoints": 112.42,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 43,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 71.4,
+     "opponentPoints": 166.54,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 43,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 43,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 92.56,
+     "opponentPoints": 157.12,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 48,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 118.96,
+     "opponentPoints": 82.62,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 48,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 113.78,
+     "opponentPoints": 108.76,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 48,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 149.38,
+     "opponentPoints": 121.88,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 48,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 48,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 157.12,
+     "opponentPoints": 92.56,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 41,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": {
+     "points": 147.86,
+     "opponentPoints": 124.38,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 41,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 112.42,
+     "opponentPoints": 126.84,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 41,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 99.12,
+     "opponentPoints": 118.32,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 41,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 4
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 41,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 119.9,
+     "opponentPoints": 146.16,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 50,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 162.48,
+     "opponentPoints": 136.68,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 50,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 120.9,
+     "opponentPoints": 188.48,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 50,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 151.68,
+     "opponentPoints": 167.46,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 50,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 50,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 147.9,
+     "opponentPoints": 157.4,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 52,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": {
+     "points": 124.38,
+     "opponentPoints": 147.86,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 52,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 134.68,
+     "opponentPoints": 88.9,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 52,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 116.82,
+     "opponentPoints": 129.58,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 52,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 4
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 52,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 154.16,
+     "opponentPoints": 97.22,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 49,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 120.4,
+     "opponentPoints": 135.28,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 49,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 111.84,
+     "opponentPoints": 155.16,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 49,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 121.88,
+     "opponentPoints": 149.38,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 49,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 49,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 134.46,
+     "opponentPoints": 164.96,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 32,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 136.68,
+     "opponentPoints": 162.48,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 32,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 114.9,
+     "opponentPoints": 147.54,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 32,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 118.32,
+     "opponentPoints": 99.12,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 32,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 32,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 90.76,
+     "opponentPoints": 158.36,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 46,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 82.62,
+     "opponentPoints": 118.96,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 46,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 88.9,
+     "opponentPoints": 134.68,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 46,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 166.54,
+     "opponentPoints": 71.4,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 46,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 45,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 46,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 1,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 97.22,
+     "opponentPoints": 154.16,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 45,
+    "week": 2,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 0
+    },
+    "result": {
+     "points": 85.42,
+     "opponentPoints": 148.32,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 45,
+    "week": 3,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": {
+     "points": 108.76,
+     "opponentPoints": 113.78,
+     "outcome": "L",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 45,
+    "week": 4,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 52,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": {
+     "points": 129.58,
+     "opponentPoints": 116.82,
+     "outcome": "W",
+     "kind": "REGULAR",
+     "bracketDisagrees": false
+    }
+   },
+   {
+    "managerId": 45,
+    "week": 5,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 43,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 6,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 32,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 7,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 50,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 0,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 8,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 7,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 9,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 41,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 10,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 46,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 11,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 44,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 2
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 12,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 49,
+    "priorRecord": {
+     "wins": 2,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 13,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 51,
+    "priorRecord": {
+     "wins": 0,
+     "losses": 1,
+     "ties": 0,
+     "meetings": 1
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 14,
+    "state": "OPPONENT",
+    "source": "SCHEDULE",
+    "opponentManagerId": 48,
+    "priorRecord": {
+     "wins": 1,
+     "losses": 2,
+     "ties": 0,
+     "meetings": 3
+    },
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 15,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 16,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   },
+   {
+    "managerId": 45,
+    "week": 17,
+    "state": "TBD",
+    "source": null,
+    "opponentManagerId": null,
+    "priorRecord": null,
+    "result": null
+   }
+  ]
+ },
+ "recommendation": {
+  "status": "OK",
+  "minMeetings": 3,
+  "minMeetingsLabel": "hand-set",
+  "pairings": [
+   {
+    "aManagerId": 41,
+    "bManagerId": 52,
+    "meetings": 4,
+    "score": 4,
+    "reason": {
+     "code": "EVEN",
+     "text": "An even series after 4 meetings: Torta Pounder with Cheese 2, inJustice for Wags 2.",
+     "numbers": {
+      "meetings": 4,
+      "aWins": 2,
+      "bWins": 2,
+      "ties": 0
+     }
+    },
+    "thin": false
+   },
+   {
+    "aManagerId": 7,
+    "bManagerId": 43,
+    "meetings": 3,
+    "score": 2.25,
+    "reason": {
+     "code": "EVEN",
+     "text": "Separated by one game after 3 meetings: Dart has hit anotha Bower 2, jpelwell 1.",
+     "numbers": {
+      "meetings": 3,
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "thin": false
+   },
+   {
+    "aManagerId": 44,
+    "bManagerId": 50,
+    "meetings": 3,
+    "score": 2.25,
+    "reason": {
+     "code": "EVEN",
+     "text": "Separated by one game after 3 meetings: Master Bates 1, Khatt Stafford 2.",
+     "numbers": {
+      "meetings": 3,
+      "aWins": 1,
+      "bWins": 2,
+      "ties": 0
+     }
+    },
+    "thin": false
+   },
+   {
+    "aManagerId": 45,
+    "bManagerId": 48,
+    "meetings": 3,
+    "score": 2.25,
+    "reason": {
+     "code": "EVEN",
+     "text": "Separated by one game after 3 meetings: Pickens you off 1, Hunter? I Barkley Goedert 2.",
+     "numbers": {
+      "meetings": 3,
+      "aWins": 1,
+      "bWins": 2,
+      "ties": 0
+     }
+    },
+    "thin": false
+   },
+   {
+    "aManagerId": 32,
+    "bManagerId": 46,
+    "meetings": 2,
+    "score": 2,
+    "reason": {
+     "code": "THIN",
+     "text": "Only met 2 times (Likely Have Downs 1, Osama Bin Loveland 1), so the history is thin.",
+     "numbers": {
+      "meetings": 2,
+      "aWins": 1,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "thin": true
+   },
+   {
+    "aManagerId": 49,
+    "bManagerId": 51,
+    "meetings": 1,
+    "score": 0.5,
+    "reason": {
+     "code": "THIN",
+     "text": "Met once: Play with the Klittle won 155.16 to 111.84.",
+     "numbers": {
+      "meetings": 1,
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "thin": true
+   }
+  ],
+  "unpaired": null,
+  "thinCount": 2,
+  "note": "This is a suggestion for a rivalry week; it doesn't change your Sleeper schedule.",
+  "week": {
+   "status": "OK",
+   "cap": 2,
+   "capLabel": "league rule",
+   "asOfWeek": 7,
+   "recommended": {
+    "week": 13,
+    "total": 12.75,
+    "bestTotal": 13.25,
+    "reason": {
+     "code": "BEST_UNDER_CAP",
+     "text": "3 of the best pairings would go over the 2-meeting limit in week 13, so they're swapped out. This set scores 12.75 of a possible 13.25.",
+     "numbers": {
+      "week": 13,
+      "cap": 2,
+      "heldBack": 3,
+      "bestPairings": 6,
+      "total": 12.75,
+      "bestTotal": 13.25,
+      "tiedWeeks": 1
+     }
+    },
+    "pairings": [
+     {
+      "pairing": {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetings": 4,
+       "score": 4,
+       "reason": {
+        "code": "EVEN",
+        "text": "An even series after 4 meetings: Torta Pounder with Cheese 2, inJustice for Wags 2.",
+        "numbers": {
+         "meetings": 4,
+         "aWins": 2,
+         "bWins": 2,
+         "ties": 0
+        }
+       },
+       "thin": false
+      },
+      "alreadyScheduled": true
+     },
+     {
+      "pairing": {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetings": 3,
+       "score": 2.25,
+       "reason": {
+        "code": "EVEN",
+        "text": "Separated by one game after 3 meetings: Dart has hit anotha Bower 2, jpelwell 1.",
+        "numbers": {
+         "meetings": 3,
+         "aWins": 2,
+         "bWins": 1,
+         "ties": 0
+        }
+       },
+       "thin": false
+      },
+      "alreadyScheduled": true
+     },
+     {
+      "pairing": {
+       "aManagerId": 32,
+       "bManagerId": 50,
+       "meetings": 2,
+       "score": 2,
+       "reason": {
+        "code": "THIN",
+        "text": "Only met 2 times (Likely Have Downs 1, Khatt Stafford 1), so the history is thin.",
+        "numbers": {
+         "meetings": 2,
+         "aWins": 1,
+         "bWins": 1,
+         "ties": 0
+        }
+       },
+       "thin": true
+      },
+      "alreadyScheduled": true
+     },
+     {
+      "pairing": {
+       "aManagerId": 44,
+       "bManagerId": 48,
+       "meetings": 2,
+       "score": 2,
+       "reason": {
+        "code": "THIN",
+        "text": "Only met 2 times (Master Bates 1, Hunter? I Barkley Goedert 1), so the history is thin.",
+        "numbers": {
+         "meetings": 2,
+         "aWins": 1,
+         "bWins": 1,
+         "ties": 0
+        }
+       },
+       "thin": true
+      },
+      "alreadyScheduled": false
+     },
+     {
+      "pairing": {
+       "aManagerId": 46,
+       "bManagerId": 49,
+       "meetings": 2,
+       "score": 2,
+       "reason": {
+        "code": "THIN",
+        "text": "Only met 2 times (Osama Bin Loveland 1, Puka-Boo 1), so the history is thin.",
+        "numbers": {
+         "meetings": 2,
+         "aWins": 1,
+         "bWins": 1,
+         "ties": 0
+        }
+       },
+       "thin": true
+      },
+      "alreadyScheduled": false
+     },
+     {
+      "pairing": {
+       "aManagerId": 45,
+       "bManagerId": 51,
+       "meetings": 1,
+       "score": 0.5,
+       "reason": {
+        "code": "THIN",
+        "text": "Met once: Play with the Klittle won 148.32 to 85.42.",
+        "numbers": {
+         "meetings": 1,
+         "aWins": 0,
+         "bWins": 1,
+         "ties": 0
+        }
+       },
+       "thin": true
+      },
+      "alreadyScheduled": true
+     }
+    ],
+    "unpaired": null,
+    "heldBack": [
+     {
+      "aManagerId": 44,
+      "bManagerId": 50,
+      "meetsInWeeks": [
+       3,
+       14
+      ],
+      "wouldMeet": 3
+     },
+     {
+      "aManagerId": 45,
+      "bManagerId": 48,
+      "meetsInWeeks": [
+       3,
+       14
+      ],
+      "wouldMeet": 3
+     },
+     {
+      "aManagerId": 49,
+      "bManagerId": 51,
+      "meetsInWeeks": [
+       3,
+       14
+      ],
+      "wouldMeet": 3
+     }
+    ],
+    "displaced": [
+     {
+      "aManagerId": 44,
+      "bManagerId": 49,
+      "metInWeeks": [
+       2
+      ],
+      "stillMeetsInWeeks": []
+     },
+     {
+      "aManagerId": 46,
+      "bManagerId": 48,
+      "metInWeeks": [
+       2
+      ],
+      "stillMeetsInWeeks": []
+     }
+    ]
+   },
+   "others": [
+    {
+     "week": 12,
+     "total": 11,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "5 of the best pairings would go over the 2-meeting limit in week 12, so they're swapped out. This set scores 11 of a possible 13.25.",
+      "numbers": {
+       "week": 12,
+       "cap": 2,
+       "heldBack": 5,
+       "bestPairings": 6,
+       "total": 11,
+       "bestTotal": 13.25,
+       "tiedWeeks": 1
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 46,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Dart has hit anotha Bower 2, Osama Bin Loveland 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 50,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: jpelwell 2, Khatt Stafford 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": true
+      },
+      {
+       "pairing": {
+        "aManagerId": 45,
+        "bManagerId": 49,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Pickens you off 2, Puka-Boo 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": true
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 48,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Master Bates 1, Hunter? I Barkley Goedert 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 51,
+        "bManagerId": 52,
+        "meetings": 0,
+        "score": 0,
+        "reason": {
+         "code": "NOT_YET_MET",
+         "text": "Haven't played each other yet; the schedule has them meeting in week 6.",
+         "numbers": {
+          "meetings": 0,
+          "aWins": 0,
+          "bWins": 0,
+          "ties": 0,
+          "scheduledWeek": 6
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 50,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 48,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 52,
+       "metInWeeks": [
+        1
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 32,
+       "bManagerId": 44,
+       "metInWeeks": [
+        1
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 48,
+       "metInWeeks": [
+        1
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 46,
+       "bManagerId": 51,
+       "metInWeeks": [
+        1
+       ],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    },
+    {
+     "week": 14,
+     "total": 10.75,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "2 of the best pairings would go over the 2-meeting limit in week 14, so they're swapped out. This set scores 10.75 of a possible 13.25.",
+      "numbers": {
+       "week": 14,
+       "cap": 2,
+       "heldBack": 2,
+       "bestPairings": 6,
+       "total": 10.75,
+       "bestTotal": 13.25,
+       "tiedWeeks": 1
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 50,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Master Bates 1, Khatt Stafford 2.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 1,
+          "bWins": 2,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": true
+      },
+      {
+       "pairing": {
+        "aManagerId": 45,
+        "bManagerId": 48,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Pickens you off 1, Hunter? I Barkley Goedert 2.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 1,
+          "bWins": 2,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": true
+      },
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 49,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Dart has hit anotha Bower 1, Puka-Boo 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 46,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (jpelwell 1, Osama Bin Loveland 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 51,
+        "bManagerId": 52,
+        "meetings": 0,
+        "score": 0,
+        "reason": {
+         "code": "NOT_YET_MET",
+         "text": "Haven't played each other yet; the schedule has them meeting in week 6.",
+         "numbers": {
+          "meetings": 0,
+          "aWins": 0,
+          "bWins": 0,
+          "ties": 0,
+          "scheduledWeek": 6
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 32,
+       "metInWeeks": [
+        3
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 43,
+       "metInWeeks": [
+        3
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 46,
+       "bManagerId": 52,
+       "metInWeeks": [
+        3
+       ],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "metInWeeks": [
+        3
+       ],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    },
+    {
+     "week": 8,
+     "total": 9.25,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "5 of the best pairings would go over the 2-meeting limit in week 8, so they're swapped out. This set scores 9.25 of a possible 13.25. It's the earliest of 4 equally strong weeks.",
+      "numbers": {
+       "week": 8,
+       "cap": 2,
+       "heldBack": 5,
+       "bestPairings": 6,
+       "total": 9.25,
+       "bestTotal": 13.25,
+       "tiedWeeks": 4
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 45,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Dart has hit anotha Bower 1, Pickens you off 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": true
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 46,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (jpelwell 1, Osama Bin Loveland 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 48,
+        "bManagerId": 49,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Hunter? I Barkley Goedert 1, Puka-Boo 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 51,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Master Bates won 154.52 to 141.62.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 50,
+        "bManagerId": 52,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Khatt Stafford won 169.30 to 117.22.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 50,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 48,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 32,
+       "bManagerId": 51,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 46,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 43,
+       "bManagerId": 48,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 52,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 50,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    },
+    {
+     "week": 9,
+     "total": 9.25,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "5 of the best pairings would go over the 2-meeting limit in week 9, so they're swapped out. This set scores 9.25 of a possible 13.25. Ties with week 8 on every count; week 8 comes first.",
+      "numbers": {
+       "week": 9,
+       "cap": 2,
+       "heldBack": 5,
+       "bestPairings": 6,
+       "total": 9.25,
+       "bestTotal": 13.25,
+       "tiedWeeks": 4,
+       "firstTiedWeek": 8
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 45,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Dart has hit anotha Bower 1, Pickens you off 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 46,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (jpelwell 1, Osama Bin Loveland 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 48,
+        "bManagerId": 49,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Hunter? I Barkley Goedert 1, Puka-Boo 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 51,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Master Bates won 154.52 to 141.62.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 50,
+        "bManagerId": 52,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Khatt Stafford won 169.30 to 117.22.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 50,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 48,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 49,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 32,
+       "bManagerId": 48,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 45,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 43,
+       "bManagerId": 52,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 46,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 50,
+       "bManagerId": 51,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    },
+    {
+     "week": 10,
+     "total": 9.25,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "5 of the best pairings would go over the 2-meeting limit in week 10, so they're swapped out. This set scores 9.25 of a possible 13.25. Ties with week 8 on every count; week 8 comes first.",
+      "numbers": {
+       "week": 10,
+       "cap": 2,
+       "heldBack": 5,
+       "bestPairings": 6,
+       "total": 9.25,
+       "bestTotal": 13.25,
+       "tiedWeeks": 4,
+       "firstTiedWeek": 8
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 45,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Dart has hit anotha Bower 1, Pickens you off 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 46,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (jpelwell 1, Osama Bin Loveland 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 48,
+        "bManagerId": 49,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Hunter? I Barkley Goedert 1, Puka-Boo 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 51,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Master Bates won 154.52 to 141.62.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 50,
+        "bManagerId": 52,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Khatt Stafford won 169.30 to 117.22.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 50,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 48,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 51,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 32,
+       "bManagerId": 52,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 49,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 43,
+       "bManagerId": 44,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 46,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 48,
+       "bManagerId": 50,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    },
+    {
+     "week": 11,
+     "total": 9.25,
+     "bestTotal": 13.25,
+     "reason": {
+      "code": "BEST_UNDER_CAP",
+      "text": "5 of the best pairings would go over the 2-meeting limit in week 11, so they're swapped out. This set scores 9.25 of a possible 13.25. Ties with week 8 on every count; week 8 comes first.",
+      "numbers": {
+       "week": 11,
+       "cap": 2,
+       "heldBack": 5,
+       "bestPairings": 6,
+       "total": 9.25,
+       "bestTotal": 13.25,
+       "tiedWeeks": 4,
+       "firstTiedWeek": 8
+      }
+     },
+     "pairings": [
+      {
+       "pairing": {
+        "aManagerId": 32,
+        "bManagerId": 41,
+        "meetings": 3,
+        "score": 2.25,
+        "reason": {
+         "code": "EVEN",
+         "text": "Separated by one game after 3 meetings: Likely Have Downs 2, Torta Pounder with Cheese 1.",
+         "numbers": {
+          "meetings": 3,
+          "aWins": 2,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": false
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 7,
+        "bManagerId": 45,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Dart has hit anotha Bower 1, Pickens you off 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 43,
+        "bManagerId": 46,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (jpelwell 1, Osama Bin Loveland 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 48,
+        "bManagerId": 49,
+        "meetings": 2,
+        "score": 2,
+        "reason": {
+         "code": "THIN",
+         "text": "Only met 2 times (Hunter? I Barkley Goedert 1, Puka-Boo 1), so the history is thin.",
+         "numbers": {
+          "meetings": 2,
+          "aWins": 1,
+          "bWins": 1,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 44,
+        "bManagerId": 51,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Master Bates won 154.52 to 141.62.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": false
+      },
+      {
+       "pairing": {
+        "aManagerId": 50,
+        "bManagerId": 52,
+        "meetings": 1,
+        "score": 0.5,
+        "reason": {
+         "code": "THIN",
+         "text": "Met once: Khatt Stafford won 169.30 to 117.22.",
+         "numbers": {
+          "meetings": 1,
+          "aWins": 1,
+          "bWins": 0,
+          "ties": 0
+         }
+        },
+        "thin": true
+       },
+       "alreadyScheduled": true
+      }
+     ],
+     "unpaired": null,
+     "heldBack": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 43,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 52,
+       "meetsInWeeks": [
+        2,
+        13
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 50,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 45,
+       "bManagerId": 48,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      },
+      {
+       "aManagerId": 49,
+       "bManagerId": 51,
+       "meetsInWeeks": [
+        3,
+        14
+       ],
+       "wouldMeet": 3
+      }
+     ],
+     "displaced": [
+      {
+       "aManagerId": 7,
+       "bManagerId": 48,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 32,
+       "bManagerId": 43,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 41,
+       "bManagerId": 51,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 44,
+       "bManagerId": 45,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      },
+      {
+       "aManagerId": 46,
+       "bManagerId": 49,
+       "metInWeeks": [],
+       "stillMeetsInWeeks": []
+      }
+     ]
+    }
+   ],
+   "unfitWeeks": [],
+   "overCapNote": null
+  }
+ },
+ "discovery": {
+  "minMeetings": 3,
+  "minMeetingsLabel": "hand-set",
+  "mostPlayed": [
+   {
+    "aManagerId": 41,
+    "bManagerId": 52,
+    "meetings": 4,
+    "aWins": 2,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 163.86,
+      "bPoints": 146.48,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 121.54,
+      "bPoints": 128.02,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 144.86,
+      "bPoints": 162.1,
+      "winner": "B",
+      "kind": "POSTSEASON_UNSPLIT"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 147.86,
+      "bPoints": 124.38,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ],
+    "playoffMatches": 0
+   }
+  ],
+  "closest": [
+   {
+    "aManagerId": 41,
+    "bManagerId": 52,
+    "meetings": 4,
+    "aWins": 2,
+    "bWins": 2,
+    "ties": 0,
+    "byKind": {
+     "REGULAR": {
+      "aWins": 2,
+      "bWins": 1,
+      "ties": 0
+     },
+     "PLAYOFF": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "PLACEMENT": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "CONSOLATION": {
+      "aWins": 0,
+      "bWins": 0,
+      "ties": 0
+     },
+     "POSTSEASON_UNSPLIT": {
+      "aWins": 0,
+      "bWins": 1,
+      "ties": 0
+     }
+    },
+    "status": "MET",
+    "finals": [],
+    "games": [
+     {
+      "season": 2025,
+      "week": 2,
+      "aPoints": 163.86,
+      "bPoints": 146.48,
+      "winner": "A",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 13,
+      "aPoints": 121.54,
+      "bPoints": 128.02,
+      "winner": "B",
+      "kind": "REGULAR"
+     },
+     {
+      "season": 2025,
+      "week": 16,
+      "aPoints": 144.86,
+      "bPoints": 162.1,
+      "winner": "B",
+      "kind": "POSTSEASON_UNSPLIT"
+     },
+     {
+      "season": 2026,
+      "week": 2,
+      "aPoints": 147.86,
+      "bPoints": 124.38,
+      "winner": "A",
+      "kind": "REGULAR"
+     }
+    ],
+    "playoffMatches": 0
+   }
+  ],
+  "lopsided": [],
+  "playoff": [],
+  "playoffUnsplitSeasons": [
+   2025
+  ]
+ }
+}

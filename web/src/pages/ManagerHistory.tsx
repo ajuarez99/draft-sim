@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom'
 import { Link, useParams } from 'react-router-dom'
 import {
   getManagerHistory,
+  getManagerRivals,
   type CareerProfile,
+  type ChainRivals,
   type ManagerHistory as ManagerHistoryData,
   type Rank,
   type Sport,
@@ -17,6 +19,8 @@ import { useRailContextSlot } from '../appSlots'
 import Avatar from '../components/Avatar'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
+import ManagerRivalsBlock from '../components/ManagerRivalsBlock'
+import { useBlock } from '../useBlock'
 
 // Same order draftHistory already renders in (Sport.values() server-side:
 // NFL, NBA) -- not exported from destinations.ts, so restated here rather
@@ -35,6 +39,10 @@ export default function ManagerHistory() {
   const rail = useRailContextSlot()
   const [data, setData] = useState<ManagerHistoryData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Spec 047 US3: nemesis and victim per chain. Its own block: a failure or a 404 (an older backend, or a manager out of
+  // scope) hides the rivals and never the page.
+  const rivals = useBlock(managerId ? () => getManagerRivals(Number(managerId)) : null, [managerId])
+  const rivalChains = rivals.status === 'ok' && rivals.data ? rivals.data.chains : []
 
   useEffect(() => {
     if (!managerId) return
@@ -227,7 +235,7 @@ export default function ManagerHistory() {
           they win" is exactly the defect class T029's OneEfficiencyImplementationTest
           exists to catch one level down, and duplicating the arithmetic here
           would reintroduce it one level up. */}
-      <CareerPanel careers={data.careers} />
+      <CareerPanel careers={data.careers} managerId={data.managerId} rivals={rivalChains} />
 
       </div>
     </>
@@ -395,13 +403,13 @@ function PlayerCardRow({ sport, career }: { sport: Sport; career: CareerProfile 
  * season in any sport, matching the seasons table's and draftHistory's own
  * "nothing to say" rule.
  */
-function CareerPanel({ careers }: { careers: CareerProfile[] }) {
+function CareerPanel({ careers, managerId, rivals }: { careers: CareerProfile[]; managerId: number; rivals: ChainRivals[] }) {
   if (careers.length === 0) return null
   return (
     <section className="section">
       <h3 className="section-title">Career profile</h3>
       {careers.map((c) => (
-        <CareerBlock key={c.sport} career={c} />
+        <CareerBlock key={c.sport} career={c} managerId={managerId} rivals={rivals.filter((r) => r.sport === c.sport)} />
       ))}
       <HowThisWorks>
         <p>
@@ -416,7 +424,7 @@ function CareerPanel({ careers }: { careers: CareerProfile[] }) {
   )
 }
 
-function CareerBlock({ career: c }: { career: CareerProfile }) {
+function CareerBlock({ career: c, managerId, rivals }: { career: CareerProfile; managerId: number; rivals: ChainRivals[] }) {
   const record = `${c.wins}-${c.losses}${c.ties > 0 ? `-${c.ties}` : ''}`
   return (
     <div className="manager-sport-block">
@@ -477,6 +485,7 @@ function CareerBlock({ career: c }: { career: CareerProfile }) {
         />
       </div>
 
+      <ManagerRivalsBlock managerId={managerId} chains={rivals} />
       <RankList ranks={c.ranks} />
       <UnavailableList items={c.unavailable} />
       <WaiverPanel waivers={c.waivers} />

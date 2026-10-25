@@ -1,0 +1,106 @@
+{
+ "managerId": 23,
+ "manager": "aerie33",
+ "avatarId": "b3338675f635c2c1f42b469621d38ec6",
+ "draftHistory": [
+  {
+   "sport": "nfl",
+   "reachBias": 10.13,
+   "relativeReachBias": null,
+   "relativeReachStdErr": null,
+   "positionalTilt": {
+    "QB": 1.4095238095238096,
+    "RB": 0.921904761904762,
+    "WR": 0.9142857142857144,
+    "TE": 1.511111111111111
+   },
+   "draftsObserved": 1,
+   "picksScored": 0,
+   "provenance": "NEUTRAL"
+  }
+ ],
+ "careers": [
+  {
+   "sport": "nfl",
+   "seasonsCounted": 1,
+   "seasons": [
+    {
+     "leagueId": 9466,
+     "rosterId": 7,
+     "managerId": 23,
+     "manager": "aerie33",
+     "avatarId": "b3338675f635c2c1f42b469621d38ec6",
+     "wins": 7,
+     "losses": 7,
+     "ties": 0,
+     "pointsFor": 1916.44,
+     "pointsAgainst": 1816.42,
+     "champion": false,
+     "season": 2025,
+     "sleeperLeagueId": "1262506916429430784",
+     "sport": "nfl",
+     "leagueName": "West Coast Fantasy Football",
+     "complete": true,
+     "counted": true
+    }
+   ],
+   "wins": 7,
+   "losses": 7,
+   "ties": 0,
+   "winRate": 0.5,
+   "pointsFor": 1916.44,
+   "pointsAgainst": 1816.42,
+   "pointsPerSeason": 1916.44,
+   "averageEfficiency": 0.8872,
+   "weeksCounted": 18,
+   "weeksExcluded": 0,
+   "winsAboveExpected": -1.91,
+   "titles": 0,
+   "unavailable": [
+    {
+     "figure": "playoffAppearances",
+     "reason": "only the champion's placement is stored; the bracket is not parsed"
+    },
+    {
+     "figure": "tradesPerSeason",
+     "reason": "trades are not attributed to a manager (a trade names several rosters)"
+    }
+   ],
+   "ranks": [
+    {
+     "figure": "winRate",
+     "position": 4,
+     "population": 12,
+     "leagueName": "West Coast Fantasy Football",
+     "sleeperLeagueId": "1262506916429430784"
+    },
+    {
+     "figure": "pointsPerSeason",
+     "position": 1,
+     "population": 12,
+     "leagueName": "West Coast Fantasy Football",
+     "sleeperLeagueId": "1262506916429430784"
+    },
+    {
+     "figure": "averageEfficiency",
+     "position": 7,
+     "population": 12,
+     "leagueName": "West Coast Fantasy Football",
+     "sleeperLeagueId": "1262506916429430784"
+    }
+   ],
+   "waivers": {
+    "movesPerSeason": 40,
+    "seasonsCounted": 1,
+    "faab": null,
+    "faabExcludedSeasons": [
+     {
+      "season": 2025,
+      "leagueName": "West Coast Fantasy Football",
+      "reason": "used waiver priority, not FAAB"
+     }
+    ]
+   }
+  }
+ ]
+}

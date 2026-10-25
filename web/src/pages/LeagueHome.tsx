@@ -46,7 +46,7 @@ import { isSettled, unavailableReason, useLeagueAvailability } from '../useLeagu
 import { cachedDrafts } from '../railLeague'
 import { ordinal } from '../rankOrder'
 import { buildHeadline, computeWeeklyStory, leagueVoteHero } from './PowerRankings'
-import { TITLES } from './Superlatives'
+import { TITLES } from '../awardTitles'
 
 export type { Block } from '../useBlock'
 

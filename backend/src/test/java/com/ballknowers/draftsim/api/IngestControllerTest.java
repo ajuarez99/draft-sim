@@ -249,12 +249,12 @@ class IngestControllerTest {
     @Test
     void bracketsReturnsThePerSeasonCountsAndPassesForceThrough() {
         when(bracketIngest.backfillChain("L1", true)).thenReturn(List.of(
-                new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false)));
+                new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false, 7)));
 
         var resp = controller().brackets("L1", true);
 
         assertEquals(200, resp.getStatusCode().value());
-        assertEquals(List.of(new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false)),
+        assertEquals(List.of(new com.ballknowers.draftsim.ingest.BracketIngestService.SeasonResult(2025, "L1", 7, false, 7)),
                 resp.getBody().get("seasons"));
         verify(bracketIngest).backfillChain("L1", true);
     }

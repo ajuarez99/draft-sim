@@ -1,0 +1,1522 @@
+{
+ "sleeperLeagueId": "1346366555759341568",
+ "canCommission": true,
+ "records": {
+  "limit": 10,
+  "highestWeeks": [
+   {
+    "season": 2025,
+    "week": 8,
+    "rosterId": 7,
+    "managerId": 52,
+    "manager": "GraftonCarlson",
+    "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+    "points": 205.04
+   },
+   {
+    "season": 2025,
+    "week": 7,
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 203.24
+   },
+   {
+    "season": 2025,
+    "week": 12,
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 192.46
+   },
+   {
+    "season": 2025,
+    "week": 13,
+    "rosterId": 8,
+    "managerId": 49,
+    "manager": "theadambomb98",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 191.38
+   },
+   {
+    "season": 2025,
+    "week": 16,
+    "rosterId": 8,
+    "managerId": 49,
+    "manager": "theadambomb98",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 190
+   },
+   {
+    "season": 2026,
+    "week": 3,
+    "rosterId": 10,
+    "managerId": 44,
+    "manager": "kieriskash",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "points": 188.48
+   },
+   {
+    "season": 2025,
+    "week": 15,
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "points": 184.42
+   },
+   {
+    "season": 2025,
+    "week": 5,
+    "rosterId": 1,
+    "managerId": 7,
+    "manager": "popsharky",
+    "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+    "points": 182.82
+   },
+   {
+    "season": 2025,
+    "week": 2,
+    "rosterId": 11,
+    "managerId": 32,
+    "manager": "njerickson",
+    "avatarId": "4b497865b72cac32f7c250f948326a9c",
+    "points": 177.4
+   },
+   {
+    "season": 2025,
+    "week": 3,
+    "rosterId": 6,
+    "managerId": 55,
+    "manager": "wags707",
+    "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+    "points": 176.64
+   }
+  ],
+  "lowestWeeks": [
+   {
+    "season": 2025,
+    "week": 17,
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "points": 40.68
+   },
+   {
+    "season": 2026,
+    "week": 2,
+    "rosterId": 1,
+    "managerId": 7,
+    "manager": "popsharky",
+    "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+    "points": 59.6
+   },
+   {
+    "season": 2026,
+    "week": 4,
+    "rosterId": 9,
+    "managerId": 43,
+    "manager": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "points": 71.4
+   },
+   {
+    "season": 2025,
+    "week": 2,
+    "rosterId": 4,
+    "managerId": 50,
+    "manager": "ImReallyHarry",
+    "avatarId": "e9a48a9868067128e57699eb1375c266",
+    "points": 73.14
+   },
+   {
+    "season": 2025,
+    "week": 8,
+    "rosterId": 3,
+    "managerId": 46,
+    "manager": "ChedddaBob",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "points": 73.82
+   },
+   {
+    "season": 2025,
+    "week": 17,
+    "rosterId": 4,
+    "managerId": 50,
+    "manager": "ImReallyHarry",
+    "avatarId": "e9a48a9868067128e57699eb1375c266",
+    "points": 76.9
+   },
+   {
+    "season": 2025,
+    "week": 5,
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "points": 77.02
+   },
+   {
+    "season": 2025,
+    "week": 13,
+    "rosterId": 9,
+    "managerId": 43,
+    "manager": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "points": 77.24
+   },
+   {
+    "season": 2025,
+    "week": 12,
+    "rosterId": 10,
+    "managerId": 44,
+    "manager": "kieriskash",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "points": 78.14
+   },
+   {
+    "season": 2025,
+    "week": 9,
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "points": 79.16
+   }
+  ],
+  "closestMatchups": [
+   {
+    "season": 2025,
+    "week": 17,
+    "margin": 0.16,
+    "winner": {
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "points": 132.58
+    },
+    "loser": {
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "points": 132.42
+    }
+   },
+   {
+    "season": 2025,
+    "week": 4,
+    "margin": 0.36,
+    "winner": {
+     "rosterId": 8,
+     "managerId": 49,
+     "manager": "theadambomb98",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "points": 118.12
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 117.76
+    }
+   },
+   {
+    "season": 2025,
+    "week": 17,
+    "margin": 2.12,
+    "winner": {
+     "rosterId": 5,
+     "managerId": 45,
+     "manager": "jstrobe",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "points": 111.98
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 109.86
+    }
+   },
+   {
+    "season": 2025,
+    "week": 9,
+    "margin": 2.46,
+    "winner": {
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "points": 134.86
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 132.4
+    }
+   },
+   {
+    "season": 2025,
+    "week": 14,
+    "margin": 2.46,
+    "winner": {
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "points": 130.2
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 127.74
+    }
+   },
+   {
+    "season": 2025,
+    "week": 3,
+    "margin": 2.6,
+    "winner": {
+     "rosterId": 11,
+     "managerId": 32,
+     "manager": "njerickson",
+     "avatarId": "4b497865b72cac32f7c250f948326a9c",
+     "points": 117.72
+    },
+    "loser": {
+     "rosterId": 12,
+     "managerId": 41,
+     "manager": "GrandmasBeefRagu",
+     "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+     "points": 115.12
+    }
+   },
+   {
+    "season": 2025,
+    "week": 16,
+    "margin": 3.74,
+    "winner": {
+     "rosterId": 6,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "points": 132.72
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 128.98
+    }
+   },
+   {
+    "season": 2025,
+    "week": 5,
+    "margin": 4.36,
+    "winner": {
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "points": 164.64
+    },
+    "loser": {
+     "rosterId": 6,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "points": 160.28
+    }
+   },
+   {
+    "season": 2025,
+    "week": 6,
+    "margin": 4.52,
+    "winner": {
+     "rosterId": 12,
+     "managerId": 41,
+     "manager": "GrandmasBeefRagu",
+     "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+     "points": 130.42
+    },
+    "loser": {
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "points": 125.9
+    }
+   },
+   {
+    "season": 2025,
+    "week": 11,
+    "margin": 4.76,
+    "winner": {
+     "rosterId": 7,
+     "managerId": 52,
+     "manager": "GraftonCarlson",
+     "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+     "points": 111.6
+    },
+    "loser": {
+     "rosterId": 9,
+     "managerId": 43,
+     "manager": "jpelwell",
+     "avatarId": "f0edbf4278f53f9425db175073df6584",
+     "points": 106.84
+    }
+   }
+  ],
+  "biggestBlowouts": [
+   {
+    "season": 2025,
+    "week": 8,
+    "margin": 118.86,
+    "winner": {
+     "rosterId": 7,
+     "managerId": 52,
+     "manager": "GraftonCarlson",
+     "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+     "points": 205.04
+    },
+    "loser": {
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "points": 86.18
+    }
+   },
+   {
+    "season": 2026,
+    "week": 2,
+    "margin": 99.68,
+    "winner": {
+     "rosterId": 9,
+     "managerId": 43,
+     "manager": "jpelwell",
+     "avatarId": "f0edbf4278f53f9425db175073df6584",
+     "points": 159.28
+    },
+    "loser": {
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "points": 59.6
+    }
+   },
+   {
+    "season": 2026,
+    "week": 4,
+    "margin": 95.14,
+    "winner": {
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "points": 166.54
+    },
+    "loser": {
+     "rosterId": 9,
+     "managerId": 43,
+     "manager": "jpelwell",
+     "avatarId": "f0edbf4278f53f9425db175073df6584",
+     "points": 71.4
+    }
+   },
+   {
+    "season": 2025,
+    "week": 6,
+    "margin": 88.28,
+    "winner": {
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "points": 176.58
+    },
+    "loser": {
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "points": 88.3
+    }
+   },
+   {
+    "season": 2025,
+    "week": 12,
+    "margin": 84.22,
+    "winner": {
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "points": 162.36
+    },
+    "loser": {
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "points": 78.14
+    }
+   },
+   {
+    "season": 2025,
+    "week": 15,
+    "margin": 77.08,
+    "winner": {
+     "rosterId": 12,
+     "managerId": 41,
+     "manager": "GrandmasBeefRagu",
+     "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+     "points": 184.42
+    },
+    "loser": {
+     "rosterId": 5,
+     "managerId": 45,
+     "manager": "jstrobe",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "points": 107.34
+    }
+   },
+   {
+    "season": 2025,
+    "week": 7,
+    "margin": 69.3,
+    "winner": {
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "points": 163.74
+    },
+    "loser": {
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "points": 94.44
+    }
+   },
+   {
+    "season": 2026,
+    "week": 1,
+    "margin": 67.6,
+    "winner": {
+     "rosterId": 6,
+     "managerId": 51,
+     "manager": "xonicboom",
+     "avatarId": "c7601f667f04b29a3c4324e4f2fb1865",
+     "points": 158.36
+    },
+    "loser": {
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "points": 90.76
+    }
+   },
+   {
+    "season": 2026,
+    "week": 3,
+    "margin": 67.58,
+    "winner": {
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "points": 188.48
+    },
+    "loser": {
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "points": 120.9
+    }
+   },
+   {
+    "season": 2025,
+    "week": 3,
+    "margin": 65.02,
+    "winner": {
+     "rosterId": 6,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "points": 176.64
+    },
+    "loser": {
+     "rosterId": 7,
+     "managerId": 52,
+     "manager": "GraftonCarlson",
+     "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+     "points": 111.62
+    }
+   }
+  ],
+  "marginsUnavailableReason": null,
+  "pointsLeaders": [
+   {
+    "rosterId": 1,
+    "managerId": 7,
+    "manager": "popsharky",
+    "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+    "points": 3000.5,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 7,
+    "managerId": 52,
+    "manager": "GraftonCarlson",
+    "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+    "points": 2843.16,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 8,
+    "managerId": 49,
+    "manager": "theadambomb98",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 2786.54,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 11,
+    "managerId": 32,
+    "manager": "njerickson",
+    "avatarId": "4b497865b72cac32f7c250f948326a9c",
+    "points": 2781.4,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 4,
+    "managerId": 50,
+    "manager": "ImReallyHarry",
+    "avatarId": "e9a48a9868067128e57699eb1375c266",
+    "points": 2647.92,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 10,
+    "managerId": 44,
+    "manager": "kieriskash",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "points": 2605.56,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 3,
+    "managerId": 46,
+    "manager": "ChedddaBob",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "points": 2566.28,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "points": 2557.34,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "points": 2541.44,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   },
+   {
+    "rosterId": 9,
+    "managerId": 43,
+    "manager": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "points": 2464.68,
+    "spanSeasons": [
+     2025,
+     2026
+    ]
+   }
+  ],
+  "winStreaks": [
+   {
+    "rosterId": 1,
+    "managerId": 7,
+    "manager": "popsharky",
+    "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+    "length": 7,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 4,
+    "endWeek": 10,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 9,
+    "managerId": 43,
+    "manager": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "length": 5,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 4,
+    "endWeek": 8,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 10,
+    "managerId": 44,
+    "manager": "kieriskash",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "length": 4,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 4,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 11,
+    "managerId": 32,
+    "manager": "njerickson",
+    "avatarId": "4b497865b72cac32f7c250f948326a9c",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 1,
+    "endWeek": 4,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 4,
+    "managerId": 50,
+    "manager": "ImReallyHarry",
+    "avatarId": "e9a48a9868067128e57699eb1375c266",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 3,
+    "endWeek": 6,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 7,
+    "endWeek": 10,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 3,
+    "managerId": 46,
+    "manager": "ChedddaBob",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 13,
+    "endWeek": 16,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 7,
+    "managerId": 52,
+    "manager": "GraftonCarlson",
+    "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 13,
+    "endWeek": 16,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 6,
+    "managerId": 51,
+    "manager": "xonicboom",
+    "avatarId": "c7601f667f04b29a3c4324e4f2fb1865",
+    "length": 3,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 3,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 9,
+    "managerId": 43,
+    "manager": "jpelwell",
+    "avatarId": "f0edbf4278f53f9425db175073df6584",
+    "length": 3,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 3,
+    "withinSeasonOnly": true
+   }
+  ],
+  "lossStreaks": [
+   {
+    "rosterId": 2,
+    "managerId": 48,
+    "manager": "BamAddABio",
+    "avatarId": "a669fc23016821e781e053b4c370a525",
+    "length": 7,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 6,
+    "endWeek": 12,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 10,
+    "managerId": 44,
+    "manager": "kieriskash",
+    "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+    "length": 5,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 6,
+    "endWeek": 10,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 12,
+    "managerId": 41,
+    "manager": "GrandmasBeefRagu",
+    "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+    "length": 5,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 9,
+    "endWeek": 13,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 2,
+    "managerId": 48,
+    "manager": "BamAddABio",
+    "avatarId": "a669fc23016821e781e053b4c370a525",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 1,
+    "endWeek": 4,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 7,
+    "managerId": 52,
+    "manager": "GraftonCarlson",
+    "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 1,
+    "endWeek": 4,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 3,
+    "managerId": 46,
+    "manager": "ChedddaBob",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 3,
+    "endWeek": 6,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "length": 4,
+    "spanSeasons": [
+     2025
+    ],
+    "startWeek": 13,
+    "endWeek": 16,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 3,
+    "managerId": 46,
+    "manager": "ChedddaBob",
+    "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+    "length": 3,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 3,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 5,
+    "managerId": 45,
+    "manager": "jstrobe",
+    "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+    "length": 3,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 3,
+    "withinSeasonOnly": true
+   },
+   {
+    "rosterId": 11,
+    "managerId": 32,
+    "manager": "njerickson",
+    "avatarId": "4b497865b72cac32f7c250f948326a9c",
+    "length": 3,
+    "spanSeasons": [
+     2026
+    ],
+    "startWeek": 1,
+    "endWeek": 3,
+    "withinSeasonOnly": true
+   }
+  ]
+ },
+ "seasons": [
+  {
+   "season": 2026,
+   "leagueId": 4,
+   "sleeperLeagueId": "1346366555759341568",
+   "name": "(Foot) Ball Knowers",
+   "standings": [
+    {
+     "leagueId": 4,
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "wins": 4,
+     "losses": 0,
+     "ties": 0,
+     "pointsFor": 643.24,
+     "pointsAgainst": 517.38,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Master Bates",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 6,
+     "managerId": 51,
+     "manager": "xonicboom",
+     "avatarId": "c7601f667f04b29a3c4324e4f2fb1865",
+     "wins": 3,
+     "losses": 1,
+     "ties": 0,
+     "pointsFor": 603.46,
+     "pointsAgainst": 442.54,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Play with the Klittle",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "wins": 3,
+     "losses": 1,
+     "ties": 0,
+     "pointsFor": 531.99,
+     "pointsAgainst": 573.76,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Dart has hit anotha Bower",
+     "isMe": true
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 9,
+     "managerId": 43,
+     "manager": "jpelwell",
+     "avatarId": "f0edbf4278f53f9425db175073df6584",
+     "wins": 3,
+     "losses": 1,
+     "ties": 0,
+     "pointsFor": 503.68,
+     "pointsAgainst": 458.46,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "jpelwell",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "wins": 3,
+     "losses": 1,
+     "ties": 0,
+     "pointsFor": 474.68,
+     "pointsAgainst": 470.38,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Hunter? I Barkley Goedert",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 12,
+     "managerId": 41,
+     "manager": "GrandmasBeefRagu",
+     "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+     "wins": 2,
+     "losses": 2,
+     "ties": 0,
+     "pointsFor": 516.52,
+     "pointsAgainst": 462.1,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Torta Pounder with Cheese",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 554.96,
+     "pointsAgainst": 638.78,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Khatt Stafford",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 7,
+     "managerId": 52,
+     "manager": "GraftonCarlson",
+     "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 523.78,
+     "pointsAgainst": 523.74,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "inJustice for Wags",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 8,
+     "managerId": 49,
+     "manager": "theadambomb98",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 508.28,
+     "pointsAgainst": 537.04,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Puka-Boo",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 11,
+     "managerId": 32,
+     "manager": "njerickson",
+     "avatarId": "4b497865b72cac32f7c250f948326a9c",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 504.36,
+     "pointsAgainst": 574.1,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Likely Have Downs",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 428.82,
+     "pointsAgainst": 483.4,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Osama Bin Loveland",
+     "isMe": false
+    },
+    {
+     "leagueId": 4,
+     "rosterId": 5,
+     "managerId": 45,
+     "manager": "jstrobe",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "wins": 1,
+     "losses": 3,
+     "ties": 0,
+     "pointsFor": 420.98,
+     "pointsAgainst": 533.08,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "IN_PROGRESS",
+     "finalRank": null,
+     "finalRankWeek": null,
+     "teamName": "Pickens you off",
+     "isMe": false
+    }
+   ]
+  },
+  {
+   "season": 2025,
+   "leagueId": 5,
+   "sleeperLeagueId": "1254190892974084096",
+   "name": "(Foot) Ball Knowers",
+   "standings": [
+    {
+     "leagueId": 5,
+     "rosterId": 1,
+     "managerId": 7,
+     "manager": "popsharky",
+     "avatarId": "e1d4ebf9ea0760f248119d4ec2ac5a63",
+     "wins": 10,
+     "losses": 4,
+     "ties": 0,
+     "pointsFor": 2042.84,
+     "pointsAgainst": 1771.16,
+     "champion": true,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 1,
+     "finalRankWeek": 17,
+     "teamName": "popsharky",
+     "isMe": true
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 11,
+     "managerId": 32,
+     "manager": "njerickson",
+     "avatarId": "4b497865b72cac32f7c250f948326a9c",
+     "wins": 10,
+     "losses": 4,
+     "ties": 0,
+     "pointsFor": 1924.64,
+     "pointsAgainst": 1798.3,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 4,
+     "finalRankWeek": 17,
+     "teamName": "Generational St. Brown",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 4,
+     "managerId": 50,
+     "manager": "ImReallyHarry",
+     "avatarId": "e9a48a9868067128e57699eb1375c266",
+     "wins": 9,
+     "losses": 5,
+     "ties": 0,
+     "pointsFor": 1741.56,
+     "pointsAgainst": 1616.68,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 8,
+     "finalRankWeek": 17,
+     "teamName": "She Sutton on my Dicker",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 9,
+     "managerId": 43,
+     "manager": "jpelwell",
+     "avatarId": "f0edbf4278f53f9425db175073df6584",
+     "wins": 9,
+     "losses": 5,
+     "ties": 0,
+     "pointsFor": 1588.2,
+     "pointsAgainst": 1494.68,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 11,
+     "finalRankWeek": 17,
+     "teamName": "jpelwell",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 8,
+     "managerId": 49,
+     "manager": "theadambomb98",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "wins": 8,
+     "losses": 6,
+     "ties": 0,
+     "pointsFor": 1800.02,
+     "pointsAgainst": 1784.24,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 3,
+     "finalRankWeek": 17,
+     "teamName": "Republic of Azer-Bijan",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 3,
+     "managerId": 46,
+     "manager": "ChedddaBob",
+     "avatarId": "942bfb8fc7c764e270ae98987c424dba",
+     "wins": 8,
+     "losses": 6,
+     "ties": 0,
+     "pointsFor": 1766.1,
+     "pointsAgainst": 1768.48,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 6,
+     "finalRankWeek": 17,
+     "teamName": "FatDeebo’s DoubleDogCombo",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 5,
+     "managerId": 45,
+     "manager": "jstrobe",
+     "avatarId": "82aec8e811b839b8ec25d7b458afd57b",
+     "wins": 7,
+     "losses": 7,
+     "ties": 0,
+     "pointsFor": 1791.44,
+     "pointsAgainst": 1780.62,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 7,
+     "finalRankWeek": 17,
+     "teamName": "jstrobe",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 7,
+     "managerId": 52,
+     "manager": "GraftonCarlson",
+     "avatarId": "f9a72da68ecb2109212197b6be1ff676",
+     "wins": 6,
+     "losses": 8,
+     "ties": 0,
+     "pointsFor": 1855.86,
+     "pointsAgainst": 1940.36,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 2,
+     "finalRankWeek": 17,
+     "teamName": "i Chase Brown kids",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 6,
+     "managerId": 55,
+     "manager": "wags707",
+     "avatarId": "15d7cf259bc30eab8f6120f45f652fb6",
+     "wins": 5,
+     "losses": 9,
+     "ties": 0,
+     "pointsFor": 1868.98,
+     "pointsAgainst": 1888.36,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 5,
+     "finalRankWeek": 17,
+     "teamName": "wags707",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 12,
+     "managerId": 41,
+     "manager": "GrandmasBeefRagu",
+     "avatarId": "c1d8d68414ff33fc454f7ea82320baac",
+     "wins": 5,
+     "losses": 9,
+     "ties": 0,
+     "pointsFor": 1670.86,
+     "pointsAgainst": 1746.82,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 9,
+     "finalRankWeek": 17,
+     "teamName": "Kraft Mac n’ Cheese",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 10,
+     "managerId": 44,
+     "manager": "kieriskash",
+     "avatarId": "bbd21d12d7e92377fae2a5289b83310e",
+     "wins": 5,
+     "losses": 9,
+     "ties": 0,
+     "pointsFor": 1612.42,
+     "pointsAgainst": 1891.24,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 10,
+     "finalRankWeek": 17,
+     "teamName": "kieriskash",
+     "isMe": false
+    },
+    {
+     "leagueId": 5,
+     "rosterId": 2,
+     "managerId": 48,
+     "manager": "BamAddABio",
+     "avatarId": "a669fc23016821e781e053b4c370a525",
+     "wins": 2,
+     "losses": 12,
+     "ties": 0,
+     "pointsFor": 1618.18,
+     "pointsAgainst": 1800.16,
+     "champion": false,
+     "season": null,
+     "sleeperLeagueId": null,
+     "sport": null,
+     "leagueName": null,
+     "complete": null,
+     "rankStatus": "RANKED",
+     "finalRank": 12,
+     "finalRankWeek": 17,
+     "teamName": "T. Lawrence of her Labia",
+     "isMe": false
+    }
+   ]
+  }
+ ]
+}

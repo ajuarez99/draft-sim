@@ -186,6 +186,44 @@ class RivalryParityIT {
         assertEquals(2, consolation, "5 v 6 only meet in the 2025 consolation weeks 7 and 8 of the playoff weeks");
     }
 
+    /**
+     * specs/047 T019 (SC-002/SC-003): every discovery entry IS its matrix cell, field for field, and the
+     * claim lists never name a pair below N meetings. Run on one NFL and one NBA chain.
+     */
+    @Test
+    void discoveryEntriesAreTheirMatrixCellsAndNeverBelowTheFloor() {
+        for (String league : List.of(X26, Z26)) {
+            Response r = rivalries.forLeague(league, null).orElseThrow();
+            RivalryService.Discovery d = r.discovery();
+            assertNotNull(d, league);
+            assertEquals(3, d.minMeetings(), league + ": N is the hand-set weights.yml value");
+            assertEquals("hand-set", d.minMeetingsLabel());
+            Map<String, PairRecord> cells = new HashMap<>();
+            for (PairRecord p : r.matrix().pairs()) cells.put(p.aManagerId() + "-" + p.bManagerId(), p);
+            int entries = 0;
+            for (var named : Map.of("mostPlayed", d.mostPlayed(), "closest", d.closest(),
+                    "lopsided", d.lopsided(), "playoff", d.playoff()).entrySet()) {
+                for (RivalryService.DiscoveredPair e : named.getValue()) {
+                    entries++;
+                    String label = league + " " + named.getKey() + " " + e.aManagerId() + "-" + e.bManagerId();
+                    PairRecord cell = cells.get(e.aManagerId() + "-" + e.bManagerId());
+                    assertNotNull(cell, label + " has a matrix cell");
+                    assertEquals(cell.meetings(), e.meetings(), label);
+                    assertEquals(cell.aWins(), e.aWins(), label);
+                    assertEquals(cell.bWins(), e.bWins(), label);
+                    assertEquals(cell.ties(), e.ties(), label);
+                    assertEquals(cell.byKind(), e.byKind(), label);
+                    assertEquals(cell.status(), e.status(), label);
+                    assertEquals(cell.finals(), e.finals(), label);
+                    assertEquals(cell.games(), e.games(), label);
+                    // the playoff list is a record of fact and has no floor; the three claims do
+                    if (!named.getKey().equals("playoff")) assertTrue(e.meetings() >= d.minMeetings(), label);
+                }
+            }
+            assertTrue(entries > 0, league + ": the fixture must produce at least one entry to compare");
+        }
+    }
+
     @Test
     void sportsNeverMixAndTheNbaChainStandsAlone() {
         Response nba = rivalries.forLeague(Z26, null).orElseThrow();

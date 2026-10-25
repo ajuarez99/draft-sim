@@ -63,6 +63,22 @@ Built so far:
   037, **which week** to play them. No pair may meet more than twice in the regular season
   (a league rule in `weights.yml`); the page names pairs the rule held back, the matchups the
   week replaces, and every other eligible week with its own pairings. Read-only toward Sleeper.
+- **Hall of fame** (specs/047-hall-of-fame). Three additions, all read-only toward Sleeper:
+  - History gets a trophy case: one row per finished season with the champion (the same rule as the
+    standings' trophy), the runner-up (the loser of the stored playoff final), the regular-season points
+    leader(s) and last place. A cell that can't name someone says why. Last place is read from Sleeper's
+    losers bracket and **refused** unless the stored scores show which end of it is last
+    (`engine/LastPlaceRule`): on today's data "(Foot) Ball Knowers" 2025 and West Coast 2025 name one, and
+    both "Ball Knowers" NBA seasons say "not reported". An Awards toggle per season shows that season's
+    winners from the same endpoint and rendering as the Awards page.
+  - Rivalries gets a "Notable rivalries" block above the grid: most played, closest, most one-sided and
+    playoff meetings, from the grid's own pairs. N (3) is the existing hand-set meeting floor, and
+    every tied pair is listed.
+  - A manager's page shows their nemesis and victim per league chain, scoped to the leagues the viewer
+    shares with them.
+  - **After deploying, run the bracket backfill once per chain** (`POST /api/ingest/brackets/{leagueId}` with
+    `X-Admin-Token`), never during a live draft: migration V40 adds the losers-bracket table, and until the
+    backfill runs, finished seasons show "not available" / "not reported" for runner-up and last place.
 - **The season after the draft** (specs/030-post-draft-season-view). Between a completed draft
   and the first *final* scored week, the league home leads with this season. It drops last
   season's matchup, power and award blocks; shows the first-games date; ranks every roster by

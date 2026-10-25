@@ -191,8 +191,28 @@ public class RivalryService {
     public record Displaced(long aManagerId, long bManagerId, List<Integer> metInWeeks,
                             List<Integer> stillMeetsInWeeks) {}
 
+    /**
+     * Spec 047 US2: one notable pair. Every field up to {@code games} is copied from the pair's own
+     * {@link PairRecord}, so an entry equals its matrix cell by construction (SC-003). {@code playoffMatches} is
+     * the number of playoff MATCHES (a two-week final is one), not weeks.
+     */
+    public record DiscoveredPair(long aManagerId, long bManagerId, int meetings, int aWins, int bWins, int ties,
+                                 Map<String, KindTally> byKind, String status, List<Final> finals,
+                                 List<GameLine> games, int playoffMatches) {}
+
+    /**
+     * Spec 047 US2: notable rivalries picked out of the matrix, from the same {@code calc} map so the population
+     * is the matrix's (current managers). {@code minMeetings} is N, {@code minMeetingsLabel} says it is hand-set;
+     * both are null only when the rivalry settings didn't load, and then every list is empty. Each list returns
+     * EVERY tied entry. {@code playoffUnsplitSeasons}: seasons whose playoff weeks couldn't be split (the
+     * matrix's split notes), so an empty or partial {@code playoff} list can say what it can't tell.
+     */
+    public record Discovery(Integer minMeetings, String minMeetingsLabel, List<DiscoveredPair> mostPlayed,
+                            List<DiscoveredPair> closest, List<DiscoveredPair> lopsided,
+                            List<DiscoveredPair> playoff, List<Integer> playoffUnsplitSeasons) {}
+
     public record Response(String sport, int season, List<Integer> seasonsCovered, Matrix matrix,
-                           SeasonGrid seasonGrid, Recommendation recommendation) {}
+                           SeasonGrid seasonGrid, Recommendation recommendation, Discovery discovery) {}
 
     // ---------------------------------------------------------------- entry point
 
@@ -222,39 +242,12 @@ public class RivalryService {
         }
 
         // Per chain league: formats, brackets, shared-season membership, and the classified games.
-        List<Long> chainIds = chain.stream().map(LeagueRow::id).toList();
-        Map<Long, List<LeagueBracketRepository.Match>> bracketByLeague = new HashMap<>();
-        for (LeagueBracketRepository.Match m : brackets.forLeagues(chainIds)) {
-            bracketByLeague.computeIfAbsent(m.leagueId(), k -> new ArrayList<>()).add(m);
-        }
-        List<Game> games = new ArrayList<>();
-        Map<Long, Set<Long>> managersOfScoredLeague = new HashMap<>();
-        Map<Long, PlayoffFormat> formatByLeague = new HashMap<>();
-        for (LeagueRow l : chain) {
-            PlayoffFormat fmt = leagues.playoffFormat(l.id()).orElse(null);
-            formatByLeague.put(l.id(), fmt);
-            List<LeagueBracketRepository.Match> bracket = bracketByLeague.getOrDefault(l.id(), List.of());
-            List<PairedGame> played = fixtures.pairedWithScores(List.of(l.id()), WeekBound.ALL_WEEKS);
-            for (PairedGame g : played) {
-                if (g.aManagerId() == null && g.bManagerId() == null) continue;
-                if (g.aManagerId() != null && g.aManagerId().equals(g.bManagerId())) continue;
-                Classification c = RivalryGameKind.classify(fmt, bracket, g.week(), g.aRosterId(), g.bRosterId());
-                games.add(new Game(l.id(), l.season(), g.week(), g.aRosterId(), g.bRosterId(),
-                        g.aManagerId(), g.bManagerId(), g.aPoints().doubleValue(), g.bPoints().doubleValue(), c));
-            }
-            if (!played.isEmpty()) {
-                Set<Long> owners = new HashSet<>();
-                for (StandingRow s : rosterSeasons.forLeague(l.id())) if (s.managerId() != null) owners.add(s.managerId());
-                managersOfScoredLeague.put(l.id(), owners);
-            }
-        }
-        games.sort(Comparator.comparingInt(Game::season).thenComparingInt(Game::week));
-
-        Map<PairKey, List<Game>> byPair = new HashMap<>();
-        for (Game g : games) {
-            if (g.aMgr() == null || g.bMgr() == null) continue;
-            byPair.computeIfAbsent(PairKey.of(g.aMgr(), g.bMgr()), k -> new ArrayList<>()).add(g);
-        }
+        ChainGames cg = chainGames(chain);
+        Map<Long, List<LeagueBracketRepository.Match>> bracketByLeague = cg.bracketByLeague();
+        List<Game> games = cg.games();
+        Map<Long, Set<Long>> managersOfScoredLeague = cg.managersOfScoredLeague();
+        Map<Long, PlayoffFormat> formatByLeague = cg.formatByLeague();
+        Map<PairKey, List<Game>> byPair = cg.byPair();
 
         List<ScheduledPair> scheduled = fixtures.scheduledPairs(league.id());
         Map<PairKey, Integer> scheduledWeek = new HashMap<>();
@@ -330,19 +323,152 @@ public class RivalryService {
         Recommendation rec = recommendation(chain, managerIds, nameOf, calc, weekCtx);
 
         List<Integer> seasons = chain.stream().map(LeagueRow::season).toList();
-        return Optional.of(new Response(league.sport().code(), league.season(), seasons, matrix, grid, rec));
+        Discovery discovery = props.minMeetings() == null
+                ? new Discovery(null, null, List.of(), List.of(), List.of(), List.of(), unsplitSeasons(matrix.splitNotes()))
+                : discovery(calc, props.minMeetings(), matrix.splitNotes());
+        return Optional.of(new Response(league.sport().code(), league.season(), seasons, matrix, grid, rec, discovery));
+    }
+
+    // ---------------------------------------------------------------- discovery (spec 047 US2, research R9)
+
+    private static List<Integer> unsplitSeasons(List<SplitNote> notes) {
+        return notes.stream().map(SplitNote::season).toList();
+    }
+
+    private static DiscoveredPair discovered(PairCalc pc) {
+        PairRecord r = pc.record();
+        return new DiscoveredPair(r.aManagerId(), r.bManagerId(), r.meetings(), r.aWins(), r.bWins(), r.ties(),
+                r.byKind(), r.status(), r.finals(), r.games(), pc.stats().playoffMeetings());
+    }
+
+    private static int gap(PairCalc pc) {
+        return Math.abs(pc.record().aWins() - pc.record().bWins());
+    }
+
+    /**
+     * The four lists, from the matrix's own pair calculations (research R9 + plan A2/A3; the rules are
+     * definitions, not tuned weights, and N is the existing hand-set {@code rivalry.min-meetings}):
+     *
+     * <ul>
+     *   <li><b>mostPlayed</b>: the most meetings, among pairs with {@code >= N}.
+     *   <li><b>closest</b>: the smallest |wins - losses|, then more meetings, among pairs with {@code >= N}.
+     *   <li><b>lopsided</b>: the largest |wins - losses|, then the higher winner share of meetings, among pairs
+     *       with {@code >= N}; shown only when that gap is at least 2 AND larger than the closest tier's gap
+     *       (a league where every pair is 2-1 has no lopsided rivalry, only a closest one).
+     *   <li><b>playoff</b>: every pair with at least one playoff match, with NO meetings floor: it is a record of
+     *       fact (they met in the playoffs), not a claim about how strong the rivalry is. Most playoff matches
+     *       first.
+     * </ul>
+     * Ties are never broken silently: every tied entry is returned.
+     */
+    static Discovery discovery(Map<PairKey, PairCalc> calc, int minMeetings, List<SplitNote> splitNotes) {
+        List<PairCalc> eligible = new ArrayList<>();
+        List<PairCalc> playoffPairs = new ArrayList<>();
+        for (PairCalc pc : calc.values()) {
+            if ("MET".equals(pc.record().status()) && pc.record().meetings() >= minMeetings) eligible.add(pc);
+            if (pc.stats().playoffMeetings() > 0) playoffPairs.add(pc);
+        }
+
+        List<PairCalc> mostPlayed = new ArrayList<>();
+        int maxMeetings = eligible.stream().mapToInt(pc -> pc.record().meetings()).max().orElse(0);
+        for (PairCalc pc : eligible) if (pc.record().meetings() == maxMeetings) mostPlayed.add(pc);
+
+        List<PairCalc> closest = new ArrayList<>();
+        int closestGap = eligible.stream().mapToInt(RivalryService::gap).min().orElse(0);
+        int closestMeetings = 0;
+        for (PairCalc pc : eligible) {
+            if (gap(pc) == closestGap) closestMeetings = Math.max(closestMeetings, pc.record().meetings());
+        }
+        for (PairCalc pc : eligible) {
+            if (gap(pc) == closestGap && pc.record().meetings() == closestMeetings) closest.add(pc);
+        }
+
+        List<PairCalc> lopsided = new ArrayList<>();
+        if (!eligible.isEmpty()) {
+            int widest = eligible.stream().mapToInt(RivalryService::gap).max().orElse(0);
+            if (widest >= 2 && widest > closestGap) {
+                double bestShare = -1;
+                for (PairCalc pc : eligible) {
+                    if (gap(pc) == widest) bestShare = Math.max(bestShare, share(pc));
+                }
+                for (PairCalc pc : eligible) {
+                    if (gap(pc) == widest && share(pc) == bestShare) lopsided.add(pc);
+                }
+            }
+        }
+
+        playoffPairs.sort(Comparator.comparingInt((PairCalc pc) -> -pc.stats().playoffMeetings())
+                .thenComparingInt(pc -> -pc.record().meetings()));
+        return new Discovery(minMeetings, MINIMUM_LABEL,
+                mostPlayed.stream().map(RivalryService::discovered).toList(),
+                closest.stream().map(RivalryService::discovered).toList(),
+                lopsided.stream().map(RivalryService::discovered).toList(),
+                playoffPairs.stream().map(RivalryService::discovered).toList(),
+                unsplitSeasons(splitNotes));
+    }
+
+    /** The winner's share of the meetings: max(wins, losses) / meetings. Exact for the small ints involved. */
+    private static double share(PairCalc pc) {
+        PairRecord r = pc.record();
+        return (double) Math.max(r.aWins(), r.bWins()) / r.meetings();
+    }
+
+    /**
+     * Spec 047 T004: everything the chain loop produced, so the rivalry matrix (current managers only) and the
+     * hall of fame (any pair of the chain, former managers included) read the same classified games.
+     */
+    record ChainGames(List<Game> games, Map<PairKey, List<Game>> byPair,
+                      Map<Long, Set<Long>> managersOfScoredLeague, Map<Long, PlayoffFormat> formatByLeague,
+                      Map<Long, List<LeagueBracketRepository.Match>> bracketByLeague) {}
+
+    /** The chain loop of {@link #forLeague}, unchanged: formats, brackets, scored games, shared-season membership. */
+    ChainGames chainGames(List<LeagueRow> chain) {
+        List<Long> chainIds = chain.stream().map(LeagueRow::id).toList();
+        Map<Long, List<LeagueBracketRepository.Match>> bracketByLeague = new HashMap<>();
+        for (LeagueBracketRepository.Match m : brackets.forLeagues(chainIds)) {
+            bracketByLeague.computeIfAbsent(m.leagueId(), k -> new ArrayList<>()).add(m);
+        }
+        List<Game> games = new ArrayList<>();
+        Map<Long, Set<Long>> managersOfScoredLeague = new HashMap<>();
+        Map<Long, PlayoffFormat> formatByLeague = new HashMap<>();
+        for (LeagueRow l : chain) {
+            PlayoffFormat fmt = leagues.playoffFormat(l.id()).orElse(null);
+            formatByLeague.put(l.id(), fmt);
+            List<LeagueBracketRepository.Match> bracket = bracketByLeague.getOrDefault(l.id(), List.of());
+            List<PairedGame> played = fixtures.pairedWithScores(List.of(l.id()), WeekBound.ALL_WEEKS);
+            for (PairedGame g : played) {
+                if (g.aManagerId() == null && g.bManagerId() == null) continue;
+                if (g.aManagerId() != null && g.aManagerId().equals(g.bManagerId())) continue;
+                Classification c = RivalryGameKind.classify(fmt, bracket, g.week(), g.aRosterId(), g.bRosterId());
+                games.add(new Game(l.id(), l.season(), g.week(), g.aRosterId(), g.bRosterId(),
+                        g.aManagerId(), g.bManagerId(), g.aPoints().doubleValue(), g.bPoints().doubleValue(), c));
+            }
+            if (!played.isEmpty()) {
+                Set<Long> owners = new HashSet<>();
+                for (StandingRow s : rosterSeasons.forLeague(l.id())) if (s.managerId() != null) owners.add(s.managerId());
+                managersOfScoredLeague.put(l.id(), owners);
+            }
+        }
+        games.sort(Comparator.comparingInt(Game::season).thenComparingInt(Game::week));
+
+        Map<PairKey, List<Game>> byPair = new HashMap<>();
+        for (Game g : games) {
+            if (g.aMgr() == null || g.bMgr() == null) continue;
+            byPair.computeIfAbsent(PairKey.of(g.aMgr(), g.bMgr()), k -> new ArrayList<>()).add(g);
+        }
+        return new ChainGames(games, byPair, managersOfScoredLeague, formatByLeague, bracketByLeague);
     }
 
     // ---------------------------------------------------------------- internals
 
-    private record PairKey(long lo, long hi) {
+    record PairKey(long lo, long hi) {
         static PairKey of(long x, long y) {
             return new PairKey(Math.min(x, y), Math.max(x, y));
         }
     }
 
     /** One classified, deduplicated meeting. {@code aMgr}/{@code bMgr} follow roster order, not manager order. */
-    private record Game(long leagueId, int season, int week, int aRoster, int bRoster, Long aMgr, Long bMgr,
+    record Game(long leagueId, int season, int week, int aRoster, int bRoster, Long aMgr, Long bMgr,
                         double aPts, double bPts, Classification c) {}
 
     private static final Comparator<StandingRow> STANDINGS_ORDER = Comparator
@@ -353,10 +479,10 @@ public class RivalryService {
             .thenComparing(s -> s.managerId() == null ? Long.MAX_VALUE : s.managerId());
 
     /** A pair's wire record plus the extras the reasons need. */
-    private record PairCalc(PairRecord record, PairStats stats, List<Game> games, int playoffAWins, int playoffBWins,
+    record PairCalc(PairRecord record, PairStats stats, List<Game> games, int playoffAWins, int playoffBWins,
                             List<int[]> placementGames, Integer scheduledWeek, String streakSide, int streakLength) {}
 
-    private PairCalc pairCalc(PairKey key, List<Game> games, Integer scheduledWeek,
+    PairCalc pairCalc(PairKey key, List<Game> games, Integer scheduledWeek,
                               Map<Long, Set<Long>> managersOfScoredLeague, Map<Long, PlayoffFormat> formats) {
         int aw = 0, bw = 0, ties = 0;
         EnumMap<Kind, int[]> by = new EnumMap<>(Kind.class);

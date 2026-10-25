@@ -6671,3 +6671,90 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .adp-budget-left { font-size: 22px; }
   .adp-table th.sl-pin { min-width: 130px; }
 }
+
+/* --- Hall of fame (specs/047-hall-of-fame) -------------------------------------
+   The trophy case is seasons x roles, so it is a table that scrolls inside .hof-wrap with a sticky season column
+   (the page never scrolls sideways at 375px). Each role column carries its own tint so the roles read apart at a
+   glance: champion gold, runner-up teal, points leader neutral, last place a muted red. A cell that names nobody
+   says why in .hof-note. */
+.hof-section { min-width: 0; }
+.hof-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.hof-table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 640px; }
+.hof-table thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 8px 12px; text-align: left; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; }
+.hof-table tbody > tr > * { border-bottom: 1px solid var(--line); }
+.hof-table tbody > tr:last-child > * { border-bottom: none; }
+.hof-first { position: sticky; left: 0; z-index: 1; background: var(--panel); border-right: 1px solid var(--line); }
+.hof-table thead .hof-first { z-index: 2; }
+.hof-season { padding: 12px 14px; font-size: 15px; font-weight: 700; text-align: left; font-variant-numeric: tabular-nums; }
+.hof-c { padding: 10px 12px; vertical-align: top; min-width: 150px; }
+.hof-c > * + * { margin-top: 6px; }
+.hof-champ { background: color-mix(in oklab, var(--volt) 13%, var(--panel)); }
+.hof-ru { background: color-mix(in oklab, var(--teal) 9%, var(--panel)); }
+.hof-pl { background: var(--panel); }
+.hof-last { background: color-mix(in oklab, var(--down) 8%, var(--panel)); }
+.hof-table tbody > tr:hover > .hof-c { filter: brightness(1.12); }
+.hof-who-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.hof-who { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); text-decoration: none; }
+.hof-link:hover .hof-name { text-decoration: underline; }
+.hof-avatar { flex: none; }
+.hof-name { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.hof-cup { font-size: 16px; line-height: 1; }
+.hof-pts { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--muted); }
+.hof-note { display: block; color: var(--muted); font-size: 11px; line-height: 1.35; max-width: 34ch; }
+.hof-dash { color: var(--muted); }
+@media (max-width: 480px) {
+  .hof-first { padding-left: 10px; padding-right: 10px; }
+  .hof-season { font-size: 13px; }
+}
+
+/* --- Notable rivalries (specs/047-hall-of-fame US2) ------------------------------
+   Four short lists above the matrix. Each card carries its own tint in its title chip (most played teal, closest
+   volt, one-sided pink, playoff crimson) so the four questions read apart; the row is the same pair shape as a
+   cell: left name, the record it prints, right name. Narrow screens stack the cards. */
+.rvd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 10px; }
+.rvd-card { min-width: 0; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-top: 3px solid var(--rvd-tint, var(--line)); }
+.rvd-mostPlayed { --rvd-tint: var(--teal); }
+.rvd-closest { --rvd-tint: var(--volt); }
+.rvd-lopsided { --rvd-tint: var(--down); }
+.rvd-playoff { --rvd-tint: var(--crimson); }
+.rvd-title { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rvd-tint, var(--muted)); }
+.rvd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rvd-row { border-radius: 8px; transition: background 120ms ease; }
+.rvd-row:hover { background: color-mix(in oklab, var(--rvd-tint, var(--teal)) 12%, transparent); }
+.rvd-link { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 4px; color: var(--text); text-decoration: none; }
+.rvd-side { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.rvd-side-b { justify-content: flex-end; text-align: right; }
+.rvd-side .rv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rvd-rec { display: grid; justify-items: center; line-height: 1.2; }
+.rvd-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rvd-met { color: var(--muted); font-size: 10px; }
+.rvd-po { color: var(--crimson-text); font-size: 10px; font-weight: 600; }
+.rvd-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.rvd-empty, .rvd-note { margin: 0; }
+.rvd-note { margin-top: 8px; }
+
+/* --- Rivals on the manager page (specs/047-hall-of-fame US3) ----------------------
+   One block per league chain inside a sport's career block. Nemesis and victim are two tinted panels (pink / green,
+   the same worse/better pair the rest of the app uses) so which is which reads before the words do. */
+.mrv-block { margin: 14px 0 6px; display: grid; gap: 14px; }
+.mrv-chain-h { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--text); }
+.mrv-sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 10px; }
+.mrv-side { min-width: 0; padding: 10px 12px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-left: 3px solid var(--mrv-tint, var(--line)); }
+.mrv-side-nemesis { --mrv-tint: var(--down); }
+.mrv-side-victim { --mrv-tint: var(--up); }
+.mrv-title { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mrv-tint, var(--muted)); }
+.mrv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.mrv-entry { border-radius: 8px; transition: background 120ms ease; }
+.mrv-entry:hover { background: color-mix(in oklab, var(--mrv-tint, var(--teal)) 12%, transparent); }
+.mrv-link { display: flex; align-items: center; gap: 8px; padding: 5px 4px; color: var(--text); text-decoration: none; min-width: 0; flex-wrap: wrap; }
+.mrv-name { font-weight: 600; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.mrv-former { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--muted) 22%, transparent); color: var(--text); }
+.mrv-rec { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mrv-met { color: var(--muted); font-size: 11px; }
+.mrv-none { margin: 0; }
+.hof-awards-btn { display: block; margin: 6px 0 0; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
+.hof-awards-btn:hover, .hof-awards-btn[aria-expanded="true"] { color: var(--text); border-color: color-mix(in oklab, var(--teal) 60%, var(--line)); background: color-mix(in oklab, var(--teal) 12%, transparent); }
+.hof-awards-row > td { padding: 12px 14px 16px; background: color-mix(in oklab, var(--bg) 40%, var(--panel)); border-top: 1px dashed var(--line); }
+.hof-awards-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; margin-bottom: 8px; }
+.hof-award { min-width: 0; padding: 8px 10px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-left: 3px solid oklch(60% 0.12 var(--sl-hue, 250)); }
+.hof-award-title { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: oklch(75% 0.11 var(--sl-hue, 250)); }

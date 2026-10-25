@@ -86,6 +86,15 @@ public class SleeperClient {
         return http.get().uri("/league/{id}/winners_bracket", leagueId).retrieve().body(List.class);
     }
 
+    /**
+     * Spec 047: the losers bracket, same row shape as {@link #winnersBracket}. Sleeper does not say which end of it
+     * is "last place" (its {@code loser_bracket_type} setting is null for every real league), so the reader decides
+     * that from the stored scores (engine/LastPlaceRule).
+     */
+    public List<Map<String, Object>> losersBracket(String leagueId) {
+        return http.get().uri("/league/{id}/losers_bracket", leagueId).retrieve().body(List.class);
+    }
+
     /** Per-roster points_points/starters_points/players/starters for one scored week. */
     public List<Map<String, Object>> matchups(String leagueId, int week) {
         return http.get().uri("/league/{id}/matchups/{week}", leagueId, week).retrieve().body(List.class);
