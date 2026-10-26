@@ -165,6 +165,7 @@ describe('destinationsFor', () => {
       ['forecast', 'forecast'],
       ['weeklyReport', 'weekly-report'],
       ['superlatives', 'superlatives'],
+      ['weeklyPot', 'weekly-pot'],
     ]
     for (const [key, path] of oneSeason) {
       expect(hrefOf(key), key).toBe(`/leagues/L_OLD/${path}`)

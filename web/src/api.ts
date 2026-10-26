@@ -4251,3 +4251,84 @@ export const refreshDigestStats = (token: string) =>
     method: 'POST',
     headers: { 'X-Admin-Token': token },
   }).then(adminJson<{ results: DigestRefreshResult[] }>)
+
+// --- spec 048: weekly high-score pot ---
+
+/** DECIDED moves money; NO_SCORES (every stored score exactly 0) does not; NOT_FINAL = stored but not final; MISSING = no rows. */
+export type WeeklyPotWeekStatus = 'DECIDED' | 'NO_SCORES' | 'NOT_FINAL' | 'MISSING'
+
+export type WeeklyPotWeek = {
+  week: number
+  status: WeeklyPotWeekStatus
+  /** Roster ids; empty unless DECIDED. More than one = a tie for the week. */
+  winners: number[]
+  winningPoints: number | null
+  runnerUpPoints: number | null
+  payers: number
+  potCents: number
+}
+
+export type WeeklyPotBalance = {
+  rosterId: number
+  managerId: number | null
+  name: string
+  avatarId: string | null
+  isMe: boolean
+  noManager: boolean
+  weeksWon: number
+  collectedCents: number
+  paidCents: number
+  netCents: number
+}
+
+export type WeeklyPotDebt = { fromRosterId: number; toRosterId: number; cents: number }
+
+export type WeeklyPotLiveLeader = { week: number; rosterIds: number[]; points: number }
+
+/** Off: the server sends only these fields (nothing to render as money). */
+export type WeeklyPotOff = {
+  season: number
+  sport: Sport
+  enabled: false
+  stakeCents: number
+  canEdit: boolean
+  commissionerKnown: boolean
+}
+
+export type WeeklyPotOn = {
+  season: number
+  sport: Sport
+  enabled: true
+  stakeCents: number
+  canEdit: boolean
+  commissionerKnown: boolean
+  regularSeasonKnown: boolean
+  regularSeasonThroughWeek: number | null
+  throughWeek: number
+  /** Highest DECIDED week, 0 when none; balances include every decided week up to it. */
+  latestDecidedWeek: number
+  seasonFinal: boolean
+  tieCentRule: string
+  weeks: WeeklyPotWeek[]
+  balances: WeeklyPotBalance[]
+  pairwise: WeeklyPotDebt[]
+  shortcut: WeeklyPotDebt[]
+  liveLeader: WeeklyPotLiveLeader | null
+  liveUnavailable: boolean
+}
+
+export type WeeklyPot = WeeklyPotOff | WeeklyPotOn
+
+export const getWeeklyPot = (sleeperLeagueId: string) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-pot`).then(json<WeeklyPot>)
+
+/** Commissioner only. 200 returns the same body GET would; 400/403 throw with the server's `message`. */
+export const saveWeeklyPotSettings = (
+  sleeperLeagueId: string,
+  body: { enabled: boolean; stakeCents: number },
+) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/weekly-pot/settings`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(json<WeeklyPot>)

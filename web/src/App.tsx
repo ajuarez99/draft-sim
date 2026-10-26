@@ -16,6 +16,7 @@ import RosterManagement from './pages/RosterManagement'
 import ExpectedWins from './pages/ExpectedWins'
 import ScheduleGrid from './pages/ScheduleGrid'
 import Rivalries from './pages/Rivalries'
+import WeeklyPot from './pages/WeeklyPot'
 import AdpCompare from './pages/AdpCompare'
 import StatCalculator from './pages/StatCalculator'
 import StatLeaderboard from './pages/StatLeaderboard'
@@ -179,6 +180,10 @@ export default function App() {
               <Route
                 path="/leagues/:sleeperLeagueId/superlatives"
                 element={<KeyedByLeague page={Superlatives} gate="superlatives" />}
+              />
+              <Route
+                path="/leagues/:sleeperLeagueId/weekly-pot"
+                element={<KeyedByLeague page={WeeklyPot} gate="weeklyPot" />}
               />
               {/* Spec 043: unlisted on purpose (no nav link anywhere); the backend's admin token is the gate. */}
               <Route path="/admin/digest" element={<AdminDigest />} />

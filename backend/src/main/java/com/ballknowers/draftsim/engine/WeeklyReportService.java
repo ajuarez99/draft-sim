@@ -485,8 +485,8 @@ public class WeeklyReportService {
 
         int week = live.week();
         if (stored.contains(week)) return LiveDecision.NONE;
-        boolean started = live.rows().stream().anyMatch(r -> r.points() > 0)
-                || !playerGames.forWeek(settings.sport(), league.season(), week).isEmpty();
+        boolean started = LiveWeekSource.hasStarted(live,
+                () -> !playerGames.forWeek(settings.sport(), league.season(), week).isEmpty());
         if (!started) {
             return requestedWeek == week
                     ? new LiveDecision(week, null, false, "week " + week + " hasn't started", week)
