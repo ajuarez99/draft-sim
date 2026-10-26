@@ -1,5 +1,23 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-26: spec 048 (Weekly pot) built and live-verified locally; NOT committed
+
+- **Where:** worktree `.claude/worktrees/048-weekly-high-score-ledger`, branch `048-weekly-high-score-ledger` (from
+  `origin/main` ec72031), uncommitted. Docs in `specs/048-weekly-high-score-ledger/` (spec with clarifications and
+  amendments, plan with A1–A15, research, data-model, contract, plan-review, tasks, code-review + fix pass,
+  `verification.md`). Commit, PR and deploy need Allan's go-ahead.
+- **What it does:** `GET /api/leagues/{id}/weekly-pot` and commissioner-only `PUT .../weekly-pot/settings`; page
+  `/leagues/{id}/weekly-pot` ("Weekly pot" in the rail's season group). V41 `league_weekly_pot` (per league-season
+  row). Pure `engine/WeeklyPotLedger` does the cents math; `WeeklyPotService` applies finality (`ScoredWeeks`), the
+  regular-season bound and `LiveWeekSource.peek`. `LiveWeekSource.hasStarted` is now the one "week has started"
+  rule, shared with the weekly report.
+- **Scope decision for Allan:** ESPN leagues are refused in v1 (plan A9): ESPN's playoff start is in matchup
+  periods while its scores are per scoring period.
+- **Known gaps:** leagues with Sleeper `start_week` > 1 (not stored by ingest); tied weeks and NOT_FINAL/MISSING
+  weeks only exercised by tests, not real data.
+- **Local test noise:** `HallOfFameServiceIT` fails on 5433 because spec 047's bracket backfill was never run
+  locally (West Coast 2025: 7 winners-bracket rows, 0 losers). Not a 048 regression.
+
 ## UPDATE 2026-10-24: spec 047 (Hall of fame) built; backend + vitest verified, browser check owed; NOT committed
 
 - **Where:** worktree `.claude/worktrees/047-hall-of-fame`, branch `047-hall-of-fame` (from `origin/main` ebf4ee8),

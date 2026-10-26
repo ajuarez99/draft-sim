@@ -43,7 +43,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries' | 'adp'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries' | 'adp' | 'weeklyPot'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -346,6 +346,22 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     // one season: the page reads the season it is opened on
     href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/superlatives`,
     match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inRail: true,
+  },
+  {
+    key: 'weeklyPot',
+    group: 'season',
+    // Glyph is not a dollar sign on purpose: the rail shouldn't imply money on leagues that never opted in (spec 048 A7).
+    glyph: '◎',
+    // Both sports. It only reads stored weekly scores, which both have.
+    sports: ['nfl', 'nba'],
+    label: 'Weekly pot',
+    // one season: the pot is per league row
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/weekly-pot`,
+    match: /^\/leagues\/([^/]+)\/weekly-pot\/?$/,
     idKind: 'league',
     requiresStatus: null,
     isAction: false,

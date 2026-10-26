@@ -160,6 +160,15 @@ public class LiveWeekSource {
         executor.shutdownNow();
     }
 
+    /**
+     * Whether the live week has STARTED (spec 045 A11 / FR-017; shared with spec 048 so the rule has one
+     * implementation): some roster has points above 0, or the caller finds stored player games for that
+     * sport/season/week. The games read is lazy -- it only runs when no roster has points yet.
+     */
+    public static boolean hasStarted(Live live, java.util.function.BooleanSupplier hasPlayerGames) {
+        return live.rows().stream().anyMatch(r -> r.points() > 0) || hasPlayerGames.getAsBoolean();
+    }
+
     /** The cached answer if it is still inside its TTL (outer Optional empty: nothing fresh). */
     private Optional<Optional<Live>> fresh(String id, Instant now) {
         Cached hit = cache.get(id);
