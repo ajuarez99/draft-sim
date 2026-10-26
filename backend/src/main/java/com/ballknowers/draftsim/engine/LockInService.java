@@ -575,7 +575,7 @@ public class LockInService {
     }
 
     private static final String STATUS_COMPLETE = "complete";
-    private static final String STATUS_IN_GAME = "in_game";
+    static final String STATUS_IN_GAME = "in_game";
 
     /**
      * Whether the player's latest box game is one that can still be locked (code review B1, B2; only the latest

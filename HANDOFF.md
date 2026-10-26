@@ -1,5 +1,26 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-26: spec 049 (Compare two players; renumbered from 048, which main's weekly-pot spec took) built, reviewed and live-verified locally; NOT committed
+
+- **Where:** worktree `.claude/worktrees/048-player-compare`, branch `049-player-compare` (from `origin/main`
+  `ec72031`, spec 047 merged), all uncommitted. Docs in `specs/049-player-compare/`: spec, plan (A1–A15 win),
+  research, data-model, contracts, quickstart, plan-review (F1–F15), tasks (T001–T021 plus "Amended during build"),
+  code-review (B1–B3, S1–S4, N1–N7, all fixed except N7, which was measured), verification.
+- **What it is:** `/leagues/:id/compare?a=&b=`, basketball only. It shows two players' player-page figures side by
+  side and marks the better value only on fantasy pts/game, minutes/game, PTS/REB/AST/STL/BLK/3PM per game, and
+  turnover rate (lower). These are never marked: shooting %, TOV/g, PF, games, the season box-score total, games
+  this week (Allan's calls on review F4/F5/F6). Windows that are short, stale or a small sample are withheld, with
+  the reason shown. There is no verdict anywhere. Entry: "Compare with another player" on the player page.
+- **Backend:** two additive fields on the player page response: `thisWeek {week, played, remaining,
+  scheduleStored}` (lock-ins' `liveWeek` and counting, from the URL league) and `windowQualification` (the
+  server's `qualify` per window + `lastN` + a new `stale` flag). No migration, no new endpoint.
+- **Verified locally:** 10 pairs, 0 value/mark errors against an independent rule; 375 px with no scroll; football
+  refusal; one-column 404; this-week counts equal the stored week-2 schedule. Not verified: production, a real
+  `played > 0` week (local box scores end 10-21).
+- **Owed:** commit, PR, deploy (Allan's go-ahead). Backend suite: 1 known failure,
+  `HallOfFameServiceIT.nameLastPlaceOnlyWhenTheRuleCouldReadIt`, reproduced on unmodified main (spec 047 bracket
+  backfill missing from the shared DB).
+
 ## UPDATE 2026-10-24: spec 047 (Hall of fame) built; backend + vitest verified, browser check owed; NOT committed
 
 - **Where:** worktree `.claude/worktrees/047-hall-of-fame`, branch `047-hall-of-fame` (from `origin/main` ebf4ee8),

@@ -43,7 +43,7 @@ export type LeagueContext = {
 
 export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
-  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'stats' | 'rivalries' | 'adp'
+  | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'compare' | 'stats' | 'rivalries' | 'adp'
 
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
@@ -241,6 +241,24 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     requiresStatus: null,
     isAction: false,
     // Reached from a player's name, not from the rail or the palette.
+    inRail: false,
+  },
+  {
+    key: 'compare',
+    group: 'thisWeek',
+    glyph: '⇄',
+    // Basketball only, like the player pages it composes (specs/049). This is the ONE place that says so --
+    // comparePagesFor() reads it, for both the page's football line and the player page's Compare link.
+    sports: ['nba'],
+    label: 'Compare players',
+    // one season: addressed by a league id, so the rail's year links keep you on the page. Accepted (plan A8):
+    // a season switch from the rail drops ?a=&b=, because another season's league is a different comparison.
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/compare`,
+    match: /^\/leagues\/([^/]+)\/compare\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    // Reached from the Compare link on a player page, not from the rail or the palette.
     inRail: false,
   },
   {
@@ -468,6 +486,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
  *  string. */
 export function playerPagesFor(sport: Sport): boolean {
   return LEAGUE_DESTINATIONS.find((d) => d.key === 'players')?.sports.includes(sport) ?? false
+}
+
+/** True when this sport has the player comparison (spec 049). Same shape as playerPagesFor: derived from the
+ *  `compare` row's `sports`, so no caller compares a sport string. */
+export function comparePagesFor(sport: Sport): boolean {
+  return LEAGUE_DESTINATIONS.find((d) => d.key === 'compare')?.sports.includes(sport) ?? false
 }
 
 /** The player id in a player-page pathname, or null on any other path. */

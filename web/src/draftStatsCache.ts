@@ -9,11 +9,22 @@ import type { PlayerWindowKind, StatLeaderboard } from './api'
  * request. A rejected promise is evicted so a later open can retry.
  */
 const cache = new Map<string, Promise<StatLeaderboard>>()
+/** The league data version each cached promise was fetched under (only for callers that pass one). */
+const versions = new Map<string, number>()
 
 export const statsCacheKey = (sleeperLeagueId: string, window: PlayerWindowKind) => `${sleeperLeagueId}|${window}`
 
-export function fetchDraftStats(sleeperLeagueId: string, window: PlayerWindowKind): Promise<StatLeaderboard> {
+/**
+ * `version` is the league's data version (`useLeagueDataVersion`): a caller that passes a newer one than the
+ * cached entry was fetched under gets a fresh request, so a nightly refresh isn't hidden for the life of the tab
+ * (spec 049 review N2). Callers that omit it keep the old behaviour.
+ */
+export function fetchDraftStats(sleeperLeagueId: string, window: PlayerWindowKind, version?: number): Promise<StatLeaderboard> {
   const key = statsCacheKey(sleeperLeagueId, window)
+  if (version != null && version > (versions.get(key) ?? 0)) {
+    cache.delete(key)
+    versions.set(key, version)
+  }
   const hit = cache.get(key)
   if (hit) return hit
   const p = getStatLeaderboard(sleeperLeagueId, window)
@@ -27,4 +38,5 @@ export function fetchDraftStats(sleeperLeagueId: string, window: PlayerWindowKin
 /** For tests: forget everything cached. */
 export function clearDraftStatsCache(): void {
   cache.clear()
+  versions.clear()
 }

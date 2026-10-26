@@ -3386,6 +3386,41 @@ export type PlayerStatsPage = {
   upcoming: NextGame[]
   /** When the stored schedule was fetched (a game played earlier today can still read pre_game until the next refresh); null = no schedule. */
   scheduleAsOf: string | null
+  /**
+   * specs/049: games played and left in the current scoring week, for the URL league (never the fallback season,
+   * so on opening night `played` is 0). The week is lock-ins' (`LockInService.liveWeek`): the first counted game on
+   * or after today, else the league's `leg`. Null when the URL league is complete, he has no team, there is
+   * neither a schedule nor a `leg`, or the sport isn't basketball. `played` lags the box-score ingest and
+   * `remaining` lags the schedule refresh, so a game that finished tonight can count as remaining; the page shows
+   * `scheduleAsOf` beside it. Optional: absent from a backend deployed before this field; read as "unknown".
+   */
+  thisWeek?: ThisWeek | null
+  /**
+   * specs/049: the server's own qualification verdict per window, so the comparison holds no copy of 10 or 5.
+   * Empty when `available` is false. Optional for the same deploy-skew reason: absent means unknown, and the
+   * comparison then withholds every last-N mark.
+   */
+  windowQualification?: Partial<Record<PlayerWindowKind, WindowQualification>>
+}
+export type ThisWeek = {
+  week: number
+  played: number
+  remaining: number
+  /** False when no schedule is stored for the season: `remaining` is then 0 because nothing is known (review S3). */
+  scheduleStored: boolean
+}
+export type WindowQualification = {
+  qualified: boolean
+  /** Null exactly when `qualified`. */
+  reason: PlayerRanksReason | null
+  /** N for a last-N window; null for SEASON. */
+  lastN: number | null
+  /**
+   * The recency rule failed, whatever else did (review B2): `reason` names only the first failure, so a window
+   * under the minutes floor that is also stale reads NOT_QUALIFIED. Optional: absent from a backend deployed
+   * before it; the client then falls back to `reason === 'NOT_QUALIFIED_STALE'`.
+   */
+  stale?: boolean
 }
 export type NextGameReason = 'NO_TEAM' | 'NO_GAMES_LEFT' | 'NO_SCHEDULE'
 export type PlayerStatus = {
