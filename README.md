@@ -63,6 +63,13 @@ Built so far:
   037, **which week** to play them. No pair may meet more than twice in the regular season
   (a league rule in `weights.yml`); the page names pairs the rule held back, the matchups the
   week replaces, and every other eligible week with its own pairings. Read-only toward Sleeper.
+- **Weekly pot** (specs/048-weekly-high-score-ledger). A league side bet: each decided regular-season
+  week's top scorer collects a stake (default $1) from every other team. Off until the league's commissioner
+  turns it on per season (migration V41, `league_weekly_pot`); everything else is derived on read from the
+  stored weekly scores, in integer cents, so balances always sum to $0. The page shows standings, week by
+  week, and settle-up two ways: every pair's netted debt, and a shorter list that never needs more payments.
+  Ties split the stake (the extra cent goes in roster order, labelled a house convention). A "leading this
+  week, not final" line reads Sleeper's live week and moves no money. Sleeper leagues only (ESPN refused).
 - **Hall of fame** (specs/047-hall-of-fame). Three additions, all read-only toward Sleeper:
   - History gets a trophy case: one row per finished season with the champion (the same rule as the
     standings' trophy), the runner-up (the loser of the stored playoff final), the regular-season points

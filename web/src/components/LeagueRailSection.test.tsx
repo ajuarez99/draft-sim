@@ -146,6 +146,7 @@ describe('what a league is offered', () => {
       'Bench points',
       'Playoff odds',
       'Awards',
+      'Weekly pot',
       'Draft board',
       'Mock it',
       'Standings',

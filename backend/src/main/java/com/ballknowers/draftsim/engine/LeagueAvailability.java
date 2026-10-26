@@ -78,6 +78,9 @@ public class LeagueAvailability {
                 "lock-ins"));
         m.put("schedule", List.of("schedule", "next-matchup"));
         m.put("superlatives", List.of("superlatives", "conduct-list"));
+        // spec 048: the pot follows Sleeper's weekly scores; "weekly-pot" governs the settings sub-path too
+        // (pageKeyOf matches the first segment).
+        m.put("weeklyPot", List.of("weekly-pot"));
         m.put("weeklyReport", List.of("weekly-report"));
         m.put("expectedWins", List.of("expected-wins"));
         m.put("forecast", List.of("forecast"));
@@ -102,6 +105,7 @@ public class LeagueAvailability {
         m.put("stats", "Player stats, the stat calculator, the spotlight and trends follow Sleeper leagues only.");
         m.put("schedule", "The schedule grid and next-matchup game counts follow Sleeper leagues only.");
         m.put("superlatives", "Season superlatives follow Sleeper leagues only.");
+        m.put("weeklyPot", "The weekly pot follows Sleeper leagues only.");
         m.put("weeklyReport", "The weekly report follows Sleeper leagues only.");
         m.put("expectedWins", "Expected wins follows Sleeper leagues only.");
         m.put("forecast", "The season forecast follows Sleeper leagues only.");
