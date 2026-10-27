@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react'
+import { useEffect, type ComponentType } from 'react'
 import { Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
 import DraftPicker from './pages/DraftPicker'
@@ -34,6 +34,7 @@ import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import PlatformGate from './components/PlatformGate'
 import { useUser } from './user'
+import { title as landingTitle } from './landingCopy'
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -98,6 +99,12 @@ function KeyedByLeagueAndPlayer({ page: Page, gate }: { page: ComponentType; gat
 
 export default function App() {
   const user = useUser()
+
+  // Spec 050: index.html carries the long SEO title for crawlers and the signed-out landing
+  // page. Signed-in tabs, bookmarks and history entries keep the short name they always had.
+  useEffect(() => {
+    document.title = user ? 'Ball Knowers' : landingTitle
+  }, [user])
 
   // One shell for the whole site. The horizontal `.top` header this replaced
   // was suppressed on "/" only (`0c6f0ab`), which left the app with two

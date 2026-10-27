@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { getSleeperUser } from '../api'
 import { setUser } from '../user'
+import { featureSports, footerLine, groups, headingOf, headline, platformsNote, sports, subheadline } from '../landingCopy'
 
 // Accepts a pasted profile URL the same way DraftPicker.leagueIdFrom accepts
 // a league URL -- people paste links, not bare ids/usernames. Sleeper profile
@@ -50,53 +51,87 @@ export default function SignIn() {
   }
 
   return (
-    // spec 013 US9 (T093): a centered welcome, no box. The product name, one line
-    // of pitch, a large field and the page's one primary action (--volt).
-    <div className="content signin-content signin-welcome">
-      <p className="signin-kicker cond">Ball Knowers</p>
-      <h1 className="signin-pitch">
-        Your league&apos;s real managers, simulated. See who&apos;s likely gone before you pick.
-      </h1>
+    // Spec 050: the signed-out root is the landing page -- a hero that holds the
+    // unchanged sign-in form (spec 013 US9: one field, one --volt action), then the
+    // rail's own feature groups. Its words come from landingCopy.ts, which
+    // landingHtml.ts also writes into the delivered HTML, so keep the element tree and
+    // class names here in step with staticBody() there (landingHtml.test.ts compares
+    // the text). `.landing` is its own scroll container: `.app` is a fixed 100vh.
+    <div className="content landing">
+      <header className="landing-hero">
+        <p className="landing-kicker cond">Ball Knowers</p>
+        <h1 className="landing-headline">{headline}</h1>
+        <p className="landing-sub">{subheadline}</p>
+        <p className="landing-sports">
+          {sports.map((s) => (
+            <span key={s} className="landing-sport">{s}</span>
+          ))}
+        </p>
 
-      <form
-        className="signin-form"
-        onSubmit={(e) => {
-          e.preventDefault()
-          submit()
-        }}
-      >
-        <label className="signin-label">
-          Your Sleeper username
-          <input
-            className="signin-input"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Username or profile link"
-            autoFocus
-          />
-        </label>
-        <button className="signin-continue" type="submit" disabled={status === 'resolving' || !input.trim()}>
-          {status === 'resolving' ? 'Checking…' : 'Continue'}
-        </button>
-      </form>
+        <form
+          className="signin-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          <label className="signin-label">
+            Your Sleeper username
+            <input
+              className="signin-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Username or profile link"
+              autoFocus
+            />
+          </label>
+          <button className="signin-continue" type="submit" disabled={status === 'resolving' || !input.trim()}>
+            {status === 'resolving' ? 'Checking…' : 'Continue'}
+          </button>
+        </form>
 
-      <p className="signin-note muted small">
-        Enter your Sleeper username (or paste your Sleeper profile link) to see your own leagues and
-        get your seat highlighted at the table. No password -- this app never asks Sleeper for
-        anything private.
-      </p>
+        <p className="signin-note muted small">
+          Enter your Sleeper username (or paste your Sleeper profile link) to see your own leagues and
+          get your seat highlighted at the table. No password -- this app never asks Sleeper for
+          anything private.
+        </p>
 
-      {status === 'not-found' && (
-        <div className="error">
-          No Sleeper user called “{lastTried}”. Check the spelling and try again.
-        </div>
-      )}
-      {status === 'unreachable' && (
-        <div className="error">
-          Couldn’t reach Sleeper just now -- that’s not on you.{' '}
-          <button className="link-button" onClick={submit}>Try again</button>
-        </div>
-      )}
+        {status === 'not-found' && (
+          <div className="error">
+            No Sleeper user called “{lastTried}”. Check the spelling and try again.
+          </div>
+        )}
+        {status === 'unreachable' && (
+          <div className="error">
+            Couldn’t reach Sleeper just now -- that’s not on you.{' '}
+            <button className="link-button" onClick={submit}>Try again</button>
+          </div>
+        )}
+
+        <p className="landing-platforms muted small">{platformsNote}</p>
+      </header>
+
+      {groups.map((g) => (
+        <section key={g.key} className="landing-group" data-group={g.key}>
+          <h2 className="landing-group-title cond">{headingOf(g.key)}</h2>
+          <ul className="landing-tiles">
+            {g.features.map((f) => {
+              const only = featureSports(f)
+              return (
+                <li key={f.name} className="landing-tile">
+                  <div className="landing-tile-head">
+                    <h3 className="landing-tile-name">{f.name}</h3>
+                    {only.length === 1 && <span className="landing-tag">{only[0].toUpperCase()}</span>}
+                  </div>
+                  <p className="landing-tile-line">{f.line}</p>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      ))}
+
+      <p className="landing-footer muted small">{footerLine}</p>
     </div>
   )
 }

@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SignIn from './SignIn'
+import { groups, headingOf, headline, platformsNote } from '../landingCopy'
 
 const getSleeperUser = vi.fn()
 vi.mock('../api', () => ({
@@ -95,16 +96,13 @@ describe('SignIn', () => {
 
 // spec 013 US9 (T093): a centered welcome.
 describe('SignIn welcome', () => {
-  it('leads with the product name and the exact pitch, and keeps the no-password line', () => {
+  it('leads with the landing headline, and keeps the no-password line', () => {
     render(<SignIn />)
 
+    // Spec 050: the product name is the kicker above the h1 (FR-002), shown exactly once;
+    // the headline is asserted by role.
     expect(screen.getByText('Ball Knowers')).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: "Your league's real managers, simulated. See who's likely gone before you pick.",
-      }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(headline)
     expect(screen.getByText(/No password -- this app never asks Sleeper for anything private/)).toBeInTheDocument()
   })
 
@@ -117,5 +115,35 @@ describe('SignIn welcome', () => {
     expect(container.querySelectorAll('button.signin-continue')).toHaveLength(1)
     await user.type(screen.getByLabelText(/your sleeper username/i), 'popsharky{Enter}')
     expect(getSleeperUser).toHaveBeenCalledWith('popsharky')
+  })
+})
+
+// Spec 050: the signed-out root is a landing page, not just a form.
+describe('SignIn landing', () => {
+  it('renders the four feature groups in rail order', () => {
+    render(<SignIn />)
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
+    expect(headings).toEqual(groups.map((g) => headingOf(g.key)))
+    expect(headings).toEqual(['This week', 'The season', 'Draft', 'History'])
+  })
+
+  it('tags a basketball-only feature NBA and leaves a two-sport feature untagged', () => {
+    render(<SignIn />)
+    const tile = (name: string) => screen.getByRole('heading', { level: 3, name }).closest('li') as HTMLElement
+    expect(within(tile('Schedule grid')).getByText('NBA')).toBeInTheDocument()
+    expect(within(tile('Power rankings')).queryByText('NBA')).not.toBeInTheDocument()
+    expect(within(tile('Power rankings')).queryByText('NFL')).not.toBeInTheDocument()
+  })
+
+  it('is Sleeper-first, and ESPN appears only in the platform note', () => {
+    const { container } = render(<SignIn />)
+    expect(container.textContent).toContain('Sleeper')
+    expect(screen.getByText(platformsNote)).toBeInTheDocument()
+    expect((container.textContent ?? '').replace(platformsNote, '')).not.toContain('ESPN')
+  })
+
+  it('never carries the prerender class, so signing out in the same tab shows it', () => {
+    const { container } = render(<SignIn />)
+    expect(container.querySelector('.landing-prerender')).toBeNull()
   })
 })

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Spec 050 share-preview source. Rendered to ../../public/og-image.png by render.mjs.
+       All text sits inside the centred 630x630 square (x 285..915) so a square crop keeps it.
+       Colours are the app's dark tokens as sRGB; no real names or league data. -->
+  <rect width="1200" height="630" fill="#040913"/>
+  <!-- abstract tiles in the four group tints, behind the text and clear of the square -->
+  <g opacity="0.9">
+    <rect x="40" y="60" width="200" height="120" rx="14" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
+    <rect x="40" y="200" width="200" height="120" rx="14" fill="#0d2a1b" stroke="#37a05a" stroke-width="2"/>
+    <rect x="40" y="340" width="200" height="120" rx="14" fill="#2c230c" stroke="#b58a1d" stroke-width="2"/>
+    <rect x="40" y="480" width="200" height="90" rx="14" fill="#1f1736" stroke="#7e62c8" stroke-width="2"/>
+    <rect x="960" y="60" width="200" height="90" rx="14" fill="#1f1736" stroke="#7e62c8" stroke-width="2"/>
+    <rect x="960" y="170" width="200" height="120" rx="14" fill="#2c230c" stroke="#b58a1d" stroke-width="2"/>
+    <rect x="960" y="310" width="200" height="120" rx="14" fill="#0d2a1b" stroke="#37a05a" stroke-width="2"/>
+    <rect x="960" y="450" width="200" height="120" rx="14" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
+  </g>
+  <text x="600" y="190" text-anchor="middle" font-family="Bahnschrift, 'Arial Narrow', Arial, sans-serif" font-size="46" letter-spacing="8" fill="#8d96a5">BALL KNOWERS</text>
+  <text x="600" y="290" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" fill="#f1f3f6">Your fantasy league,</text>
+  <text x="600" y="355" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="54" fill="#f1f3f6">all season long.</text>
+  <text x="600" y="418" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="26" fill="#8d96a5">For Sleeper leagues</text>
+  <g font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="26" letter-spacing="3" text-anchor="middle">
+    <rect x="450" y="460" width="130" height="52" rx="26" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
+    <text x="515" y="496" fill="#4fd1c5">NFL</text>
+    <rect x="620" y="460" width="130" height="52" rx="26" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
+    <text x="685" y="496" fill="#4fd1c5">NBA</text>
+  </g>
+</svg>
