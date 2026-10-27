@@ -1,9 +1,18 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { transform } from './src/landingHtml'
+
+// Spec 050: link-preview bots and most crawlers don't run scripts, so the title, the
+// preview tags and the landing text have to be in the HTML as delivered. Writing them
+// here from the same copy module SignIn.tsx renders keeps one source of the words
+// instead of a hand-edited index.html that would drift from the page.
+function landingHtml(): Plugin {
+  return { name: 'landing-html', transformIndexHtml: { order: 'pre', handler: (html) => transform(html) } }
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), landingHtml()],
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/setupTests.ts'],

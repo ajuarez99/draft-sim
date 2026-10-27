@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 // password and nothing hidden. Versioned key so a future shape change is a
 // clean reset (treated as signed out) rather than a crash on someone's stale
 // JSON.
-const STORAGE_KEY = 'bk.user.v1'
+export const STORAGE_KEY = 'bk.user.v1'
 
 export type BkUser = {
   sleeperUserId: string

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { headline, title as landingTitle } from './landingCopy'
 import { clearUser, setUser, type BkUser } from './user'
 import * as api from './api'
 import { invalidateRailLeagues } from './railLeague'
@@ -106,12 +107,22 @@ describe('App sign-out gating', () => {
 
     await user.click(screen.getByRole('button', { name: /sign out/i }))
 
-    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: headline })).toBeInTheDocument()
     expect(screen.getByLabelText(/your sleeper username/i)).toBeInTheDocument()
     // Regex, not the string '/' -- toHaveTextContent does a substring match,
     // so the plain string would also pass against '/leagues/1/power' and this
     // assertion (the only one guarding the navigate) could never fail.
     expect(screen.getByTestId('location-probe')).toHaveTextContent(/^\/$/)
+  })
+
+  it('the tab title is the short name when signed in and the landing title when signed out (spec 050)', async () => {
+    const { unmount } = render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    expect(document.title).toBe(landingTitle)
+    unmount()
+    setUser(sampleUser)
+    render(<MemoryRouter initialEntries={['/']}><App /></MemoryRouter>)
+    expect(await screen.findByText('draft picker')).toBeInTheDocument()
+    expect(document.title).toBe('Ball Knowers')
   })
 
   it('a deep link while signed out shows the username screen, not the page it points to', () => {
@@ -121,7 +132,7 @@ describe('App sign-out gating', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: headline })).toBeInTheDocument()
   })
 
   it('a junk path while signed out shows the username screen, not the "Nothing here" fallback', () => {
@@ -131,7 +142,7 @@ describe('App sign-out gating', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { name: /real managers, simulated/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: headline })).toBeInTheDocument()
     expect(screen.queryByText(/nothing here/i)).not.toBeInTheDocument()
   })
 
