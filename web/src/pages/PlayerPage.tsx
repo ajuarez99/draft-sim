@@ -1,7 +1,7 @@
 import { useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import NotFound from '../components/NotFound'
-import OwnershipMark from '../components/OwnershipMark'
+import { OwnerList, TeamLines, UnknownPlayerNote } from '../components/PlayerHeaderParts'
 import PageHeader from '../components/PageHeader'
 import PlayerFace from '../components/PlayerFace'
 import { PlayerLockInsView } from '../components/PlayerLockIns'
@@ -20,6 +20,7 @@ import {
   type PlayerWindowKind,
   type Rate,
 } from '../api'
+import { comparePagesFor } from '../destinations'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import {
   ADVANCED_KEYS,
@@ -40,7 +41,6 @@ import {
   longDate,
   nextGameReasonSentence,
   opponentText,
-  ownershipAsOf,
   rankMoveSentence,
   reasonSentence,
   reasonShort,
@@ -50,6 +50,7 @@ import {
   type AdvancedKey,
   type StatReason,
 } from '../statCopy'
+import { DASH, fixed, madeAttempted, minutes, num } from '../statFormat'
 import { useBlock } from '../useBlock'
 
 /**
@@ -69,14 +70,7 @@ const WINDOWS: { kind: PlayerWindowKind; label: string; size?: number }[] = [
   { kind: 'LAST_5', label: 'Last 5', size: 5 },
 ]
 
-const DASH = '—'
-
-const MINUS = '−'
-/** toFixed with the page's one minus sign (U+2212) instead of a hyphen. */
-const fixed = (n: number, digits: number) => n.toFixed(digits).replace('-', MINUS)
-const num = (n: number | null | undefined, digits = 1) => (n == null ? DASH : fixed(n, digits))
 const signed = (n: number, digits = 1) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toFixed(digits)}`
-const minutes = (n: number) => fixed(n, 1)
 const shortDay = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
@@ -98,7 +92,7 @@ function RateValue({ r, made, att }: { r: Rate; made?: number; att?: number }) {
   return (
     <>
       <span>{`${fixed(r.value, 1)}%`}</span>
-      {made != null && att != null && <span className="pp-made muted small">{`${Math.round(made)}-${Math.round(att)}`}</span>}
+      {made != null && att != null && <span className="pp-made muted small">{madeAttempted(made, att)}</span>}
     </>
   )
 }
@@ -114,15 +108,9 @@ function rateReasons(windows: PlayerWindow[]): StatReason[] {
   return [...out]
 }
 
-function Header({ d }: { d: PlayerStatsPage }) {
+function Header({ d, leagueId }: { d: PlayerStatsPage; leagueId: string }) {
   const p = d.player
   const name = p.name ?? 'Unknown player'
-  const own = d.ownership
-  const ownLabel = own ? (ownershipAsOf(own.asOf, d.season) ?? 'Ownership') : null
-  const nowLabel = d.currentOwnership && d.requestedSeason != null ? `Now (${seasonLabel(d.requestedSeason)})` : null
-  const nowAsOf = d.currentOwnership ? ownershipAsOf(d.currentOwnership.asOf, d.requestedSeason ?? d.season) : null
-  const otherTeams = d.teamsThisSeason.length > 1
-
   return (
     <section className="pp-card pp-head" aria-label="Player">
       <PlayerFace
@@ -142,29 +130,17 @@ function Header({ d }: { d: PlayerStatsPage }) {
             </span>
           ))}
           {p.team && <span className="pp-team">{p.team}</span>}
-          {!p.known && <span className="muted small">{`We have games for this player but no player record (id ${p.sleeperPlayerId}).`}</span>}
+          <UnknownPlayerNote d={d} />
         </p>
-        {otherTeams && (
-          <p className="muted small pp-line">{`Played for ${d.teamsThisSeason.join(', ')} in ${seasonLabel(d.season)}.`}</p>
+        <TeamLines d={d} />
+        <OwnerList d={d} />
+        {d.available && comparePagesFor(d.sport) && (
+          <p className="pp-line">
+            <Link className="pp-compare" to={`/leagues/${encodeURIComponent(leagueId)}/compare?a=${encodeURIComponent(p.sleeperPlayerId)}`}>
+              Compare with another player
+            </Link>
+          </p>
         )}
-        {d.teamGamesMissed > 0 && (
-          <p className="muted small pp-line">{`Missed ${d.teamGamesMissed} of his team’s games in ${seasonLabel(d.season)}.`}</p>
-        )}
-        <div className="pp-own-list">
-          {own && (
-            <div className="pp-own">
-              <span className="pp-own-label">{ownLabel}</span>
-              <OwnershipMark o={own} verbose />
-            </div>
-          )}
-          {d.currentOwnership && nowLabel && (
-            <div className="pp-own pp-own-now">
-              <span className="pp-own-label">{nowLabel}</span>
-              <OwnershipMark o={d.currentOwnership} verbose />
-              {nowAsOf && <span className="muted small">{nowAsOf}</span>}
-            </div>
-          )}
-        </div>
         <HeaderFacts d={d} />
       </div>
     </section>
@@ -825,7 +801,7 @@ export default function PlayerPage() {
               {fallbackNote(seasonLabel(d.requestedSeason), seasonLabel(d.season))}
             </p>
           )}
-          <Header d={d} />
+          <Header d={d} leagueId={leagueId} />
 
           {d.reason ? (
             <section className="section pp-reason">

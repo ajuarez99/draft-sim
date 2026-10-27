@@ -22,6 +22,7 @@ import StatCalculator from './pages/StatCalculator'
 import StatLeaderboard from './pages/StatLeaderboard'
 import PlayerTrends from './pages/PlayerTrends'
 import PlayerPage from './pages/PlayerPage'
+import PlayerCompare from './pages/PlayerCompare'
 import SeasonForecast from './pages/SeasonForecast'
 import WeeklyReport from './pages/WeeklyReport'
 import Superlatives from './pages/Superlatives'
@@ -158,6 +159,8 @@ export default function App() {
                 path="/leagues/:sleeperLeagueId/players/:sleeperPlayerId"
                 element={<KeyedByLeagueAndPlayer page={PlayerPage} gate="stats" />}
               />
+              {/* specs/049: two players side by side. Addressed by a league; the players ride in ?a=&b=. */}
+              <Route path="/leagues/:sleeperLeagueId/compare" element={<KeyedByLeague page={PlayerCompare} gate="stats" />} />
               <Route
                 path="/leagues/:sleeperLeagueId/roster-management"
                 element={<KeyedByLeague page={RosterManagement} />}

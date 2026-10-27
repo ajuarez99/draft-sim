@@ -12,6 +12,7 @@ import {
   labelOf,
   leagueIdFromPath,
   playerIdFromPath,
+  comparePagesFor,
   playerPagesFor,
   type LeagueContext,
 } from './destinations'
@@ -386,9 +387,9 @@ describe('stats destination', () => {
 describe('players destination', () => {
   const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'players')!
 
-  it('is hidden from the rail: the only row with inRail false', () => {
+  it('is hidden from the rail: one of the two rows with inRail false (the other is compare, spec 049)', () => {
     expect(row().inRail).toBe(false)
-    expect(LEAGUE_DESTINATIONS.filter((d) => !d.inRail).map((d) => d.key)).toEqual(['players'])
+    expect(LEAGUE_DESTINATIONS.filter((d) => !d.inRail).map((d) => d.key)).toEqual(['players', 'compare'])
   })
 
   it('is matched on its route and carries the league id', () => {
@@ -414,6 +415,27 @@ describe('players destination', () => {
   it('derives playerPagesFor from the row: basketball yes, football no', () => {
     expect(playerPagesFor('nba')).toBe(true)
     expect(playerPagesFor('nfl')).toBe(false)
+  })
+})
+
+// specs/049-player-compare: reached from a player page's Compare link, basketball only.
+describe('compare destination', () => {
+  const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'compare')!
+
+  it('is hidden from the rail and basketball only', () => {
+    expect(row().inRail).toBe(false)
+    expect(row().sports).toEqual(['nba'])
+  })
+
+  it('is matched on its route and carries the league id', () => {
+    expect(destinationFromPath('/leagues/L7/compare')).toBe('compare')
+    expect(destinationFromPath('/leagues/L7/compare/')).toBe('compare')
+    expect(leagueIdFromPath('/leagues/L7/compare')).toEqual({ idKind: 'league', id: 'L7' })
+  })
+
+  it('derives comparePagesFor from the row: basketball yes, football no', () => {
+    expect(comparePagesFor('nba')).toBe(true)
+    expect(comparePagesFor('nfl')).toBe(false)
   })
 })
 

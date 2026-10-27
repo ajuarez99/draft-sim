@@ -842,3 +842,25 @@ describe('PlayerPage lock-ins tab (spec 044)', () => {
     expect(screen.queryByText(/%/)).not.toBeInTheDocument()
   })
 })
+
+// specs/049: the entry point into the comparison, in the header card beside the owner.
+describe('PlayerPage compare link', () => {
+  it('links a basketball player to the comparison with him already chosen', async () => {
+    show(page())
+    const link = await screen.findByRole('link', { name: 'Compare with another player' })
+    expect(link).toHaveAttribute('href', '/leagues/L25/compare?a=1350')
+  })
+
+  it('has no link on a page that is not available', async () => {
+    show(page({ available: false, reason: 'NOT_BASKETBALL' }))
+    await screen.findByText(/Player pages aren’t available|basketball/i)
+    expect(screen.queryByRole('link', { name: 'Compare with another player' })).not.toBeInTheDocument()
+  })
+
+  it('has no link for football', async () => {
+    show(page({ sport: 'nfl' }))
+    await screen.findByRole('heading', { level: 2, name: 'Rudy Gobert' })
+    expect(screen.queryByRole('link', { name: 'Compare with another player' })).not.toBeInTheDocument()
+  })
+})
+

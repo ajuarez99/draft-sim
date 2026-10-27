@@ -133,6 +133,10 @@ public class PlayerStatsService {
      *                         Schedule tab; empty when {@code nextGame} is null
      * @param scheduleAsOf     when the stored schedule was fetched (a game played earlier today can still read
      *                         pre_game until the next refresh); null when no schedule is stored
+     * @param thisWeek         games played and left in the current scoring week, from the URL league (spec 049);
+     *                         null when there is no such week to name
+     * @param windowQualification per window, the ranking rule's verdict on this player and N for a last-N window
+     *                         (spec 049); empty when unavailable
      */
     public record PlayerStatsPage(String sport, int season, Integer requestedSeason, boolean available,
                                   String reason, OffsetDateTime dataAsOf, List<SeasonOption> seasons,
@@ -141,7 +145,26 @@ public class PlayerStatsService {
                                   Fantasy fantasy, Map<WindowKind, Map<String, List<Pct>>> percentiles,
                                   List<GameLogRow> gameLog, QualificationRule qualification,
                                   PlayerStatus status, NextGame nextGame, String nextGameReason,
-                                  List<NextGame> upcoming, OffsetDateTime scheduleAsOf) {}
+                                  List<NextGame> upcoming, OffsetDateTime scheduleAsOf, ThisWeek thisWeek,
+                                  Map<WindowKind, WindowQualification> windowQualification) {}
+
+    /**
+     * Spec 049. The week lock-ins call live ({@link LockInService#liveWeek}) and the player's games in it: his box
+     * lines already ingested ({@code played}) and his team's counted games still to come ({@code remaining}).
+     * Both lag their sources: a game that finished tonight can count as remaining until the schedule refresh and
+     * the box-score ingest have run, which the page says by showing {@code scheduleAsOf}.
+     * {@code scheduleStored} is false when no schedule is stored for the season, so {@code remaining} is 0 because
+     * nothing is known, not because no game is left (code-review S3).
+     */
+    public record ThisWeek(int week, int played, int remaining, boolean scheduleStored) {}
+
+    /**
+     * The server's own {@code qualify} verdict for one window, plus that window's N so the client holds no copy of
+     * 10 or 5 ({@code lastN} is null for SEASON). Spec 049 reads {@code qualified}'s reason, never re-derives it.
+     * {@code stale} is the recency rule on its own (code-review B2): a window can fail the minutes floor and be
+     * stale at once, and {@code reason} then names only the first failure.
+     */
+    public record WindowQualification(boolean qualified, String reason, Integer lastN, boolean stale) {}
 
     public static final String NO_TEAM = "NO_TEAM";
     public static final String NO_GAMES_LEFT = "NO_GAMES_LEFT";
@@ -229,7 +252,11 @@ public class PlayerStatsService {
                         List<PlayerAbsenceRepository.Row> absences) {}
 
     /** Whether a player counts for ranks in a window, and if not, why ({@code NOT_QUALIFIED} or {@code NOT_QUALIFIED_STALE}). */
-    public record Qualification(boolean qualified, String reason) {}
+    public record Qualification(boolean qualified, String reason, boolean stale) {
+        public Qualification(boolean qualified, String reason) {
+            this(qualified, reason, false);
+        }
+    }
 
     public record Computed(Map<WindowKind, Window> windows, Fantasy fantasy, int teamGamesMissed,
                            List<String> teams, List<GameLogRow> gameLog,
@@ -374,12 +401,53 @@ public class PlayerStatsService {
         }
 
         Header header = header(requested, targetPlayer);
+        ThisWeek thisWeek = thisWeek(requested, targetPlayer, sleeperPlayerId);
         return Optional.of(new PlayerStatsPage(sport.code(), dataSeason, requestedSeason, true,
                 hasGames ? null : NO_PLAYER_GAMES, dataAsOf, seasons, currentOwnership, ref, c.teams(),
                 c.teamGamesMissed(), ownership, c.windows(), c.fantasy(), percentiles, c.gameLog(),
                 new QualificationRule(props.rankMinGamesShare(), minGames(box.lines(), props),
                         maxTeamGames(box.lines()), props.rankMinMinutesPerGame(), props.recencyDays()),
-                header.status(), header.nextGame(), header.reason(), header.upcoming(), header.scheduleAsOf()));
+                header.status(), header.nextGame(), header.reason(), header.upcoming(), header.scheduleAsOf(),
+                thisWeek, windowQualification(c.qualification())));
+    }
+
+    /** Never {@code Map.of}: a null reason (a qualified window) would throw. */
+    private static Map<WindowKind, WindowQualification> windowQualification(Map<WindowKind, Qualification> qualification) {
+        Map<WindowKind, WindowQualification> out = new EnumMap<>(WindowKind.class);
+        for (Map.Entry<WindowKind, Qualification> e : qualification.entrySet()) {
+            out.put(e.getKey(), new WindowQualification(e.getValue().qualified(), e.getValue().reason(),
+                    e.getKey().lastN(), e.getValue().stale()));
+        }
+        return out;
+    }
+
+    /**
+     * Spec 049 (plan A3, A12). Under {@link #header}'s rule: everything is the <b>URL</b> league's, never the
+     * fallback season's, so opening night (a schedule and no box scores yet) reads {@code played == 0}. The week
+     * and the counting are lock-ins' ({@link LockInService#liveWeek}, {@code computeLive}'s games-left filter),
+     * with no date join. Null when the URL league is complete, there is no team, or there is neither a schedule
+     * nor a {@code leg} to name a week from.
+     */
+    private ThisWeek thisWeek(LeagueRow requested, Player target, String sleeperPlayerId) {
+        if (requested.complete()) return null;
+        String team = target == null ? null : target.team();
+        if (team == null || team.isBlank()) return null;
+        Sport sport = requested.sport();
+        List<SportSchedule.Game> games = schedules.forSeason(sport.code(), requested.season());
+        OptionalInt leg = leagues.currentLeg(requested.id());
+        if (games.isEmpty() && leg.isEmpty()) return null;
+        LocalDate today = NextGames.today(clock);
+        int week = LockInService.liveWeek(games, today, leg.isPresent() ? leg.getAsInt() : Integer.MIN_VALUE);
+        if (week == Integer.MIN_VALUE) return null;
+        java.util.Set<String> playedIds = new java.util.HashSet<>();
+        List<Line> mine = boxCache.get(sport, requested.season()).lines().byPlayer().get(sleeperPlayerId);
+        if (mine != null) for (Line l : mine) if (l.week() == week) playedIds.add(l.gameId());
+        int remaining = 0;
+        for (SportSchedule.Game g : NextGames.forTeam(games, team, today, Integer.MAX_VALUE)) {
+            // Lock-ins' own games-left rule (computeLive): a game in progress is not "left" (N6).
+            if (g.week() == week && !playedIds.contains(g.gameId()) && !LockInService.STATUS_IN_GAME.equals(g.status())) remaining++;
+        }
+        return new ThisWeek(week, playedIds.size(), remaining, !games.isEmpty());
     }
 
     private record Header(PlayerStatus status, NextGame nextGame, String reason, List<NextGame> upcoming,
@@ -448,7 +516,7 @@ public class PlayerStatsService {
                                                OffsetDateTime dataAsOf, List<SeasonOption> seasons, PlayerRef player) {
         return new PlayerStatsPage(sport.code(), season, requestedSeason, false, reason, dataAsOf, seasons, null,
                 player, List.of(), 0, null, new EnumMap<>(WindowKind.class), null, new EnumMap<>(WindowKind.class),
-                List.of(), null, null, null, null, List.of(), null);
+                List.of(), null, null, null, null, List.of(), null, null, new EnumMap<>(WindowKind.class));
     }
 
     // ------------------------------------------------------------------ leaderboard (contract C2)
@@ -768,10 +836,12 @@ public class PlayerStatsService {
             boolean ok = window.size() >= minGames && minutesOk;
             return new Qualification(ok, ok ? null : NOT_QUALIFIED);
         }
-        if (window.size() < kind.lastN() || !minutesOk) return new Qualification(false, NOT_QUALIFIED);
+        // Recency is evaluated whatever else fails, so a short or low-minutes window that is also stale says so
+        // (spec 049 B2); `reason` keeps its original precedence, which the ranks read.
         LocalDate last = window.getLast().date();
         boolean stale = latest != null && last.isBefore(latest.minusDays(p.recencyDays()));
-        return stale ? new Qualification(false, NOT_QUALIFIED_STALE) : new Qualification(true, null);
+        if (window.size() < kind.lastN() || !minutesOk) return new Qualification(false, NOT_QUALIFIED, stale);
+        return stale ? new Qualification(false, NOT_QUALIFIED_STALE, true) : new Qualification(true, null);
     }
 
     /**

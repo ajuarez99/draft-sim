@@ -722,4 +722,169 @@ class PlayerStatsServiceTest {
         assertNull(PlayerStatsService.sameScoring(scoring("pts", 1), Map.of()));
         assertNull(PlayerStatsService.sameScoring(Map.of(), Map.of()));
     }
+
+    // ------------------------------------------------------------------ spec 049: thisWeek and windowQualification
+
+    private static Line weekLine(String gameId, int week, String date) {
+        return new Line(gameId, LocalDate.parse(date), week, "AAA", "BBB", true, 30, stats("pts", 10), null, null);
+    }
+
+    /** A wiring whose URL league is {@code requested} with {@code mine} as the player's box lines for that season. */
+    private Wiring weekWiring(LeagueRow requested, Player target, List<Line> mine, int leg) {
+        Wiring w = new Wiring(true);
+        when(w.resolver.resolve(requested.sleeperId(), Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(requested, null)));
+        when(w.resolver.seasons(requested.sleeperId())).thenReturn(List.of());
+        Map<String, List<Line>> by = new HashMap<>();
+        by.put(target.sleeperId(), mine);
+        when(w.box.get(Sport.NBA, requested.season())).thenReturn(season(by, 5, true));
+        when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of(target.sleeperId(), target));
+        when(w.leagues.scoringOf(anyLong())).thenReturn(scoring("pts", 1));
+        if (leg > 0) when(w.leagues.currentLeg(requested.id())).thenReturn(OptionalInt.of(leg));
+        return w;
+    }
+
+    @Test
+    void thisWeekNamesTheNextWeekAcrossAGapEvenWhenLegIsStillLastWeek() {
+        // NOW is Wed 2026-10-21 with no game today: the first counted game on or after is in week 2, but the
+        // league row's leg still says 1 (liveWeek's gap rule, plan A3).
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        Wiring w = weekWiring(league, playerOn("p", "AAA", null, null), List.of(weekLine("w1", 1, "2026-10-18")), 1);
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(
+                game("w1", 1, "2026-10-18", "complete", "AAA", "BBB"),
+                game("a", 2, "2026-10-23", "pre_game", "AAA", "BBB"),
+                game("b", 2, "2026-10-25", "pre_game", "BBB", "AAA")));
+
+        var tw = w.service(PROPS).read(league, "p", null).orElseThrow().thisWeek();
+
+        assertEquals(new PlayerStatsService.ThisWeek(2, 0, 2, true), tw);
+    }
+
+    @Test
+    void aGameTodayCountsAsRemainingUntilIngestedAndThenAsPlayedNeverBoth() {
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        List<SportSchedule.Game> sched = schedule(
+                game("t", 2, "2026-10-21", "pre_game", "AAA", "BBB"),      // today, finished but the schedule lags
+                game("n", 2, "2026-10-24", "pre_game", "BBB", "AAA"));
+        Wiring before = weekWiring(league, playerOn("p", "AAA", null, null), List.of(weekLine("e", 2, "2026-10-20")), 2);
+        when(before.schedules.forSeason("nba", 2026)).thenReturn(sched);
+        assertEquals(new PlayerStatsService.ThisWeek(2, 1, 2, true),
+                before.service(PROPS).read(league, "p", null).orElseThrow().thisWeek(),
+                "not yet ingested: today's game is still remaining");
+
+        Wiring after = weekWiring(league, playerOn("p", "AAA", null, null),
+                List.of(weekLine("e", 2, "2026-10-20"), weekLine("t", 2, "2026-10-21")), 2);
+        when(after.schedules.forSeason("nba", 2026)).thenReturn(sched);
+        assertEquals(new PlayerStatsService.ThisWeek(2, 2, 1, true),
+                after.service(PROPS).read(league, "p", null).orElseThrow().thisWeek(),
+                "ingested: played, and no longer remaining");
+    }
+
+    @Test
+    void aUrlSeasonWithAScheduleAndNoBoxScoresStillHasAThisWeekWithZeroPlayed() {
+        // Opening night (A12): the stats fall back to 2025, the week is still the URL season's.
+        Wiring w = new Wiring(true);
+        LeagueRow requested = row(3, 2026, "L26", "in_season");
+        when(w.resolver.resolve("L26", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(requested, null)));
+        when(w.resolver.seasons("L26")).thenReturn(List.of());
+        when(w.box.get(Sport.NBA, 2026)).thenReturn(season(Map.of(), 0, false));
+        when(w.box.token(Sport.NBA, 2025)).thenReturn(new SeasonToken(5, OffsetDateTime.parse("2026-04-01T00:00:00Z")));
+        Map<String, List<Line>> by = new HashMap<>();
+        by.put("p", flat("p", 5, 10, 25));
+        when(w.box.get(Sport.NBA, 2025)).thenReturn(season(by, 5, true));
+        when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of("p", playerOn("p", "AAA", null, null)));
+        when(w.leagues.scoringOf(anyLong())).thenReturn(scoring("pts", 1));
+        when(w.schedules.forSeason("nba", 2026)).thenReturn(schedule(
+                game("a", 1, "2026-10-21", "pre_game", "BBB", "AAA"),
+                game("b", 1, "2026-10-23", "pre_game", "AAA", "BBB")));
+
+        PlayerStatsPage page = w.service(PROPS).read(requested, "p", null).orElseThrow();
+
+        assertEquals(2026, page.requestedSeason(), "the stats fell back");
+        assertEquals(new PlayerStatsService.ThisWeek(1, 0, 2, true), page.thisWeek());
+    }
+
+    @Test
+    void thisWeekIsNullForACompleteLeagueAForATeamlessPlayerAndWithNoScheduleNorLeg() {
+        LeagueRow complete = row(2, 2025, "L25", "complete");
+        Wiring done = weekWiring(complete, playerOn("p", "AAA", null, null), flat("p", 5, 10, 25), 3);
+        when(done.schedules.forSeason("nba", 2025)).thenReturn(schedule(game("a", 3, "2026-10-25", "pre_game", "AAA", "BBB")));
+        assertNull(done.service(PROPS).read(complete, "p", null).orElseThrow().thisWeek());
+
+        LeagueRow live = row(3, 2026, "L26", "in_season");
+        Wiring fa = weekWiring(live, playerOn("p", null, "FA", null), flat("p", 5, 10, 25), 3);
+        when(fa.schedules.forSeason("nba", 2026)).thenReturn(schedule(game("a", 3, "2026-10-25", "pre_game", "AAA", "BBB")));
+        assertNull(fa.service(PROPS).read(live, "p", null).orElseThrow().thisWeek());
+
+        Wiring none = weekWiring(live, playerOn("p", "AAA", null, null), flat("p", 5, 10, 25), 0);
+        assertNull(none.service(PROPS).read(live, "p", null).orElseThrow().thisWeek());
+    }
+
+    @Test
+    void windowQualificationCarriesTheServersVerdictAndNPerWindow() {
+        // "short" has 3 games; "stale" has 15 (a full LAST_5, a qualified SEASON) but stopped 15 days before the season's latest game.
+        Wiring w = new Wiring(true);
+        LeagueRow league = row(1, 2025, "L25", "complete");
+        when(w.resolver.resolve("L25", Rule.STORED_GAMES)).thenReturn(Optional.of(new Resolved(league, null)));
+        when(w.resolver.seasons("L25")).thenReturn(List.of());
+        Map<String, List<Line>> by = new HashMap<>();
+        by.put("short", flat("short", 3, 10, 25));
+        by.put("stale", flat("stale", 15, 10, 25));
+        by.put("busy", flat("busy", 30, 10, 25));
+        when(w.box.get(Sport.NBA, 2025)).thenReturn(season(by, 30, true));
+        when(w.players.byIds(any(), anyCollection())).thenReturn(Map.of(
+                "short", playerOn("short", "AAA", null, null), "stale", playerOn("stale", "AAA", null, null)));
+        when(w.leagues.scoringOf(anyLong())).thenReturn(scoring("pts", 1));
+
+        // "short" ended on day 3 of a season whose latest game is day 30: short AND stale, reason still the first failure.
+        var shortQ = w.service(PROPS).read(league, "short", null).orElseThrow().windowQualification();
+        assertEquals(new PlayerStatsService.WindowQualification(false, "NOT_QUALIFIED", 10, true), shortQ.get(WindowKind.LAST_10));
+        assertEquals(new PlayerStatsService.WindowQualification(false, "NOT_QUALIFIED", null, false), shortQ.get(WindowKind.SEASON));
+        assertEquals(3, shortQ.size());
+
+        var staleQ = w.service(PROPS).read(league, "stale", null).orElseThrow().windowQualification();
+        assertEquals(new PlayerStatsService.WindowQualification(false, "NOT_QUALIFIED_STALE", 5, true), staleQ.get(WindowKind.LAST_5));
+        assertEquals(new PlayerStatsService.WindowQualification(true, null, null, false), staleQ.get(WindowKind.SEASON),
+                "a qualified window has a null reason, so the map must not be Map.of");
+    }
+
+    @Test
+    void aWindowUnderTheMinutesFloorThatIsAlsoStaleIsFlaggedStaleAndKeepsItsReason() {
+        // Code-review B2: 10 games at 12 mpg (under the 15-minute floor) whose last game is long before the
+        // season's latest. `reason` keeps its original precedence (the ranks read it); `stale` is independent.
+        var lines = flat("x", 10, 10, 12);
+        LocalDate latest = lines.getLast().date().plusDays(PROPS.recencyDays() + 1);
+        var q = PlayerStatsService.qualify(WindowKind.LAST_10, lines, 5, PROPS, latest);
+        assertFalse(q.qualified());
+        assertEquals("NOT_QUALIFIED", q.reason());
+        assertTrue(q.stale());
+        var fresh = PlayerStatsService.qualify(WindowKind.LAST_10, lines, 5, PROPS, lines.getLast().date());
+        assertEquals("NOT_QUALIFIED", fresh.reason());
+        assertFalse(fresh.stale());
+        assertFalse(PlayerStatsService.qualify(WindowKind.SEASON, lines, 5, PROPS, latest).stale(), "SEASON has no recency rule");
+    }
+
+    @Test
+    void thisWeekSaysWhenNoScheduleIsStoredAndDoesNotCountAGameInProgressAsLeft() {
+        LeagueRow league = row(3, 2026, "L26", "in_season");
+        Wiring none = weekWiring(league, playerOn("p", "AAA", null, null), List.of(weekLine("e", 2, "2026-10-20")), 2);
+        assertEquals(new PlayerStatsService.ThisWeek(2, 1, 0, false),
+                none.service(PROPS).read(league, "p", null).orElseThrow().thisWeek());
+
+        Wiring live = weekWiring(league, playerOn("p", "AAA", null, null), List.of(weekLine("e", 2, "2026-10-20")), 2);
+        when(live.schedules.forSeason("nba", 2026)).thenReturn(schedule(
+                game("t", 2, "2026-10-21", "in_game", "AAA", "BBB"),
+                game("n", 2, "2026-10-24", "pre_game", "BBB", "AAA")));
+        assertEquals(new PlayerStatsService.ThisWeek(2, 1, 1, true),
+                live.service(PROPS).read(league, "p", null).orElseThrow().thisWeek(),
+                "lock-ins' games-left rule: the game on the floor is not left");
+    }
+
+    @Test
+    void anUnavailablePageHasNoThisWeekAndAnEmptyWindowQualification() {
+        LeagueRow league = row(1, 2025, "L25", "complete");
+        PlayerStatsPage page = new Wiring(false).service(PROPS).read(league, "p", null).orElseThrow();
+        assertFalse(page.available());
+        assertNull(page.thisWeek());
+        assertTrue(page.windowQualification().isEmpty());
+    }
 }

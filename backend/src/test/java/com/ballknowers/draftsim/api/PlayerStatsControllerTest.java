@@ -69,4 +69,50 @@ class PlayerStatsControllerTest {
         assertEquals(HttpStatus.NOT_FOUND, controller.leaderboard("L1", "SEASON", "stranger").getStatusCode());
         verify(stats, never()).readLeaderboard(any(), any(), any());
     }
+
+    /**
+     * Spec 049: the player page's JSON carries {@code thisWeek} and {@code windowQualification}, and an absent
+     * {@code thisWeek} is {@code null} on the wire, not missing (the client reads missing as "older backend").
+     */
+    @Test
+    void thePlayerPageJsonCarriesBothNewFieldsAndAnAbsentThisWeekIsNull() throws Exception {
+        var wq = new java.util.EnumMap<WindowKind, PlayerStatsService.WindowQualification>(WindowKind.class);
+        wq.put(WindowKind.SEASON, new PlayerStatsService.WindowQualification(true, null, null, false));
+        wq.put(WindowKind.LAST_10, new PlayerStatsService.WindowQualification(false, "NOT_QUALIFIED", 10, true));
+        when(stats.read(any(), eq("live"), any())).thenReturn(Optional.of(page(new PlayerStatsService.ThisWeek(2, 1, 3, true), wq)));
+        when(stats.read(any(), eq("none"), any())).thenReturn(Optional.of(
+                page(null, new java.util.EnumMap<WindowKind, PlayerStatsService.WindowQualification>(WindowKind.class))));
+        var mapper = com.fasterxml.jackson.databind.json.JsonMapper.builder().findAndAddModules().build();
+        var mvc = org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(controller)
+                .setMessageConverters(new org.springframework.http.converter.json.MappingJackson2HttpMessageConverter(mapper))
+                .build();
+
+        var l = mapper.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/leagues/L1/players/live").header("X-Sleeper-User", "me"))
+                .andReturn().getResponse().getContentAsString());
+        assertEquals(2, l.get("thisWeek").get("week").asInt());
+        assertEquals(1, l.get("thisWeek").get("played").asInt());
+        assertEquals(3, l.get("thisWeek").get("remaining").asInt());
+        assertEquals(10, l.get("windowQualification").get("LAST_10").get("lastN").asInt());
+        assertEquals("NOT_QUALIFIED", l.get("windowQualification").get("LAST_10").get("reason").asText());
+        assertTrue(l.get("windowQualification").get("LAST_10").get("stale").asBoolean());
+        assertFalse(l.get("windowQualification").get("SEASON").get("stale").asBoolean());
+        assertTrue(l.get("thisWeek").get("scheduleStored").asBoolean());
+        assertTrue(l.get("windowQualification").get("SEASON").get("reason").isNull());
+
+        var n = mapper.readTree(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .get("/api/leagues/L1/players/none").header("X-Sleeper-User", "me"))
+                .andReturn().getResponse().getContentAsString());
+        assertTrue(n.has("thisWeek"), "present");
+        assertTrue(n.get("thisWeek").isNull(), "and null, not absent");
+        assertTrue(n.get("windowQualification").isObject());
+        assertEquals(0, n.get("windowQualification").size());
+    }
+
+    private static PlayerStatsService.PlayerStatsPage page(PlayerStatsService.ThisWeek tw,
+            java.util.Map<WindowKind, PlayerStatsService.WindowQualification> wq) {
+        return new PlayerStatsService.PlayerStatsPage("nba", 2025, null, true, null, null, List.of(), null, null,
+                List.of(), 0, null, new java.util.EnumMap<>(WindowKind.class), null,
+                new java.util.EnumMap<>(WindowKind.class), List.of(), null, null, null, null, List.of(), null, tw, wq);
+    }
 }
