@@ -206,7 +206,7 @@ export type RailLeague = {
  * the route is one that accepts a hint, so a hint left over from a previous
  * page cannot put a League section on a route that has no business with one.
  */
-export function useRailLeague(pathname: string, hintLeagueId?: string | null): RailLeague | null {
+export function useRailLeague(pathname: string, hintLeagueId?: string | null, userId?: string | null): RailLeague | null {
   const [value, setValue] = useState<RailLeague | null>(null)
 
   useEffect(() => {
@@ -255,7 +255,9 @@ export function useRailLeague(pathname: string, hintLeagueId?: string | null): R
     return () => {
       live = false
     }
-  }, [pathname, hintLeagueId])
+    // userId: /api/drafts is scoped to the signed-in user, so signing in or out changes the answer
+    // without changing the path (Spec 052 code review #2). The caller invalidates the cache first.
+  }, [pathname, hintLeagueId, userId])
 
   return value
 }

@@ -57,6 +57,7 @@ import PickInsightCard from '../components/PickInsightCard'
 import { prime, readSoundPref, speechSupported, writeSoundPref } from '../sound'
 import { useAnnouncer } from '../useAnnouncer'
 import { useLiveDraft } from '../useLiveDraft'
+import { trackAction } from '../analytics'
 import type { FeedPick } from '../components/PickFeed'
 
 // Same cap the mock view's resim uses; 500 was carried over from there, not
@@ -357,6 +358,7 @@ export default function LiveDraftView() {
     setForkError(null)
     try {
       const session = await createMockSessionFromDraft(draftId, slotKnown ? mySlot : undefined)
+      trackAction('mock-started', { from: 'live' }) // spec 052
       navigate(`/mock/${session.id}`)
     } catch (e) {
       setForkError(e instanceof Error ? e.message : String(e))

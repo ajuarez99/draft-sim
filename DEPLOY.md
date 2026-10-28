@@ -176,6 +176,7 @@ Set on the `draft-sim` (backend) service unless noted.
 | `DB_POOL_SIZE` | Defaults to 10 |
 | `APP_OWNER_SLEEPER_USER_ID` | **A seat-preselect default only, never an authorization.** It picks which draft seat to highlight; a header-less request is no longer let through because of it. (It still satisfies the commissioner *identity* check, which since 2026-10-05 is an honour system, not a gate) |
 | `VITE_API_BASE` | **Frontend service.** Baked in at Docker *build* time |
+| `VITE_UMAMI_WEBSITE_ID` | **Frontend service.** Spec 052. A build variable, like `VITE_API_BASE`. Absent = analytics off: no tracker script is added and nothing is sent. See "Analytics" below |
 
 **`VITE_API_BASE` is inlined by Vite at build time**, so changing it requires a
 rebuild, not a restart with a new env value.
@@ -301,11 +302,50 @@ flag behaviour is stable. Verified locally, not yet on production.
   mode, so clickjacking protection starts only when it is enforced.
 - **Adding a new external origin (API host, CDN, font, image host) means
   updating the CSP in `web/serve.json`.** Today: `https://api.ballknowers.co`
-  (connect), `https://sleepercdn.com` (img), Google Fonts (style and font).
+  (connect), `https://sleepercdn.com` (img), Google Fonts (style and font), and
+  (spec 052) `https://cloud.umami.is` (script, the analytics tracker) and
+  `https://gateway.umami.is` (connect, where it sends counts).
 - HSTS is `max-age=31536000` with no `includeSubDomains`, until every
   `*.ballknowers.co` host is confirmed HTTPS-only.
 - The backend (`api.ballknowers.co`) is a separate service and sends none of
   these; that is a separate decision.
+
+## Analytics (spec 052)
+
+Cookie-free usage counts through Umami Cloud's free plan. Front end only; nothing in the
+backend or the database. The numbers are read on Umami's own dashboard, behind your login.
+
+- **Turn it on:** create a website in Umami Cloud for `www.ballknowers.co`, copy its website
+  id, and set `VITE_UMAMI_WEBSITE_ID` as a **build** variable on the frontend service (then
+  rebuild; Vite inlines it). Without it nothing loads.
+- **It only runs on `www.ballknowers.co` / `ballknowers.co`.** `localhost`, previews and any
+  other host never load the tracker, even with the variable set. For payload checks in dev,
+  set `VITE_ANALYTICS_DEBUG=1` and the would-be payloads are logged with `console.debug`
+  instead of being sent.
+- **Exclude your own browser:** `localStorage.setItem('umami.disabled','1')` in DevTools on
+  the site. Both this app and Umami's script honour it.
+- **The numbers are a floor.** Visitors with a blocker or tracking protection are not counted.
+  And they start on the deploy day: there is no backfill (FR-010).
+- **The league id changes at season rollover.** Sleeper issues a new league id each season,
+  so a league's `league-view` events split at the rollover; the sport does not.
+- **"Page views minus league views" is only a rough "no league" count (review #3).** A
+  `league-view` is sent only when the rail resolves a league for the path, so some league-route
+  page views send none: a league the signed-in user is not a member of (`/api/drafts` is scoped
+  to the user), the first half of an auction-draft redirect, and a draft id missing from its
+  lineage. Treat the difference as an upper bound; the cleaner "no league" read is by route
+  template (anything outside `/leagues/`, `/drafts/` and `/mock/:session`, plus `/(landing)/*`).
+- **`league-added` with `via: id` also counts a re-paste (review #7).** The ingest is
+  idempotent, so pasting the id of a league that is already added succeeds and is counted as a
+  league added. The one-click path and ESPN do not have this.
+- **An auction-draft redirect counts two page views** (the board route, then the redirect
+  target).
+- **What is sent** is exactly `specs/052-site-analytics/data-model.md`: a route template
+  (e.g. `/leagues/:league/power`, never the real URL), the sport and league id on a league
+  view, an outside referrer's origin on the first view, and three key actions (`sign-in`,
+  `league-added`, `mock-started`). Never a username, display name, draft, player, manager or
+  mock-session id. Signed-out visits are filed under `/(landing)/...`.
+- The sign-in screen says all of this in one sentence (`analyticsLine` in
+  `web/src/landingCopy.ts`).
 
 ## Things that will probably bite
 

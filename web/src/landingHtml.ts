@@ -1,5 +1,5 @@
 import {
-  SITE_ORIGIN, description, featureSports, footerLine, groups, headingOf, headline, imageAlt,
+  SITE_ORIGIN, analyticsLine, description, featureSports, footerLine, groups, headingOf, headline, imageAlt,
   platformsNote, sports, subheadline, title,
 } from './landingCopy'
 
@@ -108,6 +108,7 @@ export function staticBody(): string {
     `<button class="signin-continue" type="submit" disabled>Continue</button></form>` +
     `<p class="signin-note muted small">Enter your Sleeper username (or paste your Sleeper profile link) to see your own leagues and ` +
     `get your seat highlighted at the table. No password -- this app never asks Sleeper for anything private.</p>` +
+    `<p class="signin-note muted small">${esc(analyticsLine)}</p>` +
     `<p class="landing-platforms muted small">${esc(platformsNote)}</p>` +
     `</header>${groupHtml}` +
     `<p class="landing-footer muted small">${esc(footerLine)}</p>` +
