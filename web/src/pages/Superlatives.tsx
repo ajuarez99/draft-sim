@@ -138,6 +138,18 @@ export default function Superlatives() {
 
           <HowThisWorks>
             <p>One row each. If an award can&apos;t be worked out yet, its row says why.</p>
+            {data.superlatives.some((s) => s.kind === 'TRENDING_TONY') && (
+              <p>
+                The Trending Tony counts pickups that were on Sleeper&apos;s trending list when they were made. That list
+                is platform-wide (the players added most across all Sleeper leagues in the last 24 hours), not this
+                league&apos;s, and a pickup counts when the player was in its top 15. Each pickup is judged by the
+                first list recorded within a day after it (the one whose 24-hour window contains the pickup), or failing that
+                the last list recorded within a day before it. &quot;Not judged&quot;
+                means no usable list was recorded, which is not the same as &quot;not trending&quot;. Lists have only been
+                recorded since the day recording began, so earlier pickups can never be judged. Waiver claims are timed
+                when they process, not when they were submitted. Trending data from Sleeper.
+              </p>
+            )}
           </HowThisWorks>
         </>
       )}
@@ -317,6 +329,8 @@ function SuperlativeCard({
           leagueId={leagueId}
           sport={sport}
           figure={(v) => standingFigure(s.kind, s.unit, v)}
+          // Spec 051 F6: a player row's figure is the pickup's trending RANK, not a count, so it can't share `figure`.
+          contributionFigure={s.kind === 'TRENDING_TONY' ? (v) => `#${v} trending` : undefined}
         />
       )}
 
@@ -370,6 +384,8 @@ function formatValue(value: number, unit: Superlative['unit']): string {
   if (unit === 'WINS') return `${value} ${value === 1 ? 'win' : 'wins'}`
   if (unit === 'GAMES') return `${value} ${value === 1 ? 'game' : 'games'}`
   if (unit === 'ADDS') return `${value} ${value === 1 ? 'add' : 'adds'}`
+  // Spec 051: TRENDING_TONY's count of pickups that were on the trending list.
+  if (unit === 'PICKUPS') return `${value} trending ${value === 1 ? 'pickup' : 'pickups'}`
   return String(value)
 }
 

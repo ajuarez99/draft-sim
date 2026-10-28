@@ -2501,7 +2501,7 @@ export const getPlayerSpotlight = (sleeperLeagueId: string) =>
 export type SuperlativeKind =
   | 'HIGHEST_WEEK' | 'LOWEST_WEEK' | 'BIGGEST_BLOWOUT' | 'CLOSEST_GAME'
   | 'CLOSE_WINS' | 'CLOSE_LOSSES' | 'LUCKIEST' | 'UNLUCKIEST' | 'MOST_BENCH_POINTS'
-  | 'WAIVER_WIRE_WARRIOR' | 'JABARI_SMITH_JR' | 'JOEL_EMBIID' | 'UNETHICAL'
+  | 'WAIVER_WIRE_WARRIOR' | 'JABARI_SMITH_JR' | 'JOEL_EMBIID' | 'UNETHICAL' | 'TRENDING_TONY'
 
 export type SuperlativeHolder = {
   rosterId: number
@@ -2657,6 +2657,31 @@ export type SuperlativeDetail =
       /** null when not a bid (a free-agent add, or a waiver claim with no FAAB); 0 is a real bid, never confused with null. */
       faabBid: number | null
     }
+  | {
+      /** Spec 051 (TRENDING_TONY): one counted pickup that was on Sleeper's trending list when it was made. Mirrors SeasonSuperlativesService.TrendingPickupDetail. `position` is null when the player isn't in the player table. */
+      type: 'TRENDING_PICKUP'
+      playerId: string
+      playerName: string
+      position: string | null
+      rosterId: number
+      week: number
+      addType: 'WAIVER' | 'FREE_AGENT'
+      /** 1-based place on the nearest trending list (the award counts ranks 1..15). */
+      trendingRank: number
+      /** Sleeper's own platform-wide add count behind that rank. */
+      addCount: number
+      /** When the matched trending list was recorded (ISO instant). */
+      snapshotAt: string
+    }
+
+/** Spec 051: how much of the season's pickups the Trending Tony could actually judge. `judged + notJudged === totalPickups`. */
+export type TrendingCoverage = {
+  /** Time of the earliest pickup that could be judged (ISO instant). */
+  judgingSinceAt: string
+  judged: number
+  notJudged: number
+  totalPickups: number
+}
 
 export type Superlative = {
   kind: SuperlativeKind
@@ -2664,7 +2689,7 @@ export type Superlative = {
   reason?: string | null
   early: boolean
   value: number | null
-  unit: 'POINTS' | 'WINS' | 'GAMES' | 'ADDS' | null
+  unit: 'POINTS' | 'WINS' | 'GAMES' | 'ADDS' | 'PICKUPS' | null
   holders: SuperlativeHolder[]
   emptyReason?: string | null
   detail: SuperlativeDetail[]
@@ -2677,6 +2702,8 @@ export type Superlative = {
   playerStandings: SuperlativePlayerStanding[]
   /** Spec 040: JOEL_EMBIID, WAIVER_WIRE_WARRIOR, UNETHICAL carry every contributing player; `[]` for every other kind. */
   playerContributions: SuperlativePlayerContribution[]
+  /** Spec 051: TRENDING_TONY only; `null` for every other kind and whenever the award is unavailable. Non-null on every available TRENDING_TONY card, even with no holders. */
+  trendingCoverage: TrendingCoverage | null
 }
 
 export type SuperlativesResponse = {

@@ -99,8 +99,7 @@ public final class MostAddedPlayers {
                                                                    Predicate<String> eligiblePlayerId) {
         Map<String, List<CompletedAdd>> byPlayer = new LinkedHashMap<>();
         for (CompletedAdd a : adds) {
-            if (!"WAIVER".equals(a.type()) && !"FREE_AGENT".equals(a.type())) continue;
-            if (a.week() < 1 || a.week() > throughWeek) continue;
+            if (!PickupRules.isCountedPickup(a) || a.week() > throughWeek) continue;
             if (!eligiblePlayerId.test(a.playerId())) continue;
             byPlayer.computeIfAbsent(a.playerId(), k -> new ArrayList<>()).add(a);
         }

@@ -143,10 +143,11 @@ function SeasonAwards({ s, load }: { s: TrophySeason; load: Promise<Superlatives
   return (
     <>
       <div className="hof-awards-list">
-        {d.superlatives.map((a, i) => (
-          <article key={a.kind} className="hof-award" style={{ ['--sl-hue' as string]: hueForIndex(i, d.superlatives.length) }}>
+        {/* Spec 051 F8: an unavailable Trending Tony (no history for a past season) is hidden here; the Awards page still explains it. */}
+        {d.superlatives.filter((a) => !(a.kind === 'TRENDING_TONY' && !a.available)).map((a, i, shown) => (
+          <article key={a.kind} className="hof-award" style={{ ['--sl-hue' as string]: hueForIndex(i, shown.length) }}>
             <h5 className="hof-award-title">{TITLES[a.kind]?.title ?? a.kind}</h5>
-            <AwardWinners s={a} hue={hueForIndex(i, d.superlatives.length)} sport={d.sport} leagueId={d.leagueSleeperId} throughWeek={d.throughWeek} />
+            <AwardWinners s={a} hue={hueForIndex(i, shown.length)} sport={d.sport} leagueId={d.leagueSleeperId} throughWeek={d.throughWeek} />
           </article>
         ))}
       </div>

@@ -37,6 +37,8 @@ type Props = {
   sport: Sport
   /** Built by the card from `standingFigure`, so this list and the card can't disagree on a figure (amendment 10). */
   figure: (v: number) => string
+  /** Spec 051 F6: the Players view's figure when it isn't the same unit as the Teams view's (TRENDING_TONY: a rank, not a count). Defaults to `figure`. */
+  contributionFigure?: (v: number) => string
 }
 
 /**
@@ -51,7 +53,7 @@ type Props = {
  * A row with no value says why (`missingReason`) instead of showing a 0 that
  * would read as a measured result.
  */
-export default function SuperlativeStandings({ s, title, hue, leagueId, sport, figure }: Props) {
+export default function SuperlativeStandings({ s, title, hue, leagueId, sport, figure, contributionFigure = figure }: Props) {
   const titleId = useId()
   const isPlayers = s.kind === 'JABARI_SMITH_JR'
   const hasContributions = s.playerContributions.length > 0
@@ -119,7 +121,7 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
           </span>
           {c.note && <span className="muted small sl-standing-note">{c.note}</span>}
         </span>
-        <span className="sl-standing-figure">{figure(c.value)}</span>
+        <span className="sl-standing-figure">{contributionFigure(c.value)}</span>
       </li>
     )
   }

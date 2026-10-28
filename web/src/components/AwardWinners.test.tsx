@@ -29,7 +29,7 @@ function award(over: Partial<Superlative>): Superlative {
     playerHolders: [],
     standings: [],
     playerStandings: [],
-    playerContributions: [],
+    playerContributions: [], trendingCoverage: null,
     ...over,
   }
 }
@@ -93,5 +93,58 @@ describe('AwardWinners', () => {
     }))
     expect(screen.getByText(/5 of 6 weeks — week 2 has no per-player breakdown/)).toBeInTheDocument()
     expect(screen.getByText(/90.25 points left on the bench/)).toBeInTheDocument()
+  })
+
+  // ---- spec 051: The Trending Tony ----------------------------------------------------------------
+
+  const tonyHolder = { rosterId: 7, managerId: 70, teamName: 'Chasers', username: null, avatarId: null }
+  const tonyPickup = {
+    type: 'TRENDING_PICKUP' as const, playerId: 'p9', playerName: 'Hot Pickup', position: 'WR', rosterId: 7,
+    week: 3, addType: 'WAIVER' as const, trendingRank: 2, addCount: 55000, snapshotAt: '2026-10-14T09:00:00Z',
+  }
+  const coverage = { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 8, notJudged: 3, totalPickups: 11 }
+  const tony = (over: Partial<Superlative> = {}) => award({
+    kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 4, holders: [tonyHolder],
+    detail: [tonyPickup, { ...tonyPickup, playerId: 'p10', playerName: 'Free Guy', week: 5, addType: 'FREE_AGENT', trendingRank: 11 }],
+    trendingCoverage: coverage, ...over,
+  })
+
+  it('trending pickups: one line per pickup, with its rank, week and how it was added, and the player linked', () => {
+    show(tony())
+    expect(screen.getByRole('link', { name: 'Hot Pickup' })).toBeInTheDocument()
+    expect(screen.getByText(/· #2 trending · week 3 · Waiver$/)).toBeInTheDocument()
+    expect(screen.getByText(/· #11 trending · week 5 · Free agent$/)).toBeInTheDocument()
+  })
+
+  it('trending coverage (NFL): names the start date, the judged and unjudged counts, the week and the defense exclusion', () => {
+    render(<AwardWinners s={tony()} hue={200} sport="nfl" leagueId="L1" throughWeek={6} />)
+    const since = new Date('2026-10-14T09:00:00Z').toLocaleDateString()
+    expect(screen.getByText(
+      `Judged since ${since} · 8 of 11 pickups judged, 3 not (before trending history began or no list within a day) · pickups through week 6, team defenses excluded`,
+    )).toBeInTheDocument()
+  })
+
+  it('trending coverage (NBA): the same line without the team-defenses clause', () => {
+    show(tony())
+    const since = new Date('2026-10-14T09:00:00Z').toLocaleDateString()
+    expect(screen.getByText(
+      `Judged since ${since} · 8 of 11 pickups judged, 3 not (before trending history began or no list within a day) · pickups through week 6`,
+    )).toBeInTheDocument()
+    expect(screen.queryByText(/team defenses/)).not.toBeInTheDocument()
+  })
+
+  it('trending, nobody named: the emptyReason AND the coverage line both print', () => {
+    show(tony({ holders: [], detail: [], value: 1, emptyReason: 'nobody has chased the trending list twice yet' }))
+    expect(screen.getByText('nobody has chased the trending list twice yet')).toBeInTheDocument()
+    expect(screen.getByText(/8 of 11 pickups judged/)).toBeInTheDocument()
+  })
+
+  it.each([
+    'Trending data comes from Sleeper; this league is on ESPN.',
+    "Transactions for this season haven't loaded yet.",
+  ])('trending unavailable: prints the reason "%s" and no coverage line', (reason) => {
+    show(tony({ available: false, reason, holders: [], detail: [], value: null, unit: null, trendingCoverage: null }))
+    expect(screen.getByText(reason)).toBeInTheDocument()
+    expect(screen.queryByText(/pickups judged/)).not.toBeInTheDocument()
   })
 })

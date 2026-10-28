@@ -19,4 +19,6 @@ export const TITLES: Record<string, { title: string; subtitle?: string; note?: s
   // holder line the way other kinds' figures are.
   JOEL_EMBIID: { title: 'The Joel Embiid Award', note: "Weeks missed, cause unknown. An estimate: each week he sat out entirely costs one game's average, and a week he played any game costs nothing." },
   UNETHICAL: { title: 'The Unethical Award' },
+  // Spec 051: pickups judged against Sleeper's platform-wide trending list at the time they were made.
+  TRENDING_TONY: { title: 'The Trending Tony' },
 }

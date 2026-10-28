@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.engine;
 
+import com.ballknowers.draftsim.domain.Platform;
 import com.ballknowers.draftsim.domain.Player;
 import com.ballknowers.draftsim.domain.Position;
 import com.ballknowers.draftsim.domain.Sport;
@@ -9,6 +10,10 @@ import com.ballknowers.draftsim.store.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -50,6 +55,7 @@ public class SeasonSuperlativesService {
     private final GameScoringService gameScoring;
     private final StatusCaptureRepository statusCaptures;
     private final LeagueConductRepository conduct;
+    private final SportTrendingRepository sportTrending;
 
     public SeasonSuperlativesService(LeagueRepository leagues, LeagueSeasonResolver seasons,
                                      RosterWeekPointsRepository weekPoints, LeagueMatchupRepository matchups,
@@ -59,7 +65,7 @@ public class SeasonSuperlativesService {
                                      PlayerRepository players, LeagueTransactionRepository transactions,
                                      PlayerAbsenceRepository absences, PlayerGameRepository games,
                                      GameScoringService gameScoring, StatusCaptureRepository statusCaptures,
-                                     LeagueConductRepository conduct) {
+                                     LeagueConductRepository conduct, SportTrendingRepository sportTrending) {
         this.leagues = leagues;
         this.seasons = seasons;
         this.weekPoints = weekPoints;
@@ -77,13 +83,16 @@ public class SeasonSuperlativesService {
         this.gameScoring = gameScoring;
         this.statusCaptures = statusCaptures;
         this.conduct = conduct;
+        this.sportTrending = sportTrending;
     }
 
     // --------------------------------------------------------------- shapes
 
     public enum Kind {
         HIGHEST_WEEK, LOWEST_WEEK, BIGGEST_BLOWOUT, CLOSEST_GAME, CLOSE_WINS, CLOSE_LOSSES,
-        LUCKIEST, UNLUCKIEST, MOST_BENCH_POINTS, WAIVER_WIRE_WARRIOR, JABARI_SMITH_JR, JOEL_EMBIID, UNETHICAL
+        LUCKIEST, UNLUCKIEST, MOST_BENCH_POINTS, WAIVER_WIRE_WARRIOR, JABARI_SMITH_JR, JOEL_EMBIID, UNETHICAL,
+        /** Spec 051: appended LAST so every existing card keeps its place (order is display order). */
+        TRENDING_TONY
     }
 
     /** The six kinds FR-006 marks as "mostly noise" while the season window is early. */
@@ -99,7 +108,7 @@ public class SeasonSuperlativesService {
     /** One row of a superlative's supporting detail. Discriminated on the wire by a "type" field the controller adds. */
     public sealed interface DetailRow
             permits WeekScoreDetail, GameDetail, LuckDetail, BenchTotalDetail, PickupDetail, AbsenceDetail,
-            ConductDetail, AddDetail {}
+            ConductDetail, AddDetail, TrendingPickupDetail {}
 
     public record WeekScoreDetail(int week, int rosterId, double points) implements DetailRow {}
 
@@ -147,6 +156,24 @@ public class SeasonSuperlativesService {
                             String addType, Integer faabBid) implements DetailRow {}
 
     /**
+     * One trending pickup behind the TRENDING_TONY award (spec 051). {@code position} is nullable (an
+     * unknown player); {@code addType} is {@code "WAIVER"} or {@code "FREE_AGENT"}; {@code trendingRank}
+     * is 1..{@link TrendingPickups#TOP_N} in the judging snapshot, whose time is {@code snapshotAt}.
+     * Like {@link PickupDetail} it carries no team name: the row sits under its holder.
+     */
+    public record TrendingPickupDetail(String playerId, String playerName, String position, int rosterId, int week,
+                                       String addType, int trendingRank, int addCount,
+                                       OffsetDateTime snapshotAt) implements DetailRow {}
+
+    /**
+     * How much of a season TRENDING_TONY could judge (spec 051 FR-007, research R7). Deliberately not
+     * {@link Coverage}: its fields are weeks, and pickups dressed as weeks would read wrong.
+     * {@code judgingSinceAt} is the earliest pickup that could be judged this season (its own time, not
+     * its judging snapshot's), an instant the browser formats as a local date; {@code judged + notJudged == totalPickups}.
+     */
+    public record TrendingCoverage(OffsetDateTime judgingSinceAt, int judged, int notJudged, int totalPickups) {}
+
+    /**
      * One row of a team award's full standings (spec 010). Invariants: {@code rank == null} iff
      * {@code !hasValue}, and {@code missingReason != null} iff {@code !hasValue}. A row without a
      * value is a roster the award couldn't measure -- listed last with the reason, never as a 0.
@@ -173,11 +200,25 @@ public class SeasonSuperlativesService {
      * @param standings       spec 010: one row per roster in the league-season (orphans included), ranked
      *                        for this award; {@code []} for an unavailable/empty kind and for JABARI_SMITH_JR
      * @param playerStandings spec 010: JABARI_SMITH_JR only, {@code []} for every other kind
+     * @param trendingCoverage spec 051: TRENDING_TONY only, and only when available; null for every other kind
      */
     public record Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                               List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
                               List<PlayerHolder> playerHolders, List<Standing> standings,
-                              List<PlayerStanding> playerStandings, List<PlayerContribution> playerContributions) {
+                              List<PlayerStanding> playerStandings, List<PlayerContribution> playerContributions,
+                              TrendingCoverage trendingCoverage) {
+        /**
+         * The 14-argument shape (no trendingCoverage); defaults it to null. Rebuilders must NOT use this
+         * either -- withUsernames/withStandings use the canonical constructor so the field survives
+         * (spec 051 plan-review F12).
+         */
+        public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
+                           List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
+                           List<PlayerHolder> playerHolders, List<Standing> standings,
+                           List<PlayerStanding> playerStandings, List<PlayerContribution> playerContributions) {
+            this(kind, available, reason, early, value, unit, holders, emptyReason, detail, coverage, playerHolders,
+                    standings, playerStandings, playerContributions, null);
+        }
         /** Old 13-argument shape (no playerContributions); defaults it to empty. Rebuilders must NOT use this -- see withUsernames/withStandings (spec 040 plan-review F2). */
         public Superlative(Kind kind, boolean available, String reason, boolean early, Double value, String unit,
                            List<Holder> holders, String emptyReason, List<DetailRow> detail, Coverage coverage,
@@ -362,6 +403,10 @@ public class SeasonSuperlativesService {
                 playersBySleeperId, early, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.JABARI_SMITH_JR, mostAddedSuperlative(sleeperLeagueId, txRows, throughWeek,
                 playersBySleeperId, nameByRoster, avatarByRoster));
+
+        // Spec 051: reuses the same txRows, so the award adds no second transactions query.
+        built.put(Kind.TRENDING_TONY, trendingTonySuperlative(sportTrending, league, txRows, throughWeek,
+                playersBySleeperId, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
 
         built.put(Kind.JOEL_EMBIID, absenceSuperlative(league, sleeperLeagueId, rules, scoredWeeksFinal, parsedWeeks,
                 playersBySleeperId, early, rosterIds, nameByRoster, avatarByRoster, managerByRoster));
@@ -555,7 +600,7 @@ public class SeasonSuperlativesService {
     private static Superlative withStandings(Superlative s, List<Standing> standings) {
         return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), s.holders(),
                 s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings(),
-                s.playerContributions());
+                s.playerContributions(), s.trendingCoverage());
     }
 
     /**
@@ -870,6 +915,190 @@ public class SeasonSuperlativesService {
 
         return new Superlative(Kind.JABARI_SMITH_JR, true, null, false, (double) ranked.get(0).adds(), "ADDS",
                 List.of(), null, detail, null, playerHolders, List.of(), playerStandings);
+    }
+
+    // ---------------------------------------------------------------- spec 051
+
+    /** How far either side of a pickup a snapshot may sit; equals the stored lookback ({@code TrendingRefresh.LOOKBACK_HOURS}), not tuned. */
+    private static final Duration TRENDING_MATCH_WINDOW = Duration.ofHours(24);
+
+    /**
+     * How far either side of the pickups' span the snapshot headers are loaded. The judge applies each
+     * snapshot's own stored lookback; this margin only has to cover the largest lookback ever stored
+     * (24h today), so it is deliberately wider than {@link #TRENDING_MATCH_WINDOW} (review B3).
+     */
+    private static final Duration TRENDING_HEADER_MARGIN = Duration.ofHours(48);
+
+    /**
+     * TRENDING_TONY (spec 051, research R4-R6): the manager who most often picked up a player Sleeper's
+     * platform-wide trending list had in its top {@link TrendingPickups#TOP_N} at the time. The judging
+     * rule is {@link TrendingPickups#judge}; this method gathers its inputs -- the same pickups
+     * {@link #mostAddedSuperlative} counts, plus only the snapshot rows the judge can use (F4) -- and
+     * {@link #trendingTonyFromJudged} shapes the result. Static and package-private, taking the repository,
+     * so {@code SeasonSuperlativesTrendingTonyGatherTest} can drive this gathering half with a mock (review B2).
+     *
+     * <p>Not early-eligible: a count of events, like CLOSE_WINS and JABARI_SMITH_JR.
+     */
+    static Superlative trendingTonySuperlative(SportTrendingRepository sportTrending,
+                                                LeagueRepository.LeagueRow league,
+                                                List<LeagueTransactionRepository.Row> txRows, int throughWeek,
+                                                Map<String, Player> playersBySleeperId, Set<Integer> rosterIds,
+                                                Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                                Map<Integer, Long> managerByRoster) {
+        if (league.platform() == Platform.ESPN) {
+            return unavailable(Kind.TRENDING_TONY, "Trending data comes from Sleeper; this league is on ESPN.");
+        }
+        if (txRows.isEmpty()) {
+            return unavailable(Kind.TRENDING_TONY, "Transactions for this season haven't loaded yet.");
+        }
+        List<WaiverPickupAttribution.CompletedAdd> completedAdds = WaiverPickupAttribution.completedAdds(txRows);
+        // Same football-defense exclusion as mostAddedSuperlative (research R16 decision 2).
+        Predicate<String> eligible = playerId -> {
+            Player p = playersBySleeperId.get(playerId);
+            return p == null || !p.positions().contains(Position.DEF);
+        };
+        List<WaiverPickupAttribution.CompletedAdd> counted = completedAdds.stream()
+                .filter(a -> PickupRules.isCountedPickup(a) && a.week() <= throughWeek && eligible.test(a.playerId()))
+                .toList();
+        Instant first = null;
+        Instant last = null;
+        Set<String> pickedUp = new HashSet<>();
+        for (WaiverPickupAttribution.CompletedAdd a : counted) {
+            pickedUp.add(a.playerId());
+            if (a.createdAt() == null) continue;
+            if (first == null || a.createdAt().isBefore(first)) first = a.createdAt();
+            if (last == null || a.createdAt().isAfter(last)) last = a.createdAt();
+        }
+
+        String sport = league.sport().code();
+        List<SportTrendingRepository.TrendingSnapshotHeader> headers = List.of();
+        Map<Long, Map<String, SportTrendingRepository.TrendingSnapshotRank>> ranks = new HashMap<>();
+        if (first != null) {
+            headers = sportTrending.snapshotHeaders(sport,
+                    first.minus(TRENDING_HEADER_MARGIN).atOffset(ZoneOffset.UTC),
+                    last.plus(TRENDING_HEADER_MARGIN).atOffset(ZoneOffset.UTC));
+            for (SportTrendingRepository.TrendingSnapshotRank r : sportTrending.snapshotRanks(
+                    headers.stream().map(SportTrendingRepository.TrendingSnapshotHeader::id).toList(),
+                    TrendingPickups.TOP_N, pickedUp)) {
+                ranks.computeIfAbsent(r.snapshotId(), k -> new HashMap<>()).put(r.playerId(), r);
+            }
+        }
+        List<TrendingPickups.Judged> judged = TrendingPickups.judge(completedAdds, headers, ranks, throughWeek, eligible);
+        boolean anyJudged = judged.stream().anyMatch(j -> j.verdict() != TrendingPickups.Verdict.NOT_JUDGED);
+        Optional<OffsetDateTime> earliest = anyJudged ? Optional.empty() : sportTrending.earliestSnapshotAt(sport);
+        return trendingTonyFromJudged(judged, earliest, last, league.complete(), playersBySleeperId, rosterIds,
+                nameByRoster, avatarByRoster, managerByRoster);
+    }
+
+    /**
+     * The shaping half of {@link #trendingTonySuperlative}, pure so {@code SeasonSuperlativesTrendingTonyTest}
+     * drives it without Postgres.
+     *
+     * @param earliestSnapshot when trending history began for the sport; only consulted when nothing was
+     *                         judged, to pick between the two unavailable reasons (F2)
+     * @param lastPickupAt     the latest counted pickup's time, null when no counted pickup has one
+     * @param seasonComplete   the league-season is finished; only then can "history began after every pickup"
+     *                         be called "wasn't being recorded", since a live season's later pickups may yet be judged
+     */
+    static Superlative trendingTonyFromJudged(List<TrendingPickups.Judged> judged,
+                                              Optional<OffsetDateTime> earliestSnapshot, Instant lastPickupAt,
+                                              boolean seasonComplete,
+                                              Map<String, Player> playersBySleeperId, Set<Integer> rosterIds,
+                                              Map<Integer, String> nameByRoster, Map<Integer, String> avatarByRoster,
+                                              Map<Integer, Long> managerByRoster) {
+        int total = judged.size();
+        int notJudged = (int) judged.stream().filter(j -> j.verdict() == TrendingPickups.Verdict.NOT_JUDGED).count();
+        int judgedCount = total - notJudged;
+        if (judgedCount == 0) {
+            // R6 / F2: a card with nothing judged would have no judgingSince, so it is unavailable, never "nobody".
+            // Review B1: "wasn't being recorded" is only true when there is no history at all, or the season is
+            // over and history began after its last pickup. A live season (or a gap in history) is "not yet".
+            boolean noHistoryYet = earliestSnapshot.isEmpty()
+                    || (seasonComplete && lastPickupAt != null
+                        && earliestSnapshot.get().toInstant().isAfter(lastPickupAt.plus(TRENDING_MATCH_WINDOW)));
+            return unavailable(Kind.TRENDING_TONY, noHistoryYet
+                    ? "Trending history wasn't being recorded yet for this season."
+                    : "Nothing could be judged yet: trending history began on "
+                            + earliestSnapshot.get().withOffsetSameInstant(ZoneOffset.UTC).toLocalDate()
+                            + " (UTC), and no pickup since has a list within a day of it.");
+        }
+        // Review B5: the earliest pickup that could be judged (not the snapshot's time, which can postdate it).
+        OffsetDateTime since = judged.stream().filter(j -> j.verdict() != TrendingPickups.Verdict.NOT_JUDGED)
+                .map(j -> j.add().createdAt()).filter(Objects::nonNull)
+                .min(Comparator.naturalOrder()).orElseThrow().atOffset(ZoneOffset.UTC);
+        TrendingCoverage coverage = new TrendingCoverage(since, judgedCount, notJudged, total);
+
+        Map<Integer, TrendingPickups.Tally> tally = TrendingPickups.tally(judged);
+        List<TrendingPickups.Judged> trending = judged.stream()
+                .filter(j -> j.verdict() == TrendingPickups.Verdict.TRENDING).toList();
+
+        // Standings: every roster, zeros included (it was measured -- its pickups are known), competition ranks.
+        List<SuperlativeStandings.Entry> entries = new ArrayList<>();
+        for (int id : rosterIds) {
+            TrendingPickups.Tally t = tally.get(id);
+            entries.add(new SuperlativeStandings.Entry(holder(id, nameByRoster, avatarByRoster, managerByRoster),
+                    t == null ? 0.0 : (double) t.trending(),
+                    t == null ? "no judged pickups"
+                            : t.trending() + " of " + t.judged() + (t.judged() == 1 ? " judged pickup" : " judged pickups"),
+                    null));
+        }
+        List<Standing> standings = SuperlativeStandings.rank(entries, false);
+
+        // Players view: every trending pickup, all rosters; value is the trending rank, so lowest first.
+        List<TrendingPickups.Judged> ordered = new ArrayList<>(trending);
+        ordered.sort(Comparator.<TrendingPickups.Judged>comparingInt(j -> j.trendingRank())
+                .thenComparingInt(j -> j.add().week())
+                .thenComparingInt(j -> j.add().rosterId())
+                .thenComparing(j -> j.add().playerId()));
+        List<PlayerContribution> contributions = new ArrayList<>();
+        int rank = 0;
+        int prevRank = -1;
+        for (int i = 0; i < ordered.size(); i++) {
+            TrendingPickups.Judged j = ordered.get(i);
+            if (j.trendingRank() != prevRank) rank = i + 1; // competition ranks, like every other list
+            prevRank = j.trendingRank();
+            Player p = playersBySleeperId.get(j.add().playerId());
+            contributions.add(new PlayerContribution(rank, j.add().playerId(), p == null ? "Unknown player" : p.name(),
+                    p == null ? null : p.primary().name(),
+                    holder(j.add().rosterId(), nameByRoster, avatarByRoster, managerByRoster),
+                    j.trendingRank(), "week " + j.add().week() + " · " + addTypeLabel(j.add().type())));
+        }
+
+        int max = tally.values().stream().mapToInt(TrendingPickups.Tally::trending).max().orElse(0);
+        if (max < TrendingPickups.MIN_TO_NAME) {
+            return new Superlative(Kind.TRENDING_TONY, true, null, false, null, "PICKUPS", List.of(),
+                    "nobody has chased the trending list twice yet", List.of(), null, List.of(), standings,
+                    List.of(), contributions, coverage);
+        }
+        List<Integer> topRosters = tally.values().stream().filter(t -> t.trending() == max)
+                .map(TrendingPickups.Tally::rosterId).sorted().toList();
+        List<Holder> holders = topRosters.stream()
+                .map(id -> holder(id, nameByRoster, avatarByRoster, managerByRoster)).toList();
+        List<DetailRow> detail = new ArrayList<>();
+        for (int id : topRosters) {
+            // Review B6: the 3 best per holder (lowest rank, then week), like the Waiver Wire Warrior cap;
+            // playerContributions keeps every pickup.
+            trending.stream().filter(j -> j.add().rosterId() == id)
+                    .sorted(Comparator.<TrendingPickups.Judged>comparingInt(j -> j.trendingRank())
+                            .thenComparingInt(j -> j.add().week())
+                            .thenComparing(j -> j.add().playerId()))
+                    .limit(TRENDING_DETAIL_PER_HOLDER)
+                    .forEach(j -> {
+                        Player p = playersBySleeperId.get(j.add().playerId());
+                        detail.add(new TrendingPickupDetail(j.add().playerId(),
+                                p == null ? "Unknown player" : p.name(), p == null ? null : p.primary().name(),
+                                id, j.add().week(), j.add().type(), j.trendingRank(), j.addCount(), j.snapshotAt()));
+                    });
+        }
+        return new Superlative(Kind.TRENDING_TONY, true, null, false, (double) max, "PICKUPS", holders, null, detail,
+                null, List.of(), standings, List.of(), contributions, coverage);
+    }
+
+    /** Holder detail rows shown per holder (hand-set, matches the Waiver Wire Warrior cap). */
+    private static final int TRENDING_DETAIL_PER_HOLDER = 3;
+
+    private static String addTypeLabel(String type) {
+        return "WAIVER".equals(type) ? "waiver" : "free agent";
     }
 
     // ---------------------------------------------------------------- US4
@@ -1845,7 +2074,7 @@ public class SeasonSuperlativesService {
                 .toList();
         return new Superlative(s.kind(), s.available(), s.reason(), s.early(), s.value(), s.unit(), holders,
                 s.emptyReason(), s.detail(), s.coverage(), s.playerHolders(), standings, s.playerStandings(),
-                contributions);
+                contributions, s.trendingCoverage());
     }
 
     private static Holder withUsername(Holder h, Map<Integer, String> usernameByRoster) {
