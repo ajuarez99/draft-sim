@@ -17,6 +17,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -54,6 +55,8 @@ class SportTrendingRepositoryIT {
     void clean() {
         // sport_trending rows cascade from the fetch row.
         jdbc.update("delete from sport_trending_fetch where sport = ?", SPORT);
+        // Spec 051: snapshot history has no FK to the fetch row; entries cascade from the snapshot.
+        jdbc.update("delete from sport_trending_snapshot where sport = ?", SPORT);
     }
 
     private static List<SportTrendingRepository.Entry> entries(int n) {
@@ -147,5 +150,97 @@ class SportTrendingRepositoryIT {
     @Test
     void anUnknownSportReadsEmpty() {
         assertTrue(repo.read(SPORT).isEmpty());
+    }
+
+    // ---- spec 051: snapshot history (T005) ----
+
+    @Test
+    void replaceWritesOneSnapshotMatchingTheCurrentListAndFetchedAt() {
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 34, 56, 0, ZoneOffset.UTC);
+
+        repo.replace(SPORT, 24, 2026, null, entries(25), at);
+
+        var headers = repo.snapshotHeaders(SPORT, at.minusDays(1), at.plusDays(1));
+        assertEquals(1, headers.size());
+        var h = headers.get(0);
+        assertTrue(at.isEqual(h.fetchedAt()));
+        assertEquals(24, h.lookbackHours());
+        assertEquals(25, h.entryCount());
+        assertTrue(repo.read(SPORT).orElseThrow().fetchedAt().isEqual(h.fetchedAt()));
+        List<String> history = jdbc.queryForList(
+                "select sleeper_player_id from sport_trending_snapshot_entry where snapshot_id = ? order by rank",
+                String.class, h.id());
+        assertEquals(repo.read(SPORT).orElseThrow().entries().stream().map(SportTrendingRepository.Entry::sleeperPlayerId).toList(),
+                history);
+    }
+
+    @Test
+    void recordFailureWritesNoSnapshot() {
+        repo.recordFailure(SPORT, OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC), "boom");
+
+        assertEquals(0, jdbc.queryForObject("select count(*) from sport_trending_snapshot where sport = ?", Integer.class, SPORT));
+    }
+
+    @Test
+    void twoReplacesKeepTwoSnapshotsWhileTheCurrentListHoldsOnlyTheSecond() {
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC);
+        repo.replace(SPORT, 24, 2026, null, entries(25), at);
+        repo.replace(SPORT, 24, 2026, null, entries(3), at.plusHours(2));
+
+        var headers = repo.snapshotHeaders(SPORT, at.minusDays(1), at.plusDays(1));
+        assertEquals(List.of(25, 3), headers.stream().map(SportTrendingRepository.TrendingSnapshotHeader::entryCount).toList());
+        assertEquals(3, repo.read(SPORT).orElseThrow().entries().size());
+    }
+
+    @Test
+    void anEmptyListStoresASnapshotWithEntryCountZero() {
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC);
+        repo.replace(SPORT, 24, 2026, null, List.of(), at);
+
+        var headers = repo.snapshotHeaders(SPORT, at, at);
+        assertEquals(1, headers.size());
+        assertEquals(0, headers.get(0).entryCount());
+    }
+
+    @Test
+    void snapshotHeadersRespectInclusiveBoundsAndSport() {
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC);
+        repo.replace(SPORT, 24, 2026, null, entries(2), at);
+        repo.replace(SPORT, 24, 2026, null, entries(2), at.plusHours(5));
+        repo.replace(SPORT, 24, 2026, null, entries(2), at.plusHours(10));
+
+        assertEquals(2, repo.snapshotHeaders(SPORT, at, at.plusHours(5)).size(), "both bounds inclusive");
+        assertEquals(1, repo.snapshotHeaders(SPORT, at.plusHours(1), at.plusHours(9)).size());
+        assertEquals(0, repo.snapshotHeaders("it-other-sport", at.minusDays(1), at.plusDays(1)).size());
+    }
+
+    @Test
+    void snapshotRanksFiltersByRankAndPlayerIdsThroughRealArrayBinds() {
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC);
+        repo.replace(SPORT, 24, 2026, null, entries(25), at);
+        repo.replace(SPORT, 24, 2026, null, entries(25), at.plusHours(3));
+        List<Long> ids = repo.snapshotHeaders(SPORT, at, at.plusHours(3)).stream()
+                .map(SportTrendingRepository.TrendingSnapshotHeader::id).toList();
+
+        // p2, p15 are inside top 15; p16 and p22 are not; "nobody" is not in the list at all.
+        var ranks = repo.snapshotRanks(ids, 15, Set.of("p2", "p15", "p16", "p22", "nobody"));
+
+        assertEquals(4, ranks.size(), "2 players x 2 snapshots");
+        assertTrue(ranks.stream().allMatch(r -> r.playerId().equals("p2") || r.playerId().equals("p15")));
+        var p15 = ranks.stream().filter(r -> r.playerId().equals("p15")).findFirst().orElseThrow();
+        assertEquals(15, p15.rank());
+        assertEquals(1000 - 15, p15.addCount());
+        assertTrue(repo.snapshotRanks(List.of(), 15, Set.of("p2")).isEmpty());
+        assertTrue(repo.snapshotRanks(ids, 15, Set.of()).isEmpty());
+    }
+
+    @Test
+    void earliestSnapshotAtIsEmptyWithNoRowAndTheMinimumOtherwise() {
+        assertTrue(repo.earliestSnapshotAt(SPORT).isEmpty());
+        OffsetDateTime at = OffsetDateTime.of(2026, 10, 1, 12, 0, 0, 0, ZoneOffset.UTC);
+        repo.replace(SPORT, 24, 2026, null, entries(1), at.plusHours(4));
+        repo.replace(SPORT, 24, 2026, null, entries(1), at);
+
+        assertTrue(at.isEqual(repo.earliestSnapshotAt(SPORT).orElseThrow()));
     }
 }

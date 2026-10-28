@@ -199,7 +199,7 @@ describe('past award winners (US4)', () => {
     holders: [{ rosterId: 1, managerId: 10, teamName: 'Award Winners FC', username: null, avatarId: null }],
     emptyReason: null,
     detail: [{ type: 'WEEK_SCORE', week: 3, rosterId: 1, points: 180.5 }],
-    coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [],
+    coverage: null, playerHolders: [], standings: [], playerStandings: [], playerContributions: [], trendingCoverage: null,
     ...over,
   })
   const response = (over: Partial<SuperlativesResponse> = {}): SuperlativesResponse => ({
@@ -231,6 +231,29 @@ describe('past award winners (US4)', () => {
     // a kind that is unavailable still says why
     expect(screen.getByText('not built yet')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /2025’s awards page/ })).toHaveAttribute('href', '/leagues/S2025/superlatives')
+  })
+
+  it('hides an unavailable Trending Tony but still shows an available one (spec 051 F8)', async () => {
+    const tony = (available: boolean) => award({
+      kind: 'TRENDING_TONY', available, reason: available ? null : 'no trending history for this season',
+      unit: 'PICKUPS', value: available ? 3 : null, holders: available ? [{ rosterId: 2, managerId: 20, teamName: 'Chasers', username: null, avatarId: null }] : [],
+      detail: [],
+      trendingCoverage: available ? { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 3, notJudged: 0, totalPickups: 3 } : null,
+    })
+    fetchSuperlatives.mockResolvedValue(response({ superlatives: [award(), tony(false)] }))
+    await open()
+    expect(await screen.findByText('Highest week')).toBeInTheDocument()
+    expect(screen.queryByText('The Trending Tony')).not.toBeInTheDocument()
+    expect(screen.queryByText('no trending history for this season')).not.toBeInTheDocument()
+  })
+
+  it('shows an available Trending Tony in a past season', async () => {
+    fetchSuperlatives.mockResolvedValue(response({ superlatives: [award({
+      kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 3, detail: [],
+      trendingCoverage: { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 3, notJudged: 0, totalPickups: 3 },
+    })] }))
+    await open()
+    expect(await screen.findByText('The Trending Tony')).toBeInTheDocument()
   })
 
   it('caches the response per row: closing and reopening does not ask again', async () => {

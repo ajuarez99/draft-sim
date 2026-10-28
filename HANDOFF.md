@@ -1,5 +1,23 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-28: spec 051 (The Trending Tony award) built, reviewed and live-verified locally; NOT committed
+
+- **What:** a 14th award for the manager with the most completed pickups of players in the top 15 of Sleeper's
+  platform-wide trending-adds list at the time of the pickup. The worktree is `.claude/worktrees/051-trending-tony-award`,
+  on branch `051-trending-tony-award` off main 7168753. Docs are in `specs/051-trending-tony-award/`: spec (amendments
+  A1–A5), plan-review, code-review and verification.
+- **Migration V42** (`sport_trending_snapshot`, `sport_trending_snapshot_entry`). It was free on every branch and
+  worktree on 2026-10-27; **re-check before merge** (lesson #43).
+- **No backfill is possible.** Before this, trending was overwritten on every fetch, and Sleeper only answers "now". History
+  starts the day V42 deploys. Every earlier pickup is "not judged", and the card says so. Past seasons show the award
+  as unavailable with that reason.
+- **Owed after deploy:**
+  - Count snapshots per sport after one day (SC-006). The guaranteed floor is the 11:00 UTC daily cron; visits add
+    more.
+  - Look at NBA 2026's card once a scored week has pickups within a day of a snapshot.
+- **Measured, not assumed:** NBA's `throughWeek` excludes the week in play, so the card lags up to a week
+  (verification V2b). The one backend failure, `PlayerTrendsReadIT`, fails identically on main; it is date-dependent.
+
 ## UPDATE 2026-10-26: spec 049 (Compare two players; renumbered from 048, which main's weekly-pot spec took) built, reviewed and live-verified locally; NOT committed
 
 - **Where:** worktree `.claude/worktrees/048-player-compare`, branch `049-player-compare` (from `origin/main`

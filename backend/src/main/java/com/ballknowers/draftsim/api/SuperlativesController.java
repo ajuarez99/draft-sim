@@ -327,6 +327,18 @@ public class SuperlativesController {
             contributions.add(c);
         }
         m.put("playerContributions", contributions);
+        // Spec 051: present on EVERY superlative, null for all but an available TRENDING_TONY, so the web
+        // type can be non-optional. judgingSinceAt is an ISO instant; the browser picks the local date.
+        m.put("trendingCoverage", s.trendingCoverage() == null ? null : trendingCoverageRow(s.trendingCoverage()));
+        return m;
+    }
+
+    private static Map<String, Object> trendingCoverageRow(SeasonSuperlativesService.TrendingCoverage c) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("judgingSinceAt", c.judgingSinceAt() == null ? null : c.judgingSinceAt().toInstant().toString());
+        m.put("judged", c.judged());
+        m.put("notJudged", c.notJudged());
+        m.put("totalPickups", c.totalPickups());
         return m;
     }
 
@@ -470,6 +482,18 @@ public class SuperlativesController {
             m.put("avatarId", a.avatarId());
             m.put("addType", a.addType());
             m.put("faabBid", a.faabBid());
+        } else if (d instanceof SeasonSuperlativesService.TrendingPickupDetail t) {
+            // Spec 051: position is nullable, so this map is never Map.of.
+            m.put("type", "TRENDING_PICKUP");
+            m.put("playerId", t.playerId());
+            m.put("playerName", t.playerName());
+            m.put("position", t.position());
+            m.put("rosterId", t.rosterId());
+            m.put("week", t.week());
+            m.put("addType", t.addType());
+            m.put("trendingRank", t.trendingRank());
+            m.put("addCount", t.addCount());
+            m.put("snapshotAt", t.snapshotAt() == null ? null : t.snapshotAt().toInstant().toString());
         }
         return m;
     }

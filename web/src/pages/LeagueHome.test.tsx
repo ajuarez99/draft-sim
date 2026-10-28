@@ -163,7 +163,7 @@ function awards(): SuperlativesResponse {
         coverage: null,
         playerHolders: [],
         standings: [],
-        playerStandings: [], playerContributions: [],
+        playerStandings: [], playerContributions: [], trendingCoverage: null,
       },
     ],
   } as unknown as SuperlativesResponse
@@ -444,6 +444,18 @@ describe('League home', () => {
     expect(screen.queryByRole('heading', { name: 'Latest matchup' })).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Next opponent' })).toBeNull()
     expect(screen.queryByText(/Couldn't load/)).toBeNull()
+  })
+
+  it('words the Trending Tony PICKUPS unit as "trending pickups" on the awards block (spec 051)', async () => {
+    const a = awards()
+    a.superlatives = [{
+      ...a.superlatives[0], kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 4, early: false,
+    }]
+    arrange({ awards: () => Promise.resolve(a) })
+    renderHome()
+    const awardsBlock = await waitFor(() => section('Awards'))
+    await waitFor(() => expect(within(awardsBlock).getByText(/4 trending pickups/)).toBeInTheDocument())
+    expect(within(awardsBlock).getByText('The Trending Tony')).toBeInTheDocument()
   })
 
   it('leaves the other blocks standing when one endpoint fails', async () => {

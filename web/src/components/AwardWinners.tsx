@@ -3,7 +3,7 @@ import Avatar from './Avatar'
 import PlayerFace from './PlayerFace'
 import PlayerLink from './PlayerLink'
 import PersonName from './PersonName'
-import type { Sport, Superlative, SuperlativeDetail } from '../api'
+import type { Sport, Superlative, SuperlativeDetail, TrendingCoverage } from '../api'
 
 /**
  * The winner lines of one award (specs/008-season-superlatives; extracted from pages/Superlatives.tsx by
@@ -29,6 +29,18 @@ export default function AwardWinners({
   const isPlayerHeadedKind = s.kind === 'JABARI_SMITH_JR'
   const isEmpty = s.holders.length === 0 && s.playerHolders.length === 0
   return (
+    <>
+      {renderBody()}
+      {/* Spec 051 FR-007: the coverage line prints whenever the card is available, holders or not -- an
+          empty card ("nobody has chased the trending list twice yet") still owes the reader what was judged. */}
+      {s.available && s.trendingCoverage && (
+        <p className="muted small sl-coverage">{trendingCoverageLine(s.trendingCoverage, throughWeek, sport)}</p>
+      )}
+    </>
+  )
+
+  function renderBody() {
+    return (
     <>
       {!s.available ? (
         <p className="muted small">{s.reason}</p>
@@ -124,6 +136,21 @@ export default function AwardWinners({
         </>
       )}
     </>
+    )
+  }
+}
+
+/**
+ * Spec 051 FR-007 / F9: names what the count did NOT cover, so a low number can't be read as "chased nothing".
+ * The date is the viewer's local one (F13). Team defenses are an NFL-only exclusion, so the clause is dropped for NBA.
+ */
+function trendingCoverageLine(c: TrendingCoverage, throughWeek: number | null, sport: Sport): string {
+  const since = new Date(c.judgingSinceAt).toLocaleDateString()
+  const through = throughWeek != null ? ` · pickups through week ${throughWeek}` : ''
+  const defenses = sport === 'nfl' ? ', team defenses excluded' : ''
+  return (
+    `Judged since ${since} · ${c.judged} of ${c.totalPickups} pickups judged, ${c.notJudged} not ` +
+    `(before trending history began or no list within a day)${through}${defenses}`
   )
 }
 
@@ -206,6 +233,17 @@ function holderDetailLines(
       )
     })
     return [...total, ...pickupLines]
+  }
+  // Spec 051 (T018): one line per counted pickup, the player linked like the other pickup lines.
+  if (s.kind === 'TRENDING_TONY') {
+    return rows
+      .filter((d): d is Extract<SuperlativeDetail, { type: 'TRENDING_PICKUP' }> => d.type === 'TRENDING_PICKUP')
+      .map((d) => (
+        <>
+          {who(d.playerId, d.playerName)}
+          {` · #${d.trendingRank} trending · week ${d.week} · ${d.addType === 'WAIVER' ? 'Waiver' : 'Free agent'}`}
+        </>
+      ))
   }
   // US4 (T049): the total, then each top absence -- "estimated" said on both
   // the total and every player line (FR-015), never left to be assumed once.
@@ -329,7 +367,8 @@ function expandableRows(s: Superlative): string[] {
       )
   }
   if (s.kind === 'MOST_BENCH_POINTS' || s.kind === 'WAIVER_WIRE_WARRIOR'
-      || s.kind === 'JABARI_SMITH_JR' || s.kind === 'JOEL_EMBIID' || s.kind === 'UNETHICAL') {
+      || s.kind === 'JABARI_SMITH_JR' || s.kind === 'JOEL_EMBIID' || s.kind === 'UNETHICAL'
+      || s.kind === 'TRENDING_TONY') {
     // Already fully represented on the holder line(s) above -- nothing new
     // to say behind an expandable panel, so the card never opens an empty one.
     return []

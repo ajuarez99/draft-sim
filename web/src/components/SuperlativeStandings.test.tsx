@@ -34,7 +34,7 @@ function award(kind: Superlative['kind'], over: Partial<Superlative> = {}): Supe
   return {
     kind, available: true, early: false, value: 10, unit: 'POINTS', holders: [t1], detail: [], coverage: null,
     playerHolders: [], standings: [standing(1, t1, 30), standing(2, t2, 20)], playerStandings: [],
-    playerContributions: [], ...over,
+    playerContributions: [], trendingCoverage: null, ...over,
   }
 }
 
@@ -151,5 +151,32 @@ describe('Jabari fold label (spec 040 F6)', () => {
     mount(award('WAIVER_WIRE_WARRIOR', { playerContributions: [contrib(1, 'Amy', t1, 12), contrib(2, 'Tyrod', t1, -0.76)] }))
     expect(standingFigure('WAIVER_WIRE_WARRIOR', 'POINTS', -0.76)).toBe('-0.76 points')
     expect(standingFigure('JOEL_EMBIID', 'POINTS', -4)).toBe('-4.00 estimated points lost')
+  })
+
+  // ---- spec 051 F6: Trending Tony's Players view figure is a rank, not a count ----------------------
+
+  const mountTony = (s: Superlative, kind: 'tony' | 'other' = 'tony') =>
+    render(
+      <SuperlativeStandings
+        s={s} title="The Trending Tony" hue={200} leagueId="L1" sport="nba"
+        figure={(v) => standingFigure(s.kind, s.unit, v)}
+        contributionFigure={kind === 'tony' ? (v) => `#${v} trending` : undefined}
+      />,
+    )
+
+  it('TRENDING_TONY: Teams reads "4 trending pickups", Players reads "#2 trending", never "2 trending pickups"', async () => {
+    mountTony(award('TRENDING_TONY', {
+      unit: 'PICKUPS', standings: [standing(1, t1, 4), standing(2, t2, 1)], playerContributions: [contrib(1, 'Zed', t1, 2)],
+    }))
+    expect(screen.getByText('4 trending pickups')).toBeInTheDocument()
+    expect(screen.getByText('1 trending pickup')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Players' }))
+    expect(screen.getByText('#2 trending')).toBeInTheDocument()
+    expect(screen.queryByText('2 trending pickups')).not.toBeInTheDocument()
+  })
+
+  it('contributions of another award still use figure (no contributionFigure passed)', () => {
+    mountTony(award('JOEL_EMBIID', { playerContributions: [contrib(1, 'Zed', t1, 2)] }), 'other')
+    expect(screen.getByText('2.00 estimated points lost')).toBeInTheDocument()
   })
 })

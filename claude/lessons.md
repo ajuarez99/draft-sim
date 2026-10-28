@@ -1112,3 +1112,19 @@ ignoring seasons past next calendar year.
 
 **How to apply:** a max/newest over user-supplied rows needs a plausibility bound. Run live checks against a DB
 the full test suite has also run against; that's where fixture residue shows up.
+
+## 53. A history that was never kept can't be judged later, and a live season isn't a past one
+
+Found 2026-10-27 to 28 in spec 051 (Trending Tony). Trending had been overwritten on every fetch since spec 014, so an
+award about "trending *at the time*" could only start counting the day history was first stored. There was no
+backfill: Sleeper only answers "now". The first "nothing judged" reason, "history wasn't being recorded yet",
+was true of finished seasons and read as *never* on NBA 2026, a season still being played. Only live
+verification showed it. The unit tests asserted the string, not what a reader would conclude from it (class 5).
+
+Also found: hand-seeding rows at fixed ids (`setval(999)`, then ids 1001–1006) collided with the next IT's inserts
+from the same sequence.
+
+**How to apply:** before designing on a stored "current" value, check whether its history exists. If it doesn't,
+start keeping it first and say plainly what can never be judged. Choose an "unavailable" reason by the
+season's state (complete vs in play), not only by data presence. Seed test rows through the sequence, never at a
+hand-picked id.

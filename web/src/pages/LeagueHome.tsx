@@ -134,6 +134,8 @@ function unitLabel(unit: string | null): string {
       return 'games'
     case 'ADDS':
       return 'adds'
+    case 'PICKUPS':
+      return 'trending pickups'
     default:
       return ''
   }
