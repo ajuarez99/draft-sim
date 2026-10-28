@@ -1,5 +1,16 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-10-28: spec 052 (site analytics) built; NOT committed, NOT verified in a browser or on production
+
+- **What:** cookie-free usage counts via Umami Cloud, front end only (`web/src/analytics.ts`; hooks in `AppShell`,
+  `main.tsx` and five call sites; one disclosure sentence on the sign-in screen and the static landing; CSP origins in
+  `web/serve.json`; build arg in `web/Dockerfile`). Docs are in `specs/052-site-analytics/`; DEPLOY.md has an
+  "Analytics" section.
+- **Verified:** unit tests and the type check and build (see `tasks.md` "Implementation notes"). **Not verified:**
+  anything in a real browser, the script actually loading, the real payloads reaching Umami, the CSP in a browser.
+- **Owed:** Allan creates the Umami account and website and sets `VITE_UMAMI_WEBSITE_ID` as a build variable on the
+  frontend service; then the production checks in `specs/052-site-analytics/quickstart.md`. Off until that variable exists.
+
 ## UPDATE 2026-10-28: spec 051 (The Trending Tony award) built, reviewed and live-verified locally; NOT committed
 
 - **What:** a 14th award for the manager with the most completed pickups of players in the top 15 of Sleeper's

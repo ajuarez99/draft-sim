@@ -5,6 +5,11 @@ import EspnLeagueSetup, { espnErrorText } from './EspnLeagueSetup'
 import PlatformBadge from './PlatformBadge'
 import { EspnSetupError, type EspnAddResult } from '../api'
 
+const trackAction = vi.fn()
+vi.mock('../analytics', () => ({
+  trackAction: (...args: unknown[]) => trackAction(...args),
+}))
+
 let fetchMock: ReturnType<typeof vi.fn>
 
 const result = (written: boolean): EspnAddResult => ({
@@ -26,6 +31,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 
 beforeEach(() => {
+  trackAction.mockReset()
   fetchMock = vi.fn()
   vi.stubGlobal('fetch', fetchMock)
 })
@@ -105,5 +111,28 @@ describe('PlatformBadge', () => {
     expect(container.textContent).toBe('')
     rerender(<PlatformBadge platform={undefined} />)
     expect(container.textContent).toBe('')
+  })
+})
+
+// Spec 052: league-added (via espn) fires on the write, not on the preview lookup, and not on failure.
+describe('EspnLeagueSetup analytics', () => {
+  it('counts once, after the claim writes', async () => {
+    fetchMock.mockResolvedValueOnce(json(result(false))).mockResolvedValueOnce(json(result(true)))
+    open()
+    fireEvent.click(screen.getByText('Look up league'))
+    await screen.findByText('Team One')
+    expect(trackAction).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('This is my team'))
+    await waitFor(() => expect(screen.getByText(/Open league/)).toBeTruthy())
+    expect(trackAction).toHaveBeenCalledTimes(1)
+    expect(trackAction).toHaveBeenCalledWith('league-added', { via: 'espn' })
+  })
+
+  it('counts nothing when the lookup fails', async () => {
+    fetchMock.mockResolvedValueOnce(json({ error: 'ESPN_PRIVATE_NO_ACCESS', message: 'x' }, 403))
+    open()
+    fireEvent.click(screen.getByText('Look up league'))
+    await waitFor(() => expect(screen.getAllByText(/ESPN login cookies/).length).toBeGreaterThan(0))
+    expect(trackAction).not.toHaveBeenCalled()
   })
 })

@@ -36,6 +36,11 @@ export const imageAlt =
 
 export const footerLine = 'Free. No password.'
 
+// Spec 052 FR-012: what the site counts, said where people sign in. Shared by SignIn.tsx and the
+// static landing (landingHtml.ts) so the two copies cannot drift.
+export const analyticsLine =
+  'We count page visits and a few actions (signing in, adding a league, starting a mock) anonymously: which pages and which league, never your username, and no cookies.'
+
 /** `managers` is the one rail entry that is not a league destination (the tendencies page). */
 export type LandingDestination = DestinationKey | 'managers'
 
@@ -115,7 +120,7 @@ export function featureSports(f: Pick<LandingFeature, 'destination'>): Sport[] {
 /** Every string the page and its head tags can say, for the banned-words guard. */
 export function allCopyStrings(): string[] {
   return [
-    title, description, headline, subheadline, platformsNote, imageAlt, footerLine,
+    title, description, headline, subheadline, platformsNote, imageAlt, footerLine, analyticsLine,
     ...sports,
     ...groups.flatMap((g) => [headingOf(g.key), ...g.features.flatMap((f) => [f.name, f.line])]),
   ]

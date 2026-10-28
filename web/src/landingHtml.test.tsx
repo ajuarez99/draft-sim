@@ -2,7 +2,7 @@ import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import source from '../index.html?raw'
 import SignIn from './pages/SignIn'
-import { groups } from './landingCopy'
+import { analyticsLine, groups } from './landingCopy'
 import { staticBody, transform } from './landingHtml'
 
 vi.mock('./api', () => ({ getSleeperUser: vi.fn() }))
@@ -66,6 +66,11 @@ describe('static body vs the React landing (FR-018)', () => {
       expect(fromStatic, sel).toEqual(texts(container, sel))
     }
     expect(texts(staticDoc, 'h3')).toHaveLength(groups.flatMap((g) => g.features).length)
+  })
+
+  it('carries the analytics disclosure in both copies (spec 052 FR-012)', () => {
+    expect(norm(new DOMParser().parseFromString(staticBody(), 'text/html').body.textContent)).toContain(analyticsLine)
+    expect(norm(render(<SignIn />).container.textContent)).toContain(analyticsLine)
   })
 
   it('is wrapped in .app > .landing-prerender and its form is disabled', () => {

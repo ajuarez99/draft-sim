@@ -11,6 +11,10 @@ COPY . .
 # backend service's public URL, e.g. https://api.ballknowers.co
 ARG VITE_API_BASE
 ENV VITE_API_BASE=$VITE_API_BASE
+# Spec 052: Umami Cloud website id, a build variable like the one above. Optional --
+# absent means analytics is off (no tracker script is added to the page).
+ARG VITE_UMAMI_WEBSITE_ID
+ENV VITE_UMAMI_WEBSITE_ID=$VITE_UMAMI_WEBSITE_ID
 RUN npm run build
 
 FROM node:20-alpine AS runtime

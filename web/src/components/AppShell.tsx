@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Rail from './Rail'
 import JumpTo from './JumpTo'
 import LeagueRailSection from './LeagueRailSection'
 import { useNarrow } from '../useNarrow'
 import { PageActionSlotContext, RailContextSlotContext, RailLeagueHintContext } from '../appSlots'
-import { useAllLeagues, useRailLeague } from '../railLeague'
+import { acceptsLeagueHint, invalidateRailLeagues, leagueRefFromPath, useAllLeagues, useRailLeague } from '../railLeague'
+import { trackLeagueView, trackPageView } from '../analytics'
 import { useSearchIndex } from '../searchIndex'
 import { clearUser, useUser } from '../user'
 import { LeagueDataVersionProvider } from '../leagueDataVersion'
@@ -75,7 +76,59 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // -- the league-scoped routes share two URL shapes, and the rail would
   // otherwise need the same block portaled from every one of them. See
   // railLeague.ts and destinations.ts.
-  const railLeague = useRailLeague(location.pathname, pageLeagueHint ?? stateLeagueHint)
+  //
+  // Spec 052: /api/drafts is scoped to the signed-in user, so a list cached while signed out is
+  // wrong the moment someone signs in on a league deep link (and the other way round on sign-out).
+  // The cache is dropped when the user id changes -- in an effect declared BEFORE useRailLeague so
+  // it runs before the rail's own effect re-resolves on that same id.
+  const userId = user?.sleeperUserId ?? null
+  const lastUserId = useRef(userId)
+  useEffect(() => {
+    if (lastUserId.current === userId) return
+    lastUserId.current = userId
+    invalidateRailLeagues()
+  }, [userId])
+  const railLeague = useRailLeague(location.pathname, pageLeagueHint ?? stateLeagueHint, userId)
+
+  // Spec 052: one page view per route change, signed in or out. This effect lives up here, above
+  // the signed-out early return below, because signed-out visitors are the ones arriving from a
+  // shared link and need counting too. Keyed on signedIn as well as the path: signing in changes
+  // the page without changing the pathname.
+  //
+  // ORDER IS LOAD-BEARING: this effect must stay declared BEFORE the league-view effect below.
+  // React runs effects in declaration order, and trackPageView re-arms the league-view latch
+  // (analytics.ts) -- the reset has to land before the league view is sent on the same render.
+  const signedIn = user != null
+  useEffect(() => {
+    trackPageView(location.pathname, signedIn)
+  }, [signedIn, location.pathname])
+
+  // Spec 052: which league a league-scoped page was for. railLeague deliberately does not clear
+  // on navigation (railLeague.ts), so after A -> B it still holds A's league until B resolves.
+  // Send only when the resolved season is the one THIS path expects -- by the path's own id, or
+  // by the hint on the routes that take one -- and only signed in (signed-out pages send none).
+  const hintForPath = pageLeagueHint ?? stateLeagueHint
+  useEffect(() => {
+    if (!signedIn || !railLeague) return
+    const fromPath = leagueRefFromPath(location.pathname)
+    const expected =
+      fromPath ??
+      (hintForPath && acceptsLeagueHint(location.pathname)
+        ? ({ kind: 'league', sleeperLeagueId: hintForPath } as const)
+        : null)
+    if (!expected) return
+    const matches =
+      expected.kind === 'draft'
+        ? railLeague.season.sleeperDraftId === expected.sleeperDraftId
+        : railLeague.season.sleeperLeagueId === expected.sleeperLeagueId
+    if (!matches) return
+    trackLeagueView(
+      location.pathname,
+      signedIn,
+      railLeague.lineage.current.sport,
+      railLeague.lineage.current.sleeperLeagueId,
+    )
+  }, [railLeague, signedIn, location.pathname, hintForPath])
 
   // Every league the user can see, for the rail's switcher. Same cache as
   // above, so this costs no request of its own -- and only asked for once we

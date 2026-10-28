@@ -10,6 +10,11 @@ vi.mock('react-router-dom', () => ({
   useLocation: () => ({ state: mockLocationState }),
 }))
 
+const trackAction = vi.fn()
+vi.mock('../analytics', () => ({
+  trackAction: (...args: unknown[]) => trackAction(...args),
+}))
+
 const createMockSession = vi.fn()
 const getManagers = vi.fn()
 vi.mock('../api', () => ({
@@ -18,6 +23,7 @@ vi.mock('../api', () => ({
 }))
 
 beforeEach(() => {
+  trackAction.mockReset()
   navigate.mockClear()
   createMockSession.mockReset()
   getManagers.mockReset()
@@ -243,5 +249,26 @@ describe('MockSetup', () => {
 
       expect(createMockSession).toHaveBeenCalledWith('nfl', 10, 2, {}, undefined)
     })
+  })
+})
+
+// Spec 052: mock-started (from setup) fires once, only after the session exists.
+describe('MockSetup analytics', () => {
+  it('success: one call', async () => {
+    createMockSession.mockResolvedValue({ id: 42 })
+    const user = userEvent.setup()
+    render(<MockSetup />)
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
+    expect(trackAction).toHaveBeenCalledTimes(1)
+    expect(trackAction).toHaveBeenCalledWith('mock-started', { from: 'setup' })
+  })
+
+  it('failure: none', async () => {
+    createMockSession.mockRejectedValue(new Error('backend down'))
+    const user = userEvent.setup()
+    render(<MockSetup />)
+    await user.click(screen.getByRole('button', { name: /start the draft/i }))
+    await screen.findByText(/backend down/)
+    expect(trackAction).not.toHaveBeenCalled()
   })
 })

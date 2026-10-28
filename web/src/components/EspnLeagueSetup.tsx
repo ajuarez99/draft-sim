@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { addEspnLeague, EspnSetupError, type EspnAddResult, type EspnAddRequest } from '../api'
 import { invalidateRailLeagues } from '../railLeague'
+import { trackAction } from '../analytics'
 import UnmatchedPlayersNote from './UnmatchedPlayersNote'
 
 /** Human text for every contract error code (contracts/espn-setup.md). Falls back to the server's own fixed text. */
@@ -68,6 +69,7 @@ export default function EspnLeagueSetup({ onAdded }: { onAdded?: () => void }) {
       const result = await addEspnLeague(request(claim))
       if (result.written) {
         setDone(result)
+        trackAction('league-added', { via: 'espn' }) // spec 052: only the write, not the preview step
         setPreview(null)
         // The rail caches the league list; a new league is invisible to it until it is dropped.
         invalidateRailLeagues()

@@ -2,11 +2,16 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import SignIn from './SignIn'
-import { groups, headingOf, headline, platformsNote } from '../landingCopy'
+import { analyticsLine, groups, headingOf, headline, platformsNote } from '../landingCopy'
 
 const getSleeperUser = vi.fn()
 vi.mock('../api', () => ({
   getSleeperUser: (...args: unknown[]) => getSleeperUser(...args),
+}))
+
+const trackAction = vi.fn()
+vi.mock('../analytics', () => ({
+  trackAction: (...args: unknown[]) => trackAction(...args),
 }))
 
 const setUser = vi.fn()
@@ -17,6 +22,7 @@ vi.mock('../user', () => ({
 beforeEach(() => {
   getSleeperUser.mockReset()
   setUser.mockReset()
+  trackAction.mockReset()
 })
 
 const sampleUser = {
@@ -37,6 +43,9 @@ describe('SignIn', () => {
 
     expect(getSleeperUser).toHaveBeenCalledWith('popsharky')
     expect(setUser).toHaveBeenCalledWith(sampleUser)
+    // Spec 052: counted once, after success.
+    expect(trackAction).toHaveBeenCalledTimes(1)
+    expect(trackAction).toHaveBeenCalledWith('sign-in')
   })
 
   it('an unknown username shows the "no such user" state, not a generic error', async () => {
@@ -49,6 +58,7 @@ describe('SignIn', () => {
 
     expect(await screen.findByText(/no sleeper user called/i)).toBeInTheDocument()
     expect(setUser).not.toHaveBeenCalled()
+    expect(trackAction).not.toHaveBeenCalled()
   })
 
   it('a network failure shows the unreachable state with a retry, distinct from a typo', async () => {
@@ -104,6 +114,8 @@ describe('SignIn welcome', () => {
     expect(screen.getByText('Ball Knowers')).toBeInTheDocument()
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(headline)
     expect(screen.getByText(/No password -- this app never asks Sleeper for anything private/)).toBeInTheDocument()
+    // Spec 052 FR-012: says what is counted, beside the no-password line.
+    expect(screen.getByText(analyticsLine)).toBeInTheDocument()
   })
 
   it('has one text field and one primary Continue button, and Enter submits', async () => {

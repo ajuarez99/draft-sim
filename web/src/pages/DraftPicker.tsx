@@ -16,6 +16,7 @@ import HowThisWorks from '../components/HowThisWorks'
 import HomeSpotlight from '../components/HomeSpotlight'
 import { useRailContextSlot } from '../appSlots'
 import { useUser } from '../user'
+import { trackAction } from '../analytics'
 import { auctionAdpRoute } from '../destinations'
 import {
   getDrafts,
@@ -166,6 +167,8 @@ export default function DraftPicker() {
         return
       }
     }
+    // Spec 052: one league-added per one-click setup, after every stage succeeded -- not per stage.
+    trackAction('league-added', { via: 'sleeper' })
     setSetupState((prev) => {
       const next = { ...prev }
       delete next[l.sleeperLeagueId]
@@ -194,6 +197,7 @@ export default function DraftPicker() {
     setAddError(null)
     try {
       await ingestLeague(leagueIdFrom(leagueId))
+      trackAction('league-added', { via: 'id' }) // spec 052
       setLeagueId('')
       refetch()
     } catch (e) {

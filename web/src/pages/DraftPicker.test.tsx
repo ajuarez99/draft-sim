@@ -53,6 +53,11 @@ vi.mock('../user', () => ({
   clearUser: vi.fn(),
 }))
 
+const trackAction = vi.fn()
+vi.mock('../analytics', () => ({
+  trackAction: (...args: unknown[]) => trackAction(...args),
+}))
+
 const nbaLeague: SleeperLeague = {
   sleeperLeagueId: '999',
   name: 'Ball Knowers',
@@ -66,6 +71,7 @@ const nbaLeague: SleeperLeague = {
 }
 
 beforeEach(() => {
+  trackAction.mockReset()
   getDrafts.mockReset().mockResolvedValue([])
   getMockSessions.mockReset().mockResolvedValue([])
   getSleeperUserLeagues.mockReset().mockResolvedValue([nbaLeague])
@@ -338,5 +344,43 @@ describe('DraftPicker player spotlight', () => {
     await screen.findByRole('heading', { name: 'Mock drafts' })
     expect(screen.queryByRole('heading', { name: 'Player spotlight' })).not.toBeInTheDocument()
     expect(getPlayerSpotlight).not.toHaveBeenCalled()
+  })
+})
+
+// Spec 052: league-added fires once per user action, after success, never per setup stage.
+describe('DraftPicker league-added analytics', () => {
+  it('one-click setup: exactly one call, via sleeper', async () => {
+    const user = userEvent.setup()
+    render(<DraftPicker />)
+    await user.click(await screen.findByRole('button', { name: 'Set up' }))
+    await waitFor(() => expect(getDrafts).toHaveBeenCalledTimes(2))
+    expect(trackAction).toHaveBeenCalledTimes(1)
+    expect(trackAction).toHaveBeenCalledWith('league-added', { via: 'sleeper' })
+  })
+
+  it('one-click setup failing at a stage: none', async () => {
+    ingestLeague.mockRejectedValue(new Error('sleeper unreachable'))
+    const user = userEvent.setup()
+    render(<DraftPicker />)
+    await user.click(await screen.findByRole('button', { name: 'Set up' }))
+    await screen.findByRole('button', { name: 'Retry' })
+    expect(trackAction).not.toHaveBeenCalled()
+  })
+
+  it('pasted id: one call, via id; a failed ingest: none', async () => {
+    const user = userEvent.setup()
+    render(<DraftPicker />)
+    await screen.findByText('Ball Knowers')
+    await user.type(screen.getByLabelText(/Sleeper league link or ID/), '1391509063170293760')
+    await user.click(screen.getByRole('button', { name: 'Add league' }))
+    await waitFor(() => expect(trackAction).toHaveBeenCalledTimes(1))
+    expect(trackAction).toHaveBeenCalledWith('league-added', { via: 'id' })
+
+    trackAction.mockReset()
+    ingestLeague.mockRejectedValue(new Error('nope'))
+    await user.type(screen.getByLabelText(/Sleeper league link or ID/), '1391509063170293761')
+    await user.click(screen.getByRole('button', { name: 'Add league' }))
+    await screen.findByText('nope')
+    expect(trackAction).not.toHaveBeenCalled()
   })
 })

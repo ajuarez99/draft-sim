@@ -7,6 +7,7 @@ import { hueForIndex } from '../hue'
 import { roundPickLabel } from '../roundPickLabel'
 import { archetype } from '../managerBehaviour'
 import Avatar from '../components/Avatar'
+import { trackAction } from '../analytics'
 
 // Same domain as LeagueShape.SUPPORTED_TEAM_COUNTS (engine/LeagueShape.java) --
 // one team-size dropdown across the whole app, per claude/next-features-roadmap.md §3.1.
@@ -124,6 +125,7 @@ export default function MockSetup() {
         managerSeats,
         handoff?.sourceSleeperLeagueId,
       )
+      trackAction('mock-started', { from: 'setup' }) // spec 052
       navigate(`/mock/${session.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

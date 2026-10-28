@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { getSleeperUser } from '../api'
 import { setUser } from '../user'
-import { featureSports, footerLine, groups, headingOf, headline, platformsNote, sports, subheadline } from '../landingCopy'
+import { trackAction } from '../analytics'
+import { analyticsLine, featureSports, footerLine, groups, headingOf, headline, platformsNote, sports, subheadline } from '../landingCopy'
 
 // Accepts a pasted profile URL the same way DraftPicker.leagueIdFrom accepts
 // a league URL -- people paste links, not bare ids/usernames. Sleeper profile
@@ -41,6 +42,8 @@ export default function SignIn() {
         return
       }
       setUser(found)
+      // Spec 052: counted once, only after Sleeper recognised the name.
+      trackAction('sign-in')
       // No further action -- App.tsx renders the picker as soon as a user exists.
     } catch {
       // Sleeper unreachable, or this app's own backend down -- not the
@@ -95,6 +98,7 @@ export default function SignIn() {
           get your seat highlighted at the table. No password -- this app never asks Sleeper for
           anything private.
         </p>
+        <p className="signin-note muted small">{analyticsLine}</p>
 
         {status === 'not-found' && (
           <div className="error">
