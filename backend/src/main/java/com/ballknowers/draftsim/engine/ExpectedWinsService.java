@@ -200,6 +200,20 @@ public class ExpectedWinsService {
     }
 
     /**
+     * Real head-to-head record as whole counts (spec 054): {@link #actualWins} returns a half-win
+     * double and cannot give W-L-T. Same {@code Double.compare} rule, so the two always agree.
+     */
+    static Map<Integer, WinLossTie> headToHead(List<Game> games) {
+        Map<Integer, int[]> acc = new HashMap<>();
+        for (Game g : games) {
+            int cmp = Double.compare(g.aPoints(), g.bPoints());
+            acc.computeIfAbsent(g.aRosterId(), k -> new int[3])[cmp > 0 ? 0 : cmp < 0 ? 1 : 2]++;
+            acc.computeIfAbsent(g.bRosterId(), k -> new int[3])[cmp > 0 ? 1 : cmp < 0 ? 0 : 2]++;
+        }
+        return toRecords(acc);
+    }
+
+    /**
      * Mean of the opponents' points per game, minus the league-wide points per
      * game. Positive means a harder schedule -- the sign is stated on the page
      * rather than left to the reader (US3.3).
@@ -391,10 +405,12 @@ public class ExpectedWinsService {
         return WeekBound.ALL_WEEKS;
     }
 
-    /** {@code withSwap}: only the regular-season path (the Luck page) builds the schedule-swap matrix. */
-    private Result compute(LeagueSeasonResolver.Resolved found, WeekBound bound, boolean withSwap) {
-        LeagueRepository.LeagueRow league = found.league();
-
+    /**
+     * The played, scored, FINAL games of one league-season inside {@code bound}. The one place this
+     * rule lives: {@link #compute} and {@code MedianWhatIfService} (spec 054) both read games here,
+     * so the history page's median can never count a different set of weeks than the Luck page's.
+     */
+    List<Game> finalGames(LeagueRepository.LeagueRow league, WeekBound bound) {
         List<Game> games = new ArrayList<>();
         ScoredWeeks.Snapshot scored = scoredWeeks.of(league.id());
         for (LeagueMatchupRepository.PairedGame p : matchups.pairedWithScores(List.of(league.id()), bound)) {
@@ -404,6 +420,14 @@ public class ExpectedWinsService {
             games.add(new Game(p.week(), p.aRosterId(), p.aPoints().doubleValue(),
                     p.bRosterId(), p.bPoints().doubleValue()));
         }
+        return games;
+    }
+
+    /** {@code withSwap}: only the regular-season path (the Luck page) builds the schedule-swap matrix. */
+    private Result compute(LeagueSeasonResolver.Resolved found, WeekBound bound, boolean withSwap) {
+        LeagueRepository.LeagueRow league = found.league();
+
+        List<Game> games = finalGames(league, bound);
         if (games.isEmpty()) {
             return Result.unavailable("no completed games for this league yet", league.season(), league.sport());
         }

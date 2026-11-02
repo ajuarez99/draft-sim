@@ -5373,6 +5373,26 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .stand-mark.worst { color: var(--down); }
 .standings th.mono { line-height: 1.25; }
 
+/* --- 054: "If median had been on" -------------------------------------------
+   A tinted column group, so the what-if reads as a different kind of number from
+   the real W/L/PF columns beside it. The tint is a wash, not a card: the glyphs
+   and words (▲/▼, "would have made playoffs") carry the meaning, never the colour. */
+.standings .stand-whatif { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.standings .stand-group-row td { border-bottom: none; }
+.standings th.stand-whatif-head {
+  text-align: center; color: var(--teal); letter-spacing: 0.06em;
+  border-bottom: 2px solid color-mix(in oklch, var(--teal) 55%, var(--line));
+}
+.stand-move { margin-left: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.stand-move.up { color: var(--up); }
+.stand-move.down { color: var(--down); }
+.stand-cross {
+  display: block; margin-top: 3px; width: fit-content; padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
+}
+.stand-cross.made { color: var(--up); background: color-mix(in oklch, var(--up) 14%, transparent); }
+.stand-cross.missed { color: var(--down); background: color-mix(in oklch, var(--down) 14%, transparent); }
+
 /* --- 013 US9: Superlatives (Awards, trophy list) ---------------------------
    One row per award on the page: trophy (--fitted, "earned"), name, the holder
    with their detail lines, and the headline figure in big tabular numbers.

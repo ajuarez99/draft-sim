@@ -166,6 +166,20 @@ class ExpectedWinsServiceTest {
         assertEquals(2.0, exp, 1e-9);
     }
 
+    /** Spec 054: whole W-L-T counts per roster, same compare rule as actualWins (a tie is a tie, not half a win). */
+    @Test
+    void headToHeadCountsWinLossAndExactTieAsWholeNumbers() {
+        List<Game> games = List.of(
+                new Game(1, 1, 100, 2, 90),     // 1 beats 2
+                new Game(1, 3, 80, 4, 80),      // exact tie
+                new Game(2, 1, 70, 3, 75));     // 3 beats 1
+        Map<Integer, ExpectedWinsService.WinLossTie> h = ExpectedWinsService.headToHead(games);
+        assertEquals(new ExpectedWinsService.WinLossTie(1, 1, 0), h.get(1));
+        assertEquals(new ExpectedWinsService.WinLossTie(0, 1, 0), h.get(2));
+        assertEquals(new ExpectedWinsService.WinLossTie(1, 0, 1), h.get(3));
+        assertEquals(new ExpectedWinsService.WinLossTie(0, 0, 1), h.get(4));
+    }
+
     /**
      * US3.3. Positive means a harder schedule. Roster 1 faces only the
      * high-scoring roster 2; roster 3 faces only the low-scoring roster 4.
