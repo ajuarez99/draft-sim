@@ -908,12 +908,66 @@ export type StandingRow = {
  */
 export type RankStatus = 'RANKED' | 'IN_PROGRESS' | 'NOT_COMPUTED' | 'UNAVAILABLE'
 
+/** A whole-number record; mirrors ExpectedWinsService.WinLossTie. */
+export type WinLossTie = { wins: number; losses: number; ties: number }
+
+/**
+ * Spec 054. Mirrors MedianWhatIfService.SeasonMedian status values. UNAVAILABLE is a season whose block failed to
+ * compute (the page shows dashes); NO_REGULAR_SEASON_BOUND means the league states no regular-season length, so
+ * median/all-play are shown over every final week and no what-if is.
+ */
+export type SeasonMedianStatus =
+  | 'WHAT_IF'
+  | 'ALREADY_ON'
+  | 'NO_FINAL_WEEKS'
+  | 'NO_REGULAR_SEASON_BOUND'
+  | 'UNAVAILABLE'
+
+/**
+ * Mirrors MedianWhatIfService.SeasonMedianTeam. `real`..`playoffCross` are null unless the season's status is
+ * WHAT_IF (and `playoffCross` only when the playoff line is shown and the two places sit on opposite sides of it).
+ */
+export type SeasonMedianTeam = {
+  rosterId: number
+  /** Weeks this roster appears in among the games used; median.wins + losses + ties always equals it. */
+  gamesCounted: number
+  median: WinLossTie
+  allPlay: WinLossTie
+  real: WinLossTie | null
+  /** real + median, field by field. */
+  withMedian: WinLossTie | null
+  /** Equal to median.wins: wins only, never the losses the same games add. */
+  winsGained: number | null
+  /** Regular-season place by this app's ordering (win share, then points for), actual vs with the median games. */
+  actualPlace: number | null
+  whatIfPlace: number | null
+  playoffCross: 'MADE' | 'MISSED' | null
+}
+
+/** Mirrors MedianWhatIfService.SeasonMedian; the history response's per-season `median` block. */
+export type SeasonMedian = {
+  status: SeasonMedianStatus
+  /** Distinct final weeks in the games used. */
+  weeksCounted: number
+  /** Under OFFICIAL: number of ROSTERS (not games) whose re-counted head-to-head differs, by any amount, from Sleeper's record. */
+  driftGames: number
+  regularSeasonWeeks: number | null
+  /** OFFICIAL = Sleeper's/ESPN's own W-L-T; COUNTED_GAMES = re-counted from the stored scores. Null unless WHAT_IF. */
+  realSource: 'OFFICIAL' | 'COUNTED_GAMES' | null
+  playoffTeams: number | null
+  /** Why the playoff marker is withheld; null when it is shown. */
+  playoffLineWithheld: 'DIVISIONS' | 'SEED_TYPE' | 'NO_PLAYOFF_TEAMS' | 'BRACKET_UNKNOWN' | 'ORDER_DISAGREES' | null
+  teams: SeasonMedianTeam[]
+}
+
 export type SeasonHistory = {
   season: number
   leagueId: number
   sleeperLeagueId: string
   name: string | null
   standings: StandingRow[]
+  /** Spec 054. Always present from the backend; optional here so an older backend still type-checks and renders dashes. */
+  median?: SeasonMedian
 }
 
 /**

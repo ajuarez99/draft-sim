@@ -53,7 +53,7 @@ class PowerComputeFinalityTest {
                 .thenReturn(new PowerRankingRepository.Entry[12]);
 
         controller = new LeagueHistoryController(null, null, power, null, membership, null, null, null,
-                null, null, null, odds, null, null, scoredWeeks);
+                null, null, null, odds, null, null, scoredWeeks, null);
     }
 
     private static <T> T any() {

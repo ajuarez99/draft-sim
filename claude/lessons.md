@@ -1128,3 +1128,21 @@ from the same sequence.
 start keeping it first and say plainly what can never be judged. Choose an "unavailable" reason by the
 season's state (complete vs in play), not only by data presence. Seed test rows through the sequence, never at a
 hand-picked id.
+
+## 54. `roster_season.final_placement` is champion-only; the playoff field lives in the bracket
+
+Spec 054 checked "did this app's regular-season order pick the same playoff teams Sleeper did" by
+comparing the top N against `final_placement <= N`. Both ingests (`LeagueHistoryIngestService`
+for Sleeper, `EspnSeason` for ESPN) only ever write `final_placement = 1` for the champion and
+null for everyone else, so for any N >= 2 the check could never pass. Every finished season would
+have come back "order disagrees" and the page would have printed a claim it never tested. The unit
+tests and the IT passed because their fixtures gave every roster a placement 1..N, which real
+ingest never produces.
+
+The bug-hunting review caught it by reading the ingest code, not the feature code. The fix reads
+the playoff field from `league_bracket_match` (every t1/t2 roster in the winners bracket) and
+gives "no bracket stored" its own code (`BRACKET_UNKNOWN`) rather than folding it into a mismatch.
+On the real league both finished seasons now pass the check (measured 2026-11-02, local re-ingest).
+
+**Rule:** a fixture must be shaped like what ingest actually writes. Before asserting on a stored
+column, grep for where it's written, not just where it's read.

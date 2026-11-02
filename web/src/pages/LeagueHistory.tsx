@@ -4,15 +4,14 @@ import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import {
   backfillFinalRanks,
-  getExpectedWins,
   getLeagueHistory,
-  type ExpectedWins,
-  type ExpectedWinsTeam,
   ingestLeagueHistory,
   type LeagueHistory as LeagueHistoryData,
   type LeagueRecords,
   type MarginRecord,
   type RankStatus,
+  type SeasonMedian,
+  type SeasonMedianTeam,
   type StandingRow,
   type StreakRecord,
   type WeeklyScoreRecord,
@@ -370,35 +369,59 @@ function Mark({ value, ex }: { value: number | null | undefined; ex: Extremes })
   return null
 }
 
+/** One sentence per reason the playoff marker is withheld (the wire carries a code, the page owns the words). */
+const PLAYOFF_LINE_WITHHELD: Record<NonNullable<SeasonMedian['playoffLineWithheld']>, string> = {
+  DIVISIONS: "Division seeding isn't modelled, so no playoff marker is shown for this season.",
+  SEED_TYPE: "This league seeds its playoffs by a rule this app doesn't reproduce, so no playoff marker is shown.",
+  NO_PLAYOFF_TEAMS: "This league doesn't state how many teams make its playoffs, so no playoff marker is shown.",
+  BRACKET_UNKNOWN:
+    "Who actually made the playoffs isn't stored for this season, so no playoff marker is shown.",
+  ORDER_DISAGREES:
+    "This app's regular-season order doesn't match the stored playoff bracket, so no playoff marker is shown.",
+}
+
+/** +N / −N places with a text label so colour is never the only signal; a place number going DOWN is an improvement. Not ▲/▼, which Mark uses for best/worst. */
+function PlaceMove({ from, to }: { from: number; to: number }) {
+  const gained = from - to
+  if (gained === 0) return <span className="muted stand-move" title="Same place">–</span>
+  const label = gained > 0 ? `Up ${gained} place${gained === 1 ? '' : 's'}` : `Down ${-gained} place${gained === -1 ? '' : 's'}`
+  return (
+    <span role="img" aria-label={label} title={label} className={`stand-move ${gained > 0 ? 'up' : 'down'}`}>
+      {gained > 0 ? '+' : '−'}{Math.abs(gained)}
+    </span>
+  )
+}
+
 function StandingsTable({
   rows,
-  season,
-  expected,
+  median,
+  inProgress,
   onCompute,
   computing,
   canCommission,
 }: {
   rows: StandingRow[]
-  season: number
-  /** Expected-wins response, or null when unavailable. Used only where its own `season` equals this table's. */
-  expected: ExpectedWins | null
+  /** The season's own median block (spec 054); undefined from an older backend. */
+  median: SeasonMedian | undefined
+  /** Whether this season is still being played: a playoff marker then reads "would be in/out", not "would have made". */
+  inProgress: boolean
   onCompute: () => void
   computing: boolean
   canCommission: boolean
 }) {
   const linkState = useLeagueLinkState()
-  // The expected-wins endpoint answers for ONE season (it may fall back from the
-  // one asked for). Its figures belong to that season only, so another season's
-  // table shows a dash rather than this season's numbers.
-  const teams = new Map<number, ExpectedWinsTeam>()
-  if (expected?.available && expected.season === season) {
-    for (const t of expected.teams) teams.set(t.rosterId, t)
+  // Every season carries its own block, so a table never borrows another season's figures. A missing
+  // or UNAVAILABLE block leaves the team map empty and every cell a dash.
+  const teams = new Map<number, SeasonMedianTeam>()
+  if (median && median.status !== 'UNAVAILABLE') {
+    for (const t of median.teams) teams.set(t.rosterId, t)
   }
   // These two columns count FINAL weeks only (ExpectedWinsService); W-L is Sleeper's own
   // and can already include a week this app hasn't marked final. Name the span so the
   // two can't be read as covering the same games (spec 013 code-review fix pass).
-  const finalWeeks = teams.size > 0 ? expected?.weeksScored ?? null : null
+  const finalWeeks = teams.size > 0 ? median?.weeksCounted ?? null : null
   const span = finalWeeks == null ? 'reg. season' : `${finalWeeks} final wk${finalWeeks === 1 ? '' : 's'}`
+  const whatIf = median?.status === 'WHAT_IF' && teams.size > 0
   const exW = extremes(rows.map((r) => r.wins), true)
   const exL = extremes(rows.map((r) => r.losses), false)
   const exPF = extremes(rows.map((r) => r.pointsFor), true)
@@ -413,67 +436,138 @@ function StandingsTable({
   }
   const exAll = extremes(rows.map(allShare), true)
   const exMed = extremes(rows.map(medShare), true)
+  const crossText = (c: 'MADE' | 'MISSED') =>
+    inProgress
+      ? c === 'MADE' ? 'would be in' : 'would be out'
+      : c === 'MADE' ? 'would have made playoffs' : 'would have missed playoffs'
+  const drift = median?.driftGames ?? 0
   return (
-    <div className="table-wrap">
-      <table className="standings">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Manager</th>
-            <th className="mono" title="End-of-season power rank">Rank</th>
-            <th className="mono">W</th>
-            <th className="mono">L</th>
-            <th className="mono">T</th>
-            <th className="mono">PF</th>
-            <th className="mono">PA</th>
-            <th className="mono" title="Regular season: each week's score against every other team's score that week">
-              Record vs all ({span})
-            </th>
-            <th className="mono" title="Regular season: each week's score against that week's median. Median games only, not added to the real record">
-              Vs weekly median ({span})
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const t = teams.get(r.rosterId)
-            return (
-              <tr key={r.rosterId}>
-                <td>{r.champion && <span title="Champion">🏆</span>}</td>
-                <td>
-                  {r.managerId != null ? (
-                    <Link
-                      to={`/managers/${r.managerId}/history`}
-                      state={linkState}
-                      className="standings-manager"
-                    >
-                      <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.teamName ?? r.manager} />
-                      <PersonName teamName={r.teamName} username={r.manager} fallback={`roster ${r.rosterId}`} />
-                    </Link>
-                  ) : (
-                    <span className="muted">roster {r.rosterId} (unowned)</span>
-                  )}
-                </td>
-                <RankCell row={r} onCompute={onCompute} computing={computing} canCommission={canCommission} />
-                <td className="mono">{r.wins ?? '—'}<Mark value={r.wins} ex={exW} /></td>
-                <td className="mono">{r.losses ?? '—'}<Mark value={r.losses} ex={exL} /></td>
-                <td className="mono">{r.ties ?? '—'}</td>
-                <td className="mono">{r.pointsFor?.toFixed(2) ?? '—'}<Mark value={r.pointsFor} ex={exPF} /></td>
-                <td className="mono">{r.pointsAgainst?.toFixed(2) ?? '—'}<Mark value={r.pointsAgainst} ex={exPA} /></td>
-                <td className="mono">
-                  {t?.allPlay ? recText(t.allPlay) : '—'}
-                  <Mark value={allShare(r)} ex={exAll} />
-                </td>
-                <td className="mono">
-                  {t?.median ? recText(t.median) : '—'}
-                  <Mark value={medShare(r)} ex={exMed} />
-                </td>
+    <>
+      {median?.status === 'ALREADY_ON' && (
+        <p className="muted small">
+          This season played a median game every week, so those games are already in its W and L.
+        </p>
+      )}
+      {median?.status === 'NO_REGULAR_SEASON_BOUND' && (
+        <p className="muted small">
+          This league doesn't say how long its regular season is, so the two columns count every final week
+          stored and no what-if is shown.
+        </p>
+      )}
+      <div className="table-wrap">
+        <table className="standings">
+          <thead>
+            {whatIf && (
+              <tr className="stand-group-row">
+                <td colSpan={10}></td>
+                <th colSpan={3} className="stand-whatif stand-whatif-head" scope="colgroup">
+                  If median had been on ({span})
+                </th>
               </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
+            )}
+            <tr>
+              <th></th>
+              <th>Manager</th>
+              <th className="mono" title="End-of-season power rank">Rank</th>
+              <th className="mono">W</th>
+              <th className="mono">L</th>
+              <th className="mono">T</th>
+              <th className="mono">PF</th>
+              <th className="mono">PA</th>
+              <th className="mono" title="Regular season: each week's score against every other team's score that week">
+                Record vs all ({span})
+              </th>
+              <th className="mono" title="Regular season: each week's score against that week's median score. These are median games, kept apart from the real W-L unless the season already played them">
+                Vs weekly median ({span})
+              </th>
+              {whatIf && (
+                <>
+                  <th className="mono stand-whatif" title="Real record plus the median games">With median</th>
+                  <th className="mono stand-whatif" title="The extra games the median adds: wins and losses both">Median games</th>
+                  <th className="mono stand-whatif" title="Regular-season place by win share, then points for: this app's ordering, not Sleeper's seeding">Place</th>
+                </>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const t = teams.get(r.rosterId)
+              return (
+                <tr key={r.rosterId}>
+                  <td>{r.champion && <span title="Champion">🏆</span>}</td>
+                  <td>
+                    {r.managerId != null ? (
+                      <Link
+                        to={`/managers/${r.managerId}/history`}
+                        state={linkState}
+                        className="standings-manager"
+                      >
+                        <Avatar avatarId={r.avatarId} seed={String(r.managerId)} label={r.teamName ?? r.manager} />
+                        <PersonName teamName={r.teamName} username={r.manager} fallback={`roster ${r.rosterId}`} />
+                      </Link>
+                    ) : (
+                      <span className="muted">roster {r.rosterId} (unowned)</span>
+                    )}
+                  </td>
+                  <RankCell row={r} onCompute={onCompute} computing={computing} canCommission={canCommission} />
+                  <td className="mono">{r.wins ?? '—'}<Mark value={r.wins} ex={exW} /></td>
+                  <td className="mono">{r.losses ?? '—'}<Mark value={r.losses} ex={exL} /></td>
+                  <td className="mono">{r.ties ?? '—'}</td>
+                  <td className="mono">{r.pointsFor?.toFixed(2) ?? '—'}<Mark value={r.pointsFor} ex={exPF} /></td>
+                  <td className="mono">{r.pointsAgainst?.toFixed(2) ?? '—'}<Mark value={r.pointsAgainst} ex={exPA} /></td>
+                  <td className="mono">
+                    {t?.allPlay ? recText(t.allPlay) : '—'}
+                    <Mark value={allShare(r)} ex={exAll} />
+                  </td>
+                  <td className="mono">
+                    {t?.median ? recText(t.median) : '—'}
+                    <Mark value={medShare(r)} ex={exMed} />
+                  </td>
+                  {whatIf && (
+                    <>
+                      <td className="mono stand-whatif">{t?.withMedian ? recText(t.withMedian) : '—'}</td>
+                      <td className="mono stand-whatif">
+                        {t?.median
+                          ? `+${t.median.wins} W / +${t.median.losses} L${t.median.ties > 0 ? ` / +${t.median.ties} T` : ''}`
+                          : '—'}
+                      </td>
+                      <td className="mono stand-whatif">
+                        {t?.actualPlace != null && t.whatIfPlace != null ? (
+                          <>
+                            {t.actualPlace} → {t.whatIfPlace} <PlaceMove from={t.actualPlace} to={t.whatIfPlace} />
+                            {t.playoffCross && (
+                              <span className={`stand-cross ${t.playoffCross === 'MADE' ? 'made' : 'missed'}`}>
+                                {crossText(t.playoffCross)}
+                              </span>
+                            )}
+                          </>
+                        ) : '—'}
+                      </td>
+                    </>
+                  )}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      {whatIf && median?.realSource === 'COUNTED_GAMES' && (
+        <p className="muted small">
+          The real half of the "if median had been on" columns is re-counted from the {median.weeksCounted} final
+          week{median.weeksCounted === 1 ? '' : 's'} stored here, not taken from Sleeper's W-L (the two couldn't be
+          matched to the same games), so it can differ from W and L above.
+        </p>
+      )}
+      {whatIf && median?.realSource === 'OFFICIAL' && drift > 0 && (
+        <p className="muted small">
+          {drift} manager{drift === 1 ? "'s" : "s'"} record{drift === 1 ? '' : 's'} differ{drift === 1 ? 's' : ''} from
+          Sleeper's when re-counted from the stored scores; the median games use the stored scores.
+        </p>
+      )}
+      {whatIf && median?.playoffLineWithheld && (
+        <p className="muted small">{PLAYOFF_LINE_WITHHELD[median.playoffLineWithheld]}</p>
+      )}
+    </>
   )
 }
 
@@ -483,7 +577,6 @@ export default function LeagueHistory() {
   const { error, notFound, setError, fail } = useFailure()
   const [loading, setLoading] = useState(false)
   const [computing, setComputing] = useState(false)
-  const [expected, setExpected] = useState<ExpectedWins | null>(null)
   // Bumped by the rail when this league's background refresh finishes
   // (specs/009-auto-data-refresh): refetch, but keep what is on screen.
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
@@ -501,20 +594,6 @@ export default function LeagueHistory() {
     getLeagueHistory(sleeperLeagueId)
       .then(setHistory)
       .catch((e) => fail(e))
-    // Optional extra columns: a failure here leaves them as dashes and never
-    // blocks the standings themselves.
-    let cancelled = false
-    ;(async () => {
-      try {
-        const ew = await getExpectedWins(sleeperLeagueId)
-        if (!cancelled) setExpected(ew)
-      } catch {
-        if (!cancelled) setExpected(null)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
   }, [sleeperLeagueId, dataVersion])
 
   // Backs the error state's own button. Same call the page used to print as a
@@ -624,8 +703,8 @@ export default function LeagueHistory() {
                   )}
                   <StandingsTable
                     rows={s.standings}
-                    season={s.season}
-                    expected={expected}
+                    median={s.median}
+                    inProgress={s.standings.some((r) => r.rankStatus === 'IN_PROGRESS')}
                     onCompute={computeFinalRanks}
                     computing={computing}
                     canCommission={canCommission}
@@ -648,20 +727,36 @@ export default function LeagueHistory() {
               It matches ffwrapped's "Record vs all".
             </p>
             <p>
-              <strong>Vs weekly median (reg. season)</strong> counts one game a week: above that week's
-              median score is a win, below it a loss (with an odd number of teams, the median team ties).
-              Those games are kept apart and are <em>not</em> added to the real W-L record. ffwrapped's
-              "Median record" does add them, so the same team can read 3-0 here and 6-0 there (3 real
-              wins plus 3 median wins). Neither is wrong; they count different things.
+              <strong>Vs weekly median</strong> counts one game a week: above that week's median score is
+              a win, below it a loss (with an odd number of teams, the median team ties). It is worked out
+              from each season's own scores, so every season fills in, not just the current one.
             </p>
             <p>
-              Both columns count only weeks this app has marked final, so the header names how many.
+              <strong>If median had been on</strong> appears for a season that did not play median games.
+              <em> With median</em> is the real record plus those median games, so the wins it gains are
+              exactly the median wins. <em>Median games</em> shows both sides, wins and losses, because the
+              same extra games add losses too. The real record is Sleeper's own where it adds up to the
+              same regular-season games; where it can't be matched, it is re-counted from the stored
+              scores and a note under the table says so. If any manager's stored scores give a different
+              record from Sleeper's, that is named too. ffwrapped's "Median record" adds the games the same way.
+            </p>
+            <p>
+              <strong>Place</strong> orders the regular season by win share (a tie is half a win), then points
+              for. That is this app's ordering, not Sleeper's seeding, and the playoffs are not replayed: a
+              "would have made playoffs" tag only says the manager would have finished inside the playoff
+              line, not that they would have won anything. The tag is left off when the league's playoff
+              format can't be reproduced, when who made the playoffs isn't stored, or when this app's order doesn't match the stored playoff bracket.
+            </p>
+            <p>
+              A season that <em>already</em> plays a median game every week has them inside its W and L, so it
+              gets no what-if, only the median and all-play columns.
+            </p>
+            <p>
+              Both number columns count only weeks this app has marked final, so the header names how many.
               Sleeper's W-L can already include a week that is over on Sleeper but not yet marked final
               here, which is why the two can cover a different number of games for a day or two.
-              Both columns come from the Luck page's calculation, which covers one season at a time.
-              Any season it did not compute shows a dash. In each number column, ▲ marks the best value
-              and ▼ the worst (fewest losses and points against count as best); nothing is marked when
-              every team is level.
+              In each number column (not Place, which shows its move as +N or −N places), ▲ marks the best value and ▼ the worst (fewest losses and points
+              against count as best); nothing is marked when every team is level.
             </p>
           </HowThisWorks>
         )}

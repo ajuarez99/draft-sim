@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.config.OwnerProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueRecordService;
 import com.ballknowers.draftsim.engine.ManagerCareerService;
+import com.ballknowers.draftsim.engine.MedianWhatIfService;
 import com.ballknowers.draftsim.engine.MemberRankingService;
 import com.ballknowers.draftsim.engine.ScoredWeeks;
 import com.ballknowers.draftsim.engine.PlayoffOddsService;
@@ -20,6 +21,8 @@ import com.ballknowers.draftsim.store.WeekBound;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.RankingBallotRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,6 +41,8 @@ import java.util.*;
 @RequestMapping("/api")
 public class LeagueHistoryController {
 
+    private static final Logger log = LoggerFactory.getLogger(LeagueHistoryController.class);
+
     private final LeagueRepository leagues;
     private final RosterSeasonRepository rosterSeasons;
     private final PowerRankingService power;
@@ -54,6 +59,7 @@ public class LeagueHistoryController {
     private final LeagueRecordService records;
     private final ManagerCareerService careers;
     private final ScoredWeeks scoredWeeks;
+    private final MedianWhatIfService medianWhatIf;
 
     public LeagueHistoryController(LeagueRepository leagues, RosterSeasonRepository rosterSeasons,
                                    PowerRankingService power, ProfileService profiles,
@@ -61,8 +67,10 @@ public class LeagueHistoryController {
                                    LeagueMemberRepository leagueMembers, RankingBallotRepository ballots,
                                    MemberRankingService memberRankings, OwnerProperties ownerProperties,
                                    PlayoffOddsService playoffOdds, LeagueRecordService records,
-                                   ManagerCareerService careers, ScoredWeeks scoredWeeks) {
+                                   ManagerCareerService careers, ScoredWeeks scoredWeeks,
+                                   MedianWhatIfService medianWhatIf) {
         this.scoredWeeks = scoredWeeks;
+        this.medianWhatIf = medianWhatIf;
         this.leagues = leagues;
         this.rosterSeasons = rosterSeasons;
         this.power = power;
@@ -131,7 +139,8 @@ public class LeagueHistoryController {
             // season's own team name (it changes year to year), falling back to
             // the username the row already carries.
             Map<Long, String> teamNames = teamNamesByManager(league.id());
-            List<Map<String, Object>> standings = rosterSeasons.forLeague(league.id()).stream()
+            List<RosterSeasonRepository.StandingRow> standingRows = rosterSeasons.forLeague(league.id());
+            List<Map<String, Object>> standings = standingRows.stream()
                     .map(r -> {
                         Map<String, Object> row = withFinalRank(standingRow(r, league.complete()), r.rosterId(), ranks);
                         // Mutable map: teamName is legitimately null for an unowned roster.
@@ -148,6 +157,17 @@ public class LeagueHistoryController {
             season.put("sleeperLeagueId", league.sleeperId());
             season.put("name", league.name());
             season.put("standings", standings);
+            // Spec 054: always present, so "nothing to show" is distinguishable from "older backend".
+            // One season failing never fails the response (FR-012): it degrades to UNAVAILABLE.
+            MedianWhatIfService.SeasonMedian median;
+            try {
+                median = medianWhatIf.forSeason(league, standingRows, leagues.playoffFormat(league.id()));
+            } catch (RuntimeException e) {
+                log.warn("median what-if unavailable for league {} (sleeper {}): {}",
+                        league.id(), league.sleeperId(), e.toString());
+                median = MedianWhatIfService.SeasonMedian.unavailable();
+            }
+            season.put("median", medianBlock(median));
             seasons.add(season);
         }
 
@@ -166,6 +186,47 @@ public class LeagueHistoryController {
         response.put("records", recordBook(records.forChain(chainIds, WeekBound.ALL_WEEKS)));
         response.put("seasons", seasons);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Spec 054's per-season median block. Mutable maps throughout: most what-if fields are legitimately
+     * null (an ALREADY_ON season, a withheld playoff line), and {@code Map.of} throws on a null value.
+     */
+    private static Map<String, Object> medianBlock(MedianWhatIfService.SeasonMedian m) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", m.status());
+        out.put("weeksCounted", m.weeksCounted());
+        out.put("driftGames", m.driftGames());
+        out.put("regularSeasonWeeks", m.regularSeasonWeeks());
+        out.put("realSource", m.realSource());
+        out.put("playoffTeams", m.playoffTeams());
+        out.put("playoffLineWithheld", m.playoffLineWithheld());
+        List<Map<String, Object>> teams = new ArrayList<>();
+        for (MedianWhatIfService.SeasonMedianTeam t : m.teams()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("rosterId", t.rosterId());
+            row.put("gamesCounted", t.gamesCounted());
+            row.put("median", wlt(t.median()));
+            row.put("allPlay", wlt(t.allPlay()));
+            row.put("real", wlt(t.real()));
+            row.put("withMedian", wlt(t.withMedian()));
+            row.put("winsGained", t.winsGained());
+            row.put("actualPlace", t.actualPlace());
+            row.put("whatIfPlace", t.whatIfPlace());
+            row.put("playoffCross", t.playoffCross());
+            teams.add(row);
+        }
+        out.put("teams", teams);
+        return out;
+    }
+
+    private static Map<String, Object> wlt(com.ballknowers.draftsim.engine.ExpectedWinsService.WinLossTie r) {
+        if (r == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("wins", r.wins());
+        m.put("losses", r.losses());
+        m.put("ties", r.ties());
+        return m;
     }
 
     /**

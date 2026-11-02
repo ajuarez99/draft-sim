@@ -8,6 +8,8 @@ import type {
   LeagueRecords,
   PointsLeaderRecord,
   RankStatus,
+  SeasonMedian,
+  SeasonMedianTeam,
   StandingRow,
   StreakRecord,
   WeeklyScoreRecord,
@@ -21,14 +23,12 @@ vi.mock('react-router-dom', () => ({
 const getLeagueHistory = vi.fn()
 const ingestLeagueHistory = vi.fn()
 const backfillFinalRanks = vi.fn()
-const getExpectedWins = vi.fn()
 // Spec 047: the Hall of fame section fetches its own block; these tests are about the standings, so it is absent (null = hidden).
 const getTrophyCase = vi.fn()
 vi.mock('../api', () => ({
   getLeagueHistory: (...args: unknown[]) => getLeagueHistory(...args),
   ingestLeagueHistory: (...args: unknown[]) => ingestLeagueHistory(...args),
   backfillFinalRanks: (...args: unknown[]) => backfillFinalRanks(...args),
-  getExpectedWins: (...args: unknown[]) => getExpectedWins(...args),
   getTrophyCase: (...args: unknown[]) => getTrophyCase(...args),
 }))
 
@@ -113,8 +113,6 @@ beforeEach(() => {
   getLeagueHistory.mockReset()
   ingestLeagueHistory.mockReset()
   backfillFinalRanks.mockReset()
-  getExpectedWins.mockReset()
-  getExpectedWins.mockRejectedValue(new Error('no expected wins in this test'))
   getTrophyCase.mockReset()
   getTrophyCase.mockResolvedValue(null)
 })
@@ -419,21 +417,56 @@ describe('season final rank', () => {
 
 // --- spec 013 US9: season label once, best/worst marks, expected-wins columns ---
 
-function ewTeam(rosterId: number, allPlay: [number, number, number], median: [number, number, number]) {
+const wlt = (w: number, l: number, t = 0) => ({ wins: w, losses: l, ties: t })
+
+/** Spec 054: one roster's line in a season's median block. Defaults to a median-off (WHAT_IF) season. */
+function medTeam(rosterId: number, over: Partial<SeasonMedianTeam> = {}): SeasonMedianTeam {
   return {
-    rosterId, managerId: rosterId, teamName: `T${rosterId}`, username: `mgr${rosterId}`, avatarId: null,
-    expectedWins: 1, actualWins: 1, winsAboveExpected: 0, strengthOfSchedule: 0,
-    luckSource: 'CONSISTENT_OPPONENT_SCORING' as const, swingWeeks: [],
-    allPlay: { wins: allPlay[0], losses: allPlay[1], ties: allPlay[2] },
-    median: { wins: median[0], losses: median[1], ties: median[2] },
+    rosterId, gamesCounted: 3,
+    allPlay: wlt(28, 5), median: wlt(3, 0),
+    real: wlt(2, 1), withMedian: wlt(5, 1), winsGained: 3,
+    actualPlace: 2, whatIfPlace: 1, playoffCross: null,
+    ...over,
   }
 }
 
-function ew(season: number) {
+function medBlock(over: Partial<SeasonMedian> = {}): SeasonMedian {
   return {
-    available: true, season, sport: 'NFL', weeksScored: 3, early: true, leagueAveragePpg: 100,
-    teams: [ewTeam(1, [28, 5, 0], [3, 0, 0]), ewTeam(2, [8, 25, 0], [0, 3, 0])],
+    status: 'WHAT_IF', weeksCounted: 3, driftGames: 0, regularSeasonWeeks: 3, realSource: 'OFFICIAL',
+    playoffTeams: 1, playoffLineWithheld: null,
+    teams: [
+      medTeam(1),
+      medTeam(2, {
+        allPlay: wlt(8, 25), median: wlt(0, 3), real: wlt(1, 2), withMedian: wlt(1, 5), winsGained: 0, actualPlace: 1, whatIfPlace: 2,
+      }),
+    ],
+    ...over,
   }
+}
+
+/** A median-on season: median/all-play only, every what-if field null. */
+function alreadyOn(): SeasonMedian {
+  const nulls = { real: null, withMedian: null, winsGained: null, actualPlace: null, whatIfPlace: null, playoffCross: null }
+  return medBlock({
+    status: 'ALREADY_ON', realSource: null, playoffTeams: null,
+    teams: [medTeam(1, nulls), medTeam(2, { ...nulls, allPlay: wlt(8, 25), median: wlt(0, 3) })],
+  })
+}
+
+/** Rows of one season's table as arrays of cell text. */
+function cellText(table: HTMLElement): string[][] {
+  return Array.from(table.querySelectorAll('tbody tr')).map((tr) =>
+    Array.from(tr.querySelectorAll('td')).map((td) => td.textContent?.trim() ?? ''))
+}
+
+/** The first season's block only (table and its notes), so How-this-works can't satisfy an assertion about it. */
+function seasonText(): string {
+  return document.querySelector('.history-season')?.textContent ?? ''
+}
+
+function withMedian(h: LeagueHistoryData, median: SeasonMedian | undefined, idx = 0): LeagueHistoryData {
+  h.seasons[idx] = { ...h.seasons[idx], median }
+  return h
 }
 
 describe('standings: season in progress, marks and expected-wins columns', () => {
@@ -448,37 +481,181 @@ describe('standings: season in progress, marks and expected-wins columns', () =>
     expect(heading.textContent).toMatch(/season in progress/i)
   })
 
-  it('renders the new columns, and fills them only where the expected-wins season matches', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2026))
-    getExpectedWins.mockReset()
-    getExpectedWins.mockResolvedValue(ew(2026))
+  it('renders the median and all-play columns from the season block, spanned by its own final weeks', async () => {
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2026), medBlock()))
     render(<LeagueHistory />)
 
     expect(await screen.findByText('28-5')).toBeTruthy()
     expect(screen.getByText('8-25')).toBeTruthy()
-    // Median games only: 3-0, not added to the real 9-5 record.
-    expect(screen.getByText('3-0')).toBeTruthy()
-    // The span is named from the payload's final-week count (code-review fix pass).
-    expect(screen.getByRole("columnheader", { name: /^Record vs all \(\d+ final wks?\)$/ })).toBeTruthy()
-    expect(screen.getByRole("columnheader", { name: /^Vs weekly median \(\d+ final wks?\)$/ })).toBeTruthy()
+    // The median record on its own: 3-0, apart from the real 2-1.
+    expect(screen.getAllByText('3-0').length).toBeGreaterThan(0)
+    expect(screen.getByRole('columnheader', { name: /^Record vs all \(\d+ final wks?\)$/ })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: /^Vs weekly median \(\d+ final wks?\)$/ })).toBeTruthy()
   })
 
-  it('shows dashes when the expected-wins season differs from the row season', async () => {
-    getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025))
-    getExpectedWins.mockReset()
-    getExpectedWins.mockResolvedValue(ew(2026))
+  it('fills an OLDER season from its own block, not only the current one (the bug as reported)', async () => {
+    const h = withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2026)
+    h.seasons.push({
+      season: 2025, leagueId: 4, sleeperLeagueId: 'L0', name: 'BK',
+      standings: [standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)],
+      median: medBlock({ teams: [medTeam(1, { allPlay: wlt(40, 12), median: wlt(7, 3) }), medTeam(2)] }),
+    })
+    h.seasons[0] = { ...h.seasons[0], median: alreadyOn() }
+    getLeagueHistory.mockResolvedValue(h)
     render(<LeagueHistory />)
 
-    await screen.findByText('Final ranks appear once the commissioner computes them.').catch(() => null)
-    await waitFor(() => expect(getExpectedWins).toHaveBeenCalled())
-    expect(screen.queryByText('28-5')).toBeNull()
-    expect(screen.queryByText('3-0')).toBeNull()
-    const cells = Array.from(document.querySelectorAll('tbody tr')).map((tr) => tr.querySelectorAll('td'))
-    expect(cells.length).toBe(2)
-    cells.forEach((tds) => {
-      expect(tds[tds.length - 1].textContent?.trim()).toBe('—')
-      expect(tds[tds.length - 2].textContent?.trim()).toBe('—')
+    const tables = await screen.findAllByRole('table')
+    expect(tables).toHaveLength(2)
+    // The 2025 table (second) shows its own 40-12 all-play and 7-3 median, none of the 2026 figures.
+    expect(cellText(tables[1])[0].join('|')).toMatch(/40-12/)
+    expect(cellText(tables[1])[0].join('|')).toMatch(/7-3/)
+    expect(cellText(tables[0])[0].join('|')).not.toMatch(/40-12/)
+  })
+
+  it('shows dashes when a season has no median block (an older backend) or it is UNAVAILABLE', async () => {
+    const h = withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025)
+    h.seasons.push({
+      season: 2024, leagueId: 3, sleeperLeagueId: 'L00', name: 'BK',
+      standings: [standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)],
+      median: { ...medBlock(), status: 'UNAVAILABLE', teams: [], weeksCounted: 0 },
     })
+    getLeagueHistory.mockResolvedValue(h)
+    render(<LeagueHistory />)
+
+    const tables = await screen.findAllByRole('table')
+    expect(tables).toHaveLength(2)
+    for (const t of tables) {
+      cellText(t).forEach((tds) => {
+        expect(tds[tds.length - 1]).toBe('—')
+        expect(tds[tds.length - 2]).toBe('—')
+      })
+      expect(t.textContent).not.toMatch(/If median had been on/)
+    }
+  })
+
+  it('renders the what-if group for a WHAT_IF season: With median, and Median games as both sides', async () => {
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), medBlock()))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByRole('columnheader', { name: /^If median had been on \(3 final wks\)$/ })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'With median' })).toBeTruthy()
+    expect(screen.getByRole('columnheader', { name: 'Median games' })).toBeTruthy()
+    const [r1, r2] = cellText(screen.getByRole('table'))
+    expect(r1).toContain('5-1')
+    expect(r1).toContain('+3 W / +0 L')
+    expect(r2).toContain('1-5')
+    expect(r2).toContain('+0 W / +3 L')   // losses are shown, never wins alone
+  })
+
+  it('shows ties in the combined record and median games only when there are some', async () => {
+    // Four games each (internally consistent: median, real and with-median all sum to gamesCounted).
+    const m = medBlock({
+      weeksCounted: 4, regularSeasonWeeks: 4,
+      teams: [medTeam(1, { gamesCounted: 4, median: wlt(2, 1, 1), real: wlt(1, 2, 1), withMedian: wlt(3, 3, 2), winsGained: 2 }),
+              medTeam(2, { gamesCounted: 4, median: wlt(0, 4), real: wlt(1, 3), withMedian: wlt(1, 7), winsGained: 0, actualPlace: 1, whatIfPlace: 2 })],
+    })
+    getLeagueHistory.mockResolvedValue(withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), m))
+    render(<LeagueHistory />)
+
+    await screen.findByRole('columnheader', { name: /^If median had been on \(4 final wks\)$/ })
+    const [r1, r2] = cellText(screen.getByRole('table'))
+    expect(r1).toContain('3-3-2')
+    expect(r1).toContain('+2 W / +1 L / +1 T')
+    expect(r2).toContain('1-7')
+  })
+
+  it('says an ALREADY_ON season includes its median games in W-L, with no what-if columns', async () => {
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2026), alreadyOn()))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText(/played a median game every week, so those games are already in its W and L/)).toBeTruthy()
+    expect(screen.queryByRole('columnheader', { name: /^If median had been on \(3 final wks\)$/ })).toBeNull()
+    expect(screen.queryByRole('columnheader', { name: 'With median' })).toBeNull()
+    // The median and all-play columns still fill.
+    expect(screen.getByText('28-5')).toBeTruthy()
+  })
+
+  it('names the span and the drift when the real half is not purely Sleeper\'s record', async () => {
+    const rows = [standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)]
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings(rows, 2025), medBlock({ realSource: 'COUNTED_GAMES' })))
+    const { unmount } = render(<LeagueHistory />)
+    expect(await screen.findByText(/re-counted from the 3 final weeks stored here/)).toBeTruthy()
+    unmount()
+
+    getLeagueHistory.mockResolvedValue(withMedian(withStandings(rows, 2025), medBlock({ driftGames: 2 })))
+    render(<LeagueHistory />)
+    expect(await screen.findByText(/2 managers' records differ from Sleeper's/)).toBeTruthy()
+  })
+
+  // --- spec 054 US3: place movement and the playoff line
+
+  it('shows actual to what-if place with a labelled up or down movement', async () => {
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), medBlock()))
+    render(<LeagueHistory />)
+
+    await screen.findByRole('columnheader', { name: /^If median had been on \(3 final wks\)$/ })
+    const [r1, r2] = cellText(screen.getByRole('table'))
+    expect(r1.join('|')).toMatch(/2 → 1 \+1/)    // place 2 -> 1 is an improvement
+    expect(r2.join('|')).toMatch(/1 → 2 −1/)
+    expect(screen.getByRole('img', { name: 'Up 1 place' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: 'Down 1 place' })).toBeTruthy()
+  })
+
+  it('tags a team that would have crossed the playoff line, in either direction', async () => {
+    const m = medBlock({
+      teams: [medTeam(1, { playoffCross: 'MADE' }),
+              medTeam(2, { allPlay: wlt(8, 25), median: wlt(0, 3), real: wlt(1, 2), withMedian: wlt(1, 5), winsGained: 0, actualPlace: 1, whatIfPlace: 2, playoffCross: 'MISSED' })],
+    })
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), m))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText('would have made playoffs')).toBeTruthy()
+    expect(screen.getByText('would have missed playoffs')).toBeTruthy()
+  })
+
+  it('words the marker as "would be in / out" for a season still being played', async () => {
+    const m = medBlock({ teams: [medTeam(1, { playoffCross: 'MADE' }), medTeam(2, { playoffCross: 'MISSED' })] })
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'IN_PROGRESS'), standing(2, 'IN_PROGRESS')], 2026), m))
+    render(<LeagueHistory />)
+
+    expect(await screen.findByText('would be in')).toBeTruthy()
+    expect(screen.getByText('would be out')).toBeTruthy()
+    expect(screen.queryByText('would have made playoffs')).toBeNull()
+  })
+
+  it('says why the playoff marker is withheld instead of silently dropping it', async () => {
+    const m = medBlock({ playoffTeams: null, playoffLineWithheld: 'DIVISIONS' })
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), m))
+    const { unmount } = render(<LeagueHistory />)
+
+    await screen.findByRole('table')
+    expect(seasonText()).toMatch(/Division seeding isn't modelled/)
+    expect(screen.queryByText('would have made playoffs')).toBeNull()
+    unmount()
+
+    const m2 = medBlock({ playoffTeams: null, playoffLineWithheld: 'ORDER_DISAGREES' })
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), m2))
+    const { unmount: unmount2 } = render(<LeagueHistory />)
+    await screen.findByRole('table')
+    expect(seasonText()).toMatch(/doesn't match the stored playoff bracket/)
+    unmount2()
+
+    const m3 = medBlock({ playoffTeams: null, playoffLineWithheld: 'BRACKET_UNKNOWN' })
+    getLeagueHistory.mockResolvedValue(
+      withMedian(withStandings([standing(1, 'RANKED', 1, 17), standing(2, 'RANKED', 2, 17)], 2025), m3))
+    render(<LeagueHistory />)
+    await screen.findByRole('table')
+    expect(seasonText()).toMatch(/Who actually made the playoffs isn't stored/)
+    expect(seasonText()).not.toMatch(/doesn't match/)
   })
 
   it('marks best and worst with a glyph and a label, not colour alone, and none when level', async () => {
@@ -495,12 +672,19 @@ describe('standings: season in progress, marks and expected-wins columns', () =>
     expect(screen.getAllByRole('img', { name: 'Best in the league' })[0].textContent).toBe('▲')
   })
 
-  it('explains both expected-wins columns, including how ffwrapped differs', async () => {
+  it('explains the median games, the place tie-break and that the playoffs are not replayed', async () => {
     getLeagueHistory.mockResolvedValue(withStandings([standing(1, 'RANKED', 1, 17)], 2025))
     render(<LeagueHistory />)
 
     await screen.findByText('How this works')
-    expect(document.body.textContent).toMatch(/not.*added to the real W-L record/)
-    expect(document.body.textContent).toMatch(/ffwrapped's "Median record" does add them/)
+    const text = document.body.textContent ?? ''
+    expect(text).toMatch(/If median had been on/)
+    expect(text).toMatch(/win share.*then points/)
+    expect(text).toMatch(/not Sleeper's seeding/)
+    expect(text).toMatch(/playoffs are not replayed/)
+    expect(text).toMatch(/already.* plays a median game every week/)
+    // The old wording is gone: median games are now added in the what-if, and no Luck-page caveat applies.
+    expect(text).not.toMatch(/not.*added to the real W-L record/)
+    expect(text).not.toMatch(/Luck page/)
   })
 })
