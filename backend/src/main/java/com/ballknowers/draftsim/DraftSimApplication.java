@@ -28,7 +28,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         ProjectionAccuracyProperties.class,
         LockInProperties.class,
         RecapProperties.class,
-        RivalryProperties.class
+        RivalryProperties.class,
+        HistoricalProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {

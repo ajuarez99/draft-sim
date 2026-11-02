@@ -19,7 +19,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.postgresql:postgresql")
+    implementation("org.postgresql:postgresql") // compile-time: CopyManager for the historical import (spec 053 F3)
     // specs/020-ai-weekly-recap: the only paid outbound dependency. Inert unless
     // draftsim.recap.enabled AND a non-blank ANTHROPIC_API_KEY (RecapEnabledCondition).
     implementation("com.anthropic:anthropic-java:2.68.0")

@@ -6921,3 +6921,46 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .wp-week-pts, .wp-week-margin { grid-column: 2; }
   .wp-week-pot { grid-row: 1; grid-column: 3; }
 }
+
+/* Spec 053: Time Machine (historical draft game) ------------------------------------------- */
+.hist-hero { background: linear-gradient(135deg, color-mix(in oklch, var(--teal) 14%, var(--panel)), var(--panel) 70%); }
+.hist-steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 8px; }
+.hist-start { padding: 10px 20px; font-weight: 700; }
+.hist-games { list-style: none; margin: 0; padding: 0; }
+.hist-game { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 8px; border-radius: 10px; transition: background 120ms, transform 120ms; }
+.hist-game:hover { background: color-mix(in oklch, var(--teal) 8%, var(--panel)); transform: translateY(-1px); }
+.hist-game-actions { display: flex; gap: 8px; }
+.hist-disclosure { margin-bottom: 12px; }
+.hist-disclosure-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.hist-counted { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.hist-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: color-mix(in oklch, var(--teal) 18%, var(--panel)); border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.hist-excluded { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.hist-list-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.hist-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.hist-search { flex: 1 1 140px; min-width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.hist-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.hist-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border-bottom: 1px solid var(--line); transition: background 120ms, transform 120ms; }
+.hist-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); transform: translateY(-1px); }
+.hist-rank { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+.hist-name { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hist-line { margin-top: 2px; }
+.hist-table { width: 100%; border-collapse: collapse; }
+.hist-table th, .hist-table td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+.hist-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.hist-me { background: color-mix(in oklch, var(--crimson-text) 16%, var(--panel)); box-shadow: inset 3px 0 0 var(--crimson-text); }
+.hist-results { display: grid; gap: 14px; margin-bottom: 14px; }
+.hist-finish-title { font-size: 34px; margin: 4px 0; }
+.hist-compare { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 8px; }
+.hist-stat { display: grid; }
+.hist-stat-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hist-verdict.good { color: var(--teal); font-weight: 600; }
+.hist-callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
+.hist-callout { padding: 12px 14px; border-radius: 12px; background: color-mix(in oklch, var(--line) 35%, var(--panel)); }
+.hist-callout h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.hist-matchups { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+.hist-matchups li { display: grid; grid-template-columns: 1fr 70px 24px 70px 1fr; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; }
+.hist-matchups b { text-align: right; font-variant-numeric: tabular-nums; }
+.hist-matchups b.win { color: var(--teal); }
+@media (max-width: 640px) {
+  .hist-matchups li { grid-template-columns: 1fr 56px 18px 56px 1fr; font-size: 13px; }
+}

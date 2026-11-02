@@ -62,6 +62,31 @@ public class SleeperPlayerStatsClient {
     }
 
     /**
+     * One season's per-player TOTALS: {@code GET /v1/stats/{sport}/regular/{season}} (spec 053 T012, measured
+     * 2026-11-02). A JSON object keyed by Sleeper player id, each value the player's stat map for the season
+     * ({@code gp}, {@code pts}, {@code reb}, ... ; an id with nothing to report maps to {@code {}}). Keys of
+     * the form {@code TEAM_xxx} appear from 2019 on and are team pseudo-players, not people.
+     *
+     * <p>Defensively typed like {@link #week}: read as an untyped {@code Object}, and only entries whose value
+     * really is a map are kept, with every stat value passed through as the raw JSON number or string.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Map<String, Object>> seasonTotals(String sport, int season) {
+        Object body = http.get()
+                .uri(b -> b.path("/v1/stats/{sport}/regular/{season}").build(sport, season))
+                .retrieve()
+                .body(Object.class);
+        Map<String, Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        if (!(body instanceof Map<?, ?> m)) return out;
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            if (e.getKey() != null && e.getValue() instanceof Map<?, ?> stats) {
+                out.put(e.getKey().toString(), (Map<String, Object>) stats);
+            }
+        }
+        return out;
+    }
+
+    /**
      * A season's regular-season schedule: {@code GET /schedule/{sport}/regular/{season}}.
      * One array of games carrying {@code game_id}, {@code week}, {@code date},
      * {@code status} and home/away. The home/away value's shape differs by sport

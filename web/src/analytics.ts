@@ -48,6 +48,8 @@ const ROUTES: RouteEntry[] = [
   { path: '/drafts/:draftId/live', url: '/drafts/:draft/live', title: 'Live draft' },
   { path: '/mock/new', url: '/mock/new', title: 'Mock draft setup' },
   { path: '/mock/:sessionId', url: '/mock/:session', title: 'Mock draft' },
+  { path: '/history', url: '/history', title: 'Time Machine' },
+  { path: '/history/:gameId', url: '/history/:game', title: 'Time Machine game' },
   { path: '/managers', url: '/managers', title: 'Managers' },
   { path: '/managers/:managerId/history', url: '/managers/:manager/history', title: 'Manager history' },
   { path: '/managers/:aId/versus/:bId', url: '/managers/:a/versus/:b', title: 'Manager comparison' },

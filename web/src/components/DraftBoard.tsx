@@ -56,6 +56,8 @@ type Props = {
   // noise PROVENANCE_LABEL's own comment says this feature exists to avoid.
   // Same additive-prop pattern D used for live mode's `landed` field.
   hideProvenanceDots?: boolean
+  /** Historical games: the ids are not Sleeper ids, so no headshot is ever requested (spec 053 review F3). */
+  hidePhotos?: boolean
   /**
    * The round from which snake parity flips; 0 is plain snake,
    * which is every football draft.
@@ -112,6 +114,7 @@ export default function DraftBoard({
   onCellClick,
   onSeatClick,
   hideProvenanceDots,
+  hidePhotos,
   reversalRound,
   valueView = false,
   adpAtDraft,
@@ -332,7 +335,7 @@ export default function DraftBoard({
                         line it truncated 16 of 180 names at 1440 vs 1 without
                         (measured, spec 013 parent review). */}
                     <div className="meta">
-                      <PlayerFace sport={sport} sleeperId={shown.sleeperId} team={shown.team} position={shown.position} name={shown.name} size={16} />
+                      <PlayerFace sport={sport} sleeperId={shown.sleeperId} team={shown.team} position={shown.position} name={shown.name} size={16} noPhoto={hidePhotos} />
                       <span className="team-code mono">{shown.team ?? '—'}</span>
                       {grades &&
                         (grade?.valueOverSlot != null ? (

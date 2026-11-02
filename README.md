@@ -58,6 +58,15 @@ Built so far:
   and makes a trade "not comparable by points" when a side got nothing else. Reversed and restored
   trades say so. Each trade expands into its players' season stretches, a reconciliation
   count checks the transaction log against the scoring rows, and the trade log downloads as CSV.
+- **Time Machine** (specs/053-historical-draft-game). A basketball draft game on real history: pick a random
+  NBA season (1970-71 to 2025-26), draft a 12-team, 14-round snake against bots, then watch that season's real box
+  scores play out as a fantasy season under the Legacy Ball Knowers scoring. Cards show only the stats a season
+  actually recorded (steals and blocks before 1973-74, turnovers before 1977-78, three-pointers before 1979-80,
+  and double-doubles before 1983-84 are dropped and said so), and no card shows anything from the drafted season.
+  Ranking is a labelled fallback (prior-season fantasy points), never ADP. Results compare you against the best
+  possible lineup, your worst pick and the best player you passed on. Data: a CC0 Kaggle box-score set
+  (1946-2022) plus Sleeper weekly stats (2017+), loaded by an admin import (migration V43, `historical_*` tables).
+  Reference data only: it never touches a league.
 - **Rivalry week** (specs/034-rivalry-schedule-grid, specs/037-rivalry-week-pick). The
   Rivalries page recommends a full set of rivalry pairings from league history and, since spec
   037, **which week** to play them. No pair may meet more than twice in the regular season

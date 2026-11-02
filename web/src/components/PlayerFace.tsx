@@ -15,6 +15,11 @@ type Props = {
   name: string
   /** Square edge in px. The box is this size in every state, so nothing shifts. */
   size: number
+  /**
+   * No headshot exists for this player (historical games, spec 053): start at initials and never request the CDN,
+   * because the id is not a Sleeper id and the CDN would answer with a stranger's photo.
+   */
+  noPhoto?: boolean
 }
 
 type Stage = 'photo' | 'logo' | 'initials'
@@ -34,11 +39,11 @@ export const teamLogoSrc = (sport: Sport, team: string) =>
  */
 export default function PlayerFace(props: Props) {
   // Re-key on identity so a recycled row never inherits the previous player's stage.
-  return <Face key={`${props.sport}:${props.sleeperId}:${props.team ?? ''}`} {...props} />
+  return <Face key={`${props.sport}:${props.sleeperId}:${props.team ?? ''}:${props.noPhoto ? 'n' : 'p'}`} {...props} />
 }
 
-function Face({ sport, sleeperId, team, position, name, size }: Props) {
-  const [stage, setStage] = useState<Stage>(position === 'DEF' ? 'logo' : 'photo')
+function Face({ sport, sleeperId, team, position, name, size, noPhoto }: Props) {
+  const [stage, setStage] = useState<Stage>(noPhoto ? 'initials' : position === 'DEF' ? 'logo' : 'photo')
 
   // Skip a logo step there is nothing to fetch for.
   const effective: Stage = stage === 'logo' && !team ? 'initials' : stage
