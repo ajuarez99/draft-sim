@@ -253,8 +253,10 @@ public class WeeklyReportService {
         Map<Integer, String> recordByRoster = new HashMap<>();
         List<LeagueMatchupRepository.PairedGame> paired =
                 matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS);
+        Map<Integer, String> records = recordsThrough(paired, league.season(), week,
+                leagues.playoffFormat(league.id()));
         for (int rosterId : dir.rosterIds()) {
-            recordByRoster.put(rosterId, recordAfter(all, league.season(), week, rosterId, paired));
+            recordByRoster.put(rosterId, records.getOrDefault(rosterId, "0-0"));
         }
 
         Map<Integer, Double> pointsByRoster = new HashMap<>();
@@ -513,8 +515,10 @@ public class WeeklyReportService {
         List<LeagueMatchupRepository.PairedGame> paired =
                 matchups.pairedWithScores(List.of(league.id()), WeekBound.ALL_WEEKS);
         Map<Integer, String> recordByRoster = new HashMap<>();
+        Map<Integer, String> records = recordsThrough(paired, league.season(), week - 1,
+                leagues.playoffFormat(league.id()));
         for (int rosterId : dir.rosterIds()) {
-            recordByRoster.put(rosterId, recordAfter(List.of(), league.season(), week - 1, rosterId, paired));
+            recordByRoster.put(rosterId, records.getOrDefault(rosterId, "0-0"));
         }
 
         List<LeagueMatchupRepository.ScoredRow> rows = live.rows().stream()
@@ -767,21 +771,41 @@ public class WeeklyReportService {
         }
     }
 
-    /** W-L through this week, from the paired games. */
-    private static String recordAfter(List<RosterWeekPointsRepository.WeekBreakdown> all, int season,
-                                      int week, int rosterId,
-                                      List<LeagueMatchupRepository.PairedGame> games) {
-        int w = 0, l = 0, t = 0;
-        for (LeagueMatchupRepository.PairedGame g : games) {
+    /**
+     * W-L through this week, from the paired games, as the league counts it: with
+     * {@code league_average_match} on, every regular-season week is also one game against that
+     * week's median. Head-to-head alone printed roster 12 of NBA "Ball Knowers" 2026 as 1-1 after
+     * week 2 while Sleeper had it 4-0 (claude/nba-2026-score-drift.md). The h2h and median rules,
+     * and the regular-season bound, are {@link ExpectedWinsService}'s, so this record cannot count
+     * a game differently from the Luck page or the history page's median column.
+     */
+    static Map<Integer, String> recordsThrough(List<LeagueMatchupRepository.PairedGame> paired, int season,
+                                               int week, Optional<LeagueRepository.PlayoffFormat> format) {
+        List<ExpectedWinsService.Game> games = new ArrayList<>();
+        for (LeagueMatchupRepository.PairedGame g : paired) {
             if (g.season() != season || g.week() > week) continue;
             if (g.aPoints() == null || g.bPoints() == null) continue;
-            double mine, theirs;
-            if (g.aRosterId() == rosterId) { mine = g.aPoints().doubleValue(); theirs = g.bPoints().doubleValue(); }
-            else if (g.bRosterId() == rosterId) { mine = g.bPoints().doubleValue(); theirs = g.aPoints().doubleValue(); }
-            else continue;
-            if (mine > theirs) w++; else if (mine < theirs) l++; else t++;
+            games.add(new ExpectedWinsService.Game(g.week(), g.aRosterId(), g.aPoints().doubleValue(),
+                    g.bRosterId(), g.bPoints().doubleValue()));
         }
-        return t > 0 ? w + "-" + l + "-" + t : w + "-" + l;
+        Map<Integer, int[]> acc = new HashMap<>();
+        ExpectedWinsService.headToHead(games).forEach((r, x) -> add(acc, r, x));
+        if (format.map(LeagueRepository.PlayoffFormat::medianMatch).orElse(false)) {
+            Integer through = ExpectedWinsService.regularSeasonBoundOf(format).throughWeek();
+            List<ExpectedWinsService.Game> regular = games.stream()
+                    .filter(g -> through == null || g.week() <= through).toList();
+            ExpectedWinsService.median(regular).forEach((r, x) -> add(acc, r, x));
+        }
+        Map<Integer, String> out = new HashMap<>();
+        acc.forEach((r, a) -> out.put(r, a[2] > 0 ? a[0] + "-" + a[1] + "-" + a[2] : a[0] + "-" + a[1]));
+        return out;
+    }
+
+    private static void add(Map<Integer, int[]> acc, int rosterId, ExpectedWinsService.WinLossTie x) {
+        int[] a = acc.computeIfAbsent(rosterId, k -> new int[3]);
+        a[0] += x.wins();
+        a[1] += x.losses();
+        a[2] += x.ties();
     }
 
     private static String ordinalSuffix(int n) {

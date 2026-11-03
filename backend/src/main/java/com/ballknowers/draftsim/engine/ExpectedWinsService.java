@@ -398,7 +398,11 @@ public class ExpectedWinsService {
      * applies the identical rule rather than each re-deriving it.
      */
     public WeekBound regularSeasonBound(LeagueRepository.LeagueRow league) {
-        Optional<LeagueRepository.PlayoffFormat> format = leagues.playoffFormat(league.id());
+        return regularSeasonBoundOf(leagues.playoffFormat(league.id()));
+    }
+
+    /** {@link #regularSeasonBound(LeagueRepository.LeagueRow)} for a format already read. */
+    static WeekBound regularSeasonBoundOf(Optional<LeagueRepository.PlayoffFormat> format) {
         if (format.isPresent() && format.get().playoffWeekStart() >= 2) {
             return WeekBound.through(format.get().playoffWeekStart() - 1);
         }
