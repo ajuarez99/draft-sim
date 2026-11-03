@@ -4347,6 +4347,12 @@ export type WeeklyPotWeek = {
   runnerUpPoints: number | null
   payers: number
   potCents: number
+  /**
+   * DECIDED only, else null. OFFICIAL = difference of Sleeper's season totals between two scored legs;
+   * FEED = Sleeper's public matchup score, which can differ from its official standings
+   * (claude/official-week-scores.md).
+   */
+  scoreSource: 'OFFICIAL' | 'FEED' | null
 }
 
 export type WeeklyPotBalance = {

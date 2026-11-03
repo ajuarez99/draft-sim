@@ -38,13 +38,14 @@ class LeagueHistoryIngestServiceTest {
     @Mock private TransactionIngestService transactions;
     @Mock private LeagueWeekFetchRepository weekFetches;
     @Mock private BracketIngestService bracketIngest;
+    @Mock private com.ballknowers.draftsim.store.RosterFptsSnapshotRepository fptsSnapshots;
 
     private LeagueHistoryIngestService service;
 
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions, weekFetches, bracketIngest);
+                weekPoints, fixtures, transactions, weekFetches, bracketIngest, fptsSnapshots);
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
     }
@@ -86,6 +87,38 @@ class LeagueHistoryIngestServiceTest {
         r.put("owner_id", ownerId);
         r.put("settings", settings);
         return r;
+    }
+
+    /**
+     * claude/official-week-scores.md: the season totals are keyed by {@code last_scored_leg}, never by
+     * {@code leg} (the live week). Keying by {@code leg} would shift every official week by one.
+     */
+    @Test
+    void fptsSnapshotsAreKeyedByLastScoredLegNotTheLiveLeg() {
+        Map<String, Object> settings = Map.of("last_scored_leg", 2, "leg", 3, "playoff_week_start", 20);
+        when(sleeper.leagueChain("L1")).thenReturn(List.of(leagueObject("L1", 2026, settings, Map.of(), "in_season")));
+        when(sleeper.leagueUsers("L1")).thenReturn(List.of(Map.of("user_id", "u1", "display_name", "Alice")));
+        when(managers.upsert("u1", "Alice", null)).thenReturn(101L);
+        when(sleeper.rosters("L1")).thenReturn(List.of(rosterObject(1, "u1", 2, 2, 529, 50)));
+
+        service.ingestChain(Sport.NBA, "L1", Set.of());
+
+        ArgumentCaptor<List<com.ballknowers.draftsim.store.RosterFptsSnapshotRepository.Snapshot>> captor =
+                ArgumentCaptor.forClass(List.class);
+        verify(fptsSnapshots).upsertAll(eq(55L), eq(2), captor.capture());
+        assertEquals(1, captor.getValue().size());
+        assertEquals(new java.math.BigDecimal("529.50"), captor.getValue().get(0).fpts());
+    }
+
+    @Test
+    void aPlayoffLegIsNotSnapshotted() {
+        Map<String, Object> settings = Map.of("last_scored_leg", 20, "playoff_week_start", 20);
+        when(sleeper.leagueChain("L1")).thenReturn(List.of(leagueObject("L1", 2026, settings, Map.of(), "in_season")));
+        when(sleeper.rosters("L1")).thenReturn(List.of(rosterObject(1, "u1", 2, 2, 529, 50)));
+
+        service.ingestChain(Sport.NBA, "L1", Set.of());
+
+        verify(fptsSnapshots, never()).upsertAll(anyLong(), anyInt(), any());
     }
 
     @Test

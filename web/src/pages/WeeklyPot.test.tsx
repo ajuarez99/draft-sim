@@ -44,11 +44,11 @@ function on(over: Partial<WeeklyPotOn> = {}): WeeklyPotOn {
     seasonFinal: false,
     tieCentRule: 'TIE-CENT-RULE-TEXT',
     weeks: [
-      { week: 1, status: 'DECIDED', winners: [1], winningPoints: 150.5, runnerUpPoints: 140.25, payers: 2, potCents: 200 },
-      { week: 2, status: 'DECIDED', winners: [2, 3], winningPoints: 130, runnerUpPoints: 120, payers: 1, potCents: 100 },
-      { week: 3, status: 'NOT_FINAL', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0 },
-      { week: 4, status: 'MISSING', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0 },
-      { week: 5, status: 'NO_SCORES', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0 },
+      { week: 1, status: 'DECIDED', winners: [1], winningPoints: 150.5, runnerUpPoints: 140.25, payers: 2, potCents: 200, scoreSource: 'OFFICIAL' },
+      { week: 2, status: 'DECIDED', winners: [2, 3], winningPoints: 130, runnerUpPoints: 120, payers: 1, potCents: 100, scoreSource: 'FEED' },
+      { week: 3, status: 'NOT_FINAL', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0, scoreSource: null },
+      { week: 4, status: 'MISSING', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0, scoreSource: null },
+      { week: 5, status: 'NO_SCORES', winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0, scoreSource: null },
     ],
     balances: [
       bal(1, 'Alpha', 1250, { weeksWon: 1, collectedCents: 1250 }),
@@ -112,11 +112,19 @@ describe('WeeklyPot page', () => {
     expect(screen.getByText('TIE-CENT-RULE-TEXT')).toBeTruthy()
   })
 
+  it('marks feed-scored weeks with an asterisk and explains it once', async () => {
+    getWeeklyPot.mockResolvedValue(on({}))
+    render(<WeeklyPot />)
+    await screen.findByText(/Settle up/)
+    expect(screen.getAllByTitle(/public matchup feed/)).toHaveLength(1)
+    expect(screen.getByText(/^\* Scored from Sleeper’s public matchup feed/)).toBeTruthy()
+  })
+
   it('labels the weeks the money includes when a gap sits below the latest decided week', async () => {
     const w = (week: number, status: WeeklyPotOn['weeks'][number]['status']) =>
       status === 'DECIDED'
-        ? { week, status, winners: [1], winningPoints: 100, runnerUpPoints: 90, payers: 2, potCents: 200 }
-        : { week, status, winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0 }
+        ? { week, status, winners: [1], winningPoints: 100, runnerUpPoints: 90, payers: 2, potCents: 200, scoreSource: 'OFFICIAL' as const }
+        : { week, status, winners: [], winningPoints: null, runnerUpPoints: null, payers: 0, potCents: 0, scoreSource: null }
     getWeeklyPot.mockResolvedValue(
       on({
         throughWeek: 1,
