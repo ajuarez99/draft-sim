@@ -54,7 +54,8 @@ class ChampionOnlyWhenCompleteTest {
     @BeforeEach
     void setUp() {
         service = new LeagueHistoryIngestService(sleeper, leagues, managers, leagueMembers, rosterSeasons,
-                weekPoints, fixtures, transactions, weekFetches, bracketIngest);
+                weekPoints, fixtures, transactions, weekFetches, bracketIngest,
+                mock(com.ballknowers.draftsim.store.RosterFptsSnapshotRepository.class));
         lenient().when(leagues.upsert(any(), anyInt(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
                 .thenReturn(55L);
         lenient().when(sleeper.leagueUsers(anyString())).thenReturn(List.of(

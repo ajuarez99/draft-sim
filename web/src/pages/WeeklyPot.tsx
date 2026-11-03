@@ -201,6 +201,9 @@ function Standings({ balances }: { balances: WeeklyPotBalance[] }) {
   )
 }
 
+const FEED_NOTE =
+  'Scored from Sleeper’s public matchup feed, which can differ from Sleeper’s official standings. Weeks without a * use the official totals.'
+
 function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: number) => string }) {
   const newestFirst = [...weeks].sort((a, b) => b.week - a.week)
   return (
@@ -229,7 +232,14 @@ function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: numb
                   {w.winners.map(nameOf).join(' & ')}
                   {w.winners.length > 1 && <span className="wp-tie">Tie</span>}
                 </span>
-                <span className="wp-week-pts">{w.winningPoints?.toFixed(2)}</span>
+                <span className="wp-week-pts">
+                  {w.winningPoints?.toFixed(2)}
+                  {w.scoreSource === 'FEED' && (
+                    <span className="wp-feed" title={FEED_NOTE}>
+                      *
+                    </span>
+                  )}
+                </span>
                 <span className="wp-week-margin muted">{isTie ? 'tied' : margin != null ? `+${margin} over 2nd` : ''}</span>
                 <span className="wp-week-pot">{money(w.potCents)}</span>
               </li>
@@ -237,6 +247,7 @@ function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: numb
           })}
         </ul>
       )}
+      {weeks.some((w) => w.scoreSource === 'FEED') && <p className="wp-feed-note muted">* {FEED_NOTE}</p>}
     </section>
   )
 }

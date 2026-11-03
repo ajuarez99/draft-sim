@@ -8,6 +8,7 @@ import com.ballknowers.draftsim.store.LeagueMemberRepository;
 import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.LeagueWeekFetchRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
+import com.ballknowers.draftsim.store.RosterFptsSnapshotRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
 import org.slf4j.Logger;
@@ -58,6 +59,7 @@ public class LeagueHistoryIngestService {
     private final TransactionIngestService transactions;
     private final LeagueWeekFetchRepository weekFetches;
     private final BracketIngestService bracketIngest;
+    private final RosterFptsSnapshotRepository fptsSnapshots;
 
     public LeagueHistoryIngestService(SleeperClient sleeper, LeagueRepository leagues,
                                       ManagerRepository managers, LeagueMemberRepository leagueMembers,
@@ -65,7 +67,8 @@ public class LeagueHistoryIngestService {
                                       LeagueMatchupRepository fixtures,
                                       TransactionIngestService transactions,
                                       LeagueWeekFetchRepository weekFetches,
-                                      BracketIngestService bracketIngest) {
+                                      BracketIngestService bracketIngest,
+                                      RosterFptsSnapshotRepository fptsSnapshots) {
         this.sleeper = sleeper;
         this.leagues = leagues;
         this.managers = managers;
@@ -76,6 +79,7 @@ public class LeagueHistoryIngestService {
         this.transactions = transactions;
         this.weekFetches = weekFetches;
         this.bracketIngest = bracketIngest;
+        this.fptsSnapshots = fptsSnapshots;
     }
 
     public record Result(int seasons, int rostersUpserted, int weeksIngested, int fixturesIngested,
@@ -217,7 +221,36 @@ public class LeagueHistoryIngestService {
                     rosterPlayers(roster), fetchedAt));
         }
         rosterSeasons.upsertAll(rows);
+        snapshotFpts(leagueId, league, rows);
         return rows.size();
+    }
+
+    /**
+     * claude/official-week-scores.md: the same /rosters read, kept per scored leg so consecutive legs can be
+     * differenced into official week scores. Only for regular-season legs: whether {@code fpts} counts
+     * playoff weeks was never measured, so those legs are not captured rather than guessed at.
+     */
+    private void snapshotFpts(long leagueId, Map<String, Object> league, List<RosterSeasonRepository.Upsert> rows) {
+        Map<String, Object> settings = asMap(league.get("settings"));
+        int lastScoredLeg = LeagueMapper.asInt(settings.get("last_scored_leg"), 0);
+        int playoffWeekStart = LeagueMapper.asInt(settings.get("playoff_week_start"), 0);
+        if (!fptsSnapshotLeg(lastScoredLeg, playoffWeekStart)) return;
+        List<RosterFptsSnapshotRepository.Snapshot> snaps = new ArrayList<>();
+        for (RosterSeasonRepository.Upsert r : rows) {
+            if (r.pointsFor() == null) continue;
+            snaps.add(new RosterFptsSnapshotRepository.Snapshot(r.rosterId(), cents(r.pointsFor()),
+                    r.pointsAgainst() == null ? null : cents(r.pointsAgainst())));
+        }
+        fptsSnapshots.upsertAll(leagueId, lastScoredLeg, snaps);
+    }
+
+    /** A leg is captured when it is scored and before the playoffs; an unknown playoff start captures nothing. */
+    static boolean fptsSnapshotLeg(int lastScoredLeg, int playoffWeekStart) {
+        return lastScoredLeg >= 1 && playoffWeekStart > 0 && lastScoredLeg < playoffWeekStart;
+    }
+
+    private static java.math.BigDecimal cents(double points) {
+        return java.math.BigDecimal.valueOf(points).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     /**
