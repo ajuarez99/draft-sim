@@ -243,6 +243,7 @@ draftsim:
   # a string. An empty or missing list means "exclude nothing".
   nba-games:
     excluded-game-ids:
+      - "20231209_LAL_IND"       # 2023-24 Cup final, IND v LAL (2023-12-09); id read from Sleeper /stats/nba/2023/7
       - "20241217_OKC_MIL"       # 2024-25 Cup final, OKC v MIL (2024-12-17)
       - "1305814461864501248"    # 2025-26 Cup final, NYK v SAS (2025-12-16)
 

@@ -37,7 +37,7 @@ class NbaGamePropertiesTest {
         assertTrue(f.exists(), "config/weights.yml not found from " + new File(".").getAbsolutePath());
         List<PropertySource<?>> loaded = new YamlPropertySourceLoader().load("weights", new FileSystemResource(f));
         NbaGameProperties p = bind(loaded.get(0));
-        assertEquals(List.of("20241217_OKC_MIL", "1305814461864501248"), p.excludedGameIds());
+        assertEquals(List.of("20231209_LAL_IND", "20241217_OKC_MIL", "1305814461864501248"), p.excludedGameIds());
         assertTrue(p.excludedGameIdSet().contains("1305814461864501248"), "the numeric-looking id stays a string");
     }
 }

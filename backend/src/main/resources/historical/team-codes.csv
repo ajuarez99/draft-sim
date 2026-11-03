@@ -1,0 +1,15 @@
+# Spec 053 (historical draft game), plan-review F17. Kaggle's box-score file and season file use different
+# codes for some franchises; this maps the box-score code to the season-file code. Codes not listed here
+# are assumed identical. Extend from the import report. Lines starting with '#' are comments.
+box_code,season_code
+BKN,BRK
+BLT,BAL
+GOS,GSW
+PHL,PHI
+PHX,PHO
+SAN,SAS
+UTH,UTA
+WAS,WSB
+CHA,CHO
+KCK,KCO
+NOK,NOH

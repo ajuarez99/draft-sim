@@ -78,27 +78,44 @@ public class RealizedLineupService {
         // the draft board: the board is a forward-looking artifact and a
         // player who has left it can still have scored in week 3. Filtering by
         // it here would silently shrink a realized lineup.
-        record Scored(Player player, double points) {}
-        List<Scored> scored = new ArrayList<>(raw.size());
+        List<ScoredPlayer> scored = new ArrayList<>(raw.size());
         for (Map.Entry<String, Object> e : raw.entrySet()) {
             Player p = playersBySleeperId.get(e.getKey());
             if (p == null) continue;
             if (!(e.getValue() instanceof Number n)) continue;
-            scored.add(new Scored(p, n.doubleValue()));
+            scored.add(new ScoredPlayer(p, n.doubleValue()));
         }
         if (scored.isEmpty()) {
             return WeekLineup.absent("no scored players on this roster could be resolved");
         }
+        return bestLineup(scored, settings, rules);
+    }
+
+    /** One player and the points he put up in the week being valued. */
+    public record ScoredPlayer(Player player, double points) {}
+
+    /**
+     * The optimal lineup for already-resolved (player, points) pairs. The one implementation: the JSON entry
+     * point above resolves its ids and delegates here, and the historical draft game (spec 053) calls it
+     * directly with per-player weekly best-game scores.
+     *
+     * <p>Ties on points break by player id ascending (spec 053 plan F20), so the same input always seats the
+     * same lineup whatever order it arrived in. An empty list is a valid week of zero, not an absent one:
+     * the caller decides whether "nobody scored" means absent, as the JSON path does.
+     */
+    public WeekLineup bestLineup(List<ScoredPlayer> scoredIn, LeagueSettings settings, SportRules rules) {
+        List<ScoredPlayer> scored = new ArrayList<>(scoredIn);
 
         // Highest scorer first. The rank becomes the synthetic adp below so
         // RosterState's per-position ordering matches the ordering the value
         // function will impose anyway -- see the note on adp in toRoster.
-        scored.sort(Comparator.comparingDouble(Scored::points).reversed());
+        scored.sort(Comparator.comparingDouble(ScoredPlayer::points).reversed()
+                .thenComparingLong(s -> s.player().id()));
 
         RosterState roster = new RosterState();
         Map<Long, Double> pointsByPlayerId = new java.util.HashMap<>();
         int rank = 1;
-        for (Scored s : scored) {
+        for (ScoredPlayer s : scored) {
             // adp is a RANK here, not a draft position. RosterState keeps each
             // position's list sorted by adp ascending, and startingLineup
             // re-sorts by the supplied value function regardless -- so adp only

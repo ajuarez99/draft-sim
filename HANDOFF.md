@@ -1,5 +1,31 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-11-02: spec 053 (Time Machine, historical draft game) built; NOT committed, NOT deployed, NOT browser-verified
+
+- **What:** backend `historical/*` plus `api/Historical*Controller`, migration V43, resources in `historical/`, and the
+  web pages `HistoricalDraft` / `HistoricalRoom` (rail entry "Time Machine"). Docs: `specs/053-historical-draft-game/`
+  (`research-notes.md` has every measurement). Lives in worktree `.claude/worktrees/053-historical-draft-game`, branch
+  `053-historical-draft-game`, uncommitted.
+- **Verified:** full backend suite against a scratch Postgres on 5438 and the web type check, vitest and build (see
+  `research-notes.md` and `tasks.md` T029). Import of all 58 seasons ran locally (~2 min); game create and final pick
+  measured at 100 to 750 ms. SC-005 source parity for 2018-19: 99.2% of players within 0.5 pts. **Not verified:** a
+  real browser session, Railway, or concurrent users.
+- **Deploy order:** backend first (applies V43), then web. Then run the import once as admin:
+  `POST /api/admin/historical/import {"part":"ALL"}` with `X-Admin-Token`, and poll
+  `GET /api/admin/historical/import/{jobId}`. **Run `VACUUM` on the `historical_*` tables after any re-import** (the
+  per-season replace leaves dead tuples; 397 MB unvacuumed vs ~173 MB true locally). **Check the Railway volume has
+  room first** (~173 MB measured locally, up to ~290 MB true mid-reimport); Railway itself was not measured.
+- **Allan to accept before production (provenance):** the Kaggle dataset is CC0, but its season file is
+  Basketball-Reference-shaped and its box scores came via NBA.com. We rely on the uploader's licence.
+- **Known gaps, none hidden:** Sleeper ADP failed the leak check, so every season uses the fallback ranking.
+  (The All-Star/Rising Stars/Cup-final defect found by the parity run is FIXED by the code-review pass: the Sleeper
+  import drops exhibition games with `ScheduleGridService.exhibitionGames` and Cup finals with `weights.yml`
+  `excluded-game-ids`; re-measured 99.2% as imported.) **Do not run a historical re-import while games are
+  DRAFTING:** a re-import that re-keys a person makes that game fail at its last pick with a 409 ("re-imported while
+  this game was in progress") instead of scoring him 0. Smaller gaps: Charles Jones
+  1988-89 (96 game rows left off), no box rows for Loy Vaught 1990-95 and Ed O'Bannon 1995-96, Johnson/Smith-style
+  same-name people are curated by hand in `historical-same-name.csv`. Full list in `research-notes.md`.
+
 ## UPDATE 2026-10-28: spec 052 (site analytics) built; NOT committed, NOT verified in a browser or on production
 
 - **What:** cookie-free usage counts via Umami Cloud, front end only (`web/src/analytics.ts`; hooks in `AppShell`,

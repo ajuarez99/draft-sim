@@ -4413,3 +4413,185 @@ export const saveWeeklyPotSettings = (
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(json<WeeklyPot>)
+
+// --- spec 053: historical draft game ---------------------------------------------------------------
+// Mirrors historical/HistoricalPlayerCard, HistoricalGameState and HistoricalResult (Java records), field for
+// field, and api/HistoricalGameController's SeasonSummary. While a game is DRAFTING nothing from the drafted
+// season's own statistics is in any of it (FR-003): cards carry a PRIOR season's line only.
+
+/** A prior-season line: counted counting stats only, bonuses excluded (plan F12). */
+export type HistoricalPrior = {
+  /** Which season these numbers are from, e.g. "1994-95". */
+  seasonLabel: string
+  games: number
+  /** Only the stats the drafted season counts (pts, reb, ast, ...). */
+  perGame: Record<string, number>
+  fantasyPoints: number
+  /** The season the ranking used (the better of the last two), or null when no prior season qualified. */
+  bestOfTwo: string | null
+}
+
+export type HistoricalPlayerCard = {
+  id: number
+  name: string
+  /** Engine positions: PG, SG, SF, PF, C. */
+  positions: string[]
+  /** The PRIOR season's team; null for a rookie. */
+  team: string | null
+  /** The prior season's age; null for a rookie. */
+  age: number | null
+  /** 1 = best. Ranked by last season's points, never ADP. */
+  rank: number
+  positionalRank: number
+  /** Null for a player with no prior line (a rookie). */
+  prior: HistoricalPrior | null
+}
+
+export type HistoricalSeasonView = {
+  label: string
+  countedStats: string[]
+  excludedStats: Record<string, string>
+  /** Share of played box-score rows carrying each stat, 0..1. */
+  statCoverage: Record<string, number>
+  rankingSource: string
+  rankingLabel: string
+  settingsSource: string
+}
+
+export type HistoricalPickView = {
+  pickNo: number
+  round: number
+  draftSlot: number
+  seatType: 'USER' | 'BOT'
+  player: HistoricalPlayerCard | null
+}
+
+export type HistoricalMatchup = { homeSlot: number; awaySlot: number; homePoints: number; awayPoints: number }
+/** startDate is null only if no board player played that week. */
+export type HistoricalWeek = { week: number; startDate: string | null; matchups: HistoricalMatchup[] }
+export type HistoricalStanding = {
+  slot: number
+  wins: number
+  losses: number
+  ties: number
+  pointsFor: number
+  place: number
+}
+/** gameDate is the date of the single game that was locked for this starter that week. */
+export type HistoricalStarter = { playerId: number; slot: string; points: number; gameDate: string | null }
+export type HistoricalLineupWeek = { week: number; starters: HistoricalStarter[] }
+export type HistoricalHindsightPick = { pickNo: number; player: HistoricalPlayerCard; seasonValue: number }
+/** Greedy, lineup-aware, bots unchanged. userBeatIt = hindsight scored LESS than you: show that, not a negative gap. */
+export type HistoricalHindsight = {
+  label: string
+  pointsFor: number
+  userPointsFor: number
+  userBeatIt: boolean
+  picks: HistoricalHindsightPick[]
+}
+export type HistoricalBust = {
+  pickNo: number
+  player: HistoricalPlayerCard
+  /** Rank by season value among all 168 drafted players. */
+  seasonValueRank: number
+  seasonValue: number
+}
+export type HistoricalSteal = {
+  pickNo: number
+  taken: HistoricalPlayerCard
+  takenValue: number
+  passedOn: HistoricalPlayerCard
+  passedOnValue: number
+}
+
+/** Frozen at the last pick; present only when status is COMPLETE. */
+export type HistoricalResult = {
+  weeks: HistoricalWeek[]
+  standings: HistoricalStanding[]
+  userFinish: number
+  /** Keyed by draft slot as a string; v1 stores only the user's own. */
+  lineups: Record<string, HistoricalLineupWeek[]>
+  hindsight: HistoricalHindsight
+  biggestBust: HistoricalBust | null
+  bestStealPassedOn: HistoricalSteal | null
+}
+
+export type HistoricalGameState = {
+  id: number
+  status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED'
+  season: HistoricalSeasonView
+  teams: number
+  rounds: number
+  rosterPositions: string[]
+  userSlot: number
+  myPicks: number[]
+  currentPickNo: number
+  /** Null once the game is no longer DRAFTING. */
+  onTheClockSlot: number | null
+  isUsersTurn: boolean
+  picks: HistoricalPickView[]
+  /** Rank order, best first; empty once the game is no longer DRAFTING. */
+  available: HistoricalPlayerCard[]
+  result: HistoricalResult | null
+}
+
+export type HistoricalGameSummary = {
+  id: number
+  seasonLabel: string
+  status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED'
+  userSlot: number
+  /** Your place in the final standings; null until COMPLETE. */
+  finish: number | null
+  /** ISO timestamp. */
+  createdAt: string
+}
+
+/** One offered season, for the "about this game" panel (GET /api/history/seasons). */
+export type HistoricalSeasonSummary = {
+  seasonStart: number
+  label: string
+  source: 'KAGGLE' | 'SLEEPER'
+  countedStats: string[]
+  excludedStats: Record<string, string>
+  statCoverage: Record<string, number>
+  rankingSource: string
+  settingsSource: string
+}
+
+export const historicalSeasons = () =>
+  apiFetch('/api/history/seasons').then(json<HistoricalSeasonSummary[]>)
+
+/** Starts a game on a random season; `userSlot` (1..12) is random when omitted. Bots are already at your first turn. */
+export const startHistoricalGame = (userSlot?: number) =>
+  apiFetch('/api/history/games', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userSlot != null ? { userSlot } : {}),
+  }).then(json<HistoricalGameState>)
+
+export const listHistoricalGames = () =>
+  apiFetch('/api/history/games').then(json<HistoricalGameSummary[]>)
+
+export const getHistoricalGame = (id: number) =>
+  apiFetch(`/api/history/games/${id}`).then(json<HistoricalGameState>)
+
+export const historicalPick = (id: number, playerId: number) =>
+  apiFetch(`/api/history/games/${id}/pick`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ playerId }),
+  }).then(json<HistoricalGameState>)
+
+/** PICK makes your one pick for you; FINISH makes every remaining pick and replays the season. */
+export const historicalAuto = (id: number, scope: 'PICK' | 'FINISH') =>
+  apiFetch(`/api/history/games/${id}/auto`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scope }),
+  }).then(json<HistoricalGameState>)
+
+/** 204 on success; a game that is not DRAFTING is a 409 (thrown), someone else's a 404. */
+export const abandonHistoricalGame = (id: number) =>
+  apiFetch(`/api/history/games/${id}/abandon`, { method: 'POST' }).then(async (res) => {
+    if (!res.ok) throw await apiError(res)
+  })

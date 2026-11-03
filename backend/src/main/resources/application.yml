@@ -100,3 +100,33 @@ refresh:
     enabled: true
   # Blank means the daily route does not exist (research R8).
   secret: ${REFRESH_SECRET:}
+
+# Historical draft game (specs/053-historical-draft-game). The import downloads the pinned Kaggle zip
+# once, from an admin call, never on a user request; the SHA-256 is checked whatever URL is used.
+historical:
+  kaggle-zip-url: ${HISTORICAL_KAGGLE_ZIP_URL:https://www.kaggle.com/api/v1/datasets/download/loganlauton/nba-players-and-team-data?datasetVersionNumber=2}
+  kaggle-zip-sha256: 7a127548ce7143e85540ea899c93bada25a5944344d7adb4cfc89645ef3d46a4
+  era-threshold: 0.90        # hand-set (spec 053 FR-007, Allan 2026-11-02), not fitted
+  rank-standard-games: 72    # hand-set (F6)
+  rank-min-games: 20         # hand-set (F6)
+  rank-lookback-seasons: 3   # hand-set (spec 053 F6 amended at build: 2 seasons missed Jordan 1995-96, whose last qualifying season was 1992-93)
+  teams: 12
+  rounds: 14
+  reversal-round: 0          # Sleeper default: plain snake (F8)
+  # Legacy Ball Knowers league scoring (FR-002, O1)
+  scoring:
+    pts: 0.5
+    reb: 1
+    ast: 1
+    stl: 2
+    blk: 2
+    to: -1
+    tpm: 0.5
+    dd: 1
+    td: 2
+    bonus_pt_40p: 2
+    bonus_pt_50p: 2
+    bonus_reb_20p: 1
+    bonus_ast_15p: 1
+    tf: -2
+    ff: -2

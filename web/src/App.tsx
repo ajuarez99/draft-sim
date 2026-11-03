@@ -8,6 +8,8 @@ import LiveDraftView from './pages/LiveDraftView'
 import MockSetup from './pages/MockSetup'
 import MockDraftView from './pages/MockDraftView'
 import ManagerTendencies from './pages/ManagerTendencies'
+import HistoricalDraft from './pages/HistoricalDraft'
+import HistoricalRoom from './pages/HistoricalRoom'
 import LeagueHome from './pages/LeagueHome'
 import LeagueHistory from './pages/LeagueHistory'
 import PowerRankings from './pages/PowerRankings'
@@ -68,6 +70,12 @@ function KeyedLiveDraftView() {
 function KeyedMockDraftView() {
   const { sessionId } = useParams<{ sessionId: string }>()
   return <MockDraftView key={sessionId} />
+}
+
+// Spec 053: same reason for the historical room -- a param-only change must not keep the old game's state alive.
+function KeyedHistoricalRoom() {
+  const { gameId } = useParams<{ gameId: string }>()
+  return <HistoricalRoom key={gameId} />
 }
 
 // One generic remount wrapper for every /leagues/:sleeperLeagueId/* page. The
@@ -131,6 +139,8 @@ export default function App() {
               <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
               <Route path="/mock/new" element={<MockSetup />} />
               <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
+              <Route path="/history" element={<HistoricalDraft />} />
+              <Route path="/history/:gameId" element={<KeyedHistoricalRoom />} />
               <Route path="/managers" element={<ManagerTendencies />} />
               <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
               {/* specs/006-deeper-history-both-sports US4: manager-scoped, not

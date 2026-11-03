@@ -111,6 +111,7 @@ export default function Rail({
   // over from the header nav this replaces.
   const onHome = location.pathname === '/'
   const onManagers = location.pathname.startsWith('/managers')
+  const onHistory = location.pathname.startsWith('/history')
 
   return (
     <nav className={`app-rail${collapsed ? ' collapsed' : ''}`} aria-label="Main">
@@ -181,6 +182,12 @@ export default function Rail({
             ●
           </span>
           <span className="app-rail-row-label">Managers</span>
+        </Link>
+        <Link to="/history" className={`app-rail-row${onHistory ? ' on' : ''}`} title="Time Machine" aria-label="Time Machine">
+          <span className="app-rail-glyph" aria-hidden="true">
+            ↺
+          </span>
+          <span className="app-rail-row-label">Time Machine</span>
         </Link>
         <button
           type="button"

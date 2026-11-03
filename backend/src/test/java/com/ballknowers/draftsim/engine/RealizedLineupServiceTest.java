@@ -196,4 +196,39 @@ class RealizedLineupServiceTest {
         assertEquals(30.0, w.points(), 1e-9);
         assertEquals(2, w.lineup().size());
     }
+
+    /**
+     * Spec 053 T005: the JSON entry point and the resolved-pairs entry point are one implementation, so
+     * the same input gives the same total and the same seated players, whatever order the pairs arrive in.
+     */
+    @Test
+    void bothEntryPointsGiveTheSameLineup() {
+        nba("pg1", "PG One", List.of(Position.PG));
+        nba("sg1", "SG One", List.of(Position.SG, Position.PG));
+        nba("sf1", "SF One", List.of(Position.SF));
+        nba("pf1", "PF One", List.of(Position.PF, Position.C));
+        nba("c1", "C One", List.of(Position.C));
+        nba("c2", "C Two", List.of(Position.C));
+        Map<String, Double> pts = Map.of("pg1", 30.0, "sg1", 28.0, "sf1", 26.0, "pf1", 24.0, "c1", 22.0, "c2", 22.0);
+        String blob = "{\"pg1\":30.0,\"sg1\":28.0,\"sf1\":26.0,\"pf1\":24.0,\"c1\":22.0,\"c2\":22.0}";
+
+        RealizedLineupService.WeekLineup viaJson = service.bestLineup(blob, nbaPlayers, NBA, basketball);
+
+        List<RealizedLineupService.ScoredPlayer> pairs = new java.util.ArrayList<>();
+        for (Map.Entry<String, Double> e : pts.entrySet()) {
+            pairs.add(new RealizedLineupService.ScoredPlayer(nbaPlayers.get(e.getKey()), e.getValue()));
+        }
+        RealizedLineupService.WeekLineup direct = service.bestLineup(pairs, NBA, basketball);
+        java.util.Collections.reverse(pairs);
+        RealizedLineupService.WeekLineup reversed = service.bestLineup(pairs, NBA, basketball);
+
+        assertEquals(viaJson.points(), direct.points(), 1e-9);
+        assertEquals(direct.points(), reversed.points(), 1e-9);
+        assertEquals(seatedIds(viaJson), seatedIds(direct));
+        assertEquals(seatedIds(direct), seatedIds(reversed), "input order must not change who is seated");
+    }
+
+    private static List<Long> seatedIds(RealizedLineupService.WeekLineup w) {
+        return w.lineup().stream().map(a -> a.entry().player().id()).sorted().toList();
+    }
 }

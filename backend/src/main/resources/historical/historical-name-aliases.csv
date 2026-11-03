@@ -1,0 +1,430 @@
+# Spec 053 (historical draft game), research R5. Maps a name as the Kaggle BOX-SCORE file spells it to the
+# name as the SEASON file spells it, for the season where the two disagree. The importer normalises both
+# (accents, punctuation, case) before comparing, so only genuinely different spellings belong here.
+# Lines starting with '#' are comments. Curate locally until the import report has no unmatched names.
+# Each row below was added by the T019 curation run (2026-11-02) on evidence, never by name alone. A row is
+# written only when the box-score name has no season-file row that season AND exactly one season-file player of
+# that season (not already matched by a box name) has: (a) a name that is a spelling or nickname variant
+# (similarity >= 0.45 on normalised names, then eyeballed), (b) a team equal to every team the box rows show
+# (after team-codes.csv) and (c) a season-file G within 3 of the box played-game count. Rows whose names are
+# far apart (Double D Davis = Dwight Davis, Pooh Jeter = Eugene Jeter, ...) were each read against team, G and
+# age in neighbouring seasons. Seven rows (Thomas Barr, Emmette Bryant, Edward Davis 1972, John Clemens 1973,
+# Johnny Warren 1973, Peter Verhoeven, Roger Mason Jr.) had a games gap or a second plausible candidate and were
+# decided by hand: see specs/053-historical-draft-game/research-notes.md.
+season_end,box_name,season_name
+1970,Alvin Attles,Al Attles
+1970,Arthur Williams,Art Williams
+1970,Carlos Ogden,Bud Ogden
+1970,Eldo Garrett,Dick Garrett
+1970,Emmette Bryant,Em Bryant
+1970,John Clemens,Barry Clemens
+1970,Johnny Warren,John Warren
+1970,Jojo White,Jo Jo White
+1970,Lucious Jackson,Luke Jackson
+1970,Luke Rackley,Luther Rackley
+1970,Thomas Sanders,Tom Sanders
+1970,Wilmer Hosket,Bill Hosket
+1971,Alvin Attles,Al Attles
+1971,Alvin Holt,A.W. Holt
+1971,Arthur Williams,Art Williams
+1971,Carlos Ogden,Bud Ogden
+1971,Eldo Garrett,Dick Garrett
+1971,Emmette Bryant,Em Bryant
+1971,Ernie Killum,Earnie Killum
+1971,Garfield Heard,Gar Heard
+1971,John Clemens,Barry Clemens
+1971,Johnny Warren,John Warren
+1971,Jojo White,Jo Jo White
+1971,Lucious Jackson,Luke Jackson
+1971,Luke Rackley,Luther Rackley
+1971,Nate Archibald,Tiny Archibald
+1971,Thomas Barr,Moe Barr
+1971,Thomas Sanders,Tom Sanders
+1971,Wilmer Hosket,Bill Hosket
+1972,Arthur Williams,Art Williams
+1972,Bill Smith,William Smith
+1972,Chuck Lowery,Charlie Lowery
+1972,Dennis Layton,Mo Layton
+1972,Eldo Garrett,Dick Garrett
+1972,Emmette Bryant,Em Bryant
+1972,Garfield Heard,Gar Heard
+1972,John Clemens,Barry Clemens
+1972,Johnny Warren,John Warren
+1972,Jojo White,Jo Jo White
+1972,Lucious Jackson,Luke Jackson
+1972,Luke Rackley,Luther Rackley
+1972,Nate Archibald,Tiny Archibald
+1972,Thomas Sanders,Tom Sanders
+1972,Wilmer Hosket,Bill Hosket
+1973,Arthur Williams,Art Williams
+1973,Bill Smith,William Smith
+1973,Charlie Johnson,Charles Johnson
+1973,Dennis Layton,Mo Layton
+1973,Double D Davis,Dwight Davis
+1973,Edward Davis,Mickey Davis
+1973,Eldo Garrett,Dick Garrett
+1973,Emanuel Leaks,Manny Leaks
+1973,Fred Boyd,Freddie Boyd
+1973,Garfield Heard,Gar Heard
+1973,Isaac Stallworth,Bud Stallworth
+1973,John Clemens,Barry Clemens
+1973,Johnny Warren,John Warren
+1973,Jojo White,Jo Jo White
+1973,Luke Rackley,Luther Rackley
+1973,Nate Archibald,Tiny Archibald
+1973,Russell Lee,Russ Lee
+1973,Thomas Sanders,Tom Sanders
+1973,Tommy Patterson,Tom Patterson
+1974,Arthur Williams,Art Williams
+1974,Charlie Johnson,Charles Johnson
+1974,Dennis Layton,Mo Layton
+1974,Double D Davis,Dwight Davis
+1974,Edward Davis,Mickey Davis
+1974,Eldo Garrett,Dick Garrett
+1974,Emanuel Leaks,Manny Leaks
+1974,Fred Boyd,Freddie Boyd
+1974,Garfield Heard,Gar Heard
+1974,Isaac Stallworth,Bud Stallworth
+1974,John Clemens,Barry Clemens
+1974,Johnny Warren,John Warren
+1974,Jojo White,Jo Jo White
+1974,Luke Rackley,Luther Rackley
+1974,Nate Archibald,Tiny Archibald
+1974,Russell Lee,Russ Lee
+1974,Tommy Patterson,Tom Patterson
+1975,Charlie Johnson,Charles Johnson
+1975,Daniel Anderson,Dan Anderson
+1975,Double D Davis,Dwight Davis
+1975,Edward Davis,Mickey Davis
+1975,Fred Boyd,Freddie Boyd
+1975,Garfield Heard,Gar Heard
+1975,Isaac Stallworth,Bud Stallworth
+1975,John Clemens,Barry Clemens
+1975,Jojo White,Jo Jo White
+1975,Nate Archibald,Tiny Archibald
+1975,Russell Lee,Russ Lee
+1975,Talvin Skinner,Tal Skinner
+1976,Charles Kupec,C.J. Kupec
+1976,Charlie Johnson,Charles Johnson
+1976,Daniel Anderson,Dan Anderson
+1976,Double D Davis,Dwight Davis
+1976,Edward Davis,Mickey Davis
+1976,Fred Boyd,Freddie Boyd
+1976,Garfield Heard,Gar Heard
+1976,Isaac Stallworth,Bud Stallworth
+1976,John Clemens,Barry Clemens
+1976,Jojo White,Jo Jo White
+1976,Nate Archibald,Tiny Archibald
+1976,Robert Hawkins,Bubbles Hawkins
+1976,Talvin Skinner,Tal Skinner
+1976,World Free,World B. Free
+1977,Charles Kupec,C.J. Kupec
+1977,Charlie Johnson,Charles Johnson
+1977,Dennis Layton,Mo Layton
+1977,Double D Davis,Dwight Davis
+1977,Edward Davis,Mickey Davis
+1977,Eugene Kennedy,Goo Kennedy
+1977,Fred Boyd,Freddie Boyd
+1977,Garfield Heard,Gar Heard
+1977,Isaac Stallworth,Bud Stallworth
+1977,Jojo White,Jo Jo White
+1977,Lou Dampier,Louie Dampier
+1977,Luther Burden,Ticky Burden
+1977,Nate Archibald,Tiny Archibald
+1977,Robert Hawkins,Bubbles Hawkins
+1977,Roland Taylor,Fatty Taylor
+1977,Ted 'Hound Dog' McClain,Ted McClain
+1977,William Averitt,Bird Averitt
+1977,World Free,World B. Free
+1978,Charles Kupec,C.J. Kupec
+1978,Charlie Johnson,Charles Johnson
+1978,Dennis Layton,Mo Layton
+1978,Eric Marsh,Ricky Marsh
+1978,Fred Boyd,Freddie Boyd
+1978,Garfield Heard,Gar Heard
+1978,Joey Hassett,Joe Hassett
+1978,Jojo White,Jo Jo White
+1978,Lou Dampier,Louie Dampier
+1978,Luther Burden,Ticky Burden
+1978,Robert Hawkins,Bubbles Hawkins
+1978,Ted 'Hound Dog' McClain,Ted McClain
+1978,William Averitt,Bird Averitt
+1978,World Free,World B. Free
+1979,Charlie Johnson,Charles Johnson
+1979,Garfield Heard,Gar Heard
+1979,Jeffrey Crompton,Geoff Crompton
+1979,Joey Hassett,Joe Hassett
+1979,Jojo White,Jo Jo White
+1979,Lou Dampier,Louie Dampier
+1979,Nate Archibald,Tiny Archibald
+1979,Robert Hawkins,Bubbles Hawkins
+1979,Sammy Smith,Sam Smith
+1979,Ted 'Hound Dog' McClain,Ted McClain
+1979,Tommy Green,Tommie Green
+1979,World Free,World B. Free
+1980,Billyray Bates,Billy Ray Bates
+1980,Cliff T. Robinson,Cliff Robinson
+1980,David Greenwood,Dave Greenwood
+1980,Don Williams,Duck Williams
+1980,Garfield Heard,Gar Heard
+1980,Joey Hassett,Joe Hassett
+1980,Jojo White,Jo Jo White
+1980,Lynbert Johnson,Cheese Johnson
+1980,Nate Archibald,Tiny Archibald
+1980,Roylee Hamilton,Roy Hamilton
+1980,Sammy Smith,Sam Smith
+1980,Thomas Wilson,Bubba Wilson
+1980,World Free,World B. Free
+1981,Billyray Bates,Billy Ray Bates
+1981,Charles Whitney,Hawkeye Whitney
+1981,Cliff T. Robinson,Cliff Robinson
+1981,David Britton,Dave Britton
+1981,David Greenwood,Dave Greenwood
+1981,Ed Lawrence,Edmund Lawrence
+1981,Garfield Heard,Gar Heard
+1981,Jamesearl Ray,James Ray
+1981,Jeffrey Crompton,Geoff Crompton
+1981,Joey Hassett,Joe Hassett
+1981,Jojo White,Jo Jo White
+1981,Nate Archibald,Tiny Archibald
+1981,Ron Valentine,Ronnie Valentine
+1981,Roylee Hamilton,Roy Hamilton
+1981,World Free,World B. Free
+1982,Billyray Bates,Billy Ray Bates
+1982,Charles Whitney,Hawkeye Whitney
+1982,Charlie Davis,Charles Davis
+1982,Cliff T. Robinson,Cliff Robinson
+1982,Dan Schayes,Danny Schayes
+1982,David Greenwood,Dave Greenwood
+1982,Jamesearl Ray,James Ray
+1982,Jeffrey Crompton,Geoff Crompton
+1982,Joey Hassett,Joe Hassett
+1982,Nate Archibald,Tiny Archibald
+1982,Peter Verhoeven,Pete Verhoeven
+1982,Petur Gudmundsson,Pétur Guðmundsson
+1982,Samuel Williams,Sam Williams
+1982,World Free,World B. Free
+1983,Billyray Bates,Billy Ray Bates
+1983,Charlie Davis,Charles Davis
+1983,Charlie Pittman,Charles Pittman
+1983,Cliff T. Robinson,Cliff Robinson
+1983,Dan Schayes,Danny Schayes
+1983,David Greenwood,Dave Greenwood
+1983,Edmund Sherod,Ed Sherod
+1983,Jamesearl Ray,James Ray
+1983,Jeffrey Crompton,Geoff Crompton
+1983,Joey Hassett,Joe Hassett
+1983,John Cox,Chubby Cox
+1983,Lafayette Lever,Fat Lever
+1983,Michael Davis,Mike Davis
+1983,Mitchell Anderson,J.J. Anderson
+1983,Nate Archibald,Tiny Archibald
+1983,Peter Verhoeven,Pete Verhoeven
+1983,Samuel Williams,Sam Williams
+1983,Willie Jones,Hutch Jones
+1983,World Free,World B. Free
+1984,Charlie Davis,Charles Davis
+1984,Charlie Pittman,Charles Pittman
+1984,Cliff T. Robinson,Cliff Robinson
+1984,Dan Schayes,Danny Schayes
+1984,David Greenwood,Dave Greenwood
+1984,Jeffrey Crompton,Geoff Crompton
+1984,Lafayette Lever,Fat Lever
+1984,Mike Wilson,Michael Wilson
+1984,Mitchell Anderson,J.J. Anderson
+1984,Nate Archibald,Tiny Archibald
+1984,Peter Verhoeven,Pete Verhoeven
+1984,Samuel Williams,Sam Williams
+1984,Willie Jones,Hutch Jones
+1984,World Free,World B. Free
+1985,Charlie Davis,Charles Davis
+1985,Charlie Pittman,Charles Pittman
+1985,Cliff T. Robinson,Cliff Robinson
+1985,Dan Schayes,Danny Schayes
+1985,David Greenwood,Dave Greenwood
+1985,Eddielee Wilkins,Eddie Lee Wilkins
+1985,Kent Edelin,Kenton Edelin
+1985,Lafayette Lever,Fat Lever
+1985,Mel Turpin,Melvin Turpin
+1985,Mike Wilson,Michael Wilson
+1985,Mitchell Anderson,J.J. Anderson
+1985,Peter Verhoeven,Pete Verhoeven
+1985,Samuel Williams,Sam Williams
+1985,World Free,World B. Free
+1986,Charlie Davis,Charles Davis
+1986,Charlie Pittman,Charles Pittman
+1986,Cliff T. Robinson,Cliff Robinson
+1986,Dan Schayes,Danny Schayes
+1986,David Greenwood,Dave Greenwood
+1986,Lafayette Lever,Fat Lever
+1986,Mel Turpin,Melvin Turpin
+1986,Mike Phelps,Michael Phelps
+1986,Peter Verhoeven,Pete Verhoeven
+1986,Petur Gudmundsson,Pétur Guðmundsson
+1986,World Free,World B. Free
+1987,Cliff T. Robinson,Cliff Robinson
+1987,Dan Schayes,Danny Schayes
+1987,David Greenwood,Dave Greenwood
+1987,Dwayne Washington,Pearl Washington
+1987,Eddielee Wilkins,Eddie Lee Wilkins
+1987,Lafayette Lever,Fat Lever
+1987,Mel Turpin,Melvin Turpin
+1987,Mike Phelps,Michael Phelps
+1987,Mike Wilson,Michael Wilson
+1987,Mo Martin,Maurice Martin
+1987,Peter Verhoeven,Pete Verhoeven
+1987,World Free,World B. Free
+1988,Charlie Davis,Charles Davis
+1988,Cliff T. Robinson,Cliff Robinson
+1988,Dan Schayes,Danny Schayes
+1988,David Greenwood,Dave Greenwood
+1988,Dwayne Washington,Pearl Washington
+1988,Lafayette Lever,Fat Lever
+1988,Mel Turpin,Melvin Turpin
+1988,Mike Phelps,Michael Phelps
+1988,Mo Martin,Maurice Martin
+1988,Petur Gudmundsson,Pétur Guðmundsson
+1988,World Free,World B. Free
+1989,Charlie Davis,Charles Davis
+1989,Cliff T. Robinson,Cliff Robinson
+1989,Dan Schayes,Danny Schayes
+1989,David Greenwood,Dave Greenwood
+1989,Dwayne Washington,Pearl Washington
+1989,Eddielee Wilkins,Eddie Lee Wilkins
+1989,Lafayette Lever,Fat Lever
+1989,Petur Gudmundsson,Pétur Guðmundsson
+1989,Robert Lock,Rob Lock
+1989,Robert Rose,Rob Rose
+1989,Ronnie Grandison,Ron Grandison
+1989,Wayne Englestad,Wayne Engelstad
+1990,Charlie Davis,Charles Davis
+1990,Dan Schayes,Danny Schayes
+1990,David Greenwood,Dave Greenwood
+1990,Eddielee Wilkins,Eddie Lee Wilkins
+1990,Lafayette Lever,Fat Lever
+1990,Mel Turpin,Melvin Turpin
+1991,Dan Schayes,Danny Schayes
+1991,David Greenwood,Dave Greenwood
+1991,Eddielee Wilkins,Eddie Lee Wilkins
+1991,Lafayette Lever,Fat Lever
+1992,Cliff T. Robinson,Cliff Robinson
+1992,Dan Schayes,Danny Schayes
+1992,Lafayette Lever,Fat Lever
+1992,Ronnie Grandison,Ron Grandison
+1992,Stephen Bardo,Steve Bardo
+1992,Steven Smith,Steve Smith
+1993,Clar. Weatherspoon,Clarence Weatherspoon
+1993,Dan Schayes,Danny Schayes
+1993,Eddielee Wilkins,Eddie Lee Wilkins
+1993,Jojo English,Jo Jo English
+1993,Stephen Bardo,Steve Bardo
+1993,Steven Smith,Steve Smith
+1994,Clar. Weatherspoon,Clarence Weatherspoon
+1994,Dan Schayes,Danny Schayes
+1994,Jojo English,Jo Jo English
+1994,Lafayette Lever,Fat Lever
+1994,Steven Smith,Steve Smith
+1995,Clar. Weatherspoon,Clarence Weatherspoon
+1995,Dan Schayes,Danny Schayes
+1995,Jojo English,Jo Jo English
+1995,Ronnie Grandison,Ron Grandison
+1995,Steven Smith,Steve Smith
+1996,Clar. Weatherspoon,Clarence Weatherspoon
+1996,Dan Schayes,Danny Schayes
+1996,Log Vander Velden,Logan Vander Velden
+1996,Richard Manning,Rich Manning
+1996,Ronnie Grandison,Ron Grandison
+1996,Stephen Bardo,Steve Bardo
+1996,Steven Smith,Steve Smith
+1997,Clar. Weatherspoon,Clarence Weatherspoon
+1997,Dan Schayes,Danny Schayes
+1997,Ike Austin,Isaac Austin
+1997,Richard Manning,Rich Manning
+1997,Steven Smith,Steve Smith
+1998,Clar. Weatherspoon,Clarence Weatherspoon
+1998,Dan Schayes,Danny Schayes
+1998,Ike Austin,Isaac Austin
+1998,Kiwane Garris,Kiwane Lemorris Garris
+1998,Steven Smith,Steve Smith
+1999,Charles R. Jones,Charles Jones
+1999,Clar. Weatherspoon,Clarence Weatherspoon
+1999,Dan Schayes,Danny Schayes
+1999,Ike Austin,Isaac Austin
+1999,Steven Smith,Steve Smith
+2000,Charles R. Jones,Charles Jones
+2000,Clar. Weatherspoon,Clarence Weatherspoon
+2000,Ike Austin,Isaac Austin
+2000,Kiwane Garris,Kiwane Lemorris Garris
+2000,Steven Smith,Steve Smith
+2001,Clar. Weatherspoon,Clarence Weatherspoon
+2001,Ike Austin,Isaac Austin
+2001,Slava Medvedenko,Stanislav Medvedenko
+2001,Steven Smith,Steve Smith
+2002,Clar. Weatherspoon,Clarence Weatherspoon
+2002,Ike Austin,Isaac Austin
+2002,Ike Fontaine,Isaac Fontaine
+2002,Norman Richardson,Norm Richardson
+2002,Slava Medvedenko,Stanislav Medvedenko
+2002,Steven Smith,Steve Smith
+2003,Clar. Weatherspoon,Clarence Weatherspoon
+2003,Flip Murray,Ronald Murray
+2003,Roger Mason Jr.,Roger Mason
+2003,Slava Medvedenko,Stanislav Medvedenko
+2003,Steven Smith,Steve Smith
+2004,Clar. Weatherspoon,Clarence Weatherspoon
+2004,Flip Murray,Ronald Murray
+2004,Michael Sweetney,Mike Sweetney
+2004,Roger Mason Jr.,Roger Mason
+2004,Slava Medvedenko,Stanislav Medvedenko
+2004,Steven Smith,Steve Smith
+2005,Clar. Weatherspoon,Clarence Weatherspoon
+2005,Flip Murray,Ronald Murray
+2005,Ibrahim Kutluay,Ibo Kutluay
+2005,Michael Sweetney,Mike Sweetney
+2005,Slava Medvedenko,Stanislav Medvedenko
+2005,Steven Smith,Steve Smith
+2006,Flip Murray,Ronald Murray
+2006,Michael Sweetney,Mike Sweetney
+2006,Slava Medvedenko,Stanislav Medvedenko
+2007,Flip Murray,Ronald Murray
+2007,Michael Sweetney,Mike Sweetney
+2007,Roger Mason Jr.,Roger Mason
+2007,Slava Medvedenko,Stanislav Medvedenko
+2008,Flip Murray,Ronald Murray
+2008,Roger Mason Jr.,Roger Mason
+2009,Flip Murray,Ronald Murray
+2009,Roger Mason Jr.,Roger Mason
+2010,Flip Murray,Ronald Murray
+2010,Roger Mason Jr.,Roger Mason
+2011,Omer Asik,Ömer Aşık
+2011,Pooh Jeter,Eugene Jeter
+2011,Roger Mason Jr.,Roger Mason
+2012,Marcus Morris Sr.,Marcus Morris
+2012,Omer Asik,Ömer Aşık
+2012,Roger Mason Jr.,Roger Mason
+2013,Jeffery Taylor,Jeff Taylor
+2013,Marcus Morris Sr.,Marcus Morris
+2013,Omer Asik,Ömer Aşık
+2013,Perry Jones III,Perry Jones
+2013,Roger Mason Jr.,Roger Mason
+2014,Glen Rice,Glen Rice Jr.
+2014,Jeffery Taylor,Jeff Taylor
+2014,Marcus Morris Sr.,Marcus Morris
+2014,Omer Asik,Ömer Aşık
+2014,Perry Jones III,Perry Jones
+2014,Roger Mason Jr.,Roger Mason
+2014,Vitor Faverani,Vítor Luiz Faverani
+2015,Glen Rice,Glen Rice Jr.
+2015,Jeffery Taylor,Jeff Taylor
+2015,Johnny O'Bryant III,Johnny O'Bryant
+2015,Marcus Morris Sr.,Marcus Morris
+2015,Omer Asik,Ömer Aşık
+2015,Perry Jones III,Perry Jones
+2016,Johnny O'Bryant III,Johnny O'Bryant
+2016,Marcus Morris Sr.,Marcus Morris
+2016,Omer Asik,Ömer Aşık
+2016,Tibor Pleiss,Tibor Pleiß
+2017,Johnny O'Bryant III,Johnny O'Bryant
+2017,Marcus Morris Sr.,Marcus Morris
+2017,Omer Asik,Ömer Aşık
+2017,Wade Baldwin IV,Wade Baldwin
