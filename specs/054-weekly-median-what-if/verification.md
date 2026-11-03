@@ -34,7 +34,24 @@ only) depend on rows other ITs leave behind. After the fix pass the targeted sui
 (`*MedianWhatIf*`, `*LeagueHistory*`, `*ExpectedWins*`) are 0 failed, 0 skipped. Web: tsc clean,
 vitest 2733 passed, build OK.
 
-## Owed after deploy
+## Prod check (2026-11-03, after the push of 0446524)
+
+`api.ballknowers.co` history for `1339351318115946496`, read as a league member; web bundle
+`index-B-rZg_09.js` contains the new UI; page opened signed in as popsharky.
+
+| Check | Result |
+|---|---|
+| `median` block on all 3 seasons; invariants 1–3 | **PASS**, 0 violations. Response 0.63–0.67 s end to end over the internet. |
+| Re-counted vs official records (`driftGames`) | **2025: 4, 2024: 0**, exactly the 2026-10-12 measurement. The local 6/9 was the degraded re-ingest, as predicted. |
+| The answer on prod's real scores | 2025: places shuffle by up to 2 (e.g. 1 → 3, 6 → 4), nobody crosses the 6-team line. **2024: two crossings**: "Harden the Strip Club" (popsharky) 8 → 6 **would have made** the playoffs; "B Milla's Serial Killas" 6 → 8 **would have missed**. The local run showed no crossing; the degraded local scores hid this. |
+| UI on prod | "If median had been on (18/21 final wks)" groups render, with "would have made playoffs" / "would have missed playoffs" tags present. |
+| V4 (2026, median on) | **Inconclusive on data, not code.** Our median matches a re-count of prod's stored scores for 12/12 rosters. But neither source reproduces Sleeper's 2026 record: stored scores + our rule give 5/12, and **Sleeper's own `/matchups` points + our rule give 3/12** (its own h2h doesn't match either). Prod's stored 2026 week 1–2 scores differ from Sleeper's `/matchups` for 22/24 roster-weeks, by up to 45 points. That disagreement predates this spec and is filed as its own follow-up. |
+
+The hand recompute of two managers against prod's stored per-week scores (SC-003) was replaced by
+the V4 re-count above: for 2026, the API's median equals a re-count from prod's own stored weekly
+scores (via `/weekly-report/{1,2}`) for all 12 rosters.
+
+## Owed after deploy (superseded by the prod check above, kept as written)
 
 - Re-read `GET /api/leagues/1339351318115946496/history` on prod: 2024/2025 drift should be ≈4 / 0
   (the 2026-10-12 measurement), and spot-check two managers' median records against prod's stored
