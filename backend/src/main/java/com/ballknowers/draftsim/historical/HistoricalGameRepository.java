@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * One user's play of one historical season (spec 053, V45 {@code historical_game} and
+ * One user's play of one historical season (spec 053, V43 {@code historical_game} and
  * {@code historical_game_pick}). Separate from {@link HistoricalDataRepository}, which owns the imported
  * reference data, so the two can change independently.
  *

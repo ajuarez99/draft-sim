@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * The historical draft game's REFERENCE data (spec 053, V45): players, per-season card lines, per-game box
+ * The historical draft game's REFERENCE data (spec 053, V43): players, per-season card lines, per-game box
  * lines, season metadata and import jobs. Written by the import, read by play. The game tables live in
  * {@link HistoricalGameRepository}.
  *
