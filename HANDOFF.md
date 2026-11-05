@@ -1,5 +1,58 @@
 # Ball Knowers — handoff
 
+## CURRENT STATE 2026-11-05 (read this first; the UPDATE entries below are history)
+
+Checked against `git log origin/main` (tip `0446524`, 2026-11-02), `gh pr list` and the branch refs
+on 2026-11-03. **Amended in place:** the 10-23 → 10-28 UPDATE headers below say "NOT committed" for
+specs 045–052. That went stale. All of them merged since (PRs #45–#52), and 054 merged directly.
+Merging to `main` deploys both Railway services. Merged is a git fact; where prod was actually
+looked at, the line says so.
+
+**Merged to main:** 044 lock-ins (prod checked), 045 matchups live season (prod not checked), 046 ADP
+compare + auction board, 047 hall of fame, 048 weekly pot (prod checked), 049 compare two players, 050
+landing page, 051 Trending Tony, 052 analytics (inert until Allan sets `VITE_UMAMI_WEBSITE_ID`), 054
+weekly median what-if (prod checked 11-03: drift 2025=4 / 2024=0, two 2024 playoff-line crossings).
+Also merged earlier: 032–037, 039–041, 043.
+
+**Merged 2026-11-05 (main `7f9516e`), 053 first, then 055,** because Flyway's `outOfOrder` is unset
+(false). If V44 had deployed before V43, the boot after 053 merged would have failed validation.
+- **053 Time Machine** (PR #53, V43). The 11-02 UPDATE entry below still says "NOT committed"; that is
+  stale. Prod still owes: Allan accepting the Kaggle provenance, a Railway volume-room check, then the
+  one-off admin import (`POST /api/admin/historical/import {"part":"ALL"}`) and a `VACUUM`. See
+  `specs/053-historical-draft-game/`.
+- **055 official week scores** (V44 `roster_fpts_snapshot`). **Deadline:** prod has to capture fpts at
+  leg 2 *and* leg 3, and leg 2 ends when week 3 scores (~11-09/10). Owed: 12 rows at `through_week`
+  2 on prod. After week 3 scores, compare fpts(3)−fpts(2) with the Sleeper app.
+- **Checked before the push** on a fresh Postgres (V1–V44 applied in order):
+  - web 2,750/2,750 passing; tsc and build clean.
+  - backend 2,683 tests, 13 failed, 54 skipped. The same 13 fail on unmerged `0446524` against the
+    same DB. They need real data (an NFL board, the NBA league chain), so they're not from the merge.
+
+**Not on main, in order of urgency:**
+
+1. ~~055~~ and ~~053~~: merged, see above.
+3. **Weekly report counts the median game in W-L**: branch `fix-weekly-report-median-record`
+   (`3aa2bb9`, **unpushed**, no PR), no migration. It also carries `claude/nba-2026-score-drift.md`.
+   Open question: Sleeper's tie-break at the median.
+4. **038 Season Wrapped**: planned and reviewed, T001 measured, nothing built. Worktree
+   `.claude/worktrees/038-season-wrapped` (off `abf839c`, now far behind main). Next: T002.
+5. **021 codebase cleanup**: committed locally, never pushed, off `7b7238e` (October). It needs a
+   rebase over ~30 merged specs before its parity method means anything again.
+
+**Scheduled / owed measurements:**
+- **Week-3 Sleeper poller** (Windows task `BallKnowers-week3-sleeper-poller`, Sun 11-08 21:00 CT →
+  Tue 11-10 19:00 CT). Run its `analyze.py` afterwards. It names the first snapshot where
+  `/matchups/3` equals Δfpts on 12/12 rosters, which is the earliest safe NBA 2026 re-ingest. Then
+  delete the task. **Never re-ingest NBA 2026 weeks from `/matchups` before that.**
+- After 055 deploys: 12 rows at `through_week` 2 on prod. After week 3 scores, compare
+  fpts(3)−fpts(2) with Sleeper-app numbers.
+- Open, not investigated: prod's stored NBA 2026 week 1–2 scores differ from `/matchups` on 22/24
+  roster-weeks, and neither matches Sleeper's official record (`claude/nba-2026-score-drift.md`).
+- 020 AI recap is deployed but inert. It needs Allan's `ANTHROPIC_API_KEY` for T036.
+
+**Local-only state:** the main checkout (`C:\Users\allan\source\draft-sim`) is parked on the old
+`017-nba-schedule-grid` branch with uncommitted edits from several sessions. Don't read its
+HANDOFF.md as current; this file on `main` is the one.
 ## UPDATE 2026-11-02: spec 053 (Time Machine, historical draft game) built; NOT committed, NOT deployed, NOT browser-verified
 
 - **What:** backend `historical/*` plus `api/Historical*Controller`, migration V43, resources in `historical/`, and the
