@@ -2,7 +2,7 @@
 
 ## UPDATE 2026-11-02: spec 053 (Time Machine, historical draft game) built; NOT committed, NOT deployed, NOT browser-verified
 
-- **What:** backend `historical/*` plus `api/Historical*Controller`, migration V43, resources in `historical/`, and the
+- **What:** backend `historical/*` plus `api/Historical*Controller`, migration V45, resources in `historical/`, and the
   web pages `HistoricalDraft` / `HistoricalRoom` (rail entry "Time Machine"). Docs: `specs/053-historical-draft-game/`
   (`research-notes.md` has every measurement). Lives in worktree `.claude/worktrees/053-historical-draft-game`, branch
   `053-historical-draft-game`, uncommitted.
@@ -10,7 +10,7 @@
   `research-notes.md` and `tasks.md` T029). Import of all 58 seasons ran locally (~2 min); game create and final pick
   measured at 100 to 750 ms. SC-005 source parity for 2018-19: 99.2% of players within 0.5 pts. **Not verified:** a
   real browser session, Railway, or concurrent users.
-- **Deploy order:** backend first (applies V43), then web. Then run the import once as admin:
+- **Deploy order:** backend first (applies V45), then web. Then run the import once as admin:
   `POST /api/admin/historical/import {"part":"ALL"}` with `X-Admin-Token`, and poll
   `GET /api/admin/historical/import/{jobId}`. **Run `VACUUM` on the `historical_*` tables after any re-import** (the
   per-season replace leaves dead tuples; 397 MB unvacuumed vs ~173 MB true locally). **Check the Railway volume has

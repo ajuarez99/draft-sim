@@ -20,7 +20,12 @@
 > - Standings carry `ties` (F16).
 > - Bust and hindsight are redefined per F1/F4.
 
-Migration: **`V43__historical_draft_game.sql`**. The highest migration on
+> **Amended 2026-11-05 (renumbered V43 → V45):** spec 055 (official week scores) shipped `V44__roster_fpts_snapshot.sql`
+> to main and prod first, under a deadline. Flyway runs with `outOfOrder` off, so a V43 merged after V44
+> was applied would stop prod from starting. Allan chose to renumber this migration to **V45**; the SQL is unchanged.
+> Any scratch DB that already applied it as V43 (e.g. 053's on 5438) needs a fresh DB or a `flyway repair`.
+
+Migration: **`V43__historical_draft_game.sql`** (now `V45__historical_draft_game.sql`, see the amendment above). The highest migration on
 `origin/main` and every local branch was V42 on 2026-11-02. Re-check this before
 the migration is applied (constitution rule 1). All tables are new and nothing
 existing is altered.

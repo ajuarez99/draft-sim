@@ -65,7 +65,7 @@ Built so far:
   and double-doubles before 1983-84 are dropped and said so), and no card shows anything from the drafted season.
   Ranking is a labelled fallback (prior-season fantasy points), never ADP. Results compare you against the best
   possible lineup, your worst pick and the best player you passed on. Data: a CC0 Kaggle box-score set
-  (1946-2022) plus Sleeper weekly stats (2017+), loaded by an admin import (migration V43, `historical_*` tables).
+  (1946-2022) plus Sleeper weekly stats (2017+), loaded by an admin import (migration V45, `historical_*` tables).
   Reference data only: it never touches a league.
 - **Rivalry week** (specs/034-rivalry-schedule-grid, specs/037-rivalry-week-pick). The
   Rivalries page recommends a full set of rivalry pairings from league history and, since spec
