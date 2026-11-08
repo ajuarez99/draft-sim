@@ -53,7 +53,7 @@ Also merged earlier: 032–037, 039–041, 043.
 **Local-only state:** the main checkout (`C:\Users\allan\source\draft-sim`) is parked on the old
 `017-nba-schedule-grid` branch with uncommitted edits from several sessions. Don't read its
 HANDOFF.md as current; this file on `main` is the one.
-## UPDATE 2026-11-08: spec 056 (Football Time Machine) MERGED to main (`c83973b`) and backend DEPLOYED; prod import done (26 seasons); web build failed on Railway, redeploy owed
+## UPDATE 2026-11-08: spec 056 (Football Time Machine) MERGED to main and DEPLOYED (both services); prod import done (26 seasons); browser-checked on prod
 
 An NFL copy of 053, 2000–2025, on nflverse data. Details, reviews and the verification record are in
 `specs/056-nfl-historical-draft-game/` (`verification.md` says what was run and what wasn't).
@@ -73,9 +73,9 @@ An NFL copy of 053, 2000–2025, on nflverse data. Details, reviews and the veri
    1999 is only the prior-season line for 2000).
 
 **Prod (2026-11-08):** backend on V46, NFLVERSE import done (26 seasons), one football game played end to end
-on prod (see `verification.md`). **Owed:** the web service (`perpetual-vitality`) build failed. Main's `web/` builds
-fine in `node:20-alpine` locally, so redeploy it and send the log if it fails again. Prod has no NBA history
-seasons at all: 053's own import is still owed there.
+on prod (see `verification.md`). The first web build failed on Railway but never reproduced (same commit built locally, and the next push
+built on Railway); the web is live and browser-checked. Prod has no NBA history seasons at all: 053's own
+import is still owed there, so Basketball can't be played on prod yet.
 
 **Open for Allan:**
 - **S2:** bots stack bench QBs (2.87 per bot roster, measured). Left unchanged.
