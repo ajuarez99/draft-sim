@@ -49,3 +49,16 @@ Every line below was **run** unless it says otherwise.
 - **Prod `historical_game` row count before V45** (SC-008 on real prod games). Not available from here.
 - **S2: bots stack bench QBs** (2.87 QBs per bot roster across 99 rosters). Measured by the code review, and seen again live: auto-pick drafted 4 QBs onto this session's 2005 roster. Allan's call; not changed.
 - **The V45 number collides with spec 057** (`V45__week_score_override.sql`, uncommitted in worktree peaceful-panini-70c6a7). Whichever merges second must renumber. Allan's call.
+
+## Production, 2026-11-08 (merged to main `c83973b`, fast-forward)
+
+Read-only checks through `api.ballknowers.co` as popsharky (`X-Sleeper-User`), plus one game created and finished
+on prod. Allan ran the admin import himself (`{"part":"NFLVERSE"}`, job 1); this session never held the admin token.
+
+| Check | Result |
+|---|---|
+| Backend redeployed with V46 | `GET /api/history/seasons` with no sport → **400** `sport must be one of [NBA, NFL]` (only the new code says this, and it boots only after Flyway applied V46) ✅ |
+| Import | `GET /seasons?sport=NFL` → **26 seasons, 2000–2025**. Notes match local: 2000 "246 of 248…", 2001 "3 source rows…", 2003/2005 "1 source row…". 2012 also shows "1 source row…" |
+| A full football game | game 1, season 2001 (random), slot 4: create 201 in 0.77 s, auto FINISH 200 in 0.93 s. 17 weeks, 3rd of 12 (11–6). Board QB/RB/WR/TE only, "ranked by last season's points over replacement", attribution present. Faulk 2000 card = STL (franchise-code fix holds). Bust = Patrick Jeffers (2001 preseason ACL). Steal passed on = Priest Holmes (2001 breakout) ✅ |
+| SC-008 on prod | the new game got id 1, so prod held **0** `historical_game` rows before V46: nothing to regress. Prod has **no NBA seasons** either (053's admin import was never run there), so a prod NBA game can't be played yet. That is 053's owed import, not a 056 regression |
+| Web | **not deployed.** Railway's `perpetual-vitality` build failed. Main's exact `web/` builds cleanly in `node:20-alpine` here (`docker build`, exit 0), so the failure is not reproducible from the code. Until it redeploys, prod's old web calls `/seasons` without a sport and the Time Machine page errors |
