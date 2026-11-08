@@ -50,6 +50,7 @@ class WeeklyReportServiceLiveWeekTest {
     private final ScoredWeeks scoredWeeks = mock(ScoredWeeks.class);
     private final ManagerRepository managers = mock(ManagerRepository.class);
     private final LiveWeekSource liveWeeks = mock(LiveWeekSource.class);
+    private final WeekScoreResolver scoreResolver = mock(WeekScoreResolver.class);
     private final LeagueRepository.LeagueRow league =
             new LeagueRepository.LeagueRow(ID, Sport.NBA, "L26", "n", 2026, 12, List.of(), 0, "L25", "in_season");
     private WeeklyReportService service;
@@ -57,7 +58,9 @@ class WeeklyReportServiceLiveWeekTest {
     @BeforeEach
     void setUp() {
         service = new WeeklyReportService(leagues, weekPoints, matchups, rosterSeasons, members, players, registry,
-                realized, seasons, playerGames, new GameScoringService(), scoredWeeks, managers, liveWeeks);
+                realized, seasons, playerGames, new GameScoringService(), scoredWeeks, managers, liveWeeks,
+                scoreResolver);
+        when(scoreResolver.resolve(any())).thenReturn(WeekScoreResolver.Resolution.EMPTY);
         when(registry.get(Sport.NBA)).thenReturn(rules);
         when(rules.playsMultipleGamesPerScoringPeriod()).thenReturn(true);
         when(seasons.resolve("L26", Rule.LIVE_WEEK))
@@ -151,6 +154,72 @@ class WeeklyReportServiceLiveWeekTest {
     void openingWeek_anExplicitRequestForTheLiveWeekIsLiveToo() {
         live(Optional.of(ok(1, 201.5)));
         assertTrue(service.forWeek("L26", 1, null, Rule.LIVE_WEEK).orElseThrow().live());
+    }
+
+    // ---- spec 057: the score source of a stored week ------------------------------------------------
+
+    @Test
+    void aStoredWeekCarriesItsScoreSource_andTeamTotalsFollowTheResolutionNotTheBreakdown() {
+        stored(3, 3, 1, 2, 3);
+        live(Optional.empty());
+        // raw breakdown: roster 1 scored 150, roster 2 scored 140. The commissioner entered 100 and 180.
+        when(weekPoints.breakdownsFor(ID, 2026)).thenReturn(List.of(
+                new RosterWeekPointsRepository.WeekBreakdown(3, 1, 150, "{}", null),
+                new RosterWeekPointsRepository.WeekBreakdown(3, 2, 140, "{}", null)));
+        when(realized.bestLineup(any(), any(), any(), any()))
+                .thenReturn(new RealizedLineupService.WeekLineup(false, 0, List.of(), "x"));
+        when(scoreResolver.resolve(any())).thenReturn(WeekScoreResolver.Resolution.of(java.util.Map.of(ID, java.util.Map.of(
+                3, new WeekScoreResolver.Resolved(WeekScoreResolver.Source.COMMISSIONER,
+                        java.util.Map.of(1, new java.math.BigDecimal("100.00"), 2, new java.math.BigDecimal("180.00")))))));
+        when(matchups.pairedWithScores(anyCollection(), any())).thenReturn(List.of(
+                new LeagueMatchupRepository.PairedGame(2026, 3, 1, 1L, "user1", "av1", new java.math.BigDecimal("100.00"),
+                        2, 2L, "user2", "av2", new java.math.BigDecimal("180.00"))));
+
+        Result r = service.forWeek("L26", 3, null, Rule.LIVE_WEEK).orElseThrow();
+
+        assertEquals("COMMISSIONER", r.scoreSource());
+        assertEquals(100.0, r.matchups().getFirst().home().points());
+        // a bench-swap award compares a team total with per-player feed points: omitted on a non-feed week, with a reason
+        assertTrue(r.awardsOmitted().stream().anyMatch(o -> o.kind().equals("SELF_INFLICTED_WOUND")
+                && o.reason().equals(WeeklyReportService.SCORES_NOT_FROM_FEED)), r.awardsOmitted().toString());
+    }
+
+    @Test
+    void anOfficialWeekWhoseTotalsEqualTheBreakdown_keepsTheSelfInflictedWoundAward() {
+        stored(3, 3, 1, 2, 3);
+        live(Optional.empty());
+        when(weekPoints.breakdownsFor(ID, 2026)).thenReturn(List.of(
+                new RosterWeekPointsRepository.WeekBreakdown(3, 1, 150, "{}", null),
+                new RosterWeekPointsRepository.WeekBreakdown(3, 2, 140, "{}", null)));
+        when(realized.bestLineup(any(), any(), any(), any()))
+                .thenReturn(new RealizedLineupService.WeekLineup(false, 0, List.of(), "x"));
+        when(scoreResolver.resolve(any())).thenReturn(WeekScoreResolver.Resolution.of(java.util.Map.of(ID, java.util.Map.of(
+                3, new WeekScoreResolver.Resolved(WeekScoreResolver.Source.OFFICIAL,
+                        java.util.Map.of(1, new java.math.BigDecimal("150.00"), 2, new java.math.BigDecimal("140.00")))))));
+        when(matchups.pairedWithScores(anyCollection(), any())).thenReturn(List.of(
+                new LeagueMatchupRepository.PairedGame(2026, 3, 1, 1L, "user1", "av1", new java.math.BigDecimal("150.00"),
+                        2, 2L, "user2", "av2", new java.math.BigDecimal("140.00"))));
+
+        Result r = service.forWeek("L26", 3, null, Rule.LIVE_WEEK).orElseThrow();
+
+        assertEquals("OFFICIAL", r.scoreSource());
+        assertTrue(r.awardsOmitted().stream().noneMatch(o -> WeeklyReportService.SCORES_NOT_FROM_FEED.equals(o.reason())),
+                r.awardsOmitted().toString());
+    }
+
+    @Test
+    void aFeedWeekSaysFeed_andALiveWeekHasNoSource() {
+        stored(3, 3, 1, 2, 3);
+        live(Optional.empty());
+        when(weekPoints.breakdownsFor(ID, 2026)).thenReturn(List.of(
+                new RosterWeekPointsRepository.WeekBreakdown(3, 1, 150, "{}", null)));
+        when(realized.bestLineup(any(), any(), any(), any()))
+                .thenReturn(new RealizedLineupService.WeekLineup(false, 0, List.of(), "x"));
+        assertEquals("FEED", service.forWeek("L26", 3, null, Rule.LIVE_WEEK).orElseThrow().scoreSource());
+
+        stored(0, 0);
+        live(Optional.of(ok(1, 201.5)));
+        assertNull(service.forWeek("L26", 0, null, Rule.LIVE_WEEK).orElseThrow().scoreSource());
     }
 
     // ---- mid-season -----------------------------------------------------------------------------------

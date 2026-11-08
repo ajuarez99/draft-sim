@@ -44,6 +44,7 @@ public class WeeklyReportService {
     private final ScoredWeeks scoredWeeks;
     private final ManagerRepository managers;
     private final LiveWeekSource liveWeeks;
+    private final WeekScoreResolver scoreResolver;
 
     public WeeklyReportService(LeagueRepository leagues, RosterWeekPointsRepository weekPoints,
                                LeagueMatchupRepository matchups, RosterSeasonRepository rosterSeasons,
@@ -51,7 +52,9 @@ public class WeeklyReportService {
                                SportRulesRegistry rulesRegistry, RealizedLineupService realized,
                                LeagueSeasonResolver seasons, PlayerGameRepository playerGames,
                                GameScoringService gameScoring, ScoredWeeks scoredWeeks,
-                               ManagerRepository managers, LiveWeekSource liveWeeks) {
+                               ManagerRepository managers, LiveWeekSource liveWeeks,
+                               WeekScoreResolver scoreResolver) {
+        this.scoreResolver = scoreResolver;
         this.liveWeeks = liveWeeks;
         this.managers = managers;
         this.scoredWeeks = scoredWeeks;
@@ -139,7 +142,25 @@ public class WeeklyReportService {
                          String basis, List<SectionUnavailable> sectionsUnavailable,
                          List<Award> awards, List<OmittedAward> awardsOmitted,
                          int latestScoredWeek, int latestFinalWeek, boolean weekFinal,
-                         boolean live, Integer liveWeek, String sleeperLeagueId) {
+                         boolean live, Integer liveWeek, String sleeperLeagueId, String scoreSource) {
+
+        /**
+         * Spec 057: the 21-argument shape before {@code scoreSource}, defaulting it to null, so a construction
+         * that predates it (shape tests, recap fixtures) keeps compiling. The stored path always fills it.
+         */
+        public Result(boolean available, String reason, int season, Integer requestedSeason,
+                      int week, Sport sport, boolean playersPlayMultiplePerPeriod,
+                      List<Matchup> matchups, List<Performer> topPerformers,
+                      List<NightPerformance> bestNights, List<PlayerWeek> bestWeek,
+                      String basis, List<SectionUnavailable> sectionsUnavailable,
+                      List<Award> awards, List<OmittedAward> awardsOmitted,
+                      int latestScoredWeek, int latestFinalWeek, boolean weekFinal,
+                      boolean live, Integer liveWeek, String sleeperLeagueId) {
+            this(available, reason, season, requestedSeason, week, sport, playersPlayMultiplePerPeriod,
+                    matchups, topPerformers, bestNights, bestWeek, basis, sectionsUnavailable,
+                    awards, awardsOmitted, latestScoredWeek, latestFinalWeek, weekFinal, live, liveWeek,
+                    sleeperLeagueId, null);
+        }
 
         /**
          * Spec 045 A9: today's 18-argument shape, defaulting {@code live=false, liveWeek=null,
@@ -178,12 +199,15 @@ public class WeeklyReportService {
                                   int latestFinalWeek, Integer liveWeek, String sleeperLeagueId) {
             return new Result(false, reason, season, null, week, sport, false,
                     List.of(), List.of(), null, null, null, null, List.of(), List.of(), latestScoredWeek,
-                    latestFinalWeek, false, false, liveWeek, sleeperLeagueId);
+                    latestFinalWeek, false, false, liveWeek, sleeperLeagueId, null);
         }
     }
 
     /** Reason code for an award that needs starter identity and cannot have it. */
     static final String STARTERS_NOT_STORED = "STARTERS_NOT_STORED";
+
+    /** Reason code for an award that compares a team total with per-player feed points, on a week whose team totals are not the feed's. */
+    static final String SCORES_NOT_FROM_FEED = "SCORES_NOT_FROM_FEED";
 
     /**
      * Which week a request resolves to: the one asked for, else the latest FINAL week, else the
@@ -245,6 +269,11 @@ public class WeeklyReportService {
                     liveWeek, league.sleeperId()));
         }
 
+        // Spec 057: team-level numbers (matchup scores, records) come from the resolved reads; the per-player
+        // breakdown below stays raw (FR-012).
+        WeekScoreResolver.Resolution resolvedScores = scoreResolver.resolve(List.of(league.id()));
+        WeekScoreResolver.Source scoreSource = resolvedScores.source(league.id(), week);
+
         Directory dir = directory(league, sleeperUserId);
         Map<Integer, String> nameByRoster = dir.nameByRoster();
         Map<Integer, String> usernameByRoster = dir.usernameByRoster();
@@ -259,9 +288,15 @@ public class WeeklyReportService {
             recordByRoster.put(rosterId, records.getOrDefault(rosterId, "0-0"));
         }
 
+        // Two team-total maps, on purpose (spec 057 FR-012 / plan review M1). pointsByRoster is the score in use
+        // (commissioner > official > feed) and ranks teams against each other. rawPointsByRoster is the
+        // breakdown's own total, the only one that can sit beside per-player feed points in a ratio.
         Map<Integer, Double> pointsByRoster = new HashMap<>();
+        Map<Integer, Double> rawPointsByRoster = new HashMap<>();
         for (RosterWeekPointsRepository.WeekBreakdown w : thisWeek) {
-            pointsByRoster.put(w.rosterId(), w.startersPoints());
+            rawPointsByRoster.put(w.rosterId(), w.startersPoints());
+            pointsByRoster.put(w.rosterId(), resolvedScores.points(league.id(), week, w.rosterId(),
+                    java.math.BigDecimal.valueOf(w.startersPoints())).doubleValue());
         }
 
         // ---- matchups (US5.1): both teams, their records, their final scores
@@ -329,11 +364,25 @@ public class WeeklyReportService {
             if (best.valid()) optimalByRoster.put(w.rosterId(), best.points());
         }
 
-        gotAwayWithIt(games, pointsByRoster, optimalByRoster, nameByRoster).ifPresent(awards::add);
+        gotAwayWithIt(games, rawPointsByRoster, optimalByRoster, nameByRoster).ifPresent(awards::add);
         deservedBetter(games, pointsByRoster, nameByRoster).ifPresent(awards::add);
         onePlayerCarry(thisWeek, playersBySleeperId, nameByRoster).ifPresent(awards::add);
 
-        if (anyStarters) {
+        // Omit only when a resolved team total really differs from the breakdown's own total (a non-feed week whose
+        // numbers equal the feed mixes nothing, so the award stays).
+        boolean totalsDiffer = false;
+        for (Map.Entry<Integer, Double> e : pointsByRoster.entrySet()) {
+            Double raw = rawPointsByRoster.get(e.getKey());
+            if (raw != null && java.math.BigDecimal.valueOf(raw).compareTo(java.math.BigDecimal.valueOf(e.getValue())) != 0) {
+                totalsDiffer = true;
+                break;
+            }
+        }
+        if (scoreSource != WeekScoreResolver.Source.FEED && totalsDiffer) {
+            // The margin is the score in use; the best bench swap is per-player feed points. Saying one flips the
+            // other would compare two sources (FR-012), so the award is omitted with a stated reason.
+            omitted.add(new OmittedAward("SELF_INFLICTED_WOUND", SCORES_NOT_FROM_FEED));
+        } else if (anyStarters) {
             selfInflictedWound(games, thisWeek, playersBySleeperId, nameByRoster, settings, rules)
                     .ifPresentOrElse(awards::add,
                             () -> { /* computable, simply nobody qualified this week */ });
@@ -420,7 +469,7 @@ public class WeeklyReportService {
         return Optional.of(new Result(true, null, league.season(), found.get().requestedSeason(),
                 week, settings.sport(), multipleGames, games, topForResult,
                 bestNights, bestWeek, basis, sectionsUnavailable, awards, omitted, latestScoredWeek, scored.latestFinal(), scored.isFinal(week),
-                false, liveWeek, league.sleeperId()));
+                false, liveWeek, league.sleeperId(), scoreSource.name()));
     }
 
     // ------------------------------------------------------------- the live week (spec 045)
@@ -538,7 +587,7 @@ public class WeeklyReportService {
                 multipleGames ? BASIS_ALL_GAMES : null,
                 multipleGames ? List.of() : null,
                 List.of(), List.of(), scored.latestStored(), scored.latestFinal(), false,
-                true, week, league.sleeperId());
+                true, week, league.sleeperId(), null);
     }
 
     private static Side side(LeagueMatchupRepository.ScoredRow r, Directory dir, Map<Integer, String> records) {
@@ -779,7 +828,7 @@ public class WeeklyReportService {
      * and the regular-season bound, are {@link ExpectedWinsService}'s, so this record cannot count
      * a game differently from the Luck page or the history page's median column.
      */
-    static Map<Integer, String> recordsThrough(List<LeagueMatchupRepository.PairedGame> paired, int season,
+    public static Map<Integer, String> recordsThrough(List<LeagueMatchupRepository.PairedGame> paired, int season,
                                                int week, Optional<LeagueRepository.PlayoffFormat> format) {
         List<ExpectedWinsService.Game> games = new ArrayList<>();
         for (LeagueMatchupRepository.PairedGame g : paired) {

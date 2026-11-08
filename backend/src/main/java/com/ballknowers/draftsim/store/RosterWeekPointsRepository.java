@@ -18,9 +18,11 @@ import java.util.stream.Collectors;
 public class RosterWeekPointsRepository {
 
     private final JdbcClient db;
+    private final WeekScoreResolver scores;
 
-    public RosterWeekPointsRepository(JdbcClient db) {
+    public RosterWeekPointsRepository(JdbcClient db, WeekScoreResolver scores) {
         this.db = db;
+        this.scores = scores;
     }
 
     public record Row(long leagueId, int season, int week, int rosterId, double startersPoints,
@@ -50,6 +52,20 @@ public class RosterWeekPointsRepository {
                 .params(r.leagueId(), r.season(), r.week(), r.rosterId(), r.startersPoints(),
                         r.playersPointsJson(), r.startersJson())
                 .update();
+    }
+
+    /**
+     * The RAW feed score of every roster stored for one week (roster id -> starters_points), never resolved
+     * (spec 057): the commissioner entry view shows it beside the score in use, and a save must name exactly
+     * these rosters.
+     */
+    public java.util.Map<Integer, BigDecimal> feedForWeek(long leagueId, int week) {
+        java.util.Map<Integer, BigDecimal> out = new java.util.TreeMap<>();
+        db.sql("select roster_id, starters_points from roster_week_points where league_id = ? and week = ?")
+                .params(leagueId, week)
+                .query((rs, i) -> out.put(rs.getInt(1), rs.getBigDecimal(2)))
+                .list();
+        return out;
     }
 
     /** Whether any stored week carries a per-player breakdown (an ESPN week written without one does not). */
@@ -97,7 +113,7 @@ public class RosterWeekPointsRepository {
 
     /** Every stored week for a league, through weekThrough inclusive, roster_id then week order. */
     public List<WeekPoint> through(long leagueId, int weekThrough) {
-        return db.sql("""
+        List<WeekPoint> raw = db.sql("""
                 select week, roster_id, starters_points
                 from roster_week_points
                 where league_id = ? and week <= ?
@@ -106,6 +122,15 @@ public class RosterWeekPointsRepository {
                 .params(leagueId, weekThrough)
                 .query((rs, i) -> new WeekPoint(rs.getInt(1), rs.getInt(2), rs.getDouble(3)))
                 .list();
+        // Spec 057: commissioner > official > feed.
+        WeekScoreResolver.Resolution resolved = scores.resolve(List.of(leagueId));
+        if (resolved.isEmpty()) return raw;
+        List<WeekPoint> out = new java.util.ArrayList<>(raw.size());
+        for (WeekPoint p : raw) {
+            BigDecimal v = resolved.points(leagueId, p.week(), p.rosterId(), BigDecimal.valueOf(p.startersPoints()));
+            out.add(new WeekPoint(p.week(), p.rosterId(), v.doubleValue()));
+        }
+        return out;
     }
 
     /**
@@ -197,23 +222,17 @@ public class RosterWeekPointsRepository {
      */
     public List<ScoreRow> extremes(Collection<Long> leagueIds, boolean highest, int limit, WeekBound bound) {
         if (leagueIds == null || leagueIds.isEmpty()) return List.of();
-        String direction = highest ? "desc" : "asc";
-        String weekFilter = bound.throughWeek() != null ? "and w.week <= ?" : "";
-        String sql = """
-                select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points
-                from roster_week_points w
-                left join roster_season rs on rs.league_id = w.league_id and rs.roster_id = w.roster_id
-                left join manager m on m.id = rs.manager_id
-                where w.league_id in (%s) %s
-                order by w.starters_points %s, w.season desc, w.week asc, w.roster_id asc
-                limit %d
-                """.formatted(inClause(leagueIds), weekFilter, direction, Math.max(0, limit));
-        var spec = db.sql(sql).params(List.copyOf(leagueIds));
-        if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
-        return spec
-                .query((rs, i) -> new ScoreRow(rs.getInt(1), rs.getInt(2), rs.getInt(3),
-                        (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7)))
-                .list();
+        // Spec 057: one query definition (allScores), resolved, then ordered and limited here, so the order is
+        // over the score actually in use. Same tiebreak the SQL had: points, then season desc, week asc, roster asc.
+        java.util.Comparator<ScoreRow> byPoints = java.util.Comparator.comparing(ScoreRow::points);
+        if (highest) byPoints = byPoints.reversed();
+        return allScores(leagueIds, bound).stream()
+                .sorted(byPoints
+                        .thenComparing(java.util.Comparator.comparingInt(ScoreRow::season).reversed())
+                        .thenComparingInt(ScoreRow::week)
+                        .thenComparingInt(ScoreRow::rosterId))
+                .limit(Math.max(0, limit))
+                .toList();
     }
 
     /**
@@ -227,13 +246,17 @@ public class RosterWeekPointsRepository {
      * unowned roster-season (R1) still contributes its points instead of
      * being silently dropped by an inner join.
      *
+     * <p>Spec 057: the points are the RESOLVED ones (commissioner > official > feed,
+     * {@link WeekScoreResolver}).
+     *
      * @param bound explicit, never defaulted -- see {@link #extremes}'s javadoc.
      */
     public List<ScoreRow> allScores(Collection<Long> leagueIds, WeekBound bound) {
         if (leagueIds == null || leagueIds.isEmpty()) return List.of();
         String weekFilter = bound.throughWeek() != null ? "and w.week <= ?" : "";
         String sql = """
-                select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points
+                select w.season, w.week, w.roster_id, rs.manager_id, m.display_name, m.avatar_id, w.starters_points,
+                       w.league_id
                 from roster_week_points w
                 left join roster_season rs on rs.league_id = w.league_id and rs.roster_id = w.roster_id
                 left join manager m on m.id = rs.manager_id
@@ -242,9 +265,11 @@ public class RosterWeekPointsRepository {
                 """.formatted(inClause(leagueIds), weekFilter);
         var spec = db.sql(sql).params(List.copyOf(leagueIds));
         if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
+        WeekScoreResolver.Resolution resolved = scores.resolve(leagueIds);
         return spec
                 .query((rs, i) -> new ScoreRow(rs.getInt(1), rs.getInt(2), rs.getInt(3),
-                        (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7)))
+                        (Long) rs.getObject(4), rs.getString(5), rs.getString(6),
+                        resolved.points(rs.getLong(8), rs.getInt(2), rs.getInt(3), rs.getBigDecimal(7))))
                 .list();
     }
 

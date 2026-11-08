@@ -206,7 +206,7 @@ describe('past award winners (US4)', () => {
     available: true, season: 2025, requestedSeason: null, sport: 'nfl', throughWeek: 17, weeksScored: 17,
     regularSeasonEnd: 14, early: false, earlyThresholdWeeks: 4, closeGameMargin: 10, suspensionWeeksObserved: [],
     commissionerListAvailable: false, superlatives: [award(), award({ kind: 'LOWEST_WEEK', available: false, reason: 'not built yet', holders: [] })],
-    leagueSleeperId: 'S2025',
+    leagueSleeperId: 'S2025', scoreSources: [],
     ...over,
   })
   const open = async () => {

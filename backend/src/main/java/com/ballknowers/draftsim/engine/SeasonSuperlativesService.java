@@ -56,6 +56,7 @@ public class SeasonSuperlativesService {
     private final StatusCaptureRepository statusCaptures;
     private final LeagueConductRepository conduct;
     private final SportTrendingRepository sportTrending;
+    private final WeekScoreResolver scoreResolver;
 
     public SeasonSuperlativesService(LeagueRepository leagues, LeagueSeasonResolver seasons,
                                      RosterWeekPointsRepository weekPoints, LeagueMatchupRepository matchups,
@@ -65,7 +66,8 @@ public class SeasonSuperlativesService {
                                      PlayerRepository players, LeagueTransactionRepository transactions,
                                      PlayerAbsenceRepository absences, PlayerGameRepository games,
                                      GameScoringService gameScoring, StatusCaptureRepository statusCaptures,
-                                     LeagueConductRepository conduct, SportTrendingRepository sportTrending) {
+                                     LeagueConductRepository conduct, SportTrendingRepository sportTrending,
+                                     WeekScoreResolver scoreResolver) {
         this.leagues = leagues;
         this.seasons = seasons;
         this.weekPoints = weekPoints;
@@ -84,6 +86,7 @@ public class SeasonSuperlativesService {
         this.statusCaptures = statusCaptures;
         this.conduct = conduct;
         this.sportTrending = sportTrending;
+        this.scoreResolver = scoreResolver;
     }
 
     // --------------------------------------------------------------- shapes
@@ -269,7 +272,11 @@ public class SeasonSuperlativesService {
     public record Result(boolean available, String reason, int season, Integer requestedSeason, Sport sport,
                          Integer throughWeek, int weeksScored, Integer regularSeasonEnd, boolean early,
                          int earlyThresholdWeeks, Double closeGameMargin, List<Integer> suspensionWeeksObserved,
-                         boolean commissionerListAvailable, List<Superlative> superlatives, String leagueSleeperId) {}
+                         boolean commissionerListAvailable, List<Superlative> superlatives, String leagueSleeperId,
+                         List<WeekSource> scoreSources) {}
+
+    /** Where one scored week's team scores came from (spec 057). FEED is listed too, so the client never infers. */
+    public record WeekSource(int week, WeekScoreResolver.Source source) {}
 
     /** The regular-season weeks this league-season has scored, and where the regular season ends (null if unknown). */
     private record ScoredWindow(Integer regularSeasonEnd, Set<Integer> scoredWeeks) {}
@@ -313,7 +320,7 @@ public class SeasonSuperlativesService {
             return Optional.of(new Result(false, "no week of this season has been scored yet",
                     league.season(), requestedSeason, league.sport(), null, 0, regularSeasonEnd, false,
                     SeasonWindow.EARLY_THRESHOLD_WEEKS, closeMargin, List.of(), commissionerListAvailable, List.of(),
-                    league.sleeperId()));
+                    league.sleeperId(), List.of()));
         }
 
         int throughWeek = Collections.max(scoredWeeks);
@@ -343,6 +350,15 @@ public class SeasonSuperlativesService {
                         .stream().filter(w -> scoredWeeksFinal.contains(w.week())).toList();
         Map<String, Player> playersBySleeperId = playersBySleeperId(players.findAll(league.sport()));
         List<ParsedWeek> parsedWeeks = parseWeeks(leagueBreakdowns);
+        // Spec 057: a team's week TOTAL is the resolved score (commissioner > official > feed). The per-player
+        // breakdowns above stay raw (FR-012); only the HIGHEST/LOWEST_WEEK standings take this copy.
+        WeekScoreResolver.Resolution resolvedScores = scoreResolver.resolve(List.of(league.id()));
+        List<RosterWeekPointsRepository.WeekBreakdown> resolvedBreakdowns = leagueBreakdowns.stream()
+                .map(w -> new RosterWeekPointsRepository.WeekBreakdown(w.week(), w.rosterId(),
+                        resolvedScores.points(league.id(), w.week(), w.rosterId(),
+                                BigDecimal.valueOf(w.startersPoints())).doubleValue(),
+                        w.playersPointsJson(), w.startersJson()))
+                .toList();
 
         List<LeagueMatchupRepository.PairedGame> games =
                 matchups.pairedWithScores(List.of(league.id()), bound).stream()
@@ -361,11 +377,11 @@ public class SeasonSuperlativesService {
         // leagueBreakdowns for the week scores, games for the margins.
         built.put(Kind.HIGHEST_WEEK, weekScoreSuperlative(Kind.HIGHEST_WEEK,
                 records.highestWeeks(List.of(league.id()), 20, bound),
-                weekScoreStandings(leagueBreakdowns, rosterIds, true, nameByRoster, avatarByRoster, managerByRoster),
+                weekScoreStandings(resolvedBreakdowns, rosterIds, true, nameByRoster, avatarByRoster, managerByRoster),
                 nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.LOWEST_WEEK, weekScoreSuperlative(Kind.LOWEST_WEEK,
                 records.lowestWeeks(List.of(league.id()), 20, bound),
-                weekScoreStandings(leagueBreakdowns, rosterIds, false, nameByRoster, avatarByRoster, managerByRoster),
+                weekScoreStandings(resolvedBreakdowns, rosterIds, false, nameByRoster, avatarByRoster, managerByRoster),
                 nameByRoster, avatarByRoster, managerByRoster));
         built.put(Kind.BIGGEST_BLOWOUT, marginSuperlative(Kind.BIGGEST_BLOWOUT,
                 records.biggestBlowouts(List.of(league.id()), 20, bound), pairingCoverage,
@@ -424,7 +440,9 @@ public class SeasonSuperlativesService {
 
         return Optional.of(new Result(true, null, league.season(), requestedSeason, league.sport(),
                 throughWeek, weeksScored, regularSeasonEnd, early, SeasonWindow.EARLY_THRESHOLD_WEEKS, closeMargin,
-                suspensionWeeksObserved, commissionerListAvailable, superlatives, league.sleeperId()));
+                suspensionWeeksObserved, commissionerListAvailable, superlatives, league.sleeperId(),
+                scoredWeeksFinal.stream().sorted()
+                        .map(w -> new WeekSource(w, resolvedScores.source(league.id(), w))).toList()));
     }
 
     /**

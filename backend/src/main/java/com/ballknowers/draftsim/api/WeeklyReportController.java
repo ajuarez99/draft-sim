@@ -69,6 +69,8 @@ public class WeeklyReportController {
         out.put("live", r.live());
         out.put("liveWeek", r.liveWeek());
         out.put("sleeperLeagueId", r.sleeperLeagueId());
+        // Spec 057: where this week's team scores came from (COMMISSIONER, OFFICIAL, FEED); null when not a stored week.
+        out.put("scoreSource", r.scoreSource());
         if (!r.available()) {
             out.put("reason", r.reason());
             out.put("matchups", List.of());

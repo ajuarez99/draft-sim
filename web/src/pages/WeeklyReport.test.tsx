@@ -29,11 +29,17 @@ const getWeeklyReport = vi.fn()
 const fetchRecap = vi.fn()
 const getDrafts = vi.fn()
 const fetchLockIns = vi.fn()
+const getScoreOverride = vi.fn()
+const saveScoreOverride = vi.fn()
+const clearScoreOverride = vi.fn()
 vi.mock('../api', () => ({
   getDrafts: (...args: unknown[]) => getDrafts(...args),
   getWeeklyReport: (...args: unknown[]) => getWeeklyReport(...args),
   fetchRecap: (...args: unknown[]) => fetchRecap(...args),
   fetchLockIns: (...args: unknown[]) => fetchLockIns(...args),
+  getScoreOverride: (...args: unknown[]) => getScoreOverride(...args),
+  saveScoreOverride: (...args: unknown[]) => saveScoreOverride(...args),
+  clearScoreOverride: (...args: unknown[]) => clearScoreOverride(...args),
 }))
 
 const recapOff = {
@@ -48,6 +54,11 @@ beforeEach(() => {
   fetchRecap.mockReset()
   fetchLockIns.mockReset()
   fetchLockIns.mockResolvedValue({ status: 'NOT_NBA', locks: [], live: null })
+  // By default the caller cannot edit: the commissioner panel renders nothing.
+  getScoreOverride.mockReset()
+  getScoreOverride.mockRejectedValue(new Error('not found'))
+  saveScoreOverride.mockReset()
+  clearScoreOverride.mockReset()
   fetchRecap.mockResolvedValue(recapOff)
 })
 
@@ -81,6 +92,7 @@ function data(over: Partial<Data> = {}): Data {
     live: false,
     liveWeek: null,
     sleeperLeagueId: 'L1',
+    scoreSource: 'FEED',
     ...over,
   }
 }
@@ -980,5 +992,66 @@ describe('Weekly report: lock-ins on the cards', () => {
     renderPage('/leagues/L1/weekly-report?week=5')
     expect((await screen.findAllByText(/can't tell for this week/)).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText('no locks')).not.toBeInTheDocument()
+  })
+
+  // ---- spec 057: where the week's scores came from, and the commissioner's entry panel -------------------
+
+  describe('score source', () => {
+    const view = (over: Record<string, unknown> = {}) => ({
+      week: 1, isFinal: true, canEdit: true, commissionerKnown: true, source: 'FEED', enteredAt: null,
+      teams: [
+        { rosterId: 1, teamName: 'Dart has hit anotha Bower', feedPoints: 157.4, inUsePoints: 157.4, overridePoints: null },
+        { rosterId: 2, teamName: 'Justice for Wags', feedPoints: 147.9, inUsePoints: 147.9, overridePoints: null },
+      ],
+      checks: {
+        totals: { status: 'UNAVAILABLE', throughWeek: null, rows: [] },
+        record: { status: 'UNAVAILABLE', throughWeek: null, rows: [] },
+      },
+      ...over,
+    })
+
+    it('says in words that the scores were entered by the commissioner', async () => {
+      getWeeklyReport.mockResolvedValue(data({ scoreSource: 'COMMISSIONER' }))
+      renderPage()
+      expect(await screen.findByText(/Scores entered by the commissioner from the Sleeper app\./)).toBeInTheDocument()
+    })
+
+    it('says nothing about the source of a feed week', async () => {
+      getWeeklyReport.mockResolvedValue(data({ scoreSource: 'FEED' }))
+      renderPage()
+      await screen.findByRole('heading', { name: /week [0-9]+ matchups/i })
+      expect(screen.queryByText(/commissioner/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/official totals/i)).not.toBeInTheDocument()
+    })
+
+    it('shows no entry panel to a reader who cannot edit', async () => {
+      getWeeklyReport.mockResolvedValue(data())
+      getScoreOverride.mockResolvedValue(view({ canEdit: false }))
+      renderPage()
+      await screen.findByRole('heading', { name: /week [0-9]+ matchups/i })
+      await waitFor(() => expect(getScoreOverride).toHaveBeenCalled())
+      expect(screen.queryByText(/Commissioner: enter week/)).not.toBeInTheDocument()
+    })
+
+    it("calls the entry endpoint with the report's own season id, not the route's, and refetches after a save", async () => {
+      // the route is L1; the report fell back to an earlier season, whose Sleeper id is L0
+      getWeeklyReport.mockResolvedValue(data({ sleeperLeagueId: 'L0', requestedSeason: 2027 }))
+      getScoreOverride.mockResolvedValue(view())
+      saveScoreOverride.mockResolvedValue(view({ source: 'COMMISSIONER' }))
+      renderPage()
+      expect(await screen.findByText(/Commissioner: enter week 1 scores/)).toBeInTheDocument()
+      expect(getScoreOverride).toHaveBeenCalledWith('L0', 1)
+
+      const calls = getWeeklyReport.mock.calls.length
+      fireEvent.change(screen.getAllByLabelText(/score for week 1/, { selector: 'input' })[0], { target: { value: '157.4' } })
+      fireEvent.change(screen.getAllByLabelText(/score for week 1/, { selector: 'input' })[1], { target: { value: '147.9' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Save week 1' }))
+      await waitFor(() => expect(saveScoreOverride).toHaveBeenCalled())
+      expect(saveScoreOverride).toHaveBeenCalledWith('L0', 1, [
+        { rosterId: 1, points: 157.4 },
+        { rosterId: 2, points: 147.9 },
+      ])
+      await waitFor(() => expect(getWeeklyReport.mock.calls.length).toBeGreaterThan(calls))
+    })
   })
 })
