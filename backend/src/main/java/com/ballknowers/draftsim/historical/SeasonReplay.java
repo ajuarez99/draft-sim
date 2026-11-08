@@ -6,7 +6,6 @@ import com.ballknowers.draftsim.engine.GameScoringService;
 import com.ballknowers.draftsim.engine.RealizedLineupService;
 import com.ballknowers.draftsim.engine.RealizedLineupService.ScoredPlayer;
 import com.ballknowers.draftsim.engine.RealizedLineupService.WeekLineup;
-import com.ballknowers.draftsim.historical.HistoricalDataRepository.GameLine;
 import com.ballknowers.draftsim.historical.HistoricalResult.LineupWeek;
 import com.ballknowers.draftsim.historical.HistoricalResult.Matchup;
 import com.ballknowers.draftsim.historical.HistoricalResult.Standing;
@@ -58,13 +57,13 @@ public class SeasonReplay {
      * @param scoring    the era-filtered scoring snapshot, in the order its JSON was stored
      * @param weekStarts first game date seen in each week, from the reference data
      * @param cards      the board snapshot by player id
-     * @param games      the season's played games for every board player
+     * @param games      the season's played games for every board player (any sport's {@link WeekStatLine})
      */
     public record Input(LeagueSettings settings, SportRules rules, Map<String, Double> scoring, int weekCount,
                         long seed, int userSlot, List<Pick> picks, Map<Long, HistoricalPlayerCard> cards,
-                        List<GameLine> games, Map<Integer, LocalDate> weekStarts) {}
+                        List<? extends WeekStatLine> games, Map<Integer, LocalDate> weekStarts) {}
 
-    /** The single game locked for a player in a week. */
+    /** The single game locked for a player in a week. {@code date} is null for football (no dates in the source). */
     public record Locked(double points, LocalDate date) {}
 
     /** Player-week scores: {@code playerId -> week -> locked game}. A week without a game has no entry. */
@@ -108,9 +107,9 @@ public class SeasonReplay {
      * in real lock-in. On equal scores the earlier game is the locked one ({@code games} arrive ordered by
      * week, then date).
      */
-    public PlayerWeeks scorePlayerWeeks(Map<String, Double> scoring, List<GameLine> games) {
+    public PlayerWeeks scorePlayerWeeks(Map<String, Double> scoring, List<? extends WeekStatLine> games) {
         PlayerWeeks pw = new PlayerWeeks();
-        for (GameLine g : games) {
+        for (WeekStatLine g : games) {
             double pts = scorer.score(scoring, statMap(g, scoring.keySet()));
             Locked cur = pw.get(g.playerId(), g.week());
             if (cur == null || pts > cur.points()) pw.put(g.playerId(), g.week(), new Locked(pts, g.gameDate()));
@@ -119,28 +118,11 @@ public class SeasonReplay {
     }
 
     /** The counted keys of one game as numbers; unrecorded counted keys are 0 (FR-007). Mutable on purpose. */
-    static Map<String, Object> statMap(GameLine g, Collection<String> keys) {
+    static Map<String, Object> statMap(WeekStatLine g, Collection<String> keys) {
         Map<String, Object> m = new LinkedHashMap<>();
         for (String k : keys) {
-            Integer v = switch (k) {
-                case "pts" -> g.pts();
-                case "reb" -> g.reb();
-                case "ast" -> g.ast();
-                case "stl" -> g.stl();
-                case "blk" -> g.blk();
-                case "to" -> g.to();
-                case "tpm" -> g.tpm();
-                case "tf" -> g.tf();
-                case "ff" -> g.ff();
-                case "dd" -> g.dd();
-                case "td" -> g.td();
-                case "bonus_pt_40p" -> g.bonusPt40();
-                case "bonus_pt_50p" -> g.bonusPt50();
-                case "bonus_reb_20p" -> g.bonusReb20();
-                case "bonus_ast_15p" -> g.bonusAst15();
-                default -> null;
-            };
-            m.put(k, v == null ? 0 : v);
+            Double v = g.stat(k);   // the per-sport switch lives on the line (spec 056 T005)
+            m.put(k, v == null ? 0.0 : v);
         }
         return m;
     }
@@ -198,7 +180,7 @@ public class SeasonReplay {
 
         Map<Long, Player> players = new HashMap<>();
         for (HistoricalPlayerCard c : in.cards().values()) {
-            players.put(c.id(), HistoricalBoardBuilder.toEntry(c).player());
+            players.put(c.id(), HistoricalBoardBuilder.toEntry(c, in.settings().sport()).player());
         }
         PlayerWeeks pw = scorePlayerWeeks(in.scoring(), in.games());
         TeamScorer team = new TeamScorer(lineups, in.settings(), in.rules(), players, pw);
@@ -219,7 +201,13 @@ public class SeasonReplay {
                     for (SportRules.Assigned a : wl.lineup()) {
                         long id = a.entry().player().id();
                         Locked l = pw.get(id, w);
-                        starters.add(new Starter(id, a.slot(), a.value(), l == null ? null : l.date().toString()));
+                        // Football lines have no game date (F4): a null date is "no date", never a crash. A starter
+                        // always has a game (review N2): the lineup is built only from players passed in `scored`,
+                        // i.e. those with a Locked entry, so l is never null here and a null date therefore means
+                        // "played, but the source carries no date". The web shows "Week N" for that; a 0-point
+                        // starter played and scored 0. The l == null arm is defensive only.
+                        starters.add(new Starter(id, a.slot(), a.value(),
+                                l == null || l.date() == null ? null : l.date().toString()));
                     }
                     userLineups.add(new LineupWeek(w, starters));
                 }

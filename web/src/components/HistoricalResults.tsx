@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult } from '../api'
-import { ordinal, pts1, teamName } from '../historicalCopy'
+import { ordinal, pts1, sportOf, teamName } from '../historicalCopy'
 
 type Props = { game: HistoricalGameState; result: HistoricalResult }
 
@@ -153,13 +153,17 @@ export default function HistoricalResults({ game, result }: Props) {
         {lineupWeek && (
           <>
             <h3>Your lineup, week {lineupWeek.week}</h3>
-            <p className="muted small">Each starter counts his single best game of the week; the date is the game that was locked.</p>
+            <p className="muted small">
+              {sportOf(game) === 'NFL'
+                ? "Each starter counts his score for the week; your best legal lineup is set for you."
+                : 'Each starter counts his single best game of the week; the date is the game that was locked.'}
+            </p>
             <table className="hist-table">
               <thead>
                 <tr>
                   <th>Slot</th>
                   <th>Player</th>
-                  <th>Locked game</th>
+                  <th>{sportOf(game) === 'NFL' ? 'Game' : 'Locked game'}</th>
                   <th className="num">Points</th>
                 </tr>
               </thead>
@@ -168,7 +172,7 @@ export default function HistoricalResults({ game, result }: Props) {
                   <tr key={`${s.slot}-${i}`}>
                     <td>{s.slot}</td>
                     <td>{nameOf(cards, s.playerId)}</td>
-                    <td>{s.gameDate ?? 'did not play'}</td>
+                    <td>{s.gameDate ?? (sportOf(game) === 'NFL' ? `Week ${lineupWeek.week}` : 'did not play')}</td>
                     <td className="num">{pts1(s.points)}</td>
                   </tr>
                 ))}

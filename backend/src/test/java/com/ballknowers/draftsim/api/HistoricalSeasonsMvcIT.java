@@ -52,14 +52,45 @@ class HistoricalSeasonsMvcIT {
         mvc.perform(get("/api/history/seasons").header("X-Sleeper-User", " ")).andExpect(status().isUnauthorized());
     }
 
+    /** Spec 056 T021: sport is required with no default; a defaulted sport asserts a rule. */
+    @Test
+    void aMissingOrUnknownSportIs400WithNoDefault() throws Exception {
+        mvc.perform(get("/api/history/seasons").header("X-Sleeper-User", "it-user"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/history/seasons?sport=").header("X-Sleeper-User", "it-user"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/history/seasons?sport=MLB").header("X-Sleeper-User", "it-user"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/history/seasons?sport=nba").header("X-Sleeper-User", "it-user"))
+                .andExpect(status().isBadRequest());   // case-sensitive: the stored codes are NBA / NFL
+        // identity is still checked first
+        mvc.perform(get("/api/history/seasons")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void footballRowsCarryTheirSportAndDataNotesAndNeverMixWithBasketball() throws Exception {
+        MvcResult r = mvc.perform(get("/api/history/seasons?sport=NFL").header("X-Sleeper-User", "it-user"))
+                .andExpect(status().isOk()).andReturn();
+        for (JsonNode s : json.readTree(r.getResponse().getContentAsString())) {
+            assertEquals("NFL", s.get("sport").asText());
+            assertEquals("NFLVERSE", s.get("source").asText());
+            assertTrue(s.get("seasonStart").asInt() >= 2000 && s.get("seasonStart").asInt() <= 2025);
+            assertTrue(s.get("dataNotes").isArray());
+            assertEquals("PRIOR_SEASON_POINTS", s.get("rankingSource").asText());
+            assertTrue(s.get("settingsSource").asText().contains("full PPR"));
+        }
+    }
+
     @Test
     void theOfferedSeasonsCarryTheDisclosureAndStayInTheOfferedRange() throws Exception {
-        MvcResult r = mvc.perform(get("/api/history/seasons").header("X-Sleeper-User", "it-user"))
+        MvcResult r = mvc.perform(get("/api/history/seasons?sport=NBA").header("X-Sleeper-User", "it-user"))
                 .andExpect(status().isOk()).andReturn();
         JsonNode list = json.readTree(r.getResponse().getContentAsString());
         assertTrue(list.isArray());
         int previous = 0;
         for (JsonNode s : list) {
+            assertEquals("NBA", s.get("sport").asText());
+            assertTrue(s.get("dataNotes").isArray() && s.get("dataNotes").isEmpty(), "basketball has no data notes");
             int start = s.get("seasonStart").asInt();
             assertTrue(start >= 1970 && start <= 2025, "outside the offered range: " + start);
             assertTrue(start > previous, "ascending");

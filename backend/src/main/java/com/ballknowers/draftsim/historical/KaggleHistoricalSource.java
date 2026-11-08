@@ -518,9 +518,9 @@ public class KaggleHistoricalSource {
                 }
                 data.replaceSeasonGames(s, games);
                 gameRowCount[0] = games.size();
-                data.upsertSeason(new SeasonRow(s, label(s), EraScoring.KAGGLE, opening, last, weeks.weekCount(),
+                data.upsertSeason(new SeasonRow("NBA", s, label(s), EraScoring.KAGGLE, opening, last, weeks.weekCount(),
                         gameIds.size(), new ArrayList<>(era.scoring().keySet()), toJson(era.excluded()),
-                        toJson(era.coverage()), "PRIOR_SEASON_POINTS", OffsetDateTime.now(ZoneOffset.UTC)));
+                        toJson(era.coverage()), "PRIOR_SEASON_POINTS", OffsetDateTime.now(ZoneOffset.UTC), null, 0, null));
             });
 
             Map<String, Object> m = new LinkedHashMap<>();

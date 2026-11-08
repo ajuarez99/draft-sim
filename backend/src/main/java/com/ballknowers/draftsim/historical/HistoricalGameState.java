@@ -18,25 +18,29 @@ import java.util.Map;
  * so a reopened game returns exactly what was frozen at completion (FR-013). Null until COMPLETE.
  * {@code available} is empty once the game is no longer DRAFTING.
  */
-public record HistoricalGameState(long id, String status, SeasonView season, int teams, int rounds,
+public record HistoricalGameState(long id, String sport, String status, SeasonView season, int teams, int rounds,
                                   List<String> rosterPositions, int userSlot, List<Integer> myPicks,
                                   int currentPickNo, Integer onTheClockSlot, boolean isUsersTurn,
                                   List<PickView> picks, List<HistoricalPlayerCard> available, JsonNode result) {
 
-    /** What the screen prints as where the settings come from (FR-002, plan F13). */
-    public static final String SETTINGS_SOURCE = "App standard 12-team NBA roster · Legacy Ball Knowers scoring";
-
     /**
      * @param countedStats the scoring keys this season counts, from the game's own frozen scoring snapshot
      * @param rankingLabel what to call the board order: never "ADP" (FR-009)
+     * @param dataNotes    plain-language caveats about the data behind this season (spec 056 FR-014); empty when
+     *                     there is nothing to say, never null
+     * @param attribution  the data-licence line to show (nflverse, CC BY 4.0 for football); null for basketball
      */
     public record SeasonView(String label, List<String> countedStats, Map<String, String> excludedStats,
                              Map<String, Double> statCoverage, String rankingSource, String rankingLabel,
-                             String settingsSource) {}
+                             String settingsSource, List<String> dataNotes, String attribution) {
+        public SeasonView {
+            dataNotes = dataNotes == null ? List.of() : List.copyOf(dataNotes);
+        }
+    }
 
     public record PickView(int pickNo, int round, int draftSlot, String seatType, HistoricalPlayerCard player) {}
 
     /** One row of {@code GET /api/history/games}; {@code finish} is null until COMPLETE. */
-    public record GameSummary(long id, String seasonLabel, String status, int userSlot, Integer finish,
-                              OffsetDateTime createdAt) {}
+    public record GameSummary(long id, String sport, String seasonLabel, String status, int userSlot,
+                              Integer finish, OffsetDateTime createdAt) {}
 }

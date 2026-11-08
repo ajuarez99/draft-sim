@@ -21,7 +21,7 @@ import HistoricalPlayerList from '../components/HistoricalPlayerList'
 import HistoricalResults from '../components/HistoricalResults'
 import PageHeader from '../components/PageHeader'
 import { LoadingScreen } from '../components/Skeleton'
-import { cardToPlayerRef, coverageText, historicalSeats, statLong } from '../historicalCopy'
+import { cardToPlayerRef, coverageText, historicalSeats, sportOf, statLong } from '../historicalCopy'
 
 /** Same stub the mock room uses: no fitted-history provenance exists for a computer team here. */
 function toBoardSeat(s: MockSeat): Seat {
@@ -42,23 +42,24 @@ function toBoardSeat(s: MockSeat): Seat {
   }
 }
 
-/** What counts, what does not, and why: the era disclosure (FR-007/FR-008). */
+/** What counts, what does not, and why: the era disclosure (FR-007/FR-008), per sport (spec 056). */
 function SeasonDisclosure({ game }: { game: HistoricalGameState }) {
   const s = game.season
+  const nfl = sportOf(game) === 'NFL'
   const excluded = Object.entries(s.excludedStats)
   return (
     <section className="panel hist-disclosure" aria-label="What counts this season">
       <div className="hist-disclosure-cols">
         <div>
-          <h2>Stats that count in {s.label}</h2>
+          <h2>{nfl ? `Scoring in ${s.label}` : `Stats that count in ${s.label}`}</h2>
           <ul className="hist-counted">
             {s.countedStats.map((k) => (
-              <li key={k} className="hist-pill" title={coverageText(k, s.statCoverage[k])}>
-                {coverageText(k, s.statCoverage[k])}
+              <li key={k} className="hist-pill" title={nfl ? statLong(k) : coverageText(k, s.statCoverage[k])}>
+                {nfl ? statLong(k) : coverageText(k, s.statCoverage[k])}
               </li>
             ))}
           </ul>
-          <p className="muted small">A stat missing from a box score scores 0. Bonuses are not shown on player cards.</p>
+          {!nfl && <p className="muted small">A stat missing from a box score scores 0. Bonuses are not shown on player cards.</p>}
         </div>
         {excluded.length > 0 && (
           <div>
@@ -73,9 +74,17 @@ function SeasonDisclosure({ game }: { game: HistoricalGameState }) {
           </div>
         )}
       </div>
+      {(s.dataNotes ?? []).length > 0 && (
+        <ul className="hist-notes muted small" aria-label="About the data">
+          {(s.dataNotes ?? []).map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+        </ul>
+      )}
       <p className="muted small">
         Board order: {s.rankingLabel}. {s.settingsSource}
       </p>
+      {(s.attribution ?? null) && <p className="muted small hist-attribution">{s.attribution}</p>}
     </section>
   )
 }
@@ -124,6 +133,7 @@ export default function HistoricalRoom() {
   }
   if (!state) return <LoadingScreen label="Loading this draft…" />
 
+  const sport = sportOf(state)
   const complete = state.status === 'COMPLETE'
   const drafting = state.status === 'DRAFTING'
   const board: PredictedPick[] = state.picks
@@ -134,14 +144,14 @@ export default function HistoricalRoom() {
       slot: p.draftSlot,
       manager: seats.find((s) => s.slot === p.draftSlot)?.manager ?? String(p.draftSlot),
       avatarId: null,
-      player: cardToPlayerRef(p.player),
+      player: cardToPlayerRef(p.player, sport),
       probability: 1,
       isModal: true,
       alternatives: [],
     }))
   const userPicks: Record<number, ReturnType<typeof cardToPlayerRef>> = {}
   for (const p of state.picks) {
-    if (p.seatType === 'USER' && p.player) userPicks[p.pickNo] = cardToPlayerRef(p.player)
+    if (p.seatType === 'USER' && p.player) userPicks[p.pickNo] = cardToPlayerRef(p.player, sport)
   }
   const nextOwnPick = state.myPicks.find((p) => p > state.currentPickNo) ?? null
 
@@ -185,7 +195,7 @@ export default function HistoricalRoom() {
       userPicks={userPicks}
       seats={seats.map(toBoardSeat)}
       mySlot={state.userSlot}
-      sport="nba"
+      sport={sport === 'NFL' ? 'nfl' : 'nba'}
       reversalRound={0}
       hideProvenanceDots
       hidePhotos
@@ -257,6 +267,7 @@ export default function HistoricalRoom() {
           <HistoricalPlayerList
             players={state.available}
             rankingLabel={state.season.rankingLabel}
+            sport={sport}
             canPick={state.isUsersTurn}
             busy={busy != null}
             onPick={(c) => void run('DRAFT', () => historicalPick(state.id, c.id))}

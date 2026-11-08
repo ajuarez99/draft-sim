@@ -61,7 +61,7 @@ class HistoricalRealSeasonIT {
     @Test
     void aKaggleSeasonAndASleeperSeasonBothPlayThroughToAFrozenResult() throws Exception {
         for (int season : new int[]{1971, 1995, 2023}) {
-            Assumptions.assumeTrue(data.offeredSeasons(season, season).size() == 1,
+            Assumptions.assumeTrue(data.offeredSeasons("NBA", season, season).size() == 1,
                     "season " + season + " is not imported here -- skipping");
             playThrough(season);
         }
@@ -72,7 +72,7 @@ class HistoricalRealSeasonIT {
 
     private void playThrough(int season) throws Exception {
         long t0 = System.nanoTime();
-        HistoricalGameState created = service.create(USER, 6, season);
+        HistoricalGameState created = service.create(USER, "NBA", 6, season);
         long createMs = (System.nanoTime() - t0) / 1_000_000;
         assertEquals("DRAFTING", created.status());
         assertEquals(6, created.currentPickNo());
@@ -84,7 +84,7 @@ class HistoricalRealSeasonIT {
         assertEquals("COMPLETE", done.status());
         JsonNode result = done.result();
         assertEquals(12, result.get("standings").size(), "twelve teams");
-        int weekCount = data.findSeason(season).orElseThrow().weekCount();
+        int weekCount = data.findSeason("NBA", season).orElseThrow().weekCount();
         assertEquals(weekCount, result.get("weeks").size(), "one replayed week per week of the real season");
         assertEquals(168, done.picks().size());
         assertEquals(weekCount, result.get("lineups").get("6").size());
@@ -110,7 +110,7 @@ class HistoricalRealSeasonIT {
         }
         assertEquals(fromMatchups, Math.round(week1 * 100) / 100.0, 0.011, "week-1 starters add up to the matchup score");
 
-        report.add("== season " + season + " (" + data.findSeason(season).orElseThrow().source() + ") ==");
+        report.add("== season " + season + " (" + data.findSeason("NBA", season).orElseThrow().source() + ") ==");
         report.add("create " + createMs + " ms, final auto-FINISH (13 user picks + bots + replay) " + finishMs + " ms");
         report.add("weeks " + weekCount + ", userFinish " + result.get("userFinish").asInt());
         for (JsonNode s : result.get("standings")) {
@@ -138,8 +138,8 @@ class HistoricalRealSeasonIT {
     @Test
     void jordanIsInTheTopTenOfThe1995Board() throws Exception {
         int s = 1995;
-        Assumptions.assumeTrue(data.offeredSeasons(s, s).size() == 1, "season 1995 is not imported here -- skipping");
-        var season = data.offeredSeasons(s, s).get(0);
+        Assumptions.assumeTrue(data.offeredSeasons("NBA", s, s).size() == 1, "season 1995 is not imported here -- skipping");
+        var season = data.offeredSeasons("NBA", s, s).get(0);
         java.util.Map<String, Double> scoring = new java.util.TreeMap<>();
         for (String k : season.countedStats()) {
             if (props.scoring().containsKey(k)) scoring.put(k, props.scoring().get(k));

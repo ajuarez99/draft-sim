@@ -158,6 +158,76 @@ class ComparisonsTest {
         assertEquals(2L, h.picks().get(0).player().id(), "player 1 was gone by pick 2");
     }
 
+    // ---- football (spec 056 T026): the same comparisons, over QB/RB/WR/TE week lines with no dates ----------------
+
+    private static NflHistoricalRepository.NflWeekLine nflWeek(long player, int week, double rushYd) {
+        return new NflHistoricalRepository.NflWeekLine(player, 2011, week, "AAA", Map.of("rush_yd", rushYd));
+    }
+
+    /** Season values from real football week lines: id n scored n rushing yards in the one week. */
+    private static PlayerWeeks nflValues(int players) {
+        List<NflHistoricalRepository.NflWeekLine> games = new ArrayList<>();
+        for (int id = 1; id <= players; id++) games.add(nflWeek(id, 1, id));
+        return REPLAY.scorePlayerWeeks(Map.of("rush_yd", 1.0), games);
+    }
+
+    /** Pick 3 finishing 150th of 160 is the bust; pick 160 finishing 2nd is a star and never the bust. */
+    @Test
+    void nflTheBustIsTheEarlyPickWhoFinishedFarDownAndNeverTheLatePickWhoStarred() {
+        PlayerWeeks pw = nflValues(160);
+        List<Long> ids = new ArrayList<>();
+        Map<Long, Double> value = new HashMap<>();
+        for (long id = 1; id <= 160; id++) {
+            ids.add(id);
+            value.put(id, pw.seasonValue(id));
+        }
+        Map<Long, Integer> rank = Comparisons.valueRanks(ids, value);
+        assertEquals(150, rank.get(11L), "11 yards of 160 players: 150th");
+        assertEquals(2, rank.get(159L));
+        List<Pick> mine = List.of(new Pick(3, 1, 11L), new Pick(160, 1, 159L));
+        Bust b = Comparisons.bust(mine, rank, value, Map.of());
+        assertNotNull(b);
+        assertEquals(3, b.pickNo(), "pick 3 finishing 150th, not pick 160 finishing 2nd");
+        assertEquals(150, b.seasonValueRank());
+        assertNull(Comparisons.bust(List.of(new Pick(160, 1, 159L)), rank, value, Map.of()),
+                "a late-pick star alone is no bust");
+    }
+
+    /**
+     * One QB slot, two RB, two WR, one TE, one FLEX. Three QBs (100, 99, 98), three RBs (50, 40, 35), two WRs
+     * (30, 20) and a TE (10). A raw-value hindsight would take the three QBs; the lineup-aware one takes a QB, then
+     * RB, RB, and the third RB (35 in the FLEX beats the first WR's 30), because a second QB and a QB in a FLEX never
+     * start. A well-formed search pointed at raw points would still pass every structural test (bug class 1).
+     */
+    @Test
+    void nflHindsightIsLineupAwareAndNeverTakesASecondQuarterback() {
+        Map<Long, HistoricalPlayerCard> cards = new LinkedHashMap<>();
+        List<NflHistoricalRepository.NflWeekLine> games = new ArrayList<>();
+        String[] pos = {"QB", "QB", "QB", "RB", "RB", "RB", "WR", "WR", "TE"};
+        double[] pts = {100, 99, 98, 50, 40, 35, 30, 20, 10};
+        for (int i = 0; i < pos.length; i++) {
+            long id = i + 1;
+            cards.put(id, card(id, pos[i]));
+            games.add(nflWeek(id, 1, pts[i]));
+        }
+        for (long j = 20; j <= 23; j++) cards.put(j, card(j, "WR"));   // the user's real picks: nobody who scored
+        List<Pick> real = List.of(new Pick(1, 1, 20L), new Pick(2, 1, 21L), new Pick(3, 1, 22L), new Pick(4, 1, 23L));
+
+        PlayerWeeks pw = REPLAY.scorePlayerWeeks(Map.of("rush_yd", 1.0), games);
+        Map<Long, com.ballknowers.draftsim.domain.Player> players = new HashMap<>();
+        cards.values().forEach(c -> players.put(c.id(),
+                HistoricalBoardBuilder.toEntry(c, com.ballknowers.draftsim.domain.Sport.NFL).player()));
+        TeamScorer team = new TeamScorer(LINEUPS, nflSettings(12), nflRules(), players, pw);
+        Map<Long, Double> value = new HashMap<>();
+        cards.keySet().forEach(id -> value.put(id, pw.seasonValue(id)));
+
+        Hindsight h = CMP.hindsight(List.of(1, 2, 3, 4), real, cards.keySet(), team, 1, value, cards, 0.0);
+
+        assertEquals(List.of(1L, 4L, 5L, 6L), h.picks().stream().map(p -> p.player().id()).toList(),
+                "QB1, RB1, RB2, then RB3 in the FLEX; not QB2 or QB3");
+        assertEquals(100 + 50 + 40 + 35, h.pointsFor());
+    }
+
     @Test
     void userBeatIsTrueExactlyWhenHindsightScoredLess() {
         Map<Long, HistoricalPlayerCard> cards = new LinkedHashMap<>();

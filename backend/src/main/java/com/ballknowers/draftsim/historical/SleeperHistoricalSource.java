@@ -427,9 +427,9 @@ public class SleeperHistoricalSource {
                 }
                 data.replaceSeasonGames(y, games);
                 counts[1] = games.size();
-                data.upsertSeason(new SeasonRow(y, KaggleHistoricalSource.label(y), EraScoring.SLEEPER, openingF, lastF,
+                data.upsertSeason(new SeasonRow("NBA", y, KaggleHistoricalSource.label(y), EraScoring.SLEEPER, openingF, lastF,
                         weeksF.weekCount(), gameIds.size(), new ArrayList<>(props.scoring().keySet()), "{}", "{}",
-                        "PRIOR_SEASON_POINTS", OffsetDateTime.now(ZoneOffset.UTC)));
+                        "PRIOR_SEASON_POINTS", OffsetDateTime.now(ZoneOffset.UTC), null, 0, null));
             });
 
             Map<String, Object> m = new LinkedHashMap<>();
