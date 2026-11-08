@@ -55,7 +55,24 @@ public class HistoricalDataRepository {
      */
     public record SeasonLine(long playerId, int seasonStart, String team, Integer age, int games,
                              List<String> positions, Double pts, Double reb, Double ast, Double stl, Double blk,
-                             Double to, Double tpm, Double fgm, Double fga, Double ftm, Double fta) {}
+                             Double to, Double tpm, Double fgm, Double fga, Double ftm, Double fta)
+            implements StatLine {
+
+        /** The season total of a counting stat; null when unrecorded. (Moved verbatim from the board builder, 056 T005.) */
+        @Override
+        public Double stat(String key) {
+            return switch (key) {
+                case "pts" -> pts();
+                case "reb" -> reb();
+                case "ast" -> ast();
+                case "stl" -> stl();
+                case "blk" -> blk();
+                case "to" -> to();
+                case "tpm" -> tpm();
+                default -> throw new IllegalArgumentException("not a counting stat: " + key);
+            };
+        }
+    }
 
     /** A season line with the player's display name, for building a board. */
     public record NamedSeasonLine(String name, SeasonLine line) {}
@@ -68,13 +85,43 @@ public class HistoricalDataRepository {
                            Integer pts, Integer reb, Integer ast, Integer stl, Integer blk, Integer to,
                            Integer tpm, Integer fgm, Integer fga, Integer ftm, Integer fta, Integer tf,
                            Integer ff, Integer dd, Integer td, Integer bonusPt40, Integer bonusPt50,
-                           Integer bonusReb20, Integer bonusAst15) {}
+                           Integer bonusReb20, Integer bonusAst15) implements WeekStatLine {
 
-    /** The per-season metadata row; the jsonb columns are carried as JSON text. */
-    public record SeasonRow(int seasonStart, String label, String source, LocalDate openingNight,
+        /** One stat of this game, null when unrecorded. (Moved verbatim from {@code SeasonReplay.statMap}, 056 T005.) */
+        @Override
+        public Double stat(String key) {
+            Integer v = switch (key) {
+                case "pts" -> pts();
+                case "reb" -> reb();
+                case "ast" -> ast();
+                case "stl" -> stl();
+                case "blk" -> blk();
+                case "to" -> to();
+                case "tpm" -> tpm();
+                case "tf" -> tf();
+                case "ff" -> ff();
+                case "dd" -> dd();
+                case "td" -> td();
+                case "bonus_pt_40p" -> bonusPt40();
+                case "bonus_pt_50p" -> bonusPt50();
+                case "bonus_reb_20p" -> bonusReb20();
+                case "bonus_ast_15p" -> bonusAst15();
+                default -> null;
+            };
+            return v == null ? null : v.doubleValue();
+        }
+    }
+
+    /**
+     * The per-season metadata row; the jsonb columns are carried as JSON text. {@code sport} is "NBA" or "NFL"
+     * (V46; no default, spec 056 F8). {@code openingNight}/{@code lastCountedDate} are null for football.
+     * {@code expectedGameCount} and {@code sourceSha256} are null for basketball.
+     */
+    public record SeasonRow(String sport, int seasonStart, String label, String source, LocalDate openingNight,
                             LocalDate lastCountedDate, int weekCount, int gameCount, List<String> countedStats,
                             String excludedStatsJson, String statCoverageJson, String rankingSource,
-                            OffsetDateTime importedAt) {}
+                            OffsetDateTime importedAt, Integer expectedGameCount, int droppedRows,
+                            String sourceSha256) {}
 
     public record ImportJobRow(long id, String part, String status, OffsetDateTime startedAt,
                                OffsetDateTime finishedAt, String reportJson) {}
@@ -196,79 +243,102 @@ public class HistoricalDataRepository {
 
     // ---- season metadata -----------------------------------------------------------------------------
 
-    /** Insert or overwrite the season row. Written last, in the season's own transaction, so a row means it committed. */
+    /**
+     * Insert or overwrite the season row, keyed on (sport, season_start) since V46 (spec 056 F3: the old
+     * {@code on conflict (season_start)} is refused by Postgres once the primary key changes). Written last, in the
+     * season's own transaction, so a row means it committed.
+     */
     public void upsertSeason(SeasonRow s) {
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement("""
-                    insert into historical_season (season_start, label, source, opening_night, last_counted_date,
-                        week_count, game_count, counted_stats, excluded_stats, stat_coverage, ranking_source,
-                        imported_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
-                    on conflict (season_start) do update set label = excluded.label, source = excluded.source,
+                    insert into historical_season (sport, season_start, label, source, opening_night,
+                        last_counted_date, week_count, game_count, counted_stats, excluded_stats, stat_coverage,
+                        ranking_source, imported_at, expected_game_count, dropped_rows, source_sha256)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?)
+                    on conflict (sport, season_start) do update set label = excluded.label, source = excluded.source,
                         opening_night = excluded.opening_night, last_counted_date = excluded.last_counted_date,
                         week_count = excluded.week_count, game_count = excluded.game_count,
                         counted_stats = excluded.counted_stats, excluded_stats = excluded.excluded_stats,
                         stat_coverage = excluded.stat_coverage, ranking_source = excluded.ranking_source,
-                        imported_at = excluded.imported_at
+                        imported_at = excluded.imported_at, expected_game_count = excluded.expected_game_count,
+                        dropped_rows = excluded.dropped_rows, source_sha256 = excluded.source_sha256
                     """);
-            ps.setInt(1, s.seasonStart());
-            ps.setString(2, s.label());
-            ps.setString(3, s.source());
-            ps.setObject(4, s.openingNight());
-            ps.setObject(5, s.lastCountedDate());
-            ps.setInt(6, s.weekCount());
-            ps.setInt(7, s.gameCount());
-            ps.setArray(8, con.createArrayOf("text", s.countedStats().toArray()));
-            ps.setString(9, s.excludedStatsJson());
-            ps.setString(10, s.statCoverageJson());
-            ps.setString(11, s.rankingSource());
-            ps.setObject(12, s.importedAt());
+            ps.setString(1, s.sport());
+            ps.setInt(2, s.seasonStart());
+            ps.setString(3, s.label());
+            ps.setString(4, s.source());
+            ps.setObject(5, s.openingNight());
+            ps.setObject(6, s.lastCountedDate());
+            ps.setInt(7, s.weekCount());
+            ps.setInt(8, s.gameCount());
+            ps.setArray(9, con.createArrayOf("text", s.countedStats().toArray()));
+            ps.setString(10, s.excludedStatsJson());
+            ps.setString(11, s.statCoverageJson());
+            ps.setString(12, s.rankingSource());
+            ps.setObject(13, s.importedAt());
+            setInt(ps, 14, s.expectedGameCount());
+            ps.setInt(15, s.droppedRows());
+            ps.setString(16, s.sourceSha256());
             return ps;
         });
     }
 
-    public Optional<SeasonRow> findSeason(int seasonStart) {
-        return db.sql(SEASON_SELECT + " where season_start = ?")
-                .param(seasonStart)
+    public Optional<SeasonRow> findSeason(String sport, int seasonStart) {
+        return db.sql(SEASON_SELECT + " where s.sport = ? and s.season_start = ?")
+                .params(sport, seasonStart)
                 .query(this::mapSeason)
                 .optional();
     }
 
     /**
-     * The seasons a user may start: the season row has committed AND the prior season's card lines exist
-     * (plan F14), so a half-imported season is never offered. Newest first is the caller's call; ascending here.
+     * The seasons a user may start in one sport: the season row has committed AND the prior season's card lines
+     * exist (plan F14), so a half-imported season is never offered. The prior-lines check reads the sport's own
+     * line table, so a basketball line can never make a football season look offered. Ascending.
      */
-    public List<SeasonRow> offeredSeasons() {
-        return offeredSeasons(FIRST_OFFERED, LAST_OFFERED);
+    public List<SeasonRow> offeredSeasons(String sport) {
+        return switch (sport) {
+            case "NBA" -> offeredSeasons(sport, NBA_FIRST_OFFERED, NBA_LAST_OFFERED);
+            // Football's range is configuration (historical-nfl.first-offered / last-offered), read in exactly one
+            // place, NflHistoricalSport. It is not repeated here (spec 056 T020).
+            case "NFL" -> throw new IllegalArgumentException(
+                    "football's offered range is configured: use HistoricalSports.get(\"NFL\").offeredSeasons()");
+            default -> throw new IllegalArgumentException("unknown sport: " + sport);
+        };
     }
 
-    public static final int FIRST_OFFERED = 1970, LAST_OFFERED = 2025;
+    public static final int NBA_FIRST_OFFERED = 1970, NBA_LAST_OFFERED = 2025;
 
     /** The same rule over an explicit range (the integration test uses synthetic seasons outside the real one). */
-    List<SeasonRow> offeredSeasons(int firstSeason, int lastSeason) {
-        return db.sql(SEASON_SELECT + """
-                 where s.season_start between ? and ?
-                   and exists (select 1 from historical_player_season p where p.season_start = s.season_start - 1)
-                 order by season_start
-                """)
-                .params(firstSeason, lastSeason)
+    public List<SeasonRow> offeredSeasons(String sport, int firstSeason, int lastSeason) {
+        // The table/column come from a closed switch, never from the caller's string.
+        String priorLines = switch (sport) {
+            case "NBA" -> "select 1 from historical_player_season p where p.season_start = s.season_start - 1";
+            case "NFL" -> "select 1 from historical_nfl_player_season p where p.season = s.season_start - 1";
+            default -> throw new IllegalArgumentException("unknown sport: " + sport);
+        };
+        return db.sql(SEASON_SELECT + " where s.sport = ? and s.season_start between ? and ? and exists ("
+                + priorLines + ") order by s.season_start")
+                .params(sport, firstSeason, lastSeason)
                 .query(this::mapSeason)
                 .list();
     }
 
     private static final String SEASON_SELECT = """
-            select season_start, label, source, opening_night, last_counted_date, week_count, game_count,
-                   counted_stats, excluded_stats::text as excluded_stats, stat_coverage::text as stat_coverage,
-                   ranking_source, imported_at
+            select s.sport, s.season_start, s.label, s.source, s.opening_night, s.last_counted_date, s.week_count,
+                   s.game_count, s.counted_stats, s.excluded_stats::text as excluded_stats,
+                   s.stat_coverage::text as stat_coverage, s.ranking_source, s.imported_at,
+                   s.expected_game_count, s.dropped_rows, s.source_sha256
             from historical_season s
             """;
 
     private SeasonRow mapSeason(ResultSet rs, int i) throws SQLException {
-        return new SeasonRow(rs.getInt("season_start"), rs.getString("label"), rs.getString("source"),
-                rs.getObject("opening_night", LocalDate.class), rs.getObject("last_counted_date", LocalDate.class),
+        return new SeasonRow(rs.getString("sport"), rs.getInt("season_start"), rs.getString("label"),
+                rs.getString("source"), rs.getObject("opening_night", LocalDate.class),
+                rs.getObject("last_counted_date", LocalDate.class),
                 rs.getInt("week_count"), rs.getInt("game_count"), textArray(rs, "counted_stats"),
                 rs.getString("excluded_stats"), rs.getString("stat_coverage"), rs.getString("ranking_source"),
-                rs.getObject("imported_at", OffsetDateTime.class));
+                rs.getObject("imported_at", OffsetDateTime.class), nullableInt(rs, "expected_game_count"),
+                rs.getInt("dropped_rows"), rs.getString("source_sha256"));
     }
 
     // ---- reads for play ------------------------------------------------------------------------------

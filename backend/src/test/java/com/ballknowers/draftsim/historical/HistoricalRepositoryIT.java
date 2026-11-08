@@ -70,10 +70,10 @@ class HistoricalRepositoryIT {
     }
 
     private SeasonRow season(int start) {
-        return new SeasonRow(start, start + "-" + (start + 1), "KAGGLE", LocalDate.of(start, 10, 22),
+        return new SeasonRow("NBA", start, start + "-" + (start + 1), "KAGGLE", LocalDate.of(start, 10, 22),
                 LocalDate.of(start + 1, 4, 10), 25, 1230, List.of("pts", "reb", "ast"),
                 "{\"stl\":\"not tracked by the league that season\"}", "{\"pts\":1.0,\"reb\":0.96}",
-                "PRIOR_SEASON_POINTS", NOW);
+                "PRIOR_SEASON_POINTS", NOW, null, 0, null);
     }
 
     @Test
@@ -148,21 +148,21 @@ class HistoricalRepositoryIT {
     void aSeasonIsOfferedOnlyWhenItsPriorSeasonLinesExist() {
         long p = data.upsertPlayer("KAGGLE", SRC_PREFIX + "o", "Offered O");
         data.upsertSeason(season(S1));
-        assertTrue(data.offeredSeasons(S0, S2).stream().noneMatch(s -> s.seasonStart() == S1),
+        assertTrue(data.offeredSeasons("NBA", S0, S2).stream().noneMatch(s -> s.seasonStart() == S1),
                 "no prior-season lines yet, so it must not be offered");
 
         data.replaceSeasonLines(S0, List.of(new SeasonLine(p, S0, "BOS", 25, 60, List.of("C"), 1000.0, 300.0, 100.0,
                 50.0, 40.0, 90.0, 0.0, 400.0, 900.0, 100.0, 150.0)));
-        assertTrue(data.offeredSeasons(S0, S2).stream().anyMatch(s -> s.seasonStart() == S1));
+        assertTrue(data.offeredSeasons("NBA", S0, S2).stream().anyMatch(s -> s.seasonStart() == S1));
 
-        SeasonRow read = data.findSeason(S1).orElseThrow();
+        SeasonRow read = data.findSeason("NBA", S1).orElseThrow();
         assertEquals(List.of("pts", "reb", "ast"), read.countedStats(), "text[] must round-trip");
         assertEquals(NOW, read.importedAt().withOffsetSameInstant(java.time.ZoneOffset.UTC));
         assertEquals(LocalDate.of(S1, 10, 22), read.openingNight());
         assertTrue(read.excludedStatsJson().contains("stl"));
 
         data.upsertSeason(season(S1)); // an upsert, not a duplicate-key failure
-        assertTrue(data.findSeason(S2).isEmpty());
+        assertTrue(data.findSeason("NBA", S2).isEmpty());
     }
 
     @Test
@@ -184,7 +184,7 @@ class HistoricalRepositoryIT {
         long q = data.upsertPlayer("KAGGLE", SRC_PREFIX + "y", "Pick Y");
         data.upsertSeason(season(S1));
 
-        long id = games.create("it-user", S1, 12, 14, 0, List.of("PG", "SG", "BN"), "{\"pts\":0.5}", 4, 99L,
+        long id = games.create("it-user", "NBA", S1, 12, 14, 0, List.of("PG", "SG", "BN"), "{\"pts\":0.5}", 4, 99L,
                 "[{\"playerId\":" + p + ",\"adp\":1,\"positionalRank\":1}]", NOW);
 
         GameRow g = games.find(id).orElseThrow();

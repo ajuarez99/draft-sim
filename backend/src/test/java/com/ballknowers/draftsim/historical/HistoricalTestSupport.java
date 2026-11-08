@@ -30,6 +30,19 @@ final class HistoricalTestSupport {
         return new BasketballRules(new ScoringProperties(null, sc));
     }
 
+    /** Football rules (QB, 2 RB, 2 WR, TE, FLEX) for the spec 056 comparison cases. */
+    static SportRules nflRules() {
+        var sc = new ScoringProperties.SportScoring(
+                new ScoringProperties.Weights(1.0, 0.35, 0.5, 0.25),
+                12.0, 3.0, 60.0, 0.15, 6, 0.85, Map.of("K", 3, "DEF", 4), 1.0, 30);
+        return new com.ballknowers.draftsim.sport.FootballRules(new ScoringProperties(sc, null));
+    }
+
+    static LeagueSettings nflSettings(int teams) {
+        return new LeagueSettings(Sport.NFL, teams, 15, List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "BN", "BN",
+                "BN", "BN", "BN", "BN", "BN", "BN"), 0.0, 0);
+    }
+
     static LeagueSettings settings(int teams) {
         return new LeagueSettings(Sport.NBA, teams, 14, LeagueShape.NBA_ROSTER, 0.0, 0);
     }

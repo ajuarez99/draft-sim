@@ -40,10 +40,22 @@ public class HistoricalImportController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> start(@RequestBody(required = false) Map<String, String> body) {
         String part = body == null ? null : body.get("part");
-        long jobId = imports.start(part);
+        // Optional, NFLVERSE only (spec 056): re-import a range of seasons instead of all 27 files.
+        Integer from = seasonOf(body, "fromSeason"), to = seasonOf(body, "toSeason");
+        long jobId = imports.start(part, from, to);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("jobId", jobId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(out);
+    }
+
+    private static Integer seasonOf(Map<String, String> body, String key) {
+        String v = body == null ? null : body.get(key);
+        if (v == null || v.isBlank()) return null;
+        try {
+            return Integer.valueOf(v.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(key + " must be a year, got '" + v + "'");
+        }
     }
 
     @GetMapping("/{jobId}")

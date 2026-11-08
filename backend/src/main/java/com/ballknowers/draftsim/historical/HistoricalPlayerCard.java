@@ -14,9 +14,17 @@ import java.util.Map;
  *
  * @param rank           1-based board position, ascending: 1 = the best (what the engine reads as adp)
  * @param positionalRank rank within the primary position, in board order
+ * @param rookiePick     football only (spec 056 F14): the overall NFL draft pick of a rookie with no prior line;
+ *                       null for veterans and always null for basketball. A rookie's {@code prior} stays null.
  */
 public record HistoricalPlayerCard(long id, String name, List<String> positions, String team, Integer age,
-                                   int rank, int positionalRank, Prior prior) {
+                                   int rank, int positionalRank, Prior prior, Integer rookiePick) {
+
+    /** Basketball and veterans: no rookie pick. Absence of a pick is not a rule, so this is not a defaulted sport. */
+    public HistoricalPlayerCard(long id, String name, List<String> positions, String team, Integer age,
+                                int rank, int positionalRank, Prior prior) {
+        this(id, name, positions, team, age, rank, positionalRank, prior, null);
+    }
 
     /**
      * A prior-season line, counted stats only and excluding bonuses (plan F12).
@@ -27,11 +35,16 @@ public record HistoricalPlayerCard(long id, String name, List<String> positions,
      * @param fantasyPoints season total of those counting stats under the drafted season's scoring
      * @param bestOfTwo    the season the RANKING used (the better of the last two with enough games), or null
      *                     when no prior season had enough games and the player is ranked after everyone who did
+     * @param totals       football only (spec 056 F16): season totals of the keys that are too rare to show per game
+     *                     (st_td, fum_lost, the 2-point keys), nonzero keys only. Never null: {@code {}} when there
+     *                     are none, and always {@code {}} for basketball.
      */
     public record Prior(String seasonLabel, int games, Map<String, Double> perGame, double fantasyPoints,
-                        String bestOfTwo) {
+                        String bestOfTwo, Map<String, Double> totals) {
         public Prior {
             perGame = perGame == null ? null : StatOrder.sorted(perGame);   // jsonb reorders keys (finding 11)
+            // A snapshot written before V46 has no totals key: it reads as empty, never null.
+            totals = totals == null ? new java.util.LinkedHashMap<>() : StatOrder.sorted(totals);
         }
     }
 }

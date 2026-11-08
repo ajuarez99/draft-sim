@@ -67,6 +67,13 @@ Built so far:
   possible lineup, your worst pick and the best player you passed on. Data: a CC0 Kaggle box-score set
   (1946-2022) plus Sleeper weekly stats (2017+), loaded by an admin import (migration V43, `historical_*` tables).
   Reference data only: it never touches a league.
+- **Football Time Machine** (specs/056-nfl-historical-draft-game). The same game for the NFL, 2000 to 2025:
+  a 12-team, 15-round snake (QB, 2 RB, 2 WR, TE, FLEX, 8 bench; no K/DEF) under full PPR with INT −1, then that
+  season's real weeks replayed. Bots rank by last season's points over replacement (a hand-set ranking, labelled
+  as such, never ADP), and rookies from NFL rounds 1-2 are slotted by their real draft pick. Positions are
+  nflverse's current listing, which is disclosed. Data: nflverse weekly stats and draft picks (CC BY 4.0, credited in
+  the room and results), loaded by the `NFLVERSE` part of the admin import. Migration V46 keys the shared
+  `historical_season`/`historical_game` tables on `(sport, season_start)` and adds the `historical_nfl_*` tables.
 - **Rivalry week** (specs/034-rivalry-schedule-grid, specs/037-rivalry-week-pick). The
   Rivalries page recommends a full set of rivalry pairings from league history and, since spec
   037, **which week** to play them. No pair may meet more than twice in the regular season

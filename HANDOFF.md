@@ -53,6 +53,31 @@ Also merged earlier: 032–037, 039–041, 043.
 **Local-only state:** the main checkout (`C:\Users\allan\source\draft-sim`) is parked on the old
 `017-nba-schedule-grid` branch with uncommitted edits from several sessions. Don't read its
 HANDOFF.md as current; this file on `main` is the one.
+## UPDATE 2026-11-08: spec 056 (Football Time Machine) built, reviewed and live-verified locally; pushed on branch `056-nfl-historical-draft-game`, no PR, NOT deployed
+
+An NFL copy of 053, 2000–2025, on nflverse data. Details, reviews and the verification record are in
+`specs/056-nfl-historical-draft-game/` (`verification.md` says what was run and what wasn't).
+
+**Merge and deploy order. Get this right or prod's boot fails:**
+1. **057 (commissioner score override, V45) merges and deploys first.** 056 was renumbered to V46 for it
+   on 2026-11-06 (Allan's call). Flyway's `outOfOrder` is false, so a V45 arriving after V46 is refused.
+2. **Before 056's V46 runs, count `historical_game` rows in prod** (SC-008: those basketball games must
+   reopen unchanged afterwards).
+3. **Web before backend.** `sport` is now required on the history endpoints, with no default, so the old
+   web gets 400s from the new backend. The new web works against the old backend (it reads a missing
+   `sport` as basketball and hides Football until NFL seasons exist). Railway deploys both on a merge, so
+   check which service finishes first, or deploy web by hand first.
+4. **Then run the import:** `POST /api/admin/historical/import {"part":"NFLVERSE"}` (27 seasons, 1999–2025;
+   1999 is only the prior-season line for 2000).
+
+**Open for Allan:**
+- **S2:** bots stack bench QBs (2.87 per bot roster, measured). Left unchanged.
+- **Not run:** a real-data pass over every same-name pair (SC-007), and a live check of the new web against a
+  real 053 backend (only vitest fixtures cover it).
+
+**Local cleanup:** the scratch Postgres is docker `draftsim-pg-056` on 5439. Its `draftsim` DB still records
+the pre-renumber V45 row, so recreate it before reuse or remove it (`docker rm -f draftsim-pg-056`).
+
 ## UPDATE 2026-11-02: spec 053 (Time Machine, historical draft game) built; NOT committed, NOT deployed, NOT browser-verified
 
 - **What:** backend `historical/*` plus `api/Historical*Controller`, migration V43, resources in `historical/`, and the

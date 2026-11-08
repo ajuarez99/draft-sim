@@ -4435,22 +4435,35 @@ export type HistoricalPrior = {
   fantasyPoints: number
   /** The season the ranking used (the better of the last two), or null when no prior season qualified. */
   bestOfTwo: string | null
+  /**
+   * Football only (spec 056 F16): season totals of the keys too rare to show per game (st_td, fum_lost, the
+   * 2-point keys), nonzero keys only. Never null; `{}` when there are none and always `{}` for basketball.
+   */
+  totals: Record<string, number>
 }
+
+/** Spec 056: the two sports a historical game can be played in (wire form; the shared `Sport` type is lowercase). */
+export type HistoricalSport = 'NBA' | 'NFL'
 
 export type HistoricalPlayerCard = {
   id: number
   name: string
-  /** Engine positions: PG, SG, SF, PF, C. */
+  /** Engine positions: PG, SG, SF, PF, C for basketball; exactly one of QB, RB, WR, TE for football. */
   positions: string[]
   /** The PRIOR season's team; null for a rookie. */
   team: string | null
-  /** The prior season's age; null for a rookie. */
+  /** The prior season's age; null for a rookie, and always null for football. */
   age: number | null
   /** 1 = best. Ranked by last season's points, never ADP. */
   rank: number
   positionalRank: number
   /** Null for a player with no prior line (a rookie). */
   prior: HistoricalPrior | null
+  /**
+   * Football only (spec 056 F14): the overall NFL draft pick of a rookie with no prior line. Null for veterans
+   * and always null for basketball.
+   */
+  rookiePick: number | null
 }
 
 export type HistoricalSeasonView = {
@@ -4462,6 +4475,10 @@ export type HistoricalSeasonView = {
   rankingSource: string
   rankingLabel: string
   settingsSource: string
+  /** Plain-language caveats about the data behind this season (spec 056 FR-014). Empty when none; never null. */
+  dataNotes?: string[]
+  /** The data-licence line to show (nflverse, CC BY 4.0 for football); null for basketball. */
+  attribution?: string | null
 }
 
 export type HistoricalPickView = {
@@ -4524,6 +4541,8 @@ export type HistoricalResult = {
 
 export type HistoricalGameState = {
   id: number
+  /** Absent from a 053 backend (deploy window): treat as NBA via sportOf(). */
+  sport?: HistoricalSport
   status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED'
   season: HistoricalSeasonView
   teams: number
@@ -4543,6 +4562,8 @@ export type HistoricalGameState = {
 
 export type HistoricalGameSummary = {
   id: number
+  /** Absent from a 053 backend (deploy window): treat as NBA via sportOf(). */
+  sport?: HistoricalSport
   seasonLabel: string
   status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED'
   userSlot: number
@@ -4554,25 +4575,30 @@ export type HistoricalGameSummary = {
 
 /** One offered season, for the "about this game" panel (GET /api/history/seasons). */
 export type HistoricalSeasonSummary = {
+  /** Absent from a 053 backend, which also ignores ?sport= and returns NBA rows: such a row is NBA, never NFL. */
+  sport?: HistoricalSport
   seasonStart: number
   label: string
-  source: 'KAGGLE' | 'SLEEPER'
+  source: 'KAGGLE' | 'SLEEPER' | 'NFLVERSE'
   countedStats: string[]
   excludedStats: Record<string, string>
   statCoverage: Record<string, number>
   rankingSource: string
   settingsSource: string
+  /** Plain-language data caveats (spec 056); empty when none, never null. Absent from a 053 backend. */
+  dataNotes?: string[]
 }
 
-export const historicalSeasons = () =>
-  apiFetch('/api/history/seasons').then(json<HistoricalSeasonSummary[]>)
+/** `sport` is required (no default): a defaulted sport would assert a rule, not carry a value. */
+export const historicalSeasons = (sport: HistoricalSport) =>
+  apiFetch(`/api/history/seasons?sport=${sport}`).then(json<HistoricalSeasonSummary[]>)
 
-/** Starts a game on a random season; `userSlot` (1..12) is random when omitted. Bots are already at your first turn. */
-export const startHistoricalGame = (userSlot?: number) =>
+/** Starts a game on a random season of `sport`; `userSlot` (1..12) is random when omitted. Bots are already at your first turn. */
+export const startHistoricalGame = (sport: HistoricalSport, userSlot?: number) =>
   apiFetch('/api/history/games', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(userSlot != null ? { userSlot } : {}),
+    body: JSON.stringify(userSlot != null ? { sport, userSlot } : { sport }),
   }).then(json<HistoricalGameState>)
 
 export const listHistoricalGames = () =>

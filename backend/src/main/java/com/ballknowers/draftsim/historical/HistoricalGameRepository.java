@@ -41,35 +41,38 @@ public class HistoricalGameRepository {
      * @param boardJson   the rank-ordered board snapshot ({playerId, adp, positionalRank}) as JSON text
      * @param resultJson  the frozen results, or null until the game completes
      */
-    public record GameRow(long id, String sleeperUserId, int seasonStart, int teams, int rounds, int reversalRound,
+    public record GameRow(long id, String sleeperUserId, String sport, int seasonStart, int teams, int rounds,
+                          int reversalRound,
                           List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                           int currentPickNo, String boardJson, String status, String resultJson,
                           OffsetDateTime createdAt, OffsetDateTime completedAt) {}
 
     public record PickRow(long gameId, int pickNo, int round, int draftSlot, String seatType, long playerId) {}
 
-    /** A new game, {@code DRAFTING}, at pick 1. */
-    public long create(String sleeperUserId, int seasonStart, int teams, int rounds, int reversalRound,
+    /** A new game, {@code DRAFTING}, at pick 1. {@code sport} is named explicitly: the column has no default (V46, F8). */
+    public long create(String sleeperUserId, String sport, int seasonStart, int teams, int rounds, int reversalRound,
                        List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                        String boardJson, OffsetDateTime createdAt) {
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement("""
-                    insert into historical_game (sleeper_user_id, season_start, teams, rounds, reversal_round,
-                        roster_positions, scoring, user_slot, rng_seed, current_pick_no, board, status, created_at)
-                    values (?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?)
+                    insert into historical_game (sleeper_user_id, sport, season_start, teams, rounds,
+                        reversal_round, roster_positions, scoring, user_slot, rng_seed, current_pick_no, board,
+                        status, created_at)
+                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, sleeperUserId);
-            ps.setInt(2, seasonStart);
-            ps.setInt(3, teams);
-            ps.setInt(4, rounds);
-            ps.setInt(5, reversalRound);
-            ps.setArray(6, con.createArrayOf("text", rosterPositions.toArray()));
-            ps.setString(7, scoringJson);
-            ps.setInt(8, userSlot);
-            ps.setLong(9, rngSeed);
-            ps.setString(10, boardJson);
-            ps.setObject(11, createdAt);
+            ps.setString(2, sport);
+            ps.setInt(3, seasonStart);
+            ps.setInt(4, teams);
+            ps.setInt(5, rounds);
+            ps.setInt(6, reversalRound);
+            ps.setArray(7, con.createArrayOf("text", rosterPositions.toArray()));
+            ps.setString(8, scoringJson);
+            ps.setInt(9, userSlot);
+            ps.setLong(10, rngSeed);
+            ps.setString(11, boardJson);
+            ps.setObject(12, createdAt);
             return ps;
         }, keys);
         Number id = (Number) keys.getKeys().get("id");
@@ -94,22 +97,26 @@ public class HistoricalGameRepository {
     }
 
     /** One row of the caller's games list: no board, no result, just what the list shows. */
-    public record SummaryRow(long id, String seasonLabel, String status, int userSlot, Integer finish,
-                             OffsetDateTime createdAt) {}
+    public record SummaryRow(long id, String sport, String seasonLabel, String status, int userSlot,
+                             Integer finish, OffsetDateTime createdAt) {}
 
     /** A user's games for the list screen, newest first. {@code finish} comes straight out of the frozen result. */
     public List<SummaryRow> summaries(String sleeperUserId) {
         return db.sql("""
-                select g.id, s.label, g.status, g.user_slot, (g.result ->> 'userFinish')::int as finish,
+                select g.id, g.sport, s.label, g.status, g.user_slot, (g.result ->> 'userFinish')::int as finish,
                        g.created_at
-                from historical_game g join historical_season s on s.season_start = g.season_start
+                from historical_game g
+                join historical_season s on s.sport = g.sport and s.season_start = g.season_start
                 where g.sleeper_user_id = ? order by g.created_at desc, g.id desc
                 """)
                 .param(sleeperUserId)
                 .query((rs, i) -> {
-                    int f = rs.getInt("finish");
-                    return new SummaryRow(rs.getLong("id"), rs.getString("label"), rs.getString("status"),
-                            rs.getInt("user_slot"), rs.wasNull() ? null : f,
+                    // getObject, not getInt + wasNull(): wasNull() reports on the LAST column read, which used to
+                    // be user_slot (never null), so every unfinished game came back finish 0 instead of null.
+                    Integer f = rs.getObject("finish", Integer.class);
+                    return new SummaryRow(rs.getLong("id"), rs.getString("sport"), rs.getString("label"),
+                            rs.getString("status"),
+                            rs.getInt("user_slot"), f,
                             rs.getObject("created_at", OffsetDateTime.class));
                 })
                 .list();
@@ -155,7 +162,7 @@ public class HistoricalGameRepository {
     }
 
     private static final String SELECT = """
-            select id, sleeper_user_id, season_start, teams, rounds, reversal_round, roster_positions,
+            select id, sleeper_user_id, sport, season_start, teams, rounds, reversal_round, roster_positions,
                    scoring::text as scoring, user_slot, rng_seed, current_pick_no, board::text as board, status,
                    result::text as result, created_at, completed_at
             from historical_game
@@ -163,7 +170,8 @@ public class HistoricalGameRepository {
 
     private GameRow map(ResultSet rs, int i) throws SQLException {
         Array a = rs.getArray("roster_positions");
-        return new GameRow(rs.getLong("id"), rs.getString("sleeper_user_id"), rs.getInt("season_start"),
+        return new GameRow(rs.getLong("id"), rs.getString("sleeper_user_id"), rs.getString("sport"),
+                rs.getInt("season_start"),
                 rs.getInt("teams"), rs.getInt("rounds"), rs.getInt("reversal_round"),
                 List.of((String[]) a.getArray()), rs.getString("scoring"), rs.getInt("user_slot"),
                 rs.getLong("rng_seed"), rs.getInt("current_pick_no"), rs.getString("board"),

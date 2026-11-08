@@ -14,7 +14,10 @@ import java.util.Map;
 public final class StatOrder {
 
     public static final List<String> ORDER = List.of("pts", "reb", "ast", "stl", "blk", "to", "tpm", "fgm", "fga",
-            "ftm", "fta", "dd", "td", "bonus_pt_40p", "bonus_pt_50p", "bonus_reb_20p", "bonus_ast_15p", "tf", "ff");
+            "ftm", "fta", "dd", "td", "bonus_pt_40p", "bonus_pt_50p", "bonus_reb_20p", "bonus_ast_15p", "tf", "ff",
+            // Football (spec 056 T008), appended so the NBA order above is unchanged.
+            "pass_yd", "pass_td", "pass_int", "rush_yd", "rush_td", "rec", "rec_yd", "rec_td", "fum_lost",
+            "pass_2pt", "rush_2pt", "rec_2pt", "st_td");
 
     private StatOrder() {}
 

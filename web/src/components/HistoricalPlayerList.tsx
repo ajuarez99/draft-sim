@@ -1,17 +1,22 @@
 import { useMemo, useState } from 'react'
-import type { HistoricalPlayerCard } from '../api'
+import type { HistoricalPlayerCard, HistoricalSport } from '../api'
 import { posPill } from '../positions'
 import { cardToPlayerRef, priorLine, pts1 } from '../historicalCopy'
 
 type Props = {
   players: HistoricalPlayerCard[]
   rankingLabel: string
+  /** Which sport's filters and copy to show (spec 056). Defaults to NBA, which is all a 053 backend has. */
+  sport?: HistoricalSport
   canPick: boolean
   busy: boolean
   onPick: (c: HistoricalPlayerCard) => void
 }
 
-const FILTERS = ['ALL', 'PG', 'SG', 'SF', 'PF', 'C']
+const FILTERS: Record<HistoricalSport, string[]> = {
+  NBA: ['ALL', 'PG', 'SG', 'SF', 'PF', 'C'],
+  NFL: ['ALL', 'QB', 'RB', 'WR', 'TE'],
+}
 const PAGE = 80
 
 /**
@@ -19,7 +24,7 @@ const PAGE = 80
  * purpose: it tiers and labels by ADP and shows survival odds, and a historical game has neither
  * (the order is last season's points, and says so in the header via the API's own label).
  */
-export default function HistoricalPlayerList({ players, rankingLabel, canPick, busy, onPick }: Props) {
+export default function HistoricalPlayerList({ players, rankingLabel, sport = 'NBA', canPick, busy, onPick }: Props) {
   const [filter, setFilter] = useState('ALL')
   const [q, setQ] = useState('')
   const [shown, setShown] = useState(PAGE)
@@ -35,11 +40,14 @@ export default function HistoricalPlayerList({ players, rankingLabel, canPick, b
     <section className="panel hist-list" aria-label="Available players">
       <div className="panel-head">
         <h2>Available players</h2>
-        <span className="muted small">{rankingLabel} · fantasy points exclude bonuses</span>
+        <span className="muted small">
+          {rankingLabel}
+          {sport === 'NBA' ? ' · fantasy points exclude bonuses' : ''}
+        </span>
       </div>
       <div className="hist-list-tools">
         <div className="hist-filters" role="group" aria-label="Position filter">
-          {FILTERS.map((f) => (
+          {FILTERS[sport].map((f) => (
             <button
               key={f}
               type="button"
@@ -71,7 +79,7 @@ export default function HistoricalPlayerList({ players, rankingLabel, canPick, b
       ) : (
         <ul className="hist-rows">
           {rows.slice(0, shown).map((p) => {
-            const pill = posPill(cardToPlayerRef(p), 'nba')
+            const pill = posPill(cardToPlayerRef(p, sport), sport === 'NFL' ? 'nfl' : 'nba')
             return (
               <li key={p.id} className="hist-row">
                 <span className="hist-rank" title={rankingLabel}>
@@ -97,11 +105,11 @@ export default function HistoricalPlayerList({ players, rankingLabel, canPick, b
                     </span>
                   </div>
                   <div className={`hist-line small${p.prior ? '' : ' muted'}`}>
-                    {priorLine(p.prior)}
+                    {priorLine(p.prior, sport, p.rookiePick)}
                     {p.prior && (
                       <span className="muted">
                         {' '}
-                        · {pts1(p.prior.fantasyPoints)} fantasy pts (excludes bonuses)
+                        · {pts1(p.prior.fantasyPoints)} fantasy pts{sport === 'NBA' ? ' (excludes bonuses)' : ''}
                         {p.prior.bestOfTwo ? ` · ranked on ${p.prior.bestOfTwo}` : ''}
                       </span>
                     )}

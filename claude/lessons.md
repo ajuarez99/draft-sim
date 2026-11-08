@@ -1146,3 +1146,14 @@ On the real league both finished seasons now pass the check (measured 2026-11-02
 
 **Rule:** a fixture must be shaped like what ingest actually writes. Before asserting on a stored
 column, grep for where it's written, not just where it's read.
+
+## 55. A historical dataset can quietly rewrite the past to match today
+Spec 056's nflverse weekly files normalize `team`/`opponent_team` to the current franchise codes, so a
+2004 card said Tomlinson played for "LAC" and Torry Holt for "LA". Every test passed: the fixtures used
+the codes the file uses, and nothing checks a team code against its year. It surfaced only in live
+verification, by reading a real 2004 card. The fix (`NflverseSource.franchiseCodeIn`) maps relocations
+back by season (LAC→SD up to 2016, LA→STL up to 2015, LV→OAK up to 2019), then a re-import.
+
+**Rule:** for any "as of then" data, ask which columns the source re-keys to the present (team codes,
+positions, names), and check one known old fact against a real row before trusting it. Positions have
+the same problem here (Pryor 2012 shows as WR). That one was left as-is and disclosed, by Allan's call.

@@ -39,7 +39,9 @@ export function card(id: number, name: string, over: Partial<HistoricalPlayerCar
       perGame: { pts: 29.3, reb: 8.1, ast: 4.2 },
       fantasyPoints: 3010.5,
       bestOfTwo: '1993-94',
+      totals: {},
     },
+    rookiePick: null,
     ...over,
   }
 }
@@ -47,6 +49,7 @@ export function card(id: number, name: string, over: Partial<HistoricalPlayerCar
 export function drafting(): HistoricalGameState {
   return {
     id: 5,
+    sport: 'NBA',
     status: 'DRAFTING',
     season: {
       label: '1995-96',
@@ -56,6 +59,8 @@ export function drafting(): HistoricalGameState {
       rankingSource: 'PRIOR_SEASON_POINTS',
       rankingLabel: "ranked by last season's points",
       settingsSource: 'Settings: the Legacy Ball Knowers league.',
+      dataNotes: [],
+      attribution: null,
     },
     teams: 2,
     rounds: 2,
@@ -270,5 +275,150 @@ describe('HistoricalRoom when complete', () => {
     expect(screen.getByText(/Nobody left on the board outscored/)).toBeInTheDocument()
     await waitFor(() => expect(screen.getByText('1995-11-07')).toBeInTheDocument())
     expect(screen.getByText('Mine One', { selector: 'td' })).toBeInTheDocument()
+  })
+})
+
+// ---- Spec 056: football ---------------------------------------------------------------------------------
+
+const NFL_KEYS = ['pass_yd', 'pass_td', 'pass_int', 'rush_yd', 'rush_td', 'rec', 'rec_yd', 'rec_td', 'fum_lost', 'st_td', 'pass_2pt', 'rush_2pt', 'rec_2pt']
+
+function nflCard(id: number, name: string, pos: string, over: Partial<HistoricalPlayerCard> = {}): HistoricalPlayerCard {
+  return card(id, name, {
+    positions: [pos],
+    team: 'SD',
+    age: null,
+    prior: {
+      seasonLabel: '2006',
+      games: 16,
+      perGame: { pass_yd: 0, pass_td: 0, pass_int: 0, rush_yd: 115.8, rush_td: 1.1, rec: 3.5, rec_yd: 20.1, rec_td: 0 },
+      fantasyPoints: 476.9,
+      bestOfTwo: '2006',
+      totals: { st_td: 2, fum_lost: 3 },
+    },
+    ...over,
+  })
+}
+
+function nflDrafting(): HistoricalGameState {
+  const g = drafting()
+  return {
+    ...g,
+    sport: 'NFL',
+    season: {
+      label: '2007',
+      countedStats: NFL_KEYS,
+      excludedStats: {},
+      statCoverage: {},
+      rankingSource: 'PRIOR_SEASON_VORP',
+      rankingLabel: "ranked by last season's points over replacement",
+      settingsSource: 'Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR',
+      dataNotes: ['Week 17 of 2007 is missing from the data'],
+      attribution: 'Stats: nflverse (nflverse-data), CC BY 4.0',
+    },
+    rosterPositions: ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'BN'],
+    available: [
+      nflCard(1, 'Top Back', 'RB'),
+      nflCard(2, 'Gunslinger Gus', 'QB'),
+      nflCard(3, 'Rookie Ray', 'WR', { prior: null, team: null, rookiePick: 5 }),
+      nflCard(4, 'Walk-on Wes', 'TE', { prior: null, team: null, rookiePick: null }),
+    ],
+  }
+}
+
+function nflComplete(): HistoricalGameState {
+  const g = nflDrafting()
+  const done = complete(false)
+  return {
+    ...g,
+    status: 'COMPLETE',
+    onTheClockSlot: null,
+    isUsersTurn: false,
+    available: [],
+    picks: [
+      { pickNo: 1, round: 1, draftSlot: 1, seatType: 'USER', player: nflCard(11, 'Mine One', 'RB') },
+      { pickNo: 2, round: 1, draftSlot: 2, seatType: 'BOT', player: nflCard(12, 'Other Two', 'QB') },
+    ],
+    result: {
+      ...done.result!,
+      weeks: [
+        { week: 1, startDate: null, matchups: [{ homeSlot: 1, awaySlot: 2, homePoints: 101.5, awayPoints: 88 }] },
+        { week: 2, startDate: null, matchups: [{ homeSlot: 2, awaySlot: 1, homePoints: 100, awayPoints: 110 }] },
+      ],
+      lineups: { '1': [{ week: 1, starters: [{ playerId: 11, slot: 'RB', points: 22.5, gameDate: null }] }] },
+    },
+  }
+}
+
+describe('HistoricalRoom, football', () => {
+  it('shows scoring keys, the data note, the attribution and the settings, with no NBA copy and no ADP', async () => {
+    getHistoricalGame.mockResolvedValue(nflDrafting())
+    const { container } = renderRoom()
+    expect(await screen.findByText("You're drafting 2007")).toBeInTheDocument()
+    expect(screen.getByText('Scoring in 2007')).toBeInTheDocument()
+    expect(screen.getByText('passing yards')).toBeInTheDocument()
+    expect(screen.getByText('return touchdowns')).toBeInTheDocument()
+    expect(screen.getByText('Week 17 of 2007 is missing from the data')).toBeInTheDocument()
+    expect(screen.getByText('Stats: nflverse (nflverse-data), CC BY 4.0')).toBeInTheDocument()
+    expect(screen.getByText(/Hand-set 12-team, 15-round roster/)).toBeInTheDocument()
+    expect(screen.getAllByText(/ranked by last season's points over replacement/).length).toBeGreaterThan(0)
+    const text = container.textContent ?? ''
+    expect(text).not.toMatch(/ADP/i)
+    expect(text).not.toMatch(/box scores/)
+    expect(text).not.toMatch(/bonus/i)
+    expect(text).not.toMatch(/NBA/)
+    expect(text).not.toMatch(/_/)
+  })
+
+  it('filters by QB, RB, WR, TE only, and each filter narrows the list', async () => {
+    getHistoricalGame.mockResolvedValue(nflDrafting())
+    renderRoom()
+    await screen.findByText("You're drafting 2007")
+    const group = screen.getByRole('group', { name: 'Position filter' })
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['All', 'QB', 'RB', 'WR', 'TE'])
+    fireEvent.click(within(group).getByRole('button', { name: 'QB' }))
+    const list = screen.getByRole('region', { name: 'Available players' })
+    expect(within(list).getByText('Gunslinger Gus')).toBeInTheDocument()
+    expect(within(list).queryByText('Top Back')).not.toBeInTheDocument()
+    fireEvent.click(within(group).getByRole('button', { name: 'TE' }))
+    expect(within(list).getByText('Walk-on Wes')).toBeInTheDocument()
+    expect(within(list).queryByText('Gunslinger Gus')).not.toBeInTheDocument()
+  })
+
+  it('renders card lines: zero keys hidden, totals shown, rookie pick or no-stats line, no bonuses wording', async () => {
+    getHistoricalGame.mockResolvedValue(nflDrafting())
+    renderRoom()
+    await screen.findByText("You're drafting 2007")
+    const list = screen.getByRole('region', { name: 'Available players' })
+    const line = within(list).getAllByText(/^2006 · 16 G/)[0]
+    expect(line.textContent).toContain('115.8 rush yd 1.1 rush TD 3.5 rec 20.1 rec yd')
+    expect(line.textContent).not.toMatch(/pass yd|pass TD|INT|rec TD/)
+    expect(line.textContent).toContain('3 fum lost · 2 ret TD')
+    expect(line.textContent).toContain('476.9 fantasy pts')
+    expect(line.textContent).not.toMatch(/bonus/i)
+    expect(within(list).getByText('rookie · NFL pick #5')).toBeInTheDocument()
+    expect(within(list).getByText('no NFL stats last season')).toBeInTheDocument()
+    expect(within(list).queryByText(/no NBA stats/)).not.toBeInTheDocument()
+  })
+
+  it('results show Week N for a starter with no game date, never "did not play", and keep the attribution', async () => {
+    getHistoricalGame.mockResolvedValue(nflComplete())
+    const { container } = renderRoom()
+    expect(await screen.findByText('You finished 1st of 2')).toBeInTheDocument()
+    expect(screen.getByText('Week 1', { selector: 'td' })).toBeInTheDocument()
+    const text = container.textContent ?? ''
+    expect(text).not.toMatch(/did not play/)
+    expect(text).not.toMatch(/ADP/i)
+    expect(text).not.toMatch(/locked/i)
+    expect(screen.getByText('Stats: nflverse (nflverse-data), CC BY 4.0')).toBeInTheDocument()
+  })
+
+  it('basketball still says "did not play" for a starter with no game date', async () => {
+    const c = complete(false)
+    getHistoricalGame.mockResolvedValue({
+      ...c,
+      result: { ...c.result!, lineups: { '1': [{ week: 1, starters: [{ playerId: 11, slot: 'PG', points: 0, gameDate: null }] }] } },
+    })
+    renderRoom()
+    expect(await screen.findByText('did not play')).toBeInTheDocument()
   })
 })

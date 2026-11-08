@@ -37,10 +37,10 @@ public final class HistoricalSyntheticSeason {
 
     /** Seeds the season row, {@link #PLAYERS} players, their S-2/S-1 lines, the sentinel S line and 3 weeks of games. */
     public static void seed(HistoricalDataRepository data) {
-        data.upsertSeason(new SeasonRow(S, "1895-96", "KAGGLE", LocalDate.of(1895, 11, 6), LocalDate.of(1896, 4, 1),
+        data.upsertSeason(new SeasonRow("NBA", S, "1895-96", "KAGGLE", LocalDate.of(1895, 11, 6), LocalDate.of(1896, 4, 1),
                 WEEKS, 100, List.of("pts", "reb", "ast"),
                 "{\"stl\":\"not tracked by the league that season\"}", "{\"pts\":1.0,\"reb\":0.97,\"ast\":0.95}",
-                "PRIOR_SEASON_POINTS", OffsetDateTime.parse("2026-11-02T12:00:00Z")));
+                "PRIOR_SEASON_POINTS", OffsetDateTime.parse("2026-11-02T12:00:00Z"), null, 0, null));
 
         String[] pos = {"PG", "SG", "SF", "PF", "C"};
         List<SeasonLine> l2 = new ArrayList<>(), l1 = new ArrayList<>(), l0 = new ArrayList<>();

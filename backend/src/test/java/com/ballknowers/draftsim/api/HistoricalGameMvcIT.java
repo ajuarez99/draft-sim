@@ -7,7 +7,9 @@ import com.ballknowers.draftsim.engine.MockDraftEngine;
 import com.ballknowers.draftsim.historical.HistoricalDataRepository;
 import com.ballknowers.draftsim.historical.HistoricalGameRepository;
 import com.ballknowers.draftsim.historical.HistoricalGameService;
+import com.ballknowers.draftsim.historical.HistoricalSports;
 import com.ballknowers.draftsim.historical.HistoricalSyntheticSeason;
+import com.ballknowers.draftsim.historical.NbaHistoricalSport;
 import com.ballknowers.draftsim.historical.SeasonReplay;
 import com.ballknowers.draftsim.sport.SportRulesRegistry;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -104,7 +106,7 @@ class HistoricalGameMvcIT {
 
     private long newGame(String user, int slot) {
         ensureSeeded();
-        return service.create(user, slot, HistoricalSyntheticSeason.S).id();
+        return service.create(user, "NBA", slot, HistoricalSyntheticSeason.S).id();
     }
 
     private void cleanup() {
@@ -327,7 +329,7 @@ class HistoricalGameMvcIT {
                     props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(),
                     props.teams(), props.rounds(), props.reversalRound(), other);
             HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
-                    changed, json);
+                    new HistoricalSports(java.util.List.of(new NbaHistoricalSport(changed, data))), json);
             JsonNode viaChanged = json.valueToTree(svc.get(id, ALICE).orElseThrow().result());
             assertEquals(json.readTree(stored), viaChanged, "reopen under changed scoring config must not re-score");
 
@@ -353,10 +355,11 @@ class HistoricalGameMvcIT {
         HistoricalProperties rev3 = new HistoricalProperties(props.kaggleZipUrl(), props.kaggleZipSha256(),
                 props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(), props.teams(), props.rounds(),
                 3, props.scoring());
-        HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay, rev3, json);
+        HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
+                new HistoricalSports(java.util.List.of(new NbaHistoricalSport(rev3, data))), json);
         try {
             ensureSeeded();
-            long id = svc.create(ALICE, 4, HistoricalSyntheticSeason.S).id();
+            long id = svc.create(ALICE, "NBA", 4, HistoricalSyntheticSeason.S).id();
             assertEquals(3, jdbc.queryForObject("select reversal_round from historical_game where id = ?",
                     Integer.class, id));
             var done = svc.auto(id, HistoricalGameService.Scope.FINISH, ALICE).orElseThrow();
@@ -375,12 +378,36 @@ class HistoricalGameMvcIT {
         }
     }
 
+    /** Spec 056 T021: sport is required on create, with no default. None of these reach a season lookup. */
+    @Test
+    void createWithoutOrWithAnUnknownSportIs400() throws Exception {
+        for (String body : new String[]{null, "{}", "{\"userSlot\":3}", "{\"sport\":null,\"userSlot\":3}",
+                "{\"sport\":\"\"}", "{\"sport\":\"MLB\"}", "{\"sport\":\"nba\"}"}) {
+            var req = post("/api/history/games").header("X-Sleeper-User", ALICE);
+            if (body != null) req.contentType(MediaType.APPLICATION_JSON).content(body);
+            mvc.perform(req).andExpect(status().isBadRequest());
+        }
+        assertEquals(0, jdbc.queryForObject("select count(*) from historical_game where sleeper_user_id like 'it-hgame-%'",
+                Integer.class), "a refused create writes nothing");
+    }
+
+    @Test
+    void theListNamesTheSportOfEachGame() throws Exception {
+        try {
+            newGame(ALICE, 2);
+            JsonNode list = state(ALICE, "/api/history/games", false, null, 200);
+            assertEquals("NBA", list.get(0).get("sport").asText());
+        } finally {
+            cleanup();
+        }
+    }
+
     @Test
     void postCreatesARealSeasonGameAs201WithTheBotsAdvanced() throws Exception {
         try {
-            Assumptions.assumeTrue(!data.offeredSeasons().isEmpty(), "no real seasons imported -- skipping");
+            Assumptions.assumeTrue(!data.offeredSeasons("NBA").isEmpty(), "no real seasons imported -- skipping");
             MvcResult r = mvc.perform(post("/api/history/games").header("X-Sleeper-User", ALICE)
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"userSlot\":7}"))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"sport\":\"NBA\",\"userSlot\":7}"))
                     .andExpect(status().isCreated()).andReturn();
             JsonNode s = json.readTree(r.getResponse().getContentAsString());
             assertEquals("DRAFTING", s.get("status").asText());
@@ -389,7 +416,7 @@ class HistoricalGameMvcIT {
             assertTrue(s.get("isUsersTurn").asBoolean());
             // out-of-range slot is a 400
             mvc.perform(post("/api/history/games").header("X-Sleeper-User", ALICE)
-                    .contentType(MediaType.APPLICATION_JSON).content("{\"userSlot\":13}"))
+                    .contentType(MediaType.APPLICATION_JSON).content("{\"sport\":\"NBA\",\"userSlot\":13}"))
                     .andExpect(status().isBadRequest());
         } finally {
             cleanup();

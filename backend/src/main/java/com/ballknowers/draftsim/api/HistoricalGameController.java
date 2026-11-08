@@ -1,8 +1,9 @@
 package com.ballknowers.draftsim.api;
 
-import com.ballknowers.draftsim.historical.HistoricalDataRepository;
 import com.ballknowers.draftsim.historical.HistoricalGameService;
 import com.ballknowers.draftsim.historical.HistoricalGameState;
+import com.ballknowers.draftsim.historical.HistoricalSport;
+import com.ballknowers.draftsim.historical.HistoricalSports;
 import com.ballknowers.draftsim.historical.HistoricalDataRepository.SeasonRow;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -32,40 +34,45 @@ import java.util.Map;
 @RequestMapping("/api/history")
 public class HistoricalGameController {
 
-    /** What the screen prints as where the settings come from (FR-002, plan F13). */
-    public static final String SETTINGS_SOURCE = HistoricalGameState.SETTINGS_SOURCE;
-
     private static final TypeReference<Map<String, String>> STRING_MAP = new TypeReference<>() {};
     private static final TypeReference<Map<String, Double>> DOUBLE_MAP = new TypeReference<>() {};
 
-    private final HistoricalDataRepository data;
+    private final HistoricalSports sports;
     private final HistoricalGameService service;
     private final ObjectMapper json;
 
-    public HistoricalGameController(HistoricalDataRepository data, HistoricalGameService service,
+    public HistoricalGameController(HistoricalSports sports, HistoricalGameService service,
                                     ObjectMapper json) {
-        this.data = data;
+        this.sports = sports;
         this.service = service;
         this.json = json;
     }
 
-    /** One offered season, for the "about this game" panel. */
-    public record SeasonSummary(int seasonStart, String label, String source, List<String> countedStats,
+    /** One offered season, for the "about this game" panel. {@code dataNotes} is never null (spec 056 FR-014). */
+    public record SeasonSummary(String sport, int seasonStart, String label, String source, List<String> countedStats,
                                 Map<String, String> excludedStats, Map<String, Double> statCoverage,
-                                String rankingSource, String settingsSource) {}
+                                String rankingSource, String settingsSource, List<String> dataNotes) {}
 
-    /** Seasons 1970..2025 whose rows and prior-season card lines both committed (plan F14), ascending. */
+    /**
+     * The offered seasons of one sport whose rows and prior-season card lines both committed (plan F14), ascending.
+     * {@code sport} is REQUIRED, with no default: missing or unknown is a 400 (spec 056 contracts).
+     */
     @GetMapping("/seasons")
     public List<SeasonSummary> seasons(
+            @RequestParam(value = "sport", required = false) String sportCode,
             @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         requireIdentity(sleeperUserId);
-        return data.offeredSeasons().stream().map(this::summary).toList();
+        HistoricalSport sport = sports.get(sportCode);
+        return sport.offeredSeasons().stream().map(s -> summary(s, sport)).toList();
     }
 
     // ---- games (T018) -----------------------------------------------------------------------------------
 
-    /** @param userSlot optional, 1..teams; random when absent */
-    public record CreateRequest(Integer userSlot) {}
+    /**
+     * @param sport    "NBA" or "NFL", required: no default, because a defaulted sport asserts a rule
+     * @param userSlot optional, 1..teams for that sport; random when absent
+     */
+    public record CreateRequest(String sport, Integer userSlot) {}
 
     public record PickRequest(Long playerId) {}
 
@@ -78,7 +85,8 @@ public class HistoricalGameController {
             @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
         requireIdentity(sleeperUserId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.create(sleeperUserId, body == null ? null : body.userSlot(), null));
+                .body(service.create(sleeperUserId, body == null ? null : body.sport(),
+                        body == null ? null : body.userSlot(), null));
     }
 
     /** The caller's games, newest first. */
@@ -128,10 +136,10 @@ public class HistoricalGameController {
                 : ResponseEntity.notFound().build();
     }
 
-    private SeasonSummary summary(SeasonRow s) {
-        return new SeasonSummary(s.seasonStart(), s.label(), s.source(), s.countedStats(),
+    private SeasonSummary summary(SeasonRow s, HistoricalSport sport) {
+        return new SeasonSummary(s.sport(), s.seasonStart(), s.label(), s.source(), s.countedStats(),
                 read(s.excludedStatsJson(), STRING_MAP), read(s.statCoverageJson(), DOUBLE_MAP),
-                s.rankingSource(), SETTINGS_SOURCE);
+                s.rankingSource(), sport.settingsSource(), sport.dataNotes(s));
     }
 
     private <T> Map<String, T> read(String text, TypeReference<Map<String, T>> type) {

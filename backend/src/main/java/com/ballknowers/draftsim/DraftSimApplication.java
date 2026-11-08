@@ -29,7 +29,8 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         LockInProperties.class,
         RecapProperties.class,
         RivalryProperties.class,
-        HistoricalProperties.class
+        HistoricalProperties.class,
+        NflHistoricalProperties.class
 })
 public class DraftSimApplication {
     public static void main(String[] args) {
