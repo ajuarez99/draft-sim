@@ -55,9 +55,10 @@ export default function HistoricalDraft() {
   const [games, setGames] = useState<HistoricalGameSummary[] | null>(null)
   const [nbaRows, setNbaRows] = useState<HistoricalSeasonSummary[] | null>(null)
   const [nflRows, setNflRows] = useState<HistoricalSeasonSummary[] | null>(null)
+  const [seasonsFailed, setSeasonsFailed] = useState(false)
   const [starting, setStarting] = useState(false)
   // Basketball is only the preselected tab; every request still carries the sport explicitly.
-  const [sport, setSport] = useState<HistoricalSport>('NBA')
+  const [chosen, setSport] = useState<HistoricalSport>('NBA')
 
   useEffect(() => {
     listHistoricalGames()
@@ -73,16 +74,30 @@ export default function HistoricalDraft() {
     let current = true
     historicalSeasons('NBA')
       .then((x) => current && setNbaRows(x.filter((r) => sportOf(r) === 'NBA')))
-      .catch(() => current && setNbaRows([]))
+      .catch(() => {
+        if (!current) return
+        setSeasonsFailed(true)
+        setNbaRows([])
+      })
     historicalSeasons('NFL')
       .then((x) => current && setNflRows(x.filter((r) => r.sport === 'NFL')))
-      .catch(() => current && setNflRows([]))
+      .catch(() => {
+        if (!current) return
+        setSeasonsFailed(true)
+        setNflRows([])
+      })
     return () => {
       current = false
     }
   }, [])
 
-  const footballOffered = (nflRows ?? []).length > 0
+  // A sport is offered only once the server lists at least one of its seasons: prod ran with football imported
+  // and basketball not (2026-11-08), and the Basketball tab then failed every start. If a seasons request failed we
+  // can't tell, so the old behaviour stands (basketball preselected, start allowed) rather than locking the page.
+  const loaded = nbaRows !== null && nflRows !== null
+  const offered = (['NBA', 'NFL'] as const).filter((sp) => ((sp === 'NFL' ? nflRows : nbaRows) ?? []).length > 0)
+  const sport: HistoricalSport = offered.includes(chosen) || seasonsFailed ? chosen : (offered[0] ?? chosen)
+  const nothingOffered = loaded && !seasonsFailed && offered.length === 0
   const seasons = sport === 'NFL' ? nflRows : nbaRows
   const copy = COPY[sport](nflRange(nflRows ?? []))
 
@@ -119,16 +134,22 @@ export default function HistoricalDraft() {
         title="Draft a random year"
         sub={copy.sub}
         actions={
-          <button type="button" className="chip on hist-start" onClick={() => void start()} disabled={starting}>
+          <button
+            type="button"
+            className="chip on hist-start"
+            onClick={() => void start()}
+            disabled={starting || !loaded || nothingOffered}
+          >
             {starting ? 'Starting…' : 'Draft a random year'}
           </button>
         }
       />
       {error && <div className="error">{error}</div>}
+      {nothingOffered && <div className="muted">No seasons are loaded yet, so there is nothing to draft.</div>}
 
-      {footballOffered && (
+      {offered.length > 1 && (
         <div className="hist-sports" role="group" aria-label="Sport">
-          {(['NBA', 'NFL'] as const).map((sp) => (
+          {offered.map((sp) => (
             <button
               key={sp}
               type="button"

@@ -40,6 +40,13 @@ const g = (id: number, status: HistoricalGameSummary['status'], finish: number |
   createdAt: '2026-11-01T12:00:00Z',
 })
 
+/** The start button stays disabled until both seasons requests have answered. */
+async function startButton() {
+  const b = await screen.findByRole('button', { name: 'Draft a random year' })
+  await waitFor(() => expect(b).toBeEnabled())
+  return b
+}
+
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/history']}>
@@ -89,7 +96,7 @@ describe('HistoricalDraft', () => {
     listHistoricalGames.mockResolvedValue([])
     startHistoricalGame.mockResolvedValue({ id: 42 })
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Draft a random year' }))
+    await userEvent.click(await startButton())
     expect(await screen.findByText('room page')).toBeInTheDocument()
   })
 
@@ -97,7 +104,7 @@ describe('HistoricalDraft', () => {
     listHistoricalGames.mockResolvedValue([])
     startHistoricalGame.mockResolvedValue({ id: 42 })
     renderPage()
-    await userEvent.click(await screen.findByRole('button', { name: 'Draft a random year' }))
+    await userEvent.click(await startButton())
     expect(startHistoricalGame).toHaveBeenCalledWith('NBA')
     expect(historicalSeasons).toHaveBeenCalledWith('NBA')
   })
@@ -126,7 +133,7 @@ describe('HistoricalDraft', () => {
     expect(text).not.toMatch(/real NBA season/)
     expect(text).not.toMatch(/1970-71/)
     expect(text).not.toMatch(/ADP/i)
-    await userEvent.click(screen.getByRole('button', { name: 'Draft a random year' }))
+    await userEvent.click(await startButton())
     expect(startHistoricalGame).toHaveBeenCalledWith('NFL')
     expect(await screen.findByText('room page')).toBeInTheDocument()
   })
@@ -142,5 +149,38 @@ describe('HistoricalDraft', () => {
     expect(within(nfl).getByText('Football')).toBeInTheDocument()
     expect(within(nfl).queryByText('Basketball')).not.toBeInTheDocument()
     expect(within(nba).getByText('Basketball')).toBeInTheDocument()
+  })
+
+  it('offers only football when only football seasons exist (prod 2026-11-08: no NBA import yet)', async () => {
+    listHistoricalGames.mockResolvedValue([])
+    startHistoricalGame.mockResolvedValue({ id: 44 })
+    historicalSeasons.mockImplementation((sp: string) =>
+      Promise.resolve(sp === 'NFL' ? [{ ...season, sport: 'NFL', seasonStart: 2001, label: '2001', source: 'NFLVERSE' }] : []),
+    )
+    const { container } = renderPage()
+    const start = await startButton()
+    expect(screen.queryByRole('group', { name: 'Sport' })).not.toBeInTheDocument()
+    expect(container.textContent ?? '').toMatch(/real NFL season/)
+    await userEvent.click(start)
+    expect(startHistoricalGame).toHaveBeenCalledWith('NFL')
+  })
+
+  it('disables start and says so when no season of either sport is loaded', async () => {
+    listHistoricalGames.mockResolvedValue([])
+    historicalSeasons.mockResolvedValue([])
+    renderPage()
+    expect(await screen.findByText(/No seasons are loaded yet/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Draft a random year' })).toBeDisabled()
+    expect(screen.queryByRole('group', { name: 'Sport' })).not.toBeInTheDocument()
+  })
+
+  it('keeps basketball startable when a seasons request fails (cannot tell what exists)', async () => {
+    listHistoricalGames.mockResolvedValue([])
+    startHistoricalGame.mockResolvedValue({ id: 45 })
+    historicalSeasons.mockRejectedValue(new Error('network'))
+    renderPage()
+    await userEvent.click(await startButton())
+    expect(startHistoricalGame).toHaveBeenCalledWith('NBA')
+    expect(screen.queryByText(/No seasons are loaded yet/)).not.toBeInTheDocument()
   })
 })
