@@ -1,6 +1,6 @@
 # Quickstart / validation guide: spec 056
 
-> **Renumbered 2026-11-06:** this feature's migration is now `V46__historical_nfl.sql` (057 keeps V45, Allan's call; 057 merges first). See plan.md. "V45" below means this migration under its old number.
+> **Renumbered 2026-11-06:** this feature's migration is now `V46__historical_nfl.sql` (057 keeps V45, Allan's call; 057 merges first). **Amended 2026-11-08:** 056 merged first after all, since 057 was still uncommitted; 057 renumbers to V47. See plan.md. "V45" below means this migration under its old number.
 
 ## Prerequisites
 - A scratch Postgres for this branch: docker `draftsim-pg-056` on **5439**, trust auth, db/user

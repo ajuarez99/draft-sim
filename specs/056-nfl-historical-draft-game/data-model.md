@@ -1,6 +1,6 @@
 # Data model: Football Time Machine (spec 056)
 
-> **Renumbered 2026-11-06:** this feature's migration is now `V46__historical_nfl.sql` (057 keeps V45, Allan's call; 057 merges first). See plan.md. "V45" below means this migration under its old number.
+> **Renumbered 2026-11-06:** this feature's migration is now `V46__historical_nfl.sql` (057 keeps V45, Allan's call; 057 merges first). **Amended 2026-11-08:** 056 merged first after all, since 057 was still uncommitted; 057 renumbers to V47. See plan.md. "V45" below means this migration under its old number.
 
 Migration **`V45__historical_nfl.sql`**. V44 is the highest anywhere: `V44__roster_fpts_snapshot.sql`
 is on branch 055, re-checked 2026-11-05 across every local and remote branch. V43 belongs

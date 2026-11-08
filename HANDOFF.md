@@ -59,8 +59,10 @@ An NFL copy of 053, 2000–2025, on nflverse data. Details, reviews and the veri
 `specs/056-nfl-historical-draft-game/` (`verification.md` says what was run and what wasn't).
 
 **Merge and deploy order. Get this right or prod's boot fails:**
-1. **057 (commissioner score override, V45) merges and deploys first.** 056 was renumbered to V46 for it
-   on 2026-11-06 (Allan's call). Flyway's `outOfOrder` is false, so a V45 arriving after V46 is refused.
+1. ~~057 (commissioner score override, V45) merges and deploys first.~~ **Amended 2026-11-08 (Allan's
+   call):** 057 was still uncommitted, so 056 merged first as V46. **057 must renumber its migration to
+   V47 before it merges.** Flyway's `outOfOrder` is false, so a V45 arriving after V46 is refused. V45
+   is left as a permanent gap; V45 was never applied anywhere in prod.
 2. **Before 056's V46 runs, count `historical_game` rows in prod** (SC-008: those basketball games must
    reopen unchanged afterwards).
 3. **Web before backend.** `sport` is now required on the history endpoints, with no default, so the old
