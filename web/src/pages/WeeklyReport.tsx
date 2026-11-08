@@ -19,7 +19,9 @@ import {
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
 import PersonName from '../components/PersonName'
-import { useLeagueDataVersion } from '../leagueDataVersion'
+import { useBumpLeagueDataVersion, useLeagueDataVersion } from '../leagueDataVersion'
+import CommissionerScoresPanel from '../components/CommissionerScoresPanel'
+import { PER_PLAYER_FEED_NOTE, reportScoreNote } from '../lib/scoreSource'
 import { useSeasonLeagueIds } from '../railLeague'
 
 /**
@@ -46,6 +48,10 @@ export default function WeeklyReport() {
   const [loading, setLoading] = useState(false)
   // Bumped by the rail when this league's background refresh finishes (specs/009-auto-data-refresh).
   const dataVersion = useLeagueDataVersion(sleeperLeagueId)
+  const bumpLeagueData = useBumpLeagueDataVersion()
+  // Bumped after the commissioner saves or clears scores: the report can show an earlier season than the route,
+  // so a bump on the route's id alone would not refetch it.
+  const [reloadTick, setReloadTick] = useState(0)
   const leagueIdForSeason = useSeasonLeagueIds(sleeperLeagueId)
 
   useEffect(() => {
@@ -66,7 +72,7 @@ export default function WeeklyReport() {
     return () => {
       cancelled = true
     }
-  }, [sleeperLeagueId, requestedWeek, dataVersion])
+  }, [sleeperLeagueId, requestedWeek, dataVersion, reloadTick])
 
   const latest = data?.latestScoredWeek ?? 0
   // Spec 045 A2: the newest week the reader can reach is the live one when it is ahead of the newest STORED
@@ -179,6 +185,11 @@ export default function WeeklyReport() {
           <section className="section">
             <h3 className="section-title">Week {data.week} matchups</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
+            {reportScoreNote(data.scoreSource) && (
+              <p className="muted small wr-scoresource">
+                {reportScoreNote(data.scoreSource)} {PER_PLAYER_FEED_NOTE}
+              </p>
+            )}
             <MatchupLockInsProvider data={data}>
             <LockInsNote />
             {mine ? (
@@ -201,6 +212,18 @@ export default function WeeklyReport() {
             )}
             </MatchupLockInsProvider>
           </section>
+
+          {!data.live && data.weekFinal && (data.sleeperLeagueId ?? sleeperLeagueId) && (
+            <CommissionerScoresPanel
+              leagueSleeperId={(data.sleeperLeagueId ?? sleeperLeagueId) as string}
+              week={data.week}
+              onChanged={() => {
+                setReloadTick((n) => n + 1)
+                bumpLeagueData((data.sleeperLeagueId ?? sleeperLeagueId) as string)
+                if (sleeperLeagueId) bumpLeagueData(sleeperLeagueId)
+              }}
+            />
+          )}
 
           {data.live ? (
             // Every ranking and award would claim a decided week; none is sent (spec 045 FR-003).
@@ -261,7 +284,9 @@ function Omitted({ data }: { data: Data }) {
           <strong>{titleOf(o.kind)}</strong> could not be worked out for this week:{' '}
           {o.reason === 'STARTERS_NOT_STORED'
             ? 'this week was stored before the app recorded which players were actually started, so naming the swap would be a guess.'
-            : o.reason}
+            : o.reason === 'SCORES_NOT_FROM_FEED'
+              ? "this week's team scores are not Sleeper's public feed, but the bench swap is worked out from the feed's player points, so saying it flipped the matchup would compare two different sources."
+              : o.reason}
         </li>
       ))}
     </ul>

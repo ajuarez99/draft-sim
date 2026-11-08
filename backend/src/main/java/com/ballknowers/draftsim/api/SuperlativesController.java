@@ -278,6 +278,14 @@ public class SuperlativesController {
         out.put("suspensionWeeksObserved", r.suspensionWeeksObserved());
         out.put("commissionerListAvailable", r.commissionerListAvailable());
         out.put("leagueSleeperId", r.leagueSleeperId());
+        List<Map<String, Object>> scoreSources = new ArrayList<>();
+        for (SeasonSuperlativesService.WeekSource w : r.scoreSources()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("week", w.week());
+            m.put("source", w.source().name());
+            scoreSources.add(m);
+        }
+        out.put("scoreSources", scoreSources);
         List<Map<String, Object>> superlatives = new ArrayList<>();
         for (SeasonSuperlativesService.Superlative s : r.superlatives()) {
             superlatives.add(superlativeRow(s));

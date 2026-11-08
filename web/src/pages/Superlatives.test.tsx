@@ -69,6 +69,7 @@ function baseline(): SuperlativesResponse {
     commissionerListAvailable: false,
     superlatives: KINDS.map(notBuiltYet),
     leagueSleeperId: 'L1',
+    scoreSources: [],
   }
 }
 
@@ -251,6 +252,28 @@ describe('Superlatives', () => {
     render(<Superlatives />)
 
     expect(await screen.findByText(/every scored week counts/)).toBeInTheDocument()
+  })
+
+  // Spec 057: a hand-entered number is never presented as if it were measured.
+  it('names the commissioner-entered weeks in words, and says nothing when every week is the feed', async () => {
+    const data = baseline()
+    data.scoreSources = [
+      { week: 1, source: 'COMMISSIONER' }, { week: 2, source: 'COMMISSIONER' },
+      { week: 3, source: 'OFFICIAL' }, { week: 4, source: 'FEED' },
+    ]
+    fetchSuperlatives.mockResolvedValue(data)
+    const { unmount } = render(<Superlatives />)
+    expect(await screen.findByText('Weeks 1–2 use scores the commissioner entered from the Sleeper app.')).toBeInTheDocument()
+    expect(screen.getByText("Week 3 uses Sleeper's official totals.")).toBeInTheDocument()
+    unmount()
+
+    const feedOnly = baseline()
+    feedOnly.scoreSources = [{ week: 1, source: 'FEED' }, { week: 2, source: 'FEED' }]
+    fetchSuperlatives.mockResolvedValue(feedOnly)
+    render(<Superlatives />)
+    await screen.findByText(/through week 6/)
+    expect(screen.queryByText(/commissioner entered/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/official totals/)).not.toBeInTheDocument()
   })
 
   // FR-002 (2026-09-23 live-check finding): the week must be visible on the

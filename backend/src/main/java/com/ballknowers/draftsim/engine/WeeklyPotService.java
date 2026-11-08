@@ -6,10 +6,10 @@ import com.ballknowers.draftsim.store.LeagueRepository;
 import com.ballknowers.draftsim.store.LeagueWeeklyPotRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
-import com.ballknowers.draftsim.store.RosterFptsSnapshotRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
 import com.ballknowers.draftsim.store.WeekBound;
+import com.ballknowers.draftsim.store.WeekScoreResolver;
 import com.ballknowers.draftsim.domain.Sport;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,14 +39,6 @@ import java.util.TreeMap;
 @Service
 public class WeeklyPotService {
 
-    /**
-     * How far an official week's league-wide total may sit from the feed's before the official week is
-     * distrusted and the feed is used instead. Hand-set and arbitrary: measured drift on NBA 2026 was about 8%
-     * (claude/nba-2026-score-drift.md), while a snapshot taken a leg late doubles one week and zeroes the next
-     * (about 100% off), which is the failure this exists to catch (claude/official-week-scores-code-review.md H1).
-     */
-    static final BigDecimal MAX_OFFICIAL_DRIFT = new BigDecimal("0.25");
-
     public static final String TIE_CENT_RULE = "When a stake doesn't split evenly, the extra cent goes to "
             + "co-winners in roster order. A house convention, not a league rule.";
 
@@ -56,9 +47,11 @@ public class WeeklyPotService {
     /**
      * Where a DECIDED week's scores came from (claude/official-week-scores.md). OFFICIAL is the difference of
      * Sleeper's season totals between two scored legs; FEED is the public /matchups score, which for NBA 2026
-     * does not match Sleeper's own standings (claude/nba-2026-score-drift.md). Null unless DECIDED.
+     * does not match Sleeper's own standings (claude/nba-2026-score-drift.md). COMMISSIONER is a score the league
+     * commissioner typed in from the Sleeper app (spec 057). Null unless DECIDED. The decision itself is
+     * {@link WeekScoreResolver}'s; this is its label on the wire.
      */
-    public enum ScoreSource { OFFICIAL, FEED }
+    public enum ScoreSource { COMMISSIONER, OFFICIAL, FEED }
 
     /** What the page gets: {@link Off} (no money anywhere in it) or {@link On}. */
     public sealed interface View permits Off, On {}
@@ -95,14 +88,14 @@ public class WeeklyPotService {
     private final LiveWeekSource liveWeeks;
     private final PlayerGameRepository playerGames;
     private final ManagerRepository managers;
-    private final RosterFptsSnapshotRepository fptsSnapshots;
+    private final WeekScoreResolver scoreResolver;
 
     public WeeklyPotService(LeagueWeeklyPotRepository settings, LeagueMembership membership,
                             LeagueMemberRepository leagueMembers, ExpectedWinsService expectedWins,
                             ScoredWeeks scoredWeeks, RosterWeekPointsRepository weekPoints,
                             RosterSeasonRepository rosterSeasons, LiveWeekSource liveWeeks,
                             PlayerGameRepository playerGames, ManagerRepository managers,
-                            RosterFptsSnapshotRepository fptsSnapshots) {
+                            WeekScoreResolver scoreResolver) {
         this.settings = settings;
         this.membership = membership;
         this.leagueMembers = leagueMembers;
@@ -113,7 +106,7 @@ public class WeeklyPotService {
         this.liveWeeks = liveWeeks;
         this.playerGames = playerGames;
         this.managers = managers;
-        this.fptsSnapshots = fptsSnapshots;
+        this.scoreResolver = scoreResolver;
     }
 
     public View view(LeagueRepository.LeagueRow row, String sleeperUserId) {
@@ -131,6 +124,8 @@ public class WeeklyPotService {
 
         ScoredWeeks.Snapshot snapshot = scoredWeeks.of(row.id());
         Map<Integer, List<RosterWeekPointsRepository.ScoreRow>> rowsByWeek = new TreeMap<>();
+        // allScores is already resolved (commissioner > official > feed, WeekScoreResolver); the source label
+        // for each week comes from the same resolver.
         for (RosterWeekPointsRepository.ScoreRow r : weekPoints.allScores(List.of(row.id()), bound)) {
             if (r.points() == null) continue;
             rowsByWeek.computeIfAbsent(r.week(), w -> new ArrayList<>()).add(r);
@@ -156,8 +151,7 @@ public class WeeklyPotService {
 
         List<RosterSeasonRepository.StandingRow> standings = rosterSeasons.forLeague(row.id());
         List<Integer> allRosterIds = standings.stream().map(RosterSeasonRepository.StandingRow::rosterId).toList();
-        Map<Integer, Map<Integer, BigDecimal>> official = RosterFptsSnapshotRepository.officialWeekScores(
-                fptsSnapshots.byWeek(row.id()), new HashSet<>(allRosterIds));
+        Map<Integer, WeekScoreResolver.Source> resolvedSources = scoreResolver.sources(row.id());
 
         List<WeeklyPotLedger.Score> decided = new ArrayList<>();
         Map<Integer, Status> statusByWeek = new TreeMap<>();
@@ -173,13 +167,11 @@ public class WeeklyPotService {
                 status = Status.NO_SCORES;
             } else {
                 status = Status.DECIDED;
-                // The feed decides which rosters played; the official score, when every roster has one, decides
-                // how much each scored.
-                Map<Integer, BigDecimal> officialWeek = plausibleOfficial(official.get(w), rows);
-                sourceByWeek.put(w, officialWeek != null ? ScoreSource.OFFICIAL : ScoreSource.FEED);
+                // The stored rows decide which rosters played; their points are already the resolved ones.
+                sourceByWeek.put(w, ScoreSource.valueOf(
+                        resolvedSources.getOrDefault(w, WeekScoreResolver.Source.FEED).name()));
                 for (RosterWeekPointsRepository.ScoreRow r : rows) {
-                    BigDecimal points = officialWeek != null ? officialWeek.get(r.rosterId()) : r.points();
-                    decided.add(new WeeklyPotLedger.Score(w, r.rosterId(), points));
+                    decided.add(new WeeklyPotLedger.Score(w, r.rosterId(), r.points()));
                 }
             }
             statusByWeek.put(w, status);
@@ -241,27 +233,6 @@ public class WeeklyPotService {
         return new On(row.season(), row.sport(), true, setting.stakeCents(), canEdit, commissionerKnown,
                 regularSeasonKnown, boundWeek, throughWeek, latestDecidedWeek, seasonFinal, TIE_CENT_RULE, weeks, balances,
                 debts(ledger.pairwise()), debts(ledger.shortcut()), liveLeader, liveUnavailable);
-    }
-
-    /**
-     * The official week, or null when it should not be trusted over the feed: a roster the feed has but the
-     * official week doesn't (never mix the two in one week), a negative week, or a league-wide total further
-     * than {@link #MAX_OFFICIAL_DRIFT} from the feed's (a snapshot keyed to the wrong leg).
-     */
-    static Map<Integer, BigDecimal> plausibleOfficial(Map<Integer, BigDecimal> officialWeek,
-                                                      List<RosterWeekPointsRepository.ScoreRow> feedRows) {
-        if (officialWeek == null) return null;
-        BigDecimal officialTotal = BigDecimal.ZERO;
-        BigDecimal feedTotal = BigDecimal.ZERO;
-        for (RosterWeekPointsRepository.ScoreRow r : feedRows) {
-            BigDecimal o = officialWeek.get(r.rosterId());
-            if (o == null || o.signum() < 0) return null;
-            officialTotal = officialTotal.add(o);
-            feedTotal = feedTotal.add(r.points());
-        }
-        if (feedTotal.signum() <= 0) return null;
-        BigDecimal drift = officialTotal.subtract(feedTotal).abs().divide(feedTotal, 4, java.math.RoundingMode.HALF_UP);
-        return drift.compareTo(MAX_OFFICIAL_DRIFT) > 0 ? null : officialWeek;
     }
 
     private static boolean moves(Status s) {

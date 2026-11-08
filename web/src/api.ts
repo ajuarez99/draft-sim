@@ -2409,6 +2409,11 @@ export type WeeklyReport = {
   liveWeek: number | null
   /** Spec 045: the Sleeper league id of the season actually shown; differs from the route's after a fallback. */
   sleeperLeagueId: string | null
+  /**
+   * Spec 057: where this week's team scores came from. Null for a live (unstored) week and the unavailable shapes.
+   * Per-player points in the report are always the public feed's, whatever this says.
+   */
+  scoreSource: ScoreSource | null
 }
 
 /** `week` 0 asks for the latest scored week; the response's `week` says which that was. */
@@ -2787,7 +2792,18 @@ export type SuperlativesResponse = {
    * CommissionerListPanel).
    */
   leagueSleeperId: string
+  /**
+   * Spec 057: where each scored week's team scores came from, FEED included so the page never infers.
+   * COMMISSIONER = typed in by the league commissioner from the Sleeper app; OFFICIAL = Sleeper's season-total
+   * snapshots; FEED = Sleeper's public matchup score. Mirrors SeasonSuperlativesService.WeekSource.
+   */
+  scoreSources: WeekScoreSource[]
 }
+
+/** Spec 057: mirrors WeekScoreResolver.Source. */
+export type ScoreSource = 'COMMISSIONER' | 'OFFICIAL' | 'FEED'
+
+export type WeekScoreSource = { week: number; source: ScoreSource }
 
 export const fetchSuperlatives = (sleeperLeagueId: string) =>
   apiFetch(`/api/leagues/${sleeperLeagueId}/superlatives`).then(json<SuperlativesResponse>)
@@ -4350,9 +4366,9 @@ export type WeeklyPotWeek = {
   /**
    * DECIDED only, else null. OFFICIAL = difference of Sleeper's season totals between two scored legs;
    * FEED = Sleeper's public matchup score, which can differ from its official standings
-   * (claude/official-week-scores.md).
+   * (claude/official-week-scores.md). COMMISSIONER = typed in by the league commissioner (spec 057).
    */
-  scoreSource: 'OFFICIAL' | 'FEED' | null
+  scoreSource: ScoreSource | null
 }
 
 export type WeeklyPotBalance = {
@@ -4419,6 +4435,87 @@ export const saveWeeklyPotSettings = (
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(json<WeeklyPot>)
+
+// --- spec 057: commissioner score override ---------------------------------------------------------
+// Mirrors engine/ScoreOverrideService's View, Team, Checks, Totals, Records (Java records), field for field.
+
+export type ScoreOverrideTeam = {
+  rosterId: number
+  teamName: string
+  /** Sleeper's public matchup score, as stored. */
+  feedPoints: number
+  /** The score every page is using for this team this week. */
+  inUsePoints: number
+  /** What the commissioner entered; null when nothing is entered for this team. */
+  overridePoints: number | null
+}
+
+export type ScoreCheckStatus = 'MATCH' | 'MISMATCH' | 'UNAVAILABLE'
+
+export type ScoreOverrideTotalsRow = {
+  rosterId: number
+  teamName: string
+  inUseTotal: number
+  sleeperTotal: number
+}
+
+export type ScoreOverrideRecordRow = {
+  rosterId: number
+  teamName: string
+  computed: string
+  sleeper: string
+}
+
+export type ScoreOverrideChecks = {
+  /** Weeks 1..N in-use scores summed vs Sleeper's season total through N (latest stored snapshot). */
+  totals: {
+    status: ScoreCheckStatus
+    throughWeek: number | null
+    /** Weeks in 1..throughWeek still on the public feed, where a mismatch is expected. */
+    feedWeeks: number[]
+    rows: ScoreOverrideTotalsRow[]
+  }
+  /** W-L recomputed from in-use scores (median game included) vs Sleeper's record. */
+  record: {
+    status: ScoreCheckStatus
+    throughWeek: number | null
+    feedWeeks: number[]
+    rows: ScoreOverrideRecordRow[]
+  }
+}
+
+export type ScoreOverrideView = {
+  week: number
+  isFinal: boolean
+  canEdit: boolean
+  commissionerKnown: boolean
+  source: ScoreSource
+  /** ISO-8601; null when nothing is entered. */
+  enteredAt: string | null
+  teams: ScoreOverrideTeam[]
+  checks: ScoreOverrideChecks
+}
+
+export const getScoreOverride = (sleeperLeagueId: string, week: number) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/score-overrides/${week}`).then(json<ScoreOverrideView>)
+
+/** Commissioner only. Whole-week: one entry per team that played. 400/403 throw with the server's `message`. */
+export const saveScoreOverride = (
+  sleeperLeagueId: string,
+  week: number,
+  scores: { rosterId: number; points: number }[],
+) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/score-overrides/${week}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scores }),
+  }).then(json<ScoreOverrideView>)
+
+/** Commissioner only. Removes the week's entered scores; the week goes back to official or feed. */
+export const clearScoreOverride = (sleeperLeagueId: string, week: number) =>
+  apiFetch(`/api/leagues/${sleeperLeagueId}/score-overrides/${week}`, { method: 'DELETE' }).then(
+    json<ScoreOverrideView>,
+  )
 
 // --- spec 053: historical draft game ---------------------------------------------------------------
 // Mirrors historical/HistoricalPlayerCard, HistoricalGameState and HistoricalResult (Java records), field for

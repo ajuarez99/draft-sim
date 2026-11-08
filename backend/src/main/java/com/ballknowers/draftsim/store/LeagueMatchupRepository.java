@@ -20,9 +20,11 @@ import java.util.stream.Collectors;
 public class LeagueMatchupRepository {
 
     private final JdbcClient db;
+    private final WeekScoreResolver scores;
 
-    public LeagueMatchupRepository(JdbcClient db) {
+    public LeagueMatchupRepository(JdbcClient db, WeekScoreResolver scores) {
         this.db = db;
+        this.scores = scores;
     }
 
     /** {@code matchupId} null = no game that week (bye, odd roster count, or unpublished). */
@@ -143,7 +145,8 @@ public class LeagueMatchupRepository {
         String sql = """
                 select a.season, a.week,
                        a.roster_id, rsa.manager_id, ma.display_name, ma.avatar_id, wa.starters_points,
-                       b.roster_id, rsb.manager_id, mb.display_name, mb.avatar_id, wb.starters_points
+                       b.roster_id, rsb.manager_id, mb.display_name, mb.avatar_id, wb.starters_points,
+                       a.league_id
                 from league_matchup a
                 join league_matchup b
                   on b.league_id = a.league_id and b.season = a.season and b.week = a.week
@@ -159,11 +162,29 @@ public class LeagueMatchupRepository {
                 """.formatted(ids, weekFilter);
         var spec = db.sql(sql).params(List.copyOf(leagueIds));
         if (bound.throughWeek() != null) spec = spec.param(bound.throughWeek());
-        return spec
-                .query((rs, i) -> new PairedGame(rs.getInt(1), rs.getInt(2),
-                        rs.getInt(3), (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7),
-                        rs.getInt(8), (Long) rs.getObject(9), rs.getString(10), rs.getString(11), rs.getBigDecimal(12)))
-                .list();
+        List<PairedGame> raw = new java.util.ArrayList<>();
+        List<Long> gameLeague = new java.util.ArrayList<>();
+        spec.query((rs, i) -> {
+            raw.add(new PairedGame(rs.getInt(1), rs.getInt(2),
+                    rs.getInt(3), (Long) rs.getObject(4), rs.getString(5), rs.getString(6), rs.getBigDecimal(7),
+                    rs.getInt(8), (Long) rs.getObject(9), rs.getString(10), rs.getString(11), rs.getBigDecimal(12)));
+            gameLeague.add(rs.getLong(13));
+            return 0;
+        }).list();
+        // Spec 057: commissioner > official > feed, decided once for every consumer of this read.
+        WeekScoreResolver.Resolution resolved = scores.resolve(leagueIds);
+        if (resolved.isEmpty()) return raw;
+        List<PairedGame> out = new java.util.ArrayList<>(raw.size());
+        for (int i = 0; i < raw.size(); i++) {
+            PairedGame g = raw.get(i);
+            long lid = gameLeague.get(i);
+            out.add(new PairedGame(g.season(), g.week(),
+                    g.aRosterId(), g.aManagerId(), g.aManager(), g.aAvatarId(),
+                    resolved.points(lid, g.week(), g.aRosterId(), g.aPoints()),
+                    g.bRosterId(), g.bManagerId(), g.bManager(), g.bAvatarId(),
+                    resolved.points(lid, g.week(), g.bRosterId(), g.bPoints())));
+        }
+        return out;
     }
 
     /**

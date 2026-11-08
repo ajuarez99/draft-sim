@@ -120,6 +120,19 @@ describe('WeeklyPot page', () => {
     expect(screen.getByText(/^\* Scored from Sleeper’s public matchup feed/)).toBeTruthy()
   })
 
+  it('marks commissioner-entered weeks with a dagger and its own note, apart from the feed asterisk', async () => {
+    const base = on({})
+    getWeeklyPot.mockResolvedValue(on({
+      weeks: base.weeks.map((w) => (w.week === 1 ? { ...w, scoreSource: 'COMMISSIONER' as const } : w)),
+    }))
+    render(<WeeklyPot />)
+    await screen.findByText(/Settle up/)
+    expect(screen.getAllByTitle(/entered from the Sleeper app/)).toHaveLength(1)
+    expect(screen.getByText(/^† Scores the commissioner entered from the Sleeper app\./)).toBeTruthy()
+    // the feed week keeps its own asterisk
+    expect(screen.getAllByTitle(/public matchup feed/)).toHaveLength(1)
+  })
+
   it('labels the weeks the money includes when a gap sits below the latest decided week', async () => {
     const w = (week: number, status: WeeklyPotOn['weeks'][number]['status']) =>
       status === 'DECIDED'

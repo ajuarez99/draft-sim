@@ -202,7 +202,9 @@ function Standings({ balances }: { balances: WeeklyPotBalance[] }) {
 }
 
 const FEED_NOTE =
-  'Scored from Sleeper’s public matchup feed, which can differ from Sleeper’s official standings. Weeks without a * use the official totals.'
+  'Scored from Sleeper’s public matchup feed, which can differ from Sleeper’s official standings. Weeks without a * or † use the official totals.'
+
+const COMMISSIONER_NOTE = 'Scores the commissioner entered from the Sleeper app.'
 
 function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: number) => string }) {
   const newestFirst = [...weeks].sort((a, b) => b.week - a.week)
@@ -239,6 +241,11 @@ function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: numb
                       *
                     </span>
                   )}
+                  {w.scoreSource === 'COMMISSIONER' && (
+                    <span className="wp-feed" title={COMMISSIONER_NOTE}>
+                      †
+                    </span>
+                  )}
                 </span>
                 <span className="wp-week-margin muted">{isTie ? 'tied' : margin != null ? `+${margin} over 2nd` : ''}</span>
                 <span className="wp-week-pot">{money(w.potCents)}</span>
@@ -248,6 +255,9 @@ function WeekList({ weeks, nameOf }: { weeks: WeeklyPotWeek[]; nameOf: (id: numb
         </ul>
       )}
       {weeks.some((w) => w.scoreSource === 'FEED') && <p className="wp-feed-note muted">* {FEED_NOTE}</p>}
+      {weeks.some((w) => w.scoreSource === 'COMMISSIONER') && (
+        <p className="wp-feed-note muted">† {COMMISSIONER_NOTE}</p>
+      )}
     </section>
   )
 }

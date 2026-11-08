@@ -94,6 +94,7 @@ function weekly(over: Partial<WeeklyReport> = {}): WeeklyReport {
     live: false,
     liveWeek: null,
     sleeperLeagueId: 'L1',
+    scoreSource: 'FEED',
     ...over,
   }
 }

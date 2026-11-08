@@ -17,6 +17,7 @@ import CommissionerListPanel, { CommissionerListButton } from '../components/Com
 import { hueForIndex } from '../hue'
 import { useLeagueDataVersion } from '../leagueDataVersion'
 import { TITLES } from '../awardTitles'
+import { scoreSourceNotes } from '../lib/scoreSource'
 
 /**
  * specs/008-season-superlatives US1: the season's extremes and close games.
@@ -111,6 +112,11 @@ export default function Superlatives() {
           <section className="section">
             <h3 className="section-title">Season so far · through week {data.throughWeek}</h3>
             <SeasonFallbackNote season={data.season} requestedSeason={data.requestedSeason} />
+            {scoreSourceNotes(data.scoreSources ?? []).map((n) => (
+              <p key={n} className="muted small sl-scoresource">
+                {n}
+              </p>
+            ))}
             <p className="muted small">
               {data.regularSeasonEnd == null
                 ? 'This league has no playoff start set, so every scored week counts.'

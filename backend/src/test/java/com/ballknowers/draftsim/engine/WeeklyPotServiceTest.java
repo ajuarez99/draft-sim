@@ -11,12 +11,12 @@ import com.ballknowers.draftsim.store.LeagueRepository.LeagueRow;
 import com.ballknowers.draftsim.store.LeagueWeeklyPotRepository;
 import com.ballknowers.draftsim.store.ManagerRepository;
 import com.ballknowers.draftsim.store.PlayerGameRepository;
-import com.ballknowers.draftsim.store.RosterFptsSnapshotRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository;
 import com.ballknowers.draftsim.store.RosterSeasonRepository.StandingRow;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository;
 import com.ballknowers.draftsim.store.RosterWeekPointsRepository.ScoreRow;
 import com.ballknowers.draftsim.store.WeekBound;
+import com.ballknowers.draftsim.store.WeekScoreResolver;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -63,9 +63,9 @@ class WeeklyPotServiceTest {
     private final ManagerRepository managers = mock(ManagerRepository.class);
     private final LiveWeekSource.Reader sleeper = mock(LiveWeekSource.Reader.class);
     private final LiveWeekSource liveWeeks = new LiveWeekSource(sleeper, PROPS, CLOCK, 400);
-    private final RosterFptsSnapshotRepository fptsSnapshots = mock(RosterFptsSnapshotRepository.class);
+    private final WeekScoreResolver scoreResolver = mock(WeekScoreResolver.class);
     private final WeeklyPotService service = new WeeklyPotService(settings, membership, leagueMembers,
-            expectedWins, scoredWeeks, weekPoints, rosterSeasons, liveWeeks, playerGames, managers, fptsSnapshots);
+            expectedWins, scoredWeeks, weekPoints, rosterSeasons, liveWeeks, playerGames, managers, scoreResolver);
 
     private LeagueRow row(String status) {
         return new LeagueRow(LEAGUE_ID, Sport.NFL, "L48", "n", 2026, 4, List.of(), 0, null, status);
@@ -126,64 +126,37 @@ class WeeklyPotServiceTest {
         return (On) service.view(row, null);
     }
 
-    // ------------------------------------------------------------------ official scores (claude/official-week-scores.md)
-
-    private static Map<Integer, BigDecimal> fpts(String... byRoster) {
-        Map<Integer, BigDecimal> m = new HashMap<>();
-        for (int i = 0; i < byRoster.length; i++) m.put(i + 1, new BigDecimal(byRoster[i]));
-        return m;
-    }
+    // ------------------------------------------------------------------ score source (spec 057)
+    //
+    // The decision "commissioner > official > feed" is WeekScoreResolver's, applied inside allScores, and is tested
+    // in WeekScoreResolverTest (the official-tier cases that used to live here) and WeekScoreOverrideIT (against
+    // Postgres). What the pot owns is: pay the winner of the rows it is handed, and label the week with the
+    // resolver's source.
 
     @Test
-    void anOfficialWeekPaysTheOfficialTopScorerNotTheFeedOne() {
-        // feed: roster 4 tops both weeks (101..104, total 410). Official: week 1 roster 1 wins (110 of 415),
-        // week 2 = fpts(2) - fpts(1) -> roster 2 wins (235-105 = 130; 105, 100, 102; total 437). Both within drift.
-        given(14, 2, Set.of(1, 2), weeks(1, 2));
-        when(fptsSnapshots.byWeek(LEAGUE_ID)).thenReturn(Map.of(
-                1, fpts("110", "105", "100", "100"),
-                2, fpts("215", "235", "200", "202")));
+    void theWeekIsLabelledWithTheResolversSourceAndPaysTheRowsItWasHanded() {
+        // allScores hands the pot already-resolved rows: here week 1 is a commissioner week where roster 1 beats
+        // roster 4 (the feed pattern has roster 4 on top).
+        List<ScoreRow> rows = new ArrayList<>(weeks(2));
+        rows.add(score(1, 1, "300"));
+        rows.add(score(1, 2, "100"));
+        rows.add(score(1, 3, "100"));
+        rows.add(score(1, 4, "100"));
+        given(14, 2, Set.of(1, 2), rows);
+        when(scoreResolver.sources(LEAGUE_ID)).thenReturn(Map.of(
+                1, WeekScoreResolver.Source.COMMISSIONER, 2, WeekScoreResolver.Source.OFFICIAL));
         On on = (On) service.view(row("in_season"), null);
         assertEquals(List.of(1), on.weeks().get(0).winners());
-        assertEquals(new BigDecimal("110"), on.weeks().get(0).winningPoints());
-        assertEquals(WeeklyPotService.ScoreSource.OFFICIAL, on.weeks().get(0).scoreSource());
-        assertEquals(List.of(2), on.weeks().get(1).winners());
-        assertEquals(new BigDecimal("130"), on.weeks().get(1).winningPoints());
-        assertEquals(0L, on.balances().stream().filter(b -> b.rosterId() == 4).findFirst().orElseThrow().weeksWon());
-    }
-
-    @Test
-    void aWeekWithoutTheEarlierLegFallsBackToTheFeedAndSaysSo() {
-        // only fpts(2) exists (capture started after week 1): week 2 cannot be separated from week 1
-        given(14, 2, Set.of(1, 2), weeks(1, 2));
-        when(fptsSnapshots.byWeek(LEAGUE_ID)).thenReturn(Map.of(2, fpts("500", "100", "100", "100")));
-        On on = (On) service.view(row("in_season"), null);
-        assertEquals(List.of(4), on.weeks().get(1).winners());
-        assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(1).scoreSource());
-        assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(0).scoreSource());
-    }
-
-    @Test
-    void aSnapshotTakenALegLateDoublesOneWeekAndZeroesTheNextSoBothFallBackToTheFeed() {
-        // review H1: the leg-1 row actually holds two weeks (~2x the feed's 410), the leg-2 row repeats it (0s)
-        given(14, 2, Set.of(1, 2), weeks(1, 2));
-        when(fptsSnapshots.byWeek(LEAGUE_ID)).thenReturn(Map.of(
-                1, fpts("300", "200", "200", "200"),
-                2, fpts("300", "200", "200", "200")));
-        On on = (On) service.view(row("in_season"), null);
-        assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(0).scoreSource());
-        assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(1).scoreSource());
-        assertEquals(List.of(4), on.weeks().get(0).winners());
+        assertEquals(WeeklyPotService.ScoreSource.COMMISSIONER, on.weeks().get(0).scoreSource());
+        assertEquals(WeeklyPotService.ScoreSource.OFFICIAL, on.weeks().get(1).scoreSource());
         assertEquals(List.of(4), on.weeks().get(1).winners());
     }
 
     @Test
-    void aNegativeOfficialWeekFallsBackToTheFeed() {
+    void aWeekTheResolverHasNoAnswerForIsFeed() {
         given(14, 2, Set.of(1, 2), weeks(1, 2));
-        when(fptsSnapshots.byWeek(LEAGUE_ID)).thenReturn(Map.of(
-                1, fpts("110", "100", "100", "100"),
-                2, fpts("100", "210", "210", "210")));
         On on = (On) service.view(row("in_season"), null);
-        assertEquals(WeeklyPotService.ScoreSource.OFFICIAL, on.weeks().get(0).scoreSource());
+        assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(0).scoreSource());
         assertEquals(WeeklyPotService.ScoreSource.FEED, on.weeks().get(1).scoreSource());
     }
 
