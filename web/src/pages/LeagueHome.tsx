@@ -134,8 +134,8 @@ function unitLabel(unit: string | null): string {
       return 'games'
     case 'ADDS':
       return 'adds'
-    case 'PICKUPS':
-      return 'trending pickups'
+    case 'PERCENT':
+      return '% of pickups trending'
     default:
       return ''
   }
@@ -778,7 +778,7 @@ function AwardBlock({
               {top.value != null && (
                 <span className="muted">
                   {' '}
-                  · {Math.round(top.value * 100) / 100} {unitLabel(top.unit)}
+                  · {Math.round(top.value * 100) / 100}{top.unit === 'PERCENT' ? '' : ' '}{unitLabel(top.unit)}
                 </span>
               )}
             </p>

@@ -948,8 +948,10 @@ public class SeasonSuperlativesService {
     private static final Duration TRENDING_HEADER_MARGIN = Duration.ofHours(48);
 
     /**
-     * TRENDING_TONY (spec 051, research R4-R6): the manager who most often picked up a player Sleeper's
-     * platform-wide trending list had in its top {@link TrendingPickups#TOP_N} at the time. The judging
+     * TRENDING_TONY (spec 051, research R4-R6; ranked by share since spec 058): the manager with the highest
+     * percentage of judged pickups that Sleeper's platform-wide trending list had in its top
+     * {@link TrendingPickups#TOP_N} at the time, among teams with at least
+     * {@link TrendingPickups#MIN_JUDGED_TO_RANK} judged pickups. The judging
      * rule is {@link TrendingPickups#judge}; this method gathers its inputs -- the same pickups
      * {@link #mostAddedSuperlative} counts, plus only the snapshot rows the judge can use (F4) -- and
      * {@link #trendingTonyFromJudged} shapes the result. Static and package-private, taking the repository,
@@ -1050,15 +1052,26 @@ public class SeasonSuperlativesService {
         List<TrendingPickups.Judged> trending = judged.stream()
                 .filter(j -> j.verdict() == TrendingPickups.Verdict.TRENDING).toList();
 
-        // Standings: every roster, zeros included (it was measured -- its pickups are known), competition ranks.
+        // Spec 058: ranked by SHARE -- the percentage of a team's judged pickups that were trending -- not by
+        // count. A team below MIN_JUDGED_TO_RANK judged pickups is listed unranked with the reason: its share
+        // is real but too small a sample to sit beside the others (1 of 1 would be 100%).
+        Map<Integer, Double> shareByRoster = new HashMap<>();
         List<SuperlativeStandings.Entry> entries = new ArrayList<>();
         for (int id : rosterIds) {
             TrendingPickups.Tally t = tally.get(id);
-            entries.add(new SuperlativeStandings.Entry(holder(id, nameByRoster, avatarByRoster, managerByRoster),
-                    t == null ? 0.0 : (double) t.trending(),
-                    t == null ? "no judged pickups"
-                            : t.trending() + " of " + t.judged() + (t.judged() == 1 ? " judged pickup" : " judged pickups"),
-                    null));
+            int judgedN = t == null ? 0 : t.judged();
+            int trendingN = t == null ? 0 : t.trending();
+            Holder h = holder(id, nameByRoster, avatarByRoster, managerByRoster);
+            String note = judgedN == 0 ? null
+                    : trendingN + " of " + judgedN + (judgedN == 1 ? " judged pickup" : " judged pickups") + " trending";
+            if (judgedN >= TrendingPickups.MIN_JUDGED_TO_RANK) {
+                double share = round1(100.0 * trendingN / judgedN);
+                shareByRoster.put(id, share);
+                entries.add(new SuperlativeStandings.Entry(h, share, note, null));
+            } else {
+                entries.add(new SuperlativeStandings.Entry(h, null, note, judgedN == 0 ? "no judged pickups"
+                        : "only " + judgedN + " judged, needs " + TrendingPickups.MIN_JUDGED_TO_RANK));
+            }
         }
         List<Standing> standings = SuperlativeStandings.rank(entries, false);
 
@@ -1082,14 +1095,21 @@ public class SeasonSuperlativesService {
                     j.trendingRank(), "week " + j.add().week() + " · " + addTypeLabel(j.add().type())));
         }
 
-        int max = tally.values().stream().mapToInt(TrendingPickups.Tally::trending).max().orElse(0);
-        if (max < TrendingPickups.MIN_TO_NAME) {
-            return new Superlative(Kind.TRENDING_TONY, true, null, false, null, "PICKUPS", List.of(),
-                    "nobody has chased the trending list twice yet", List.of(), null, List.of(), standings,
+        if (shareByRoster.isEmpty()) {
+            return new Superlative(Kind.TRENDING_TONY, true, null, false, null, "PERCENT", List.of(),
+                    "no team has " + TrendingPickups.MIN_JUDGED_TO_RANK + " judged pickups yet", List.of(), null,
+                    List.of(), standings, List.of(), contributions, coverage);
+        }
+        double max = shareByRoster.values().stream().mapToDouble(Double::doubleValue).max().orElseThrow();
+        if (max <= 0) {
+            return new Superlative(Kind.TRENDING_TONY, true, null, false, null, "PERCENT", List.of(),
+                    "no ranked team has picked up a trending player yet", List.of(), null, List.of(), standings,
                     List.of(), contributions, coverage);
         }
-        List<Integer> topRosters = tally.values().stream().filter(t -> t.trending() == max)
-                .map(TrendingPickups.Tally::rosterId).sorted().toList();
+        // Holders are the same rounded shares the standings rank, so the card and the list can't disagree on a tie.
+        List<Integer> topRosters = shareByRoster.entrySet().stream()
+                .filter(e -> Double.compare(e.getValue(), max) == 0)
+                .map(Map.Entry::getKey).sorted().toList();
         List<Holder> holders = topRosters.stream()
                 .map(id -> holder(id, nameByRoster, avatarByRoster, managerByRoster)).toList();
         List<DetailRow> detail = new ArrayList<>();
@@ -1108,8 +1128,12 @@ public class SeasonSuperlativesService {
                                 id, j.add().week(), j.add().type(), j.trendingRank(), j.addCount(), j.snapshotAt()));
                     });
         }
-        return new Superlative(Kind.TRENDING_TONY, true, null, false, (double) max, "PICKUPS", holders, null, detail,
+        return new Superlative(Kind.TRENDING_TONY, true, null, false, max, "PERCENT", holders, null, detail,
                 null, List.of(), standings, List.of(), contributions, coverage);
+    }
+
+    private static double round1(double d) {
+        return Math.round(d * 10.0) / 10.0;
     }
 
     /** Holder detail rows shown per holder (hand-set, matches the Waiver Wire Warrior cap). */

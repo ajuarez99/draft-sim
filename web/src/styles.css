@@ -4937,7 +4937,35 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .sl-player-standing .sl-standing-note { padding-left: 0; }
 .sl-standing-figure { text-align: right; white-space: nowrap; }
 .sl-standing-missing .sl-standing-figure { white-space: normal; max-width: 22ch; }
+/* Spec 058: a Teams row with players behind its figure opens them in place. */
+.sl-team-row { display: flex; flex-direction: column; gap: 4px; }
+.sl-standing-btn {
+  width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: transparent; transition: background 0.12s, border-color 0.12s;
+}
+.sl-standing-btn:not(.sl-standing-top) { border-color: transparent; }
+.sl-standing-btn:hover, .sl-standing-btn.open {
+  background: color-mix(in oklab, var(--panel) 80%, oklch(60% 0.12 var(--sl-hue, 250)) 20%);
+}
+.sl-standing-btn.sl-standing-top {
+  background: color-mix(in oklab, var(--panel) 88%, oklch(60% 0.12 var(--sl-hue, 250)) 12%);
+}
+.sl-standing-btn.sl-standing-top:hover, .sl-standing-btn.sl-standing-top.open {
+  background: color-mix(in oklab, var(--panel) 76%, oklch(60% 0.12 var(--sl-hue, 250)) 24%);
+}
+.sl-standing-btn:focus-visible { outline: 2px solid oklch(70% 0.12 var(--sl-hue, 250)); outline-offset: 1px; }
+.sl-team-players {
+  list-style: none; margin: 0 0 4px calc(2.2ch + 20px); padding: 4px 0 4px 12px;
+  display: flex; flex-direction: column; gap: 2px;
+  border-left: 2px solid color-mix(in oklab, var(--line) 50%, oklch(60% 0.12 var(--sl-hue, 250)));
+}
+.sl-team-player {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px;
+  padding: 4px 8px; font-variant-numeric: tabular-nums; font-size: 14px;
+}
+.sl-team-player-name { font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 700px) {
+  .sl-team-players { margin-left: 8px; }
   .modal-backdrop:has(.sl-standings-modal) { padding: 0; align-items: stretch; }
   /* Three classes, to beat the shared .modal-card.wide max-height: 80vh (T031: the sheet stopped at 650px of 812). */
   .modal-card.wide.sl-standings-modal { max-width: none; max-height: none; height: 100%; border-radius: 0; }

@@ -164,19 +164,83 @@ describe('Jabari fold label (spec 040 F6)', () => {
       />,
     )
 
-  it('TRENDING_TONY: Teams reads "4 trending pickups", Players reads "#2 trending", never "2 trending pickups"', async () => {
+  it('TRENDING_TONY: Teams reads "60% of pickups trending", Players reads "#2 trending" (spec 058)', async () => {
     mountTony(award('TRENDING_TONY', {
-      unit: 'PICKUPS', standings: [standing(1, t1, 4), standing(2, t2, 1)], playerContributions: [contrib(1, 'Zed', t1, 2)],
+      unit: 'PERCENT', standings: [standing(1, t1, 60), standing(2, t2, 33.3)], playerContributions: [contrib(1, 'Zed', t1, 2)],
     }))
-    expect(screen.getByText('4 trending pickups')).toBeInTheDocument()
-    expect(screen.getByText('1 trending pickup')).toBeInTheDocument()
+    expect(screen.getByText('60% of pickups trending')).toBeInTheDocument()
+    expect(screen.getByText('33.3% of pickups trending')).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Players' }))
     expect(screen.getByText('#2 trending')).toBeInTheDocument()
-    expect(screen.queryByText('2 trending pickups')).not.toBeInTheDocument()
   })
 
   it('contributions of another award still use figure (no contributionFigure passed)', () => {
     mountTony(award('JOEL_EMBIID', { playerContributions: [contrib(1, 'Zed', t1, 2)] }), 'other')
     expect(screen.getByText('2.00 estimated points lost')).toBeInTheDocument()
+  })
+})
+
+describe('Teams view: click a team to see its own players (spec 058)', () => {
+  async function openTeams() {
+    const user = userEvent.setup()
+    mount(award('WAIVER_WIRE_WARRIOR', { playerContributions: rows }))
+    await user.click(screen.getByRole('button', { name: 'Teams' }))
+    return user
+  }
+
+  it('a team with players is a collapsed button; clicking it lists only its own players, in payload order', async () => {
+    const user = await openTeams()
+    const alpha = screen.getByRole('button', { name: /Alpha/ })
+    expect(alpha).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('link', { name: 'Amy' })).not.toBeInTheDocument()
+
+    await user.click(alpha)
+    expect(alpha).toHaveAttribute('aria-expanded', 'true')
+    const list = screen.getByRole('list', { name: 'Alpha: players' })
+    expect(within(list).getAllByRole('link').map((a) => a.textContent)).toEqual(['Amy', 'Bob'])
+    expect(within(list).getByText('15 fig')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Zed' })).not.toBeInTheDocument()
+  })
+
+  it('opening another team closes the first, and clicking an open team closes it', async () => {
+    const user = await openTeams()
+    await user.click(screen.getByRole('button', { name: /Alpha/ }))
+    await user.click(screen.getByRole('button', { name: /Bravo/ }))
+    expect(screen.queryByRole('list', { name: 'Alpha: players' })).not.toBeInTheDocument()
+    const bravo = screen.getByRole('list', { name: 'Bravo: players' })
+    expect(within(bravo).getByRole('link', { name: 'Zed' })).toBeInTheDocument()
+    expect(within(bravo).getByText('second note')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Bravo/ }))
+    expect(screen.queryByRole('list', { name: 'Bravo: players' })).not.toBeInTheDocument()
+  })
+
+  it('a team with no players behind its figure stays a plain row', async () => {
+    const user = userEvent.setup()
+    mount(award('WAIVER_WIRE_WARRIOR', { playerContributions: [contrib(1, 'Amy', t1, 15)] }))
+    await user.click(screen.getByRole('button', { name: 'Teams' }))
+    expect(screen.getByRole('button', { name: /Alpha/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Bravo/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Bravo')).toBeInTheDocument()
+  })
+
+  it('an award with no contributions has no team buttons', () => {
+    mount(award('HIGHEST_WEEK'))
+    expect(screen.queryByRole('button', { name: /Alpha/ })).not.toBeInTheDocument()
+  })
+
+  it('Trending Tony team rows open to their pickups with the rank figure', async () => {
+    const user = userEvent.setup()
+    render(
+      <SuperlativeStandings
+        s={award('TRENDING_TONY', { unit: 'PERCENT', standings: [standing(1, t1, 60)], playerContributions: [contrib(1, 'Zed', t1, 2, 'week 3 · waiver')] })}
+        title="The Trending Tony" hue={200} leagueId="L1" sport="nba"
+        figure={(v) => standingFigure('TRENDING_TONY', 'PERCENT', v)}
+        contributionFigure={(v) => `#${v} trending`}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: /Alpha/ }))
+    const list = screen.getByRole('list', { name: 'Alpha: players' })
+    expect(within(list).getByText('#2 trending')).toBeInTheDocument()
+    expect(within(list).getByText('week 3 · waiver')).toBeInTheDocument()
   })
 })

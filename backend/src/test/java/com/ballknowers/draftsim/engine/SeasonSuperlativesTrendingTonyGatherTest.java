@@ -3,7 +3,6 @@ package com.ballknowers.draftsim.engine;
 import com.ballknowers.draftsim.domain.Platform;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.SeasonSuperlativesService.Superlative;
-import com.ballknowers.draftsim.engine.SeasonSuperlativesService.TrendingPickupDetail;
 import com.ballknowers.draftsim.store.LeagueRepository.LeagueRow;
 import com.ballknowers.draftsim.store.LeagueTransactionRepository;
 import com.ballknowers.draftsim.store.SportTrendingRepository;
@@ -80,14 +79,17 @@ class SeasonSuperlativesTrendingTonyGatherTest {
         verify(repo, never()).earliestSnapshotAt(any());
 
         assertTrue(s.available());
-        assertEquals(2.0, s.value());
         assertEquals(2, s.trendingCoverage().judged());
         assertEquals(2, s.trendingCoverage().totalPickups());
         assertEquals(T1.atOffset(ZoneOffset.UTC), s.trendingCoverage().judgingSinceAt());
-        var d = (TrendingPickupDetail) s.detail().get(0);
-        assertEquals("p1", d.playerId());
-        assertEquals(3, d.trendingRank());
-        assertEquals(s1, d.snapshotAt());
+        // Spec 058: 2 judged pickups is below MIN_JUDGED_TO_RANK, so nobody is named -- but both were judged
+        // trending, which the standings note and the per-pickup rows still show.
+        assertNull(s.value());
+        assertEquals("no team has 5 judged pickups yet", s.emptyReason());
+        assertEquals("2 of 2 judged pickups trending", s.standings().get(0).note());
+        var c = s.playerContributions().get(0);
+        assertEquals("p1", c.playerId());
+        assertEquals(3.0, c.value());
     }
 
     @Test

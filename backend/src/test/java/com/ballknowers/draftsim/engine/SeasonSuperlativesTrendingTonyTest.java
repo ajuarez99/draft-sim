@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,18 +65,38 @@ class SeasonSuperlativesTrendingTonyTest {
         return shape(judged, Optional.of(SNAP), SNAP.toInstant());
     }
 
+    /** {@code n} not-trending pickups for one roster, named {@code prefix0..}, to pad a team's judged count. */
+    private static List<Judged> misses(int roster, String prefix, int n) {
+        List<Judged> out = new ArrayList<>();
+        for (int i = 0; i < n; i++) out.add(notTrending(roster, prefix + i, 1 + i));
+        return out;
+    }
+
+    @SafeVarargs
+    private static List<Judged> concat(List<Judged>... parts) {
+        List<Judged> out = new ArrayList<>();
+        for (List<Judged> p : parts) out.addAll(p);
+        return out;
+    }
+
     @Test
-    void aWinnerWithFourBeatsAManagerWithTwo() {
-        Superlative s = shape(List.of(
-                trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER"), trending(1, "c", 3, 1, "FREE_AGENT"),
-                trending(1, "d", 4, 9, "WAIVER"), trending(2, "e", 1, 2, "WAIVER"), trending(2, "f", 2, 4, "WAIVER"),
-                notTrending(2, "g", 3)));
+    void aHigherShareBeatsAHigherCount() {
+        // Spec 058 preference ordering: 3 of 5 (60%) beats 4 of 10 (40%), though 4 > 3.
+        Superlative s = shape(concat(
+                List.of(trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER"),
+                        trending(1, "c", 3, 1, "FREE_AGENT")),
+                misses(1, "m1-", 2),
+                List.of(trending(2, "e", 1, 2, "WAIVER"), trending(2, "f", 2, 4, "WAIVER"),
+                        trending(2, "g", 3, 6, "WAIVER"), trending(2, "h", 4, 8, "WAIVER")),
+                misses(2, "m2-", 6)));
 
         assertTrue(s.available());
         assertEquals(Kind.TRENDING_TONY, s.kind());
-        assertEquals("PICKUPS", s.unit());
-        assertEquals(4.0, s.value());
+        assertEquals("PERCENT", s.unit());
+        assertEquals(60.0, s.value());
         assertEquals(List.of(1), s.holders().stream().map(h -> h.rosterId()).toList());
+        assertEquals(List.of(1, 2), s.standings().stream().filter(Standing::hasValue).map(x -> x.team().rosterId()).toList());
+        assertEquals(40.0, s.standings().get(1).value());
         assertEquals(3, s.detail().size(), "detail lists the holder's 3 best trending pickups only");
         assertNull(s.emptyReason());
         var d = (TrendingPickupDetail) s.detail().get(0);
@@ -86,13 +107,33 @@ class SeasonSuperlativesTrendingTonyTest {
     }
 
     @Test
-    void aTwoWayTieNamesBothManagers() {
-        Superlative s = shape(List.of(
-                trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER"),
-                trending(2, "c", 1, 2, "WAIVER"), trending(2, "d", 2, 4, "WAIVER"), notTrending(3, "e", 1)));
+    void aSmallSampleIsListedUnrankedAndCannotWin() {
+        // 1 of 1 is 100%, but below MIN_JUDGED_TO_RANK; 2 of 5 (40%) wins.
+        Superlative s = shape(concat(
+                List.of(trending(1, "a", 1, 3, "WAIVER")),
+                List.of(trending(2, "b", 1, 2, "WAIVER"), trending(2, "c", 2, 4, "WAIVER")),
+                misses(2, "m2-", 3)));
+
+        assertEquals(List.of(2), s.holders().stream().map(h -> h.rosterId()).toList());
+        assertEquals(40.0, s.value());
+        Standing small = s.standings().stream().filter(x -> x.team().rosterId() == 1).findFirst().orElseThrow();
+        assertFalse(small.hasValue());
+        assertNull(small.rank());
+        assertEquals("only 1 judged, needs 5", small.missingReason());
+        assertEquals("1 of 1 judged pickup trending", small.note());
+    }
+
+    @Test
+    void aTwoWayTieOnShareNamesBothManagers() {
+        // 2 of 5 and 4 of 10 are both 40%.
+        Superlative s = shape(concat(
+                List.of(trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER")), misses(1, "m1-", 3),
+                List.of(trending(2, "c", 1, 2, "WAIVER"), trending(2, "d", 2, 4, "WAIVER"),
+                        trending(2, "e", 3, 6, "WAIVER"), trending(2, "f", 4, 7, "WAIVER")), misses(2, "m2-", 6)));
 
         assertEquals(List.of(1, 2), s.holders().stream().map(h -> h.rosterId()).toList());
-        assertEquals(4, s.detail().size(), "two holders, two rows each");
+        assertEquals(5, s.detail().size(), "two holders, up to three rows each");
+        assertEquals(List.of(1, 1), s.standings().stream().filter(Standing::hasValue).map(Standing::rank).toList());
     }
 
     @Test
@@ -103,6 +144,7 @@ class SeasonSuperlativesTrendingTonyTest {
 
         assertEquals(List.of("c", "e", "b"), s.detail().stream().map(r -> ((TrendingPickupDetail) r).playerId()).toList());
         assertEquals(5, s.playerContributions().size());
+        assertEquals(100.0, s.value());
     }
 
     @Test
@@ -124,9 +166,9 @@ class SeasonSuperlativesTrendingTonyTest {
         Superlative s = shape(List.of(notTrending(1, "a", 1), trending(2, "b", 1, 3, "WAIVER"),
                 trending(3, "c", 2, 4, "WAIVER"), trending(3, "d", 2, 6, "WAIVER"), notTrending(3, "e", 3)));
 
-        assertEquals("0 of 1 judged pickup", note(s, 1));
-        assertEquals("1 of 1 judged pickup", note(s, 2));
-        assertEquals("2 of 3 judged pickups", note(s, 3));
+        assertEquals("0 of 1 judged pickup trending", note(s, 1));
+        assertEquals("1 of 1 judged pickup trending", note(s, 2));
+        assertEquals("2 of 3 judged pickups trending", note(s, 3));
     }
 
     private static String note(Superlative s, int rosterId) {
@@ -134,48 +176,52 @@ class SeasonSuperlativesTrendingTonyTest {
     }
 
     @Test
-    void aTopCountOfOneNamesNobodyButKeepsCoverageAndStandings() {
+    void noTeamWithEnoughJudgedPickupsNamesNobodyButKeepsCoverageAndStandings() {
         Superlative s = shape(List.of(trending(1, "a", 1, 3, "WAIVER"), trending(2, "b", 1, 4, "WAIVER"),
                 notTrending(3, "c", 1)));
 
         assertTrue(s.available());
-        assertEquals("nobody has chased the trending list twice yet", s.emptyReason());
+        assertEquals("no team has 5 judged pickups yet", s.emptyReason());
         assertTrue(s.holders().isEmpty());
         assertNull(s.value());
         assertNotNull(s.trendingCoverage());
         assertEquals(3, s.standings().size());
+        assertTrue(s.standings().stream().noneMatch(Standing::hasValue));
         assertEquals(2, s.playerContributions().size());
     }
 
     @Test
-    void aPickupBelowTheCutDoesNotCount() {
-        // A rank-22 player reaches shaping only as NOT_TRENDING (the judge enforces TOP_N); two of those name nobody.
-        Superlative s = shape(List.of(notTrending(1, "a", 1), notTrending(1, "b", 2), trending(2, "c", 1, 1, "WAIVER")));
+    void rankedTeamsWithNoTrendingPickupNameNobody() {
+        Superlative s = shape(concat(misses(1, "m1-", 5), List.of(trending(2, "c", 1, 1, "WAIVER"))));
 
-        assertEquals("nobody has chased the trending list twice yet", s.emptyReason());
+        assertEquals("no ranked team has picked up a trending player yet", s.emptyReason());
+        assertTrue(s.holders().isEmpty());
+        Standing ranked = s.standings().get(0);
+        assertEquals(1, ranked.team().rosterId());
+        assertEquals(0.0, ranked.value());
         assertTrue(s.playerContributions().stream().noneMatch(c -> c.value() > TrendingPickups.TOP_N));
     }
 
     @Test
-    void standingsListEveryRosterWithTheShareNoteAndAZeroRow() {
-        Superlative s = shape(List.of(
-                trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER"), notTrending(1, "c", 3),
-                trending(2, "d", 1, 2, "WAIVER"), notJudged(3, "e", 1)));
+    void standingsListEveryRosterRankedFirstThenUnrankedWithTheirReasons() {
+        Superlative s = shape(concat(
+                List.of(trending(1, "a", 1, 3, "WAIVER"), trending(1, "b", 2, 5, "WAIVER")), misses(1, "m1-", 4),
+                List.of(trending(2, "d", 1, 2, "WAIVER")), List.of(notJudged(3, "e", 1))));
 
         assertEquals(3, s.standings().size());
         Standing first = s.standings().get(0);
         assertEquals(1, first.team().rosterId());
         assertEquals(1, first.rank());
-        assertEquals(2.0, first.value());
-        assertEquals("2 of 3 judged pickups", first.note());
+        assertEquals(33.3, first.value(), "2 of 6, one decimal");
+        assertEquals("2 of 6 judged pickups trending", first.note());
         Standing second = s.standings().get(1);
-        assertEquals(2, second.rank());
-        assertEquals("1 of 1 judged pickup", second.note());
+        assertFalse(second.hasValue());
+        assertEquals("only 1 judged, needs 5", second.missingReason());
         Standing last = s.standings().get(2);
         assertEquals(3, last.team().rosterId());
-        assertEquals(0.0, last.value(), "a roster with nothing judged is a measured 0, not a missing row");
-        assertTrue(last.hasValue());
-        assertEquals("no judged pickups", last.note());
+        assertFalse(last.hasValue());
+        assertEquals("no judged pickups", last.missingReason());
+        assertNull(last.note());
     }
 
     @Test
@@ -272,7 +318,7 @@ class SeasonSuperlativesTrendingTonyTest {
     void playersKnownToTheMapGetTheirNameAndPosition() {
         Player p = new Player(1L, Sport.NFL, "p9", "Some Guy", List.of(Position.WR), "BUF", null, null, null, null);
         Superlative s = SeasonSuperlativesService.trendingTonyFromJudged(
-                List.of(trending(1, "p9", 1, 2, "WAIVER"), trending(1, "p9", 2, 3, "WAIVER")),
+                concat(List.of(trending(1, "p9", 1, 2, "WAIVER"), trending(1, "p9", 2, 3, "WAIVER")), misses(1, "m-", 3)),
                 Optional.of(SNAP), SNAP.toInstant(), true, Map.of("p9", p), ROSTERS, Map.of(), Map.of(), Map.of());
 
         var d = (TrendingPickupDetail) s.detail().get(0);

@@ -447,15 +447,15 @@ describe('League home', () => {
     expect(screen.queryByText(/Couldn't load/)).toBeNull()
   })
 
-  it('words the Trending Tony PICKUPS unit as "trending pickups" on the awards block (spec 051)', async () => {
+  it('words the Trending Tony PERCENT unit as "% of pickups trending" on the awards block (spec 058)', async () => {
     const a = awards()
     a.superlatives = [{
-      ...a.superlatives[0], kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 4, early: false,
+      ...a.superlatives[0], kind: 'TRENDING_TONY', unit: 'PERCENT', value: 66.7, early: false,
     }]
     arrange({ awards: () => Promise.resolve(a) })
     renderHome()
     const awardsBlock = await waitFor(() => section('Awards'))
-    await waitFor(() => expect(within(awardsBlock).getByText(/4 trending pickups/)).toBeInTheDocument())
+    await waitFor(() => expect(within(awardsBlock).getByText(/66.7% of pickups trending/)).toBeInTheDocument())
     expect(within(awardsBlock).getByText('The Trending Tony')).toBeInTheDocument()
   })
 
