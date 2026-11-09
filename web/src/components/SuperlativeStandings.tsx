@@ -2,7 +2,13 @@ import { useId, useState } from 'react'
 import Avatar from './Avatar'
 import PersonName from './PersonName'
 import PlayerLink from './PlayerLink'
-import type { Sport, Superlative, SuperlativePlayerContribution, SuperlativePlayerStanding } from '../api'
+import type {
+  Sport,
+  Superlative,
+  SuperlativePlayerContribution,
+  SuperlativePlayerStanding,
+  SuperlativeStanding,
+} from '../api'
 
 const MAX_PLAYER_ROWS = 10
 
@@ -59,6 +65,8 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
   const hasContributions = s.playerContributions.length > 0
   const [view, setView] = useState<View>(DEFAULT_PLAYERS_VIEW.has(s.kind) ? 'players' : 'teams')
   const showPlayersView = hasContributions && view === 'players'
+  // Spec 058: the Teams-view row whose own players are open (one at a time); null = none.
+  const [openTeam, setOpenTeam] = useState<number | null>(null)
 
   // T031 live finding: 41-way tie on NFL 2025. The backend sends everyone tied with the
   // 10th (correct), but 41 identical rows are noise. Group by rank in payload order (never
@@ -126,6 +134,84 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
     )
   }
 
+  /** Spec 058: one team's own player rows, in payload order (the backend's ranking), for its expandable Teams row. */
+  function teamContributions(rosterId: number) {
+    return s.playerContributions.filter((c) => c.team.rosterId === rosterId)
+  }
+
+  function teamRowBody(r: SuperlativeStanding) {
+    return (
+      <>
+        <span className="sl-standing-rank">{r.rank ?? '—'}</span>
+        <span className="sl-standing-who">
+          <span className="sl-standing-name">
+            <Avatar
+              avatarId={r.team.avatarId}
+              seed={String(r.team.managerId ?? r.team.rosterId)}
+              label={r.team.teamName}
+              hue={hue}
+              className="sl-avatar"
+            />
+            <PersonName teamName={r.team.teamName} username={r.team.username} />
+          </span>
+          {r.note && <span className="muted small sl-standing-note">{r.note}</span>}
+        </span>
+        {r.hasValue && r.value != null ? (
+          <span className="sl-standing-figure">{figure(r.value)}</span>
+        ) : (
+          <span className="sl-standing-figure muted small">{r.missingReason}</span>
+        )}
+      </>
+    )
+  }
+
+  function teamRow(r: SuperlativeStanding) {
+    const rowClass = `sl-standing${r.rank === 1 ? ' sl-standing-top' : ''}${r.hasValue ? '' : ' sl-standing-missing'}`
+    const own = teamContributions(r.team.rosterId)
+    // A team with no player rows behind its figure has nothing to open, so it stays a plain row.
+    if (own.length === 0) {
+      return (
+        <li className={rowClass} key={r.team.rosterId}>
+          {teamRowBody(r)}
+        </li>
+      )
+    }
+    const isOpen = openTeam === r.team.rosterId
+    const listId = `${titleId}-team-${r.team.rosterId}`
+    return (
+      <li className="sl-team-row" key={r.team.rosterId}>
+        <button
+          type="button"
+          className={`${rowClass} sl-standing-btn${isOpen ? ' open' : ''}`}
+          aria-expanded={isOpen}
+          aria-controls={listId}
+          onClick={() => setOpenTeam(isOpen ? null : r.team.rosterId)}
+        >
+          {teamRowBody(r)}
+        </button>
+        {isOpen && (
+          <ul className="sl-team-players" id={listId} aria-label={`${r.team.teamName}: players`}>
+            {own.map((c, i) => (
+              <li className="sl-team-player" key={`${c.playerId}:${i}`}>
+                <span className="sl-standing-who">
+                  {/* Inline, not the flex .sl-standing-name: a wrapped long name must keep "(SG)" beside it. */}
+                  <span className="sl-team-player-name">
+                    <PlayerLink sleeperLeagueId={leagueId} sleeperPlayerId={c.playerId} sport={sport}>
+                      {c.playerName}
+                    </PlayerLink>
+                    {c.position ? ` (${c.position})` : ''}
+                  </span>
+                  {c.note && <span className="muted small">{c.note}</span>}
+                </span>
+                <span className="sl-standing-figure">{contributionFigure(c.value)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </li>
+    )
+  }
+
   return (
     // role=region labelled by the award: the in-place successor of the modal's
     // role=dialog. stopPropagation: this renders inside the row's <article>,
@@ -166,32 +252,7 @@ export default function SuperlativeStandings({ s, title, hue, leagueId, sport, f
           ? s.playerContributions.map(contributionRow)
           : isPlayers
           ? shownPlayers.map(playerRow)
-          : s.standings.map((r) => (
-              <li
-                className={`sl-standing${r.rank === 1 ? ' sl-standing-top' : ''}${r.hasValue ? '' : ' sl-standing-missing'}`}
-                key={r.team.rosterId}
-              >
-                <span className="sl-standing-rank">{r.rank ?? '—'}</span>
-                <span className="sl-standing-who">
-                  <span className="sl-standing-name">
-                    <Avatar
-                      avatarId={r.team.avatarId}
-                      seed={String(r.team.managerId ?? r.team.rosterId)}
-                      label={r.team.teamName}
-                      hue={hue}
-                      className="sl-avatar"
-                    />
-                    <PersonName teamName={r.team.teamName} username={r.team.username} />
-                  </span>
-                  {r.note && <span className="muted small sl-standing-note">{r.note}</span>}
-                </span>
-                {r.hasValue && r.value != null ? (
-                  <span className="sl-standing-figure">{figure(r.value)}</span>
-                ) : (
-                  <span className="sl-standing-figure muted small">{r.missingReason}</span>
-                )}
-              </li>
-            ))}
+          : s.standings.map(teamRow)}
       </ol>
       {isPlayers && collapsedGroups.length > 0 && (
         <details className="sl-standings-more">

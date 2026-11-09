@@ -1710,9 +1710,9 @@ describe('Superlatives player links', () => {
 
   // ---- spec 051: The Trending Tony ----------------------------------------------------------------
 
-  it('The Trending Tony renders last, titled, with its count worded "4 trending pickups"', async () => {
+  it('The Trending Tony renders last, titled, with its share worded "60% of pickups trending" (spec 058)', async () => {
     const tony: Superlative = {
-      kind: 'TRENDING_TONY', available: true, reason: null, early: false, value: 4, unit: 'PICKUPS',
+      kind: 'TRENDING_TONY', available: true, reason: null, early: false, value: 60, unit: 'PERCENT',
       holders: [{ rosterId: 3, managerId: 30, teamName: 'Chasers', username: null, avatarId: null }],
       emptyReason: null, detail: [], coverage: null, playerHolders: [], standings: [], playerStandings: [],
       playerContributions: [],
@@ -1721,7 +1721,7 @@ describe('Superlatives player links', () => {
     fetchSuperlatives.mockResolvedValue(withKind(baseline(), tony))
     render(<Superlatives />)
     expect(await screen.findByText('The Trending Tony')).toBeInTheDocument()
-    expect(screen.getByText('4 trending pickups')).toBeInTheDocument()
+    expect(screen.getByText('60% of pickups trending')).toBeInTheDocument()
     const titles = screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent)
     expect(titles[titles.length - 1]).toBe('The Trending Tony')
   })

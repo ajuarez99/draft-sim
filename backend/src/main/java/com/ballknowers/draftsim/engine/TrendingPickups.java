@@ -37,11 +37,12 @@ public final class TrendingPickups {
     public static final int TOP_N = 15;
 
     /**
-     * The fewest trending pickups a manager needs before the award names him. <b>Hand-set,
-     * arbitrary</b>, the same shape of floor as {@link MostAddedPlayers#MIN_ADDS_TO_NAME}: one is a
-     * coincidence, two is a habit. Below it the card says nobody has chased the list twice.
+     * The fewest judged pickups a team needs before its trending share is ranked (spec 058, Allan's
+     * call 2026-11-09). <b>Hand-set, arbitrary</b>: the award ranks a percentage, and without a floor
+     * 1 of 1 (100%) beats 8 of 10. Below it the team is listed unranked with the reason. Replaces
+     * spec 051's "two trending pickups to be named" floor, which counted trending pickups, not a share.
      */
-    public static final int MIN_TO_NAME = 2;
+    public static final int MIN_JUDGED_TO_RANK = 5;
 
     public enum Verdict { TRENDING, NOT_TRENDING, NOT_JUDGED }
 

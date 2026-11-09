@@ -32,7 +32,7 @@ export default function AwardWinners({
     <>
       {renderBody()}
       {/* Spec 051 FR-007: the coverage line prints whenever the card is available, holders or not -- an
-          empty card ("nobody has chased the trending list twice yet") still owes the reader what was judged. */}
+          empty card ("no team has 5 judged pickups yet") still owes the reader what was judged. */}
       {s.available && s.trendingCoverage && (
         <p className="muted small sl-coverage">{trendingCoverageLine(s.trendingCoverage, throughWeek, sport)}</p>
       )}

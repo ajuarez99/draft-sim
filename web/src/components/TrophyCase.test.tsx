@@ -236,7 +236,7 @@ describe('past award winners (US4)', () => {
   it('hides an unavailable Trending Tony but still shows an available one (spec 051 F8)', async () => {
     const tony = (available: boolean) => award({
       kind: 'TRENDING_TONY', available, reason: available ? null : 'no trending history for this season',
-      unit: 'PICKUPS', value: available ? 3 : null, holders: available ? [{ rosterId: 2, managerId: 20, teamName: 'Chasers', username: null, avatarId: null }] : [],
+      unit: 'PERCENT', value: available ? 3 : null, holders: available ? [{ rosterId: 2, managerId: 20, teamName: 'Chasers', username: null, avatarId: null }] : [],
       detail: [],
       trendingCoverage: available ? { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 3, notJudged: 0, totalPickups: 3 } : null,
     })
@@ -249,7 +249,7 @@ describe('past award winners (US4)', () => {
 
   it('shows an available Trending Tony in a past season', async () => {
     fetchSuperlatives.mockResolvedValue(response({ superlatives: [award({
-      kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 3, detail: [],
+      kind: 'TRENDING_TONY', unit: 'PERCENT', value: 3, detail: [],
       trendingCoverage: { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 3, notJudged: 0, totalPickups: 3 },
     })] }))
     await open()

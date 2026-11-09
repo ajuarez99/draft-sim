@@ -146,7 +146,9 @@ export default function Superlatives() {
             <p>One row each. If an award can&apos;t be worked out yet, its row says why.</p>
             {data.superlatives.some((s) => s.kind === 'TRENDING_TONY') && (
               <p>
-                The Trending Tony counts pickups that were on Sleeper&apos;s trending list when they were made. That list
+                The Trending Tony ranks teams by the share of their judged pickups that were on Sleeper&apos;s trending
+                list when they were made. A team needs at least 5 judged pickups to be ranked (a hand-set floor, so 1 of
+                1 can&apos;t win at 100%); below that it is listed unranked with its count. That list
                 is platform-wide (the players added most across all Sleeper leagues in the last 24 hours), not this
                 league&apos;s, and a pickup counts when the player was in its top 15. Each pickup is judged by the
                 first list recorded within a day after it (the one whose 24-hour window contains the pickup), or failing that
@@ -390,8 +392,8 @@ function formatValue(value: number, unit: Superlative['unit']): string {
   if (unit === 'WINS') return `${value} ${value === 1 ? 'win' : 'wins'}`
   if (unit === 'GAMES') return `${value} ${value === 1 ? 'game' : 'games'}`
   if (unit === 'ADDS') return `${value} ${value === 1 ? 'add' : 'adds'}`
-  // Spec 051: TRENDING_TONY's count of pickups that were on the trending list.
-  if (unit === 'PICKUPS') return `${value} trending ${value === 1 ? 'pickup' : 'pickups'}`
+  // Spec 058: TRENDING_TONY's share of a team's judged pickups that were on the trending list.
+  if (unit === 'PERCENT') return `${value}% of pickups trending`
   return String(value)
 }
 

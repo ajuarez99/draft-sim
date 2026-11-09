@@ -2748,7 +2748,7 @@ export type Superlative = {
   reason?: string | null
   early: boolean
   value: number | null
-  unit: 'POINTS' | 'WINS' | 'GAMES' | 'ADDS' | 'PICKUPS' | null
+  unit: 'POINTS' | 'WINS' | 'GAMES' | 'ADDS' | 'PERCENT' | null
   holders: SuperlativeHolder[]
   emptyReason?: string | null
   detail: SuperlativeDetail[]

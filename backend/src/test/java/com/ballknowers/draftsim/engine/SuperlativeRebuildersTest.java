@@ -27,7 +27,7 @@ class SuperlativeRebuildersTest {
 
     private static Superlative trendingTony() {
         Holder h = new Holder(3, 7L, "Team Three", null, "av");
-        return new Superlative(Kind.TRENDING_TONY, true, null, false, 4.0, "PICKUPS", List.of(h), null, List.of(),
+        return new Superlative(Kind.TRENDING_TONY, true, null, false, 60.0, "PERCENT", List.of(h), null, List.of(),
                 null, List.of(), List.of(new Standing(1, h, 4.0, "4 of 9 judged pickups", true, null)), List.of(),
                 List.of(new PlayerContribution(1, "p1", "Player One", "WR", h, 2.0, "week 3 · waiver")),
                 COVERAGE);

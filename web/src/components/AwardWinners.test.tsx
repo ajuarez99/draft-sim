@@ -104,7 +104,7 @@ describe('AwardWinners', () => {
   }
   const coverage = { judgingSinceAt: '2026-10-14T09:00:00Z', judged: 8, notJudged: 3, totalPickups: 11 }
   const tony = (over: Partial<Superlative> = {}) => award({
-    kind: 'TRENDING_TONY', unit: 'PICKUPS', value: 4, holders: [tonyHolder],
+    kind: 'TRENDING_TONY', unit: 'PERCENT', value: 60, holders: [tonyHolder],
     detail: [tonyPickup, { ...tonyPickup, playerId: 'p10', playerName: 'Free Guy', week: 5, addType: 'FREE_AGENT', trendingRank: 11 }],
     trendingCoverage: coverage, ...over,
   })
@@ -134,8 +134,8 @@ describe('AwardWinners', () => {
   })
 
   it('trending, nobody named: the emptyReason AND the coverage line both print', () => {
-    show(tony({ holders: [], detail: [], value: 1, emptyReason: 'nobody has chased the trending list twice yet' }))
-    expect(screen.getByText('nobody has chased the trending list twice yet')).toBeInTheDocument()
+    show(tony({ holders: [], detail: [], value: null, emptyReason: 'no team has 5 judged pickups yet' }))
+    expect(screen.getByText('no team has 5 judged pickups yet')).toBeInTheDocument()
     expect(screen.getByText(/8 of 11 pickups judged/)).toBeInTheDocument()
   })
 
