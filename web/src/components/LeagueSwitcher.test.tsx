@@ -1,19 +1,15 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it } from 'vitest'
-import { switchTarget } from './LeagueRailSection'
-import { draftSummary, renderAtPath, resetRail } from '../testRailHelpers'
-import type { LeagueContext } from '../destinations'
+import { draftSummary, renderAtPath, resetShell } from '../testShellHelpers'
 
 /*
- * Moving between leagues and seasons without going Home.
- *
- * The rule worth testing is the fallback: a page you are on may not exist in
- * the league you are switching to, and the switcher has to land you somewhere
- * real rather than on a page that league does not have.
+ * The league switcher in the league header: moving between leagues without going Home. The pure
+ * landing rule (a page you are on may not exist in the league you are switching to) is tested on
+ * switchTarget itself in switchTarget.test.ts; this is the menu that uses it.
  */
 
-afterEach(resetRail)
+afterEach(resetShell)
 
 const NFL_A = draftSummary({ sleeperLeagueId: 'LA', sleeperDraftId: 'DA', leagueName: 'Alpha League' })
 const NFL_B = draftSummary({
@@ -32,47 +28,12 @@ const NBA_C = draftSummary({
   sport: 'nba',
 })
 
-function ctxOf(d: typeof NFL_A): LeagueContext {
-  return { lineage: { current: d, seasons: [d] }, season: d }
-}
-
-describe('switchTarget', () => {
-  it('keeps the page you were on when the other league has it', () => {
-    expect(switchTarget('history', ctxOf(NFL_B))).toBe('/leagues/LB/history')
-    expect(switchTarget('power', ctxOf(NFL_B))).toBe('/leagues/LB/power')
-  })
-
-  // The case that makes the fallback necessary. The Schedule grid is basketball-only
-  // (Analysis was the example until spec 030 gave basketball one), and the rule for that
-  // lives in the destination table -- this reads it rather than restating it, which is
-  // why the two can't drift apart.
-  it('falls back to League home when the target league has no such page', () => {
-    expect(switchTarget('schedule', ctxOf(NFL_B))).toBe('/leagues/LB')
-  })
-
-  it('keeps Analysis for a football league and for a basketball one', () => {
-    expect(switchTarget('analysis', ctxOf(NFL_B))).toBe('/leagues/LB/analysis')
-    expect(switchTarget('analysis', ctxOf(NBA_C))).toBe('/leagues/LC/analysis')
-  })
-
-  it('sends a board to the target league’s own board', () => {
-    expect(switchTarget('board', ctxOf(NFL_B))).toBe('/drafts/DB/board')
-  })
-
-  // Was History; a page with no league destination of its own (a mock room, a
-  // manager's history) now lands on the target's board, so a flyout's year links
-  // differ per year instead of all pointing at one History URL (spec 011).
-  it('falls back to the board from a page that is not a league page at all', () => {
-    expect(switchTarget(null, ctxOf(NFL_B))).toBe('/drafts/DB/board')
-  })
-})
-
-describe('the switcher in the rail', () => {
+describe('the switcher in the league header', () => {
   it('is absent when there is nothing to switch to', async () => {
     const { leagueSection } = renderAtPath('/leagues/LA/history', { drafts: [NFL_A] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(screen.queryByTitle('Switch league or season')).toBeNull()
+    expect(screen.queryByTitle('Switch league')).toBeNull()
   })
 
   it('lists the other leagues, not the one you are in', async () => {
@@ -80,8 +41,8 @@ describe('the switcher in the rail', () => {
     const { leagueSection } = renderAtPath('/leagues/LA/history', { drafts: [NFL_A, NFL_B, NBA_C] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    await waitFor(() => expect(screen.queryByTitle('Switch league or season')).not.toBeNull())
-    await user.click(screen.getByTitle('Switch league or season'))
+    await waitFor(() => expect(screen.queryByTitle('Switch league')).not.toBeNull())
+    await user.click(screen.getByTitle('Switch league'))
 
     const items = screen.getAllByRole('menuitem').map((i) => i.textContent ?? '')
     expect(items.some((t) => t.includes('Beta League'))).toBe(true)
@@ -94,27 +55,47 @@ describe('the switcher in the rail', () => {
     const { leagueSection } = renderAtPath('/leagues/LA/power', { drafts: [NFL_A, NFL_B] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    await waitFor(() => expect(screen.queryByTitle('Switch league or season')).not.toBeNull())
-    await user.click(screen.getByTitle('Switch league or season'))
+    await waitFor(() => expect(screen.queryByTitle('Switch league')).not.toBeNull())
+    await user.click(screen.getByTitle('Switch league'))
 
     const beta = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('Beta'))
     expect(beta?.getAttribute('href')).toBe('/leagues/LB/power')
   })
 
-  it('offers an NFL league its League home when you are on an NBA league’s Schedule grid', async () => {
+  it('lands an NFL league on its League home when you are on an NBA league’s Schedule grid', async () => {
     const user = userEvent.setup()
     const { leagueSection } = renderAtPath('/leagues/LC/schedule', { drafts: [NFL_A, NBA_C] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    await waitFor(() => expect(screen.queryByTitle('Switch league or season')).not.toBeNull())
-    await user.click(screen.getByTitle('Switch league or season'))
+    await waitFor(() => expect(screen.queryByTitle('Switch league')).not.toBeNull())
+    await user.click(screen.getByTitle('Switch league'))
 
     const alpha = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('Alpha'))
     expect(alpha?.getAttribute('href')).toBe('/leagues/LA')
   })
+
+  it('moves focus in on open, closes on Escape and returns focus to the trigger', async () => {
+    const user = userEvent.setup()
+    const { leagueSection } = renderAtPath('/leagues/LA/history', { drafts: [NFL_A, NFL_B] })
+    await waitFor(() => expect(leagueSection()).not.toBeNull())
+    await waitFor(() => expect(screen.queryByTitle('Switch league')).not.toBeNull())
+
+    const trigger = screen.getByTitle('Switch league')
+    await user.click(trigger)
+    expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true)
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(trigger)
+  })
 })
 
-describe('seasons while the rail is collapsed', () => {
+/*
+ * The old rail collapsed in a draft room and its season links vanished there; the flyout was the
+ * only route to them. The compact top bar has the same job now: a draft room is exactly where
+ * comparing seasons is wanted (plan review PR-02).
+ */
+describe('seasons and leagues from a draft room (the compact top bar)', () => {
   const S26 = draftSummary({
     sleeperLeagueId: 'L26',
     sleeperDraftId: 'D26',
@@ -131,27 +112,20 @@ describe('seasons while the rail is collapsed', () => {
     leagueName: 'Alpha League',
   })
 
-  /*
-   * The gap this closes: draft rooms collapse the rail by default (a 14-team
-   * board has no width to spare), and the season links were gated on the rail
-   * being expanded -- so the seasons vanished in exactly the room where you
-   * most want to compare them.
-   */
-  it('reaches the other seasons from a collapsed draft room', async () => {
-    const user = userEvent.setup()
-    const { leagueSection, container } = renderAtPath('/drafts/D26/board', { drafts: [S26, S25] })
+  it('carries the season dropdown, the switcher and the tabs in the top bar itself', async () => {
+    const other = draftSummary({ id: 5, leagueId: 5, sleeperLeagueId: 'LB', sleeperDraftId: 'DB', leagueName: 'Beta League' })
+    const { leagueSection, topBar } = renderAtPath('/drafts/D26/board', { drafts: [S26, S25, other] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(container.querySelector('nav.app-rail')?.className).toContain('collapsed')
-    // The old inline row of years is gone at this width...
-    expect(container.querySelector('.rail-league-seasons')).toBeNull()
-
-    await user.click(screen.getByTitle('Switch league or season'))
-
-    // ...and the flyout carries them instead.
-    const items = screen.getAllByRole('menuitem').map((i) => i.textContent ?? '')
-    expect(items.some((t) => t.includes('2025'))).toBe(true)
-    expect(items.some((t) => t.includes('2026'))).toBe(true)
+    const bar = topBar()!
+    expect(bar.classList.contains('compact')).toBe(true)
+    expect(bar.contains(leagueSection())).toBe(true)
+    expect(bar.querySelector('nav[aria-label="League"]')).not.toBeNull()
+    expect(bar.querySelector('button[aria-label^="Season:"]')).not.toBeNull()
+    await waitFor(() => expect(bar.querySelector('button[title="Switch league"]')).not.toBeNull())
+    // The global links fold into the menu button there, so no Main nav competes for the width.
+    expect(bar.querySelector('nav[aria-label="Main"]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Menu' })).toBeTruthy()
   })
 
   it('links a finished season to its board', async () => {
@@ -159,17 +133,18 @@ describe('seasons while the rail is collapsed', () => {
     const { leagueSection } = renderAtPath('/drafts/D26/board', { drafts: [S26, S25] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    await user.click(screen.getByTitle('Switch league or season'))
+    await user.click(await screen.findByRole('button', { name: /^Season: / }))
 
     const older = screen.getAllByRole('menuitem').find((i) => (i.textContent ?? '').includes('2025'))
     expect(older?.getAttribute('href')).toBe('/drafts/D25/board')
   })
 
-  it('still shows the inline season row when the rail is expanded', async () => {
-    const { leagueSection, container } = renderAtPath('/leagues/L26/history', { drafts: [S26, S25] })
+  it('keeps the full header and the global links on a content page', async () => {
+    const { leagueSection, topBar, container } = renderAtPath('/leagues/L26/history', { drafts: [S26, S25] })
 
     await waitFor(() => expect(leagueSection()).not.toBeNull())
-    expect(container.querySelector('nav.app-rail')?.className).not.toContain('collapsed')
-    expect(container.querySelector('.rail-league-seasons')).not.toBeNull()
+    expect(topBar()!.classList.contains('compact')).toBe(false)
+    expect(container.querySelector('.league-header:not(.compact)')).not.toBeNull()
+    expect(topBar()!.querySelector('nav[aria-label="Main"]')).not.toBeNull()
   })
 })

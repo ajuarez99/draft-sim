@@ -70,7 +70,7 @@ describe('acceptsLeagueHint', () => {
     ['/'],
     ['/managers'],
     // The seat-setup form, not a room: no session, so no league to take.
-    // Same carve-out railDefaultCollapsed makes.
+    // Same carve-out isCompactChrome makes.
     ['/mock/new'],
     ['/mock/new/'],
     ['/nonsense'],

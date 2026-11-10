@@ -28,14 +28,13 @@ export function usePageActionSlot() {
 }
 
 /**
- * The rail's context region, between the wordmark and the Menu rows -- what
- * the *current page* wants to say in the global rail. Home fills it with the
- * sport filter; §C Phase 3 fills it with league context on league-scoped
- * routes. A page that portals nothing just leaves the rail shorter.
+ * The page-context strip, under the top bar (and under the league header when there is one): what
+ * the *current page* wants to say in the global chrome. The picker and the Scouting report fill it
+ * with the sport filter; a manager's history page fills it with who the manager is. A page that
+ * portals nothing leaves no strip at all (`:empty` in CSS).
  *
- * `collapsed` rides along because the portaled content has to render
- * differently in the icon rail (labels and counts hidden, dots kept) and a
- * portal can't read a CSS class on its target's ancestor.
+ * It used to be the left rail's middle region. The hook keeps its name and shape so its three
+ * callers compile; `collapsed` has no meaning without a rail and is always false.
  */
 export type RailContext = { node: HTMLDivElement | null; collapsed: boolean }
 
@@ -72,4 +71,19 @@ export function useRailLeagueHint(sleeperLeagueId: string | null | undefined) {
     publish(sleeperLeagueId ?? null)
     return () => publish(null)
   }, [publish, sleeperLeagueId])
+}
+
+/**
+ * True when the current path is inside a league (the same detection the shell uses for the league
+ * header: railLeague.ts's leagueRefFromPath). PageHeader reads it to drop its eyebrow there, since the
+ * league header already says which league and season.
+ *
+ * A context rather than a router hook because PageHeader sits under 25 pages whose tests render it
+ * without a router, or with a partial `react-router-dom` mock. The default is false, which is the old
+ * behaviour: outside the shell the eyebrow renders as it always did.
+ */
+export const InsideLeagueContext = createContext(false)
+
+export function useInsideLeague() {
+  return useContext(InsideLeagueContext)
 }

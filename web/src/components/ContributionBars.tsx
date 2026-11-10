@@ -17,7 +17,7 @@ export type BreakdownRow = { id: string; name: string | null; parts: Part[]; tot
 
 export const MAX_NAMED = 5
 /** Existing palette tokens; the sixth colour, for "other", is the muted ink. */
-const PART_COLOURS = ['var(--data)', 'var(--wr)', 'var(--te)', 'var(--fitted)', 'var(--qb)']
+const PART_COLOURS = ['var(--c)', 'var(--wr)', 'var(--te)', 'var(--rb)', 'var(--qb)']
 const OTHER = 'var(--muted)'
 
 /** Which term indexes get a colour: those with the largest total |value| over `rows`, ties to the earlier term. */

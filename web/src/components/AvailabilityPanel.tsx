@@ -725,7 +725,7 @@ export default function AvailabilityPanel({
                                   // rather than a gap because `.survival-block`
                                   // carries its own hairline border -- the fill is
                                   // the only thing that goes to nothing.
-                                  style={{ background: `color-mix(in oklch, var(--data) ${Math.round(pv * 92)}%, var(--panel))` }}
+                                  style={{ background: `color-mix(in oklab, var(--data) ${Math.round(pv * 92)}%, var(--panel))` }}
                                   title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
                                 />
                               )

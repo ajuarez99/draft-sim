@@ -4,7 +4,7 @@ import { Link, MemoryRouter, useLocation } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AppShell from './AppShell'
 import * as api from '../api'
-import { draftSummary, resetRail } from '../testRailHelpers'
+import { draftSummary, resetShell } from '../testShellHelpers'
 import { invalidateRailLeagues } from '../railLeague'
 import { invalidateSearchIndex } from '../searchIndex'
 import { clearUser, currentUserId, setUser } from '../user'
@@ -59,7 +59,7 @@ beforeEach(() => {
   trackPageView.mockReset()
   trackLeagueView.mockReset()
 })
-afterEach(resetRail)
+afterEach(resetShell)
 
 describe('page views', () => {
   it('A -> B -> B?x=1 -> C records three views; the query string is not a new view', async () => {

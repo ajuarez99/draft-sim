@@ -86,11 +86,17 @@
  *   number as a badge, visible on touch. Caveats are never deleted.
  *
  * NAVIGATION
- *   Groups: League home, This week, The season, Draft, History. The group that
- *   holds the current page is expanded. The league + season switcher is at the
- *   top of the league block. The collapsed rail keeps `title` and `aria-label`
- *   from the destination's label; never an unlabeled mark. Addresses never
- *   change; jump-to matches both the fan name and the former name.
+ *   A top bar (Leagues, Mock drafts, Managers, Time Machine, search, account)
+ *   and, inside a league, a header with the league's identity, season and
+ *   switcher, then TABS (Home, Matchups, Season, Players, Draft, History) and,
+ *   under the active tab, its SUB-TABS. Tabs are links; the active one is
+ *   --text with a 2px --brand underline, never a filled pill. Sub-tabs are
+ *   quieter: 13px, --muted, the active one --text on --raised. An action (Mock
+ *   it) is an outlined button at the end of its strip, not a place. On a phone
+ *   the tabs are a fixed bottom bar and everything else is behind a menu sheet.
+ *   The tab a page lives under is `tab` in destinations.ts, the one registry.
+ *   Addresses never change; jump-to matches both the fan name and the former
+ *   name. No glyph characters stand in for icons; the few icons are inline SVG.
  *
  * PLAYER FACES
  *   photo, then team logo, then initials. Fixed size, lazy loading, no layout
@@ -119,21 +125,32 @@
  *   Add a layer here, not inline.
  *
  * STACKING (page-level `position: fixed` layers, not scoped to `.board-stage`)
- *   100  `.modal-backdrop`. The top of the app.
+ *   110  `.skip-link`, while it has focus. Above everything: it is the first
+ *         thing a keyboard user reaches, and it is only on screen when focused.
+ *   100  `.modal-backdrop`. The top of the app, bar the skip link.
  *    60  `.jumpto-backdrop` -- the jump-to palette. Above the page, below a
- *         modal, because a rail row ("Mock it") can open one.
+ *         modal, because a menu row ("Mock drafts") can open one.
+ *    58  `.nav-sheet-backdrop` and `.nav-sheet` -- the menu sheet (the phone's
+ *         menu button and "More", the compact top bar's menu button). Over the
+ *         bottom bar and the dropdowns, under the palette.
+ *    55  the dropdown menus: `.topbar-account-menu`, `.league-menu` (the season
+ *         dropdown and the league switcher). Over the bottom bar, the pick card
+ *         and a drag ghost, under the sheet.
  *    50  RankBoard's drag ghost (`.rankboard-ghost`) -- comfortably above
  *         ordinary in-flow page content (which creates no stacking context of
  *         its own) and deliberately still below a modal, even though the two
  *         can never be open at once in practice (an active drag holds pointer
  *         capture, and nothing that opens a modal can fire while it does).
- *    45  `.jumpto-fab`, the phone-only return control. Below the overlay it
- *         opens, and below a drag in progress. It was 50 first, which tied the
- *         ghost and left DOM order to decide; a tie is not a decision.
+ *    45  `.bottom-bar`, the phone's league tabs. Below every overlay it can
+ *         open, and below a drag in progress. (It took the old jump-to FAB's
+ *         slot; the FAB was 50 first, which tied the ghost and left DOM order
+ *         to decide; a tie is not a decision.)
  *    44  `.pick-card` below 1280px (the draft room's stacked layout, spec 024
  *         A12), where it leaves the board stage and pins to the viewport
  *         bottom -- the board can be the hidden pane there, and a fixed card
- *         shows regardless. Just below the jump-to FAB so that is never covered.
+ *         shows regardless. Just below the bottom bar's layer, and lifted by
+ *         the bar's height (`--bar-clear`) so the bar never covers it.
+ *    40  `.topbar` on a phone only (sticky there; a flex child elsewhere).
  *   Add the next page-level fixed layer here, not inline.
  *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
@@ -254,10 +271,10 @@ button.avatar:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .app { padding: 0; gap: 0; }
 .app > .content { padding: 16px 20px; }
 
-/* The app-wide horizontal `.top` header lived here. It is gone: the rail is
-   the site's navigation on every route now (claude/site-wide-shell-
-   propagation.md). `.gear-chip` survives it -- DraftView's settings gear now
-   portals into `.app-main-head` instead of `.top-slot`. */
+/* The app-wide horizontal `.top` header lived here. It is gone: the top bar and the league
+   header are the site's navigation on every route now (claude/site-redesign.md; before that a
+   rail, claude/site-wide-shell-propagation.md). `.gear-chip` survives it -- DraftView's settings
+   gear now portals into `.app-main-head` instead of `.top-slot`. */
 .gear-chip { font-size: 14px; line-height: 1; padding: 5px 9px; }
 
 .controls {
@@ -309,7 +326,7 @@ button.avatar:focus-visible { outline: 2px solid var(--brand); outline-offset: 2
 .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
 .progress-bar { height: 100%; background: var(--data); transition: width 120ms linear; }
 
-.error { background: color-mix(in oklch, var(--danger) 16%, var(--panel)); border: 1px solid color-mix(in oklch, var(--danger) 45%, var(--panel)); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.error { background: color-mix(in oklab, var(--danger) 16%, var(--panel)); border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--panel)); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
 /* seatsDirty: the banner's own re-run action, not just a description of one
    that lives elsewhere -- see DraftView.tsx's comment at this banner. */
 .error.seats-dirty { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -609,13 +626,13 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   box-shadow: inset 0 0 0 1px var(--line);
   transition: box-shadow 140ms ease, transform 140ms ease;
 }
-.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 40%, var(--line)); }
+.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 40%, var(--line)); }
 /* A draft that hasn't finished is the only thing in this list worth an accent
    -- gold stays "you", so a live draft borrows --brand, the generic
    "something is happening" color. */
 .league-card.live {
   background: var(--raised);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 45%, var(--line));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 45%, var(--line));
 }
 
 .league-card-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
@@ -642,8 +659,8 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .manager-sport-block:last-child { margin-bottom: 0; }
 .sport-pill.nfl {
   color: var(--sport-nfl);
-  background: color-mix(in oklch, var(--sport-nfl) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nfl) 32%, transparent);
+  background: color-mix(in oklab, var(--sport-nfl) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sport-nfl) 32%, transparent);
 }
 .platform-pill {
   display: inline-block; margin-right: 7px; padding: 1px 6px; border-radius: 999px;
@@ -652,13 +669,13 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 /* Spec 035. Tinted like the sport pills but on its own hue so it never reads as a sport. */
 .platform-pill.espn {
   color: oklch(78% 0.13 25);
-  background: color-mix(in oklch, oklch(70% 0.17 25) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, oklch(70% 0.17 25) 32%, transparent);
+  background: color-mix(in oklab, oklch(70% 0.17 25) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, oklch(70% 0.17 25) 32%, transparent);
 }
 .sport-pill.nba {
   color: var(--sport-nba);
-  background: color-mix(in oklch, var(--sport-nba) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--sport-nba) 32%, transparent);
+  background: color-mix(in oklab, var(--sport-nba) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--sport-nba) 32%, transparent);
 }
 /* The season is what tells two cards of the same league apart, so it is a
    figure on the card rather than a footnote inside a row. */
@@ -681,7 +698,7 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .league-season-link:hover { background: var(--raised); color: var(--text); }
 /* The season the rest of the card is describing -- its managers, its status,
    its "Draft board" link all belong to this one. */
-.league-season-link.on { color: var(--text); background: color-mix(in oklch, var(--line) 60%, transparent); font-weight: 600; }
+.league-season-link.on { color: var(--text); background: color-mix(in oklab, var(--line) 60%, transparent); font-weight: 600; }
 
 .league-card-links { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .league-link {
@@ -777,7 +794,7 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 }
 .skeleton-bar {
   height: 10px; border-radius: 999px;
-  background: color-mix(in oklch, var(--line) 70%, var(--panel));
+  background: color-mix(in oklab, var(--line) 70%, var(--panel));
 }
 /*
  * The row's height comes from this, not from the text bar, because on a real
@@ -792,7 +809,7 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .skeleton-chip {
   margin-left: auto; flex-shrink: 0;
   width: 62px; height: 25px; border-radius: 999px;
-  background: color-mix(in oklch, var(--line) 55%, var(--panel));
+  background: color-mix(in oklab, var(--line) 55%, var(--panel));
 }
 
 /* The same shape `.start-overlay-status` gives "Simulating your draft…", so a
@@ -914,8 +931,8 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .col-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 3; }
 /* Same gold identity as `.cell.mine` -- your own seat should read as the
    same "you" everywhere on the board, not a second visual language. */
-.board .col-head.mine { background: color-mix(in oklch, var(--you) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--you), 0 0 0 4px var(--bg); }
-.board .col-head.mine:hover { background: color-mix(in oklch, var(--you) 22%, var(--panel)); }
+.board .col-head.mine { background: color-mix(in oklab, var(--you) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--you), 0 0 0 4px var(--bg); }
+.board .col-head.mine:hover { background: color-mix(in oklab, var(--you) 22%, var(--panel)); }
 /* 9px mono was small enough to read as texture rather than names -- nothing
    was truncated at that size, but nothing was legible either. 11px in the body
    face (not `.mono`, which is wider per character) trades an occasional
@@ -923,7 +940,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    the full name is in the header's own `title` and in SeatPopover. */
 .board .col-head-name {
   font-size: 11px; font-weight: 600;
-  color: color-mix(in oklch, var(--muted) 55%, var(--text));
+  color: color-mix(in oklab, var(--muted) 55%, var(--text));
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .board .col-head-meta { display: flex; align-items: center; gap: 5px; height: 8px; }
@@ -951,48 +968,48 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    near-black, and ours isn't. Measured in the running app at 22%: the name
    clears 12:1 against every position (RB tightest), and the faded
    `.uncertain` name (opacity 0.62) still clears 5.5:1. */
-.board .cell.pos-QB { background: color-mix(in oklch, var(--qb) 22%, var(--panel)); }
-.board .cell.pos-RB { background: color-mix(in oklch, var(--rb) 22%, var(--panel)); }
-.board .cell.pos-WR { background: color-mix(in oklch, var(--wr) 22%, var(--panel)); }
-.board .cell.pos-TE { background: color-mix(in oklch, var(--te) 22%, var(--panel)); }
-.board .cell.pos-K  { background: color-mix(in oklch, var(--k) 14%, var(--panel)); }
-.board .cell.pos-DEF { background: color-mix(in oklch, var(--def) 22%, var(--panel)); }
-.board .cell.pos-PG { background: color-mix(in oklch, var(--pg) 22%, var(--panel)); }
-.board .cell.pos-SG { background: color-mix(in oklch, var(--sg) 22%, var(--panel)); }
-.board .cell.pos-SF { background: color-mix(in oklch, var(--sf) 22%, var(--panel)); }
-.board .cell.pos-PF { background: color-mix(in oklch, var(--pf) 22%, var(--panel)); }
-.board .cell.pos-C  { background: color-mix(in oklch, var(--c) 22%, var(--panel)); }
-.board .cell.pos-QB:hover { background: color-mix(in oklch, var(--qb) 34%, var(--panel)); }
-.board .cell.pos-RB:hover { background: color-mix(in oklch, var(--rb) 34%, var(--panel)); }
-.board .cell.pos-WR:hover { background: color-mix(in oklch, var(--wr) 34%, var(--panel)); }
-.board .cell.pos-TE:hover { background: color-mix(in oklch, var(--te) 34%, var(--panel)); }
-.board .cell.pos-K:hover  { background: color-mix(in oklch, var(--k) 24%, var(--panel)); }
-.board .cell.pos-DEF:hover { background: color-mix(in oklch, var(--def) 34%, var(--panel)); }
-.board .cell.pos-PG:hover { background: color-mix(in oklch, var(--pg) 34%, var(--panel)); }
-.board .cell.pos-SG:hover { background: color-mix(in oklch, var(--sg) 34%, var(--panel)); }
-.board .cell.pos-SF:hover { background: color-mix(in oklch, var(--sf) 34%, var(--panel)); }
-.board .cell.pos-PF:hover { background: color-mix(in oklch, var(--pf) 34%, var(--panel)); }
-.board .cell.pos-C:hover  { background: color-mix(in oklch, var(--c) 34%, var(--panel)); }
+.board .cell.pos-QB { background: color-mix(in oklab, var(--qb) 22%, var(--panel)); }
+.board .cell.pos-RB { background: color-mix(in oklab, var(--rb) 22%, var(--panel)); }
+.board .cell.pos-WR { background: color-mix(in oklab, var(--wr) 22%, var(--panel)); }
+.board .cell.pos-TE { background: color-mix(in oklab, var(--te) 22%, var(--panel)); }
+.board .cell.pos-K  { background: color-mix(in oklab, var(--k) 14%, var(--panel)); }
+.board .cell.pos-DEF { background: color-mix(in oklab, var(--def) 22%, var(--panel)); }
+.board .cell.pos-PG { background: color-mix(in oklab, var(--pg) 22%, var(--panel)); }
+.board .cell.pos-SG { background: color-mix(in oklab, var(--sg) 22%, var(--panel)); }
+.board .cell.pos-SF { background: color-mix(in oklab, var(--sf) 22%, var(--panel)); }
+.board .cell.pos-PF { background: color-mix(in oklab, var(--pf) 22%, var(--panel)); }
+.board .cell.pos-C  { background: color-mix(in oklab, var(--c) 22%, var(--panel)); }
+.board .cell.pos-QB:hover { background: color-mix(in oklab, var(--qb) 34%, var(--panel)); }
+.board .cell.pos-RB:hover { background: color-mix(in oklab, var(--rb) 34%, var(--panel)); }
+.board .cell.pos-WR:hover { background: color-mix(in oklab, var(--wr) 34%, var(--panel)); }
+.board .cell.pos-TE:hover { background: color-mix(in oklab, var(--te) 34%, var(--panel)); }
+.board .cell.pos-K:hover  { background: color-mix(in oklab, var(--k) 24%, var(--panel)); }
+.board .cell.pos-DEF:hover { background: color-mix(in oklab, var(--def) 34%, var(--panel)); }
+.board .cell.pos-PG:hover { background: color-mix(in oklab, var(--pg) 34%, var(--panel)); }
+.board .cell.pos-SG:hover { background: color-mix(in oklab, var(--sg) 34%, var(--panel)); }
+.board .cell.pos-SF:hover { background: color-mix(in oklab, var(--sf) 34%, var(--panel)); }
+.board .cell.pos-PF:hover { background: color-mix(in oklab, var(--pf) 34%, var(--panel)); }
+.board .cell.pos-C:hover  { background: color-mix(in oklab, var(--c) 34%, var(--panel)); }
 /* Multi-position cell (spec 025 A7): the tint splits across the player's
    positions (--pos-a/b/c/d set inline) rather than taking the first one's colour.
    --pos-c/d are optional, so they fall back to the previous one to keep the gradient valid. */
 .board .cell.pos-multi {
-  /* Held in a variable so the sbrand/reach view (013 US8, below) can layer its tint over
+  /* Held in a variable so the steal/reach view (013 US8, below) can layer its tint over
      the split instead of replacing it -- single-position cells keep their colour there
      because theirs is a background-color; this one is an image (code review R1). */
   --pos-split: linear-gradient(100deg,
-    color-mix(in oklch, var(--pos-a) 22%, var(--panel)) 0%,
-    color-mix(in oklch, var(--pos-b) 22%, var(--panel)) var(--pos-t1, 50%),
-    color-mix(in oklch, var(--pos-c, var(--pos-b)) 22%, var(--panel)) var(--pos-t2, 100%),
-    color-mix(in oklch, var(--pos-d, var(--pos-c, var(--pos-b))) 22%, var(--panel)) 100%);
+    color-mix(in oklab, var(--pos-a) 22%, var(--panel)) 0%,
+    color-mix(in oklab, var(--pos-b) 22%, var(--panel)) var(--pos-t1, 50%),
+    color-mix(in oklab, var(--pos-c, var(--pos-b)) 22%, var(--panel)) var(--pos-t2, 100%),
+    color-mix(in oklab, var(--pos-d, var(--pos-c, var(--pos-b))) 22%, var(--panel)) 100%);
   background: var(--pos-split);
 }
 .board .cell.pos-multi:hover {
   background: linear-gradient(100deg,
-    color-mix(in oklch, var(--pos-a) 34%, var(--panel)) 0%,
-    color-mix(in oklch, var(--pos-b) 34%, var(--panel)) var(--pos-t1, 50%),
-    color-mix(in oklch, var(--pos-c, var(--pos-b)) 34%, var(--panel)) var(--pos-t2, 100%),
-    color-mix(in oklch, var(--pos-d, var(--pos-c, var(--pos-b))) 34%, var(--panel)) 100%);
+    color-mix(in oklab, var(--pos-a) 34%, var(--panel)) 0%,
+    color-mix(in oklab, var(--pos-b) 34%, var(--panel)) var(--pos-t1, 50%),
+    color-mix(in oklab, var(--pos-c, var(--pos-b)) 34%, var(--panel)) var(--pos-t2, 100%),
+    color-mix(in oklab, var(--pos-d, var(--pos-c, var(--pos-b))) 34%, var(--panel)) 100%);
 }
 /* Cells with a revealed pick are real <button>s (native focus/Enter/Space);
    this strips the browser's default button chrome so they still read as
@@ -1022,12 +1039,12 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    lifted muted clears it; it is still the quietest thing in the cell. */
 .board .pickno {
   position: absolute; top: 4px; right: 6px; font-size: 10px;
-  color: color-mix(in oklch, var(--muted) 72%, var(--text));
+  color: color-mix(in oklab, var(--muted) 72%, var(--text));
 }
 /* The name is abbreviated to an initial plus surname now (playerName.ts), so
    the initial is de-emphasised: at a glance the cell should read "Gibbs", with
    the "J." there only to separate him from another Gibbs. */
-.board .name-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
+.board .name-lead { font-weight: 400; color: color-mix(in oklab, var(--text) 72%, transparent); }
 /* The most-voted player here went earlier, so this cell is a second choice. */
 .board .cell.uncertain .name { opacity: 0.62; border-bottom: 1px dotted var(--line); }
 /* Position owns the fill now (`.cell.pos-*`), so "your seat" had to become a
@@ -1046,7 +1063,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    thing a second time. What still separates a pick you made from one the model
    guessed for you is this inner ring, plus the cell's own title ("Your pick --
    <name>") and the fact that the player in it is the one you took. */
-.board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--you), inset 0 0 0 4px color-mix(in oklch, var(--you) 35%, transparent); }
+.board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--you), inset 0 0 0 4px color-mix(in oklab, var(--you) 35%, transparent); }
 /* The 20px right gutter is gone. It was reserving room for `.pickno`, which
    is absolutely positioned against the *cell* and sits on the badge's line --
    measured in the running app, its bottom edge clears the name's top by 11px,
@@ -1057,7 +1074,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .board .name { display: block; margin-top: 5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .board .meta { display: flex; align-items: center; margin-top: 3px; gap: 6px; }
 /* 9px at 3.98:1, also under AA. 10px against the same lifted muted. */
-.board .team-code { color: color-mix(in oklch, var(--muted) 80%, var(--text)); font-size: 10px; }
+.board .team-code { color: color-mix(in oklab, var(--muted) 80%, var(--text)); font-size: 10px; }
 /* An undrafted cell is its pick number and nothing else -- in flow, not the
    absolute `.pickno`, so the cell has a real height to stand on. Right-aligned
    to sit exactly where the drafted cells' own number sits, so the column of
@@ -1115,7 +1132,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    rather than opaque so the empty grid is still visibly *there* underneath. */
 .start-overlay {
   position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center;
-  background: color-mix(in oklch, var(--bg) 72%, transparent);
+  background: color-mix(in oklab, var(--bg) 72%, transparent);
   backdrop-filter: blur(2px);
   text-align: center; padding: 24px;
 }
@@ -1135,15 +1152,15 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 /* The filter chips carry the same six position colors as the board cells and
    the `.pos` badges, so the sheet's header reads as part of the board it is
    lying on. "ALL" has no position and stays the neutral `.chip`. */
-.chip.pos-chip.QB { color: var(--qb); border-color: color-mix(in oklch, var(--qb) 45%, var(--line)); }
-.chip.pos-chip.RB { color: var(--rb); border-color: color-mix(in oklch, var(--rb) 45%, var(--line)); }
-.chip.pos-chip.WR { color: var(--wr); border-color: color-mix(in oklch, var(--wr) 45%, var(--line)); }
-.chip.pos-chip.TE { color: var(--te); border-color: color-mix(in oklch, var(--te) 45%, var(--line)); }
-.chip.pos-chip.PG { color: var(--pg); border-color: color-mix(in oklch, var(--pg) 45%, var(--line)); }
-.chip.pos-chip.SG { color: var(--sg); border-color: color-mix(in oklch, var(--sg) 45%, var(--line)); }
-.chip.pos-chip.SF { color: var(--sf); border-color: color-mix(in oklch, var(--sf) 45%, var(--line)); }
-.chip.pos-chip.PF { color: var(--pf); border-color: color-mix(in oklch, var(--pf) 45%, var(--line)); }
-.chip.pos-chip.C  { color: var(--c);  border-color: color-mix(in oklch, var(--c)  45%, var(--line)); }
+.chip.pos-chip.QB { color: var(--qb); border-color: color-mix(in oklab, var(--qb) 45%, var(--line)); }
+.chip.pos-chip.RB { color: var(--rb); border-color: color-mix(in oklab, var(--rb) 45%, var(--line)); }
+.chip.pos-chip.WR { color: var(--wr); border-color: color-mix(in oklab, var(--wr) 45%, var(--line)); }
+.chip.pos-chip.TE { color: var(--te); border-color: color-mix(in oklab, var(--te) 45%, var(--line)); }
+.chip.pos-chip.PG { color: var(--pg); border-color: color-mix(in oklab, var(--pg) 45%, var(--line)); }
+.chip.pos-chip.SG { color: var(--sg); border-color: color-mix(in oklab, var(--sg) 45%, var(--line)); }
+.chip.pos-chip.SF { color: var(--sf); border-color: color-mix(in oklab, var(--sf) 45%, var(--line)); }
+.chip.pos-chip.PF { color: var(--pf); border-color: color-mix(in oklab, var(--pf) 45%, var(--line)); }
+.chip.pos-chip.C  { color: var(--c);  border-color: color-mix(in oklab, var(--c)  45%, var(--line)); }
 .chip.pos-chip.QB.on { background: var(--qb); border-color: var(--qb); color: var(--bg); }
 .chip.pos-chip.RB.on { background: var(--rb); border-color: var(--rb); color: var(--bg); }
 .chip.pos-chip.WR.on { background: var(--wr); border-color: var(--wr); color: var(--bg); }
@@ -1331,7 +1348,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    paused board reads as one system rather than two different UIs. */
 .pause-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: color-mix(in oklch, var(--you) 16%, var(--panel));
+  background: color-mix(in oklab, var(--you) 16%, var(--panel));
   box-shadow: inset 0 0 0 1.5px var(--you);
   border-radius: 8px; padding: 8px 12px; font-size: 12px;
 }
@@ -1367,7 +1384,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   border-radius: 12px; padding: 9px 14px; margin-bottom: 8px;
 }
 .on-clock.mine {
-  background: color-mix(in oklch, var(--you) 16%, var(--panel));
+  background: color-mix(in oklab, var(--you) 16%, var(--panel));
   box-shadow: inset 0 0 0 1.5px var(--you);
 }
 .on-clock-avatar { width: 30px; height: 30px; font-size: 12px; }
@@ -1411,7 +1428,7 @@ button.on-clock-identity:hover {
   transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
 }
 .on-clock.mine button.on-clock-identity:hover {
-  background: color-mix(in oklch, var(--you) 12%, transparent);
+  background: color-mix(in oklab, var(--you) 12%, transparent);
 }
 button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
@@ -1433,13 +1450,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 }
 .pick-feed-no { font-size: 11px; color: var(--muted); width: 34px; flex-shrink: 0; }
 .pick-feed-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pick-feed-lead { font-weight: 400; color: color-mix(in oklch, var(--text) 72%, transparent); }
+.pick-feed-lead { font-weight: 400; color: color-mix(in oklab, var(--text) 72%, transparent); }
 .pick-feed-by { margin-left: auto; font-size: 11px; color: var(--muted); flex-shrink: 0; padding-left: 8px; }
 .pick-feed-run { margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px; }
-.pick-feed-row.pos-run-QB { background: color-mix(in oklch, var(--qb) 12%, var(--panel)); }
-.pick-feed-row.pos-run-RB { background: color-mix(in oklch, var(--rb) 12%, var(--panel)); }
-.pick-feed-row.pos-run-WR { background: color-mix(in oklch, var(--wr) 12%, var(--panel)); }
-.pick-feed-row.pos-run-TE { background: color-mix(in oklch, var(--te) 12%, var(--panel)); }
+.pick-feed-row.pos-run-QB { background: color-mix(in oklab, var(--qb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-RB { background: color-mix(in oklab, var(--rb) 12%, var(--panel)); }
+.pick-feed-row.pos-run-WR { background: color-mix(in oklab, var(--wr) 12%, var(--panel)); }
+.pick-feed-row.pos-run-TE { background: color-mix(in oklab, var(--te) 12%, var(--panel)); }
 .pos-run-QB .pick-feed-run { color: var(--qb); }
 .pos-run-RB .pick-feed-run { color: var(--rb); }
 .pos-run-WR .pick-feed-run { color: var(--wr); }
@@ -1456,7 +1473,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pick-feed-row.lead .pick-feed-name { font-size: 13px; }
 .pick-feed-fit {
   margin-left: auto; font-size: 10px; letter-spacing: 0.06em; flex-shrink: 0; padding-left: 8px;
-  color: color-mix(in oklch, var(--lead-hue, var(--text)) 70%, var(--text));
+  color: color-mix(in oklab, var(--lead-hue, var(--text)) 70%, var(--text));
 }
 
 /* Live feed rows become buttons only when the room passes onPickClick (the
@@ -1469,7 +1486,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   text-align: left; cursor: pointer;
 }
 .pick-feed-row.lead .pick-feed-btn { padding-top: 8px; padding-bottom: 8px; }
-.pick-feed-btn:hover { background: color-mix(in oklch, var(--lead-hue, var(--brand)) 10%, transparent); }
+.pick-feed-btn:hover { background: color-mix(in oklab, var(--lead-hue, var(--brand)) 10%, transparent); }
 .pick-feed-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /*
@@ -1484,7 +1501,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   position: absolute; top: 8px; left: 8px; z-index: 7;
   width: min(440px, calc(100% - 16px)); box-sizing: border-box; min-width: 0;
   display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
-  background: color-mix(in oklch, var(--lead-hue, var(--brand)) 9%, var(--panel));
+  background: color-mix(in oklab, var(--lead-hue, var(--brand)) 9%, var(--panel));
   border-radius: 14px; box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 8px 24px rgb(0 0 0 / 0.45);
   outline: none; transition: box-shadow 0.15s, transform 0.15s;
 }
@@ -1501,7 +1518,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   background: none; border: 0; color: var(--muted); font-size: 18px; line-height: 1;
   width: 28px; height: 28px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
 }
-.pick-card-close:hover { color: var(--text); background: color-mix(in oklch, var(--text) 10%, transparent); }
+.pick-card-close:hover { color: var(--text); background: color-mix(in oklab, var(--text) 10%, transparent); }
 .pick-card-player { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .pick-card-player .pos { margin-right: 0; }
 .pick-card-name { font-size: 16px; overflow-wrap: anywhere; }
@@ -1510,11 +1527,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   font-size: 11px; letter-spacing: 0.06em; padding: 2px 9px; border-radius: 999px;
   color: var(--brand); background: var(--raised);
 }
-.pick-card-summary { margin: 0; color: color-mix(in oklch, var(--text) 80%, transparent); }
+.pick-card-summary { margin: 0; color: color-mix(in oklab, var(--text) 80%, transparent); }
 .pick-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .pick-card-tag {
   font-size: 11px; padding: 2px 9px; border-radius: 999px;
-  color: var(--text); background: color-mix(in oklch, var(--lead-hue, var(--brand)) 18%, transparent);
+  color: var(--text); background: color-mix(in oklab, var(--lead-hue, var(--brand)) 18%, transparent);
 }
 /*
  * Phone: the board collapses (`.board-stage` measured 0px tall at 375px), so a
@@ -1526,7 +1543,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
  */
 @media (max-width: 700px) {
   .pick-card {
-    position: fixed; top: auto; bottom: 12px; left: 12px; right: 12px;
+    position: fixed; top: auto; bottom: calc(var(--bar-clear, 0px) + 12px); left: 12px; right: 12px;
     width: auto; max-height: 60vh; overflow-y: auto; z-index: 44;
   }
 }
@@ -1536,12 +1553,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    with it. Width is capped so it doesn't span a tablet. */
 @media (max-width: 1279px) {
   .pick-card {
-    position: fixed; top: auto; bottom: 76px; left: 12px; right: auto;
+    position: fixed; top: auto; bottom: max(76px, calc(var(--bar-clear, 0px) + 12px)); left: 12px; right: auto;
     width: min(440px, calc(100vw - 24px)); max-height: 60vh; overflow-y: auto; z-index: 44;
   }
 }
 @media (max-width: 700px) {
-  .pick-card { left: 12px; right: 12px; width: auto; bottom: 12px; }
+  .pick-card { left: 12px; right: 12px; width: auto; bottom: calc(var(--bar-clear, 0px) + 12px); }
 }
 
 /* "Simulate again", moved out of the board header into the settings modal. */
@@ -1662,7 +1679,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   padding: 3px 10px; border-radius: 999px;
 }
 .live-fresh.ok { color: var(--brand); background: var(--raised); }
-.live-fresh.stale { color: var(--danger); background: color-mix(in oklch, var(--danger) 18%, var(--panel)); }
+.live-fresh.stale { color: var(--danger); background: color-mix(in oklab, var(--danger) 18%, var(--panel)); }
 
 .live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .live-resim-progress { margin-bottom: 10px; }
@@ -1736,7 +1753,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
  * agree, which is the whole job of a legend. */
 .bump-legend-button.on {
   color: var(--text); border-color: var(--pin);
-  background: color-mix(in oklch, var(--pin) 22%, var(--panel));
+  background: color-mix(in oklab, var(--pin) 22%, var(--panel));
 }
 .bump-legend-button.mine { color: var(--text); }
 .bump-legend-button:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1790,176 +1807,261 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 
 /*
  * ============================================================================
- * THE APP SHELL -- rail + main pane
- * Shipped 2026-09-13 (design_handoff_multisport_mock_drafts) as a Home-only
- * `.home-shell`, with every other route still on the horizontal `.top`
- * header. Promoted to the whole site 2026-09-14; see
- * claude/site-wide-shell-propagation.md for why and for the measurements
- * behind the collapsed rail. Colors and type reuse this file's own tokens and
- * fonts rather than the handoff's Barlow palette, so the app still reads as
- * one design rather than two bolted together.
+ * THE APP SHELL -- top bar, league header, context strip, main pane
+ * Replaced the left rail on 2026-11-10 (claude/site-redesign.md Phase 2), which
+ * reversed the 2026-09-14 "the rail is the site's navigation" call
+ * (claude/site-wide-shell-propagation.md).
+ *
+ * `.app` stays one 100vh screen and `.app-shell` is its column. The top bar,
+ * the league header and the context strip are non-scrolling flex children;
+ * `.app-main` is the only scroller (plan review PR-22). On a phone (<= 700px)
+ * the document scrolls instead, the 48px top bar and the 56px bottom bar pin,
+ * and the league header scrolls away with the page.
+ *
+ * Prefixes: .topbar* .league-header* .league-tabs* .league-subtabs*
+ * .bottom-bar* .nav-sheet* .context-strip*
  * ============================================================================
  */
-.app-shell { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; }
-
-.app-rail {
-  flex: 0 0 200px; display: flex; flex-direction: column; gap: 22px;
-  padding: 18px 14px; background: var(--panel); border-right: 1px solid var(--line);
-  overflow-y: auto; box-sizing: border-box;
-  transition: flex-basis 140ms ease;
+.app-shell {
+  flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: stretch;
+  position: relative;
+  /* The phone's bottom bar: 56px plus the home-indicator inset. Read by .app-main's padding and by
+     the pinned pick card (--bar-clear), both only when the bar is on screen. */
+  --bottom-bar-h: calc(56px + env(safe-area-inset-bottom, 0px));
 }
+.app-shell.has-bottom-bar { --bar-clear: var(--bottom-bar-h); }
 
-.app-rail-top { display: flex; align-items: flex-start; gap: 6px; }
-.app-wordmark {
-  font-size: 21px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.05;
-  padding: 0 6px; color: var(--text); text-decoration: none; flex: 1 1 auto; min-width: 0;
+/* First focusable element; off screen until it has focus. */
+.skip-link {
+  position: absolute; left: 8px; top: -64px; z-index: 110;
+  padding: 10px 16px; border-radius: 10px; background: var(--brand); color: var(--bg);
+  font-weight: 700; text-decoration: none;
 }
-.app-wordmark:hover { color: var(--brand); }
-.app-wordmark-line { display: block; }
-.app-rail-toggle {
-  appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0;
-  padding: 2px 5px; border-radius: 7px; cursor: pointer; flex-shrink: 0;
-  font: inherit; font-size: 13px; line-height: 1; color: var(--muted);
+.skip-link:focus { top: 8px; outline: 2px solid var(--text); outline-offset: 2px; }
+
+/* ---- Top bar ---------------------------------------------------------------
+   Navigation is links; the account and the icons are buttons. The current
+   global link is marked by --text, not a fill: the fill treatment is for the
+   league tab underline and the active segment. */
+.topbar {
+  flex: 0 0 auto; height: 52px; box-sizing: border-box; padding: 0 24px;
+  display: flex; align-items: center; gap: 20px;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.topbar-wordmark {
+  flex: 0 0 auto; font-size: 20px; letter-spacing: 0.03em; line-height: 1;
+  color: var(--text); text-decoration: none; white-space: nowrap; border-radius: 6px;
+}
+.topbar-wordmark:hover { color: var(--brand); }
+.topbar-wordmark:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.topbar-links { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.topbar-link {
+  appearance: none; -webkit-appearance: none; margin: 0; border: 0; background: none; cursor: pointer;
+  padding: 7px 12px; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 500;
+  color: var(--muted); text-decoration: none; white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
-.app-rail-toggle:hover { background: var(--raised); color: var(--text); }
-.app-rail-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.topbar-link:hover { color: var(--text); background: var(--raised); }
+.topbar-link[aria-current='page'] { color: var(--text); font-weight: 600; }
+.topbar-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-/* Page-supplied (appSlots.tsx). Most routes portal nothing into it today, and
-   an empty flex child would still spend the rail's 22px gap -- so collapse it
-   rather than leaving a hole above Menu. */
-.app-rail-context:empty { display: none; }
+/* Compact (a draft room or mock on a desktop): LeagueHeader portals its identity, switcher and tabs here. */
+.topbar-league { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; align-items: stretch; }
 
-.app-rail-section { display: flex; flex-direction: column; gap: 2px; }
-/* Holds the league's page links. On desktop it is invisible -- it reproduces
-   exactly the column the rows used to form as direct children of the section.
-   It exists for the phone breakpoint, which turns it into a scroll lane. */
-.app-rail-pages { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-/* Wraps the lane plus the phone-only "All pages" chip. `display: contents`
-   keeps the desktop column exactly as it was; the 860px block makes it a row. */
-.app-rail-pages-wrap { display: contents; }
-.app-rail-allpages { display: none; }
-.app-rail-label, .jumpto-group-label {
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--muted); padding: 0 6px 6px;
-}
-.app-rail-row {
-  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px;
-  font-size: 14px; font: inherit; color: var(--muted); font-weight: 500;
-  background: none; border: 0; text-decoration: none; cursor: pointer; text-align: left;
+.topbar-actions { margin-left: auto; flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.topbar-icon-button {
+  appearance: none; -webkit-appearance: none; margin: 0; border: 0; background: none; cursor: pointer;
+  width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; color: var(--muted);
   transition: background 120ms ease, color 120ms ease;
 }
-.app-rail-row:hover { background: var(--raised); color: var(--text); }
-.app-rail-row.on {
-  color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--line) 55%, transparent);
+.topbar-icon-button:hover { color: var(--text); background: var(--raised); }
+.topbar-icon-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.topbar-account { position: relative; margin-left: 4px; }
+.topbar-account-button {
+  appearance: none; -webkit-appearance: none; margin: 0; padding: 0; cursor: pointer;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: none; border: 1px solid var(--line);
 }
-.app-rail-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-
-.app-rail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-.app-rail-dot.on.all { background: var(--brand); }
-.app-rail-dot.on.nfl { background: var(--sport-nfl); }
-.app-rail-dot.on.nba { background: var(--sport-nba); }
-/* Menu rows get a glyph where sport rows get a color dot -- same 7px optical
-   slot, so the two sections align down one edge whether the rail is full or
-   collapsed. Not an icon font for four marks (§C step 7). */
-.app-rail-glyph {
-  width: 7px; flex-shrink: 0; font-size: 8px; line-height: 1; text-align: center; color: var(--muted);
+.topbar-account-button .avatar { width: 100%; height: 100%; font-size: 13px; }
+.topbar-account-button:hover { border-color: var(--muted); }
+.topbar-account-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.topbar-account-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 55; min-width: 190px;
+  display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 28px oklch(0% 0 0 / 0.45);
 }
-.app-rail-row.on .app-rail-glyph { color: var(--brand); }
-.app-rail-count {
-  margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
-}
-.app-rail-row.on .app-rail-count { color: var(--text); }
-
-.app-rail-spacer { flex: 1 1 auto; min-height: 8px; }
-.app-account { display: flex; align-items: center; gap: 8px; padding: 8px 6px 4px; border-top: 1px solid var(--line); }
-.app-account-name {
-  font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.app-signout {
-  display: flex; align-items: center; gap: 8px;
-  background: none; border: 0; font: inherit; cursor: pointer; text-align: left;
-  padding: 0 6px; font-size: 12.5px; color: var(--muted);
-}
-.app-signout:hover { color: var(--text); }
-.app-signout-glyph { display: none; }
-
-/*
- * LEAGUE CONTEXT IN THE RAIL
- * The home league card's menu -- draft, history, power rankings, mock -- used
- * to vanish the moment you used it. It lives here now on every league-scoped
- * route (claude/site-wide-shell-propagation.md Phase 3), which is also what
- * finally gives the draft board and the mock room a way back that isn't the
- * browser's Back button.
- */
-.app-rail-league { gap: 2px; }
-
-.rail-league-id {
-  display: flex; align-items: center; gap: 9px; padding: 4px 6px 8px;
-  text-decoration: none; color: inherit; border-radius: 9px; min-width: 0;
-}
-.rail-league-id:hover { background: var(--raised); }
-.rail-league-crest { width: 26px; height: 26px; font-size: 12px; flex-shrink: 0; }
-.rail-league-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rail-league-name {
-  font-size: 13.5px; font-weight: 700; color: var(--text);
+.topbar-account-name {
+  padding: 4px 8px; font-size: 12px; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.rail-league-sub {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 10.5px; color: var(--muted); white-space: nowrap;
+.topbar-account-item {
+  min-height: 40px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer; text-align: left;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
 }
-/* The sport pill is sized for a card here, not a rail -- a 200px column can't
-   spend a card's padding on a three-letter badge. */
-.rail-league-sub .sport-pill { font-size: 8.5px; padding: 1px 4px; }
+.topbar-account-item:hover { background: color-mix(in oklab, var(--danger) 30%, transparent); }
+.topbar-account-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
-/* specs/009: the refresh state under the league name -- the rail's existing small muted line. */
-.rail-league-refresh { font-size: 10.5px; color: var(--muted); padding: 0 6px 6px; }
-
-.rail-league-seasons { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 6px 8px; }
-
-/* The live dot stands in for a glyph on the Follow-live row, so it has to
-   occupy the same 7px optical slot the glyphs do or that one row's label
-   would sit a pixel off every other row's. */
-.app-rail-row .league-live-dot { width: 7px; height: 7px; }
-.app-rail-row.live { color: var(--brand); }
-.app-rail-row.live:hover { color: var(--brand); }
-
-/*
- * THE ICON RAIL (56px)
- * Draft rooms default to it because they measurably have no horizontal room
- * to give: at 1440px a 14-team board already overflows its scroller by 99px
- * with no rail at all, and a column is 96px -- so 200px of permanent rail
- * costs two columns (§B). Everything stays in place and only the text goes,
- * which is why every row's label is its own span: hiding a span is a rule,
- * re-laying-out a rail is a second component.
- */
-.app-rail.collapsed { flex-basis: 56px; padding: 18px 8px; align-items: stretch; }
-.app-rail.collapsed .app-rail-row-label { display: none; }
-.app-rail.collapsed .app-rail-label { display: none; }
-.app-rail.collapsed .app-rail-row { justify-content: center; padding: 9px 0; gap: 0; }
-.app-rail.collapsed .app-rail-top { flex-direction: column; align-items: center; gap: 8px; }
-.app-rail.collapsed .app-wordmark { padding: 0; flex: 0 0 auto; }
-.app-wordmark-mark {
-  display: block; font-size: 17px; letter-spacing: 0.04em;
+/* ---- League header -----------------------------------------------------------
+   One row on a desktop: who (crest, name, sport, managers), which season, which
+   league, then the tabs, then the refresh line at the far end. A sub-tab strip
+   sits under it when the active tab has more than one page. */
+.league-header {
+  flex: 0 0 auto; display: flex; flex-direction: column; padding: 0 24px;
+  background: var(--bg); border-bottom: 1px solid var(--line);
 }
-.app-rail.collapsed .app-account { justify-content: center; padding: 8px 0 4px; }
-.app-rail.collapsed .app-signout { justify-content: center; padding: 0; font-size: 14px; }
-.app-rail.collapsed .app-signout-glyph { display: block; }
-/* The dots carry the whole filter once the labels are gone, so they need to
-   be a target rather than a decoration. */
-.app-rail.collapsed .app-rail-dot { width: 9px; height: 9px; }
-/* The crest survives the collapse and the name does not: a 56px rail has room
-   for the league's mark, and that mark is already how this app says "which
-   league" on the home grid and the board's column heads. */
-.app-rail.collapsed .rail-league-id { justify-content: center; padding: 4px 0 8px; gap: 0; }
-/* The section LABELS are what separate League from Menu in the full rail, and
-   they are the first thing the icon rail hides -- so the groups need a line
-   instead, or eight identical glyphs read as one undifferentiated list.
-   `~` not `+`: the page-portal div sits between the two sections in the DOM
-   (display:none when empty, which adjacency still counts). */
-.app-rail.collapsed .app-rail-league ~ .app-rail-section { border-top: 1px solid var(--line); padding-top: 12px; }
-.app-rail.collapsed .app-rail-row .league-live-dot { width: 9px; height: 9px; }
+.league-header-row { display: flex; align-items: stretch; flex-wrap: wrap; gap: 4px 12px; min-height: 52px; min-width: 0; }
+.league-header-row > :not(.league-tabs) { align-self: center; }
+.league-identity {
+  display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 360px;
+  color: inherit; text-decoration: none; border-radius: 10px; padding: 2px 4px 2px 0;
+}
+.league-identity:hover .league-identity-name { color: var(--brand); }
+.league-identity:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.league-identity-crest { width: 32px; height: 32px; font-size: 14px; }
+.league-identity-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.league-identity-name {
+  font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.league-identity-sub { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.league-identity-sub .sport-pill { margin-right: 0; }
+.league-popup-wrap { position: relative; }
+.league-menu-button {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--line); background: none;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums;
+  transition: background 120ms ease;
+}
+.league-menu-button:hover { background: var(--raised); }
+.league-menu-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.league-season-static { font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; padding: 0 2px; }
+.league-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 55;
+  min-width: 220px; max-height: 60vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 1px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 34px oklch(0% 0 0 / 0.42);
+}
+.league-menu-label {
+  padding: 5px 8px 2px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--muted);
+}
+.league-menu-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 8px;
+  color: var(--text); text-decoration: none; font-size: 13.5px;
+}
+.league-menu-item .sport-pill { margin-right: 0; }
+.league-menu-item:hover { background: var(--raised); }
+.league-menu-item.on { background: var(--raised); font-weight: 600; }
+.league-menu-item .muted { margin-left: auto; }
+.league-menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.league-header-refresh { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* Tabs are navigation: links, the active one marked by --text and a 2px --brand underline, not a
+   filled pill. The underline sits on the header's hairline. */
+.league-tabs { display: flex; align-items: stretch; gap: 2px; margin-left: 8px; min-width: 0; }
+.league-tab {
+  display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 600;
+  color: var(--muted); text-decoration: none; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  transition: color 120ms ease;
+}
+.league-tab:hover { color: var(--text); }
+.league-tab.on { color: var(--text); border-bottom-color: var(--brand); }
+.league-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
+
+/* Sub-tabs are quieter than tabs: 13px, --muted, the active one --text on --raised. */
+.league-subtabs-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 0; }
+.league-subtabs {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.league-subtabs::-webkit-scrollbar { display: none; }
+.league-subtabs-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
+.league-subtab {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer;
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 28px; padding: 0 10px; border-radius: 8px; border: 0; background: none;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--muted); text-decoration: none; white-space: nowrap;
+  transition: background 120ms ease, color 120ms ease;
+}
+.league-subtab:hover { color: var(--text); }
+.league-subtab.on { color: var(--text); font-weight: 600; background: var(--raised); }
+.league-subtab.live { color: var(--brand); }
+/* An action (Mock it) is not a place: outlined, per the control hierarchy at the top of this file. */
+.league-subtab.action { border: 1px solid var(--line); color: var(--text); }
+.league-subtab.action:hover { background: var(--raised); }
+.league-subtab:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+
+/* Compact (draft room, mock; desktop): the identity, switcher and tabs ride in the top bar and the
+   Draft sub-tabs are the only row under it, about 32px. */
+.league-compact { display: flex; align-items: stretch; gap: 12px; min-width: 0; }
+.league-compact > :not(.league-tabs) { align-self: center; }
+.league-compact .league-identity { max-width: 240px; }
+.league-compact .league-identity-crest { width: 26px; height: 26px; font-size: 12px; }
+.league-compact .league-identity-name { font-size: 14px; }
+.league-compact .league-tabs { margin-left: 4px; flex: 1 1 auto; overflow-x: auto; scrollbar-width: none; }
+.league-compact .league-tabs::-webkit-scrollbar { display: none; }
+.league-compact .league-tab { padding: 0 12px; font-size: 13.5px; }
+.league-header.compact { padding: 0 24px; }
+.league-header.compact .league-subtabs-wrap { padding: 2px 0; min-height: 32px; box-sizing: border-box; }
+
+/* ---- Context strip -----------------------------------------------------------
+   Under the header. Pages portal into it (appSlots.tsx): the sport filter on the picker and the
+   Scouting report, who the manager is on their history page. Nothing portaled, no strip. */
+.context-strip {
+  flex: 0 0 auto; padding: 8px 24px; background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.context-strip:empty { display: none; }
+.context-strip-content { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; min-width: 0; }
+.context-strip-label { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.context-strip-count { font-variant-numeric: tabular-nums; opacity: 0.75; }
+.context-strip-id { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.context-strip-name { font-size: 14px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.context-strip-sub { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.context-strip-sub .sport-pill { margin-right: 0; }
+.context-strip-link { margin-left: auto; font-size: 13px; color: var(--muted); text-decoration: none; }
+.context-strip-link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.context-strip-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+
+/* ---- Bottom bar and menu sheet ----------------------------------------------- */
+.bottom-bar { display: none; }
+.nav-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 58; display: flex; justify-content: flex-end;
+  align-items: flex-start; padding: 56px 12px 0;
+}
+.nav-sheet {
+  width: 280px; max-width: 100%; max-height: calc(100vh - 72px); overflow-y: auto; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 12px; padding: 12px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 14px 34px oklch(0% 0 0 / 0.45);
+}
+.nav-sheet-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-sheet-label {
+  padding: 0 8px 4px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.nav-sheet-item {
+  appearance: none; -webkit-appearance: none; margin: 0; border: 0; background: none; cursor: pointer;
+  display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 9px; box-sizing: border-box;
+  font: inherit; font-size: 15px; font-weight: 500; color: var(--text); text-decoration: none; text-align: left;
+}
+.nav-sheet-item:hover { background: var(--raised); }
+.nav-sheet-item.on { background: var(--raised); font-weight: 600; box-shadow: inset 2px 0 0 var(--brand); }
+.nav-sheet-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.nav-sheet-foot { display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.nav-sheet-name { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-sheet-signout {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer; flex: 0 0 auto;
+  min-height: 44px; padding: 0 16px; border-radius: 9px; border: 0;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
+  background: color-mix(in oklab, var(--danger) 18%, transparent);
+}
+.nav-sheet-signout:hover { background: color-mix(in oklab, var(--danger) 30%, transparent); }
+.nav-sheet-signout:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /*
  * .app-main -- the one scrolling pane. It owns the page padding that `.app`
@@ -1970,6 +2072,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   flex: 1 1 0; min-width: 0; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; padding: 20px 24px 40px; gap: 16px;
 }
+
+/* The skip link's target takes focus by script (tabindex -1); a ring on the whole page would be noise. */
+.app-main:focus { outline: none; }
 
 /* Portal target for page-scoped actions -- DraftView's settings gear is the
    only one today (appSlots.tsx). Empty on every other route, and an empty
@@ -1997,7 +2102,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   font-family: var(--font-display); font-size: 11px; font-weight: 600;
   letter-spacing: 0.1em; color: var(--brand);
 }
-.page-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
+.page-title { font-size: 26px; font-weight: 700; letter-spacing: 0; margin: 0; }
+/* Sentence case in the body face (Phase 3). The hero keeps `.cond` where a page asks for it. */
+.page-title:not(.cond) { font-family: var(--font-body); }
 .page-title.hero {
   font-size: 38px; line-height: 1.02; letter-spacing: 0; margin: 10px 0 8px;
   max-width: 20ch; text-wrap: balance; color: var(--text);
@@ -2015,12 +2122,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 
 .league-card-mockit {
   appearance: none; -webkit-appearance: none; border: 1px solid var(--sport-nfl); margin: 0;
-  padding: 4px 10px; background: color-mix(in oklch, var(--sport-nfl) 12%, transparent);
+  padding: 4px 10px; background: color-mix(in oklab, var(--sport-nfl) 12%, transparent);
   color: var(--sport-nfl); font: inherit; font-size: 11px; font-weight: 600;
   border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
   transition: background 120ms ease;
 }
-.league-card-mockit:hover:not(:disabled) { background: color-mix(in oklch, var(--sport-nfl) 22%, transparent); }
+.league-card-mockit:hover:not(:disabled) { background: color-mix(in oklab, var(--sport-nfl) 22%, transparent); }
 
 /* Mock drafts list: sport badge, identity, a progress bar, recency, one CTA --
    design_handoff_multisport_mock_drafts's fix for every row looking identical. */
@@ -2048,208 +2155,99 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   position: relative; padding: 9px 18px; border-radius: 10px; font-size: 14px; font-weight: 700;
   letter-spacing: 0.04em; background: var(--bg); color: var(--muted); border: 1px solid var(--line); cursor: pointer;
 }
-.start-mock-sport-chip.nfl.on { color: var(--sport-nfl); background: color-mix(in oklch, var(--sport-nfl) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nfl) 45%, transparent); }
-.start-mock-sport-chip.nba.on { color: var(--sport-nba); background: color-mix(in oklch, var(--sport-nba) 15%, transparent); border-color: color-mix(in oklch, var(--sport-nba) 45%, transparent); }
+.start-mock-sport-chip.nfl.on { color: var(--sport-nfl); background: color-mix(in oklab, var(--sport-nfl) 15%, transparent); border-color: color-mix(in oklab, var(--sport-nfl) 45%, transparent); }
+.start-mock-sport-chip.nba.on { color: var(--sport-nba); background: color-mix(in oklab, var(--sport-nba) 15%, transparent); border-color: color-mix(in oklab, var(--sport-nba) 45%, transparent); }
 .start-mock-league-list { display: flex; flex-direction: column; gap: 7px; max-height: 220px; overflow-y: auto; }
 .start-mock-league-option {
   display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;
   border: 1px solid var(--line); background: var(--bg); cursor: pointer;
 }
-.start-mock-league-option.selected { border-color: color-mix(in oklch, var(--brand) 45%, var(--line)); background: var(--raised); }
+.start-mock-league-option.selected { border-color: color-mix(in oklab, var(--brand) 45%, var(--line)); background: var(--raised); }
 .start-mock-league-option input { position: absolute; opacity: 0; width: 0; height: 0; }
 .start-mock-league-radio {
   width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; box-sizing: border-box;
 }
 .start-mock-league-option.selected .start-mock-league-radio {
-  border-color: var(--brand); background: var(--brand); box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--brand) 8%, var(--bg));
+  border-color: var(--brand); background: var(--brand); box-shadow: inset 0 0 0 2.5px color-mix(in oklab, var(--brand) 8%, var(--bg));
 }
 .start-mock-league-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .start-mock-league-name { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .start-mock-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .start-mock-cta:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* Below the rail's own comfortable width, stack it above the content as a
-   horizontal bar instead of squeezing a 200px rail beside a narrow main pane.
-   Shipped for Home only; it applies on every route now, which is the whole
-   point of the promotion. The collapsed/expanded distinction is meaningless
-   here -- there is no column to save -- so the bar wins over `.collapsed`
-   either way and the toggle hides rather than doing nothing visible. */
+/* Phone layout (<= 860px, useNarrow's one JS copy of this query). Top bar: wordmark, search, menu,
+   account. Inside a league the tabs become the fixed bottom bar. The league header (identity,
+   season, switcher, sub-tabs) is in the page flow. */
 @media (max-width: 860px) {
-  .app-shell { flex-direction: column; }
-  /* No `.collapsed` variants anywhere in here: AppShell forces the rail
-     expanded below this width (useNarrow), because in a horizontal bar there
-     is no column to save and the collapsed state also swaps the wordmark for
-     a "BK" mark. Handling it in CSS alone left a phone in a draft room with
-     the abbreviation in a bar wide enough for the whole name. */
-  .app-rail {
-    flex: 0 0 auto; flex-basis: auto; flex-direction: row; flex-wrap: wrap; align-items: center;
-    border-right: 0; border-bottom: 1px solid var(--line); overflow-y: visible;
-    gap: 10px 16px; padding: 12px 16px;
+  .topbar {
+    height: 48px; padding: 0 12px; gap: 8px;
+    position: sticky; top: 0; z-index: 40;
   }
-  .app-rail-top { flex: 0 0 auto; margin-right: auto; }
-  .app-wordmark { padding: 0; font-size: 19px; }
-  /* One line, not two: every line the bar spends is a line the page doesn't
-     get. Measured 149px -> 128px at 375x812. */
-  .app-wordmark-line { display: inline; }
-  .app-rail-toggle { display: none; }
-  .app-rail-context:not(:empty), .app-rail-section { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .topbar-wordmark { font-size: 18px; }
+  .topbar-icon-button { width: 44px; height: 44px; }
+  .topbar-account-button { width: 40px; height: 40px; }
 
-  /*
-   * The league's nine page links ride ONE horizontally scrolling lane.
-   *
-   * Left to wrap they took five stacked lines -- measured 2026-09-22 on a
-   * 375x812 screen, the whole rail had grown to 388px, 48% of the viewport
-   * before a single row of content, of which ~200px was these links. That is
-   * past the line the note below already drew: "a third of the viewport spent
-   * permanently on navigation is worse than navigation you scroll back up to
-   * reach."
-   *
-   * Laid end to end the links are ~1250px (measured 1249 at 375px, 2026-09-28;
-   * it was ~1130 before Season forecast / Weekly report / Superlatives), so
-   * they will not fit any phone at any font size. A lane you swipe keeps
-   * every destination one gesture away and costs one line instead of five.
-   * The wrapper's `flex: 0 0 100%` puts the lane on its own row beneath the
-   * league's identity; `min-width: 0` is what actually lets it scroll rather
-   * than stretch its parent.
-   *
-   * A swipe lane hides what is off its edge, so it says so: an edge fade on
-   * whichever side still has pages (data-overflow-start/-end, set from the
-   * scroll position), the current page is scrolled into view on navigation,
-   * and a trailing "All pages" chip -- outside the scroller, so always on
-   * screen -- opens Jump to, which lists every page by name.
-   */
-  /* The rail and its sections must not be widened by their own contents --
-     without this the lane's `100%` resolves against a section that has already
-     stretched to the full width of the links, so nothing ever clips and the whole
-     page scrolls sideways instead. */
-  .app-rail { max-width: 100%; box-sizing: border-box; }
-  .app-rail-section { min-width: 0; max-width: 100%; }
-
-  .app-rail-pages-wrap {
-    display: flex; flex: 0 0 100%; min-width: 0; max-width: 100%; align-items: center; gap: 6px;
-  }
-  .app-rail-pages {
-    flex: 1 1 0; min-width: 0; max-width: 100%;
-    flex-direction: row; flex-wrap: nowrap;
-    overflow-x: auto; overflow-y: hidden;
-    gap: 4px; padding-bottom: 2px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .app-rail-pages::-webkit-scrollbar { display: none; }
-  .app-rail-pages .app-rail-row { flex: 0 0 auto; }
-  /* Fade only the edge that still has content behind it. */
-  .app-rail-pages[data-overflow-end]:not([data-overflow-start]) {
+  .league-header { padding: 8px 12px 0; }
+  .league-header-row { min-height: 0; gap: 8px 10px; }
+  .league-identity { flex: 1 1 100%; max-width: none; }
+  .league-header-refresh { margin-left: 0; flex: 1 1 100%; white-space: normal; }
+  .league-menu-button, .league-season-static { min-height: 44px; box-sizing: border-box; }
+  .league-season-static { display: inline-flex; align-items: center; }
+  .league-menu-item { min-height: 44px; box-sizing: border-box; }
+  .league-subtabs-wrap { padding: 6px 0 8px; }
+  .league-subtab { min-height: 44px; }
+  /* A strip you swipe says it continues: an edge fade on whichever side still has pages behind it
+     (data-overflow-*, set from the scroll position by LeagueHeader). */
+  .league-subtabs[data-overflow-end]:not([data-overflow-start]) {
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
   }
-  .app-rail-pages[data-overflow-start]:not([data-overflow-end]) {
+  .league-subtabs[data-overflow-start]:not([data-overflow-end]) {
     -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
     mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent);
   }
-  .app-rail-pages[data-overflow-start][data-overflow-end] {
+  .league-subtabs[data-overflow-start][data-overflow-end] {
     -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
     mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
   }
-  .app-rail-allpages {
-    display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 4px;
-    min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 999px;
-    font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
-    color: var(--text);
-    background: var(--raised);
-    border: 1px solid color-mix(in oklch, var(--brand) 40%, var(--line));
-  }
-  .app-rail-allpages:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-  /* Tap targets: 44px is the floor for a finger, on the bar and the lane both. */
-  .app-rail-row, .rail-jumpto, .rail-switcher-toggle, .app-wordmark, .rail-league-id, .league-season-link {
-    min-height: 44px; box-sizing: border-box;
+  .context-strip { padding: 8px 12px; }
+
+  .bottom-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+    display: flex; box-sizing: border-box; height: var(--bottom-bar-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg); border-top: 1px solid var(--line);
   }
-  .app-rail-row { min-width: 44px; }
+  .bottom-bar-item {
+    appearance: none; -webkit-appearance: none; margin: 0; border: 0; background: none; cursor: pointer;
+    flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center;
+    font: inherit; font-size: 12.5px; font-weight: 600; color: var(--muted); text-decoration: none;
+    border-top: 2px solid transparent; margin-top: -1px;
+  }
+  .bottom-bar-item.on { color: var(--text); border-top-color: var(--brand); }
+  .bottom-bar-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -3px; border-radius: 6px; }
+
+  /* Clear the bar when the page is scrolled to its end. */
+  .app-shell.has-bottom-bar .app-main { padding-bottom: calc(var(--bottom-bar-h) + 24px); }
+
+  /* The sheet rises from the bottom edge. */
+  .nav-sheet-backdrop { align-items: flex-end; justify-content: stretch; padding: 0; background: oklch(0% 0 0 / 0.55); }
+  .nav-sheet {
+    width: 100%; max-height: 80vh; border-radius: 14px 14px 0 0; border-width: 1px 0 0;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 @media (max-width: 700px) {
-  /*
-   * Phone chrome, cut to what a phone needs.
-   *
-   * The lane above took the rail from 388px to 229px and that was still "a
-   * shit ton of space" -- 28% of an 812px screen, and more once the browser's
-   * own address bar takes its ~100px. What was left was five stacked rows:
-   * wordmark, league identity, the lane, the global menu, and the account.
-   *
-   * Three of those carry things a phone does not need on every page, and each
-   * is still reachable:
-   *   - the season pills (2026 / 2025) duplicate the Switch menu, which lists
-   *     Seasons and Leagues and is kept;
-   *   - the league's sport pill and manager count are context, not navigation;
-   *   - Home / Managers / Mock drafts and Sign out keep their glyphs and lose
-   *     their labels, so they cost icons rather than words -- and Jump to,
-   *     which is kept at full size, reaches all of them by name anyway.
-   *
-   * Nothing is removed from the DOM: this is all display and sizing, so the
-   * accessible names on every control are untouched.
-   */
-  .app-wordmark { font-size: 16px; }
-  .rail-league-seasons { display: none; }
-  .rail-league-sub { display: none; }
-
-  /* The global menu keeps a short label under its glyph. It was icon-only (24-27px
-     wide, unlabelled ◆ ● ▶), which is neither tappable nor readable. Each is a
-     44px-min tinted pill; the glyph goes on top so the label is what you read. */
-  .app-rail-section:not(.app-rail-league) .app-rail-row {
-    flex-direction: column; justify-content: center; gap: 3px;
-    min-width: 56px; padding: 5px 10px; border-radius: 12px; text-align: center;
-    background: color-mix(in oklch, var(--line) 35%, transparent);
-  }
-  .app-rail-section:not(.app-rail-league) .app-rail-row.on {
-    background: var(--raised);
-  }
-  .app-rail-section:not(.app-rail-league) .app-rail-glyph { width: auto; font-size: 12px; }
-  .app-rail-section:not(.app-rail-league) .app-rail-row-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
-  .app-wordmark { display: flex; align-items: center; }
-
-  /* Account: the avatar is a 44px button; Sign out lives in its popover. */
-  .app-account-name { display: none; }
-  .app-account-wrap { position: relative; }
-  .app-account-button {
-    display: flex; align-items: center; justify-content: center;
-    width: 44px; height: 44px; padding: 0; border-radius: 50%; cursor: pointer;
-    background: none; border: 1px solid var(--line);
-  }
-  .app-account-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-  .app-account-menu {
-    position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 180px;
-    display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px;
-    background: var(--panel); border: 1px solid var(--line); box-shadow: 0 10px 28px oklch(0% 0 0 / 0.45);
-  }
-  .app-account-menu-name {
-    padding: 4px 8px; font-size: 12px; color: var(--muted);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .app-account-menu-item {
-    min-height: 44px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer; text-align: left;
-    font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
-    background: color-mix(in oklch, var(--danger) 18%, transparent);
-  }
-  .app-account-menu-item:hover { background: color-mix(in oklch, var(--danger) 30%, transparent); }
-  .app-account-menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-
-  .app-rail { gap: 8px 12px; padding: 10px 14px; }
-  .rail-league-id { padding: 0 6px 0 0; }
-  .rail-league-seasons { padding: 0; }
-  .app-rail-label { display: none; }
-  .app-rail-spacer { display: none; }
-  .app-account { border-top: 0; padding: 0; }
   .app-main { padding: 16px 16px 32px; }
 
   /*
-   * On a phone the chrome scrolls away with the page instead of pinning a
-   * band above a shorter pane. The app is a 100vh single screen on desktop
-   * (see LAYOUT at the top of this file) and that is right there -- but this
-   * bar carries the wordmark, the league's identity, its four actions, Menu
-   * and the account, and once league context landed that measured 252px of
-   * 812 on an iPhone-sized screen. A third of the viewport spent permanently
-   * on navigation is worse than navigation you scroll back up to reach.
+   * On a phone the document scrolls instead of a 100vh pane. Only the 48px top bar and the 56px
+   * bottom bar are pinned (104px of 812); the league header scrolls away with the page. The old
+   * header pinned nothing because it measured 252px of 812 (a third of the viewport on navigation);
+   * the redesign reverses "nothing pinned" now that the pinned part is the two thin bars and the
+   * heavy part (identity, season, sub-tabs) is the one that scrolls (claude/site-redesign.md PR-22).
    */
   .app { height: auto; min-height: 100vh; }
   .app-shell { min-height: 100vh; }
@@ -2445,14 +2443,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .rankboard-tray {
   display: flex; flex-wrap: wrap; gap: 6px; min-height: 96px; align-content: flex-start;
   padding: 8px; border: 1px dashed var(--line); border-radius: 10px;
-  background: color-mix(in oklch, var(--panel) 60%, var(--bg));
+  background: color-mix(in oklab, var(--panel) 60%, var(--bg));
 }
 
 .rankboard-slots { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .rankboard-slot {
   display: flex; align-items: center; gap: 8px; min-height: 44px;
   padding: 3px 8px 3px 4px; border: 1px solid transparent; border-radius: 10px;
-  background: color-mix(in oklch, var(--panel) 70%, var(--bg));
+  background: color-mix(in oklab, var(--panel) 70%, var(--bg));
 }
 /* The drop target. A tint and a ring, never a lift -- grid tiles are on the
    plane, and a slot that rises to meet the cursor reads as a card.
@@ -2531,9 +2529,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
      as decoration and got missed -- and a hover state is no help at all on
      the device this exists for. A phone gets no hover, so the affordance has
      to be visible standing still. */
-  background: color-mix(in oklch, var(--line) 38%, transparent);
+  background: color-mix(in oklab, var(--line) 38%, transparent);
 }
-.rankboard-handle:hover { color: var(--text); background: color-mix(in oklch, var(--line) 45%, transparent); }
+.rankboard-handle:hover { color: var(--text); background: color-mix(in oklab, var(--line) 45%, transparent); }
 
 /* The tap route's nudge pair, on the selected chip only. These are what make
    "use the arrows" a true sentence on a phone, which has no arrow keys --
@@ -2551,13 +2549,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .rankboard-nudge button:disabled { opacity: 0.3; cursor: default; }
 .rankboard-nudge button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .rankboard.dragging .rankboard-handle { cursor: grabbing; }
-.rankboard-chip:hover { border-color: color-mix(in oklch, var(--brand) 55%, var(--line)); }
+.rankboard-chip:hover { border-color: color-mix(in oklab, var(--brand) 55%, var(--line)); }
 .rankboard-chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 /* Selected is the click-to-place path's held state -- brand, because it is
    interaction, not identity. */
 .rankboard-chip.selected { border-color: var(--brand); background: var(--raised); }
 /* Gold means you, and here nothing else owns the background, so it fills. */
-.rankboard-chip.mine { border-color: var(--you); background: color-mix(in oklch, var(--you) 15%, var(--panel)); }
+.rankboard-chip.mine { border-color: var(--you); background: color-mix(in oklab, var(--you) 15%, var(--panel)); }
 /* The chip left behind while its ghost is under the pointer. */
 .rankboard-chip.drag-source { opacity: 0.32; }
 
@@ -2591,7 +2589,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    plus two absolutely-positioned children; the range is tinted rather than
    solid so the mean dot stays readable on top of it. */
 .spread-bar { position: relative; display: block; width: 120px; height: 10px; border-radius: 999px; background: var(--line); }
-.spread-bar-range { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: color-mix(in oklch, var(--data) 45%, var(--panel)); }
+.spread-bar-range { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--data) 45%, var(--panel)); }
 .spread-bar-mean { position: absolute; top: 1px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text); }
 
 /* `.content` is a flex column with no overflow of its own -- fine for the
@@ -2698,7 +2696,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-your-team {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 12px 16px; border-radius: 14px;
-  background: color-mix(in oklch, var(--you) 12%, var(--panel));
+  background: color-mix(in oklab, var(--you) 12%, var(--panel));
   box-shadow: inset 2px 0 0 var(--you);
 }
 .pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--you-text); }
@@ -2728,7 +2726,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   padding: 7px 11px;
   border-radius: 8px;
   background: var(--raised);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 24%, transparent);
 }
 
 .pr-list { max-width: 1180px; }
@@ -2756,13 +2754,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-row {
   width: 100%; text-align: left; font: inherit; color: inherit;
   background: none; border: 0;
-  border-bottom: 1px solid color-mix(in oklch, var(--line) 55%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent);
   padding: 9px 6px; cursor: pointer; border-radius: 10px;
   transition: background 100ms ease;
 }
 .pr-row:hover { background: var(--raised); }
 .pr-row.on { background: var(--raised); box-shadow: inset 2px 0 0 var(--brand); }
-.pr-row.mine { background: color-mix(in oklch, var(--you) 12%, transparent); box-shadow: inset 2px 0 0 var(--you); }
+.pr-row.mine { background: color-mix(in oklab, var(--you) 12%, transparent); box-shadow: inset 2px 0 0 var(--you); }
 .pr-row.mine.on { box-shadow: inset 2px 0 0 var(--you); }
 .pr-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
@@ -2788,14 +2786,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-record { font-size: 13px; }
 .pr-odds {
   padding: 1px 6px; border-radius: 999px; font-size: 11px; line-height: 1.5;
-  background: color-mix(in oklch, var(--muted) 16%, transparent); color: var(--muted);
+  background: color-mix(in oklab, var(--muted) 16%, transparent); color: var(--muted);
 }
 /* All but in / still alive / long odds. Brand is "good" everywhere else on this
    page, and the warm end deliberately stops short of gold -- gold means
    "this row is you". */
 .pr-odds.in { background: var(--raised); color: var(--brand); }
-.pr-odds.live { background: color-mix(in oklch, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
-.pr-odds.out { background: color-mix(in oklch, oklch(75% 0.13 50) 14%, transparent); color: oklch(78% 0.12 50); }
+.pr-odds.live { background: color-mix(in oklab, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
+.pr-odds.out { background: color-mix(in oklab, oklch(75% 0.13 50) 14%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
 .pr-move.up { color: var(--up); }
@@ -2813,7 +2811,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    it. Empty (0% width, no fill color) rather than a fake sliver when `pct` is
    null -- see PowerRankingEntry.makesPlayoffsPct's own TODO. */
 .pr-bar { position: relative; display: block; flex: 1; height: 8px; border-radius: 999px; background: var(--line); }
-.pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklch, var(--data) 55%, var(--panel)); }
+.pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklab, var(--data) 55%, var(--panel)); }
 .pr-bar-fill.mine { background: var(--you); }
 
 /* --- League-vote ladder row: ranking space (ranking-space-optimization
@@ -2846,7 +2844,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-axis-tick { position: absolute; top: 0; white-space: nowrap; }
 .pr-axis-tick::after {
   content: ''; position: absolute; top: 13px; width: 1px; height: 5px;
-  background: color-mix(in oklch, var(--muted) 45%, transparent);
+  background: color-mix(in oklab, var(--muted) 45%, transparent);
 }
 .pr-axis-tick.start { left: 0; }
 .pr-axis-tick.start::after { left: 0; }
@@ -2861,8 +2859,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    than the plain-text +/- the movement column uses elsewhere. */
 .pr-your-ballot .pr-move { padding: 2px 6px; border-radius: 999px; font-size: 11px; }
 .pr-your-ballot .pr-move.up { background: var(--raised); }
-.pr-your-ballot .pr-move.down { background: color-mix(in oklch, var(--down) 16%, transparent); }
-.pr-your-ballot .pr-move.flat { background: color-mix(in oklch, var(--muted) 16%, transparent); }
+.pr-your-ballot .pr-move.down { background: color-mix(in oklab, var(--down) 16%, transparent); }
+.pr-your-ballot .pr-move.flat { background: color-mix(in oklab, var(--muted) 16%, transparent); }
 /* One flat track, one constant fill. The old row stacked four encodings on
    this bar -- a hue-shifting range gradient, a four-hue median dot, and a
    two-tone "playoff half" backdrop -- none of which the reader could decode,
@@ -2876,7 +2874,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; margin-left: -0.5px;
   background: repeating-linear-gradient(
     180deg,
-    color-mix(in oklch, var(--muted) 60%, transparent) 0 3px,
+    color-mix(in oklab, var(--muted) 60%, transparent) 0 3px,
     transparent 3px 6px
   );
 }
@@ -2893,7 +2891,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    while this marker appears on every row (it is where I ranked THAT team). */
 .spread-bar-mine {
   position: absolute; top: -2px; width: 16px; height: 16px; margin-left: -8px;
-  border-radius: 50%; border: 2px solid color-mix(in oklch, var(--text) 75%, transparent);
+  border-radius: 50%; border: 2px solid color-mix(in oklab, var(--text) 75%, transparent);
   background: transparent;
 }
 
@@ -2903,21 +2901,21 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-range-cell { display: flex; justify-content: flex-end; }
 .pr-range-pill {
   padding: 3px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap;
-  background: color-mix(in oklch, var(--muted) 14%, transparent); color: var(--muted);
+  background: color-mix(in oklab, var(--muted) 14%, transparent); color: var(--muted);
 }
 .pr-range-pill.tight { background: var(--raised); color: var(--brand); }
-.pr-range-pill.mixed { background: color-mix(in oklch, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
-.pr-range-pill.split { background: color-mix(in oklch, oklch(75% 0.13 50) 16%, transparent); color: oklch(78% 0.12 50); }
+.pr-range-pill.mixed { background: color-mix(in oklab, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
+.pr-range-pill.split { background: color-mix(in oklab, oklch(75% 0.13 50) 16%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-space-legend { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 12px 6px 0; margin-top: 4px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
 .pr-space-legend-item { display: flex; align-items: center; gap: 6px; }
 .pr-space-legend-swatch { display: inline-block; flex: none; }
-.pr-space-legend-swatch.range { width: 22px; height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--data) 45%, var(--panel)); }
+.pr-space-legend-swatch.range { width: 22px; height: 6px; border-radius: 3px; background: color-mix(in oklab, var(--data) 45%, var(--panel)); }
 .pr-space-legend-swatch.median { width: 3px; height: 12px; border-radius: 2px; background: var(--text); }
-.pr-space-legend-swatch.mine { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in oklch, var(--text) 75%, transparent); }
+.pr-space-legend-swatch.mine { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in oklab, var(--text) 75%, transparent); }
 .pr-space-legend-swatch.halfway {
   width: 1px; height: 12px;
-  background: repeating-linear-gradient(180deg, color-mix(in oklch, var(--muted) 70%, transparent) 0 3px, transparent 3px 6px);
+  background: repeating-linear-gradient(180deg, color-mix(in oklab, var(--muted) 70%, transparent) 0 3px, transparent 3px 6px);
 }
 
 .pr-foot { margin: 10px 6px 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
@@ -3012,12 +3010,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
      also the cheapest way to make scrolling it less necessary.
      dvh, not vh, because vh on a phone is the viewport with the address bar
      hidden and leaves the submit button under it. */
-  /* The rail is gone, not merely covered, while the ballot is open. See the
-     effect in PowerRankings.tsx for why a full-viewport backdrop was not
-     enough on a real phone. Scoped to the phone breakpoint: on a desktop the
-     ballot is still a centred card over a dimmed page, and hiding the rail
-     behind it would just shuffle the page around under the dimming. */
-  body.bk-modal-fullscreen .app-rail { display: none; }
+  /* The chrome is gone, not merely covered, while the ballot is open: the top bar, the league
+     header, the context strip and the bottom bar. See the effect in PowerRankings.tsx for why a
+     full-viewport backdrop was not enough on a real phone. Scoped to the phone breakpoint: on a
+     desktop the ballot is still a centred card over a dimmed page, and hiding the chrome behind it
+     would just shuffle the page around under the dimming. */
+  body.bk-modal-fullscreen .topbar,
+  body.bk-modal-fullscreen .league-header,
+  body.bk-modal-fullscreen .context-strip,
+  body.bk-modal-fullscreen .bottom-bar { display: none; }
 
   .pr-ballot-backdrop { padding: 0; }
   .pr-ballot-backdrop .modal-card {
@@ -3127,7 +3128,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   display: inline-block; min-width: 46px; text-align: center;
   padding: 3px 8px; border-radius: 999px;
   background: var(--raised);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 35%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 35%, transparent);
   font-weight: 600;
 }
 .analysis-raw { display: block; margin-top: 2px; }
@@ -3205,19 +3206,19 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    past it the text on top starts losing contrast. */
 .analysis-cell {
   text-align: center; border-radius: 8px; padding: 4px 6px;
-  background: color-mix(in oklch, var(--panel) 100%, transparent);
+  background: color-mix(in oklab, var(--panel) 100%, transparent);
 }
-.analysis-cell.pos-QB { background: color-mix(in oklch, var(--qb) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-RB { background: color-mix(in oklch, var(--rb) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-WR { background: color-mix(in oklch, var(--wr) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-TE { background: color-mix(in oklch, var(--te) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-K { background: color-mix(in oklch, var(--k) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-DEF { background: color-mix(in oklch, var(--def) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-PG { background: color-mix(in oklch, var(--pg) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-SG { background: color-mix(in oklch, var(--sg) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-SF { background: color-mix(in oklch, var(--sf) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-PF { background: color-mix(in oklch, var(--pf) var(--tint, 0%), var(--panel)); }
-.analysis-cell.pos-C { background: color-mix(in oklch, var(--c) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-QB { background: color-mix(in oklab, var(--qb) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-RB { background: color-mix(in oklab, var(--rb) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-WR { background: color-mix(in oklab, var(--wr) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-TE { background: color-mix(in oklab, var(--te) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-K { background: color-mix(in oklab, var(--k) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-DEF { background: color-mix(in oklab, var(--def) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-PG { background: color-mix(in oklab, var(--pg) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-SG { background: color-mix(in oklab, var(--sg) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-SF { background: color-mix(in oklab, var(--sf) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-PF { background: color-mix(in oklab, var(--pf) var(--tint, 0%), var(--panel)); }
+.analysis-cell.pos-C { background: color-mix(in oklab, var(--c) var(--tint, 0%), var(--panel)); }
 
 .analysis-cell-rank { display: block; font-size: 15px; font-weight: 600; }
 .analysis-cell-points { display: block; font-size: 10px; color: var(--muted); }
@@ -3265,7 +3266,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   align-items: center; gap: 8px;
   padding: 3px 6px; border-radius: 6px;
 }
-.analysis-slot:nth-child(odd) { background: color-mix(in oklch, var(--panel) 55%, transparent); }
+.analysis-slot:nth-child(odd) { background: color-mix(in oklab, var(--panel) 55%, transparent); }
 .analysis-slot.bn .analysis-slot-name { color: var(--muted); }
 .analysis-slot-pill { margin-right: 0; }
 .analysis-slot-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
@@ -3293,8 +3294,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   background: var(--bg);
 }
 .analysis-game.mine {
-  border-color: color-mix(in oklch, var(--you) 45%, var(--line));
-  background: color-mix(in oklch, var(--you) 7%, var(--bg));
+  border-color: color-mix(in oklab, var(--you) 45%, var(--line));
+  background: color-mix(in oklab, var(--you) 7%, var(--bg));
 }
 .analysis-game-row + .analysis-game-row { margin-top: 8px; }
 .analysis-game-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -3342,7 +3343,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .analysis-weekbar { flex: 1 1 0; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
 .analysis-weekbar-track {
   width: 100%; height: 34px; display: flex; align-items: flex-end;
-  background: color-mix(in oklch, var(--panel) 60%, transparent); border-radius: 3px;
+  background: color-mix(in oklab, var(--panel) 60%, transparent); border-radius: 3px;
 }
 .analysis-weekbar-fill { width: 100%; background: var(--data); border-radius: 3px; opacity: 0.75; }
 /* The worst week is the one a reader is looking for, so it is marked -- and
@@ -3401,7 +3402,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   display: grid; grid-template-columns: minmax(0, 1fr) 62px minmax(0, 1fr);
   align-items: center; gap: 10px; padding: 4px 6px; border-radius: 6px;
 }
-.analysis-vs-row:nth-child(odd) { background: color-mix(in oklch, var(--panel) 55%, transparent); }
+.analysis-vs-row:nth-child(odd) { background: color-mix(in oklab, var(--panel) 55%, transparent); }
 .analysis-vs-slot { margin-right: 0; justify-self: center; }
 
 .analysis-vs-player { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 13px; }
@@ -3474,7 +3475,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 /* Hover depth rather than a permanent fill: fourteen rows of tinted background
    is noise, one row under the cursor is a pointer. */
 .record-row:hover { background: var(--raised); }
-.record-row.mine { background: color-mix(in oklch, var(--you) 8%, transparent); }
+.record-row.mine { background: color-mix(in oklab, var(--you) 8%, transparent); }
 
 .record-rank {
   color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right;
@@ -3579,32 +3580,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
  * two columns.
  * ========================================================================== */
 
-/* The rail's own entry point. Styled off .app-rail-row but not one of them --
-   it sits above both sections because it reaches past both. */
-.rail-jumpto {
-  display: flex; align-items: center; gap: 9px;
-  margin: 0 0 14px; padding: 8px 10px; border-radius: 9px;
-  font: inherit; font-size: 13px; color: var(--muted); text-align: left;
-  background: color-mix(in oklch, var(--line) 30%, transparent);
-  border: 1px solid var(--line); cursor: pointer;
-  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-}
-.rail-jumpto:hover {
-  background: var(--raised);
-  border-color: color-mix(in oklch, var(--brand) 35%, var(--line));
-  color: var(--text);
-}
-.rail-jumpto:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.rail-jumpto-glyph { font-size: 14px; width: 7px; text-align: center; flex-shrink: 0; }
-.rail-jumpto-text { display: flex; align-items: center; gap: 8px; flex: 1; }
-/* The shortcut, shown rather than left to be discovered. */
-.rail-jumpto-kbd {
-  margin-left: auto; padding: 1px 5px; border-radius: 4px;
-  border: 1px solid var(--line); background: var(--bg);
-  font-family: inherit; font-size: 10px; letter-spacing: 0.04em; color: var(--muted);
-}
-.app-rail.collapsed .rail-jumpto { justify-content: center; padding: 9px 0; gap: 0; margin-bottom: 10px; }
-
 /* Dimmed by `.modal-backdrop`'s own rule (it names this class too) rather than
    by a fourth recipe: the palette is a modal in every other respect -- dialog,
    aria-modal, focus trap, Escape -- and this file already carries three
@@ -3636,11 +3611,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .jumpto-note { padding: 14px 10px; margin: 0; }
 
 .jumpto-group + .jumpto-group { margin-top: 10px; }
-/* Type comes from `.app-rail-label`, which names this class too: "Pages" here
-   and "League" in the rail are the same thing said in two places, and at 55%
-   backdrop the rail's are still legible behind the overlay's. One vocabulary,
-   not two that differ by half a pixel. Only the inset is the overlay's own. */
-.jumpto-group-label { display: block; padding: 4px 10px; }
+/* The overlay's group heading: small, tracked, uppercase, muted. */
+.jumpto-group-label {
+  display: block; padding: 4px 10px 6px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+}
 
 .jumpto-row {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -3659,7 +3634,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .jumpto-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 /* 600, not 550: Barlow is loaded at wght@400;500;600;700 --
    named instances, not a variable axis -- so 550 snaps or synthesises
-   rather than rendering as drawn. 600 is what `.app-rail-row.on` already
+   rather than rendering as drawn. 600 is what the active tab already
    uses for the same "this is the live one" meaning. */
 .jumpto-row-label { font-weight: 600; }
 /* Which league this page belongs to. Five leagues each have a "History", so
@@ -3671,29 +3646,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   border-top: 1px solid var(--line); background: var(--bg); font-size: 11px;
 }
 
-/* Phone-only. Hidden on desktop, where the rail is always on screen. */
-.jumpto-fab { display: none; }
-
 @media (max-width: 860px) {
-  /*
-   * The return trip, and only that. The bar at the top still scrolls away with
-   * the page -- pinning it measured 252px of 812 (see the block above), and a
-   * third of the viewport spent permanently on navigation is worse than
-   * navigation you scroll back up to reach. A 44px button is not a band.
-   */
-  .jumpto-fab {
-    position: fixed; right: 16px; bottom: 16px; z-index: 45;
-    display: flex; align-items: center; justify-content: center;
-    width: 44px; height: 44px; border-radius: 50%;
-    background: var(--panel); color: var(--text);
-    border: 1px solid var(--line); box-shadow: 0 6px 18px oklch(0% 0 0 / 0.4);
-    font-size: 19px; cursor: pointer;
-  }
-  .jumpto-fab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .jumpto-backdrop { padding: 8vh 12px 12px; }
-  /* The rail is a horizontal bar here, so the entry point stops being a row. */
-  .rail-jumpto { margin: 0; padding: 6px 9px; }
-  .rail-jumpto-kbd { display: none; }
 }
 
 /* The manager's name doubles as the way into their own history page. Underline
@@ -3702,62 +3656,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .mgr-who-link { color: inherit; text-decoration: none; }
 .mgr-who-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .mgr-who-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
-
-/* ----------------------------------------------------------------------------
- * League / season switcher (003-easier-navigation)
- *
- * A flyout rather than more rows, because the rail cannot get wider: a 14-team
- * board already overflows a 1440px viewport by 99px with no rail at all. It is
- * also the ONLY route to a league's other seasons while the rail is collapsed,
- * which is exactly the state a draft room opens in.
- * -------------------------------------------------------------------------- */
-.rail-switcher { position: relative; }
-
-.rail-switcher-toggle {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  padding: 5px 10px; margin: 2px 0 6px; border: 0; border-radius: 8px;
-  background: none; color: var(--muted); font: inherit; font-size: 12px;
-  cursor: pointer; transition: background 120ms ease, color 120ms ease;
-}
-.rail-switcher-toggle:hover { background: var(--raised); color: var(--text); }
-.rail-switcher-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-.rail-switcher-caret { margin-left: auto; font-size: 10px; }
-.app-rail.collapsed .rail-switcher-toggle { justify-content: center; padding: 7px 0; gap: 0; }
-.app-rail.collapsed .rail-switcher-caret { margin-left: 0; }
-
-/* Fixed, not absolute: the rail is `overflow-y: auto` and 56px wide when
-   collapsed, so an absolutely-positioned child is clipped to a sliver -- the
-   seasons were in the DOM and cut off on screen. Coordinates come from the
-   toggle's own rect in JS (LeagueRailSection). */
-.rail-switcher-menu {
-  position: fixed; z-index: 40;
-  min-width: 210px; max-height: 60vh; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 1px; padding: 6px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 11px;
-  box-shadow: 0 14px 34px oklch(0% 0 0 / 0.42);
-}
-/* Collapsed vs expanded placement is decided in JS, because it has to be
-   measured against the viewport rather than an ancestor. */
-
-.rail-switcher-label {
-  padding: 5px 8px 2px; font-size: 10px; letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--muted);
-}
-.rail-switcher-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 8px; border-radius: 7px;
-  color: var(--text); text-decoration: none; font-size: 13px;
-}
-.rail-switcher-item:hover { background: var(--raised); }
-.rail-switcher-item.on { background: color-mix(in oklch, var(--line) 55%, transparent); font-weight: 600; }
-.rail-switcher-item .muted { margin-left: auto; }
-.rail-switcher-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
-
-@media (max-width: 860px) {
-  /* The rail is a horizontal bar here; the menu still drops from the button,
-     placed by the same measurement. */
-  .rail-switcher-toggle { width: auto; margin: 0; }
-}
 
 /* --- Roster management (specs/004-ffwrapped-feature-parity US2) ---------
    A table, not a grid of cards: twelve teams x four numbers is tabular data,
@@ -4991,12 +4889,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .scarcity-chip {
   display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px;
   padding: 4px 10px; border-radius: 999px; font-size: 12px;
-  border: 1px solid color-mix(in oklch, var(--scar-hue, var(--line)) 45%, var(--line));
-  background: color-mix(in oklch, var(--scar-hue, var(--line)) 14%, var(--panel));
+  border: 1px solid color-mix(in oklab, var(--scar-hue, var(--line)) 45%, var(--line));
+  background: color-mix(in oklab, var(--scar-hue, var(--line)) 14%, var(--panel));
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .scarcity-chip:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
-.scarcity-chip.running { border-color: var(--scar-hue, var(--line)); background: color-mix(in oklch, var(--scar-hue, var(--line)) 26%, var(--panel)); }
+.scarcity-chip.running { border-color: var(--scar-hue, var(--line)); background: color-mix(in oklab, var(--scar-hue, var(--line)) 26%, var(--panel)); }
 .scarcity-pos { font-weight: 700; color: var(--scar-hue, var(--text)); }
 .scarcity-next { color: var(--muted); }
 .scarcity-run { font-size: 10px; letter-spacing: 0.06em; color: var(--scar-hue, var(--text)); }
@@ -5011,12 +4909,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
   padding: 6px 8px; border-radius: 8px; font-size: 12px;
   transition: background 0.12s ease;
 }
-.onbrand-row:hover { background: color-mix(in oklch, var(--text) 6%, var(--panel)); }
+.onbrand-row:hover { background: color-mix(in oklab, var(--text) 6%, var(--panel)); }
 .onbrand-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .onbrand-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
 .onbrand-verdict { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; letter-spacing: 0.04em; cursor: help; }
 .onbrand-verdict.on { background: var(--raised); color: var(--brand); }
-.onbrand-verdict.off { background: color-mix(in oklch, var(--down) 18%, var(--panel)); color: var(--down); }
+.onbrand-verdict.off { background: color-mix(in oklab, var(--down) 18%, var(--panel)); color: var(--down); }
 .onbrand-verdict.none { color: var(--muted); border: 1px dashed var(--line); }
 
 /* T034/T035: the meters' place in the live room. Chips already wrap (flex-wrap),
@@ -5049,7 +4947,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-list .row-list > .pr-row:last-child { border-bottom: 0; }
 .pr-list .row-list > .pr-row:hover { background: var(--raised); }
 .pr-list .row-list > .pr-row.on { background: var(--raised); }
-.pr-list .row-list > .pr-row.mine { background: color-mix(in oklch, var(--you) 12%, transparent); }
+.pr-list .row-list > .pr-row.mine { background: color-mix(in oklab, var(--you) 12%, transparent); }
 
 
 /* --- 013 US1: LeagueAnalysis (Team strength) -------------------------------
@@ -5059,8 +4957,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .analysis-section .panel-head { margin: 0; }
 .analysis-section .panel-head .section-title { margin: 0; }
 .analysis-heat { display: inline-block; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
-.analysis-heat.best { background: color-mix(in oklch, var(--up) 16%, transparent); color: var(--up); }
-.analysis-heat.worst { background: color-mix(in oklch, var(--down) 16%, transparent); color: var(--down); }
+.analysis-heat.best { background: color-mix(in oklab, var(--up) 16%, transparent); color: var(--up); }
+.analysis-heat.worst { background: color-mix(in oklab, var(--down) 16%, transparent); color: var(--down); }
 .analysis-formula { font-size: 12px; }
 
 
@@ -5136,7 +5034,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
    a build-agent change that had flattened it to plain text, along with the
    loss of the "second choice" dotted underline, which carries meaning).
    Empty future cells are softened so the filled rounds read as the front line. */
-.board .cell:not([class*="pos-"]) { background: color-mix(in oklch, var(--panel) 45%, var(--bg)); }
+.board .cell:not([class*="pos-"]) { background: color-mix(in oklab, var(--panel) 45%, var(--bg)); }
 .board .cell:not([class*="pos-"]) .pickno-open { color: var(--muted); }
 
 
@@ -5159,35 +5057,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 /* Waiver adds (Bench points): rows wrap on a phone instead of pushing the page. */
 .tx-adds li { flex-wrap: wrap; min-width: 0; }
 
-/* --- 013 US3: rail groups (This week / The season / Draft / History) ---
-   Desktop: a heading button per group; closed groups are not rendered at all.
-   Phone lane (<= 860px, matched in LeagueRailSection's PHONE_LANE_QUERY): every
-   group is open, headings are small separators inside the swipe lane, and the
-   group wrappers dissolve so the lane stays one row. Collapsed rail: headings
-   shrink to a hairline between groups. */
-.app-rail-group { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
-.app-rail-group-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 6px;
-  padding: 4px 10px; background: none; border: 0; cursor: pointer; text-align: left;
-  font: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
-}
-.app-rail-group-head:hover { color: var(--text); }
-.app-rail-group-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
-.app-rail-group-head.static { cursor: default; }
-.app-rail-group-caret { font-size: 9px; }
-.app-rail.collapsed .app-rail-group { margin-top: 4px; }
-.app-rail.collapsed .app-rail-group-head.static {
-  font-size: 0; height: 1px; padding: 0; margin: 4px 10px; background: var(--line);
-}
-@media (max-width: 860px) {
-  .app-rail-group { display: contents; }
-  .app-rail-group-head.static {
-    flex: 0 0 auto; align-self: center; padding: 0 2px 0 8px; font-size: 10px;
-    letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
-  }
-  .app-rail.collapsed .app-rail-group-head.static { height: auto; margin: 0; background: none; font-size: 10px; }
-}
-
 /* --- 013 US4: League home ---------------------------------------------------
    Sections sit on the page (.section); standings are a .row-list. The only
    --brand is "Open the draft room" (.home-hero-cta), and only before the draft.
@@ -5204,7 +5073,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .lh-hero-label { font-size: 12px; color: var(--muted); }
 .lh-rows { list-style: none; margin: 0; padding: 0; }
 .lh-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
-.lh-row.mine { background: color-mix(in oklch, var(--you) 14%, transparent); }
+.lh-row.mine { background: color-mix(in oklab, var(--you) 14%, transparent); }
 .lh-pos { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .lh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lh-rec, .lh-pts { font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -5219,13 +5088,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 /* spec 030: projected strength before week 1. Leader gets a neutral tint, you get the gold one (.mine). */
 .lh-str-rows { margin: 8px 0 4px; }
 .lh-str-row { display: flex; align-items: center; gap: 10px; padding: 8px 8px; min-width: 0; border-radius: 6px; }
-.lh-str-row.lead { background: color-mix(in oklch, var(--text) 7%, transparent); }
-.lh-str-row.mine { background: color-mix(in oklch, var(--you) 14%, transparent); }
-.lh-str-row.detached { margin-top: 6px; border-top: 1px dashed color-mix(in oklch, var(--muted) 45%, transparent); border-radius: 0 0 6px 6px; }
+.lh-str-row.lead { background: color-mix(in oklab, var(--text) 7%, transparent); }
+.lh-str-row.mine { background: color-mix(in oklab, var(--you) 14%, transparent); }
+.lh-str-row.detached { margin-top: 6px; border-top: 1px dashed color-mix(in oklab, var(--muted) 45%, transparent); border-radius: 0 0 6px 6px; }
 .lh-str-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .lh-str-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.lh-str-track { height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--muted) 16%, transparent); overflow: hidden; }
-.lh-str-fill { display: block; height: 100%; border-radius: 3px; background: color-mix(in oklch, var(--muted) 75%, var(--text)); }
+.lh-str-track { height: 6px; border-radius: 3px; background: color-mix(in oklab, var(--muted) 16%, transparent); overflow: hidden; }
+.lh-str-fill { display: block; height: 100%; border-radius: 3px; background: color-mix(in oklab, var(--muted) 75%, var(--text)); }
 .lh-str-row.mine .lh-str-fill { background: var(--you); }
 .lh-str-val { flex-shrink: 0; margin-left: auto; padding-left: 8px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lh-str-line .lh-name { flex: 0 1 auto; }
@@ -5236,10 +5105,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .lh-next-note { margin: 6px 0 0; }
 /* --- 042 US3: lineup check. Rows are text first; the reason pill never carries meaning by colour alone. */
 .lc-flags, .lc-options { list-style: none; margin: 0; padding: 0; }
-.lc-flag { padding: 8px 0; border-top: 1px solid color-mix(in oklch, var(--muted) 18%, transparent); min-width: 0; }
+.lc-flag { padding: 8px 0; border-top: 1px solid color-mix(in oklab, var(--muted) 18%, transparent); min-width: 0; }
 .lc-flag:first-child { border-top: 0; }
 .lc-flag-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
-.lc-slot { display: inline-block; min-width: 34px; padding: 1px 7px; border-radius: 999px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .04em; color: var(--muted); background: color-mix(in oklch, var(--muted) 14%, transparent); }
+.lc-slot { display: inline-block; min-width: 34px; padding: 1px 7px; border-radius: 999px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .04em; color: var(--muted); background: color-mix(in oklab, var(--muted) 14%, transparent); }
 .lc-reason { font-size: 12px; font-weight: 600; }
 .lc-out, .lc-empty_slot { color: var(--down); }
 .lc-listed, .lc-no_game_in_week { color: var(--amber, var(--text)); }
@@ -5257,7 +5126,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 /* specs/015: the same lists on the root home page under a league tab strip. The strip scrolls
    within itself so the page never scrolls sideways at 375px (FR-011). */
 .home-spotlight { margin-top: 16px; }
-.home-spot-leagues { display: flex; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); overflow-x: auto; scrollbar-width: thin; min-width: 0; }
+.home-spot-leagues { display: flex; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklab, var(--muted) 14%, transparent); overflow-x: auto; scrollbar-width: thin; min-width: 0; }
 .home-spot-league { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; white-space: nowrap; color: var(--muted); background: none; cursor: pointer; }
 .home-spot-league[aria-selected="true"] { color: var(--text); font-weight: 600; background: var(--raised); }
 .lh-spotlight-tag { font-weight: 600; color: var(--brand); }
@@ -5277,9 +5146,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .lh-spot-toggle { background: none; border: 0; padding: 6px 0 2px; cursor: pointer; font-family: inherit; }
 .lh-spot-credit { margin-top: 6px; }
 .lh-yours, .lh-fa { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-.lh-yours { margin-left: 3px; color: var(--you-text); background: color-mix(in oklch, var(--you) 18%, transparent); }
+.lh-yours { margin-left: 3px; color: var(--you-text); background: color-mix(in oklab, var(--you) 18%, transparent); }
 .lh-fa { color: var(--brand); background: var(--raised); }
-.lh-spot-tabs { display: none; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); }
+.lh-spot-tabs { display: none; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklab, var(--muted) 14%, transparent); }
 .lh-spot-tab { flex: 1 1 0; border: 0; border-radius: 999px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--muted); background: none; cursor: pointer; }
 .lh-spot-tab[aria-selected="true"] { color: var(--text); font-weight: 600; background: var(--raised); }
 @media (max-width: 639px) {
@@ -5357,7 +5226,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .board-skeleton { display: grid; gap: 4px; flex: 1; min-height: 0; padding: 4px 0; }
 .board-skeleton-tile {
   min-height: 34px; border-radius: 6px;
-  background: color-mix(in oklch, var(--line) 45%, var(--bg));
+  background: color-mix(in oklab, var(--line) 45%, var(--bg));
 }
 @media (prefers-reduced-motion: no-preference) {
   .board-skeleton-tile { animation: skeleton-pulse 1.4s ease-in-out infinite; }
@@ -5375,26 +5244,26 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 }
 .grade-early { white-space: nowrap; }
 
-/* --- 013 US8: sbrands & reaches on a finished board -------------------------
+/* --- 013 US8: steals & reaches on a finished board -------------------------
    Tint = pickNo minus ADP at draft time. A gradient over the cell's position
    fill (background-image, so the position color underneath is kept). --up is
    always printed with a "+" and --down with a minus, never color alone. */
-.board.value-view .cell.value-sbrand {
-  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent));
+.board.value-view .cell.value-steal {
+  background-image: linear-gradient(color-mix(in oklab, var(--up) var(--vt, 12%), transparent), color-mix(in oklab, var(--up) var(--vt, 12%), transparent));
 }
 .board.value-view .cell.value-reach {
-  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent));
+  background-image: linear-gradient(color-mix(in oklab, var(--down) var(--vt, 12%), transparent), color-mix(in oklab, var(--down) var(--vt, 12%), transparent));
 }
 /* Spec 025 R1: a multi-position cell's position colour is itself an image, so the two
    rules above would replace it. Layer the value tint over the split instead. */
-.board.value-view .cell.pos-multi.value-sbrand {
-  background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent)), var(--pos-split);
+.board.value-view .cell.pos-multi.value-steal {
+  background-image: linear-gradient(color-mix(in oklab, var(--up) var(--vt, 12%), transparent), color-mix(in oklab, var(--up) var(--vt, 12%), transparent)), var(--pos-split);
 }
 .board.value-view .cell.pos-multi.value-reach {
-  background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent)), var(--pos-split);
+  background-image: linear-gradient(color-mix(in oklab, var(--down) var(--vt, 12%), transparent), color-mix(in oklab, var(--down) var(--vt, 12%), transparent)), var(--pos-split);
 }
 .value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
-.value-delta.sbrand { color: var(--up); }
+.value-delta.steal { color: var(--up); }
 .value-delta.reach { color: var(--down); }
 .value-delta.even, .value-delta.none { color: var(--muted); font-weight: 500; }
 .value-legend { margin: 0 0 6px; }
@@ -5419,7 +5288,7 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .standings .stand-group-row td { border-bottom: none; }
 .standings th.stand-whatif-head {
   text-align: center; color: var(--brand); letter-spacing: 0.06em;
-  border-bottom: 2px solid color-mix(in oklch, var(--brand) 55%, var(--line));
+  border-bottom: 2px solid color-mix(in oklab, var(--brand) 55%, var(--line));
 }
 .stand-move { margin-left: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .stand-move.up { color: var(--up); }
@@ -5428,8 +5297,8 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
   display: block; margin-top: 3px; width: fit-content; padding: 1px 7px; border-radius: 999px;
   font-size: 10px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap;
 }
-.stand-cross.made { color: var(--up); background: color-mix(in oklch, var(--up) 14%, transparent); }
-.stand-cross.missed { color: var(--down); background: color-mix(in oklch, var(--down) 14%, transparent); }
+.stand-cross.made { color: var(--up); background: color-mix(in oklab, var(--up) 14%, transparent); }
+.stand-cross.missed { color: var(--down); background: color-mix(in oklab, var(--down) 14%, transparent); }
 
 /* --- 013 US9: Superlatives (Awards, trophy list) ---------------------------
    One row per award on the page: trophy (--fitted, "earned"), name, the holder
@@ -5542,7 +5411,7 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .landing-sports { margin: 2px 0 4px; display: flex; gap: 8px; justify-content: center; }
 .landing-sport {
   font-size: 12px; font-weight: 700; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 999px;
-  color: var(--brand); border: 1px solid color-mix(in oklch, var(--brand) 55%, var(--line));
+  color: var(--brand); border: 1px solid color-mix(in oklab, var(--brand) 55%, var(--line));
   background: var(--raised);
 }
 .landing-platforms { max-width: 520px; margin: 4px 0 0; }
@@ -5570,15 +5439,15 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
   margin: 0; font-size: 20px; letter-spacing: 0.08em; color: var(--tint);
   display: flex; align-items: center; gap: 10px;
 }
-.landing-group-title::after { content: ''; flex: 1; height: 1px; background: color-mix(in oklch, var(--tint) 35%, var(--line)); }
+.landing-group-title::after { content: ''; flex: 1; height: 1px; background: color-mix(in oklab, var(--tint) 35%, var(--line)); }
 .landing-tiles {
   list-style: none; margin: 0; padding: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px;
 }
 .landing-tile {
   display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border-radius: 10px;
-  background: color-mix(in oklch, var(--tint) 7%, var(--panel));
-  border: 1px solid color-mix(in oklch, var(--tint) 22%, var(--line));
+  background: color-mix(in oklab, var(--tint) 7%, var(--panel));
+  border: 1px solid color-mix(in oklab, var(--tint) 22%, var(--line));
   border-left: 3px solid var(--tint);
 }
 .landing-tile-head { display: flex; align-items: center; gap: 8px; }
@@ -5586,7 +5455,7 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .landing-tile-line { margin: 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .landing-tag {
   font-size: 10px; font-weight: 700; letter-spacing: 0.1em; padding: 1px 6px; border-radius: 999px;
-  color: var(--tint); border: 1px solid color-mix(in oklch, var(--tint) 50%, var(--line));
+  color: var(--tint); border: 1px solid color-mix(in oklab, var(--tint) 50%, var(--line));
 }
 .landing-footer { margin: 0; text-align: center; }
 
@@ -5725,10 +5594,10 @@ html[data-bk-user] .landing-prerender { display: none; }
 .played-out dt { color: var(--muted); font-size: 12px; }
 .played-out dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 
-.sbrands-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
+.steals-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
 .sb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
 .sb-col { min-width: 0; padding: 8px 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-.sb-sbrands { box-shadow: inset 3px 0 0 var(--brand), inset 0 0 0 1px var(--line); }
+.sb-steals { box-shadow: inset 3px 0 0 var(--brand), inset 0 0 0 1px var(--line); }
 .sb-busts { box-shadow: inset 3px 0 0 var(--down), inset 0 0 0 1px var(--line); }
 .sb-col h4 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
 .sb-col ol { list-style: none; margin: 0; padding: 0; }
@@ -5754,7 +5623,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pt-table tbody tr:hover > td { background: var(--raised); }
 .pt-table tbody tr:last-child > td { border-bottom: 0; }
 /* specs/042 US1: a row that is the viewer's own player. Tint only; the "Yours" pill is the text signal. */
-.pt-table tbody tr.mine > td { background: color-mix(in oklch, var(--you) 8%, transparent); }
+.pt-table tbody tr.mine > td { background: color-mix(in oklab, var(--you) 8%, transparent); }
 .pt-name { font-weight: 600; }
 .pt-meta { display: block; font-size: 11px; color: var(--muted); }
 .pt-num { font-weight: 700; }
@@ -5880,7 +5749,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .sl-table th.sl-pin { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 150px; max-width: 190px; box-shadow: 1px 0 0 var(--line); }
 .sl-table tbody th.sl-pin { font-weight: 600; white-space: normal; }
 .sl-table td.sl-owner { text-align: left; }
-.sl-table tbody tr.mine > * { background: color-mix(in oklch, var(--you) 8%, var(--panel)); }
+.sl-table tbody tr.mine > * { background: color-mix(in oklab, var(--you) 8%, var(--panel)); }
 .sl-table tbody tr:hover > * { background: var(--raised); }
 .sl-table tbody tr:last-child > * { border-bottom: 0; }
 .sl-sub { display: block; font-weight: 400; line-height: 1.3; }
@@ -6043,9 +5912,9 @@ html[data-bk-user] .landing-prerender { display: none; }
    (.col-head.mine, above); an assumed one is the same colour dashed and
    low-alpha with the word "assumed", so the two cannot be mistaken. */
 .board .col-head.assumed {
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--you) 45%, transparent), 0 0 0 4px var(--bg);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--you) 45%, transparent), 0 0 0 4px var(--bg);
   border-style: dashed;
-  background: color-mix(in oklch, var(--you) 7%, var(--panel));
+  background: color-mix(in oklab, var(--you) 7%, var(--panel));
 }
 .board .col-head-you.assumed { color: var(--muted); font-style: italic; }
 .board .col-head.unclaimed .col-head-name { color: var(--brand); }
@@ -6058,7 +5927,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .board .cell.kind-empty { opacity: 0.85; }
 .board .cell.on-the-clock {
   box-shadow: inset 0 0 0 2px var(--brand);
-  background: color-mix(in oklch, var(--brand) 12%, var(--panel));
+  background: color-mix(in oklab, var(--brand) 12%, var(--panel));
 }
 .board .otc-tag {
   display: inline-block; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
@@ -7011,8 +6880,8 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-game-actions { display: flex; gap: 8px; }
 /* Spec 056: sport choice, the per-row sport tag, data notes and the licence line */
 .hist-sports { display: flex; gap: 8px; margin: 0 0 12px; }
-.hist-sport-tag { padding: 1px 9px; font-size: 11px; cursor: default; background: color-mix(in oklch, var(--sport-nba) 20%, var(--panel)); border-color: color-mix(in oklch, var(--sport-nba) 45%, var(--line)); }
-.hist-sport-tag.sport-nfl { background: color-mix(in oklch, var(--sport-nfl) 20%, var(--panel)); border-color: color-mix(in oklch, var(--sport-nfl) 45%, var(--line)); }
+.hist-sport-tag { padding: 1px 9px; font-size: 11px; cursor: default; background: color-mix(in oklab, var(--sport-nba) 20%, var(--panel)); border-color: color-mix(in oklab, var(--sport-nba) 45%, var(--line)); }
+.hist-sport-tag.sport-nfl { background: color-mix(in oklab, var(--sport-nfl) 20%, var(--panel)); border-color: color-mix(in oklab, var(--sport-nfl) 45%, var(--line)); }
 .hist-notes { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 2px; }
 .hist-attribution { margin-top: 4px; }
 .hist-disclosure { margin-bottom: 12px; }
@@ -7032,7 +6901,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-table { width: 100%; border-collapse: collapse; }
 .hist-table th, .hist-table td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); }
 .hist-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.hist-me { background: color-mix(in oklch, var(--you) 16%, var(--panel)); box-shadow: inset 3px 0 0 var(--you); }
+.hist-me { background: color-mix(in oklab, var(--you) 16%, var(--panel)); box-shadow: inset 3px 0 0 var(--you); }
 .hist-results { display: grid; gap: 14px; margin-bottom: 14px; }
 .hist-finish-title { font-size: 34px; margin: 4px 0; }
 .hist-compare { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -7040,7 +6909,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-stat-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .hist-verdict.good { color: var(--brand); font-weight: 600; }
 .hist-callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
-.hist-callout { padding: 12px 14px; border-radius: 12px; background: color-mix(in oklch, var(--line) 35%, var(--panel)); }
+.hist-callout { padding: 12px 14px; border-radius: 12px; background: color-mix(in oklab, var(--line) 35%, var(--panel)); }
 .hist-callout h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .hist-matchups { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
 .hist-matchups li { display: grid; grid-template-columns: 1fr 70px 24px 70px 1fr; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; }
