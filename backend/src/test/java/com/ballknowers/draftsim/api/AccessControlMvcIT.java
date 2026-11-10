@@ -242,6 +242,30 @@ class AccessControlMvcIT {
                 .andExpect(notTheScopingNotFound());
     }
 
+    @Test
+    void mockSeatingIsScopedToManagersTheCallerSharesALeagueWith() throws Exception {
+        // A seated manager drafts with their fitted tendencies, so seating one is reading them.
+        String seatMember = "{\"sport\":\"nfl\",\"teams\":8,\"userSlot\":1,\"managerSeats\":{\"2\":" + memberId + "}}";
+        String seatNobody = "{\"sport\":\"nfl\",\"teams\":8,\"userSlot\":1,\"managerSeats\":{\"2\":999999999}}";
+        // STRANGER is a known manager in no league; an identity that is no manager at all gets the same answer.
+        for (String outsider : List.of(STRANGER, "it-acl-not-a-manager")) {
+            String hidden = mvc.perform(post("/api/mocks").contentType("application/json").content(seatMember)
+                            .header("X-Sleeper-User", outsider))
+                    .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+            String missing = mvc.perform(post("/api/mocks").contentType("application/json").content(seatNobody)
+                            .header("X-Sleeper-User", outsider))
+                    .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString();
+            // "Not yours" and "does not exist" must be indistinguishable apart from the id echoed back.
+            org.junit.jupiter.api.Assertions.assertEquals(
+                    missing.replace("999999999", String.valueOf(memberId)), hidden);
+        }
+        // A league-mate is not refused by the scoping rule.
+        String ok = mvc.perform(post("/api/mocks").contentType("application/json").content(seatMember)
+                        .header("X-Sleeper-User", COMMISSIONER))
+                .andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(ok.contains("unknown managerId"), ok);
+    }
+
     // ------------------------------------------------------------ spec 024: targets and auto-pick
 
     @Test

@@ -131,6 +131,10 @@ class MockDraftServiceTest {
         // Stubbed permissive rather than left to answer false so a fork test
         // added here later fails on its own behavior, not on an unstubbed mock.
         lenient().when(membership.canSee(any(), anyLong())).thenReturn(true);
+        // Seating is scoped to managers the caller shares a league with. Permissive here so the seating
+        // tests below test seating; createSessionRefusesAManagerTheCallerCannotSee turns it off.
+        lenient().when(membership.visibleManagerIds(any(), any()))
+                .thenAnswer(inv -> java.util.Set.copyOf(inv.<java.util.Collection<Long>>getArgument(1)));
         service = new MockDraftService(repo, contexts, new MockDraftEngine(), boards, profiles, players, managers,
                 drafts, leagues, new OwnerProperties(null), membership, targets);
     }
@@ -180,6 +184,22 @@ class MockDraftServiceTest {
     void createSessionRejectsAnUnknownManagerId() {
         lenient().when(managers.names()).thenReturn(Map.of());
         assertThrows(IllegalArgumentException.class, () -> service.createSession(8, 1, Map.of(2, 999L), null));
+    }
+
+    @Test
+    void createSessionRefusesAManagerTheCallerCannotSee() {
+        // Manager 42 exists, but the caller shares no league with them.
+        lenient().when(managers.names()).thenReturn(Map.of(42L, "Dave"));
+        lenient().doReturn(java.util.Set.of()).when(membership).visibleManagerIds(any(), any());
+
+        IllegalArgumentException hidden = assertThrows(IllegalArgumentException.class,
+                () -> service.createSession(8, 1, Map.of(2, 42L), "stranger"));
+        IllegalArgumentException missing = assertThrows(IllegalArgumentException.class,
+                () -> service.createSession(8, 1, Map.of(2, 999L), "stranger"));
+
+        // Same refusal for "not yours" and "does not exist" (ids aside), or the difference enumerates managers.
+        assertEquals(missing.getMessage().replace("999", "42"), hidden.getMessage());
+        assertTrue(repo.sessions.isEmpty(), "a refused create must not leave a session behind");
     }
 
     @Test
