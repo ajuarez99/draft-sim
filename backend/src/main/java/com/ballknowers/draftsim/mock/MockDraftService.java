@@ -132,6 +132,13 @@ public class MockDraftService {
         // Spec 035 F1/T045: an ESPN manager has no fitted profile and is never seatable. Without this check
         // the seat would be accepted and silently played as the league-average drafter.
         java.util.Set<Long> espnManagers = managerSeats.isEmpty() ? java.util.Set.of() : managers.espnManagerIds();
+        // A manager id is a small integer, walkable by counting, and a seated manager drafts with their
+        // fitted tendencies -- so seating one is reading them. Same rule as /api/managers: only managers
+        // who share a league with the caller. A manager the caller may not see gets the SAME refusal as
+        // one that does not exist, so the answer cannot be used to enumerate who is in the database.
+        java.util.Set<Long> visibleManagers = managerSeats.isEmpty() ? java.util.Set.of()
+                : membership.visibleManagerIds(sleeperUserId,
+                        managerSeats.values().stream().filter(java.util.Objects::nonNull).toList());
         for (Map.Entry<Integer, Long> e : managerSeats.entrySet()) {
             int slot = e.getKey();
             Long managerId = e.getValue();
@@ -141,7 +148,7 @@ public class MockDraftService {
             if (managerId == null) {
                 throw new IllegalArgumentException("managerSeats slot " + slot + " needs a managerId, got null");
             }
-            if (!managerNames.containsKey(managerId)) {
+            if (!managerNames.containsKey(managerId) || !visibleManagers.contains(managerId)) {
                 throw new IllegalArgumentException("managerSeats slot " + slot + " has unknown managerId " + managerId);
             }
             if (espnManagers.contains(managerId)) {
