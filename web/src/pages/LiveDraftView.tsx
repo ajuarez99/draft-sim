@@ -170,7 +170,7 @@ export default function LiveDraftView() {
   const mySlot = slotParam ? Number(slotParam) : (seats?.mySlot ?? DEFAULT_SLOT)
   // Stricter than DraftView's version on purpose: there, DEFAULT_SLOT is a
   // starting point you are invited to correct before pressing start. Here the
-  // draft is happening, and painting a crimson "you" on slot 1 because nobody
+  // draft is happening, and painting a "you"-coloured mark on slot 1 because nobody
   // has said otherwise is a claim about reality that might be wrong. The
   // simulation still needs *a* slot, so DEFAULT_SLOT stays the request's
   // fallback -- it just doesn't get drawn as fact.
@@ -730,7 +730,7 @@ export default function LiveDraftView() {
   // Fed from `landedPicks` rather than `feedPicks` on purpose: what is spoken
   // is the manager and the name, both of which are facts on the state frame,
   // and none of it waits on the fit clause's "do we have the whole history"
-  // gate. The chime is gated on slotKnown for the same reason the crimson
+  // gate. The chime is gated on slotKnown for the same reason the "you" colour
   // cells are -- chiming for slot 1's turn because nobody has said whose seat
   // is whose would send someone to the board for a pick that isn't theirs.
   useAnnouncer(
@@ -842,7 +842,7 @@ export default function LiveDraftView() {
                 : `Picks after ${roundPickLabel(picksMade + 1, live.teams)} are projected`
               : 'Projected from scratch — no live position to project from'
             : 'No projection yet'}
-        {/* The crimson cells and the availability columns are both
+        {/* The "you" cells and the availability columns are both
             "slot N", so say which N, and say when N is only a
             fallback rather than something anyone confirmed. */}
         {result && ` · slot ${mySlot}`}
@@ -928,7 +928,7 @@ export default function LiveDraftView() {
               // no card, including the one a click would have opened.
               onPickClick={cardsOn ? openCardFor : undefined}
               // Your team, on draft night. Gated on slotKnown for the same reason
-              // the crimson board cells are: painting slot 1's roster as yours
+              // the "you" board cells are: painting slot 1's roster as yours
               // because nobody has said otherwise is a claim about reality that
               // might be wrong.
               needs={slotKnown && myNeeds.length > 0 ? myNeeds : undefined}

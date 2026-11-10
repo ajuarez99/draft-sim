@@ -591,7 +591,7 @@ describe('LeagueAnalysis', () => {
 
     // The pinned roster takes the first validated slot...
     expect(panel.querySelector('[data-role="focus-1"]')).not.toBeNull()
-    // ...and the reader keeps their own crimson line. (This fixture is two
+    // ...and the reader keeps their own "you" line. (This fixture is two
     // rosters and the other one is `isMe`, so there is no context line to find.)
     expect(panel.querySelector('[data-role="me"]')).not.toBeNull()
     // Nothing was removed -- pinning changes appearance only.

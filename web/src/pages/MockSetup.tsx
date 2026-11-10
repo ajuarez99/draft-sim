@@ -188,7 +188,7 @@ export default function MockSetup() {
         {/* Exclusive choice among four fixed values -> `.segmented`, per the
             control-hierarchy rule. Deliberately not inside `.controls`:
             `.controls button:not(.chip)` (0,1,1) would repaint every
-            `.segment` (0,1,0) as a solid teal button, the exact collision
+            `.segment` (0,1,0) as a solid brand button, the exact collision
             E2 found and fixed for `.chip` -- nothing had put a `.segment`
             inside a `.controls` block until now, so it never got the same
             guard. Easier to just not do the thing that needs guarding. */}

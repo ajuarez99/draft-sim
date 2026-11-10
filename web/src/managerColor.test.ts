@@ -27,13 +27,13 @@ describe('FOCUS_SLOTS', () => {
       'FOCUS_SLOTS changed. Re-run the palette gate before accepting this:\n' +
         '  node scripts/validate_palette.js "' +
         FOCUS_SLOTS.join(',') +
-        '" --mode dark --surface "#09121c" --pairs all\n' +
+        '" --mode dark --surface "#070604" --pairs all\n' +
         'It must report ALL CHECKS PASS. Three is the measured ceiling for crossing\n' +
         'lines on this surface, not a preference -- see research.md R2.\n' +
-        'Validate WITH crimson (#d33a3c) in the set. The reader owns a crimson line\n' +
+        'Validate WITH the own colour of the reader (--you, #f7c243) in the set. The reader owns a --you line\n' +
         'that is on screen at the same time, so four colours are visible at once --\n' +
         'checking these three alone once hid an orange slot sitting delta-E 6.7 from\n' +
-        'crimson, which is two lines the same colour.',
+        'the old red "you", which is two lines the same colour.',
     ).toEqual(['#3987e5', '#199e70', '#c98500'])
   })
 
@@ -45,18 +45,18 @@ describe('FOCUS_SLOTS', () => {
   /**
    * The bug the rendered chart caught and the unit tests did not: the palette
    * was validated as three colours, but four are on screen -- the reader's own
-   * crimson line is always there too. The orange slot was delta-E 6.7 from
-   * crimson under normal vision, well under the floor of 15.
+   * --you line is always there too. The orange slot was delta-E 6.7 from
+   * the old red "you" under normal vision, well under the floor of 15.
    *
    * This asserts the shape of the mistake rather than re-implementing the
-   * validator: no pin slot may sit in crimson's own corner of the hue wheel.
+   * validator: no pin slot may sit in the "you" colour's own corner of the hue wheel.
    */
-  it('keeps every pin slot perceptually clear of the crimson the reader wears', () => {
-    // --crimson, oklch(58% 0.19 25), resolved to hex for comparison.
-    const CRIMSON = '#d33a3c'
+  it('keeps every pin slot perceptually clear of the colour the reader wears', () => {
+    // --you, oklch(84% 0.15 85), resolved to hex for comparison (2026-11-10 palette).
+    const YOU = '#f7c243'
 
     // OKLab, the same space the palette validator measures in. sRGB hue angle
-    // is NOT a substitute: it rates the yellow slot 15deg from crimson while
+    // is NOT a substitute: it rates the yellow slot 15deg from the old red while
     // OKLab -- which accounts for lightness and chroma -- puts them 17 apart,
     // comfortably clear. Getting this wrong once already nearly cost a good
     // palette, so the real metric is spelled out rather than approximated.
@@ -79,10 +79,10 @@ describe('FOCUS_SLOTS', () => {
     }
 
     for (const slot of FOCUS_SLOTS) {
-      const d = deltaE(slot, CRIMSON)
+      const d = deltaE(slot, YOU)
       // The validator's normal-vision floor. The orange slot that shipped in the
-      // first draft of this file scored 6.7 here.
-      expect(d, `${slot} is only deltaE ${d.toFixed(1)} from crimson`).toBeGreaterThanOrEqual(15)
+      // first draft of this file scored 6.7 against the old red; the yellow slot scores 17.3 against the gold (nearest neighbour, computed 2026-11-10).
+      expect(d, `${slot} is only deltaE ${d.toFixed(1)} from --you`).toBeGreaterThanOrEqual(15)
     }
   })
 })
@@ -166,7 +166,7 @@ describe('toggleSelection', () => {
 
 describe('strokeFor / widthFor / opacityFor', () => {
   it('maps each role to a stroke', () => {
-    expect(strokeFor('me')).toBe('var(--crimson)')
+    expect(strokeFor('me')).toBe('var(--you)')
     expect(strokeFor('context')).toBe('var(--muted)')
     expect(strokeFor('focus-1')).toBe('#3987e5')
     expect(strokeFor('focus-2')).toBe('#199e70')

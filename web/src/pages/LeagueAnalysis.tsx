@@ -961,7 +961,7 @@ function ScoresBlock({ block }: { block: AnalysisScores }) {
         <>
           <p className="muted small analysis-bump-note">
             The same weeks as movement: where each roster ranked on points in each one. Your line is
-            crimson; pin up to three to compare them.
+            gold; pin up to three to compare them.
           </p>
           <BumpLegend
             rosters={block.rosters}

@@ -24,26 +24,29 @@ import type { AnalysisRosterProjection } from './api'
 /**
  * The three slots a pinned roster can take, in pin order. Blue, aqua, yellow.
  *
- * <p><b>Validate with CRIMSON in the set, not just these three.</b> The reader's
- * own line is crimson and is on screen at the same time, so what a reader
- * actually sees at once is four colours, not three. Checking the three alone
- * passed at delta-E 9.4 and hid a real failure: the orange slot this list used
- * to hold sat at normal-vision delta-E 6.7 from crimson -- two of the four lines
- * were effectively the same colour. It took looking at the rendered chart to
- * notice. So the command below includes crimson, and it is the one that counts:
+ * <p><b>Validate with the reader's own colour in the set, not just these three.</b>
+ * The reader's own line is `--you` and is on screen at the same time, so what a
+ * reader actually sees at once is four colours, not three. Checking the three
+ * alone passed at delta-E 9.4 and hid a real failure: the orange slot this list
+ * used to hold sat at normal-vision delta-E 6.7 from the old red "you" -- two of
+ * the four lines were effectively the same colour. It took looking at the
+ * rendered chart to notice. The command below includes `--you`:
  *
- *   node scripts/validate_palette.js "#d33a3c,#3987e5,#199e70,#c98500" \
- *     --mode dark --surface "#09121c" --pairs all
+ *   node scripts/validate_palette.js "#f7c243,#3987e5,#199e70,#c98500"  *     --mode dark --surface "#070604" --pairs all
  *
- * Current result: CVD delta-E 7.1 - normal-vision delta-E 17.0 (floor 15) -
- * contrast all >= 3:1 - ALL CHECKS PASS. The CVD figure sits in the 6-8 band,
- * which is legal only alongside secondary encoding; every line carries a direct
- * name label at its right end, which is that encoding. Remove the labels and
- * this palette stops being legal.
+ * <p><b>Status after the 2026-11-10 palette change (Floodlight): NOT re-run.</b>
+ * `scripts/validate_palette.js` is not in this repo. What was recomputed, in
+ * OKLab with the same formula the guard test uses: #3987e5, #199e70 and #c98500
+ * sit delta-E 37.9, 28.1 and 17.3 from the new gold (floor 15). The yellow slot
+ * is the nearest neighbour. The CVD figure (7.1 against the old red), the
+ * contrast figures and the surface were not recomputed. The earlier result
+ * (CVD 7.1, normal-vision 17.0, ALL CHECKS PASS) was for the old red and
+ * old surface. Every line still carries a direct name label at its right end,
+ * which is the secondary encoding a low CVD figure requires.
  *
- * <p>`#d33a3c` is `--crimson` (oklch(58% 0.19 25)) resolved to hex for the
- * validator, which does not read CSS variables. If `--crimson` moves in
- * styles.css, re-run this.
+ * <p>`#f7c243` is `--you` (oklch(84% 0.15 85)) resolved to hex, and `#070604`
+ * is `--bg` (oklch(12% 0.006 75)); the validator does not read CSS variables.
+ * If either moves in styles.css, re-run this.
  */
 export const FOCUS_SLOTS = ['#3987e5', '#199e70', '#c98500'] as const
 
@@ -79,7 +82,7 @@ export function roleFor(
 export function strokeFor(role: ManagerColorRole): string {
   switch (role) {
     case 'me':
-      return 'var(--crimson)'
+      return 'var(--you)'
     case 'context':
       return 'var(--muted)'
     default:

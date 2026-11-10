@@ -43,11 +43,11 @@ const renderChart = (props: Partial<React.ComponentProps<typeof BumpChart>> = {}
 
 /** US1 -- the default state stops being fourteen competing lines. */
 describe('US1: find my own roster', () => {
-  it('draws the reader in crimson and everyone else as context', () => {
+  it('draws the reader in the "you" colour and everyone else as context', () => {
     const { container } = renderChart({ meRosterId: 2 })
 
     expect(roleOf(container, 2)).toBe('me')
-    expect(strokeOf(container, 2)).toBe('var(--crimson)')
+    expect(strokeOf(container, 2)).toBe('var(--you)')
 
     for (const other of [1, 3, 4]) {
       expect(roleOf(container, other)).toBe('context')

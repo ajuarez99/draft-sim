@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
 /*
  * ============================================================================
  * House style. Read this before adding a component. These are the rules every
  * screen is checked against (specs/013-fan-first-redesign/contracts/ui-rules.md).
+ * Palette and type were replaced 2026-11-10 ("Floodlight", claude/site-redesign.md
+ * Phase 1): warm charcoal, one gold accent, Barlow. Fonts load from index.html,
+ * not an import rule here, so the stylesheet does not block on a third-party host.
  * ============================================================================
  *
  * SURFACES
@@ -17,41 +18,62 @@
  *   about layering: only `.panel` and the pick card float and carry a shadow;
  *   grid tiles are on the plane. Radii by role: 999px badges and chips, 10px
  *   tiles and controls, 12px floating sheets, 14px panels.
+ *   --raised is the third neutral, not a surface you nest: row and cell hover,
+ *   the selected row or cell, the active tab, a quiet tag background. It is a
+ *   plain neutral, never a mix, so a hover can never be mistaken for "yours".
  *
- * TYPE
- *   Oswald uppercase (`.cond`): the page H1 and hero numbers only. Section
- *   titles: Plus Jakarta 600, sentence case. Numbers: Plus Jakarta with
- *   tabular-nums (`.mono` is now exactly that). The monospace stack is `.code`
- *   and is for things that really are code: ids, URLs, hashes.
+ * TYPE (three custom properties; no rule names a font family directly)
+ *   --font-body     Barlow. Everything by default, section titles included
+ *                   (600, sentence case).
+ *   --font-display  Big Shoulders Display, uppercase (`.cond`, weight 800):
+ *                   hero numbers and the few places that want a display face.
+ *   --font-num      Barlow Semi Condensed (`.mono`, with tabular-nums): numbers.
+ *                   `.mono` sets family and tabular-nums only and leaves the
+ *                   element's own weight alone, because it sits on 180 elements
+ *                   of every weight. Whether these faces ship tabular figures
+ *                   is a browser check, not something this file proves.
+ *   The monospace stack is `.code` and is for things that really are code: ids,
+ *   URLs, hashes.
  *
  * COLOR: ONE MEANING EACH
- *   --crimson        YOU: rings, bars and other non-text marks. Never anything
- *                    that is not the viewer's own.
- *   --crimson-fill   YOU behind text. --text on it is >= 4.5:1.
- *   --crimson-text   YOU as text. >= 4.5:1 on both --bg and --panel.
- *   --teal           interaction (hover, focus, active chip). Never identity,
- *                    never data.
- *   --volt           the page's single primary action (max one per page), with
- *                    --bg text. Never links, navigation or secondary actions.
- *   --up / --down    better / worse. --down sits at hue 350, not crimson's 25,
- *                    so "worse" is never read as "you". Never identity.
- *   --fitted         earned / awards / provenance. Never a position.
+ *   --brand / --you / --you-text / --you-fill are ONE gold on purpose (Allan's
+ *   call, 2026-11-10) and stay four tokens so the roles can be split again
+ *   without a second sweep.
+ *   --brand          the primary action, the active chip / segment / tab, the
+ *                    focus ring, links. Text on a solid brand fill is --bg.
+ *   --you            YOU: rings, bars and other non-text marks, and tints
+ *                    (mix --you 8-18% into the surface). Never anything that is
+ *                    not the viewer's own. A hover or a selection is --raised,
+ *                    never a gold tint, so only "yours" is ever gold-tinted.
+ *   --you-text       YOU as text.
+ *   --you-fill       YOU as a solid fill behind text; the text is --bg (12:1).
+ *                    Used for the controls that take your pick or show your seat.
+ *   --data           bar, meter, progress and chart fills that are not yours,
+ *                    and heat ramps. A neutral warm grey-white.
+ *   --up / --down    better / worse. Never identity.
+ *   --danger         errors, failed, stale, offline, destructive. Same value as
+ *                    --down on purpose: "worse" and "broken" read as one signal.
+ *   --fitted         earned / awards / provenance from real history. Never a
+ *                    position. Always beside its text label.
+ *   --stated         provenance from a stated, not fitted, tendency. Same rule.
+ *   --sport-nfl/nba  the sport label tint; the label text carries the meaning.
  *   position tokens  position only (see below).
- *   Every text/background pair is >= 4.5:1; measure it, don't eyeball it.
- *   Error colors (.error, .track-note.failed, .live-fresh.stale, the offline
- *   banner) still use --crimson. That is a known, noted exception.
+ *   Every text/background pair is >= 4.5:1; measure it, don't eyeball it. The
+ *   contrast figures in claude/site-redesign.md were computed from the oklch
+ *   values with a script, not measured in a browser.
  *
  * POSITION COLOR IS A SYSTEM, NOT A DECORATION
  *   Six football tokens (--qb --rb --wr --te --k --def) and five basketball
- *   ones, always the same color for the same position. Three usages:
+ *   ones (--pg --sg --sf --pf --c), always the same color for the same
+ *   position, hand-set to match the convention Sleeper users know (an intent,
+ *   not something this file checks).
+ *   Three usages:
  *     .pos.RB              solid badge, `--bg` text. Carries the positional
  *                          rank too ("RB4" via posRank.ts).
  *     .cell.pos-RB         22% of the position color over `--panel`, with
- *                          `--text` on top. Measured (OKLCH math, not a
- *                          browser) >= 11.7:1 for every position token
- *                          against the 2026-09-30 --panel. Past ~25% the name
- *                          starts losing; the old "12:1" claim was for the old
- *                          --panel.
+ *                          `--text` on top. The old >= 11.7:1 figure was for the
+ *                          previous palette and is NOT re-measured; past ~25% the
+ *                          name starts losing.
  *     .chip.pos-chip.RB    filter control; 45% mix on the border, solid `.on`.
  *   Never encode position with color alone: each also carries it as text.
  *
@@ -116,13 +138,13 @@
  *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
  *   A strip of controls must say what kind of thing each one is. Mixing them
- *   is how /leagues/:id/power ended up with six identical teal buttons doing
+ *   is how /leagues/:id/power ended up with six identical brand buttons doing
  *   three different jobs.
  *     exclusive choice  ->  `.segmented` + `.segment`, exactly one `.on`.
  *                           One connected group, so it reads as one control
  *                           with a current value rather than N buttons.
  *     an action         ->  `.action-button` (outline) for a normal one,
- *                           `.controls button` (solid teal) for the primary
+ *                           `.controls button` (solid brand) for the primary
  *                           one on a screen. A control that WRITES must never
  *                           share a treatment with one that only changes what
  *                           you are looking at.
@@ -134,58 +156,47 @@
  */
 
 :root {
-  --bg: oklch(14% 0.025 255);       /* the page */
-  --panel: oklch(19% 0.03 255);     /* the one raised surface */
-  --line: oklch(28% 0.02 250);
-  --text: oklch(95% 0.005 250);
-  --muted: oklch(63% 0.02 250);
-  --crimson: oklch(58% 0.19 25);    /* YOU: rings, bars, non-text marks only */
-  --crimson-fill: oklch(54% 0.19 25);  /* YOU behind text; --text on it >= 4.5:1 */
-  --crimson-text: oklch(64% 0.19 25);  /* YOU as text; >= 4.5:1 on --bg and --panel */
-  --volt: oklch(88% 0.19 125);      /* the page's single primary action (--bg text) */
-  --up: oklch(74% 0.16 150);        /* better / gained */
-  --down: oklch(68% 0.18 350);      /* worse / lost; hue 350 keeps it off crimson ("you") */
-  --row-hover: oklch(22% 0.03 255); /* hover on a .row-list row */
-  --teal: oklch(72% 0.14 175);
-  /* provenance.ts's FITTED/BLENDED dot and border, split out from `--rb` --
-     .col-head-dot.fitted/.seat.fitted/.prov-dot.fitted all borrowed the RB
-     position token for an unrelated meaning ("this seat's tendencies came
-     from real history"), which happened to work only because RB's color was
-     never otherwise in the same view. That accident gets worse, not
-     better, with basketball's five new position tokens in the same
-     stylesheet -- a provenance color needs its own identity, not a position
-     token pressed into double duty. STATED already had its own answer,
-     `--teal` (generic interaction, see that token's own use below); this is
-     the equivalent for FITTED. Amber/gold, not a hue any position uses --
-     "earned from history" reads like a badge, not a pick. */
-  --fitted: oklch(68% 0.13 100);
-  --qb: oklch(68% 0.14 45); --rb: oklch(68% 0.14 150);
-  --wr: oklch(66% 0.15 235); --te: oklch(66% 0.14 300);
-  --k: oklch(65% 0.02 250); --def: oklch(58% 0.03 250);
-  /* Basketball's five (multi-sport-and-rebrand.md Phase 6): an oklch ramp
-     along the guard->center continuum (PG through C), evenly spaced 36deg
-     apart so it reads as one systematic sweep rather than six-and-five
-     unrelated palettes -- cool blue at the perimeter end, warming through
-     violet and magenta to a red at the paint end. L/C held at football's own
-     skill-position envelope (66-68% / 0.14-0.15) on purpose, per the design
-     note above: these are siblings of --qb/--rb/--wr/--te, not a second,
-     quieter system bolted on next to it. Hues were chosen clear of every
-     existing token above (and of --teal/--crimson below, which carry
-     unrelated system meanings a position color must not visually collide
-     with) with at least ~15deg of separation, except --sf/--te (13deg) and
-     --sg/--wr (16deg) -- both pairs are each sport's own "hybrid/tweener"
-     role, so sitting close is more honest than forcing distance that isn't
-     there, and the two sports never share one board to confuse at a glance. */
-  --pg: oklch(67% 0.145 215); --sg: oklch(67% 0.145 251);
-  --sf: oklch(67% 0.145 287); --pf: oklch(67% 0.145 323);
-  --c: oklch(67% 0.145 359);
-  /* "Which sport is this league" -- a card-level label, not a position. The
-     two live together on the picker screen and nowhere else, so the only
-     separation that matters is from each other (66deg) and from --teal, which
-     already means "a draft is happening" on the same card. Named for the two
-     sports' own colours rather than borrowed from anything above; see
-     --fitted's comment for what borrowing costs. */
-  --sport-nfl: oklch(70% 0.13 128); --sport-nba: oklch(72% 0.15 62);
+  --bg: oklch(12% 0.006 75);        /* the page */
+  --panel: oklch(17% 0.009 75);     /* the one raised surface */
+  --raised: oklch(21.5% 0.011 75);  /* hover, selected row, active tab, quiet tag background */
+  --line: oklch(28% 0.010 75);
+  --text: oklch(96% 0.008 85);
+  --muted: oklch(72% 0.012 80);
+  /* One gold for the brand and for "you". Four names so the roles can be split
+     again without a second sweep (claude/site-redesign.md). */
+  --brand: oklch(84% 0.15 85);      /* primary action, active chip/tab, focus ring, links (--bg text on it) */
+  --you: oklch(84% 0.15 85);        /* YOU: rings, bars, tints, non-text marks */
+  --you-text: oklch(84% 0.15 85);   /* YOU as text */
+  --you-fill: oklch(84% 0.15 85);   /* YOU behind text; the text is --bg */
+  --data: oklch(82% 0.03 85);       /* bar / meter / progress fills that are not yours */
+  --up: oklch(78% 0.16 150);        /* better / gained */
+  --down: oklch(68% 0.19 25);       /* worse / lost */
+  --danger: oklch(68% 0.19 25);     /* errors, stale, offline, destructive */
+  /* Provenance of a seat's tendencies. FITTED = earned from real history, STATED =
+     taken from what the manager said. Each has its own token because borrowing a
+     position colour for an unrelated meaning breaks as soon as both are on screen
+     (the original reason --fitted was split off --rb). Hue 165 is used by no
+     position in either sport; STATED is a neutral. Both always carry a text label. */
+  --fitted: oklch(84% 0.04 165);
+  --stated: oklch(72% 0.012 80);
+  /* Football. Hand-set (claude/site-redesign.md), chosen to read as the familiar fantasy
+     convention; not fitted to anything. TE sits on violet to stay clear of
+     --down/--danger (hue 25) and the gold (85). K and DEF are low-chroma. */
+  --qb: oklch(72% 0.16 350); --rb: oklch(78% 0.13 185);
+  --wr: oklch(74% 0.13 240); --te: oklch(72% 0.14 300);
+  --k: oklch(72% 0.02 260); --def: oklch(66% 0.06 55);
+  /* Basketball's five, along the guard->center continuum. Hand-set, not derived;
+     PG/WR share a hue (240) and SF/TE share one (~295-300) because the two sports
+     never share a board. C at 120 stays off --up (150) and the gold (85). */
+  --pg: oklch(74% 0.13 240); --sg: oklch(78% 0.11 200);
+  --sf: oklch(72% 0.14 295); --pf: oklch(72% 0.15 330);
+  --c: oklch(80% 0.14 120);
+  /* "Which sport is this league" -- a card-level label, not a position. */
+  --sport-nfl: oklch(76% 0.07 140); --sport-nba: oklch(76% 0.09 50);
+  /* Faces load from index.html (Google Fonts, display=swap). */
+  --font-body: 'Barlow', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --font-num: 'Barlow Semi Condensed', 'Barlow', ui-sans-serif, system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -197,25 +208,25 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.45 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 14px/1.45 var(--font-body);
 }
 
-.cond { font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase; }
-.mono { font-family: inherit; font-variant-numeric: tabular-nums; } /* numbers: the body face, aligned digits */
+.cond { font-family: var(--font-display); font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; }
+.mono { font-family: var(--font-num); font-variant-numeric: tabular-nums; } /* numbers: condensed figures, aligned digits; sets no weight so the element keeps its own */
 .code { font-family: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; } /* real code only: ids, URLs, hashes */
-.section-title { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
+.section-title { font-family: var(--font-body); font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
 .avatar { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; flex-shrink: 0; overflow: hidden; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
-/* Crimson ring, not fill, once a real photo replaces the initial -- the
-   "crimson-when-it's-you" identity rule stays visible without covering the
+/* Gold ring, not fill, once a real photo replaces the initial -- the
+   "gold-when-it's-you" identity rule stays visible without covering the
    photo. Inset so the parent's overflow:hidden (which clips the image to the
    circle) doesn't also clip an outward ring. */
-.avatar-me:has(img) { box-shadow: inset 0 0 0 2px var(--crimson); }
+.avatar-me:has(img) { box-shadow: inset 0 0 0 2px var(--you); }
 /* An avatar that's also a button (e.g. the Realized popup trigger in
    PowerRankings) needs the UA button chrome stripped back to plain .avatar. */
 button.avatar { border: 0; padding: 0; font-family: inherit; cursor: pointer; }
 button.avatar:hover { filter: brightness(1.2); }
-button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+button.avatar:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /*
  * A Sleeper draft room fits on one screen: the board and the panels below it
@@ -272,7 +283,7 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
 /*
  * `:not(.chip)` is load-bearing, not decoration. This selector is (0,1,1) and
  * `.chip` is (0,1,0), so a `<button class="chip">` inside a `.controls` block
- * used to lose to it and get repainted as a solid teal 6px primary button --
+ * used to lose to it and get repainted as a solid brand 6px primary button --
  * measured on /leagues/:id/power, where all six controls came back identical
  * and `.chip.on` was indistinguishable from `.chip`, i.e. the three-way mode
  * selector had no visible selected state at all. It also flattened the pill to
@@ -288,7 +299,7 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
  * treatment belongs in this list.
  */
 .controls button:not(.chip):not(.segment) {
-  background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
+  background: var(--brand); color: var(--bg); border: 0; border-radius: 6px;
   padding: 7px 16px; font: inherit; font-weight: 600; cursor: pointer;
   transition: filter 120ms ease, transform 120ms ease;
 }
@@ -296,9 +307,9 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
 .controls button:disabled { opacity: 0.6; cursor: default; }
 
 .progress { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; margin-bottom: 12px; }
-.progress-bar { height: 100%; background: var(--teal); transition: width 120ms linear; }
+.progress-bar { height: 100%; background: var(--data); transition: width 120ms linear; }
 
-.error { background: #3a1d1d; border: 1px solid #6b2b2b; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+.error { background: color-mix(in oklch, var(--danger) 16%, var(--panel)); border: 1px solid color-mix(in oklch, var(--danger) 45%, var(--panel)); padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
 /* seatsDirty: the banner's own re-run action, not just a description of one
    that lives elsewhere -- see DraftView.tsx's comment at this banner. */
 .error.seats-dirty { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -307,7 +318,7 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
   background: var(--panel); border-radius: 14px; padding: 18px 20px;
   box-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.18);
 }
-.panel h2 { font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
+.panel h2 { font-family: var(--font-body); font-size: 15px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text); margin: 0 0 12px; }
 /* Nested panels flatten: at most two surfaces (page + one panel). Modals use
    .modal-card, not .panel, so they are unaffected. */
 .panel .panel { border: 0; background: transparent; box-shadow: none; padding: 0; border-radius: 0; }
@@ -318,7 +329,7 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
 .row-list { list-style: none; margin: 0; padding: 0; }
 .row-list > * { border-bottom: 1px solid var(--line); }
 .row-list > *:last-child { border-bottom: 0; }
-.row-list > *:hover { background: var(--row-hover); }
+.row-list > *:hover { background: var(--raised); }
 /* "How this works": methodology kept, folded away. Muted, small, no box. */
 .how { font-size: 12px; color: var(--muted); margin-top: 12px; }
 .how > summary { cursor: pointer; font-weight: 600; color: var(--muted); width: fit-content; }
@@ -337,10 +348,10 @@ button.avatar:focus-visible { outline: 2px solid var(--teal); outline-offset: 2p
   padding: 3px 10px; font: inherit; font-size: 12px; cursor: pointer;
   transition: border-color 120ms ease, color 120ms ease;
 }
-.chip:hover { border-color: var(--teal); color: var(--text); }
-.chip.on { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+.chip:hover { border-color: var(--brand); color: var(--text); }
+.chip.on { background: var(--brand); border-color: var(--brand); color: var(--bg); }
 .chip.on:hover { color: var(--bg); }
-.chip.status-drafting { background: var(--teal); border-color: var(--teal); color: var(--bg); }
+.chip.status-drafting { background: var(--brand); border-color: var(--brand); color: var(--bg); }
 .chip.status-complete { background: var(--line); border-color: var(--line); color: var(--muted); }
 /* `.chip` is written for <button>; the picker's "live ->" is an <a>. */
 a.chip { display: inline-flex; align-items: center; text-decoration: none; }
@@ -368,14 +379,14 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   padding: 6px 14px; border-radius: 8px; cursor: pointer; white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
-.segment:hover:not(:disabled):not(.on) { color: var(--text); background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.segment:hover:not(:disabled):not(.on) { color: var(--text); background: var(--raised); }
 /* Filled, because the selected option is the control's *value* -- an outline
    or a tint would leave it competing with hover instead of clearly reading as
-   "this is the one". --teal is generic interaction, which is what a view
-   selector is; --crimson stays reserved for "you". */
-.segment.on { background: var(--teal); color: var(--bg); }
+   "this is the one". --brand is generic interaction, which is what a view
+   selector is; --you stays reserved for "you". */
+.segment.on { background: var(--brand); color: var(--bg); }
 .segment:disabled { opacity: 0.4; cursor: default; }
-.segment:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.segment:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .segmented.sm .segment { font-size: 11px; padding: 5px 11px; }
 
 /* A normal action: outline, so it is clearly pressable but does not compete
@@ -390,11 +401,11 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 .action-button:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--teal) 10%, transparent);
-  box-shadow: inset 0 0 0 1px var(--teal); transform: translateY(-1px);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--brand); transform: translateY(-1px);
 }
 .action-button:disabled { opacity: 0.55; cursor: default; }
-.action-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.action-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .power-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .power-controls-spacer { flex: 1; min-width: 0; }
@@ -413,11 +424,11 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .power-head { margin-bottom: 16px; }
 .power-head-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .power-eyebrow {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-family: var(--font-display); text-transform: uppercase;
   font-size: 11px; letter-spacing: 0.14em; color: var(--muted); margin: 0 0 2px;
 }
 .power-title {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-family: var(--font-display); text-transform: uppercase;
   font-size: 22px; font-weight: 700; letter-spacing: 0.02em; color: var(--text); margin: 0;
 }
 .power-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -436,8 +447,8 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   transition: color 120ms ease, border-color 120ms ease;
 }
 .power-tab:hover:not(.on) { color: var(--text); }
-.power-tab.on { border-bottom-color: var(--teal); color: var(--text); }
-.power-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.power-tab.on { border-bottom-color: var(--brand); color: var(--text); }
+.power-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .power-caveat { font-size: 13px; max-width: 82ch; margin: 8px 0 0; }
 
@@ -479,13 +490,13 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
   transition: background 120ms ease, box-shadow 120ms ease;
 }
-.rank-grid-row:hover { background: color-mix(in oklch, var(--teal) 6%, transparent); }
-.rank-grid-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.rank-grid-row:hover { background: var(--raised); }
+.rank-grid-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 /* Pinning is a tint plus a ring, not a lift -- rows are on the plane, per the
    house style's ELEVATION rule; a lifted row would read as a card. */
 .rank-grid-row.pinned {
-  background: color-mix(in oklch, var(--teal) 12%, transparent);
-  box-shadow: inset 2px 0 0 var(--teal);
+  background: var(--raised);
+  box-shadow: inset 2px 0 0 var(--brand);
 }
 .rank-grid-header {
   text-transform: uppercase;
@@ -495,7 +506,7 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
 .rank-grid-header:hover { background: none; }
 .rank-grid-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
 .rank-grid-rank.top { color: var(--text); }
-.rank-grid-rank.mine { color: var(--crimson-text); }
+.rank-grid-rank.mine { color: var(--you-text); }
 /* min-width: 0 on both -- the team column is a fixed 260px now, not `1fr`,
    and a fixed track does not by itself shrink a grid item's content below its
    min-content size (that needs an explicit 0 min-width); without it a long
@@ -534,8 +545,8 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
    marks in it -- a tick without data is a short stub, not a block, and only
    a week WITH data claims the full height. */
 .trend-ticks { display: flex; align-items: flex-end; gap: 4px; height: 30px; margin-top: 8px; }
-.trend-tick { flex: 1; height: 6px; border-radius: 1px; background: oklch(22% 0.02 250); }
-.trend-tick.has-data { height: 100%; background: var(--teal); }
+.trend-tick { flex: 1; height: 6px; border-radius: 1px; background: var(--raised); }
+.trend-tick.has-data { height: 100%; background: var(--data); }
 
 /* Homers -- moved under Trend in the left column. Three columns (manager,
    centered +/- bar, signed value); the bar is a track with a hairline at
@@ -598,13 +609,13 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   box-shadow: inset 0 0 0 1px var(--line);
   transition: box-shadow 140ms ease, transform 140ms ease;
 }
-.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.league-card:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 40%, var(--line)); }
 /* A draft that hasn't finished is the only thing in this list worth an accent
-   -- crimson stays "you", so a live draft borrows --teal, the generic
+   -- gold stays "you", so a live draft borrows --brand, the generic
    "something is happening" color. */
 .league-card.live {
-  background: color-mix(in oklch, var(--teal) 7%, var(--panel));
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 45%, var(--line));
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 45%, var(--line));
 }
 
 .league-card-head { display: flex; align-items: center; gap: 11px; min-width: 0; }
@@ -614,7 +625,7 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   font-size: 15px; font-weight: 700; color: var(--text); text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.league-card-name:hover { color: var(--teal); }
+.league-card-name:hover { color: var(--brand); }
 .league-card-sub { font-size: 11px; color: var(--muted); }
 /* Its own two tokens rather than borrowing a position colour -- see --fitted's
    comment for why that borrowing is a bug and not a shortcut. These are the
@@ -667,7 +678,7 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
   font-variant-numeric: tabular-nums;
   transition: background 120ms ease, color 120ms ease;
 }
-.league-season-link:hover { background: color-mix(in oklch, var(--teal) 14%, transparent); color: var(--text); }
+.league-season-link:hover { background: var(--raised); color: var(--text); }
 /* The season the rest of the card is describing -- its managers, its status,
    its "Draft board" link all belong to this one. */
 .league-season-link.on { color: var(--text); background: color-mix(in oklch, var(--line) 60%, transparent); font-weight: 600; }
@@ -682,14 +693,14 @@ a.chip { display: inline-flex; align-items: center; text-decoration: none; }
    up"/"Retry" trigger an ingest instead, so they're real <button>s -- reset
    the UA button chrome so they still read as the same control. */
 button.league-link { background: none; border: 0; font: inherit; cursor: pointer; }
-.league-link:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.league-link:hover { background: var(--raised); color: var(--text); }
 /* One primary destination, not three peers: the draft is what this app is for
    and the other two are places you go afterwards. */
 .league-link.primary {
   color: var(--text); font-weight: 600;
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--teal); color: var(--teal); }
+.league-link.primary:hover { box-shadow: inset 0 0 0 1px var(--brand); color: var(--brand); }
 
 .league-card-foot {
   /* nowrap, not wrap: flex-wrap's own line-breaking runs on items' natural
@@ -706,11 +717,11 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
 .league-card-status { color: var(--muted); }
 .league-card-live {
   display: inline-flex; align-items: center; gap: 6px;
-  color: var(--teal); text-decoration: none; font-weight: 600;
+  color: var(--brand); text-decoration: none; font-weight: 600;
   flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .league-card-live:hover { text-decoration: underline; }
-.league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+.league-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); flex-shrink: 0; }
 @media (prefers-reduced-motion: no-preference) {
   .league-live-dot { animation: live-pulse 2s ease-in-out infinite; }
   @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
@@ -724,9 +735,9 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
   border-radius: 8px; cursor: pointer; flex-shrink: 0; white-space: nowrap;
   transition: background 120ms ease, color 120ms ease;
 }
-.league-card-refresh:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
+.league-card-refresh:hover:not(:disabled) { background: var(--raised); color: var(--text); }
 .league-card-refresh:disabled { opacity: 0.55; cursor: default; }
-.league-card-refresh:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.league-card-refresh:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /*
  * A list of mock drafts to open, not a card grid -- there's one line of real
@@ -740,13 +751,13 @@ button.league-link { background: none; border: 0; font: inherit; cursor: pointer
   background: var(--panel); color: inherit; text-decoration: none;
   transition: background 100ms ease;
 }
-.draft-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.draft-row:hover { background: var(--raised); }
 .draft-row-league { font-weight: 600; flex: 1; }
 .draft-row .chip { pointer-events: none; margin-left: auto; }
 
 .track-note { color: var(--muted); font-variant-numeric: tabular-nums; }
 /* Zero seats mapped, or a failed track, is the thing you most need to notice. */
-.track-note.failed { color: var(--crimson); }
+.track-note.failed { color: var(--danger); }
 
 /*
  * LOADING PLACEHOLDERS
@@ -892,7 +903,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   appearance: none; -webkit-appearance: none; border: 0; margin: 0; width: 100%;
   font: inherit; color: inherit; cursor: pointer; transition: background 100ms ease;
 }
-.board .col-head:hover:not(:disabled) { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.board .col-head:hover:not(:disabled) { background: var(--raised); }
 .board .col-head:disabled { cursor: default; }
 /* Layer 6, scoped to the pre-start state -- see the z-index list above. Paint
    order is hit-test order, so this is what makes the header clickable again,
@@ -900,11 +911,11 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    availability sheet (layer 4) is bottom-anchored and can grow tall enough to
    reach the headers, and it should cover them when it does. */
 .board-stage.pre-start .board .col-head { z-index: 6; }
-.board .col-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
-/* Same crimson identity as `.cell.mine` -- your own seat should read as the
+.board .col-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 3; }
+/* Same gold identity as `.cell.mine` -- your own seat should read as the
    same "you" everywhere on the board, not a second visual language. */
-.board .col-head.mine { background: color-mix(in oklch, var(--crimson-fill) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--crimson), 0 0 0 4px var(--bg); }
-.board .col-head.mine:hover { background: color-mix(in oklch, var(--crimson-fill) 22%, var(--panel)); }
+.board .col-head.mine { background: color-mix(in oklch, var(--you) 16%, var(--panel)); box-shadow: inset 0 0 0 1.5px var(--you), 0 0 0 4px var(--bg); }
+.board .col-head.mine:hover { background: color-mix(in oklch, var(--you) 22%, var(--panel)); }
 /* 9px mono was small enough to read as texture rather than names -- nothing
    was truncated at that size, but nothing was legible either. 11px in the body
    face (not `.mono`, which is wider per character) trades an occasional
@@ -921,9 +932,9 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    about (provenance.ts). */
 .board .col-head-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .board .col-head-dot.neutral { background: var(--muted); opacity: 0.5; }
-.board .col-head-dot.stated { background: var(--teal); }
+.board .col-head-dot.stated { background: var(--stated); }
 .board .col-head-dot.fitted { background: var(--fitted); }
-.board .col-head-you { font-size: 8px; color: var(--crimson-text); letter-spacing: 0.04em; }
+.board .col-head-you { font-size: 8px; color: var(--you-text); letter-spacing: 0.04em; }
 .board .rnd {
   background: var(--panel); display: flex; align-items: center; justify-content: center;
   font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: 0.02em;
@@ -966,7 +977,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    positions (--pos-a/b/c/d set inline) rather than taking the first one's colour.
    --pos-c/d are optional, so they fall back to the previous one to keep the gradient valid. */
 .board .cell.pos-multi {
-  /* Held in a variable so the steal/reach view (013 US8, below) can layer its tint over
+  /* Held in a variable so the sbrand/reach view (013 US8, below) can layer its tint over
      the split instead of replacing it -- single-position cells keep their colour there
      because theirs is a background-color; this one is an image (code review R1). */
   --pos-split: linear-gradient(100deg,
@@ -990,7 +1001,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   appearance: none; -webkit-appearance: none; border: 0; margin: 0;
   font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer;
 }
-.board .cell:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
+.board .cell:hover { background: var(--raised); }
 /* A revealed cell is a fresh DOM node the instant it mounts (the hidden ->
    revealed switch is a <div> -> <button> swap, not a class toggle, so this
    fires exactly once per pick). At the reveal's 450ms tick
@@ -1005,7 +1016,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 }
 /* outline-offset is negative because `.board-scroll` clips overflow -- a
    positive offset would get cut off at the cell's outer edge. */
-.board .cell:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; z-index: 3; }
+.board .cell:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; z-index: 3; }
 /* Was 8px at opacity 0.7 -- measured 2.79:1 on a position-tinted cell, which
    fails AA outright for real content. 10px at full opacity against a slightly
    lifted muted clears it; it is still the quietest thing in the cell. */
@@ -1022,20 +1033,20 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 /* Position owns the fill now (`.cell.pos-*`), so "your seat" had to become a
    ring -- the two cannot both be the background. The ring is declared after
    the position fills and sets no background of its own, so an empty seat of
-   yours still reads crimson-on-panel and a filled one reads crimson-on-
+   yours still reads gold-on-panel and a filled one reads gold-on-
    position. */
 /* Spec 024 A6: there is no per-cell `.mine` ring any more. It was derived from
    myPicks (slot-based, so every cell in an ASSUMED seat got one: 14 red
    outlines). Your seat is marked on its column header only (.col-head.mine). */
-/* chosen is always also mine -- an addition to that crimson ring (a second,
+/* chosen is always also mine -- an addition to that gold ring (a second,
    thicker inset ring), not a full recolor, so the far more common
    mine-but-not-yet-chosen cell doesn't get harder to spot.
    It used to carry a "✓ yours" badge as well. Dropped: your whole column is
-   already ringed crimson, so a badge on every cell in it was saying the same
+   already ringed gold, so a badge on every cell in it was saying the same
    thing a second time. What still separates a pick you made from one the model
    guessed for you is this inner ring, plus the cell's own title ("Your pick --
    <name>") and the fact that the player in it is the one you took. */
-.board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--crimson), inset 0 0 0 4px color-mix(in oklch, var(--crimson) 35%, transparent); }
+.board .cell.chosen { box-shadow: inset 0 0 0 1.5px var(--you), inset 0 0 0 4px color-mix(in oklch, var(--you) 35%, transparent); }
 /* The 20px right gutter is gone. It was reserving room for `.pickno`, which
    is absolutely positioned against the *cell* and sits on the badge's line --
    measured in the running app, its bottom edge clears the name's top by 11px,
@@ -1113,7 +1124,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .start-overlay-status { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .start-overlay-status .cond { font-size: 15px; color: var(--text); letter-spacing: 0.02em; }
 .start-button {
-  background: var(--teal); color: var(--bg); border: 0; border-radius: 10px;
+  background: var(--brand); color: var(--bg); border: 0; border-radius: 10px;
   padding: 14px 34px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
   margin: 14px 0 10px; transition: filter 120ms ease, transform 120ms ease;
 }
@@ -1151,17 +1162,17 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .seat:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(0,0,0,0.32); }
-.seat.me { border-color: var(--line); box-shadow: 0 0 0 1.5px var(--crimson), 0 1px 2px rgba(0,0,0,0.22); }
-.seat.me:hover { box-shadow: 0 0 0 1.5px var(--crimson), 0 5px 12px rgba(0,0,0,0.32); }
+.seat.me { border-color: var(--line); box-shadow: 0 0 0 1.5px var(--you), 0 1px 2px rgba(0,0,0,0.22); }
+.seat.me:hover { box-shadow: 0 0 0 1.5px var(--you), 0 5px 12px rgba(0,0,0,0.32); }
 /* A configured seat should be visibly different from an unconfigured one. */
-/* var(--teal)/var(--fitted), not the TE/RB position tokens -- same accidental
+/* var(--brand)/var(--fitted), not the TE/RB position tokens -- same accidental
    coupling as .board .col-head-dot.fitted above, fixed the same way. */
-.seat.stated { border-left: 3px solid var(--teal); }
+.seat.stated { border-left: 3px solid var(--stated); }
 .seat.fitted { border-left: 3px solid var(--fitted); }
 .seat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .seat .slot { background: var(--line); border-radius: 4px; padding: 1px 6px; font-size: 11px; color: var(--muted); }
 .seat .who { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.seat .who.mine-name { color: var(--crimson-text); }
+.seat .who.mine-name { color: var(--you-text); }
 /* Was a filled uppercase badge. 23 of the 24 cards on /managers are FITTED,
    so a bright "FROM HISTORY" chip on nearly all of them marked nothing while
    outweighing the manager's own name -- the same "eleven identical league
@@ -1169,7 +1180,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
    the board's own dot, which is what that module already renders there. */
 .prov-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .prov-dot.neutral { background: var(--muted); opacity: 0.5; }
-.prov-dot.stated { background: var(--teal); }
+.prov-dot.stated { background: var(--stated); }
 .prov-dot.fitted { background: var(--fitted); }
 
 /*
@@ -1184,14 +1195,14 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 .reach { margin: 8px 0 6px; }
 .reach-track {
   position: relative; height: 6px; border-radius: 3px;
-  background: oklch(24% 0.02 250); overflow: hidden;
+  background: var(--raised); overflow: hidden;
 }
 .reach-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
-.reach-band { position: absolute; top: 0; bottom: 0; background: oklch(34% 0.02 250); }
+.reach-band { position: absolute; top: 0; bottom: 0; background: oklch(34% 0.010 75); }
 .reach-se { font-weight: 400; font-size: 10px; }
 .reach-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
 /* Two directions, two colors, because "reaches 5 early" and "waits 5 late"
-   are opposite behaviours and a single bar length cannot say which. Crimson
+   are opposite behaviours and a single bar length cannot say which. Gold
    is not available here (it means "you"), so early borrows --qb's warm end
    and late the cool --wr end. */
 .reach-fill.early { background: var(--qb); }
@@ -1216,7 +1227,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
   padding: 1px 8px; font: inherit; font-size: 10px; cursor: pointer;
 }
-.seat-edit:hover { color: var(--text); border-color: var(--teal); }
+.seat-edit:hover { color: var(--text); border-color: var(--brand); }
 
 .seat-form { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .seat-form label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
@@ -1226,12 +1237,12 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 }
 .seat-form-actions { display: flex; gap: 6px; margin-top: 2px; }
 .seat-form-actions button {
-  background: var(--teal); color: var(--bg); border: 0; border-radius: 6px;
+  background: var(--brand); color: var(--bg); border: 0; border-radius: 6px;
   padding: 4px 10px; font: inherit; font-size: 12px; cursor: pointer;
 }
 .seat-form-actions button:disabled { opacity: 0.6; cursor: default; }
 .seat-form-actions button:nth-child(n+2) { background: var(--line); color: var(--text); }
-.seat-form-error { color: #e07a7a; }
+.seat-form-error { color: var(--danger); }
 
 /* /managers -- the same `.seat` card SeatPopover uses for one seat inside a
    modal, reused as a grid of many. A neutral row (nothing entered, no
@@ -1254,12 +1265,12 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   transition: background 120ms ease;
 }
 .mgr-row:first-child { border-top: 0; }
-.mgr-row:hover { background: color-mix(in oklch, var(--teal) 5%, transparent); }
+.mgr-row:hover { background: var(--raised); }
 
 /* Provenance as a left edge, the same vocabulary `.seat` used when these were
    cards -- it reads down a list of rows better than it ever did across a
    grid, because the marks line up. */
-.mgr-row.stated { box-shadow: inset 3px 0 0 var(--teal); }
+.mgr-row.stated { box-shadow: inset 3px 0 0 var(--stated); }
 .mgr-row.fitted { box-shadow: inset 3px 0 0 var(--fitted); }
 .mgr-row.neutral-row { opacity: 0.72; }
 
@@ -1316,17 +1327,17 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
 
 
 
-/* Same crimson-tinted "your pick" language as `.board .cell.mine`, so a
+/* Same gold-tinted "your pick" language as `.board .cell.mine`, so a
    paused board reads as one system rather than two different UIs. */
 .pause-banner {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
-  box-shadow: inset 0 0 0 1.5px var(--crimson);
+  background: color-mix(in oklch, var(--you) 16%, var(--panel));
+  box-shadow: inset 0 0 0 1.5px var(--you);
   border-radius: 8px; padding: 8px 12px; font-size: 12px;
 }
-.pause-banner .chip.on { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
+.pause-banner .chip.on { background: var(--you-fill); border-color: var(--you-fill); color: var(--bg); }
 
-/* PickPrompt: the same crimson pause-banner, now carrying two actions and an
+/* PickPrompt: the same gold pause-banner, now carrying two actions and an
    honesty line instead of one bare "Continue" -- wraps rather than truncating
    at narrower widths since it's carrying more content than before. */
 .pause-banner.pick-prompt { flex-wrap: wrap; }
@@ -1348,7 +1359,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
  * reaches it through TurnIndicator). It replaced two things at once: this
  * file's old `.turn-indicator` in the mock room, and the batch room's
  * `.reveal-controls` scrubber -- two visual languages for the one question
- * "whose turn is it". Same crimson-means-you rule as the board.
+ * "whose turn is it". Same gold-means-you rule as the board.
  */
 .on-clock {
   display: flex; align-items: center; gap: 12px;
@@ -1356,15 +1367,15 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   border-radius: 12px; padding: 9px 14px; margin-bottom: 8px;
 }
 .on-clock.mine {
-  background: color-mix(in oklch, var(--crimson) 16%, var(--panel));
-  box-shadow: inset 0 0 0 1.5px var(--crimson);
+  background: color-mix(in oklch, var(--you) 16%, var(--panel));
+  box-shadow: inset 0 0 0 1.5px var(--you);
 }
 .on-clock-avatar { width: 30px; height: 30px; font-size: 12px; }
 .on-clock-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .on-clock-kicker {
   font-size: 10px; letter-spacing: 0.1em; color: var(--muted);
 }
-.on-clock.mine .on-clock-kicker { color: var(--crimson-text); }
+.on-clock.mine .on-clock-kicker { color: var(--you-text); }
 .on-clock-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .on-clock-spacer { flex: 1; min-width: 0; }
 /* The right-hand readout is one number with its own label under it, not a row
@@ -1396,13 +1407,13 @@ button.on-clock-identity {
   transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 button.on-clock-identity:hover {
-  background: color-mix(in oklch, var(--teal) 10%, var(--panel));
+  background: var(--raised);
   transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.28);
 }
 .on-clock.mine button.on-clock-identity:hover {
-  background: color-mix(in oklch, var(--crimson) 12%, transparent);
+  background: color-mix(in oklch, var(--you) 12%, transparent);
 }
-button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /*
  * The feed: three rows, newest first. Rows, not cards -- one line of content
@@ -1458,8 +1469,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   text-align: left; cursor: pointer;
 }
 .pick-feed-row.lead .pick-feed-btn { padding-top: 8px; padding-bottom: 8px; }
-.pick-feed-btn:hover { background: color-mix(in oklch, var(--lead-hue, var(--teal)) 10%, transparent); }
-.pick-feed-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.pick-feed-btn:hover { background: color-mix(in oklch, var(--lead-hue, var(--brand)) 10%, transparent); }
+.pick-feed-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /*
  * The live room's pick card (PickInsightCard). Floats over the top of
@@ -1473,7 +1484,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   position: absolute; top: 8px; left: 8px; z-index: 7;
   width: min(440px, calc(100% - 16px)); box-sizing: border-box; min-width: 0;
   display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
-  background: color-mix(in oklch, var(--lead-hue, var(--teal)) 9%, var(--panel));
+  background: color-mix(in oklch, var(--lead-hue, var(--brand)) 9%, var(--panel));
   border-radius: 14px; box-shadow: inset 3px 0 0 var(--lead-hue, var(--line)), 0 8px 24px rgb(0 0 0 / 0.45);
   outline: none; transition: box-shadow 0.15s, transform 0.15s;
 }
@@ -1497,13 +1508,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pick-card-fit { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .pick-card-fills {
   font-size: 11px; letter-spacing: 0.06em; padding: 2px 9px; border-radius: 999px;
-  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+  color: var(--brand); background: var(--raised);
 }
 .pick-card-summary { margin: 0; color: color-mix(in oklch, var(--text) 80%, transparent); }
 .pick-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .pick-card-tag {
   font-size: 11px; padding: 2px 9px; border-radius: 999px;
-  color: var(--text); background: color-mix(in oklch, var(--lead-hue, var(--teal)) 18%, transparent);
+  color: var(--text); background: color-mix(in oklch, var(--lead-hue, var(--brand)) 18%, transparent);
 }
 /*
  * Phone: the board collapses (`.board-stage` measured 0px tall at 375px), so a
@@ -1580,19 +1591,19 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    feed and the board and has to cost as little vertical space as it can. */
 .live-team { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
 .live-team .team-strip { margin: 0; flex: 1 1 auto; }
-/* "Fills RB" beside a name in the availability sheet. Teal like every other
+/* "Fills RB" beside a name in the availability sheet. Brand like every other
    generic interaction cue in the house style -- this is not a positional
    identity, it is a note about your roster. */
 .need-tag {
   margin-left: 8px; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap;
   padding: 1px 6px; border-radius: 999px;
-  color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent);
+  color: var(--brand); background: var(--raised);
 }
 .team-slot {
   display: flex; align-items: center; gap: 4px; padding: 4px 8px;
   border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: 11px;
 }
-.team-slot.filled { border-color: color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.team-slot.filled { border-color: var(--line); }
 .team-slot.open { color: var(--muted); }
 .team-slot-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .team-slot-empty { font-weight: 700; letter-spacing: 0.03em; }
@@ -1600,14 +1611,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* Row-level tags in the picker table: "fills a need", the only one left now
    that low-survival rows are filtered out of the list rather than tagged. */
 .tag { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 999px; margin-left: 6px; white-space: nowrap; }
-.tag.need { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
+.tag.need { background: var(--raised); color: var(--brand); }
 
 /* PlayerPicker: position chips above a scrollable, reused avail table. */
 .picker-filters { margin: 10px 0; }
 .picker-scroll { overflow: auto; min-height: 0; flex: 1; }
 .picker-row { cursor: pointer; transition: background 100ms ease; }
-.picker-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); }
-.picker-row:focus-visible { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); outline: 2px solid var(--teal); outline-offset: -2px; }
+.picker-row:hover { background: var(--raised); }
+.picker-row:focus-visible { background: var(--raised); outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /*
  * Live draft: one status bar above the board.
@@ -1650,15 +1661,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
   padding: 3px 10px; border-radius: 999px;
 }
-.live-fresh.ok { color: var(--teal); background: color-mix(in oklch, var(--teal) 15%, var(--panel)); }
-.live-fresh.stale { color: var(--crimson); background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); }
+.live-fresh.ok { color: var(--brand); background: var(--raised); }
+.live-fresh.stale { color: var(--danger); background: color-mix(in oklch, var(--danger) 18%, var(--panel)); }
 
 .live-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .live-resim-progress { margin-bottom: 10px; }
 /* The waiting detail and the format line live inside the status bar (spec 024 FR-016):
    the bar is the only statement of draft status, so the old .live-waiting line is gone. */
 .live-status-detail { display: inline-flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
-.live-status-detail .offline { color: var(--crimson); }
+.live-status-detail .offline { color: var(--danger); }
 
 /* Breathing room only, not a restyle -- same tokens, larger at the width
    the 1400px cap used to keep this app from ever reaching. */
@@ -1680,7 +1691,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .standings td { padding: 6px 10px; border-bottom: 1px solid var(--line); }
 .standings tr:last-child td { border-bottom: none; }
 .standings-manager { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
-.standings-manager:hover { color: var(--teal); }
+.standings-manager:hover { color: var(--brand); }
 /* The error banner carries its own recovery action now, so it needs the same
    shape `.error.seats-dirty` already uses for the same reason. */
 .history-error { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
@@ -1706,7 +1717,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .bump-hit { pointer-events: stroke; }
 
 .bump-end-label { fill: var(--muted); font-size: 10px; cursor: pointer; }
-.bump-end-label-me { fill: var(--crimson-text); font-weight: 600; }
+.bump-end-label-me { fill: var(--you-text); font-weight: 600; }
 .bump-end-label-focus-1,
 .bump-end-label-focus-2,
 .bump-end-label-focus-3 { fill: var(--text); font-weight: 600; }
@@ -1757,7 +1768,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* 10px is the type floor this file's header sets -- not a step below it. */
 .home-hero-kicker { font-size: 10px; letter-spacing: 0.12em; color: var(--muted); margin: 0; }
 .home-hero-title {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; text-transform: uppercase;
+  font-family: var(--font-display); text-transform: uppercase;
   font-size: 26px; font-weight: 700; letter-spacing: 0.01em; color: var(--text); margin: 0;
 }
 .home-hero-sub { font-size: 13px; color: var(--muted); margin: 0; line-height: 1.5; }
@@ -1770,12 +1781,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    why it gets its own class instead of reusing `.chip` at a larger size. */
 .home-hero-cta {
   flex-shrink: 0; display: inline-flex; align-items: center;
-  background: var(--volt); color: var(--bg); text-decoration: none;
+  background: var(--brand); color: var(--bg); text-decoration: none;
   font-weight: 700; font-size: 14px; padding: 12px 22px; border-radius: 999px;
   transition: filter 120ms ease, transform 120ms ease;
 }
 .home-hero-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.home-hero-cta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.home-hero-cta:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /*
  * ============================================================================
@@ -1803,7 +1814,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font-size: 21px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.05;
   padding: 0 6px; color: var(--text); text-decoration: none; flex: 1 1 auto; min-width: 0;
 }
-.app-wordmark:hover { color: var(--teal); }
+.app-wordmark:hover { color: var(--brand); }
 .app-wordmark-line { display: block; }
 .app-rail-toggle {
   appearance: none; -webkit-appearance: none; border: 0; background: none; margin: 0;
@@ -1811,8 +1822,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font: inherit; font-size: 13px; line-height: 1; color: var(--muted);
   transition: background 120ms ease, color 120ms ease;
 }
-.app-rail-toggle:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); color: var(--text); }
-.app-rail-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.app-rail-toggle:hover { background: var(--raised); color: var(--text); }
+.app-rail-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* Page-supplied (appSlots.tsx). Most routes portal nothing into it today, and
    an empty flex child would still spend the rail's 22px gap -- so collapse it
@@ -1838,14 +1849,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: none; border: 0; text-decoration: none; cursor: pointer; text-align: left;
   transition: background 120ms ease, color 120ms ease;
 }
-.app-rail-row:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
+.app-rail-row:hover { background: var(--raised); color: var(--text); }
 .app-rail-row.on {
   color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--line) 55%, transparent);
 }
-.app-rail-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.app-rail-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 .app-rail-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); flex-shrink: 0; }
-.app-rail-dot.on.all { background: var(--teal); }
+.app-rail-dot.on.all { background: var(--brand); }
 .app-rail-dot.on.nfl { background: var(--sport-nfl); }
 .app-rail-dot.on.nba { background: var(--sport-nba); }
 /* Menu rows get a glyph where sport rows get a color dot -- same 7px optical
@@ -1854,7 +1865,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .app-rail-glyph {
   width: 7px; flex-shrink: 0; font-size: 8px; line-height: 1; text-align: center; color: var(--muted);
 }
-.app-rail-row.on .app-rail-glyph { color: var(--teal); }
+.app-rail-row.on .app-rail-glyph { color: var(--brand); }
 .app-rail-count {
   margin-left: auto; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--muted);
 }
@@ -1887,7 +1898,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; align-items: center; gap: 9px; padding: 4px 6px 8px;
   text-decoration: none; color: inherit; border-radius: 9px; min-width: 0;
 }
-.rail-league-id:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.rail-league-id:hover { background: var(--raised); }
 .rail-league-crest { width: 26px; height: 26px; font-size: 12px; flex-shrink: 0; }
 .rail-league-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rail-league-name {
@@ -1911,8 +1922,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    occupy the same 7px optical slot the glyphs do or that one row's label
    would sit a pixel off every other row's. */
 .app-rail-row .league-live-dot { width: 7px; height: 7px; }
-.app-rail-row.live { color: var(--teal); }
-.app-rail-row.live:hover { color: var(--teal); }
+.app-rail-row.live { color: var(--brand); }
+.app-rail-row.live:hover { color: var(--brand); }
 
 /*
  * THE ICON RAIL (56px)
@@ -1983,8 +1994,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* Power rankings' eyebrow names the week and the league rather than the
    section, and carries the accent that marks this page as the live one. */
 .page-eyebrow.accent {
-  font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 11px; font-weight: 600;
-  letter-spacing: 0.1em; color: var(--teal);
+  font-family: var(--font-display); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.1em; color: var(--brand);
 }
 .page-title { font-size: 28px; font-weight: 700; letter-spacing: 0.01em; margin: 0; }
 .page-title.hero {
@@ -2044,13 +2055,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; align-items: center; gap: 11px; padding: 11px 13px; border-radius: 11px;
   border: 1px solid var(--line); background: var(--bg); cursor: pointer;
 }
-.start-mock-league-option.selected { border-color: color-mix(in oklch, var(--teal) 45%, var(--line)); background: color-mix(in oklch, var(--teal) 8%, var(--bg)); }
+.start-mock-league-option.selected { border-color: color-mix(in oklch, var(--brand) 45%, var(--line)); background: var(--raised); }
 .start-mock-league-option input { position: absolute; opacity: 0; width: 0; height: 0; }
 .start-mock-league-radio {
   width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--line); flex-shrink: 0; box-sizing: border-box;
 }
 .start-mock-league-option.selected .start-mock-league-radio {
-  border-color: var(--teal); background: var(--teal); box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--teal) 8%, var(--bg));
+  border-color: var(--brand); background: var(--brand); box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--brand) 8%, var(--bg));
 }
 .start-mock-league-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .start-mock-league-name { font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2145,10 +2156,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 999px;
     font: inherit; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
     color: var(--text);
-    background: color-mix(in oklch, var(--teal) 14%, transparent);
-    border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line));
+    background: var(--raised);
+    border: 1px solid color-mix(in oklch, var(--brand) 40%, var(--line));
   }
-  .app-rail-allpages:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .app-rail-allpages:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
   /* Tap targets: 44px is the floor for a finger, on the bar and the lane both. */
   .app-rail-row, .rail-jumpto, .rail-switcher-toggle, .app-wordmark, .rail-league-id, .league-season-link {
@@ -2191,7 +2202,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     background: color-mix(in oklch, var(--line) 35%, transparent);
   }
   .app-rail-section:not(.app-rail-league) .app-rail-row.on {
-    background: color-mix(in oklch, var(--teal) 16%, transparent);
+    background: var(--raised);
   }
   .app-rail-section:not(.app-rail-league) .app-rail-glyph { width: auto; font-size: 12px; }
   .app-rail-section:not(.app-rail-league) .app-rail-row-label { font-size: 11px; line-height: 1.1; white-space: nowrap; }
@@ -2205,7 +2216,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     width: 44px; height: 44px; padding: 0; border-radius: 50%; cursor: pointer;
     background: none; border: 1px solid var(--line);
   }
-  .app-account-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .app-account-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .app-account-menu {
     position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 180px;
     display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px;
@@ -2218,10 +2229,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   .app-account-menu-item {
     min-height: 44px; padding: 0 12px; border-radius: 9px; border: 0; cursor: pointer; text-align: left;
     font: inherit; font-size: 14px; font-weight: 600; color: var(--text);
-    background: color-mix(in oklch, var(--crimson) 18%, transparent);
+    background: color-mix(in oklch, var(--danger) 18%, transparent);
   }
-  .app-account-menu-item:hover { background: color-mix(in oklch, var(--crimson) 30%, transparent); }
-  .app-account-menu-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+  .app-account-menu-item:hover { background: color-mix(in oklch, var(--danger) 30%, transparent); }
+  .app-account-menu-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
   .app-rail { gap: 8px 12px; padding: 10px 14px; }
   .rail-league-id { padding: 0 6px 0 0; }
@@ -2255,7 +2266,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .signin-controls { margin-top: 10px; }
 .signin-hero .error { margin-top: 12px; margin-bottom: 0; max-width: 640px; }
 /* Inline retry inside an .error message -- text, not a control needing the
-   teal treatment `.controls button` would otherwise give it (it isn't one). */
+   brand treatment `.controls button` would otherwise give it (it isn't one). */
 .link-button {
   background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
   color: var(--text); text-decoration: underline; text-underline-offset: 2px;
@@ -2314,16 +2325,16 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
-.mock-seat-face:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--teal); }
-.mock-seat-face:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.mock-seat-face:hover:not(:disabled) { box-shadow: inset 0 0 0 1px var(--brand); }
+.mock-seat-face:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .mock-seat-face:disabled { cursor: default; opacity: 0.7; }
 .mock-seat-pick { font-size: 13px; font-weight: 700; }
 .mock-seat-who { font-size: 11px; }
 
-/* Crimson fills here because nothing else owns this seat's background --
-   the same move `.segment.on` makes with teal, substituting the identity
+/* Gold fills here because nothing else owns this seat's background --
+   the same move `.segment.on` makes with brand, substituting the identity
    color because this is specifically "you," not generic interaction. */
-.mock-seat.mine .mock-seat-face { background: var(--crimson-fill); color: var(--text); }
+.mock-seat.mine .mock-seat-face { background: var(--you-fill); color: var(--bg); }
 .mock-seat.mine .mock-seat-who { font-weight: 700; }
 .mock-seat.assigned .mock-seat-who { font-weight: 600; }
 
@@ -2374,8 +2385,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .verdict { font-size: 12px; white-space: nowrap; }
-/* Weight and shade carry the three-way hierarchy, not a new hue: --crimson
-   already means "you" only and --teal already means generic interaction
+/* Weight and shade carry the three-way hierarchy, not a new hue: --you
+   already means "you" only and --brand already means generic interaction
    (house-style header, above) -- a fourth "risk" color would either collide
    with one of those meanings or need a fifth token nothing else in the app
    uses. The words already say what a color would only repeat, so the loudest
@@ -2453,8 +2464,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    the "where will this land" indication, and a tint under the fingertip would
    be both redundant and hidden by the finger. */
 .rankboard-slot.drop-target {
-  border-color: var(--teal);
-  background: color-mix(in oklch, var(--teal) 14%, var(--panel));
+  border-color: var(--brand);
+  background: var(--raised);
 }
 .rankboard-slot-index { width: 22px; text-align: right; color: var(--muted); font-size: 12px; flex-shrink: 0; }
 
@@ -2462,8 +2473,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   flex: 1; min-height: 38px; border: 1px dashed var(--line); border-radius: 8px;
   background: none; color: var(--muted); cursor: pointer; text-align: left; padding: 0 10px;
 }
-.rankboard-slot-empty:hover { border-color: var(--teal); color: var(--text); }
-.rankboard-slot-empty:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.rankboard-slot-empty:hover { border-color: var(--brand); color: var(--text); }
+.rankboard-slot-empty:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* The chip. 999px because it is a badge-shaped thing carrying an identity, and
    min-height 44px because it is the drag handle -- the 24px .avatar inside is
@@ -2536,17 +2547,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: none; border: 1px solid var(--line); border-radius: 8px;
   color: var(--text); font-size: 10px; line-height: 1; cursor: pointer;
 }
-.rankboard-nudge button:hover:not(:disabled) { border-color: var(--teal); background: color-mix(in oklch, var(--teal) 14%, transparent); }
+.rankboard-nudge button:hover:not(:disabled) { border-color: var(--brand); background: var(--raised); }
 .rankboard-nudge button:disabled { opacity: 0.3; cursor: default; }
-.rankboard-nudge button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.rankboard-nudge button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .rankboard.dragging .rankboard-handle { cursor: grabbing; }
-.rankboard-chip:hover { border-color: color-mix(in oklch, var(--teal) 55%, var(--line)); }
-.rankboard-chip:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-/* Selected is the click-to-place path's held state -- teal, because it is
+.rankboard-chip:hover { border-color: color-mix(in oklch, var(--brand) 55%, var(--line)); }
+.rankboard-chip:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+/* Selected is the click-to-place path's held state -- brand, because it is
    interaction, not identity. */
-.rankboard-chip.selected { border-color: var(--teal); background: color-mix(in oklch, var(--teal) 16%, var(--panel)); }
-/* Crimson means you, and here nothing else owns the background, so it fills. */
-.rankboard-chip.mine { border-color: var(--crimson); background: color-mix(in oklch, var(--crimson) 15%, var(--panel)); }
+.rankboard-chip.selected { border-color: var(--brand); background: var(--raised); }
+/* Gold means you, and here nothing else owns the background, so it fills. */
+.rankboard-chip.mine { border-color: var(--you); background: color-mix(in oklch, var(--you) 15%, var(--panel)); }
 /* The chip left behind while its ghost is under the pointer. */
 .rankboard-chip.drag-source { opacity: 0.32; }
 
@@ -2560,7 +2571,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .rankboard-ghost {
   position: fixed; top: 0; left: 0; z-index: 50; pointer-events: none;
   display: flex; align-items: center; gap: 8px;
-  padding: 4px 14px 4px 4px; border: 1px solid var(--teal); border-radius: 999px;
+  padding: 4px 14px 4px 4px; border: 1px solid var(--brand); border-radius: 999px;
   background: var(--panel); box-shadow: 0 8px 24px oklch(0% 0 0 / 0.45);
   font-size: 13px; font-weight: 600;
 }
@@ -2580,7 +2591,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    plus two absolutely-positioned children; the range is tinted rather than
    solid so the mean dot stays readable on top of it. */
 .spread-bar { position: relative; display: block; width: 120px; height: 10px; border-radius: 999px; background: var(--line); }
-.spread-bar-range { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: color-mix(in oklch, var(--teal) 45%, var(--panel)); }
+.spread-bar-range { position: absolute; top: 2px; height: 6px; border-radius: 999px; background: color-mix(in oklch, var(--data) 45%, var(--panel)); }
 .spread-bar-mean { position: absolute; top: 1px; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--text); }
 
 /* `.content` is a flex column with no overflow of its own -- fine for the
@@ -2673,7 +2684,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--muted);
 }
 .pr-number-one-body { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
-.pr-number-one-rank { font-size: 56px; line-height: 0.8; font-weight: 700; color: var(--teal); }
+.pr-number-one-rank { font-size: 56px; line-height: 0.8; font-weight: 700; color: var(--brand); }
 .pr-number-one-id { min-width: 0; }
 .pr-number-one-name { font-size: 16px; font-weight: 600; }
 .pr-number-one-meta { font-size: 12px; color: var(--muted); }
@@ -2687,10 +2698,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-your-team {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 12px 16px; border-radius: 14px;
-  background: color-mix(in oklch, var(--crimson) 12%, var(--panel));
-  box-shadow: inset 2px 0 0 var(--crimson);
+  background: color-mix(in oklch, var(--you) 12%, var(--panel));
+  box-shadow: inset 2px 0 0 var(--you);
 }
-.pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--crimson-text); }
+.pr-your-team-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--you-text); }
 .pr-your-team-name { font-size: 16px; font-weight: 600; }
 .pr-your-team-detail { font-size: 13px; color: var(--muted); }
 .pr-your-team-vote { margin-left: auto; font-size: 12px; color: var(--muted); }
@@ -2716,8 +2727,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   margin: 0 0 12px;
   padding: 7px 11px;
   border-radius: 8px;
-  background: color-mix(in oklch, var(--teal) 7%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 24%, transparent);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 24%, transparent);
 }
 
 .pr-list { max-width: 1180px; }
@@ -2749,15 +2760,15 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 9px 6px; cursor: pointer; border-radius: 10px;
   transition: background 100ms ease;
 }
-.pr-row:hover { background: color-mix(in oklch, var(--teal) 6%, transparent); }
-.pr-row.on { background: color-mix(in oklch, var(--teal) 12%, transparent); box-shadow: inset 2px 0 0 var(--teal); }
-.pr-row.mine { background: color-mix(in oklch, var(--crimson) 12%, transparent); box-shadow: inset 2px 0 0 var(--crimson); }
-.pr-row.mine.on { box-shadow: inset 2px 0 0 var(--crimson); }
-.pr-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.pr-row:hover { background: var(--raised); }
+.pr-row.on { background: var(--raised); box-shadow: inset 2px 0 0 var(--brand); }
+.pr-row.mine { background: color-mix(in oklch, var(--you) 12%, transparent); box-shadow: inset 2px 0 0 var(--you); }
+.pr-row.mine.on { box-shadow: inset 2px 0 0 var(--you); }
+.pr-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 .pr-rank { font-size: 16px; font-weight: 600; text-align: right; color: var(--muted); }
 .pr-rank.top { color: var(--text); }
-.pr-rank.mine { color: var(--crimson-text); }
+.pr-rank.mine { color: var(--you-text); }
 
 .pr-team { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pr-team-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
@@ -2768,7 +2779,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    used to truncate the tag away entirely on the viewer's own row). */
 .pr-team-name { display: flex; align-items: baseline; gap: 4px; min-width: 0; font-size: 13px; font-weight: 600; }
 .pr-team-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--crimson-text); }
+.pr-you-tag { flex: none; font-size: 10px; font-weight: 600; color: var(--you-text); }
 .pr-team-sub { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Record over odds: two lines in the width one line used to take, so adding
@@ -2779,22 +2790,22 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 1px 6px; border-radius: 999px; font-size: 11px; line-height: 1.5;
   background: color-mix(in oklch, var(--muted) 16%, transparent); color: var(--muted);
 }
-/* All but in / still alive / long odds. Teal is "good" everywhere else on this
-   page, and the warm end deliberately stops short of crimson -- crimson means
+/* All but in / still alive / long odds. Brand is "good" everywhere else on this
+   page, and the warm end deliberately stops short of gold -- gold means
    "this row is you". */
-.pr-odds.in { background: color-mix(in oklch, var(--teal) 16%, transparent); color: var(--teal); }
+.pr-odds.in { background: var(--raised); color: var(--brand); }
 .pr-odds.live { background: color-mix(in oklch, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
 .pr-odds.out { background: color-mix(in oklch, oklch(75% 0.13 50) 14%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
 .pr-move.up { color: var(--up); }
 .pr-move.down { color: var(--down); }
-.pr-move.flat { color: oklch(52% 0.02 250); }
+.pr-move.flat { color: oklch(52% 0.012 80); }
 
 .pr-playoff-cell { display: flex; align-items: center; gap: 8px; }
 .pr-playoff-pct { font-size: 12px; color: var(--muted); flex: none; }
 .pr-note { font-size: 12px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pr-note.notable { color: var(--teal); }
+.pr-note.notable { color: var(--brand); }
 
 /* Playoff-odds bar. Scaled 0-100 against `pct` directly (unlike the old
    min/max-scaled score bar it replaces) -- a percentage is already on a fixed
@@ -2802,8 +2813,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    it. Empty (0% width, no fill color) rather than a fake sliver when `pct` is
    null -- see PowerRankingEntry.makesPlayoffsPct's own TODO. */
 .pr-bar { position: relative; display: block; flex: 1; height: 8px; border-radius: 999px; background: var(--line); }
-.pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklch, var(--teal) 55%, var(--panel)); }
-.pr-bar-fill.mine { background: var(--crimson); }
+.pr-bar-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 999px; background: color-mix(in oklch, var(--data) 55%, var(--panel)); }
+.pr-bar-fill.mine { background: var(--you); }
 
 /* --- League-vote ladder row: ranking space (ranking-space-optimization
    handoff) -- a range bar (ballot low..high) instead of the "Where the room
@@ -2828,7 +2839,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-axis {
   position: relative; display: block; height: 11px;
   color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none;
-  font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif; font-size: 10px;
+  font-family: var(--font-body); font-size: 10px;
 }
 /* Each tick is a label with a hairline growing down off it, aimed at the row
    of bars underneath. */
@@ -2849,7 +2860,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    pill" treatment for a status chip, and reads better at this data density
    than the plain-text +/- the movement column uses elsewhere. */
 .pr-your-ballot .pr-move { padding: 2px 6px; border-radius: 999px; font-size: 11px; }
-.pr-your-ballot .pr-move.up { background: color-mix(in oklch, var(--teal) 16%, transparent); }
+.pr-your-ballot .pr-move.up { background: var(--raised); }
 .pr-your-ballot .pr-move.down { background: color-mix(in oklch, var(--down) 16%, transparent); }
 .pr-your-ballot .pr-move.flat { background: color-mix(in oklch, var(--muted) 16%, transparent); }
 /* One flat track, one constant fill. The old row stacked four encodings on
@@ -2878,7 +2889,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--text);
 }
 /* The viewer's own ballot position on the range bar -- a neutral ring, not
-   crimson: crimson is reserved for "this row is my team" (`.pr-row.mine`),
+   gold: gold is reserved for "this row is my team" (`.pr-row.mine`),
    while this marker appears on every row (it is where I ranked THAT team). */
 .spread-bar-mine {
   position: absolute; top: -2px; width: 16px; height: 16px; margin-left: -8px;
@@ -2894,14 +2905,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 3px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap;
   background: color-mix(in oklch, var(--muted) 14%, transparent); color: var(--muted);
 }
-.pr-range-pill.tight { background: color-mix(in oklch, var(--teal) 16%, transparent); color: var(--teal); }
+.pr-range-pill.tight { background: var(--raised); color: var(--brand); }
 .pr-range-pill.mixed { background: color-mix(in oklch, oklch(80% 0.12 85) 14%, transparent); color: oklch(82% 0.1 85); }
 .pr-range-pill.split { background: color-mix(in oklch, oklch(75% 0.13 50) 16%, transparent); color: oklch(78% 0.12 50); }
 
 .pr-space-legend { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 12px 6px 0; margin-top: 4px; border-top: 1px solid var(--line); font-size: 11px; color: var(--muted); }
 .pr-space-legend-item { display: flex; align-items: center; gap: 6px; }
 .pr-space-legend-swatch { display: inline-block; flex: none; }
-.pr-space-legend-swatch.range { width: 22px; height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--teal) 45%, var(--panel)); }
+.pr-space-legend-swatch.range { width: 22px; height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--data) 45%, var(--panel)); }
 .pr-space-legend-swatch.median { width: 3px; height: 12px; border-radius: 2px; background: var(--text); }
 .pr-space-legend-swatch.mine { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in oklch, var(--text) 75%, transparent); }
 .pr-space-legend-swatch.halfway {
@@ -2915,8 +2926,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* --- trend --- */
 
 .pr-ticks { display: flex; align-items: flex-end; gap: 4px; height: 30px; margin-top: 12px; }
-.pr-tick { flex: 1; height: 6px; border-radius: 3px; background: oklch(22% 0.02 250); }
-.pr-tick.on { height: 100%; background: var(--teal); }
+.pr-tick { flex: 1; height: 6px; border-radius: 3px; background: var(--raised); }
+.pr-tick.on { height: 100%; background: var(--data); }
 
 /* --- per-team (transpose) view --- */
 
@@ -2949,7 +2960,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .pr-homer-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pr-homer-track { position: relative; height: 6px; background: var(--line); border-radius: 999px; }
-.pr-homer-mid { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: oklch(34% 0.02 250); }
+.pr-homer-mid { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: oklch(34% 0.010 75); }
 .pr-homer-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
 .pr-homer-fill.down { background: var(--down); }
 .pr-homer-fill.up { background: var(--up); }
@@ -3115,8 +3126,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-score-pill {
   display: inline-block; min-width: 46px; text-align: center;
   padding: 3px 8px; border-radius: 999px;
-  background: color-mix(in oklch, var(--teal) 18%, var(--panel));
-  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--teal) 35%, transparent);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--brand) 35%, transparent);
   font-weight: 600;
 }
 .analysis-raw { display: block; margin-top: 2px; }
@@ -3141,10 +3152,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   border-radius: 10px;
   background: var(--bg);
 }
-.analysis-bar-row:hover { background: color-mix(in oklch, var(--teal) 6%, var(--bg)); }
-/* Crimson is reserved for "this is mine" everywhere in this app; same inset
+.analysis-bar-row:hover { background: var(--raised); }
+/* Gold is reserved for "this is mine" everywhere in this app; same inset
    rule the power-rankings ladder uses, so the two pages mark you identically. */
-.analysis-bar-row.mine { box-shadow: inset 2px 0 0 var(--crimson); }
+.analysis-bar-row.mine { box-shadow: inset 2px 0 0 var(--you); }
 
 .analysis-bar-who { grid-area: who; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .analysis-bar-who .standings-manager { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3227,9 +3238,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   border-radius: 999px; padding: 3px 10px; font-size: 11px; font-family: inherit;
   cursor: pointer; white-space: nowrap;
 }
-.analysis-expand:hover { border-color: var(--teal); color: var(--text); }
-.analysis-expand:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
-.analysis-expand[aria-expanded='true'] { border-color: var(--teal); color: var(--text); }
+.analysis-expand:hover { border-color: var(--brand); color: var(--text); }
+.analysis-expand:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.analysis-expand[aria-expanded='true'] { border-color: var(--brand); color: var(--text); }
 .analysis-caret { font-size: 9px; }
 
 .analysis-lineup-wrap {
@@ -3262,7 +3273,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-slot-pts { font-size: 13px; font-weight: 600; }
 
 /* A status tag, never a number: it explains a zero rather than producing one.
-   Deliberately colourless. --crimson is reserved by this stylesheet for "this
+   Deliberately colourless. --you is reserved by this stylesheet for "this
    is yours", and an injury tag is not a severity scale this app has any way to
    rank -- the WORD is the meaning, so the word carries it. */
 .analysis-inj {
@@ -3282,8 +3293,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--bg);
 }
 .analysis-game.mine {
-  border-color: color-mix(in oklch, var(--crimson) 45%, var(--line));
-  background: color-mix(in oklch, var(--crimson) 7%, var(--bg));
+  border-color: color-mix(in oklch, var(--you) 45%, var(--line));
+  background: color-mix(in oklch, var(--you) 7%, var(--bg));
 }
 .analysis-game-row + .analysis-game-row { margin-top: 8px; }
 .analysis-game-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -3297,7 +3308,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   display: flex; height: 6px; margin: 8px 0 6px;
   border-radius: 999px; overflow: hidden; background: var(--line);
 }
-.analysis-game-fill { display: block; background: var(--teal); }
+.analysis-game-fill { display: block; background: var(--data); }
 
 .analysis-game-margin { margin: 0; font-size: 12px; }
 /* Indented under the manager it belongs to -- the association is the point. */
@@ -3333,7 +3344,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   width: 100%; height: 34px; display: flex; align-items: flex-end;
   background: color-mix(in oklch, var(--panel) 60%, transparent); border-radius: 3px;
 }
-.analysis-weekbar-fill { width: 100%; background: var(--teal); border-radius: 3px; opacity: 0.75; }
+.analysis-weekbar-fill { width: 100%; background: var(--data); border-radius: 3px; opacity: 0.75; }
 /* The worst week is the one a reader is looking for, so it is marked -- and
    named in words above the chart, because a shorter bar is not a number. */
 .analysis-weekbar-fill.low { background: var(--muted); opacity: 1; }
@@ -3347,10 +3358,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    the number itself. */
 .analysis-scores-cell.best {
   color: var(--text); font-weight: 600;
-  background: color-mix(in oklch, var(--teal) 14%, transparent);
+  background: var(--raised);
 }
-.analysis-scores-grid tr.mine { box-shadow: inset 2px 0 0 var(--crimson); }
-.analysis-scores-grid tr.on { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.analysis-scores-grid tr.mine { box-shadow: inset 2px 0 0 var(--you); }
+.analysis-scores-grid tr.on { background: var(--raised); }
 .analysis-bump-note { margin: 12px 0 6px; }
 
 /* Week chips on the matchup panel. Borrowed .chip, so "on" already reads as
@@ -3368,7 +3379,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: var(--bg); color: var(--text); border: 1px solid var(--line);
   border-radius: 6px; padding: 4px 8px; font-size: 13px; font-family: inherit; max-width: 240px;
 }
-.analysis-vs-pick select:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.analysis-vs-pick select:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .analysis-vs-versus { align-self: center; color: var(--muted); font-size: 12px; padding-bottom: 6px; }
 
 .analysis-vs-head {
@@ -3380,7 +3391,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-vs-side.right { justify-content: flex-end; }
 .analysis-vs-total { font-size: 16px; font-weight: 600; }
 .analysis-vs-margin { text-align: center; white-space: nowrap; }
-.analysis-vs-margin-n { font-size: 15px; font-weight: 600; color: var(--teal); }
+.analysis-vs-margin-n { font-size: 15px; font-weight: 600; color: var(--brand); }
 
 .analysis-vs-rows { list-style: none; margin: 0; padding: 0; }
 
@@ -3397,7 +3408,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .analysis-vs-row .analysis-vs-player:first-child { flex-direction: row-reverse; }
 .analysis-vs-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
 /* The heavier side of each row is the one in full-strength text. Weight, not
-   hue -- teal already means "the app is talking" and crimson already means
+   hue -- brand already means "the app is talking" and gold already means
    "this is you", and a third colour here would be a third rule to remember. */
 .analysis-vs-player.won .analysis-vs-name,
 .analysis-vs-player.won .analysis-vs-pts { color: var(--text); font-weight: 600; }
@@ -3462,8 +3473,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .record-row:last-child { border-bottom: none; }
 /* Hover depth rather than a permanent fill: fourteen rows of tinted background
    is noise, one row under the cursor is a pointer. */
-.record-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
-.record-row.mine { background: color-mix(in oklch, var(--crimson) 8%, transparent); }
+.record-row:hover { background: var(--raised); }
+.record-row.mine { background: color-mix(in oklch, var(--you) 8%, transparent); }
 
 .record-rank {
   color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right;
@@ -3520,7 +3531,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line);
 }
 /* Hover depth rather than a permanent fill -- same argument as .record-row. */
-.career-rank-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.career-rank-row:hover { background: var(--raised); }
 .career-rank-figure { font-weight: 600; }
 .career-rank-position { font-weight: 700; }
 .career-unavailable {
@@ -3579,11 +3590,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 .rail-jumpto:hover {
-  background: color-mix(in oklch, var(--teal) 10%, transparent);
-  border-color: color-mix(in oklch, var(--teal) 35%, var(--line));
+  background: var(--raised);
+  border-color: color-mix(in oklch, var(--brand) 35%, var(--line));
   color: var(--text);
 }
-.rail-jumpto:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.rail-jumpto:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .rail-jumpto-glyph { font-size: 14px; width: 7px; text-align: center; flex-shrink: 0; }
 .rail-jumpto-text { display: flex; align-items: center; gap: 8px; flex: 1; }
 /* The shortcut, shown rather than left to be discovered. */
@@ -3644,9 +3655,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .jumpto-row-mark { width: 18px; height: 18px; font-size: 9px; flex-shrink: 0; }
 /* One highlight, shared by mouse and keyboard -- two would mean Enter could
    take a row the pointer wasn't on. */
-.jumpto-row.on { background: color-mix(in oklch, var(--teal) 14%, transparent); }
-.jumpto-row:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
-/* 600, not 550: Plus Jakarta Sans is imported at wght@400;500;600;700 --
+.jumpto-row.on { background: var(--raised); }
+.jumpto-row:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+/* 600, not 550: Barlow is loaded at wght@400;500;600;700 --
    named instances, not a variable axis -- so 550 snaps or synthesises
    rather than rendering as drawn. 600 is what `.app-rail-row.on` already
    uses for the same "this is the live one" meaning. */
@@ -3678,7 +3689,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
     border: 1px solid var(--line); box-shadow: 0 6px 18px oklch(0% 0 0 / 0.4);
     font-size: 19px; cursor: pointer;
   }
-  .jumpto-fab:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .jumpto-fab:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
   .jumpto-backdrop { padding: 8vh 12px 12px; }
   /* The rail is a horizontal bar here, so the entry point stops being a row. */
   .rail-jumpto { margin: 0; padding: 6px 9px; }
@@ -3690,7 +3701,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    of links rather than a list of people. */
 .mgr-who-link { color: inherit; text-decoration: none; }
 .mgr-who-link:hover { text-decoration: underline; text-underline-offset: 2px; }
-.mgr-who-link:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: 3px; }
+.mgr-who-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; border-radius: 3px; }
 
 /* ----------------------------------------------------------------------------
  * League / season switcher (003-easier-navigation)
@@ -3708,8 +3719,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   background: none; color: var(--muted); font: inherit; font-size: 12px;
   cursor: pointer; transition: background 120ms ease, color 120ms ease;
 }
-.rail-switcher-toggle:hover { background: color-mix(in oklch, var(--teal) 10%, transparent); color: var(--text); }
-.rail-switcher-toggle:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.rail-switcher-toggle:hover { background: var(--raised); color: var(--text); }
+.rail-switcher-toggle:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 .rail-switcher-caret { margin-left: auto; font-size: 10px; }
 .app-rail.collapsed .rail-switcher-toggle { justify-content: center; padding: 7px 0; gap: 0; }
 .app-rail.collapsed .rail-switcher-caret { margin-left: 0; }
@@ -3737,10 +3748,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   padding: 7px 8px; border-radius: 7px;
   color: var(--text); text-decoration: none; font-size: 13px;
 }
-.rail-switcher-item:hover { background: color-mix(in oklch, var(--teal) 12%, transparent); }
+.rail-switcher-item:hover { background: var(--raised); }
 .rail-switcher-item.on { background: color-mix(in oklch, var(--line) 55%, transparent); font-weight: 600; }
 .rail-switcher-item .muted { margin-left: auto; }
-.rail-switcher-item:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.rail-switcher-item:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 @media (max-width: 860px) {
   /* The rail is a horizontal bar here; the menu still drops from the button,
@@ -4406,7 +4417,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .tx-waiver { background: oklch(70% 0.13 250); }
 .tx-free_agent { background: oklch(72% 0.13 150); }
 .tx-trade { background: oklch(75% 0.14 80); }
-.tx-commissioner { background: oklch(60% 0.02 250); }
+.tx-commissioner { background: var(--muted); }
 
 .tx-total {
   flex: 0 0 auto;
@@ -4526,7 +4537,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .tx-trades > li.tx-tcard:hover {
   transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--line) 60%, var(--text) 25%);
-  box-shadow: 0 6px 16px oklch(5% 0.02 255 / 0.45);
+  box-shadow: 0 6px 16px oklch(5% 0.01 75 / 0.45);
 }
 
 .tx-thead {
@@ -4589,7 +4600,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   border-radius: 999px;
   font-size: 12px;
   overflow-wrap: anywhere;
-  background: color-mix(in oklab, var(--panel) 85%, var(--teal) 15%);
+  background: var(--raised);
 }
 .tx-chip-pick { background: color-mix(in oklab, var(--panel) 85%, oklch(75% 0.14 80) 15%); }
 .tx-chip-faab {
@@ -4616,7 +4627,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   cursor: pointer;
 }
 .tx-csv-btn:hover { border-color: var(--muted); }
-.tx-csv-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.tx-csv-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 .tx-how { margin-top: 10px; font-size: 12px; }
 .tx-how summary { cursor: pointer; color: var(--muted); }
@@ -4862,11 +4873,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 
 /* --- 020: the AI weekly recap card ------------------------------------------
-   One raised surface with a teal edge to mark it as written text rather than
+   One raised surface with a brand edge to mark it as written text rather than
    data; headline first, then the sections as a plain reading column. */
 .recap-card {
   border: 1px solid var(--line);
-  border-left: 3px solid var(--teal);
+  border-left: 3px solid var(--brand);
   border-radius: 10px;
   background: var(--panel);
   padding: 14px 18px 12px;
@@ -4883,7 +4894,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--brand);
   font-weight: 600;
 }
 .recap-section p { margin: 0; line-height: 1.5; }
@@ -5004,8 +5015,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .onbrand-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .onbrand-line { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
 .onbrand-verdict { padding: 1px 8px; border-radius: 999px; font-size: 10.5px; letter-spacing: 0.04em; cursor: help; }
-.onbrand-verdict.on { background: color-mix(in oklch, var(--teal) 22%, var(--panel)); color: var(--teal); }
-.onbrand-verdict.off { background: color-mix(in oklch, var(--crimson) 18%, var(--panel)); color: var(--text); }
+.onbrand-verdict.on { background: var(--raised); color: var(--brand); }
+.onbrand-verdict.off { background: color-mix(in oklch, var(--down) 18%, var(--panel)); color: var(--down); }
 .onbrand-verdict.none { color: var(--muted); border: 1px dashed var(--line); }
 
 /* T034/T035: the meters' place in the live room. Chips already wrap (flex-wrap),
@@ -5018,7 +5029,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 /* --- 013 US1: DraftPicker (site home) ---------------------------------------
    The three list sections are unboxed (.section) with a heading on the page.
-   "Start a mock draft" (.home-hero-cta, --volt above) is the page's one primary
+   "Start a mock draft" (.home-hero-cta, --brand above) is the page's one primary
    action. The league cards stay cards until T047 turns them into rows. */
 .picker-section .panel-head { margin: 0; }
 .picker-section .panel-head .section-title { margin: 0; }
@@ -5036,9 +5047,9 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .pr-section .pr-ladder-head { margin-bottom: 4px; }
 .pr-list .row-list > .pr-row { border-bottom: 1px solid var(--line); border-radius: 0; }
 .pr-list .row-list > .pr-row:last-child { border-bottom: 0; }
-.pr-list .row-list > .pr-row:hover { background: var(--row-hover); }
-.pr-list .row-list > .pr-row.on { background: color-mix(in oklch, var(--teal) 12%, transparent); }
-.pr-list .row-list > .pr-row.mine { background: color-mix(in oklch, var(--crimson) 12%, transparent); }
+.pr-list .row-list > .pr-row:hover { background: var(--raised); }
+.pr-list .row-list > .pr-row.on { background: var(--raised); }
+.pr-list .row-list > .pr-row.mine { background: color-mix(in oklch, var(--you) 12%, transparent); }
 
 
 /* --- 013 US1: LeagueAnalysis (Team strength) -------------------------------
@@ -5069,7 +5080,6 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 /* --- 013 US1: SeasonForecast (Playoff odds) --------------------------------
    Sections sit on the page. The commissioner recompute stays an .action-button
-   (teal, an interaction); --volt is reserved for a page's one primary action
    and this page's only action is commissioner-only. */
 .sf-table + .sf-note { margin-top: 10px; }
 
@@ -5086,7 +5096,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
    hue encoded nothing; position in the grid is already the order). The cards
    keep their grid until the trophy-list rework (T086). */
 .sl-card { border-left: 1px solid var(--line); background: var(--panel); }
-.sl-card-openable:hover { border-color: var(--line); background: var(--row-hover); box-shadow: none; }
+.sl-card-openable:hover { border-color: var(--line); background: var(--raised); box-shadow: none; }
 
 
 /* --- 013 US1: LeagueHistory (Standings) ------------------------------------
@@ -5112,7 +5122,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .career-ranks { gap: 0; }
 .career-rank-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 4px; }
 .career-rank-row:last-child { border-bottom: 0; }
-.career-rank-row:hover { background: var(--row-hover); }
+.career-rank-row:hover { background: var(--raised); }
 
 
 /* --- 013 US1: ManagerComparison --------------------------------------------
@@ -5131,8 +5141,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 
 /* --- 013 US1: MockSetup ----------------------------------------------------
-   Seats are chips on the page; "Start the draft" is the page's one --volt. */
-.controls.mock-seat-cta button:not(.chip):not(.segment) { background: var(--volt); color: var(--bg); border-color: transparent; font-weight: 700; }
+   Seats are chips on the page; "Start the draft" is the page's one --brand. */
+.controls.mock-seat-cta button:not(.chip):not(.segment) { background: var(--brand); color: var(--bg); border-color: transparent; font-weight: 700; }
 
 /* --- 013 US1: phone width (T030) ---------------------------------------------
    Flattening .panel into .section removed the scroll container the stat tables
@@ -5162,7 +5172,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
   font: inherit; font-size: 11px; font-weight: 600; color: var(--muted);
 }
 .app-rail-group-head:hover { color: var(--text); }
-.app-rail-group-head:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 6px; }
+.app-rail-group-head:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
 .app-rail-group-head.static { cursor: default; }
 .app-rail-group-caret { font-size: 9px; }
 .app-rail.collapsed .app-rail-group { margin-top: 4px; }
@@ -5180,13 +5190,13 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 
 /* --- 013 US4: League home ---------------------------------------------------
    Sections sit on the page (.section); standings are a .row-list. The only
-   --volt is "Open the draft room" (.home-hero-cta), and only before the draft.
+   --brand is "Open the draft room" (.home-hero-cta), and only before the draft.
    Win/loss colours always travel with the words Won / Lost / Tied. */
 .lh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
 .lh-grid > .section { min-width: 0; }
 .lh-draft { margin-bottom: 20px; }
 .lh-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
-.lh-link { font-size: 13px; color: var(--teal); text-decoration: none; align-self: flex-start; }
+.lh-link { font-size: 13px; color: var(--brand); text-decoration: none; align-self: flex-start; }
 .lh-link:hover { text-decoration: underline; }
 .lh-hero-nums { display: flex; flex-wrap: wrap; gap: 8px 40px; }
 .lh-hero-nums > div { display: flex; flex-direction: column; gap: 2px; }
@@ -5194,7 +5204,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lh-hero-label { font-size: 12px; color: var(--muted); }
 .lh-rows { list-style: none; margin: 0; padding: 0; }
 .lh-row { display: flex; align-items: center; gap: 10px; padding: 8px 4px; min-width: 0; }
-.lh-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-row.mine { background: color-mix(in oklch, var(--you) 14%, transparent); }
 .lh-pos { width: 18px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .lh-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lh-rec, .lh-pts { font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -5206,17 +5216,17 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lh-result.tied { font-weight: 600; }
 .lh-headline { font-weight: 600; margin: 0; }
 .lh-award-title { font-weight: 600; margin: 0; }
-/* spec 030: projected strength before week 1. Leader gets a neutral tint, you get the crimson one (.mine). */
+/* spec 030: projected strength before week 1. Leader gets a neutral tint, you get the gold one (.mine). */
 .lh-str-rows { margin: 8px 0 4px; }
 .lh-str-row { display: flex; align-items: center; gap: 10px; padding: 8px 8px; min-width: 0; border-radius: 6px; }
 .lh-str-row.lead { background: color-mix(in oklch, var(--text) 7%, transparent); }
-.lh-str-row.mine { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 14%, transparent); }
+.lh-str-row.mine { background: color-mix(in oklch, var(--you) 14%, transparent); }
 .lh-str-row.detached { margin-top: 6px; border-top: 1px dashed color-mix(in oklch, var(--muted) 45%, transparent); border-radius: 0 0 6px 6px; }
 .lh-str-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .lh-str-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .lh-str-track { height: 6px; border-radius: 3px; background: color-mix(in oklch, var(--muted) 16%, transparent); overflow: hidden; }
 .lh-str-fill { display: block; height: 100%; border-radius: 3px; background: color-mix(in oklch, var(--muted) 75%, var(--text)); }
-.lh-str-row.mine .lh-str-fill { background: var(--crimson); }
+.lh-str-row.mine .lh-str-fill { background: var(--you); }
 .lh-str-val { flex-shrink: 0; margin-left: auto; padding-left: 8px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .lh-str-line .lh-name { flex: 0 1 auto; }
 .lh-str-caption { margin: 6px 0 0; letter-spacing: .02em; }
@@ -5231,7 +5241,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lc-flag-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
 .lc-slot { display: inline-block; min-width: 34px; padding: 1px 7px; border-radius: 999px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .04em; color: var(--muted); background: color-mix(in oklch, var(--muted) 14%, transparent); }
 .lc-reason { font-size: 12px; font-weight: 600; }
-.lc-out, .lc-empty_slot { color: var(--crimson-text); }
+.lc-out, .lc-empty_slot { color: var(--down); }
 .lc-listed, .lc-no_game_in_week { color: var(--amber, var(--text)); }
 .lc-options-note { margin: 4px 0 2px; }
 .lc-option { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; padding: 2px 0 2px 12px; min-width: 0; }
@@ -5249,8 +5259,8 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .home-spotlight { margin-top: 16px; }
 .home-spot-leagues { display: flex; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); overflow-x: auto; scrollbar-width: thin; min-width: 0; }
 .home-spot-league { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; white-space: nowrap; color: var(--muted); background: none; cursor: pointer; }
-.home-spot-league[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
-.lh-spotlight-tag { font-weight: 600; color: var(--teal); }
+.home-spot-league[aria-selected="true"] { color: var(--text); font-weight: 600; background: var(--raised); }
+.lh-spotlight-tag { font-weight: 600; color: var(--brand); }
 .lh-spot-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 8px 40px; align-items: start; }
 .lh-spot-section { margin-top: 14px; min-width: 0; }
 .lh-spot-cols > .lh-spot-section { margin-top: 0; }
@@ -5267,11 +5277,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 .lh-spot-toggle { background: none; border: 0; padding: 6px 0 2px; cursor: pointer; font-family: inherit; }
 .lh-spot-credit { margin-top: 6px; }
 .lh-yours, .lh-fa { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
-.lh-yours { margin-left: 3px; color: var(--crimson-text); background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 18%, transparent); }
-.lh-fa { color: var(--teal); background: color-mix(in oklch, var(--teal) 16%, transparent); }
+.lh-yours { margin-left: 3px; color: var(--you-text); background: color-mix(in oklch, var(--you) 18%, transparent); }
+.lh-fa { color: var(--brand); background: var(--raised); }
 .lh-spot-tabs { display: none; gap: 4px; padding: 3px; margin: 8px 0 4px; border-radius: 999px; background: color-mix(in oklch, var(--muted) 14%, transparent); }
 .lh-spot-tab { flex: 1 1 0; border: 0; border-radius: 999px; padding: 6px 8px; font: inherit; font-size: 13px; color: var(--muted); background: none; cursor: pointer; }
-.lh-spot-tab[aria-selected="true"] { color: var(--text); font-weight: 600; background: color-mix(in oklch, var(--teal) 22%, transparent); }
+.lh-spot-tab[aria-selected="true"] { color: var(--text); font-weight: 600; background: var(--raised); }
 @media (max-width: 639px) {
   .lh-spot-tabs { display: flex; }
   .lh-spot-cols { display: block; }
@@ -5281,10 +5291,10 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 /* --- 013 US4: site home league rows -----------------------------------------
    One row per league: crest, name + sport + season, draft status, one action.
    Separators come from .row-list; the live tint is the only accent. "Start a
-   mock draft" (.home-hero-cta) stays the page's one --volt. */
+   mock draft" (.home-hero-cta) stays the page's one --brand. */
 .league-rows { display: block; }
 .league-row { display: flex; align-items: center; gap: 12px 14px; padding: 12px 8px; min-width: 0; flex-wrap: wrap; }
-.league-row.live { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.league-row.live { background: var(--raised); }
 .league-row .league-card-title { flex: 1 1 200px; min-width: 0; }
 .league-row .league-card-status, .league-row .league-card-live { flex: 0 1 auto; font-size: 12px; }
 .league-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
@@ -5365,11 +5375,11 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 .grade-early { white-space: nowrap; }
 
-/* --- 013 US8: steals & reaches on a finished board -------------------------
+/* --- 013 US8: sbrands & reaches on a finished board -------------------------
    Tint = pickNo minus ADP at draft time. A gradient over the cell's position
    fill (background-image, so the position color underneath is kept). --up is
    always printed with a "+" and --down with a minus, never color alone. */
-.board.value-view .cell.value-steal {
+.board.value-view .cell.value-sbrand {
   background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent));
 }
 .board.value-view .cell.value-reach {
@@ -5377,14 +5387,14 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--teal); outline
 }
 /* Spec 025 R1: a multi-position cell's position colour is itself an image, so the two
    rules above would replace it. Layer the value tint over the split instead. */
-.board.value-view .cell.pos-multi.value-steal {
+.board.value-view .cell.pos-multi.value-sbrand {
   background-image: linear-gradient(color-mix(in oklch, var(--up) var(--vt, 12%), transparent), color-mix(in oklch, var(--up) var(--vt, 12%), transparent)), var(--pos-split);
 }
 .board.value-view .cell.pos-multi.value-reach {
   background-image: linear-gradient(color-mix(in oklch, var(--down) var(--vt, 12%), transparent), color-mix(in oklch, var(--down) var(--vt, 12%), transparent)), var(--pos-split);
 }
 .value-delta { font-size: 10px; font-weight: 700; margin-left: auto; font-variant-numeric: tabular-nums; }
-.value-delta.steal { color: var(--up); }
+.value-delta.sbrand { color: var(--up); }
 .value-delta.reach { color: var(--down); }
 .value-delta.even, .value-delta.none { color: var(--muted); font-weight: 500; }
 .value-legend { margin: 0 0 6px; }
@@ -5405,11 +5415,11 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
    A tinted column group, so the what-if reads as a different kind of number from
    the real W/L/PF columns beside it. The tint is a wash, not a card: the glyphs
    and words (▲/▼, "would have made playoffs") carry the meaning, never the colour. */
-.standings .stand-whatif { background: color-mix(in oklch, var(--teal) 7%, transparent); }
+.standings .stand-whatif { background: var(--raised); }
 .standings .stand-group-row td { border-bottom: none; }
 .standings th.stand-whatif-head {
-  text-align: center; color: var(--teal); letter-spacing: 0.06em;
-  border-bottom: 2px solid color-mix(in oklch, var(--teal) 55%, var(--line));
+  text-align: center; color: var(--brand); letter-spacing: 0.06em;
+  border-bottom: 2px solid color-mix(in oklch, var(--brand) 55%, var(--line));
 }
 .stand-move { margin-left: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .stand-move.up { color: var(--up); }
@@ -5493,26 +5503,26 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 /* --- 013 US9: ManagerTendencies (Scouting report) --------------------------
    An archetype label under each manager's name; the selected league's managers
    are grouped first under their own sub-heading. */
-.mgr-archetype-chip { font-size: 12px; font-weight: 600; color: var(--teal); width: fit-content; }
+.mgr-archetype-chip { font-size: 12px; font-weight: 600; color: var(--brand); width: fit-content; }
 .mgr-group { margin: 18px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .mgr-group:first-of-type { margin-top: 6px; }
 
 /* --- 013 US9: MockSetup ----------------------------------------------------
    One row of seat chips (it scrolls inside its own frame when the room is wider
-   than the page). "You" is --crimson-fill; a real manager shows avatar and
-   archetype; "Start the draft" is the page's one --volt (see US1 block above). */
+   than the page). "You" is --you-fill; a real manager shows avatar and
+   archetype; "Start the draft" is the page's one --brand (see US1 block above). */
 .mock-seat-strip {
   grid-template-columns: none; grid-auto-flow: column;
   grid-auto-columns: minmax(96px, 1fr); overflow-x: auto; padding-bottom: 4px;
 }
 .mock-seat.assigned .mock-seat-face { background: var(--panel); color: var(--text); }
 .mock-seat-avatar { width: 28px; height: 28px; font-size: 11px; }
-.mock-seat-arch { font-size: 10px; color: var(--teal); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mock-seat-arch { font-size: 10px; color: var(--brand); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mock-seat-who { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* --- 013 US9 + spec 050: SignIn / landing page -------------------------------
-   The signed-out root. A top-aligned hero (product name in Oswald, the headline, a
-   large field and the page's one --volt action) followed by the rail's feature groups.
+   The signed-out root. A top-aligned hero (product name in the display face, the headline, a
+   large field and the page's one --brand action) followed by the rail's feature groups.
    `.app` is a fixed 100vh and `.content` is a flex child, so `.landing` scrolls
    itself; the old vertically centred 70vh welcome would have clipped the top of a
    tall page. Each group gets its own tint (--tint) so the tiles are not one flat
@@ -5532,8 +5542,8 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .landing-sports { margin: 2px 0 4px; display: flex; gap: 8px; justify-content: center; }
 .landing-sport {
   font-size: 12px; font-weight: 700; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 999px;
-  color: var(--teal); border: 1px solid color-mix(in oklch, var(--teal) 55%, var(--line));
-  background: color-mix(in oklch, var(--teal) 10%, transparent);
+  color: var(--brand); border: 1px solid color-mix(in oklch, var(--brand) 55%, var(--line));
+  background: var(--raised);
 }
 .landing-platforms { max-width: 520px; margin: 4px 0 0; }
 .signin-form { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 520px; margin-top: 10px; }
@@ -5542,17 +5552,17 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
   width: 100%; box-sizing: border-box; font: inherit; font-size: 20px; padding: 14px 16px;
   background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 10px;
 }
-.signin-input:focus { outline: 2px solid var(--teal); outline-offset: 2px; }
+.signin-input:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
 .signin-continue {
   font: inherit; font-size: 17px; font-weight: 700; padding: 13px 18px; border: 0; border-radius: 10px;
-  background: var(--volt); color: var(--bg); cursor: pointer;
+  background: var(--brand); color: var(--bg); cursor: pointer;
 }
 .signin-continue:disabled { opacity: 0.55; cursor: default; }
 .signin-note { max-width: 520px; margin: 0; }
 .landing-hero .error { max-width: 520px; margin: 0; }
 
-.landing-group { --tint: var(--teal); display: flex; flex-direction: column; gap: 12px; }
-.landing-group[data-group="thisWeek"] { --tint: var(--teal); }
+.landing-group { --tint: var(--brand); display: flex; flex-direction: column; gap: 12px; }
+.landing-group[data-group="thisWeek"] { --tint: var(--brand); }
 .landing-group[data-group="season"] { --tint: oklch(74% 0.15 150); }
 .landing-group[data-group="draft"] { --tint: oklch(80% 0.14 80); }
 .landing-group[data-group="history"] { --tint: oklch(72% 0.13 295); }
@@ -5599,7 +5609,7 @@ html[data-bk-user] .landing-prerender { display: none; }
    Games per team per league week. The count is printed in each cell and the
    tint tracks the same count (one encoding, number spelled out). The table
    scrolls inside .sg-wrap with a sticky team column, so the page itself never
-   scrolls sideways at 375px. Tints mix --teal into --panel, so they follow
+   scrolls sideways at 375px. Tints mix --brand into --panel, so they follow
    whatever the theme variables are. */
 
 .sg-section { min-width: 0; }
@@ -5647,11 +5657,11 @@ html[data-bk-user] .landing-prerender { display: none; }
   font-weight: 600;
   letter-spacing: 0;
   white-space: normal;
-  background: color-mix(in oklab, var(--teal) 18%, transparent);
-  color: var(--teal);
+  background: var(--raised);
+  color: var(--brand);
 }
-.sg-tag-po { background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
-.sg-now { box-shadow: inset 0 -2px 0 var(--teal); }
+.sg-tag-po { background: color-mix(in oklab, var(--fitted) 16%, transparent); color: var(--fitted); }
+.sg-now { box-shadow: inset 0 -2px 0 var(--brand); }
 
 .sg-team {
   position: sticky;
@@ -5675,12 +5685,12 @@ html[data-bk-user] .landing-prerender { display: none; }
 
 .sg-cell { text-align: center; padding: 8px 10px; color: var(--text); }
 .sg-c0 { color: var(--muted); }
-.sg-c1 { background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
-.sg-c2 { background: color-mix(in oklab, var(--teal) 20%, var(--panel)); }
-.sg-c3 { background: color-mix(in oklab, var(--teal) 34%, var(--panel)); }
-.sg-c4 { background: color-mix(in oklab, var(--teal) 50%, var(--panel)); font-weight: 600; }
-.sg-c5 { background: color-mix(in oklab, var(--teal) 66%, var(--panel)); font-weight: 700; color: var(--bg); }
-.sg-c6 { background: color-mix(in oklab, var(--teal) 80%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-c1 { background: color-mix(in oklab, var(--data) 8%, var(--panel)); }
+.sg-c2 { background: color-mix(in oklab, var(--data) 20%, var(--panel)); }
+.sg-c3 { background: color-mix(in oklab, var(--data) 34%, var(--panel)); }
+.sg-c4 { background: color-mix(in oklab, var(--data) 50%, var(--panel)); font-weight: 600; }
+.sg-c5 { background: color-mix(in oklab, var(--data) 66%, var(--panel)); font-weight: 700; color: var(--bg); }
+.sg-c6 { background: color-mix(in oklab, var(--data) 80%, var(--panel)); font-weight: 700; color: var(--bg); }
 .sg-missing { font-size: 10px; color: var(--muted); white-space: normal; max-width: 90px; }
 
 /* --- 018 US2: draft grade strip --------------------------------------------
@@ -5697,7 +5707,7 @@ html[data-bk-user] .landing-prerender { display: none; }
   box-shadow: inset 0 0 0 1px var(--line);
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
-.dgs-item:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--teal); }
+.dgs-item:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--brand); }
 .dgs-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .dgs-name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dgs-value { font-size: 18px; font-weight: 700; }
@@ -5715,15 +5725,15 @@ html[data-bk-user] .landing-prerender { display: none; }
 .played-out dt { color: var(--muted); font-size: 12px; }
 .played-out dd { margin: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 
-.steals-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
+.sbrands-busts { margin: 0 0 10px; flex-shrink: 0; min-width: 0; }
 .sb-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px; }
 .sb-col { min-width: 0; padding: 8px 10px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
-.sb-steals { box-shadow: inset 3px 0 0 var(--teal), inset 0 0 0 1px var(--line); }
+.sb-sbrands { box-shadow: inset 3px 0 0 var(--brand), inset 0 0 0 1px var(--line); }
 .sb-busts { box-shadow: inset 3px 0 0 var(--down), inset 0 0 0 1px var(--line); }
 .sb-col h4 { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .06em; }
 .sb-col ol { list-style: none; margin: 0; padding: 0; }
 .sb-row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 6px; border-radius: 8px; transition: background 120ms ease; }
-.sb-row:hover { background: color-mix(in oklch, var(--teal) 8%, transparent); }
+.sb-row:hover { background: var(--raised); }
 .sb-main { display: flex; flex-direction: column; min-width: 0; }
 .sb-name { font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 640px) { .sb-cols { grid-template-columns: 1fr; } }
@@ -5733,7 +5743,7 @@ html[data-bk-user] .landing-prerender { display: none; }
    .pt-wrap so the page never scrolls sideways at 375px. */
 .pt-section { min-width: 0; margin-bottom: 28px; }
 .pt-window { margin: 0 0 8px; }
-.pt-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.pt-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); }
 .pt-lists { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); min-width: 0; }
 .pt-list { min-width: 0; }
 .pt-list h3, .pt-sub { margin: 0 0 6px; font-size: 13px; }
@@ -5741,10 +5751,10 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pt-table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
 .pt-table th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .pt-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
-.pt-table tbody tr:hover > td { background: var(--row-hover); }
+.pt-table tbody tr:hover > td { background: var(--raised); }
 .pt-table tbody tr:last-child > td { border-bottom: 0; }
 /* specs/042 US1: a row that is the viewer's own player. Tint only; the "Yours" pill is the text signal. */
-.pt-table tbody tr.mine > td { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 8%, transparent); }
+.pt-table tbody tr.mine > td { background: color-mix(in oklch, var(--you) 8%, transparent); }
 .pt-name { font-weight: 600; }
 .pt-meta { display: block; font-size: 11px; color: var(--muted); }
 .pt-num { font-weight: 700; }
@@ -5757,14 +5767,14 @@ html[data-bk-user] .landing-prerender { display: none; }
 /* --- Player page (specs/022-player-stat-analysis) --------------------------
    Cards for the header, ranks and breakdown; tables for the season line and the
    game log. Every table scrolls inside .pp-wrap so the page never scrolls
-   sideways at 375px. Real-stat columns are plain; fantasy columns take --teal. */
+   sideways at 375px. Real-stat columns are plain; fantasy columns take --brand. */
 .pp-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 0 0 16px; min-width: 0; }
 .pp-head { display: flex; gap: 16px; align-items: flex-start; }
 .pp-head .pface { margin: 0; }
 .pp-head-main { min-width: 0; flex: 1; }
 .pp-name { margin: 0; font-size: 22px; line-height: 1.2; overflow-wrap: anywhere; }
 .pp-id { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; }
-.pp-pos { padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--teal); background: color-mix(in oklab, var(--teal) 16%, transparent); }
+.pp-pos { padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--brand); background: var(--raised); }
 .pp-team { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }
 .pp-line { margin: 6px 0 0; }
 .pp-own-list { display: grid; gap: 6px; margin-top: 12px; }
@@ -5784,16 +5794,16 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pp-tabs { display: flex; gap: 4px; margin: 0 0 12px; overflow-x: auto; border-bottom: 1px solid var(--line); }
 .pp-tab { appearance: none; background: transparent; border: 0; border-bottom: 2px solid transparent; padding: 8px 14px; margin-bottom: -1px; font: inherit; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .pp-tab:hover { color: var(--text); }
-.pp-tab.on { color: var(--text); border-bottom-color: var(--teal); }
-.pp-tab:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; border-radius: 6px; }
+.pp-tab.on { color: var(--text); border-bottom-color: var(--brand); }
+.pp-tab:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; border-radius: 6px; }
 .pp-panel { min-width: 0; }
 .pp-panel:focus-visible { outline: none; }
 .pp-sched { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .pp-sched li { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: baseline; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .pp-seasons { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .pp-season { display: inline-flex; flex-direction: column; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
-.pp-season:hover { background: var(--row-hover); }
-.pp-season.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.pp-season:hover { background: var(--raised); }
+.pp-season.on { border-color: var(--brand); background: var(--raised); }
 .pp-season.empty { color: var(--muted); }
 .pp-season-note { font-size: 10px; font-weight: 500; color: var(--muted); }
 .pp-h { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.04em; }
@@ -5804,11 +5814,11 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pp-table thead th { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
 .pp-table th:first-child, .pp-table tbody th { text-align: left; font-weight: 600; }
 .pp-table tbody tr:last-child > * { border-bottom: 0; }
-.pp-table tbody tr:hover > * { background: var(--row-hover); }
+.pp-table tbody tr:hover > * { background: var(--raised); }
 .pp-group th { text-align: center; }
 .pp-real { color: var(--text); border-bottom: 2px solid var(--line); }
-.pp-fant { color: var(--teal); }
-.pp-table thead th.pp-fant { border-bottom: 2px solid var(--teal); }
+.pp-fant { color: var(--brand); }
+.pp-table thead th.pp-fant { border-bottom: 2px solid var(--brand); }
 .pp-strong { font-weight: 700; }
 .pp-shot > span { display: block; line-height: 1.25; }
 .pp-made { font-size: 11px; }
@@ -5819,7 +5829,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pp-rank-label { font-size: 12px; color: var(--muted); }
 .pp-rank-num { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .pp-meter { display: block; height: 6px; border-radius: 999px; background: color-mix(in oklab, var(--muted) 20%, transparent); overflow: hidden; min-width: 40px; }
-.pp-meter-fill { display: block; height: 100%; border-radius: 999px; background: var(--teal); }
+.pp-meter-fill { display: block; height: 100%; border-radius: 999px; background: var(--data); }
 .pp-meter-fill.down { background: var(--down); }
 .pp-meter-fill.neutral { background: var(--muted); }
 .pp-adv-sep td { font-size: 11px; color: var(--muted); padding-top: 14px; text-align: left; }
@@ -5834,8 +5844,8 @@ html[data-bk-user] .landing-prerender { display: none; }
 .pp-reason { margin: 0 0 16px; }
 .pp-toggle { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; }
 .pp-tog { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.pp-tog:hover { background: var(--row-hover); }
-.pp-tog.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.pp-tog:hover { background: var(--raised); }
+.pp-tog.on { border-color: var(--brand); background: var(--raised); }
 .pp-adv th, .pp-adv td { white-space: normal; vertical-align: top; text-align: left; }
 .pp-adv-head { min-width: 150px; }
 .pp-adv-win { display: block; font-size: 13px; color: var(--text); letter-spacing: 0; }
@@ -5856,7 +5866,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 /* --- Stats leaderboard (specs/022 US4) --------------------------------------
    The table scrolls inside .sl-wrap; the player column is pinned (sticky) so the
    name stays visible while the numbers scroll. The page never scrolls sideways. */
-.sl-controls .segment { transition: none; } /* the clicked View segment froze mid-transition (muted text on a half-teal fill) when the table/leaders subtree swapped; instant is enough (live #3) */
+.sl-controls .segment { transition: none; } /* the clicked View segment froze mid-transition (muted text on a half-brand fill) when the table/leaders subtree swapped; instant is enough (live #3) */
 .sl-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 10px; min-width: 0; }
 .sl-filters { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; }
 .sl-field { display: grid; gap: 2px; }
@@ -5870,8 +5880,8 @@ html[data-bk-user] .landing-prerender { display: none; }
 .sl-table th.sl-pin { position: sticky; left: 0; z-index: 1; text-align: left; min-width: 150px; max-width: 190px; box-shadow: 1px 0 0 var(--line); }
 .sl-table tbody th.sl-pin { font-weight: 600; white-space: normal; }
 .sl-table td.sl-owner { text-align: left; }
-.sl-table tbody tr.mine > * { background: color-mix(in oklch, var(--crimson-fill, var(--crimson)) 8%, var(--panel)); }
-.sl-table tbody tr:hover > * { background: var(--row-hover); }
+.sl-table tbody tr.mine > * { background: color-mix(in oklch, var(--you) 8%, var(--panel)); }
+.sl-table tbody tr:hover > * { background: var(--raised); }
 .sl-table tbody tr:last-child > * { border-bottom: 0; }
 .sl-sub { display: block; font-weight: 400; line-height: 1.3; }
 .sl-unranked { color: var(--muted); font-style: italic; white-space: normal; }
@@ -5969,8 +5979,8 @@ html[data-bk-user] .landing-prerender { display: none; }
   cursor: row-resize; touch-action: none; outline: none; border-radius: 4px;
 }
 .room-divider-grip { width: 56px; height: 3px; border-radius: 999px; background: var(--line); transition: background 120ms ease; }
-.room-divider:hover .room-divider-grip, .room-divider:focus-visible .room-divider-grip { background: var(--teal); }
-.room-divider:focus-visible { box-shadow: 0 0 0 2px var(--teal); }
+.room-divider:hover .room-divider-grip, .room-divider:focus-visible .room-divider-grip { background: var(--brand); }
+.room-divider:focus-visible { box-shadow: 0 0 0 2px var(--brand); }
 
 .room-toggle { align-self: flex-start; }
 
@@ -6029,16 +6039,16 @@ html[data-bk-user] .landing-prerender { display: none; }
 
 
 /* --- 024 US2: board legibility ------------------------------------------------
-   Column marking comes from mySlot only. A confirmed seat is the crimson header
+   Column marking comes from mySlot only. A confirmed seat is the gold header
    (.col-head.mine, above); an assumed one is the same colour dashed and
    low-alpha with the word "assumed", so the two cannot be mistaken. */
 .board .col-head.assumed {
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--crimson) 45%, transparent), 0 0 0 4px var(--bg);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--you) 45%, transparent), 0 0 0 4px var(--bg);
   border-style: dashed;
-  background: color-mix(in oklch, var(--crimson-fill) 7%, var(--panel));
+  background: color-mix(in oklch, var(--you) 7%, var(--panel));
 }
 .board .col-head-you.assumed { color: var(--muted); font-style: italic; }
-.board .col-head.unclaimed .col-head-name { color: var(--teal); }
+.board .col-head.unclaimed .col-head-name { color: var(--brand); }
 .board .col-head.unclaimed { border: 1px dashed var(--line); }
 .board .rnd { flex-direction: column; gap: 0; line-height: 1.1; }
 .board .rnd-arrow { font-size: 11px; font-weight: 400; opacity: 0.8; }
@@ -6047,12 +6057,12 @@ html[data-bk-user] .landing-prerender { display: none; }
 .board .cell.kind-landed .name, .board .cell.kind-real .name { opacity: 1; border-bottom: 0; }
 .board .cell.kind-empty { opacity: 0.85; }
 .board .cell.on-the-clock {
-  box-shadow: inset 0 0 0 2px var(--volt, var(--teal));
-  background: color-mix(in oklch, var(--volt, var(--teal)) 12%, var(--panel));
+  box-shadow: inset 0 0 0 2px var(--brand);
+  background: color-mix(in oklch, var(--brand) 12%, var(--panel));
 }
 .board .otc-tag {
   display: inline-block; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--volt, var(--teal)); font-weight: 700; white-space: nowrap;
+  color: var(--brand); font-weight: 700; white-space: nowrap;
 }
 .board .cell.on-the-clock .pickno-open { display: inline-block; margin-right: 6px; }
 
@@ -6079,7 +6089,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .room-controls-group .room-primary:disabled { opacity: 0.55; cursor: not-allowed; }
 /* PickPrompt inline in the controls row (projection room): the note gives way first. */
 .room-controls-group .pick-prompt-note { flex: 1 1 80px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.room-controls-group .pick-prompt-take { background: var(--crimson-fill); border-color: var(--crimson-fill); color: var(--text); }
+.room-controls-group .pick-prompt-take { background: var(--you-fill); border-color: var(--you-fill); color: var(--bg); }
 .room-controls-group .chip { flex-shrink: 0; }
 .format-summary { white-space: nowrap; }
 .scarcity-meter .scarcity-note { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -6098,15 +6108,15 @@ html[data-bk-user] .landing-prerender { display: none; }
   width: 124px; height: 24px; padding: 0 8px; font: inherit; font-size: 12px;
   background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 999px;
 }
-.avail-region .avail-search:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.avail-region .avail-search:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .avail-hide { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; cursor: pointer; }
 .star-btn {
   flex: 0 0 auto; width: 20px; padding: 0; margin-right: 4px; background: none; border: 0;
   font: inherit; font-size: 15px; line-height: 1; color: var(--muted); cursor: pointer;
 }
 .star-btn:hover { color: var(--text); }
-.star-btn.on { color: var(--teal); }
-.star-btn:focus-visible { outline: 2px solid var(--teal); border-radius: 4px; }
+.star-btn.on { color: var(--brand); }
+.star-btn:focus-visible { outline: 2px solid var(--brand); border-radius: 4px; }
 .star-btn.star-gap { display: inline-block; cursor: default; }
 .avail tr.taken, .ds-table tr.taken { opacity: 0.5; }
 .taken-tag {
@@ -6144,16 +6154,16 @@ html[data-bk-user] .landing-prerender { display: none; }
 .target-chip {
   display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 150px;
   padding: 2px 8px 2px 4px; font-size: 12px; white-space: nowrap;
-  border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line)); border-radius: 999px;
-  background: color-mix(in oklch, var(--teal) 8%, var(--panel));
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--raised);
 }
 .target-chip .target-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .target-chip.taken { opacity: 0.55; border-color: var(--line); background: none; }
 .target-chip.taken .target-name { text-decoration: line-through; }
 .target-taken { flex: 0 0 auto; font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.target-pct { flex: 0 0 auto; font-size: 11px; color: var(--teal); }
+.target-pct { flex: 0 0 auto; font-size: 11px; color: var(--brand); }
 .target-more, .target-edit { flex: 0 0 auto; }
-.target-error { flex: 0 0 auto; background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; text-decoration: underline wavy var(--crimson); white-space: nowrap; }
+.target-error { flex: 0 0 auto; background: none; border: 0; padding: 0; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; text-decoration: underline wavy var(--danger); white-space: nowrap; }
 .target-pop {
   position: absolute; left: 0; top: 100%; z-index: 30; min-width: 320px; max-width: min(460px, 100%);
   max-height: 60vh; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
@@ -6167,9 +6177,9 @@ html[data-bk-user] .landing-prerender { display: none; }
   flex: 0 0 auto; width: 26px; height: 24px; padding: 0; font: inherit; font-size: 13px; cursor: pointer;
   color: var(--text); background: none; border: 1px solid var(--line); border-radius: 6px;
 }
-.target-btn:hover:not(:disabled) { border-color: var(--teal); }
+.target-btn:hover:not(:disabled) { border-color: var(--brand); }
 .target-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.target-btn:focus-visible { outline: 2px solid var(--teal); }
+.target-btn:focus-visible { outline: 2px solid var(--brand); }
 @media (max-width: 1279px) { .target-copy { display: none; } }
 
 /* 024 US5: the tag on a pick the user's own auto-pick made. */
@@ -6203,7 +6213,7 @@ html[data-bk-user] .landing-prerender { display: none; }
   box-shadow: 0 6px 18px rgba(0,0,0,0.35);
 }
 .info-mark:hover, .info-mark:focus-visible { color: var(--text); }
-.info-mark:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.info-mark:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 /* The status strip is ONE line of at most ~45px (was 71 in the mock room): avatar shrinks, the
    kicker and name share a row, the right-hand readout is inline, and the strip has no bottom margin. */
@@ -6256,12 +6266,12 @@ html[data-bk-user] .landing-prerender { display: none; }
 /* --- Stat calculator (specs/032) ---------------------------------------------
    Reuses .sl-controls / .sl-field / .sl-wrap / .sl-table / .sl-pin from the leaderboard. The ranked
    chart is HTML rows: bar length is |value| from a zero baseline and nothing else, one colour
-   (the player page's meter colour, --teal), the exact value printed beside each bar. The page
+   (the player page's meter colour, --brand), the exact value printed beside each bar. The page
    never scrolls sideways; the table scrolls inside .sl-wrap with the player column pinned. */
 .sc-pages { display: flex; gap: 8px; margin: 0 0 12px; }
 .sc-page { padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 13px; font-weight: 600; text-decoration: none; }
-.sc-page:hover { background: var(--row-hover); }
-.sc-page.on { border-color: var(--teal); background: color-mix(in oklab, var(--teal) 14%, var(--panel)); }
+.sc-page:hover { background: var(--raised); }
+.sc-page.on { border-color: var(--brand); background: var(--raised); }
 .sc-editor { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: end; margin: 0 0 10px; min-width: 0; }
 .sc-formula-field { flex: 1 1 280px; min-width: 0; }
 .sc-input, .sc-top input { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 14px; min-width: 0; max-width: 100%; }
@@ -6284,11 +6294,11 @@ html[data-bk-user] .landing-prerender { display: none; }
 .sc-bar-rank { text-align: right; font-variant-numeric: tabular-nums; }
 .sc-bar-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sc-bar-track { position: relative; display: block; height: 14px; min-width: 0; }
-.sc-bar { position: absolute; top: 0; bottom: 0; background: var(--teal); border-radius: 0 4px 4px 0; }
+.sc-bar { position: absolute; top: 0; bottom: 0; background: var(--data); border-radius: 0 4px 4px 0; }
 .sc-bar.neg { border-radius: 4px 0 0 4px; }
 .sc-bar-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
 .sc-bar-val { text-align: right; font-variant-numeric: tabular-nums; }
-.sc-bar-row:hover { background: var(--row-hover); }
+.sc-bar-row:hover { background: var(--raised); }
 .sc-excluded-group { margin-top: 8px; }
 .sc-excluded-group p { margin: 0 0 2px; }
 .sc-excluded-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; }
@@ -6307,7 +6317,7 @@ html[data-bk-user] .landing-prerender { display: none; }
 .sc-axis-label { fill: var(--text); font-size: 12px; }
 .sc-dot { cursor: pointer; outline: none; }
 .sc-hit { fill: transparent; }
-.sc-pt { fill: var(--teal); stroke: var(--panel); stroke-width: 2; fill-opacity: 0.9; }
+.sc-pt { fill: var(--data); stroke: var(--panel); stroke-width: 2; fill-opacity: 0.9; }
 .sc-dot:hover .sc-pt, .sc-dot.on .sc-pt, .sc-dot:focus-visible .sc-pt { stroke: var(--text); fill-opacity: 1; }
 .sc-tip { position: absolute; pointer-events: none; display: grid; gap: 2px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3); box-sizing: border-box; overflow-wrap: anywhere; }
 .sc-scatter-note { margin: 6px 0 0; }
@@ -6326,28 +6336,28 @@ html[data-bk-user] .landing-prerender { display: none; }
 .sc-insert select { width: 100%; max-width: 100%; min-width: 0; }
 
 /* --- Stat calculator US5 charts (specs/032 US5): Spread, Change, Breakdown ------------------------
-   Same tokens as the ranked chart and the scatter. --teal = the primary series, --up/--down = the app's
+   Same tokens as the ranked chart and the scatter. --brand = the primary series, --up/--down = the app's
    rise/fall colours (the sign is always printed too), --muted = everyone else. */
 .sc-legend { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); }
 .sc-legend li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .sc-swatch { flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--muted); }
-.sc-swatch-top { background: var(--teal); border-radius: 50%; }
+.sc-swatch-top { background: var(--data); border-radius: 50%; }
 .sc-swatch-rest { background: var(--muted); opacity: 0.6; border-radius: 50%; }
-.sc-swatch-band { background: color-mix(in oklab, var(--teal) 16%, transparent); box-shadow: inset 0 0 0 1px var(--line); }
+.sc-swatch-band { background: color-mix(in oklab, var(--data) 16%, transparent); box-shadow: inset 0 0 0 1px var(--line); }
 .sc-swatch-then { background: transparent; box-shadow: inset 0 0 0 2px var(--muted); border-radius: 50%; }
 .sc-swatch-now { background: var(--text); border-radius: 50%; }
-.sc-swatch-rise { background: var(--teal); height: 4px; }
+.sc-swatch-rise { background: var(--data); height: 4px; }
 .sc-swatch-fall { background: var(--wr); height: 4px; }
 .sc-dot.rest .sc-pt { fill: var(--muted); fill-opacity: 0.6; }
-.sc-dot.top .sc-pt { fill: var(--teal); fill-opacity: 1; }
-.sc-iqr { fill: color-mix(in oklab, var(--teal) 12%, transparent); stroke: var(--line); stroke-width: 1; }
+.sc-dot.top .sc-pt { fill: var(--data); fill-opacity: 1; }
+.sc-iqr { fill: color-mix(in oklab, var(--data) 12%, transparent); stroke: var(--line); stroke-width: 1; }
 .sc-quart { stroke: var(--muted); stroke-width: 1; }
 .sc-median { stroke: var(--text); stroke-width: 2; }
 .sc-seg { position: absolute; top: 0; bottom: 0; box-shadow: inset 0 0 0 1px var(--panel); border-radius: 2px; }
 .sc-db-row { grid-template-columns: 24px minmax(90px, 170px) minmax(0, 1fr) minmax(96px, auto); }
 .sc-db-track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line); }
 .sc-db-line { position: absolute; top: 50%; height: 3px; margin-top: -1px; border-radius: 2px; background: var(--muted); }
-.sc-db-line.rise { background: var(--teal); } /* US5 review C3: neutral hues; --up/--down mean better/worse elsewhere */
+.sc-db-line.rise { background: var(--data); } /* US5 review C3: neutral hues; --up/--down mean better/worse elsewhere */
 .sc-db-line.fall { background: var(--wr); }
 .sc-db-dot { position: absolute; top: 50%; width: 10px; height: 10px; margin: -4px 0 0 -5px; border-radius: 50%; box-sizing: border-box; }
 .sc-db-dot.then { background: var(--panel); box-shadow: 0 0 0 2px var(--muted); }
@@ -6415,16 +6425,16 @@ html[data-bk-user] .landing-prerender { display: none; }
   .rv-first .rv-who { max-width: 100%; }
   .rv-first .rv-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
-.rv-me > .rv-first { box-shadow: inset 3px 0 0 var(--crimson); }
-.rv-me > .rv-cell { box-shadow: inset 0 1px 0 color-mix(in oklab, var(--crimson) 40%, transparent); }
+.rv-me > .rv-first { box-shadow: inset 3px 0 0 var(--you); }
+.rv-me > .rv-cell { box-shadow: inset 0 1px 0 color-mix(in oklab, var(--you) 40%, transparent); }
 .rv-legend { margin: 8px 0 4px; }
 .rv-season .rv-sc { min-width: 120px; text-align: left; }
 .rv-weekhead { min-width: 120px; }
 .rv-wk { display: block; color: var(--text); text-transform: uppercase; }
-.rv-tag { display: inline-block; margin: 4px 3px 0 0; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--teal) 18%, transparent); color: var(--teal); }
-.rv-tag-po { background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
-th.rv-now { box-shadow: inset 0 -2px 0 var(--teal); }
-td.rv-now { background: color-mix(in oklab, var(--teal) 10%, var(--panel)); }
+.rv-tag { display: inline-block; margin: 4px 3px 0 0; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--raised); color: var(--brand); }
+.rv-tag-po { background: color-mix(in oklab, var(--fitted) 16%, transparent); color: var(--fitted); }
+th.rv-now { box-shadow: inset 0 -2px 0 var(--brand); }
+td.rv-now { background: var(--raised); }
 td.rv-po { border-left: 1px dashed var(--line); }
 .rv-opp { display: block; font-weight: 600; font-size: 12px; white-space: normal; }
 .rv-state { color: var(--muted); font-size: 11px; letter-spacing: 0.04em; }
@@ -6435,13 +6445,13 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .rv-headline { font-weight: 600; margin: 8px 0; }
 .rv-pairs { list-style: none; margin: 10px 0; padding: 0; display: grid; gap: 8px; }
 .rv-pair { display: grid; gap: 6px; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); transition: transform 120ms ease, box-shadow 120ms ease; }
-.rv-pair:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--teal); }
+.rv-pair:hover { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--brand); }
 .rv-pair-who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rv-vs { color: var(--muted); font-size: 11px; text-transform: uppercase; }
 .rv-pair-why { font-size: 13px; }
 .rv-pair-meta { display: flex; gap: 8px; align-items: center; }
-.rv-thin { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--volt) 16%, transparent); color: var(--volt); }
-.rv-sched { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--teal) 16%, transparent); color: var(--teal); }
+.rv-thin { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--stated) 16%, transparent); color: var(--stated); }
+.rv-sched { padding: 1px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; background: var(--raised); color: var(--brand); }
 .rv-week-h { margin: 14px 0 4px; font-size: 16px; }
 .rv-held { margin: 8px 0; padding-left: 18px; display: grid; gap: 4px; }
 .rv-details { margin: 10px 0; padding: 8px 12px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); }
@@ -6453,7 +6463,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
    Errors and counts only; the lean is words, so there is deliberately no good/bad colour here. */
 .projacc-head { margin: 4px 0 12px; }
 .projacc-head p { margin: 0 0 6px; }
-.projacc-meter { width: 100%; max-width: 360px; height: 8px; display: block; margin: 6px 0; accent-color: var(--teal); }
+.projacc-meter { width: 100%; max-width: 360px; height: 8px; display: block; margin: 6px 0; accent-color: var(--data); }
 .projacc-tabs { margin: 0 0 10px; max-width: 100%; overflow-x: auto; }
 .projacc-table caption { text-align: left; padding: 0 0 6px; caption-side: top; }
 .projacc-table tbody th { text-align: left; font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--text); padding: 6px 10px; border-bottom: 1px solid var(--line); }
@@ -6473,22 +6483,22 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .lockin-row {
   display: grid; grid-template-columns: minmax(150px, 1.1fr) 64px minmax(190px, 2fr) auto; align-items: center;
   gap: 8px 14px; padding: 8px 12px; border-radius: 12px;
-  background: color-mix(in oklab, var(--panel) 92%, var(--teal) 8%); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--line);
 }
-.lockin-row:hover { background: color-mix(in oklab, var(--panel) 84%, var(--teal) 16%); }
+.lockin-row:hover { background: var(--raised); }
 .lockin-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .lockin-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lockin-median { font-size: 15px; text-align: right; }
 .lockin-iqr { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .lockin-bar { position: relative; display: block; height: 8px; border-radius: 4px; background: color-mix(in oklab, var(--line) 60%, transparent); }
 .lockin-bar-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
-.lockin-bar-iqr { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: color-mix(in oklab, var(--teal) 55%, var(--panel)); }
+.lockin-bar-iqr { position: absolute; top: 0; bottom: 0; border-radius: 4px; background: color-mix(in oklab, var(--data) 55%, var(--panel)); }
 .lockin-bar-median { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--text); }
 .lockin-toofew { grid-column: 2 / span 2; font-size: 13px; }
 .lockin-counts { display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .lockin-pill {
   padding: 2px 9px; border-radius: 999px; white-space: nowrap;
-  background: color-mix(in oklab, var(--panel) 70%, var(--teal) 30%);
+  background: var(--raised);
 }
 .lockin-pill-quiet { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
 .lockin-skipped, .lockin-caveats { margin: 10px 0 0; padding-left: 18px; }
@@ -6499,13 +6509,13 @@ td.rv-po { border-left: 1px dashed var(--line); }
 }
 
 /* spec 044 US2-US5: players, the evidence grid, thresholds, live calls, the player-page tab, the digest card.
-   Lock / Wait are tinted pills (teal vs amber), not a good/bad red-green: a Wait is advice, not a failure. */
+   Lock / Wait are tinted pills (brand vs amber), not a good/bad red-green: a Wait is advice, not a failure. */
 .lockin-sort { display: inline-flex; gap: 6px; margin: 0 0 10px; }
 .lockin-sort .segment { font-size: 11px; padding: 5px 11px; }
 .lockin-prow {
   display: grid; grid-template-columns: minmax(150px, 1.4fr) 64px minmax(190px, 2fr) auto; align-items: center;
   gap: 6px 14px; padding: 6px 12px; border-radius: 10px;
-  background: color-mix(in oklab, var(--panel) 94%, var(--teal) 6%); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--line);
 }
 .lockin-toofew2 { grid-column: 2 / span 2; font-size: 13px; }
 .lockin-more { margin-top: 8px; }
@@ -6514,24 +6524,24 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .lockin-grid th { font-size: 11px; font-weight: 600; text-align: left; color: var(--muted); padding: 4px 6px; }
 .lockin-grid td {
   vertical-align: top; padding: 7px 9px; border-radius: 10px; font-size: 12px;
-  background: color-mix(in oklab, var(--panel) 92%, var(--teal) 8%); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--line);
 }
 .lockin-cell-main, .lockin-cell-sub { display: block; }
 .lockin-thresholds { margin: 6px 0 4px; }
 .lockin-thr-list { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; padding: 0; }
 .lockin-thr {
   display: inline-flex; flex-direction: column; gap: 1px; padding: 6px 12px; border-radius: 12px; min-width: 76px;
-  background: color-mix(in oklab, var(--panel) 86%, var(--teal) 14%); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--line);
 }
 .lockin-calls { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .lockin-call {
   display: grid; grid-template-columns: minmax(160px, 1.3fr) minmax(200px, 2fr) auto auto; align-items: center;
   gap: 4px 14px; padding: 8px 12px; border-radius: 12px;
-  background: color-mix(in oklab, var(--panel) 92%, var(--teal) 8%); box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--raised); box-shadow: inset 0 0 0 1px var(--line);
 }
 .lockin-call-who { display: flex; flex-direction: column; min-width: 0; }
 .lockin-call-pill { padding: 3px 12px; border-radius: 999px; font-weight: 700; font-size: 12px; text-align: center; min-width: 74px; }
-.lockin-call-lock { background: color-mix(in oklab, var(--panel) 45%, var(--teal) 55%); }
+.lockin-call-lock { background: color-mix(in oklab, var(--panel) 45%, var(--brand) 55%); }
 .lockin-call-wait { background: color-mix(in oklab, var(--panel) 60%, var(--sport-nba) 40%); }
 .lockin-call-too_early { background: transparent; box-shadow: inset 0 0 0 1px var(--line); font-weight: 500; }
 .pl-lockins { display: grid; gap: 14px; }
@@ -6605,7 +6615,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
   font: inherit; font-size: 13px; padding: 4px 12px; border-radius: 999px; cursor: pointer;
   background: transparent; color: var(--text); border: 1px solid var(--line);
 }
-.sl-cl-btn:hover:not(:disabled) { background: var(--row-hover); }
+.sl-cl-btn:hover:not(:disabled) { background: var(--raised); }
 .sl-cl-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .sl-cl-btn-primary {
   background: color-mix(in oklab, var(--panel) 70%, oklch(60% 0.12 var(--sl-hue, 250)) 30%);
@@ -6654,7 +6664,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 }
 .dg-token form { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .dg-sport { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.dg-status { margin: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in oklab, var(--teal) 8%, var(--panel)); }
+.dg-status { margin: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); }
 .dg-cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); min-width: 0; }
 .dg-card {
   display: flex; flex-direction: column; gap: 8px; min-width: 0; padding: 12px 14px;
@@ -6667,7 +6677,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
   border: 1px solid var(--line); background: var(--bg); color: var(--text);
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
-.dg-card textarea:focus-visible { outline: 2px solid var(--teal); outline-offset: 1px; }
+.dg-card textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .dg-card-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .dg-card-actions { display: inline-flex; gap: 8px; margin-left: auto; }
 .dg-count { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
@@ -6695,7 +6705,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
    (hue 255) in oklch interpolates the HUE toward blue: the "green" key measured hue 197 (teal), the green gap
    pill hue 236 (blue) and the "red" key hue 307 (purple), while the legend said green and red. oklab has no
    hue to interpolate, so the tint keeps its hue. --adp-red is a true red-orange (Allan asked for red), kept
-   off the crimson that means "you" and off --down's pink. */
+   off the gold that means "you" and off --down's pink. */
 :root { --adp-red: oklch(66% 0.19 38); }
 .adp-sources { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
 .adp-source { display: grid; gap: 2px; align-content: start; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
@@ -6708,7 +6718,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .adp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .adp-rookies { align-self: flex-end; padding-bottom: 4px; }
 .adp-threshold { min-width: 200px; flex: 1 1 200px; }
-.adp-threshold input { width: 100%; accent-color: var(--teal); }
+.adp-threshold input { width: 100%; accent-color: var(--brand); }
 .adp-legend { display: grid; gap: 4px; }
 .adp-legend-item { display: block; }
 .adp-key { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 4px; vertical-align: -1px; }
@@ -6734,16 +6744,16 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .adp-blend { display: grid; gap: 10px; }
 .adp-blend-sliders { display: grid; gap: 12px 20px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
 .adp-blend-sliders label { display: grid; gap: 4px; min-width: 0; }
-.adp-blend-sliders input { width: 100%; accent-color: var(--teal); }
+.adp-blend-sliders input { width: 100%; accent-color: var(--brand); }
 .adp-hand-set { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; color: var(--fitted);
   background: color-mix(in oklab, var(--fitted) 14%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--fitted) 40%, var(--line)); }
 .adp-table td.adp-blend-cell, .adp-table td.adp-price-cell { font-weight: 600; }
 .adp-sold { color: var(--muted); }
-.adp-table tr.adp-sold-row > * { background: color-mix(in oklab, var(--teal) 5%, var(--panel)); }
-.adp-sold-tag { color: var(--teal); }
+.adp-table tr.adp-sold-row > * { background: var(--raised); }
+.adp-sold-tag { color: var(--brand); }
 
 /* Spec 046 US3: budget cards. Cards (repeated, identity-bearing), with the resting shadow and hover lift the
-   other repeated cards carry; the viewer's own is outlined in the "you" crimson, never colour alone (it says "You"). */
+   other repeated cards carry; the viewer's own is outlined in the "you" gold, never colour alone (it says "You"). */
 .adp-budgets { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 136px), 1fr)); }
 .adp-budget {
   display: grid; gap: 6px; align-content: start; min-width: 0; padding: 12px; border-radius: 12px;
@@ -6752,14 +6762,14 @@ td.rv-po { border-left: 1px dashed var(--line); }
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 .adp-budget:hover { transform: translateY(-2px); box-shadow: 0 2px 4px rgba(0,0,0,0.3), 0 12px 26px rgba(0,0,0,0.24); }
-.adp-budget.mine { border-color: var(--crimson); box-shadow: 0 0 0 1px var(--crimson), 0 8px 20px rgba(0,0,0,0.18); }
+.adp-budget.mine { border-color: var(--you); box-shadow: 0 0 0 1px var(--you), 0 8px 20px rgba(0,0,0,0.18); }
 .adp-budget-who { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .adp-budget-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .adp-budget-left { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
 .adp-budget-left small { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 4px; }
 .adp-budget-facts { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.adp-you { padding: 1px 8px; border-radius: 999px; font-size: 11px; color: var(--crimson-text);
-  background: color-mix(in oklab, var(--crimson) 14%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--crimson) 45%, var(--line)); }
+.adp-you { padding: 1px 8px; border-radius: 999px; font-size: 11px; color: var(--you-text);
+  background: color-mix(in oklab, var(--you) 14%, var(--panel)); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--you) 45%, var(--line)); }
 .adp-miss { color: var(--fitted); }
 .adp-feed { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
 .adp-feed li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); min-width: 0; }
@@ -6784,7 +6794,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 /* --- Hall of fame (specs/047-hall-of-fame) -------------------------------------
    The trophy case is seasons x roles, so it is a table that scrolls inside .hof-wrap with a sticky season column
    (the page never scrolls sideways at 375px). Each role column carries its own tint so the roles read apart at a
-   glance: champion gold, runner-up teal, points leader neutral, last place a muted red. A cell that names nobody
+   glance: champion --fitted, runner-up neutral, points leader neutral, last place a muted red. A cell that names nobody
    says why in .hof-note. */
 .hof-section { min-width: 0; }
 .hof-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
@@ -6797,8 +6807,8 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hof-season { padding: 12px 14px; font-size: 15px; font-weight: 700; text-align: left; font-variant-numeric: tabular-nums; }
 .hof-c { padding: 10px 12px; vertical-align: top; min-width: 150px; }
 .hof-c > * + * { margin-top: 6px; }
-.hof-champ { background: color-mix(in oklab, var(--volt) 13%, var(--panel)); }
-.hof-ru { background: color-mix(in oklab, var(--teal) 9%, var(--panel)); }
+.hof-champ { background: color-mix(in oklab, var(--fitted) 13%, var(--panel)); }
+.hof-ru { background: color-mix(in oklab, var(--data) 9%, var(--panel)); }
 .hof-pl { background: var(--panel); }
 .hof-last { background: color-mix(in oklab, var(--down) 8%, var(--panel)); }
 .hof-table tbody > tr:hover > .hof-c { filter: brightness(1.12); }
@@ -6817,19 +6827,19 @@ td.rv-po { border-left: 1px dashed var(--line); }
 }
 
 /* --- Notable rivalries (specs/047-hall-of-fame US2) ------------------------------
-   Four short lists above the matrix. Each card carries its own tint in its title chip (most played teal, closest
-   volt, one-sided pink, playoff crimson) so the four questions read apart; the row is the same pair shape as a
+   Four short lists above the matrix. Each card carries its own tint in its title chip (most played neutral, closest
+   --fitted, one-sided pink, playoff red) so the four questions read apart; the row is the same pair shape as a
    cell: left name, the record it prints, right name. Narrow screens stack the cards. */
 .rvd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 12px; margin-top: 10px; }
 .rvd-card { min-width: 0; padding: 12px 14px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-top: 3px solid var(--rvd-tint, var(--line)); }
-.rvd-mostPlayed { --rvd-tint: var(--teal); }
-.rvd-closest { --rvd-tint: var(--volt); }
+.rvd-mostPlayed { --rvd-tint: var(--data); }
+.rvd-closest { --rvd-tint: var(--fitted); }
 .rvd-lopsided { --rvd-tint: var(--down); }
-.rvd-playoff { --rvd-tint: var(--crimson); }
+.rvd-playoff { --rvd-tint: var(--down); }
 .rvd-title { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--rvd-tint, var(--muted)); }
 .rvd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .rvd-row { border-radius: 8px; transition: background 120ms ease; }
-.rvd-row:hover { background: color-mix(in oklab, var(--rvd-tint, var(--teal)) 12%, transparent); }
+.rvd-row:hover { background: color-mix(in oklab, var(--rvd-tint, var(--data)) 12%, transparent); }
 .rvd-link { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; padding: 6px 4px; color: var(--text); text-decoration: none; }
 .rvd-side { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .rvd-side-b { justify-content: flex-end; text-align: right; }
@@ -6837,7 +6847,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .rvd-rec { display: grid; justify-items: center; line-height: 1.2; }
 .rvd-score { font-weight: 700; font-variant-numeric: tabular-nums; }
 .rvd-met { color: var(--muted); font-size: 10px; }
-.rvd-po { color: var(--crimson-text); font-size: 10px; font-weight: 600; }
+.rvd-po { color: var(--down); font-size: 10px; font-weight: 600; }
 .rvd-more > summary { cursor: pointer; font-weight: 600; font-size: 13px; margin-bottom: 6px; }
 .rvd-empty, .rvd-note { margin: 0; }
 .rvd-note { margin-top: 8px; }
@@ -6854,7 +6864,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .mrv-title { margin: 0 0 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mrv-tint, var(--muted)); }
 .mrv-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .mrv-entry { border-radius: 8px; transition: background 120ms ease; }
-.mrv-entry:hover { background: color-mix(in oklab, var(--mrv-tint, var(--teal)) 12%, transparent); }
+.mrv-entry:hover { background: color-mix(in oklab, var(--mrv-tint, var(--data)) 12%, transparent); }
 .mrv-link { display: flex; align-items: center; gap: 8px; padding: 5px 4px; color: var(--text); text-decoration: none; min-width: 0; flex-wrap: wrap; }
 .mrv-name { font-weight: 600; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
 .mrv-former { padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; background: color-mix(in oklab, var(--muted) 22%, transparent); color: var(--text); }
@@ -6862,7 +6872,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .mrv-met { color: var(--muted); font-size: 11px; }
 .mrv-none { margin: 0; }
 .hof-awards-btn { display: block; margin: 6px 0 0; padding: 2px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 600; cursor: pointer; }
-.hof-awards-btn:hover, .hof-awards-btn[aria-expanded="true"] { color: var(--text); border-color: color-mix(in oklab, var(--teal) 60%, var(--line)); background: color-mix(in oklab, var(--teal) 12%, transparent); }
+.hof-awards-btn:hover, .hof-awards-btn[aria-expanded="true"] { color: var(--text); border-color: color-mix(in oklab, var(--brand) 60%, var(--line)); background: var(--raised); }
 .hof-awards-row > td { padding: 12px 14px 16px; background: color-mix(in oklab, var(--bg) 40%, var(--panel)); border-top: 1px dashed var(--line); }
 .hof-awards-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px; margin-bottom: 8px; }
 .hof-award { min-width: 0; padding: 8px 10px; border-radius: 10px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); border-left: 3px solid oklch(60% 0.12 var(--sl-hue, 250)); }
@@ -6874,7 +6884,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
    scroll. Long names and labels wrap (overflow-wrap) rather than truncate.
    A marked cell is tinted AND carries visually hidden text; colour is never the
    only signal. */
-.pp-compare { font-size: 13px; font-weight: 600; color: var(--teal); }
+.pp-compare { font-size: 13px; font-weight: 600; color: var(--brand); }
 .pc-intro { margin: 0 0 12px; }
 .pc-card { padding: 12px; }
 .pc-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
@@ -6897,21 +6907,21 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .pc-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .pc-per-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .pc-per-head .pp-h { margin: 0; }
-.pc-choose-btn { appearance: none; padding: 8px 14px; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--teal); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-.pc-choose-btn:hover { background: var(--row-hover); }
+.pc-choose-btn { appearance: none; padding: 8px 14px; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--brand); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pc-choose-btn:hover { background: var(--raised); }
 .pc-chooser { display: grid; gap: 6px; min-width: 0; font-weight: 400; }
 .pc-choose-label { font-size: 12px; font-weight: 600; color: var(--muted); }
 .pc-chooser input { width: 100%; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 13px; }
 .pc-options { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
 .pc-option { display: grid; grid-template-columns: 28px 1fr; gap: 2px 8px; align-items: center; padding: 6px; border-radius: 8px; cursor: pointer; }
-.pc-option.on { background: var(--row-hover); }
+.pc-option.on { background: var(--raised); }
 .pc-opt-name { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
 .pc-option > .muted, .pc-opt-own { grid-column: 2; }
 .pc-opt-own { font-size: 12px; }
 .pc-noopt { padding: 4px 6px; }
 .pc-choose-cancel { appearance: none; background: transparent; border: 0; padding: 0; justify-self: start; font: inherit; cursor: pointer; text-decoration: underline; }
 .pc-group-note { font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--muted); }
-.pc-change { appearance: none; background: transparent; border: 0; padding: 0; margin-top: 6px; font: inherit; font-size: 12px; color: var(--teal); text-decoration: underline; cursor: pointer; }
+.pc-change { appearance: none; background: transparent; border: 0; padding: 0; margin-top: 6px; font: inherit; font-size: 12px; color: var(--brand); text-decoration: underline; cursor: pointer; }
 
 /* Spec 048: weekly pot (.wp-). Standings are a table, weeks a compact list, settle-up a plain list. Net is the one
    tinted mark per row (green up / pink down); the number inside it is the exact figure, so nothing is encoded twice. */
@@ -6920,18 +6930,18 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .wp-h { margin: 0 0 8px; font-size: 15px; color: var(--text); }
 .wp-range { margin: 0 0 8px; }
 .wp-error { color: var(--down); }
-.wp-live { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 8px 12px; border-radius: 10px; background: color-mix(in oklab, var(--panel) 85%, var(--teal) 15%); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 60%, var(--teal)); }
-.wp-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); flex: none; }
+.wp-live { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 8px 12px; border-radius: 10px; background: var(--raised); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 60%, var(--brand)); }
+.wp-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); flex: none; }
 .wp-wrap { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
 .wp-table { border-collapse: separate; border-spacing: 0; width: 100%; font-variant-numeric: tabular-nums; }
 .wp-table thead th { font-size: 11px; font-weight: 600; color: var(--muted); padding: 8px 10px; text-align: left; background: var(--panel); border-bottom: 1px solid var(--line); white-space: nowrap; }
 .wp-table tbody td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .wp-table tbody tr:last-child td { border-bottom: 0; }
 .wp-table tbody tr { transition: background 0.12s, box-shadow 0.12s; }
-.wp-table tbody tr:hover { background: var(--row-hover); box-shadow: inset 3px 0 0 var(--line); }
+.wp-table tbody tr:hover { background: var(--raised); box-shadow: inset 3px 0 0 var(--line); }
 .wp-table .wp-num { text-align: right; white-space: nowrap; }
 .wp-table .wp-rank { width: 2.5ch; color: var(--muted); text-align: right; }
-.wp-table tr.wp-me { background: color-mix(in oklab, var(--panel) 88%, var(--crimson) 12%); box-shadow: inset 3px 0 0 var(--crimson); }
+.wp-table tr.wp-me { background: color-mix(in oklab, var(--panel) 88%, var(--you) 12%); box-shadow: inset 3px 0 0 var(--you); }
 .wp-name { display: inline-flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
 .wp-name-text { min-width: 0; overflow-wrap: anywhere; }
 .wp-note { font-weight: 400; font-size: 12px; }
@@ -6941,7 +6951,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .wp-net.wp-down { color: var(--down); background: color-mix(in oklab, var(--panel) 80%, var(--down) 20%); }
 .wp-weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .wp-week { display: grid; grid-template-columns: 4.5ch minmax(0, 1fr) auto auto auto; gap: 12px; align-items: baseline; padding: 7px 12px; border-radius: 8px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--line); font-variant-numeric: tabular-nums; transition: box-shadow 0.12s, background 0.12s; }
-.wp-week:hover { background: var(--row-hover); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 50%, var(--text)); }
+.wp-week:hover { background: var(--raised); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 50%, var(--text)); }
 .wp-week-n { color: var(--muted); font-weight: 600; }
 .wp-week-win { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .wp-tie { margin-left: 8px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--fitted); background: color-mix(in oklab, var(--panel) 80%, var(--fitted) 20%); }
@@ -6962,7 +6972,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .wp-off, .wp-commish { margin-bottom: 20px; }
 .wp-switch, .wp-stake { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
 .wp-stake input { width: 9ch; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
-.wp-save { margin-top: 6px; padding: 6px 16px; border: 0; border-radius: 999px; background: var(--volt); color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
+.wp-save { margin-top: 6px; padding: 6px 16px; border: 0; border-radius: 999px; background: var(--brand); color: var(--bg); font: inherit; font-weight: 700; cursor: pointer; }
 .wp-save:disabled { opacity: 0.6; cursor: default; }
 
 /* Spec 057: the commissioner's score entry (.cs-) and the muted score-source notes. Same pill button as .wp-save. */
@@ -6992,12 +7002,12 @@ td.rv-po { border-left: 1px dashed var(--line); }
 }
 
 /* Spec 053: Time Machine (historical draft game) ------------------------------------------- */
-.hist-hero { background: linear-gradient(135deg, color-mix(in oklch, var(--teal) 14%, var(--panel)), var(--panel) 70%); }
+.hist-hero { background: linear-gradient(135deg, var(--raised), var(--panel) 70%); }
 .hist-steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 8px; }
 .hist-start { padding: 10px 20px; font-weight: 700; }
 .hist-games { list-style: none; margin: 0; padding: 0; }
 .hist-game { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 8px; border-radius: 10px; transition: background 120ms, transform 120ms; }
-.hist-game:hover { background: color-mix(in oklch, var(--teal) 8%, var(--panel)); transform: translateY(-1px); }
+.hist-game:hover { background: var(--raised); transform: translateY(-1px); }
 .hist-game-actions { display: flex; gap: 8px; }
 /* Spec 056: sport choice, the per-row sport tag, data notes and the licence line */
 .hist-sports { display: flex; gap: 8px; margin: 0 0 12px; }
@@ -7008,34 +7018,34 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-disclosure { margin-bottom: 12px; }
 .hist-disclosure-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .hist-counted { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.hist-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: color-mix(in oklch, var(--teal) 18%, var(--panel)); border: 1px solid color-mix(in oklch, var(--teal) 40%, var(--line)); }
+.hist-pill { padding: 3px 10px; border-radius: 999px; font-size: 12px; background: var(--raised); border: 1px solid var(--line); }
 .hist-excluded { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .hist-list-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .hist-filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .hist-search { flex: 1 1 140px; min-width: 120px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
 .hist-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .hist-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border-bottom: 1px solid var(--line); transition: background 120ms, transform 120ms; }
-.hist-row:hover { background: color-mix(in oklch, var(--teal) 9%, var(--panel)); transform: translateY(-1px); }
+.hist-row:hover { background: var(--raised); transform: translateY(-1px); }
 .hist-rank { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
 .hist-name { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .hist-line { margin-top: 2px; }
 .hist-table { width: 100%; border-collapse: collapse; }
 .hist-table th, .hist-table td { padding: 7px 8px; text-align: left; border-bottom: 1px solid var(--line); }
 .hist-table .num { text-align: right; font-variant-numeric: tabular-nums; }
-.hist-me { background: color-mix(in oklch, var(--crimson-text) 16%, var(--panel)); box-shadow: inset 3px 0 0 var(--crimson-text); }
+.hist-me { background: color-mix(in oklch, var(--you) 16%, var(--panel)); box-shadow: inset 3px 0 0 var(--you); }
 .hist-results { display: grid; gap: 14px; margin-bottom: 14px; }
 .hist-finish-title { font-size: 34px; margin: 4px 0; }
 .hist-compare { display: flex; gap: 28px; flex-wrap: wrap; margin-bottom: 8px; }
 .hist-stat { display: grid; }
 .hist-stat-num { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.hist-verdict.good { color: var(--teal); font-weight: 600; }
+.hist-verdict.good { color: var(--brand); font-weight: 600; }
 .hist-callouts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 8px; }
 .hist-callout { padding: 12px 14px; border-radius: 12px; background: color-mix(in oklch, var(--line) 35%, var(--panel)); }
 .hist-callout h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .hist-matchups { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
 .hist-matchups li { display: grid; grid-template-columns: 1fr 70px 24px 70px 1fr; gap: 8px; align-items: center; padding: 6px 10px; border-radius: 8px; }
 .hist-matchups b { text-align: right; font-variant-numeric: tabular-nums; }
-.hist-matchups b.win { color: var(--teal); }
+.hist-matchups b.win { color: var(--brand); }
 @media (max-width: 640px) {
   .hist-matchups li { grid-template-columns: 1fr 56px 18px 56px 1fr; font-size: 13px; }
 }
