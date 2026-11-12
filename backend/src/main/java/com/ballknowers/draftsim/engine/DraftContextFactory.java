@@ -15,6 +15,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 
 /**
  * The one place a {@link DraftContext} is assembled.
@@ -59,11 +60,26 @@ public class DraftContextFactory {
                               PositionalPriors priors,
                               List<BoardEntry> board,
                               Map<Integer, Long> completedPicks) {
+        return build(settings, seats, fittedProfiles, priors, board, completedPicks, UnaryOperator.identity());
+    }
+
+    /**
+     * The same build with the sport's scoring block passed through {@code tune} first (spec 062: the Time Machine
+     * tightens its own bots this way). Only what the context's readers take from {@code cfg()} changes: the pick
+     * weights, the temperature and the candidate pool. {@link SportRules} keeps its own injected block.
+     */
+    public DraftContext build(LeagueSettings settings,
+                              List<SeatSpec> seats,
+                              Map<Long, ManagerProfile> fittedProfiles,
+                              PositionalPriors priors,
+                              List<BoardEntry> board,
+                              Map<Integer, Long> completedPicks,
+                              UnaryOperator<ScoringProperties.SportScoring> tune) {
 
         validate(settings, seats, board);
 
         SportRules rules = rulesRegistry.get(settings.sport());
-        ScoringProperties.SportScoring cfg = scoring.forSport(settings.sport());
+        ScoringProperties.SportScoring cfg = tune.apply(scoring.forSport(settings.sport()));
 
         Map<Integer, ManagerProfile> bySlot = new HashMap<>();
         for (SeatSpec seat : seats) {
