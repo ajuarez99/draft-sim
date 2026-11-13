@@ -79,8 +79,29 @@ describe('HistoricalDraft', () => {
     expect(await screen.findByText('1971-72')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Resume' })).toHaveAttribute('href', '/history/1')
     expect(screen.getByRole('link', { name: 'View' })).toHaveAttribute('href', '/history/2')
-    expect(screen.getByText('Finished 3rd')).toBeInTheDocument()
+    expect(screen.getByText('Finished 3rd (old format)')).toBeInTheDocument()
     expect(screen.queryByText('1973-74')).not.toBeInTheDocument()
+  })
+
+  it('words a finished game by its outcome, and never prints an old rank and a playoff finish as the same thing', async () => {
+    const done = (id: number, finish: number, formatVersion: number | null, outcome: HistoricalGameSummary['outcome']) => ({
+      ...g(id, 'COMPLETE', finish),
+      formatVersion,
+      outcome,
+    })
+    listHistoricalGames.mockResolvedValue([
+      done(1, 1, 2, 'CHAMPION'),
+      done(2, 2, 2, 'LOST_FINAL'),
+      done(3, 8, 2, 'MISSED_PLAYOFFS'),
+      done(4, 3, 2, 'NO_PLAYOFFS'),
+      done(5, 3, null, null),
+    ])
+    renderPage()
+    expect(await screen.findByText('Champion')).toBeInTheDocument()
+    expect(screen.getByText('Lost the final')).toBeInTheDocument()
+    expect(screen.getByText('Missed the playoffs (8th)')).toBeInTheDocument()
+    expect(screen.getByText('Finished 3rd (no playoffs)')).toBeInTheDocument()
+    expect(screen.getByText('Finished 3rd (old format)')).toBeInTheDocument()
   })
 
   it('abandons a drafting game and removes it from the list', async () => {
@@ -90,6 +111,18 @@ describe('HistoricalDraft', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Abandon' }))
     await waitFor(() => expect(screen.queryByText('1971-72')).not.toBeInTheDocument())
     expect(abandonHistoricalGame).toHaveBeenCalledWith(1)
+  })
+
+  it("removes the abandoned game's stored queue, and only that game's (CR-07)", async () => {
+    localStorage.setItem('bk.tm.queue.1', JSON.stringify([5]))
+    localStorage.setItem('bk.tm.queue.2', JSON.stringify([6]))
+    listHistoricalGames.mockResolvedValue([g(1, 'DRAFTING', null)])
+    abandonHistoricalGame.mockResolvedValue(undefined)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Abandon' }))
+    await waitFor(() => expect(localStorage.getItem('bk.tm.queue.1')).toBeNull())
+    expect(localStorage.getItem('bk.tm.queue.2')).not.toBeNull()
+    localStorage.clear()
   })
 
   it('starts a game and goes to its room', async () => {

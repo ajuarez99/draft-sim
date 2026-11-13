@@ -24,6 +24,8 @@ public final class HistoricalSyntheticSeason {
     public static final String PREFIX = "it-hgame-";
     public static final int PLAYERS = 200;
     public static final int WEEKS = 3;
+    /** A long variant (spec 063): 19 regular-season weeks plus three playoff weeks, so a bracket is played. */
+    public static final int LONG_WEEKS = 22;
 
     private HistoricalSyntheticSeason() {}
 
@@ -37,8 +39,17 @@ public final class HistoricalSyntheticSeason {
 
     /** Seeds the season row, {@link #PLAYERS} players, their S-2/S-1 lines, the sentinel S line and 3 weeks of games. */
     public static void seed(HistoricalDataRepository data) {
+        seed(data, WEEKS);
+    }
+
+    /** The same world with {@link #LONG_WEEKS} weeks: {@link #clean} first (the season row is replaced either way). */
+    public static void seedLong(HistoricalDataRepository data) {
+        seed(data, LONG_WEEKS);
+    }
+
+    private static void seed(HistoricalDataRepository data, int weeks) {
         data.upsertSeason(new SeasonRow("NBA", S, "1895-96", "KAGGLE", LocalDate.of(1895, 11, 6), LocalDate.of(1896, 4, 1),
-                WEEKS, 100, List.of("pts", "reb", "ast"),
+                weeks, 100, List.of("pts", "reb", "ast"),
                 "{\"stl\":\"not tracked by the league that season\"}", "{\"pts\":1.0,\"reb\":0.97,\"ast\":0.95}",
                 "PRIOR_SEASON_POINTS", OffsetDateTime.parse("2026-11-02T12:00:00Z"), null, 0, null));
 
@@ -59,7 +70,7 @@ public final class HistoricalSyntheticSeason {
             // the drafted season's own line: SENTINELS that must never reach the draft room
             l0.add(new SeasonLine(id, S, "ZZZ", 99, 91, p, 7777.0, 8888.0, 9999.0, null, null, null, null, null,
                     null, null, null));
-            for (int w = 1; w <= WEEKS; w++) {
+            for (int w = 1; w <= weeks; w++) {
                 games.add(new GameLine(id, w * 1000L + i, S, LocalDate.of(1895, 11, 6).plusDays(7L * (w - 1) + i % 5),
                         w, "ZZZ", 5 + (i * 7 + w * 3) % 30, w == 1 ? null : 3 + i % 6, 2 + i % 4, null, null, null,
                         null, null, null, null, null, null, null, null, null, null, null, null, null));

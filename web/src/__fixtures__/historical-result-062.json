@@ -1,0 +1,2142 @@
+{
+  "weeks" : [ {
+    "week" : 1,
+    "startDate" : "1995-11-06",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 6,
+      "homePoints" : 288.0,
+      "awayPoints" : 287.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 7,
+      "homePoints" : 262.0,
+      "awayPoints" : 265.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 4,
+      "homePoints" : 291.0,
+      "awayPoints" : 289.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 8,
+      "homePoints" : 307.0,
+      "awayPoints" : 264.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 10,
+      "homePoints" : 307.0,
+      "awayPoints" : 284.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 2,
+      "homePoints" : 263.0,
+      "awayPoints" : 309.0
+    } ]
+  }, {
+    "week" : 2,
+    "startDate" : "1995-11-13",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 5,
+      "homePoints" : 312.0,
+      "awayPoints" : 300.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 6,
+      "homePoints" : 295.0,
+      "awayPoints" : 260.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 7,
+      "homePoints" : 304.0,
+      "awayPoints" : 287.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 4,
+      "homePoints" : 283.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 8,
+      "homePoints" : 288.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 10,
+      "homePoints" : 284.0,
+      "awayPoints" : 285.0
+    } ]
+  }, {
+    "week" : 3,
+    "startDate" : "1995-11-20",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 12,
+      "homePoints" : 321.0,
+      "awayPoints" : 255.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 5,
+      "homePoints" : 281.0,
+      "awayPoints" : 318.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 6,
+      "homePoints" : 315.0,
+      "awayPoints" : 251.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 7,
+      "homePoints" : 334.0,
+      "awayPoints" : 352.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 4,
+      "homePoints" : 253.0,
+      "awayPoints" : 255.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 8,
+      "homePoints" : 258.0,
+      "awayPoints" : 251.0
+    } ]
+  }, {
+    "week" : 4,
+    "startDate" : "1995-11-27",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 1,
+      "homePoints" : 304.0,
+      "awayPoints" : 307.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 12,
+      "homePoints" : 308.0,
+      "awayPoints" : 305.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 5,
+      "homePoints" : 306.0,
+      "awayPoints" : 281.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 6,
+      "homePoints" : 282.0,
+      "awayPoints" : 280.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 7,
+      "homePoints" : 280.0,
+      "awayPoints" : 283.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 4,
+      "homePoints" : 282.0,
+      "awayPoints" : 284.0
+    } ]
+  }, {
+    "week" : 5,
+    "startDate" : "1995-12-04",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 11,
+      "homePoints" : 285.0,
+      "awayPoints" : 251.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 1,
+      "homePoints" : 301.0,
+      "awayPoints" : 271.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 12,
+      "homePoints" : 280.0,
+      "awayPoints" : 275.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 5,
+      "homePoints" : 302.0,
+      "awayPoints" : 279.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 6,
+      "homePoints" : 278.0,
+      "awayPoints" : 302.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 7,
+      "homePoints" : 302.0,
+      "awayPoints" : 303.0
+    } ]
+  }, {
+    "week" : 6,
+    "startDate" : "1995-12-11",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 3,
+      "homePoints" : 278.0,
+      "awayPoints" : 278.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 11,
+      "homePoints" : 302.0,
+      "awayPoints" : 302.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 1,
+      "homePoints" : 300.0,
+      "awayPoints" : 301.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 12,
+      "homePoints" : 301.0,
+      "awayPoints" : 302.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 5,
+      "homePoints" : 300.0,
+      "awayPoints" : 272.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 6,
+      "homePoints" : 276.0,
+      "awayPoints" : 301.0
+    } ]
+  }, {
+    "week" : 7,
+    "startDate" : "1995-12-18",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 2,
+      "homePoints" : 311.0,
+      "awayPoints" : 250.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 3,
+      "homePoints" : 251.0,
+      "awayPoints" : 318.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 11,
+      "homePoints" : 330.0,
+      "awayPoints" : 314.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 1,
+      "homePoints" : 293.0,
+      "awayPoints" : 308.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 12,
+      "homePoints" : 252.0,
+      "awayPoints" : 266.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 5,
+      "homePoints" : 348.0,
+      "awayPoints" : 258.0
+    } ]
+  }, {
+    "week" : 8,
+    "startDate" : "1995-12-25",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 10,
+      "homePoints" : 298.0,
+      "awayPoints" : 269.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 2,
+      "homePoints" : 289.0,
+      "awayPoints" : 272.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 3,
+      "homePoints" : 297.0,
+      "awayPoints" : 288.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 11,
+      "homePoints" : 271.0,
+      "awayPoints" : 299.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 1,
+      "homePoints" : 320.0,
+      "awayPoints" : 287.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 12,
+      "homePoints" : 270.0,
+      "awayPoints" : 270.0
+    } ]
+  }, {
+    "week" : 9,
+    "startDate" : "1996-01-01",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 8,
+      "homePoints" : 293.0,
+      "awayPoints" : 295.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 10,
+      "homePoints" : 266.0,
+      "awayPoints" : 283.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 2,
+      "homePoints" : 292.0,
+      "awayPoints" : 268.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 3,
+      "homePoints" : 290.0,
+      "awayPoints" : 311.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 11,
+      "homePoints" : 292.0,
+      "awayPoints" : 293.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 1,
+      "homePoints" : 293.0,
+      "awayPoints" : 309.0
+    } ]
+  }, {
+    "week" : 10,
+    "startDate" : "1996-01-08",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 4,
+      "homePoints" : 356.0,
+      "awayPoints" : 207.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 8,
+      "homePoints" : 363.0,
+      "awayPoints" : 202.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 10,
+      "homePoints" : 196.0,
+      "awayPoints" : 215.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 2,
+      "homePoints" : 365.0,
+      "awayPoints" : 222.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 3,
+      "homePoints" : 232.0,
+      "awayPoints" : 345.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 11,
+      "homePoints" : 274.0,
+      "awayPoints" : 311.0
+    } ]
+  }, {
+    "week" : 11,
+    "startDate" : "1996-01-15",
+    "matchups" : [ {
+      "homeSlot" : 9,
+      "awaySlot" : 7,
+      "homePoints" : 286.0,
+      "awayPoints" : 310.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 4,
+      "homePoints" : 291.0,
+      "awayPoints" : 292.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 8,
+      "homePoints" : 308.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 10,
+      "homePoints" : 282.0,
+      "awayPoints" : 281.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 2,
+      "homePoints" : 284.0,
+      "awayPoints" : 285.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 3,
+      "homePoints" : 287.0,
+      "awayPoints" : 285.0
+    } ]
+  }, {
+    "week" : 12,
+    "startDate" : "1996-01-22",
+    "matchups" : [ {
+      "homeSlot" : 6,
+      "awaySlot" : 9,
+      "homePoints" : 336.0,
+      "awayPoints" : 283.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 5,
+      "homePoints" : 282.0,
+      "awayPoints" : 282.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 12,
+      "homePoints" : 312.0,
+      "awayPoints" : 285.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 1,
+      "homePoints" : 335.0,
+      "awayPoints" : 277.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 11,
+      "homePoints" : 309.0,
+      "awayPoints" : 276.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 3,
+      "homePoints" : 288.0,
+      "awayPoints" : 283.0
+    } ]
+  }, {
+    "week" : 13,
+    "startDate" : "1996-01-29",
+    "matchups" : [ {
+      "homeSlot" : 5,
+      "awaySlot" : 9,
+      "homePoints" : 168.0,
+      "awayPoints" : 178.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 12,
+      "homePoints" : 331.0,
+      "awayPoints" : 310.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 1,
+      "homePoints" : 165.0,
+      "awayPoints" : 262.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 11,
+      "homePoints" : 342.0,
+      "awayPoints" : 225.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 3,
+      "homePoints" : 337.0,
+      "awayPoints" : 183.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 2,
+      "homePoints" : 351.0,
+      "awayPoints" : 342.0
+    } ]
+  }, {
+    "week" : 14,
+    "startDate" : "1996-02-05",
+    "matchups" : [ {
+      "homeSlot" : 12,
+      "awaySlot" : 9,
+      "homePoints" : 303.0,
+      "awayPoints" : 285.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 1,
+      "homePoints" : 272.0,
+      "awayPoints" : 269.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 11,
+      "homePoints" : 302.0,
+      "awayPoints" : 308.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 3,
+      "homePoints" : 277.0,
+      "awayPoints" : 273.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 2,
+      "homePoints" : 301.0,
+      "awayPoints" : 312.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 10,
+      "homePoints" : 275.0,
+      "awayPoints" : 275.0
+    } ]
+  }, {
+    "week" : 15,
+    "startDate" : "1996-02-12",
+    "matchups" : [ {
+      "homeSlot" : 1,
+      "awaySlot" : 9,
+      "homePoints" : 303.0,
+      "awayPoints" : 304.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 11,
+      "homePoints" : 274.0,
+      "awayPoints" : 303.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 3,
+      "homePoints" : 296.0,
+      "awayPoints" : 291.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 2,
+      "homePoints" : 302.0,
+      "awayPoints" : 278.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 10,
+      "homePoints" : 297.0,
+      "awayPoints" : 259.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 8,
+      "homePoints" : 279.0,
+      "awayPoints" : 271.0
+    } ]
+  }, {
+    "week" : 16,
+    "startDate" : "1996-02-19",
+    "matchups" : [ {
+      "homeSlot" : 11,
+      "awaySlot" : 9,
+      "homePoints" : 242.0,
+      "awayPoints" : 273.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 3,
+      "homePoints" : 244.0,
+      "awayPoints" : 242.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 2,
+      "homePoints" : 298.0,
+      "awayPoints" : 322.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 10,
+      "homePoints" : 315.0,
+      "awayPoints" : 323.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 8,
+      "homePoints" : 243.0,
+      "awayPoints" : 274.0
+    }, {
+      "homeSlot" : 7,
+      "awaySlot" : 4,
+      "homePoints" : 324.0,
+      "awayPoints" : 299.0
+    } ]
+  }, {
+    "week" : 17,
+    "startDate" : "1996-02-26",
+    "matchups" : [ {
+      "homeSlot" : 3,
+      "awaySlot" : 9,
+      "homePoints" : 297.0,
+      "awayPoints" : 297.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 2,
+      "homePoints" : 296.0,
+      "awayPoints" : 298.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 10,
+      "homePoints" : 297.0,
+      "awayPoints" : 298.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 8,
+      "homePoints" : 293.0,
+      "awayPoints" : 271.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 4,
+      "homePoints" : 296.0,
+      "awayPoints" : 298.0
+    }, {
+      "homeSlot" : 6,
+      "awaySlot" : 7,
+      "homePoints" : 273.0,
+      "awayPoints" : 296.0
+    } ]
+  }, {
+    "week" : 18,
+    "startDate" : "1996-03-04",
+    "matchups" : [ {
+      "homeSlot" : 2,
+      "awaySlot" : 9,
+      "homePoints" : 327.0,
+      "awayPoints" : 257.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 10,
+      "homePoints" : 262.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 8,
+      "homePoints" : 298.0,
+      "awayPoints" : 278.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 4,
+      "homePoints" : 279.0,
+      "awayPoints" : 287.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 7,
+      "homePoints" : 285.0,
+      "awayPoints" : 291.0
+    }, {
+      "homeSlot" : 5,
+      "awaySlot" : 6,
+      "homePoints" : 293.0,
+      "awayPoints" : 263.0
+    } ]
+  }, {
+    "week" : 19,
+    "startDate" : "1996-03-11",
+    "matchups" : [ {
+      "homeSlot" : 10,
+      "awaySlot" : 9,
+      "homePoints" : 293.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 8,
+      "homePoints" : 291.0,
+      "awayPoints" : 293.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 4,
+      "homePoints" : 292.0,
+      "awayPoints" : 293.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 7,
+      "homePoints" : 294.0,
+      "awayPoints" : 292.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 6,
+      "homePoints" : 294.0,
+      "awayPoints" : 289.0
+    }, {
+      "homeSlot" : 12,
+      "awaySlot" : 5,
+      "homePoints" : 292.0,
+      "awayPoints" : 292.0
+    } ]
+  }, {
+    "week" : 20,
+    "startDate" : "1996-03-18",
+    "matchups" : [ {
+      "homeSlot" : 8,
+      "awaySlot" : 9,
+      "homePoints" : 331.0,
+      "awayPoints" : 286.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 4,
+      "homePoints" : 288.0,
+      "awayPoints" : 312.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 7,
+      "homePoints" : 290.0,
+      "awayPoints" : 250.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 6,
+      "homePoints" : 255.0,
+      "awayPoints" : 350.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 5,
+      "homePoints" : 258.0,
+      "awayPoints" : 284.0
+    }, {
+      "homeSlot" : 1,
+      "awaySlot" : 12,
+      "homePoints" : 288.0,
+      "awayPoints" : 289.0
+    } ]
+  }, {
+    "week" : 21,
+    "startDate" : "1996-03-25",
+    "matchups" : [ {
+      "homeSlot" : 4,
+      "awaySlot" : 9,
+      "homePoints" : 278.0,
+      "awayPoints" : 285.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 7,
+      "homePoints" : 283.0,
+      "awayPoints" : 290.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 6,
+      "homePoints" : 285.0,
+      "awayPoints" : 312.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 5,
+      "homePoints" : 289.0,
+      "awayPoints" : 285.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 12,
+      "homePoints" : 280.0,
+      "awayPoints" : 276.0
+    }, {
+      "homeSlot" : 11,
+      "awaySlot" : 1,
+      "homePoints" : 302.0,
+      "awayPoints" : 274.0
+    } ]
+  }, {
+    "week" : 22,
+    "startDate" : "1996-04-01",
+    "matchups" : [ {
+      "homeSlot" : 7,
+      "awaySlot" : 9,
+      "homePoints" : 285.0,
+      "awayPoints" : 261.0
+    }, {
+      "homeSlot" : 4,
+      "awaySlot" : 6,
+      "homePoints" : 262.0,
+      "awayPoints" : 277.0
+    }, {
+      "homeSlot" : 8,
+      "awaySlot" : 5,
+      "homePoints" : 293.0,
+      "awayPoints" : 259.0
+    }, {
+      "homeSlot" : 10,
+      "awaySlot" : 12,
+      "homePoints" : 254.0,
+      "awayPoints" : 316.0
+    }, {
+      "homeSlot" : 2,
+      "awaySlot" : 1,
+      "homePoints" : 276.0,
+      "awayPoints" : 297.0
+    }, {
+      "homeSlot" : 3,
+      "awaySlot" : 11,
+      "homePoints" : 307.0,
+      "awayPoints" : 297.0
+    } ]
+  } ],
+  "standings" : [ {
+    "slot" : 7,
+    "wins" : 14,
+    "losses" : 7,
+    "ties" : 1,
+    "pointsFor" : 6303.0,
+    "place" : 1
+  }, {
+    "slot" : 4,
+    "wins" : 13,
+    "losses" : 9,
+    "ties" : 0,
+    "pointsFor" : 6338.0,
+    "place" : 2
+  }, {
+    "slot" : 11,
+    "wins" : 12,
+    "losses" : 9,
+    "ties" : 1,
+    "pointsFor" : 6369.0,
+    "place" : 3
+  }, {
+    "slot" : 9,
+    "wins" : 11,
+    "losses" : 9,
+    "ties" : 2,
+    "pointsFor" : 6331.0,
+    "place" : 4
+  }, {
+    "slot" : 2,
+    "wins" : 11,
+    "losses" : 10,
+    "ties" : 1,
+    "pointsFor" : 6320.0,
+    "place" : 5
+  }, {
+    "slot" : 10,
+    "wins" : 11,
+    "losses" : 10,
+    "ties" : 1,
+    "pointsFor" : 6233.0,
+    "place" : 6
+  }, {
+    "slot" : 8,
+    "wins" : 10,
+    "losses" : 11,
+    "ties" : 1,
+    "pointsFor" : 6313.0,
+    "place" : 7
+  }, {
+    "slot" : 6,
+    "wins" : 10,
+    "losses" : 12,
+    "ties" : 0,
+    "pointsFor" : 6404.0,
+    "place" : 8
+  }, {
+    "slot" : 1,
+    "wins" : 10,
+    "losses" : 12,
+    "ties" : 0,
+    "pointsFor" : 6317.0,
+    "place" : 9
+  }, {
+    "slot" : 12,
+    "wins" : 9,
+    "losses" : 11,
+    "ties" : 2,
+    "pointsFor" : 6287.0,
+    "place" : 10
+  }, {
+    "slot" : 5,
+    "wins" : 7,
+    "losses" : 12,
+    "ties" : 3,
+    "pointsFor" : 6247.0,
+    "place" : 11
+  }, {
+    "slot" : 3,
+    "wins" : 7,
+    "losses" : 13,
+    "ties" : 2,
+    "pointsFor" : 6282.0,
+    "place" : 12
+  } ],
+  "userFinish" : 11,
+  "lineups" : {
+    "5" : [ {
+      "week" : 1,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "G",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 17.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 10.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 2,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 17.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "C",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "UTIL",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 3,
+      "starters" : [ {
+        "playerId" : 20,
+        "slot" : "PG",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 23.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "C",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 140,
+        "slot" : "UTIL",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "UTIL",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 4,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "G",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 19.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "C",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "UTIL",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 5,
+      "starters" : [ {
+        "playerId" : 125,
+        "slot" : "PG",
+        "points" : 19.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "C",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "UTIL",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "UTIL",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 6,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "G",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 14.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "C",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 7,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 18.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "F",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 8,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "G",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 12.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 19.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "F",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "UTIL",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 9,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 20.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 140,
+        "slot" : "G",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "UTIL",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 10,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "F",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 11,
+      "starters" : [ {
+        "playerId" : 20,
+        "slot" : "PG",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 19.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "F",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 140,
+        "slot" : "UTIL",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 12,
+      "starters" : [ {
+        "playerId" : 20,
+        "slot" : "PG",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "F",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "C",
+        "points" : 24.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 13,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 17.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 18.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 18.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 19.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 16.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "F",
+        "points" : 20.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "C",
+        "points" : 21.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "UTIL",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "UTIL",
+        "points" : 17.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 14,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 13.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "F",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 15,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 20.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 40.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 16,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "F",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "C",
+        "points" : 29.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "UTIL",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 17,
+      "starters" : [ {
+        "playerId" : 140,
+        "slot" : "PG",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "G",
+        "points" : 43.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "SF",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 21.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "F",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "C",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "UTIL",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 18,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "SG",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 21.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 18.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "UTIL",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 140,
+        "slot" : "UTIL",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 19,
+      "starters" : [ {
+        "playerId" : 125,
+        "slot" : "PG",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 20,
+        "slot" : "G",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 37.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "C",
+        "points" : 22.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 30.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 42.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 20,
+      "starters" : [ {
+        "playerId" : 20,
+        "slot" : "PG",
+        "points" : 31.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 35.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 5,
+        "slot" : "G",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 16.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "PF",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "F",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "C",
+        "points" : 36.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "UTIL",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 21,
+      "starters" : [ {
+        "playerId" : 20,
+        "slot" : "PG",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 38.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 44.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 68,
+        "slot" : "F",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 20.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 164,
+        "slot" : "UTIL",
+        "points" : 26.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 44,
+        "slot" : "UTIL",
+        "points" : 33.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    }, {
+      "week" : 22,
+      "starters" : [ {
+        "playerId" : 5,
+        "slot" : "PG",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 101,
+        "slot" : "SG",
+        "points" : 41.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 125,
+        "slot" : "G",
+        "points" : 34.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 77,
+        "slot" : "SF",
+        "points" : 11.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 53,
+        "slot" : "PF",
+        "points" : 18.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 92,
+        "slot" : "F",
+        "points" : 39.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 29,
+        "slot" : "C",
+        "points" : 25.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 149,
+        "slot" : "UTIL",
+        "points" : 27.0,
+        "gameDate" : "1995-11-06"
+      }, {
+        "playerId" : 116,
+        "slot" : "UTIL",
+        "points" : 32.0,
+        "gameDate" : "1995-11-06"
+      } ]
+    } ]
+  },
+  "hindsight" : {
+    "label" : "greedy hindsight, bots unchanged",
+    "pointsFor" : 6510.0,
+    "userPointsFor" : 6247.0,
+    "userBeatIt" : false,
+    "picks" : [ {
+      "pickNo" : 5,
+      "player" : {
+        "id" : 5,
+        "name" : "P5",
+        "positions" : [ "PG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 5,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 20,
+      "player" : {
+        "id" : 24,
+        "name" : "P24",
+        "positions" : [ "C" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 24,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 29,
+      "player" : {
+        "id" : 33,
+        "name" : "P33",
+        "positions" : [ "PF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 33,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 44,
+      "player" : {
+        "id" : 52,
+        "name" : "P52",
+        "positions" : [ "SF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 52,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 53,
+      "player" : {
+        "id" : 61,
+        "name" : "P61",
+        "positions" : [ "SG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 61,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 68,
+      "player" : {
+        "id" : 70,
+        "name" : "P70",
+        "positions" : [ "PG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 70,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 77,
+      "player" : {
+        "id" : 79,
+        "name" : "P79",
+        "positions" : [ "C" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 79,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 92,
+      "player" : {
+        "id" : 98,
+        "name" : "P98",
+        "positions" : [ "PF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 98,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 101,
+      "player" : {
+        "id" : 107,
+        "name" : "P107",
+        "positions" : [ "SF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 107,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 116,
+      "player" : {
+        "id" : 117,
+        "name" : "P117",
+        "positions" : [ "SF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 117,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 125,
+      "player" : {
+        "id" : 126,
+        "name" : "P126",
+        "positions" : [ "SG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 126,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 616.0
+    }, {
+      "pickNo" : 140,
+      "player" : {
+        "id" : 145,
+        "name" : "P145",
+        "positions" : [ "PG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 145,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 579.0
+    }, {
+      "pickNo" : 149,
+      "player" : {
+        "id" : 162,
+        "name" : "P162",
+        "positions" : [ "SF" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 162,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 579.0
+    }, {
+      "pickNo" : 164,
+      "player" : {
+        "id" : 166,
+        "name" : "P166",
+        "positions" : [ "SG" ],
+        "team" : null,
+        "age" : null,
+        "rank" : 166,
+        "positionalRank" : 1,
+        "prior" : null,
+        "rookiePick" : null
+      },
+      "seasonValue" : 579.0
+    } ]
+  },
+  "biggestBust" : {
+    "pickNo" : 68,
+    "player" : {
+      "id" : 68,
+      "name" : "P68",
+      "positions" : [ "PF" ],
+      "team" : null,
+      "age" : null,
+      "rank" : 68,
+      "positionalRank" : 1,
+      "prior" : null,
+      "rookiePick" : null
+    },
+    "seasonValueRank" : 137,
+    "seasonValue" : 542.0
+  },
+  "bestStealPassedOn" : {
+    "pickNo" : 68,
+    "taken" : {
+      "id" : 68,
+      "name" : "P68",
+      "positions" : [ "PF" ],
+      "team" : null,
+      "age" : null,
+      "rank" : 68,
+      "positionalRank" : 1,
+      "prior" : null,
+      "rookiePick" : null
+    },
+    "takenValue" : 542.0,
+    "passedOn" : {
+      "id" : 70,
+      "name" : "P70",
+      "positions" : [ "PG" ],
+      "team" : null,
+      "age" : null,
+      "rank" : 70,
+      "positionalRank" : 1,
+      "prior" : null,
+      "rookiePick" : null
+    },
+    "passedOnValue" : 616.0
+  }
+}

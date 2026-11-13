@@ -85,9 +85,16 @@ class HistoricalRealSeasonIT {
         JsonNode result = done.result();
         assertEquals(12, result.get("standings").size(), "twelve teams");
         int weekCount = data.findSeason("NBA", season).orElseThrow().weekCount();
-        assertEquals(weekCount, result.get("weeks").size(), "one replayed week per week of the real season");
+        // Spec 063: regular-season weeks, then up to three playoff weeks; weeks after the final are not replayed.
+        JsonNode fmt = result.get("format");
+        int regular = fmt.get("regularSeasonWeeks").asInt();
+        int playoffWeeks = fmt.get("playoffWeeks").size();
+        assertEquals(weekCount, regular + playoffWeeks + fmt.get("unusedWeeks").asInt(), "the format accounts for every week");
+        assertEquals(regular + playoffWeeks, result.get("weeks").size(), "every regular week and every playoff week, nothing after");
         assertEquals(168, done.picks().size());
-        assertEquals(weekCount, result.get("lineups").get("6").size());
+        int lineupWeeks = result.get("lineups").get("6").size();
+        assertTrue(lineupWeeks >= regular && lineupWeeks <= regular + playoffWeeks,
+                "the user's lineups: every regular week plus the playoff weeks the user played");
         int wins = 0, losses = 0;
         for (JsonNode s : result.get("standings")) {
             wins += s.get("wins").asInt();

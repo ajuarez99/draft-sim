@@ -151,6 +151,8 @@
  *         shows regardless. Just below the bottom bar's layer, and lifted by
  *         the bar's height (`--bar-clear`) so the bar never covers it.
  *    40  `.topbar` on a phone only (sticky there; a flex child elsewhere).
+ *    30  `.hist-banner`, the Time Machine room's sticky clock banner (sticky, not fixed; on a phone it
+ *         pins at top: 48px, under the sticky top bar).
  *   Add the next page-level fixed layer here, not inline.
  *
  * CONTROL HIERARCHY -- THREE JOBS, THREE TREATMENTS
@@ -6917,4 +6919,170 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-matchups b.win { color: var(--brand); }
 @media (max-width: 640px) {
   .hist-matchups li { grid-template-columns: 1fr 56px 18px 56px 1fr; font-size: 13px; }
+}
+
+/* Spec 063: the Time Machine room's pick announcements. Visually hidden, still read by a screen reader; the
+   same clip-rect idiom as .rankboard-sr-only. No animation is added, so no reduced-motion guard is needed. */
+.hist-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* Spec 063: the Time Machine room and results ------------------------------------------------------------------
+   New blocks only; nothing above is restyled. Tokens and the .segmented / .chip / .panel / .pos vocabulary are the
+   app's own. The room is its own layout (HistoricalRoomLayout), not .room, so the mock and live rooms are untouched.
+   Layers: the sticky banner is z-index 30 (see the STACKING ladder at the top of this file). */
+
+/* A sticky banner needs a parent that does not shrink to the scroller's height, so this page opts out of
+   `.content`'s flex-shrink. */
+.hist-content { flex: 0 0 auto; gap: 10px; }
+.hist-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 14px; }
+.hist-head .page-title { font-size: 22px; margin: 0; }
+.hist-head p { margin: 0; }
+.hist-counts { margin-top: 0; }
+
+.hist-room { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.hist-banner {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+  padding: 10px 14px; border-radius: 14px; background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.hist-banner.your-turn {
+  background: color-mix(in oklab, var(--you) 12%, var(--panel));
+  box-shadow: 0 0 0 2px var(--you), 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.hist-banner-clock { display: flex; flex-direction: column; min-width: 0; }
+.hist-banner-headline {
+  font-family: var(--font-display); font-weight: 800; text-transform: uppercase;
+  font-size: 22px; letter-spacing: 0.02em; line-height: 1.1;
+}
+.hist-banner .room-controls-group { flex-wrap: wrap; }
+
+.hist-room-tabs { align-self: flex-start; max-width: 100%; }
+.hist-room-tabs .segment { padding: 7px 14px; }
+.hist-room-tabs .segment:focus-visible { outline-offset: -2px; }
+.hist-pane { min-width: 0; }
+.hist-board-pane { height: clamp(360px, 70vh, 760px); overflow: hidden; }
+.hist-board-pane > .board-scroll { height: 100%; min-height: 0; }
+.hist-room .chip:focus-visible, .hist-star:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* Wide: rail | main | roster, filling the viewport under the banner. The height is ARBITRARY, picked so the
+   banner, the rail and at least five player rows fit at 1366x768; it is not measured. The columns scroll inside
+   themselves. */
+@media (min-width: 1280px) {
+  .hist-room-body {
+    display: grid; grid-template-columns: 240px minmax(0, 1fr) 280px; gap: 12px;
+    height: max(460px, calc(100vh - 290px)); min-height: 0;
+  }
+  .hist-room.board-wide .hist-room-body { grid-template-columns: minmax(0, 1fr); }
+  .hist-col { min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .hist-col-main .hist-pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 8px; }
+  .hist-col-main .hist-board-pane { height: 100%; }
+  .hist-col-rail > .panel, .hist-col-roster > .panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .hist-col-rail > .panel { overflow: hidden; }
+}
+@media (max-width: 1279px) {
+  .hist-room-tabs { display: flex; width: 100%; align-self: stretch; }
+  .hist-room-tabs .segment { flex: 1 1 auto; padding: 10px 6px; text-align: center; }
+  .hist-rail-list { max-height: 70vh; }
+}
+/* On a phone the top bar is sticky and 48px tall, so the banner pins just under it. */
+@media (max-width: 860px) {
+  .hist-banner { top: 48px; }
+  .hist-banner-headline { font-size: 19px; }
+}
+
+/* The pick rail. Your picks carry a tint, a left bar AND the word "You"; the current pick is the largest row. */
+.hist-rail { display: flex; flex-direction: column; min-height: 0; padding: 12px; }
+.hist-rail .hist-rail-title { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.hist-rail-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 3px; position: relative; }
+.hist-rail-round { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 8px 4px 2px; }
+.hist-rail-pick { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 8px; padding: 6px 8px; border-radius: 10px; border-left: 3px solid transparent; }
+.hist-rail-pick.upcoming { color: var(--muted); }
+.hist-rail-pick.made { background: var(--raised); }
+.hist-rail-pick.me { background: color-mix(in oklab, var(--you) 14%, var(--panel)); border-left-color: var(--you); color: var(--text); }
+.hist-rail-pick.current { background: var(--raised); border-left-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); padding: 11px 8px; color: var(--text); font-weight: 600; }
+.hist-rail-pick.current.me { background: color-mix(in oklab, var(--you) 22%, var(--panel)); }
+.hist-rail-no { font-size: 12px; color: var(--muted); padding-top: 1px; }
+.hist-rail-body { display: grid; gap: 2px; min-width: 0; }
+.hist-rail-clock { color: var(--brand); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.hist-rail-player { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.hist-rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) {
+  .hist-rail-pick.fresh { animation: hist-pick-in 700ms ease-out; }
+  @keyframes hist-pick-in { from { background: color-mix(in oklab, var(--brand) 35%, var(--panel)); transform: translateX(-6px); } }
+}
+
+/* Roster, slot by slot. */
+.hist-slots { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 4px; }
+.hist-slot { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; border: 1px dashed var(--line); }
+.hist-slot.filled { border-style: solid; border-color: transparent; background: var(--raised); }
+.hist-slot-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+.hist-slot-player { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.hist-slot-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-bench-title { margin: 6px 0; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+/* Player list: the star, beside Draft. */
+.hist-row-actions { display: flex; align-items: center; gap: 6px; }
+.hist-star { appearance: none; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 999px; width: 32px; height: 32px; font-size: 16px; line-height: 1; cursor: pointer; }
+.hist-star:hover { border-color: var(--brand); color: var(--text); }
+.hist-star.on { color: var(--you-text); border-color: var(--you); background: color-mix(in oklab, var(--you) 14%, var(--panel)); }
+
+/* Queue. */
+.hist-queue-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hist-queue-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 10px; border-bottom: 1px solid var(--line); }
+.hist-queue-row.top { background: color-mix(in oklab, var(--you) 12%, var(--panel)); box-shadow: inset 3px 0 0 var(--you); }
+.hist-queue-n { font-size: 14px; font-weight: 700; color: var(--muted); text-align: center; }
+.hist-queue-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.hist-queue-empty { max-width: 56ch; margin: 0; }
+@media (max-width: 640px) {
+  .hist-queue-row { grid-template-columns: 24px minmax(0, 1fr); }
+  .hist-queue-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* Results: the finish, the two draft moments, the bracket. */
+.hist-finish-title.champion { color: var(--brand); }
+.hist-moments .hist-callout { border-left: 4px solid var(--line); }
+.hist-moments .hist-callout-bust { border-left-color: var(--down); }
+.hist-moments .hist-callout-steal { border-left-color: var(--brand); }
+.hist-moments .hist-callouts { margin-top: 0; }
+.hist-moments .hist-callout { padding: 14px 16px; font-size: 15px; }
+.hist-format-note { margin: 0; }
+.hist-cutline td { padding: 4px 8px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-top: 2px dashed var(--brand); border-bottom: 0; background: var(--panel); }
+.hist-bye { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
+.hist-week-round { margin: 0 0 6px; }
+.hist-matchups .hist-matchup-note { grid-column: 1 / -1; }
+
+.hist-bracket { display: grid; gap: 14px; }
+.hist-champ {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--brand) 22%, var(--panel)), var(--panel) 75%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--brand) 55%, var(--line));
+}
+.hist-champ.me { box-shadow: inset 0 0 0 2px var(--you); }
+.hist-champ-trophy { font-size: 34px; line-height: 1; color: var(--brand); }
+.hist-champ-label { margin: 0; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+.hist-champ-name { margin: 0; font-size: 28px; }
+.hist-bk-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.hist-bk-head { margin: 0 0 8px; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.hist-bk-matches, .hist-bk-byes, .hist-bk-sides { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.hist-bk-byes { margin-bottom: 8px; gap: 4px; }
+.hist-bk-byes li { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; border: 1px dashed var(--line); }
+.hist-bk-byes li.me { border-color: var(--you); background: color-mix(in oklab, var(--you) 12%, var(--panel)); }
+.hist-bk-match { background: var(--raised); border-radius: 12px; padding: 6px; }
+.hist-bk-match.final { box-shadow: inset 0 0 0 1px var(--brand); }
+.hist-bk-match.me { box-shadow: inset 0 0 0 1px var(--you); }
+.hist-bk-sides { gap: 2px; }
+.hist-bk-side { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 8px; }
+.hist-bk-side.lost { color: var(--muted); }
+.hist-bk-side.won { color: var(--text); font-weight: 700; }
+.hist-bk-side.me { background: color-mix(in oklab, var(--you) 14%, var(--raised)); box-shadow: inset 3px 0 0 var(--you); }
+.hist-bk-seed { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hist-bk-win { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brand); white-space: nowrap; }
+.hist-bk-score { font-variant-numeric: tabular-nums; text-align: right; min-width: 52px; }
+.hist-bk-tie { margin: 4px 8px 2px; color: var(--muted); }
+@media (max-width: 720px) {
+  .hist-bk-cols { grid-template-columns: minmax(0, 1fr); }
+  .hist-champ-name { font-size: 22px; }
 }

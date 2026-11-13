@@ -327,7 +327,7 @@ class HistoricalGameMvcIT {
             for (var e : props.scoring().entrySet()) other.put(e.getKey(), e.getValue() * 10 + 1);
             HistoricalProperties changed = new HistoricalProperties(props.kaggleZipUrl(), props.kaggleZipSha256(),
                     props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(),
-                    props.teams(), props.rounds(), props.reversalRound(), other);
+                    props.teams(), props.rounds(), props.reversalRound(), other, props.regularSeasonWeeks());
             HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
                     new HistoricalSports(java.util.List.of(new NbaHistoricalSport(changed, data))), json);
             JsonNode viaChanged = json.valueToTree(svc.get(id, ALICE).orElseThrow().result());
@@ -354,7 +354,7 @@ class HistoricalGameMvcIT {
         // A service built with reversal round 3, over the same beans (plan F8).
         HistoricalProperties rev3 = new HistoricalProperties(props.kaggleZipUrl(), props.kaggleZipSha256(),
                 props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(), props.teams(), props.rounds(),
-                3, props.scoring());
+                3, props.scoring(), props.regularSeasonWeeks());
         HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
                 new HistoricalSports(java.util.List.of(new NbaHistoricalSport(rev3, data))), json);
         try {
@@ -362,6 +362,7 @@ class HistoricalGameMvcIT {
             long id = svc.create(ALICE, "NBA", 4, HistoricalSyntheticSeason.S).id();
             assertEquals(3, jdbc.queryForObject("select reversal_round from historical_game where id = ?",
                     Integer.class, id));
+            assertEquals(3, svc.get(id, ALICE).orElseThrow().reversalRound(), "the state carries the stored value");
             var done = svc.auto(id, HistoricalGameService.Scope.FINISH, ALICE).orElseThrow();
             assertEquals("COMPLETE", done.status());
             // pick 25 is round 3: plain snake would run it forward (slot 1), reversal 3 flips it (slot 12)
@@ -373,6 +374,100 @@ class HistoricalGameMvcIT {
                 assertEquals("USER", done.picks().get(pickNo - 1).seatType(), "pick " + pickNo + " is the user's");
                 assertEquals(4, done.picks().get(pickNo - 1).draftSlot());
             }
+        } finally {
+            cleanup();
+        }
+    }
+
+
+    // ---- spec 063: playoffs --------------------------------------------------------------------------
+
+    @Test
+    void aShortSeasonFinishesInTheNoPlayoffsArmAndTheListSaysSo() throws Exception {
+        try {
+            long id = newGame(ALICE, 9);
+            JsonNode done = state(ALICE, "/api/history/games/" + id + "/auto", true, "{\"scope\":\"FINISH\"}", 200);
+            JsonNode result = done.get("result");
+            assertEquals(2, result.get("format").get("version").asInt());
+            assertEquals(0, result.get("format").get("playoffWeeks").size());
+            assertTrue(result.get("playoffs").isNull());
+            assertEquals("NO_PLAYOFFS", result.get("userOutcome").asText());
+            assertEquals(result.get("userFinish").asInt(), result.get("finalPlaces").get(
+                    result.get("userFinish").asInt() - 1).get("place").asInt());
+            for (JsonNode w : result.get("weeks")) assertEquals("REGULAR", w.get("phase").asText());
+            assertEquals(0, done.get("reversalRound").asInt(), "the game state carries its stored reversal round");
+            JsonNode row = state(ALICE, "/api/history/games", false, null, 200).get(0);
+            assertEquals(2, row.get("formatVersion").asInt());
+            assertEquals("NO_PLAYOFFS", row.get("outcome").asText());
+        } finally {
+            cleanup();
+        }
+    }
+
+    @Test
+    void aLongSeasonEndsInAThreeRoundBracketAndTheListCarriesTheOutcome() throws Exception {
+        try {
+            ensureSeeded();
+            HistoricalSyntheticSeason.clean(jdbc);
+            HistoricalSyntheticSeason.seedLong(data);
+            long id = newGame(ALICE, 9);
+            JsonNode done = state(ALICE, "/api/history/games/" + id + "/auto", true, "{\"scope\":\"FINISH\"}", 200);
+            JsonNode result = done.get("result");
+            JsonNode fmt = result.get("format");
+            assertEquals(2, fmt.get("version").asInt());
+            assertEquals(props.regularSeasonWeeks(), fmt.get("regularSeasonWeeks").asInt());
+            assertEquals(3, fmt.get("playoffWeeks").size());
+            assertEquals(HistoricalSyntheticSeason.LONG_WEEKS - props.regularSeasonWeeks() - 3,
+                    fmt.get("unusedWeeks").asInt());
+            assertEquals(3, result.get("playoffs").get("rounds").size());
+            assertEquals(6, result.get("playoffs").get("seeds").size());
+            assertEquals(props.regularSeasonWeeks() + 3, result.get("weeks").size(),
+                    "regular season, then three playoff weeks, nothing after");
+            int playoffWeeks = 0;
+            for (JsonNode w : result.get("weeks")) {
+                if ("PLAYOFF".equals(w.get("phase").asText())) playoffWeeks++;
+                else assertEquals(6, w.get("matchups").size());
+            }
+            assertEquals(3, playoffWeeks);
+            assertEquals(12, result.get("finalPlaces").size());
+            assertEquals(result.get("userFinish").asInt(), result.get("finalPlaces").get(
+                    result.get("userFinish").asInt() - 1).get("place").asInt());
+            int regular = props.regularSeasonWeeks();
+            for (JsonNode st : result.get("standings")) {
+                assertEquals(regular, st.get("wins").asInt() + st.get("losses").asInt() + st.get("ties").asInt(),
+                        "standings are the regular season only");
+            }
+            String outcome = result.get("userOutcome").asText();
+            JsonNode row = state(ALICE, "/api/history/games", false, null, 200).get(0);
+            assertEquals(2, row.get("formatVersion").asInt());
+            assertEquals(outcome, row.get("outcome").asText());
+            assertEquals(result.get("userFinish").asInt(), row.get("finish").asInt());
+        } finally {
+            cleanup();
+            HistoricalSyntheticSeason.clean(jdbc);
+            HistoricalSyntheticSeason.seed(data);
+        }
+    }
+
+    /** Plan A6 / PR-09: a result stored by spec 062 comes back as an equal JSON tree, unmarked by the new format. */
+    @Test
+    void aGameCompletedBeforePlayoffsComesBackAsItWasStoredAndTheListLeavesTheNewFieldsNull() throws Exception {
+        try {
+            long id = newGame(ALICE, 9);
+            String old = new String(getClass().getResourceAsStream("/historical/result-062.json").readAllBytes(),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            JsonNode oldTree = json.readTree(old);
+            assertFalse(oldTree.has("format"), "the fixture is 062-shaped");
+            jdbc.update("update historical_game set status = 'COMPLETE', result = ?::jsonb where id = ?", old, id);
+
+            JsonNode state = state(ALICE, "/api/history/games/" + id, false, null, 200);
+            assertEquals(oldTree, state.get("result"), "an equal tree: jsonb does not keep bytes or key order");
+            assertNull(state.get("result").get("format"));
+            assertNull(state.get("result").get("userOutcome"));
+            JsonNode row = state(ALICE, "/api/history/games", false, null, 200).get(0);
+            assertEquals(oldTree.get("userFinish").asInt(), row.get("finish").asInt());
+            assertTrue(row.get("formatVersion").isNull(), "an old row has no format version");
+            assertTrue(row.get("outcome").isNull(), "and no outcome: its finish is a standings rank");
         } finally {
             cleanup();
         }

@@ -4588,7 +4588,13 @@ export type HistoricalPickView = {
 
 export type HistoricalMatchup = { homeSlot: number; awaySlot: number; homePoints: number; awayPoints: number }
 /** startDate is null only if no board player played that week. */
-export type HistoricalWeek = { week: number; startDate: string | null; matchups: HistoricalMatchup[] }
+export type HistoricalWeek = {
+  week: number
+  startDate: string | null
+  matchups: HistoricalMatchup[]
+  /** Spec 063. Absent from a result stored before playoffs existed (an old backend omits it too). */
+  phase?: 'REGULAR' | 'PLAYOFF' | null
+}
 export type HistoricalStanding = {
   slot: number
   wins: number
@@ -4624,6 +4630,50 @@ export type HistoricalSteal = {
   passedOnValue: number
 }
 
+/** Spec 063. The user's outcome vocabulary, also used per team in finalPlaces. */
+export type HistoricalOutcome =
+  | 'CHAMPION'
+  | 'LOST_FINAL'
+  | 'LOST_SEMIFINAL'
+  | 'LOST_ROUND_ONE'
+  | 'MISSED_PLAYOFFS'
+  | 'NO_PLAYOFFS'
+
+/** Spec 063: how the season was split. Mirrors HistoricalResult.Format. */
+export type HistoricalFormat = {
+  version: number
+  seasonWeeks: number
+  configuredRegularSeasonWeeks: number
+  regularSeasonWeeks: number
+  playoffWeeks: number[]
+  unusedWeeks: number
+  shortened: boolean
+}
+export type HistoricalSeed = { seed: number; slot: number }
+export type HistoricalPlayoffMatchup = {
+  highSeed: number
+  lowSeed: number
+  highSlot: number
+  lowSlot: number
+  highPoints: number
+  lowPoints: number
+  winnerSlot: number
+  decidedBySeed: boolean
+}
+export type HistoricalRound = {
+  round: number
+  week: number
+  name: 'ROUND_ONE' | 'SEMIFINAL' | 'FINAL'
+  byeSlots: number[]
+  matchups: HistoricalPlayoffMatchup[]
+}
+export type HistoricalPlayoffs = {
+  seeds: HistoricalSeed[]
+  rounds: HistoricalRound[]
+  championSlot: number
+}
+export type HistoricalFinalPlace = { slot: number; place: number; outcome: HistoricalOutcome }
+
 /** Frozen at the last pick; present only when status is COMPLETE. */
 export type HistoricalResult = {
   weeks: HistoricalWeek[]
@@ -4634,6 +4684,13 @@ export type HistoricalResult = {
   hindsight: HistoricalHindsight
   biggestBust: HistoricalBust | null
   bestStealPassedOn: HistoricalSteal | null
+  // Spec 063. All four are absent from a result stored before playoffs (and from an old backend):
+  // `format == null` is the old-format test. userFinish is the standings rank in an old result.
+  format?: HistoricalFormat | null
+  /** Null when the season was too short for playoffs. */
+  playoffs?: HistoricalPlayoffs | null
+  finalPlaces?: HistoricalFinalPlace[] | null
+  userOutcome?: HistoricalOutcome | null
 }
 
 export type HistoricalGameState = {
@@ -4651,6 +4708,8 @@ export type HistoricalGameState = {
   /** Null once the game is no longer DRAFTING. */
   onTheClockSlot: number | null
   isUsersTurn: boolean
+  /** Spec 063: the game's stored reversal round (0 today). Absent from an old backend: read it as 0. */
+  reversalRound?: number
   picks: HistoricalPickView[]
   /** Rank order, best first; empty once the game is no longer DRAFTING. */
   available: HistoricalPlayerCard[]
@@ -4664,8 +4723,12 @@ export type HistoricalGameSummary = {
   seasonLabel: string
   status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED'
   userSlot: number
-  /** Your place in the final standings; null until COMPLETE. */
+  /** Your final place: after the playoffs for a format-2 game, the standings rank for an older one; null until COMPLETE. */
   finish: number | null
+  /** Spec 063: 2 for a game finished under the playoff format; null for unfinished or old-format games. Absent from an old backend. */
+  formatVersion?: number | null
+  /** Spec 063: the user's outcome; null for unfinished or old-format games. Absent from an old backend. */
+  outcome?: HistoricalOutcome | null
   /** ISO timestamp. */
   createdAt: string
 }

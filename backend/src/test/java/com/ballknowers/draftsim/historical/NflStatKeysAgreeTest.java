@@ -34,11 +34,11 @@ class NflStatKeysAgreeTest {
         for (int y = 2000; y <= 2025; y++) games.put(y, 256);
         List<String> roster = List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "BN", "BN", "BN", "BN", "BN", "BN", "BN", "BN");
         NflHistoricalProperties p = new NflHistoricalProperties("https://x/{season}.csv.gz", "https://x/d.csv", 12, 15,
-                roster, 0, Map.of("pass_yd", 0.04), 17, 6, 3, 12, 2, games, 2000, 2025);
+                roster, 0, Map.of("pass_yd", 0.04), 17, 6, 3, 12, 2, games, 2000, 2025, 14);
         assertEquals("Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR",
                 new NflHistoricalSport(p, null, null).settingsSource());
         NflHistoricalProperties q = new NflHistoricalProperties("https://x/{season}.csv.gz", "https://x/d.csv", 10, 3,
-                List.of("QB", "WR", "BN"), 0, Map.of("pass_yd", 0.04), 17, 6, 3, 12, 2, games, 2000, 2025);
+                List.of("QB", "WR", "BN"), 0, Map.of("pass_yd", 0.04), 17, 6, 3, 12, 2, games, 2000, 2025, 14);
         assertEquals("Hand-set 10-team, 3-round roster: QB, WR + 1 bench · full PPR",
                 new NflHistoricalSport(q, null, null).settingsSource());
     }

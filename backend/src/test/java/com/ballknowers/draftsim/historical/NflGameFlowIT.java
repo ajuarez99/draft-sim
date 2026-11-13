@@ -220,7 +220,9 @@ class NflGameFlowIT {
         assertEquals(12, places.size());
         assertEquals(wins, losses, "every game has a winner and a loser");
         assertEquals(0, ties % 2);
-        assertEquals(12 * NflSyntheticSeason.WEEKS, games, "every team played every week");
+        assertEquals(12 * NflSyntheticSeason.WEEKS, games, "every team played every regular-season week (the short season has no playoffs)");
+        assertEquals(2, result.get("format").get("version").asInt());
+        assertTrue(result.get("playoffs").isNull(), "four weeks is too short for a bracket");
         int userFinish = result.get("userFinish").asInt();
         assertTrue(userFinish >= 1 && userFinish <= 12);
         assertEquals(15, result.get("hindsight").get("picks").size());
@@ -292,6 +294,47 @@ class NflGameFlowIT {
     }
 
     // ---- provenance (T027) ---------------------------------------------------------------------------
+
+
+    // ---- spec 063: playoffs --------------------------------------------------------------------------
+
+    @Test
+    void aShortFootballSeasonHasNoPlayoffsAndALongOneHasABracket() {
+        long shortId = service.create(ALICE, "NFL", 3, NflSyntheticSeason.S).id();
+        JsonNode shortDone = json.valueToTree(
+                service.auto(shortId, HistoricalGameService.Scope.FINISH, ALICE).orElseThrow()).get("result");
+        assertEquals("NO_PLAYOFFS", shortDone.get("userOutcome").asText());
+        assertTrue(shortDone.get("playoffs").isNull());
+
+        NflSyntheticSeason.clean(jdbc);
+        NflSyntheticSeason.seedLong(nfl, jdbc);
+        long id = service.create(ALICE, "NFL", 3, NflSyntheticSeason.S).id();
+        JsonNode done = json.valueToTree(service.auto(id, HistoricalGameService.Scope.FINISH, ALICE).orElseThrow());
+        JsonNode result = done.get("result");
+        int regular = props.regularSeasonWeeks();
+        assertEquals(regular, result.get("format").get("regularSeasonWeeks").asInt());
+        assertEquals(NflSyntheticSeason.LONG_WEEKS - regular - 3, result.get("format").get("unusedWeeks").asInt());
+        assertEquals(regular + 3, result.get("weeks").size());
+        for (int i = 0; i < result.get("weeks").size(); i++) {
+            JsonNode w = result.get("weeks").get(i);
+            if (i < regular) {
+                assertEquals("REGULAR", w.get("phase").asText());
+                assertEquals(6, w.get("matchups").size());
+            } else {
+                assertEquals("PLAYOFF", w.get("phase").asText());
+            }
+        }
+        assertEquals(2, result.get("weeks").get(regular).get("matchups").size());
+        assertEquals(1, result.get("weeks").get(regular + 2).get("matchups").size());
+        assertEquals(3, result.get("playoffs").get("rounds").size());
+        for (JsonNode st : result.get("standings")) {
+            assertEquals(regular, st.get("wins").asInt() + st.get("losses").asInt() + st.get("ties").asInt(),
+                    "every team played every regular-season week");
+        }
+        assertEquals(12, result.get("finalPlaces").size());
+        assertEquals(result.get("userFinish").asInt(),
+                result.get("finalPlaces").get(result.get("userFinish").asInt() - 1).get("place").asInt());
+    }
 
     @Test
     void theDataNotesAndAttributionAreOnEveryFootballStateAndFrozenAtCreation() {

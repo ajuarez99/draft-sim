@@ -27,6 +27,8 @@ public final class NflSyntheticSeason {
     public static final int S2 = 1893, S1 = 1894, S = 1895;
     public static final String PREFIX = "it-nfl-";
     public static final int VETERANS = 240, ROOKIES = 10, WEEKS = 4;
+    /** A long variant (spec 063): 14 regular-season weeks plus three playoff weeks, so a bracket is played. */
+    public static final int LONG_WEEKS = 17;
     public static final String TWIN = "Twin Name";
 
     private NflSyntheticSeason() {}
@@ -118,6 +120,15 @@ public final class NflSyntheticSeason {
      * notes have something to say.
      */
     public static void seed(NflHistoricalRepository nfl, JdbcTemplate jdbc) {
+        seed(nfl, jdbc, WEEKS);
+    }
+
+    /** The same world with {@link #LONG_WEEKS} weeks: {@link #clean} first. */
+    public static void seedLong(NflHistoricalRepository nfl, JdbcTemplate jdbc) {
+        seed(nfl, jdbc, LONG_WEEKS);
+    }
+
+    private static void seed(NflHistoricalRepository nfl, JdbcTemplate jdbc, int weekCount) {
         List<SeasonAgg> l2 = new ArrayList<>(), l1 = new ArrayList<>(), l0 = new ArrayList<>();
         List<WeekRow> weeks = new ArrayList<>();
         for (int i = 0; i < VETERANS + ROOKIES; i++) {
@@ -133,7 +144,7 @@ public final class NflSyntheticSeason {
             sentinel[3] = 8888;
             sentinel[6] = 9999;
             l0.add(new SeasonAgg(id(i), name(i), pos, "ZZZ", 91, sentinel));
-            for (int w = 1; w <= WEEKS; w++) {
+            for (int w = 1; w <= weekCount; w++) {
                 if (!hasGame(i, w)) continue;
                 weeks.add(new WeekRow(id(i), name(i), pos, w, "1895_0" + w + "_ZZZ_YYY", "ZZZ", "YYY",
                         weekStats(i, w), null));
@@ -141,8 +152,8 @@ public final class NflSyntheticSeason {
         }
         nfl.replaceSeason(new ParsedSeason(S2, List.of(), l2, 0, 0, 0, 0, 0, "s2", 0), seasonRow(S2, 15, 0, null, 0));
         nfl.replaceSeason(new ParsedSeason(S1, List.of(), l1, 0, 0, 0, 0, 0, "s1", 0), seasonRow(S1, 16, 0, null, 0));
-        nfl.replaceSeason(new ParsedSeason(S, weeks, l0, 60, WEEKS, 5, 3, 7, "synthetic-sha", 123),
-                seasonRow(S, WEEKS, 60, 64, 3));
+        nfl.replaceSeason(new ParsedSeason(S, weeks, l0, 60, weekCount, 5, 3, 7, "synthetic-sha", 123),
+                seasonRow(S, weekCount, 60, 64, 3));
 
         // The rookies' NFL slots, written straight to the table: replaceDraftPicks replaces EVERYTHING, which a test
         // must never do to a database that may hold real picks.

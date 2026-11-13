@@ -98,13 +98,14 @@ public class HistoricalGameRepository {
 
     /** One row of the caller's games list: no board, no result, just what the list shows. */
     public record SummaryRow(long id, String sport, String seasonLabel, String status, int userSlot,
-                             Integer finish, OffsetDateTime createdAt) {}
+                             Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt) {}
 
     /** A user's games for the list screen, newest first. {@code finish} comes straight out of the frozen result. */
     public List<SummaryRow> summaries(String sleeperUserId) {
         return db.sql("""
                 select g.id, g.sport, s.label, g.status, g.user_slot, (g.result ->> 'userFinish')::int as finish,
-                       g.created_at
+                       (g.result -> 'format' ->> 'version')::int as format_version,
+                       g.result ->> 'userOutcome' as outcome, g.created_at
                 from historical_game g
                 join historical_season s on s.sport = g.sport and s.season_start = g.season_start
                 where g.sleeper_user_id = ? order by g.created_at desc, g.id desc
@@ -116,7 +117,8 @@ public class HistoricalGameRepository {
                     Integer f = rs.getObject("finish", Integer.class);
                     return new SummaryRow(rs.getLong("id"), rs.getString("sport"), rs.getString("label"),
                             rs.getString("status"),
-                            rs.getInt("user_slot"), f,
+                            rs.getInt("user_slot"), f, rs.getObject("format_version", Integer.class),
+                            rs.getString("outcome"),
                             rs.getObject("created_at", OffsetDateTime.class));
                 })
                 .list();

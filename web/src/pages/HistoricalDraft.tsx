@@ -12,7 +12,8 @@ import {
 import { useFailure } from '../useFailure'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
-import { ordinal, sportOf } from '../historicalCopy'
+import { sportOf, summaryStatus } from '../historicalCopy'
+import { clearDraftQueue } from '../useDraftQueue'
 
 function when(iso: string): string {
   const d = new Date(iso)
@@ -41,12 +42,6 @@ const COPY: Record<HistoricalSport, (range: string) => { sub: string; scoring: s
       'It runs as weekly best ball on real full-PPR scores: your best legal lineup is set for you each week. Quarterbacks, running backs, wide receivers and tight ends only; no kickers or defenses.',
     how: `Seasons run${range ? ` from ${range}` : ' over the years on offer'}. Scores come from the real weekly stat lines. Opponents draft from last season's points over replacement, not from a real draft-position feed.`,
   }),
-}
-
-function statusText(g: HistoricalGameSummary): string {
-  if (g.status === 'COMPLETE') return g.finish != null ? `Finished ${ordinal(g.finish)}` : 'Complete'
-  if (g.status === 'DRAFTING') return 'Drafting'
-  return 'Abandoned'
 }
 
 export default function HistoricalDraft() {
@@ -118,6 +113,7 @@ export default function HistoricalDraft() {
     setError(null)
     try {
       await abandonHistoricalGame(id)
+      clearDraftQueue(id)
       setGames((gs) => (gs ?? []).map((g) => (g.id === id ? { ...g, status: 'ABANDONED' } : g)))
     } catch (e) {
       fail(e)
@@ -196,7 +192,7 @@ export default function HistoricalDraft() {
                 <div>
                   <strong className="cond">{g.seasonLabel}</strong>{' '}
                   <span className={`chip hist-sport-tag sport-${sportOf(g).toLowerCase()}`}>{SPORT_LABEL[sportOf(g)]}</span>{' '}
-                  <span className={`chip status-${g.status.toLowerCase()}`}>{statusText(g)}</span>
+                  <span className={`chip status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
                   <span className="muted small"> · {when(g.createdAt)}</span>
                 </div>
                 <div className="hist-game-actions">
