@@ -2,6 +2,9 @@
 
 ## CURRENT STATE 2026-11-05 (read this first; the UPDATE entries below are history)
 
+**Amended 2026-11-13:** this block stops at 055. Read "UPDATE 2026-11-13" below first for 056–062 and
+the latest prod check.
+
 Checked against `git log origin/main` (tip `0446524`, 2026-11-02), `gh pr list` and the branch refs
 on 2026-11-03. **Amended in place:** the 10-23 → 10-28 UPDATE headers below say "NOT committed" for
 specs 045–052. That went stale. All of them merged since (PRs #45–#52), and 054 merged directly.
@@ -53,6 +56,43 @@ Also merged earlier: 032–037, 039–041, 043.
 **Local-only state:** the main checkout (`C:\Users\allan\source\draft-sim`) is parked on the old
 `017-nba-schedule-grid` branch with uncommitted edits from several sessions. Don't read its
 HANDOFF.md as current; this file on `main` is the one.
+## UPDATE 2026-11-13: prod check of 058, 061 and 062; the CURRENT STATE block above is behind
+
+**Amended 2026-11-13:** the CURRENT STATE block is dated 11-05 and does not cover what merged after it.
+Per `git log origin/main` (tip `1369668`): 056 Football Time Machine, 057 commissioner score override
+(PR #54), 058 Trending Tony by share of pickups (PR #55), 059 mock-manager scoping (PR #56), 060 project
+subagents (PR #57), 061 site redesign (PR #58), 062 Time Machine bot temperature 0.25 (PR #59). The
+weekly-report median fix it lists as unpushed is on main too (`ffbdf74`). No pushed feature branch is
+waiting to merge.
+
+**Checked on prod 2026-11-13**, in the browser pane, signed in as popsharky, league "Ball Knowers"
+(NBA 2026). Read-only: nothing was written.
+- `api.ballknowers.co/api/health`: `up`, `weightsLoaded: true`.
+- **061 verified.** Top bar, league tabs, Season sub-tabs, Barlow fonts and the new palette render. At
+  375px the bottom bar and the More sheet work and the page does not scroll sideways. All ten API calls
+  on league home returned 200; no console errors.
+- **058 verified.** The Trending Tony ranks by share of judged pickups (83.3%, 71.4%, 40%...), and a
+  team row in the full standings opens its players with their trending rank.
+- **062 consistent, not proven.** Allan's in-progress 1972-73 basketball game (game 4, 49 picks in) has
+  taken 48 of the board's top 49 players. That fits a low temperature; the configured 0.25 cannot be
+  read from outside. No picks were made and no new game was started.
+
+**Not checked:** Football Time Machine, a bot-only game run to the end on prod, the draft room and mock
+room under the new shell, 059 mock-manager scoping.
+
+**Still owed (unchanged, not looked at):** 055's 12 rows at `through_week` 2 on prod (its ~11-09
+deadline has passed), 057's real week 1-2 score entry, the NBA 2026 score drift.
+
+**Seen in passing, not investigated:**
+- The signed-in home page's player spotlight read "Top players · Mon, Nov 9" on Nov 13.
+- Power rankings show week 2 with 1 of 12 ballots while matchups are scored through week 3.
+- The Time Machine board says "ranked by last season's points", but the order matches fantasy points
+  per game (a 43-game player sits above 82-game players with nearly twice his total). Per-game is a
+  reading of six rows, not a check of the code.
+
+**Next:** 038 Season Wrapped (T002; its worktree needs a rebase), then the Time Machine audit leftovers
+(landing page, stub weeks, lopsided bot rosters).
+
 ## UPDATE 2026-11-08: spec 056 (Football Time Machine) MERGED to main and DEPLOYED (both services); prod import done (26 seasons); browser-checked on prod
 
 An NFL copy of 053, 2000–2025, on nflverse data. Details, reviews and the verification record are in
