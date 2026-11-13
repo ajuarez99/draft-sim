@@ -297,6 +297,34 @@ export default function HistoricalResults({ game, result, afterFinish }: Props) 
         </section>
       )}
 
+      <section className="panel" aria-label="Your draft against hindsight">
+        <h2>How your draft compares</h2>
+        <div className="hist-compare">
+          <div className="hist-stat">
+            <span className="hist-stat-label muted small">{old ? 'You' : 'You, whole real season'}</span>
+            <span className="hist-stat-num">{pts1(h.userPointsFor)}</span>
+          </div>
+          <div className="hist-stat">
+            <span className="hist-stat-label muted small">{h.label}</span>
+            <span className="hist-stat-num">{pts1(h.pointsFor)}</span>
+          </div>
+        </div>
+        {h.userBeatIt ? (
+          <p className="hist-verdict good">You beat the greedy hindsight draft.</p>
+        ) : (
+          <p className="hist-verdict">
+            Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
+          </p>
+        )}
+        <HindsightRoster game={game} result={result} />
+        {old && <Callouts game={game} result={result} />}
+        {!result.pickFinishes && (
+          <p className="muted small">
+            This game finished before pick-by-pick finishes were saved, so there is no drafted-as and finished-as table for it.
+          </p>
+        )}
+      </section>
+
       <PickFinishes game={game} result={result} />
 
       {!old && playoffs && <HistoricalBracket playoffs={playoffs} userSlot={user} />}
@@ -351,34 +379,6 @@ export default function HistoricalResults({ game, result, afterFinish }: Props) 
             ))}
           </tbody>
         </table>
-      </section>
-
-      <section className="panel" aria-label="Your draft against hindsight">
-        <h2>How your draft compares</h2>
-        <div className="hist-compare">
-          <div className="hist-stat">
-            <span className="hist-stat-label muted small">{old ? 'You' : 'You, whole real season'}</span>
-            <span className="hist-stat-num">{pts1(h.userPointsFor)}</span>
-          </div>
-          <div className="hist-stat">
-            <span className="hist-stat-label muted small">{h.label}</span>
-            <span className="hist-stat-num">{pts1(h.pointsFor)}</span>
-          </div>
-        </div>
-        {h.userBeatIt ? (
-          <p className="hist-verdict good">You beat the greedy hindsight draft.</p>
-        ) : (
-          <p className="hist-verdict">
-            Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
-          </p>
-        )}
-        <HindsightRoster game={game} result={result} />
-        {old && <Callouts game={game} result={result} />}
-        {!result.pickFinishes && (
-          <p className="muted small">
-            This game finished before pick-by-pick finishes were saved, so there is no drafted-as and finished-as table for it.
-          </p>
-        )}
       </section>
 
       <section className="panel" aria-label="Weekly results">
