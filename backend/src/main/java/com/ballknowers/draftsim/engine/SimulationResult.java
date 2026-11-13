@@ -26,9 +26,11 @@ public record SimulationResult(
      * <p>{@code position} is the first stored position (BoardEntry.position()); for basketball that is
      * Sleeper's own primary position (spec 026). {@code positions} is the full eligible list in
      * stored order, primary first; never null, empty when the player has no stored positions.
+     * <p>{@code rookie} is {@link com.ballknowers.draftsim.domain.Player#isRookie()}: Sleeper's
+     * experience figure as of the last player ingest, so it describes the current season only.
      */
     public record PlayerRef(long id, String sleeperId, String name, String position, List<String> positions,
-                            String team, double adp, int positionalRank) {
+                            String team, double adp, int positionalRank, boolean rookie) {
 
         /**
          * Reused by {@link MonteCarloRunner} and the mock draft room
@@ -40,7 +42,7 @@ public record SimulationResult(
                     e.position().name(),
                     e.player().positions() == null ? List.of()
                             : e.player().positions().stream().map(Enum::name).toList(),
-                    e.player().team(), e.adp(), e.positionalRank());
+                    e.player().team(), e.adp(), e.positionalRank(), e.player().isRookie());
         }
     }
 

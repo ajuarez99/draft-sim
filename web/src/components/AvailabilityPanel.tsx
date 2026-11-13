@@ -5,6 +5,8 @@ import { fetchDraftStats, statsCacheKey } from '../draftStatsCache'
 import { filterLikely, joinPoolStats, sortDraftRows } from '../draftRoomStats'
 import { COLUMNS, defaultDir, toggleSort, type SortState, type StatMode } from '../statLeaderboard'
 import { reasonSentence } from '../statCopy'
+import RookieTag, { RookieChip } from './RookieTag'
+import { isRookie, rookieFlagKnown } from '../rookie'
 import DraftStatsTable from './DraftStatsTable'
 import StatPickerModal from './StatPickerModal'
 import { readStatChoice, resetStatChoice, writeStatChoice } from '../statChoice'
@@ -196,8 +198,9 @@ function writeViewPref(v: 'tiers' | 'stats'): void {
 // survive; one versioned key, and anything unreadable or invalid falls back to the defaults.
 // The position filter is shared with the Tiers view on purpose: it is one state in the panel.
 const STATS_STATE_KEY = 'bk.availStatsState.v1'
-type StatsViewState = { sort: SortState; window: PlayerWindowKind; mode: StatMode; filter: string; likelyOnly: boolean }
-const DEFAULT_STATS_STATE: StatsViewState = { sort: { col: 'fp', dir: 'desc' }, window: 'SEASON', mode: 'perGame', filter: 'ALL', likelyOnly: false }
+// `rookiesOnly` joined the same key later (2026-11-13): a stored state without it reads false.
+type StatsViewState = { sort: SortState; window: PlayerWindowKind; mode: StatMode; filter: string; likelyOnly: boolean; rookiesOnly: boolean }
+const DEFAULT_STATS_STATE: StatsViewState = { sort: { col: 'fp', dir: 'desc' }, window: 'SEASON', mode: 'perGame', filter: 'ALL', likelyOnly: false, rookiesOnly: false }
 function readStatsState(): StatsViewState {
   try {
     const o = JSON.parse(sessionStorage.getItem(STATS_STATE_KEY) ?? 'null')
@@ -209,6 +212,7 @@ function readStatsState(): StatsViewState {
       mode: STAT_MODES.some((m) => m.kind === o.mode) ? o.mode : DEFAULT_STATS_STATE.mode,
       filter: typeof o.filter === 'string' ? o.filter : 'ALL',
       likelyOnly: o.likelyOnly === true,
+      rookiesOnly: o.rookiesOnly === true,
     }
   } catch {
     return DEFAULT_STATS_STATE
@@ -303,6 +307,15 @@ export default function AvailabilityPanel({
   // default: the list's job is who is still there.
   const [search, setSearch] = useState('')
   const [hideDrafted, setHideDrafted] = useState(true)
+  // Rookies only: narrows whatever the position chip already shows, in both views. Offered only
+  // when the server sends the flag (rookie.ts); a remembered "on" against a server that doesn't
+  // filters nothing.
+  const [rookiesWanted, setRookiesOnly] = useState(saved.rookiesOnly)
+  const rookiesOffered = useMemo(
+    () => rookieFlagKnown(availability ? availability.map((r) => r.player) : (statsPool ?? players ?? [])),
+    [availability, statsPool, players],
+  )
+  const rookiesOnly = rookiesWanted && rookiesOffered
   const starred = targetIds
   const starredRef = useRef(starred)
   starredRef.current = starred
@@ -340,6 +353,7 @@ export default function AvailabilityPanel({
     const candidates: ListRow[] = []
     for (const r of merged) {
       if (filter !== 'ALL' && !eligiblePositions(r.player, sport).includes(filter)) continue
+      if (rookiesOnly && !isRookie(r.player)) continue
       if (!matchesSearch(search, r.player.name)) continue
       if (r.taken) {
         if (hideDrafted) continue
@@ -354,7 +368,7 @@ export default function AvailabilityPanel({
       candidates.push(r)
     }
     return candidates
-  }, [availability, players, filter, picks, pickedPlayerIds, showSurvival, search, hideDrafted, draftedPlayers, sport])
+  }, [availability, players, filter, rookiesOnly, picks, pickedPlayerIds, showSurvival, search, hideDrafted, draftedPlayers, sport])
 
   // Tiers group by consensus ADP (tiers.ts). Inside a tier the sheet's old
   // job survives: when there are survival numbers, the player you are most at
@@ -390,8 +404,8 @@ export default function AvailabilityPanel({
   const [statMode, setStatMode] = useState<StatMode>(saved.mode)
   const [likelyOnly, setLikelyOnly] = useState(saved.likelyOnly)
   useEffect(() => {
-    writeStatsState({ sort: statSort, window: statWindow, mode: statMode, filter, likelyOnly })
-  }, [statSort, statWindow, statMode, filter, likelyOnly])
+    writeStatsState({ sort: statSort, window: statWindow, mode: statMode, filter, likelyOnly, rookiesOnly: rookiesWanted })
+  }, [statSort, statWindow, statMode, filter, likelyOnly, rookiesWanted])
   const inStats = statsReady && view === 'stats'
 
   // The leaderboard comes from a module-level promise cache (draftStatsCache), one request per
@@ -438,6 +452,7 @@ export default function AvailabilityPanel({
       (p) =>
         (!hideDrafted || !pickedPlayerIds.has(p.id)) &&
         (filter === 'ALL' || eligiblePositions(p, sport).includes(filter)) &&
+        (!rookiesOnly || isRookie(p)) &&
         matchesSearch(search, p.name),
     )
     const joined = joinPoolStats(
@@ -447,7 +462,7 @@ export default function AvailabilityPanel({
       (p) => (fitFor ? fitFor(p) : null),
     )
     return sortDraftRows(filterLikely(joined, likelyOnly), statSort, statMode)
-  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, showSurvival, nextMyPick, fitFor, sport, likelyOnly, statSort, statMode, hideDrafted, draftedPlayers, search])
+  }, [statsBoard, statsPool, statsPoolLoading, players, availability, pickedPlayerIds, filter, rookiesOnly, showSurvival, nextMyPick, fitFor, sport, likelyOnly, statSort, statMode, hideDrafted, draftedPlayers, search])
   const statColumns = useMemo(() => statIds.map((id) => COLUMNS[id]).filter(Boolean), [statIds])
   // Callbacks and the label below are stable across renders so the memoized table skips the
   // live room's once-a-second re-render (SC-006).
@@ -558,6 +573,7 @@ export default function AvailabilityPanel({
                 {p}
               </button>
             ))}
+          {rookiesOffered && <RookieChip on={rookiesOnly} onChange={setRookiesOnly} />}
           {/* A labelled set of chips, not a range input. The slider was the
               one control in the app rendering in the browser's default blue
               -- `input[type=range]` has no style here -- and it paired a
@@ -697,6 +713,7 @@ export default function AvailabilityPanel({
                             size={20}
                           />
                           <span className="pc-name" title={r.player.name}>{r.player.name}</span>
+                          <RookieTag player={r.player} />
                           <span className="team">{r.player.team}</span>
                           {r.taken && <span className="taken-tag">taken</span>}
                           {!r.taken && need(r.player) && <span className="need-tag">{need(r.player)}</span>}
@@ -746,7 +763,11 @@ export default function AvailabilityPanel({
           <p className="muted">
             {!started
               ? 'Your realistic options show up here once the draft starts.'
-              : showSurvival
+              : rookiesOnly
+                ? showSurvival
+                  ? 'No rookies among the players in range of these picks.'
+                  : 'No rookies to list.'
+                : showSurvival
                 ? 'No players survive to these picks in any run.'
                 : 'No players to list.'}
           </p>

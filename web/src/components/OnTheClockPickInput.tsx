@@ -3,6 +3,8 @@ import type { PlayerRef, Sport } from '../api'
 import { eligiblePositions, filterPositions, positionLabel, posPill } from '../positions'
 import { posRankOrAdp } from '../posRank'
 import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
+import RookieTag, { RookieChip } from './RookieTag'
+import { isRookie, rookieFlagKnown } from '../rookie'
 import PlayerFace from './PlayerFace'
 
 type Props = {
@@ -40,6 +42,9 @@ export default function OnTheClockPickInput({
 }: Props) {
   const POSITIONS = useMemo(() => filterPositions(sport), [sport])
   const [filter, setFilter] = useState<string>('ALL')
+  const [rookiesWanted, setRookiesOnly] = useState(false)
+  const rookiesOffered = useMemo(() => rookieFlagKnown(available), [available])
+  const rookiesOnly = rookiesWanted && rookiesOffered
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -52,8 +57,9 @@ export default function OnTheClockPickInput({
   const rows = useMemo(() => {
     return available
       .filter((p) => filter === 'ALL' || eligiblePositions(p, sport).includes(filter))
+      .filter((p) => !rookiesOnly || isRookie(p))
       .sort((a, b) => a.adp - b.adp)
-  }, [available, filter, sport])
+  }, [available, filter, rookiesOnly, sport])
 
   const needs = useMemo(
     () => computeTeamNeeds(sport, rosterPositions, draftedPlayers),
@@ -98,6 +104,7 @@ export default function OnTheClockPickInput({
               {p}
             </button>
           ))}
+          {rookiesOffered && <RookieChip on={rookiesOnly} onChange={setRookiesOnly} />}
         </div>
 
         <div className="picker-scroll">
@@ -129,6 +136,7 @@ export default function OnTheClockPickInput({
                       <span {...posPill(p, sport)}>{positionLabel(p, sport)}</span>
                       <PlayerFace sport={sport} sleeperId={p.sleeperId} team={p.team} position={p.position} name={p.name} size={20} />
                       {p.name}
+                      <RookieTag player={p} />
                       <span className="team">{p.team}</span>
                     </td>
                     <td className="num">{posRankOrAdp(p, sport)}</td>
@@ -138,7 +146,9 @@ export default function OnTheClockPickInput({
               })}
             </tbody>
           </table>
-          {rows.length === 0 && <p className="muted">Nothing left at this position.</p>}
+          {rows.length === 0 && (
+            <p className="muted">{rookiesOnly ? 'No rookies left here.' : 'Nothing left at this position.'}</p>
+          )}
         </div>
       </div>
     </div>

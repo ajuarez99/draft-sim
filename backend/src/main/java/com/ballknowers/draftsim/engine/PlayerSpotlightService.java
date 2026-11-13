@@ -405,8 +405,7 @@ public class PlayerSpotlightService {
         if (period == null) return new Section(List.of(), "NO_PERIOD");
         List<ScoredGame> rookies = new ArrayList<>();
         for (ScoredGame g : rows.scored()) {
-            Integer exp = g.player().yearsExp();
-            if (exp != null && exp == 0 && rules.rookieWatchEligible(g.player())) rookies.add(g);
+            if (g.player().isRookie() && rules.rookieWatchEligible(g.player())) rookies.add(g);
         }
         if (rookies.isEmpty()) return new Section(List.of(), "NO_ROOKIE_PLAYED");
         return new Section(rank(rookies, owners), null);

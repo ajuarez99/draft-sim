@@ -6001,6 +6001,14 @@ html[data-bk-user] .landing-prerender { display: none; }
 .avail .pc { display: flex; align-items: center; min-width: 0; white-space: nowrap; }
 .avail .pc-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .avail .pc .team, .avail .pc .need-tag, .avail .pc .pos { flex: 0 0 auto; }
+/* "R" beside a first-season player's name, in every draft-room player list. A fact about the
+   player, not about your roster, so it takes the neutral data colour rather than the brand
+   the "Fills C" tag uses. */
+.rookie-tag {
+  flex: 0 0 auto; margin-left: 6px; font-size: 10px; font-weight: 700; line-height: 1.5;
+  padding: 0 5px; border-radius: 4px;
+  color: var(--data); background: color-mix(in oklab, var(--data) 16%, transparent);
+}
 @media (min-width: 1280px) {
   /* Fixed layout so the name column really is 340px and the rest goes to the survival
      strip, which was getting ~648px against the name's ~260. */

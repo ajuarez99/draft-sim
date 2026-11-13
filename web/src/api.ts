@@ -26,6 +26,11 @@ export type PlayerRef = {
   // null) -- a "{position}{positionalRank}" label must special-case it rather
   // than rendering "RB999".
   positionalRank: number
+  // First-season player: Sleeper's years_exp is 0 (Player.isRookie() on the backend). It is
+  // Sleeper's figure as of the last player ingest, so it describes the current season only.
+  // Optional because of the split deploy: an older backend omits it, and then the rooms offer
+  // no rookie filter at all rather than one that matches nobody (see rookie.ts).
+  rookie?: boolean
 }
 
 export type Candidate = { player: PlayerRef; probability: number }
