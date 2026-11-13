@@ -68,8 +68,8 @@ const KIND_LABEL: Record<PowerRankingKind, string> = {
 }
 
 // Fixed, not hueFor(kind) -- the mode names hash close enough together that two
-// of them read as the same color. Clear of --crimson (~25, "you") and --teal
-// (~175, generic interaction) per styles.css's house rule.
+// of them read as the same color. Clear of --you (~85, the gold) and --down (~25)
+// per styles.css's house rule.
 const KIND_HUE: Record<PowerRankingKind, number> = {
   COMPUTED_REALIZED: 210,
   COMMISSIONER: 290,

@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
+import { useInsideLeague } from '../appSlots'
 
 type Props = {
-  /** Small uppercase line above the title: where you are, or what this is. */
+  /** Small uppercase line above the title: where you are, or what this is. Not rendered inside a
+   *  league (the league header already says league and season); outside one it renders as before. */
   eyebrow?: ReactNode
   title: ReactNode
   /** One sentence, the takeaway (not the method -- that goes in
@@ -32,7 +34,8 @@ const FORBIDDEN_SUB_WORDS = [
 ]
 
 /**
- * The app's page header: eyebrow, title, one line of explanation.
+ * The app's page header: eyebrow (outside a league), title, one line of explanation. The title is
+ * sentence case in the body face (claude/site-redesign.md Phase 3), not the uppercase display face.
  *
  * Home and Power rankings each invented this independently
  * (`.home-eyebrow`/`.home-title`/`.home-header-sub` and
@@ -49,6 +52,10 @@ const FORBIDDEN_SUB_WORDS = [
  * distinction. One vocabulary, two scales -- not two vocabularies.
  */
 export default function PageHeader({ eyebrow, title, sub, actions }: Props) {
+  // Inside a league the header above already names the league and the season, so the eyebrow would
+  // say it twice. Elsewhere (the picker, Time Machine, a manager's page, a mock's setup) it is the
+  // only place the page says where it is, and it stays.
+  const insideLeague = useInsideLeague()
   if (import.meta.env.DEV && typeof sub === 'string') {
     const lower = sub.toLowerCase()
     const hits = FORBIDDEN_SUB_WORDS.filter((w) => lower.includes(w))
@@ -59,8 +66,8 @@ export default function PageHeader({ eyebrow, title, sub, actions }: Props) {
   return (
     <header className="page-head">
       <div className="page-head-text">
-        {eyebrow && <p className="page-eyebrow">{eyebrow}</p>}
-        <h1 className="page-title cond">{title}</h1>
+        {eyebrow && !insideLeague && <p className="page-eyebrow">{eyebrow}</p>}
+        <h1 className="page-title">{title}</h1>
         {sub && <p className="page-sub">{sub}</p>}
       </div>
       {actions}

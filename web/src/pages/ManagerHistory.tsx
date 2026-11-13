@@ -102,47 +102,40 @@ export default function ManagerHistory() {
     <>
       {/* Portaled, not resolved by AppShell the way league context is: a
           manager's name isn't in the URL, and this page has already fetched
-          it. The rail resolves what the path alone can tell it; a page hands
+          it. The shell resolves what the path alone can tell it; a page hands
           over what only the page knows. claude/site-wide-shell-propagation.md
-          Phase 3. */}
+          Phase 3. It reads as a horizontal strip under the header now. */}
       {rail.node &&
         createPortal(
-          <div className="app-rail-section">
-            <span className="app-rail-label">Manager</span>
-            <div className="rail-league-id" title={name}>
+          <div className="context-strip-content">
+            <span className="context-strip-label">Manager</span>
+            <div className="context-strip-id" title={name}>
               <Avatar avatarId={data.avatarId} seed={String(data.managerId)} label={name} />
-              <span className="rail-league-text app-rail-row-label">
-                <span className="rail-league-name">{name}</span>
-                {/* FR-002: a season count is one of the totals that must not
-                    span sports, same as the header below -- so this is a
-                    count per sport, never a figure spanning them. styles.css
-                    already sizes a sport-pill inside rail-league-sub for
-                    exactly this.
-                    FR-007: and it is the SAME count the header and the career
-                    panel state. Live verification on 2026-09-21 caught this
-                    rail reading "NBA 3" beside a header reading "2 seasons"
-                    -- the third place on one screen where a number labelled
-                    "seasons" meant something different. `seasonsCounted`
-                    is the one source, and since T076 the only one -- a
-                    sport whose seasons are all uncounted reads 0 here, which
-                    is what "counted seasons" means and what the panel below
-                    says too. */}
-                <span className="rail-league-sub">
-                  {careersBySport.map(({ sport, career }, i) => (
-                    <span key={sport}>
-                      {i > 0 && ' · '}
-                      <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>{' '}
-                      {career.seasonsCounted}
-                    </span>
-                  ))}
-                </span>
+              <span className="context-strip-name">{name}</span>
+              {/* FR-002: a season count is one of the totals that must not
+                  span sports, same as the header below -- so this is a
+                  count per sport, never a figure spanning them.
+                  FR-007: and it is the SAME count the header and the career
+                  panel state. Live verification on 2026-09-21 caught this
+                  strip's predecessor reading "NBA 3" beside a header reading
+                  "2 seasons" -- the third place on one screen where a number
+                  labelled "seasons" meant something different.
+                  `seasonsCounted` is the one source, and since T076 the only
+                  one -- a sport whose seasons are all uncounted reads 0 here,
+                  which is what "counted seasons" means and what the panel
+                  below says too. */}
+              <span className="context-strip-sub">
+                {careersBySport.map(({ sport, career }, i) => (
+                  <span key={sport}>
+                    {i > 0 && ' · '}
+                    <span className={`sport-pill ${sport}`}>{sport.toUpperCase()}</span>{' '}
+                    {career.seasonsCounted}
+                  </span>
+                ))}
               </span>
             </div>
-            <Link to="/managers" className="app-rail-row" title="All managers" aria-label="All managers">
-              <span className="app-rail-glyph" aria-hidden="true">
-                ●
-              </span>
-              <span className="app-rail-row-label">All managers</span>
+            <Link to="/managers" className="context-strip-link">
+              All managers
             </Link>
           </div>,
           rail.node,

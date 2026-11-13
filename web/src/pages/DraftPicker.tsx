@@ -287,7 +287,6 @@ export default function DraftPicker() {
             sportFilter={sportFilter}
             onSportFilterChange={setSportFilter}
             counts={counts}
-            collapsed={rail.collapsed}
           />,
           rail.node,
         )}

@@ -59,7 +59,7 @@ export default function PickPrompt({ modelPick, bestAvailable, onPick, onOpenPic
   return (
     <div className="pause-banner pick-prompt">
       {/* No "Your pick — Round 2.14" line any more: OnTheClock sits directly
-          above this, in the same crimson, already naming the round and pick.
+          above this, in the same "you" colour, already naming the round and pick.
           Two banners saying whose turn it is was the duplication the shared
           strip introduced; this one keeps the half the strip doesn't have --
           what happens when you press one of these buttons. */}

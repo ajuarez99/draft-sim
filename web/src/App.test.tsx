@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import { headline, title as landingTitle } from './landingCopy'
+import { isCompactChrome } from './components/AppShell'
 import { clearUser, setUser, type BkUser } from './user'
 import * as api from './api'
 import { invalidateRailLeagues } from './railLeague'
@@ -44,7 +45,7 @@ vi.mock('./pages/StatLeaderboard', () => ({
     return <div data-instance={instance}>stat leaderboard</div>
   },
 }))
-// Mounted by the rail-collapse test below; the real one fetches on mount.
+// Mounted by the draft-room test below; the real one fetches on mount.
 vi.mock('./pages/DraftView', () => ({
   default: () => <div>draft view</div>,
 }))
@@ -105,7 +106,9 @@ describe('App sign-out gating', () => {
 
     expect(await screen.findByText('power rankings')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /sign out/i }))
+    // Sign out sits behind the avatar now: a deliberate second tap, never next to the nav.
+    await user.click(screen.getByRole('button', { name: /^account:/i }))
+    await user.click(screen.getByRole('menuitem', { name: /sign out/i }))
 
     expect(screen.getByRole('heading', { level: 1, name: headline })).toBeInTheDocument()
     expect(screen.getByLabelText(/your sleeper username/i)).toBeInTheDocument()
@@ -157,24 +160,24 @@ describe('App sign-out gating', () => {
     expect(await screen.findByText('draft picker')).toBeInTheDocument()
   })
 
-  // These two replace a pair that guarded the opposite arrangement: the rail
-  // shipped Home-only, so the old tests asserted that "/" had no nav chrome
-  // and every other route did. That split is the thing
-  // claude/site-wide-shell-propagation.md removed -- there is one shell now,
-  // and these assert the new invariant rather than the old one.
-  it('renders no rail while signed out -- SignIn is the whole screen', () => {
+  // These two replace a pair that guarded the opposite arrangement: the nav shipped Home-only, so
+  // the old tests asserted that "/" had no nav chrome and every other route did. That split is the
+  // thing claude/site-wide-shell-propagation.md removed -- there is one shell now, and these assert
+  // the invariant rather than the old one.
+  it('renders no top bar while signed out -- SignIn is the whole screen', () => {
     render(
       <MemoryRouter initialEntries={['/leagues/1/power']}>
         <App />
       </MemoryRouter>,
     )
     expect(screen.queryByRole('navigation', { name: 'Main' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Managers' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^account:/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Skip to content' })).not.toBeInTheDocument()
   })
 
   it.each([['/'], ['/leagues/1/power']])(
-    'renders exactly one rail, with the same nav, on %s',
+    'renders exactly one top bar, with the same global links, on %s',
     async (path) => {
       setUser(sampleUser)
       render(
@@ -183,57 +186,76 @@ describe('App sign-out gating', () => {
         </MemoryRouter>,
       )
 
-      // getAllBy + length, not getBy: getBy already throws on a duplicate, but
-      // the failure this guards (a rail from the shell AND a rail from the
-      // page) reads as "found multiple elements" rather than as the two-shell
-      // regression it would actually be.
+      // getAllBy + length, not getBy: getBy already throws on a duplicate, but the failure this
+      // guards (a bar from the shell AND a bar from the page) reads as "found multiple elements"
+      // rather than as the two-shell regression it would actually be.
       expect(await screen.findAllByRole('navigation', { name: 'Main' })).toHaveLength(1)
-      expect(screen.getByRole('link', { name: 'Managers' })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+      const main = screen.getByRole('navigation', { name: 'Main' })
+      expect(within(main).getAllByRole('link').map((l) => l.textContent)).toEqual(['Leagues', 'Managers', 'Time Machine'])
+      expect(within(main).getByRole('button', { name: 'Mock drafts' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^account:/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Jump to a league, page or manager' })).toBeInTheDocument()
     },
   )
 
-  it('collapses the rail by default in a draft room and not on a content page', async () => {
+  it('keeps the Managers link on /managers, and sends the league in router state when there is one', async () => {
     setUser(sampleUser)
-    const { unmount } = render(
-      <MemoryRouter initialEntries={['/drafts/abc']}>
-        <App />
-      </MemoryRouter>,
-    )
-    // aria-expanded on the toggle is the collapsed state made observable --
-    // asserting on the class would just restate the implementation.
-    expect(await screen.findByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
-    unmount()
-
     render(
-      <MemoryRouter initialEntries={['/leagues/1/power']}>
+      <MemoryRouter initialEntries={['/']}>
         <App />
       </MemoryRouter>,
     )
-    expect(await screen.findByRole('button', { name: /collapse navigation/i })).toBeInTheDocument()
+    const link = await screen.findByRole('link', { name: 'Managers' })
+    expect(link.getAttribute('href')).toBe('/managers')
   })
 
-  it('an explicit collapse choice outranks the route default and survives a remount', async () => {
+  it('makes the skip link the first focusable element and aims it at <main id="main">', async () => {
     setUser(sampleUser)
     const user = userEvent.setup()
-    const { unmount } = render(
-      <MemoryRouter initialEntries={['/leagues/1/power']}>
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
         <App />
       </MemoryRouter>,
     )
+    await screen.findByText('draft picker')
+    await user.tab()
+    const skip = screen.getByRole('link', { name: 'Skip to content' })
+    expect(document.activeElement).toBe(skip)
+    expect(skip.getAttribute('href')).toBe('#main')
+    expect(container.querySelector('main#main')).not.toBeNull()
 
-    await user.click(await screen.findByRole('button', { name: /collapse navigation/i }))
-    expect(screen.getByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
-    unmount()
+    await user.keyboard('{Enter}')
+    expect(document.activeElement).toBe(container.querySelector('main#main'))
+  })
 
-    // Same content route, which defaults to expanded -- so an expanded rail
-    // here would mean the stored choice was ignored, not that nothing broke.
+  it('has no collapse toggle, and ignores the retired bk-rail storage key', async () => {
+    setUser(sampleUser)
+    localStorage.setItem('bk-rail', 'collapsed')
     render(
       <MemoryRouter initialEntries={['/leagues/1/power']}>
         <App />
       </MemoryRouter>,
     )
-    expect(await screen.findByRole('button', { name: /expand navigation/i })).toBeInTheDocument()
+    expect(await screen.findByRole('navigation', { name: 'Main' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /(expand|collapse) navigation/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Managers' })).toBeInTheDocument()
+  })
+})
+
+// The compact top bar (global links fold into the menu button) is for a draft room or a mock: the
+// paths the rail used to collapse on. A mock's seat setup is a form, not a room.
+describe('isCompactChrome', () => {
+  it.each([
+    ['/drafts/abc', true],
+    ['/drafts/abc/board', true],
+    ['/drafts/abc/live', true],
+    ['/mock/4', true],
+    ['/mock/new', false],
+    ['/leagues/1/power', false],
+    ['/', false],
+    ['/managers', false],
+  ])('%s -> %s', (path, expected) => {
+    expect(isCompactChrome(path)).toBe(expected)
   })
 })
 

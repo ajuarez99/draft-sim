@@ -55,7 +55,7 @@ export type RankBoardMember = {
    *  checked again here defensively, since a caller could pass it through
    *  unresolved. */
   teamName: string | null
-  /** This board's viewer. At most one true. Gets --crimson, house rule. */
+  /** This board's viewer. At most one true. Gets --you, house rule. */
   isMe?: boolean
 }
 

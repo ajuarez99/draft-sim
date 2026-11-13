@@ -6,7 +6,7 @@ import type { StatLeaderboard as Board } from '../api'
  *
  * HTML rows (they reflow at 375 px with no viewBox maths). Two dots on one shared scale: a hollow ring
  * for the comparison view ("then") and a filled dot for the current one ("now"), joined by a line, so
- * which end is which does not depend on colour. The line is --teal for a rise and --wr for a fall, and the
+ * which end is which does not depend on colour. The line is --data for a rise and --wr for a fall, and the
  * signed change is printed with its sign ("+1.20", "−0.80") beside the exact values, so direction is never
  * colour alone. Those two are deliberately not --up/--down, the app's better/worse colours: the page cannot
  * know whether a higher turnover count or a lower one is good, so the legend says "higher"/"lower"

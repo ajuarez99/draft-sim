@@ -6,7 +6,7 @@ import { reasonSentence, statusAsOfLabel } from '../statCopy'
  * specs/042 US1: the one ownership mark -- who has this player -- shared by the stat leaderboard, the
  * trends tables and the player page, which each drew their own before.
  *
- * Text always accompanies colour (FR-002): the avatar and the crimson ring are never the only signal,
+ * Text always accompanies colour (FR-002): the avatar and the "you" ring are never the only signal,
  * "Yours" is spelled out. The as-of text rides in the `title`, read from the ownership's own `asOf`.
  * The state itself is `PlayerOwnership`'s -- the server's one rule -- and this holds no ownership rule.
  */

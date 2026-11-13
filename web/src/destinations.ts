@@ -16,9 +16,10 @@ import type { DraftSummary, Sport } from './api'
  * So the rule is stated once, here, and every consumer reads it:
  *
  *   - railLeague.ts     -- which league a pathname is inside (`match`/`idKind`)
- *   - LeagueRailSection -- what to render and where it links (`label`/`href`)
+ *   - LeagueHeader      -- the tabs and sub-tabs and where they link (`tab`/`label`/`href`)
  *   - searchIndex.ts    -- what the palette can offer (`destinationsFor`)
  *   - the league switcher -- what survives a switch between leagues (`key`)
+ *   - landingCopy.ts    -- the public page's sections (`group`)
  *
  * Adding a league-scoped route means adding a row here. destinations.test.ts
  * fails if App.tsx grows one without it, which is the part that stops this
@@ -45,12 +46,28 @@ export type DestinationKey =
   | 'home' | 'board' | 'live' | 'history' | 'power' | 'analysis'
   | 'rosterManagement' | 'expectedWins' | 'forecast' | 'weeklyReport' | 'superlatives' | 'mock' | 'schedule' | 'trends' | 'players' | 'compare' | 'stats' | 'rivalries' | 'adp' | 'weeklyPot'
 
+/** The league's tabs, left to right (claude/site-redesign.md Phase 2). */
+export type LeagueTab = 'home' | 'matchups' | 'season' | 'players' | 'draft' | 'history'
+
+/** The tabs in display order with the name each renders. "Season" and not "Standings": the tab
+ *  holds power rankings, odds, team strength, luck, bench points and awards, none of which is a
+ *  standings table (plan review PR-21). Declared beside the table so the order and the names are
+ *  not a second copy in the header. */
+export const LEAGUE_TABS: readonly { key: LeagueTab; label: string }[] = [
+  { key: 'home', label: 'Home' },
+  { key: 'matchups', label: 'Matchups' },
+  { key: 'season', label: 'Season' },
+  { key: 'players', label: 'Players' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'history', label: 'History' },
+]
+
 /** What a fan is doing when they reach for the page (specs/013 US3). `home` is
  *  the one group without a heading: it is a single row, "League home". */
 export type DestinationGroup = 'home' | 'thisWeek' | 'season' | 'draft' | 'history'
 
-/** The groups in rail order, with the heading each renders. Declared beside the
- *  table so the order and the names are not a second copy in the rail. */
+/** The groups in their old rail order, with the heading each renders. Read only by the
+ *  public landing page now (landingCopy.ts); the app's navigation uses LEAGUE_TABS. */
 export const DESTINATION_GROUPS: readonly { key: DestinationGroup; heading: string | null }[] = [
   { key: 'home', heading: null },
   { key: 'thisWeek', heading: 'This week' },
@@ -61,16 +78,17 @@ export const DESTINATION_GROUPS: readonly { key: DestinationGroup; heading: stri
 
 export type LeagueDestination = {
   key: DestinationKey
-  /** Which rail group the row sits in. Required: a row with no group would be
-   *  rendered nowhere. */
+  /** Which of the old rail groups the row sits in. Since the 2026-11-10 redesign the app's own
+   *  navigation reads `tab`; this survives for the public landing page (landingCopy.ts), whose
+   *  sections are these groups and whose content is therefore unchanged. Required. */
   group: DestinationGroup
+  /** Which league tab the row sits under. Required: a row with no tab would be rendered nowhere.
+   *  The order of rows within a tab, in this table, is the order of its sub-tabs. */
+  tab: LeagueTab
   /** The label this page had before the fan-first rename. Jump-to still
    *  matches it, so nobody who knows "Expected wins" loses the page. Always
    *  different from `label`; absent where the name did not change. */
   formerLabel?: string
-  /** Rail glyph. Empty for `live`, which renders a pulsing dot instead of a
-   *  character -- the one destination whose mark carries state. */
-  glyph: string
   /** Which sports offer this page. Required and non-empty by construction: a
    *  defaulted sport list asserts a rule rather than a value, which is exactly
    *  how a football-only page gets offered to a basketball league. */
@@ -93,12 +111,12 @@ export type LeagueDestination = {
   /** True for a row that runs something instead of navigating -- "Mock it"
    *  opens the new-mock modal and has no route of its own. */
   isAction: boolean
-  /** False for a page that is reached from a link rather than from the rail.
+  /** False for a page that is reached from a link rather than from the navigation.
    *  Required, never defaulted: a defaulted flag would offer a page that needs
-   *  an id nobody has to every league. The rail and the jump-to palette skip
+   *  an id nobody has to every league. The league tabs and the jump-to palette skip
    *  rows where this is false; `destinationFromPath` and the sport gate still
    *  see them. */
-  inRail: boolean
+  inNav: boolean
 }
 
 /** The ADP & prices page of a league (spec 046). Also where an auction draft lives. */
@@ -142,8 +160,8 @@ function draftLabel(d: DraftSummary): string {
 const ALL_SPORTS: Sport[] = ['nfl', 'nba']
 
 /**
- * The declaration. Order is render order within each group; the groups
- * themselves render in DESTINATION_GROUPS order.
+ * The declaration. Order is render order within each tab (the sub-tab order); the tabs
+ * themselves render in LEAGUE_TABS order.
  *
  * Two rules, and each row states which one it follows:
  *
@@ -159,7 +177,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
   {
     key: 'home',
     group: 'home',
-    glyph: '⌂',
+    tab: 'home',
     // Both sports, written out: home is composed from endpoints that exist for
     // both, and the football-only block inside it gates itself on the sport.
     sports: ['nfl', 'nba'],
@@ -170,13 +188,13 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'weeklyReport',
     group: 'thisWeek',
+    tab: 'matchups',
     formerLabel: 'Weekly report',
-    glyph: '◨',
     // Both sports. Matchups, scores and the optimal-lineup awards all read
     // points already scored; none of it is a projection.
     sports: ['nfl', 'nba'],
@@ -187,12 +205,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'schedule',
     group: 'thisWeek',
-    glyph: '▤',
+    tab: 'matchups',
     // Basketball only: an NFL team plays once a week, so the grid would be a
     // column of ones. See specs/017-nba-schedule-grid.
     sports: ['nba'],
@@ -203,12 +221,151 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
+  },
+  {
+    key: 'weeklyPot',
+    group: 'season',
+    tab: 'matchups',
+    // Both sports. It only reads stored weekly scores, which both have.
+    sports: ['nfl', 'nba'],
+    label: 'Weekly pot',
+    // one season: the pot is per league row
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/weekly-pot`,
+    match: /^\/leagues\/([^/]+)\/weekly-pot\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'power',
+    group: 'thisWeek',
+    tab: 'season',
+    sports: ALL_SPORTS,
+    label: 'Power rankings',
+    // whole chain, for now: pending a decision on whether Power rankings should follow the season
+    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/power`,
+    // `/verify` is the dev-only self-check harness (power-rankings-reskin.md
+    // §7). It is not a destination of its own, but it is inside the league and
+    // the rail should not blank out on it.
+    match: /^\/leagues\/([^/]+)\/power(?:\/verify)?\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'forecast',
+    group: 'season',
+    tab: 'season',
+    formerLabel: 'Season forecast',
+    // Both sports. The simulator is driven by weekly scores and pairings, which
+    // basketball has; the only gate is whether this app models the league's
+    // seeding, and that is a league property rather than a sport one.
+    sports: ['nfl', 'nba'],
+    label: 'Playoff odds',
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/forecast`,
+    match: /^\/leagues\/([^/]+)\/forecast\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'analysis',
+    group: 'season',
+    tab: 'season',
+    formerLabel: 'Analysis',
+    // Both sports since spec 030. Basketball's projections come from per-game lines
+    // (one average game per starter), so the page words its numbers by the payload's
+    // `unit` rather than by sport; see claude/league-analysis.md and specs/030.
+    sports: ['nfl', 'nba'],
+    label: 'Team strength',
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/analysis`,
+    match: /^\/leagues\/([^/]+)\/analysis\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'expectedWins',
+    group: 'season',
+    tab: 'season',
+    formerLabel: 'Expected wins',
+    // Both sports, explicitly. Expected wins touches no position, no lineup and
+    // no projection -- it is weekly scores and pairings, which mean the same
+    // thing in basketball.
+    sports: ['nfl', 'nba'],
+    label: 'Luck',
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/expected-wins`,
+    match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'rosterManagement',
+    group: 'season',
+    tab: 'season',
+    formerLabel: 'Roster management',
+    // Both sports, and written out rather than inherited from ALL_SPORTS by
+    // habit: this page earns it. Unlike Analysis above, nothing here is a
+    // projection -- total, potential and efficiency are all computed from
+    // points already scored, which Sleeper reports for basketball exactly as
+    // for football. See specs/004-ffwrapped-feature-parity research R2/R4.
+    sports: ['nfl', 'nba'],
+    label: 'Bench points',
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/roster-management`,
+    match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'superlatives',
+    group: 'season',
+    tab: 'season',
+    formerLabel: 'Superlatives',
+    // Both sports. Every superlative reads scores, pairings and transactions
+    // already stored -- none of it is a projection, so basketball gets it too.
+    sports: ['nfl', 'nba'],
+    label: 'Awards',
+    // one season: the page reads the season it is opened on
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/superlatives`,
+    match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
+  },
+  {
+    key: 'stats',
+    group: 'season',
+    tab: 'players',
+    // Basketball only, like the player page it links into (specs/022 US4).
+    sports: ['nba'],
+    label: 'Player stats',
+    // one season: the page reads the season it is opened on (spec 011's rule)
+    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/stats`,
+    // The calculator is part of Player stats, so the rail keeps this row lit on it (specs/032 R12).
+    match: /^\/leagues\/([^/]+)\/stats(?:\/calculator)?\/?$/,
+    idKind: 'league',
+    requiresStatus: null,
+    isAction: false,
+    inNav: true,
   },
   {
     key: 'trends',
     group: 'thisWeek',
-    glyph: '↕',
+    tab: 'players',
     // Basketball only: minutes, usage and games-per-week are NBA notions.
     // See specs/019-minutes-streaming.
     sports: ['nba'],
@@ -219,12 +376,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'players',
     group: 'thisWeek',
-    glyph: '◉',
+    tab: 'players',
     // Basketball only: the stat lines this page reads exist for the NBA alone.
     // This is the ONE place that says so -- PlayerLink asks playerPagesFor().
     sports: ['nba'],
@@ -241,12 +398,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     requiresStatus: null,
     isAction: false,
     // Reached from a player's name, not from the rail or the palette.
-    inRail: false,
+    inNav: false,
   },
   {
     key: 'compare',
     group: 'thisWeek',
-    glyph: '⇄',
+    tab: 'players',
     // Basketball only, like the player pages it composes (specs/049). This is the ONE place that says so --
     // comparePagesFor() reads it, for both the page's football line and the player page's Compare link.
     sports: ['nba'],
@@ -259,152 +416,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     requiresStatus: null,
     isAction: false,
     // Reached from the Compare link on a player page, not from the rail or the palette.
-    inRail: false,
-  },
-  {
-    key: 'power',
-    group: 'thisWeek',
-    glyph: '▲',
-    sports: ALL_SPORTS,
-    label: 'Power rankings',
-    // whole chain, for now: pending a decision on whether Power rankings should follow the season
-    href: (ctx) => `/leagues/${ctx.lineage.current.sleeperLeagueId}/power`,
-    // `/verify` is the dev-only self-check harness (power-rankings-reskin.md
-    // §7). It is not a destination of its own, but it is inside the league and
-    // the rail should not blank out on it.
-    match: /^\/leagues\/([^/]+)\/power(?:\/verify)?\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'analysis',
-    group: 'season',
-    formerLabel: 'Analysis',
-    glyph: '◫',
-    // Both sports since spec 030. Basketball's projections come from per-game lines
-    // (one average game per starter), so the page words its numbers by the payload's
-    // `unit` rather than by sport; see claude/league-analysis.md and specs/030.
-    sports: ['nfl', 'nba'],
-    label: 'Team strength',
-    // one season: the page reads the season it is opened on
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/analysis`,
-    match: /^\/leagues\/([^/]+)\/analysis\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'expectedWins',
-    group: 'season',
-    formerLabel: 'Expected wins',
-    glyph: '◑',
-    // Both sports, explicitly. Expected wins touches no position, no lineup and
-    // no projection -- it is weekly scores and pairings, which mean the same
-    // thing in basketball.
-    sports: ['nfl', 'nba'],
-    label: 'Luck',
-    // one season: the page reads the season it is opened on
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/expected-wins`,
-    match: /^\/leagues\/([^/]+)\/expected-wins\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'rosterManagement',
-    group: 'season',
-    formerLabel: 'Roster management',
-    glyph: '◱',
-    // Both sports, and written out rather than inherited from ALL_SPORTS by
-    // habit: this page earns it. Unlike Analysis above, nothing here is a
-    // projection -- total, potential and efficiency are all computed from
-    // points already scored, which Sleeper reports for basketball exactly as
-    // for football. See specs/004-ffwrapped-feature-parity research R2/R4.
-    sports: ['nfl', 'nba'],
-    label: 'Bench points',
-    // one season: the page reads the season it is opened on
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/roster-management`,
-    match: /^\/leagues\/([^/]+)\/roster-management\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'forecast',
-    group: 'season',
-    formerLabel: 'Season forecast',
-    glyph: '◔',
-    // Both sports. The simulator is driven by weekly scores and pairings, which
-    // basketball has; the only gate is whether this app models the league's
-    // seeding, and that is a league property rather than a sport one.
-    sports: ['nfl', 'nba'],
-    label: 'Playoff odds',
-    // one season: the page reads the season it is opened on
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/forecast`,
-    match: /^\/leagues\/([^/]+)\/forecast\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'superlatives',
-    group: 'season',
-    formerLabel: 'Superlatives',
-    glyph: '◈',
-    // Both sports. Every superlative reads scores, pairings and transactions
-    // already stored -- none of it is a projection, so basketball gets it too.
-    sports: ['nfl', 'nba'],
-    label: 'Awards',
-    // one season: the page reads the season it is opened on
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/superlatives`,
-    match: /^\/leagues\/([^/]+)\/superlatives\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'weeklyPot',
-    group: 'season',
-    // Glyph is not a dollar sign on purpose: the rail shouldn't imply money on leagues that never opted in (spec 048 A7).
-    glyph: '◎',
-    // Both sports. It only reads stored weekly scores, which both have.
-    sports: ['nfl', 'nba'],
-    label: 'Weekly pot',
-    // one season: the pot is per league row
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/weekly-pot`,
-    match: /^\/leagues\/([^/]+)\/weekly-pot\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
-  },
-  {
-    key: 'stats',
-    group: 'season',
-    glyph: '▥',
-    // Basketball only, like the player page it links into (specs/022 US4).
-    sports: ['nba'],
-    label: 'Player stats',
-    // one season: the page reads the season it is opened on (spec 011's rule)
-    href: (ctx) => `/leagues/${ctx.season.sleeperLeagueId}/stats`,
-    // The calculator is part of Player stats, so the rail keeps this row lit on it (specs/032 R12).
-    match: /^\/leagues\/([^/]+)\/stats(?:\/calculator)?\/?$/,
-    idKind: 'league',
-    requiresStatus: null,
-    isAction: false,
-    inRail: true,
+    inNav: false,
   },
   {
     key: 'board',
     group: 'draft',
-    glyph: '▦',
+    tab: 'draft',
     sports: ALL_SPORTS,
     label: draftLabel,
     href: (ctx) => draftRoute(ctx.season),
@@ -414,12 +431,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'draft',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'live',
     group: 'draft',
-    glyph: '',
+    tab: 'draft',
     sports: ALL_SPORTS,
     label: 'Follow live',
     // An auction has no live simulation; its live view is the ADP page (spec 046 FR-015).
@@ -429,12 +446,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'draft',
     requiresStatus: ['pre_draft', 'drafting'],
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'adp',
     group: 'draft',
-    glyph: '≈',
+    tab: 'draft',
     // Basketball only (spec 046): the Sleeper dynasty/redraft captures and Yahoo's feed are NBA sources, and
     // the compare page has no football counterpart. This is the ONE place that says so.
     sports: ['nba'],
@@ -445,12 +462,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'mock',
     group: 'draft',
-    glyph: '▶',
+    tab: 'draft',
     sports: ALL_SPORTS,
     label: 'Mock it',
     // Seeded with this league, the same way the home card's "Mock it" is. The
@@ -461,13 +478,13 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: null,
     requiresStatus: null,
     isAction: true,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'history',
     group: 'history',
+    tab: 'history',
     formerLabel: 'History',
-    glyph: '◷',
     sports: ALL_SPORTS,
     label: 'Standings',
     // whole chain: History walks every season itself
@@ -476,12 +493,12 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
   {
     key: 'rivalries',
     group: 'history',
-    glyph: '⚔',
+    tab: 'history',
     // Both sports: it reads scores and pairings already stored (specs/034).
     sports: ['nfl', 'nba'],
     label: 'Rivalries',
@@ -493,7 +510,7 @@ export const LEAGUE_DESTINATIONS: readonly LeagueDestination[] = [
     idKind: 'league',
     requiresStatus: null,
     isAction: false,
-    inRail: true,
+    inNav: true,
   },
 ]
 
@@ -519,6 +536,40 @@ export function playerIdFromPath(pathname: string): string | null {
 /** The rows of one group, in table order. */
 export function destinationsInGroup(rows: LeagueDestination[], group: DestinationGroup): LeagueDestination[] {
   return rows.filter((d) => d.group === group)
+}
+
+/** The offered rows of one tab, in table order, `inNav` only. Actions are included (the Draft tab's
+ *  "Mock it"); callers tell them apart by `isAction`. Rows with `inNav: false` (a player page) are
+ *  reached from a name and never listed. */
+export function subTabsFor(ctx: LeagueContext, tab: LeagueTab): LeagueDestination[] {
+  return destinationsFor(ctx).filter((d) => d.tab === tab && d.inNav)
+}
+
+/**
+ * The tabs this league offers, in order: a tab appears when at least one of its rows is offered AND
+ * navigable (not an action, not `inNav: false`), so football has no Players tab. Each carries its own
+ * href, which is the first such row's -- a tab is a link to its first page.
+ */
+export function tabsFor(ctx: LeagueContext): { tab: LeagueTab; label: string; href: string }[] {
+  const out: { tab: LeagueTab; label: string; href: string }[] = []
+  for (const t of LEAGUE_TABS) {
+    const first = subTabsFor(ctx, t.key).find((d) => !d.isAction)
+    if (first) out.push({ tab: t.key, label: t.label, href: first.href(ctx) })
+  }
+  return out
+}
+
+/**
+ * Which tab a pathname lights, or null on a path that is no league destination (a manager's history,
+ * a mock room). `compare` and the player page are unlisted rows of the Players tab, so they light it.
+ * Pass `offered` (destinationsFor) to apply railKeyFor: on an auction league's ADP page the row that
+ * is "here" is `board`. Both rows sit under Draft, so the tab is the same either way; the argument
+ * keeps this and the sub-tab highlight reading the one rule.
+ */
+export function tabFromPath(pathname: string, offered?: LeagueDestination[]): LeagueTab | null {
+  const raw = destinationFromPath(pathname)
+  const key = offered ? railKeyFor(raw, offered) : raw
+  return key ? (LEAGUE_DESTINATIONS.find((d) => d.key === key)?.tab ?? null) : null
 }
 
 /** Resolves a label that may depend on the season being viewed. */

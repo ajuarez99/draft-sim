@@ -11,16 +11,16 @@ import { clearUser, setUser } from './user'
 
 /*
  * Renders the real shell at an arbitrary pathname, so a test can ask the one
- * question this feature is about: standing on this URL, what does the rail
+ * question this feature is about: standing on this URL, what does the chrome
  * show?
  *
  * Deliberately little mocking. The user is signed in through `setUser`, the
- * real code path, rather than a stubbed `useUser` -- the rail renders nothing
+ * real code path, rather than a stubbed `useUser` -- the shell renders nothing
  * at all while signed out, and a stub that skipped that would hide it. Only
- * `getDrafts` is stubbed, because it is the one network call the rail makes.
+ * `getDrafts` is stubbed, because it is the one network call the shell makes.
  */
 
-/** A draft row with every field the rail reads, overridable per test. */
+/** A draft row with every field the shell reads, overridable per test. */
 export function draftSummary(over: Partial<DraftSummary> = {}): DraftSummary {
   return {
     platform: 'SLEEPER', draftType: 'snake',
@@ -47,7 +47,7 @@ export type RenderAtPathOptions = {
   managers?: ManagerSummary[]
   /** Route state, for the destinations that carry their league that way. */
   state?: unknown
-  /** What `refreshLeague` (the rail's on-visit POST) resolves to. Defaults to FRESH. */
+  /** What `refreshLeague` (the league header's on-visit POST) resolves to. Defaults to FRESH. */
   refresh?: RefreshStatus
   /** What each `getLeagueRefresh` poll resolves to, in order; the last one repeats. */
   polls?: RefreshStatus[]
@@ -55,7 +55,7 @@ export type RenderAtPathOptions = {
   page?: ReactNode
 }
 
-/** A refresh status body with every field the rail reads, overridable per test. */
+/** A refresh status body with every field the header reads, overridable per test. */
 export function refreshStatus(over: Partial<RefreshStatus> = {}): RefreshStatus {
   return {
     state: 'FRESH',
@@ -75,31 +75,34 @@ export let getManagersSpy: MockInstance<typeof api.getManagers>
 export let refreshLeagueSpy: MockInstance<typeof api.refreshLeague>
 export let getLeagueRefreshSpy: MockInstance<typeof api.getLeagueRefresh>
 
-export type RenderedRail = RenderResult & {
-  /** The rail element, or null when the shell rendered none. */
-  rail: () => HTMLElement | null
-  /** The league-context block, or null when the rail dropped it -- the single
-   *  assertion most of this feature's tests are making. */
+export type RenderedShell = RenderResult & {
+  /** The top bar, or null when the shell rendered none (signed out). */
+  topBar: () => HTMLElement | null
+  /** The league identity block -- the league header's own row, or the compact top bar's league
+   *  slot -- or null when the shell dropped league context. The single assertion most of this
+   *  feature's tests are making. */
   leagueSection: () => HTMLElement | null
-  /** Labels of the LEAGUE section's rows, in render order. Scoped to the
-   *  league block on purpose -- the global Menu rows (Home, Managers, Mock
-   *  drafts) are there on every route and would drown the assertion. */
-  rowLabels: () => string[]
-  /** Labels of the league rows currently marked `.on`. */
-  currentRowLabels: () => string[]
-  /** Labels of every row in the rail, league and global alike. */
-  allRowLabels: () => string[]
+  /** Labels of the league tabs, in order. */
+  tabLabels: () => string[]
+  /** Labels of the tabs marked current (aria-current="page"). */
+  currentTabLabels: () => string[]
+  /** Labels of the active tab's sub-tab links, in order (not the action button). */
+  subTabLabels: () => string[]
+  /** Labels of the sub-tab actions (Mock it). */
+  subActionLabels: () => string[]
+  /** Labels of the sub-tab links marked current. */
+  currentSubTabLabels: () => string[]
 }
 
 /**
  * Signs a user in, stubs the draft list, and renders `AppShell` at `pathname`.
  *
- * The rail resolves its league asynchronously (railLeague.ts fetches and
+ * The shell resolves its league asynchronously (railLeague.ts fetches and
  * caches), so callers must `await` something before asserting -- use
  * `await waitFor(() => expect(leagueSection()).not.toBeNull())` rather than
  * asserting synchronously.
  */
-export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}): RenderedRail {
+export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}): RenderedShell {
   const drafts = options.drafts ?? [draftSummary()]
 
   // Module-scope caches in railLeague.ts and searchIndex.ts: without this, the
@@ -109,7 +112,7 @@ export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}
   getDraftsSpy = vi.spyOn(api, 'getDrafts').mockResolvedValue(drafts)
   getManagersSpy = vi.spyOn(api, 'getManagers').mockResolvedValue(options.managers ?? [])
 
-  // The rail POSTs a refresh on every league it lands in. Stubbed for every
+  // The league header POSTs a refresh on every league it lands in. Stubbed for every
   // test so none of them reaches for the network, and so a test can count calls.
   refreshLeagueSpy = vi.spyOn(api, 'refreshLeague').mockResolvedValue(options.refresh ?? refreshStatus())
   getLeagueRefreshSpy = vi.spyOn(api, 'getLeagueRefresh')
@@ -139,24 +142,26 @@ export function renderAtPath(pathname: string, options: RenderAtPathOptions = {}
     </MemoryRouter>,
   )
 
-  const rail = () => result.container.querySelector<HTMLElement>('nav.app-rail')
-  const leagueSection = () => result.container.querySelector<HTMLElement>('.app-rail-league')
+  const topBar = () => result.container.querySelector<HTMLElement>('header.topbar')
+  const leagueSection = () => result.container.querySelector<HTMLElement>('.league-header:not(.compact) .league-header-row, .league-compact')
 
-  const labelsIn = (root: Element | null, selector: string) =>
-    root ? [...root.querySelectorAll(selector)].map((e) => (e.textContent ?? '').trim()) : []
+  const labelsIn = (selector: string) =>
+    [...result.container.querySelectorAll(selector)].map((e) => (e.textContent ?? '').trim())
 
   return {
     ...result,
-    rail,
+    topBar,
     leagueSection,
-    rowLabels: () => labelsIn(leagueSection(), '.app-rail-row .app-rail-row-label'),
-    currentRowLabels: () => labelsIn(leagueSection(), '.app-rail-row.on .app-rail-row-label'),
-    allRowLabels: () => labelsIn(rail(), '.app-rail-row .app-rail-row-label'),
+    tabLabels: () => labelsIn('nav[aria-label="League"] a.league-tab'),
+    currentTabLabels: () => labelsIn('nav[aria-label="League"] a.league-tab[aria-current="page"]'),
+    subTabLabels: () => labelsIn('.league-subtabs a.league-subtab'),
+    subActionLabels: () => labelsIn('.league-subtabs-actions button'),
+    currentSubTabLabels: () => labelsIn('.league-subtabs a.league-subtab[aria-current="page"]'),
   }
 }
 
 /** Signs out and drops the league cache. Call from `afterEach`. */
-export function resetRail() {
+export function resetShell() {
   clearUser()
   invalidateRailLeagues()
   invalidateSearchIndex()

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AppShell from './AppShell'
 import * as api from '../api'
 import { __resetAnalyticsForTests, initAnalytics } from '../analytics'
-import { draftSummary, resetRail } from '../testRailHelpers'
+import { draftSummary, resetShell } from '../testShellHelpers'
 import { invalidateRailLeagues } from '../railLeague'
 import { invalidateSearchIndex } from '../searchIndex'
 import { setUser } from '../user'
@@ -40,7 +40,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
   scriptEl()?.remove()
   delete (window as unknown as { umami?: unknown }).umami
-  resetRail()
+  resetShell()
 })
 
 describe('AppShell with the real analytics module', () => {

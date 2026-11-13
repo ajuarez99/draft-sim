@@ -715,17 +715,17 @@ export default function AvailabilityPanel({
                                   key={p}
                                   className="survival-block"
                                   // Teal mixed into the panel color by survival --
-                                  // full teal at 100%, fading to plain --panel as
+                                  // full --data at 100%, fading to plain --panel as
                                   // a player's odds of still being there drop to
-                                  // zero. Reusing --teal (generic interaction, per
-                                  // the house style) rather than inventing a risk
-                                  // hue: this is a decay reading, not an identity
-                                  // one, and --crimson is reserved for "you"
+                                  // zero. Reusing --data (the neutral fill token,
+                                  // per the house style) rather than inventing a
+                                  // risk hue: this is a decay reading, not an
+                                  // identity one, and --you is reserved for "you"
                                   // alone. A near-zero cell still reads as a tile
                                   // rather than a gap because `.survival-block`
                                   // carries its own hairline border -- the fill is
                                   // the only thing that goes to nothing.
-                                  style={{ background: `color-mix(in oklch, var(--teal) ${Math.round(pv * 92)}%, var(--panel))` }}
+                                  style={{ background: `color-mix(in oklab, var(--data) ${Math.round(pv * 92)}%, var(--panel))` }}
                                   title={`${roundPickLabel(p, teams)}: ${pct}% likely still there`}
                                 />
                               )

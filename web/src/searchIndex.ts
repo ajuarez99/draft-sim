@@ -93,9 +93,9 @@ export function leagueDestinations(drafts: DraftSummary[]): SearchDestination[] 
     }
 
     for (const dest of destinationsFor(ctx)) {
-      // "Mock it" opens a modal from the rail rather than going anywhere. A
+      // "Mock it" opens a modal from the league header rather than going anywhere. A
       // palette result that navigates to "/" and hopes is not a destination.
-      if (dest.isAction || !dest.inRail) continue
+      if (dest.isAction || !dest.inNav) continue
       const label = labelOf(dest, current)
       out.push({
         id: `league:${current.sleeperLeagueId}:${dest.key}`,

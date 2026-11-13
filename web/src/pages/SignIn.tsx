@@ -55,7 +55,7 @@ export default function SignIn() {
 
   return (
     // Spec 050: the signed-out root is the landing page -- a hero that holds the
-    // unchanged sign-in form (spec 013 US9: one field, one --volt action), then the
+    // unchanged sign-in form (spec 013 US9: one field, one --brand action), then the
     // rail's own feature groups. Its words come from landingCopy.ts, which
     // landingHtml.ts also writes into the delivered HTML, so keep the element tree and
     // class names here in step with staticBody() there (landingHtml.test.ts compares

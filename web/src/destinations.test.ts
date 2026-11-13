@@ -14,7 +14,12 @@ import {
   playerIdFromPath,
   comparePagesFor,
   playerPagesFor,
+  LEAGUE_TABS,
+  subTabsFor,
+  tabFromPath,
+  tabsFor,
   type LeagueContext,
+  type LeagueTab,
 } from './destinations'
 import type { DraftSummary, Sport } from './api'
 
@@ -314,7 +319,7 @@ describe('adp destination', () => {
   it('is offered to basketball and not football, and sits in the rail under Draft', () => {
     expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('adp')
     expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('adp')
-    expect(row().inRail).toBe(true)
+    expect(row().inNav).toBe(true)
     expect(row().group).toBe('draft')
     expect(labelOf(row(), draft())).toBe('ADP & prices')
   })
@@ -363,7 +368,7 @@ describe('stats destination', () => {
   it('is offered to basketball and not football, and sits in the rail', () => {
     expect(destinationsFor(ctx({ sport: 'nba' })).map((d) => d.key)).toContain('stats')
     expect(destinationsFor(ctx({ sport: 'nfl' })).map((d) => d.key)).not.toContain('stats')
-    expect(row().inRail).toBe(true)
+    expect(row().inNav).toBe(true)
   })
 
   it('is recognised from its own path and carries the league id', () => {
@@ -387,9 +392,9 @@ describe('stats destination', () => {
 describe('players destination', () => {
   const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'players')!
 
-  it('is hidden from the rail: one of the two rows with inRail false (the other is compare, spec 049)', () => {
-    expect(row().inRail).toBe(false)
-    expect(LEAGUE_DESTINATIONS.filter((d) => !d.inRail).map((d) => d.key)).toEqual(['players', 'compare'])
+  it('is hidden from the rail: one of the two rows with inNav false (the other is compare, spec 049)', () => {
+    expect(row().inNav).toBe(false)
+    expect(LEAGUE_DESTINATIONS.filter((d) => !d.inNav).map((d) => d.key)).toEqual(['players', 'compare'])
   })
 
   it('is matched on its route and carries the league id', () => {
@@ -423,7 +428,7 @@ describe('compare destination', () => {
   const row = () => LEAGUE_DESTINATIONS.find((d) => d.key === 'compare')!
 
   it('is hidden from the rail and basketball only', () => {
-    expect(row().inRail).toBe(false)
+    expect(row().inNav).toBe(false)
     expect(row().sports).toEqual(['nba'])
   })
 
@@ -524,4 +529,140 @@ describe('auction routing (spec 046 FR-015)', () => {
     expect(auctionAdpRoute('auction', 'nba', null)).toBeNull()
     expect(auctionAdpRoute('auction', 'nba', 'L1')).toBe('/leagues/L1/adp')
   })
+})
+
+// ---- Tabs (claude/site-redesign.md Phase 2) -------------------------------------------------
+
+describe('league tabs', () => {
+  const nameOf = (t: LeagueTab) => LEAGUE_TABS.find((x) => x.key === t)?.label
+
+  it('names the tabs in order, with Season (not Standings) for the third', () => {
+    expect(LEAGUE_TABS.map((t) => t.label)).toEqual(['Home', 'Matchups', 'Season', 'Players', 'Draft', 'History'])
+  })
+
+  it('gives every row a tab that is one of the six', () => {
+    const known = new Set(LEAGUE_TABS.map((t) => t.key))
+    for (const d of LEAGUE_DESTINATIONS) expect(known.has(d.tab), d.key).toBe(true)
+  })
+
+  it('still carries `group` on every row: the public landing page reads it', () => {
+    const known = new Set(DESTINATION_GROUPS.map((g) => g.key))
+    for (const d of LEAGUE_DESTINATIONS) expect(known.has(d.group), d.key).toBe(true)
+  })
+
+  it('files each row under the tab the plan names, in the plan order', () => {
+    const rows = (tab: LeagueTab) => LEAGUE_DESTINATIONS.filter((d) => d.tab === tab).map((d) => d.key)
+    expect(rows('home')).toEqual(['home'])
+    expect(rows('matchups')).toEqual(['weeklyReport', 'schedule', 'weeklyPot'])
+    expect(rows('season')).toEqual(['power', 'forecast', 'analysis', 'expectedWins', 'rosterManagement', 'superlatives'])
+    expect(rows('players')).toEqual(['stats', 'trends', 'players', 'compare'])
+    expect(rows('draft')).toEqual(['board', 'live', 'adp', 'mock'])
+    expect(rows('history')).toEqual(['history', 'rivalries'])
+  })
+
+  it('keeps every league route in App.tsx reachable from some tab', () => {
+    const paths = [...appSource.matchAll(/path="([^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((p) => p.startsWith('/leagues/') || p.startsWith('/drafts/'))
+    expect(paths.length).toBeGreaterThan(10)
+    for (const p of paths) {
+      const concrete = p.replace(/:[A-Za-z]+/g, 'x')
+      expect(destinationFromPath(concrete), `${p} has no row`).not.toBeNull()
+      expect(tabFromPath(concrete), `${p} lights no tab`).not.toBeNull()
+    }
+  })
+
+  // The tab's link is its first offered, navigable row: a tab is a link to its first page.
+  it.each([
+    ['nfl', 'complete'],
+    ['nfl', 'pre_draft'],
+    ['nfl', 'drafting'],
+    ['nba', 'complete'],
+    ['nba', 'pre_draft'],
+    ['nba', 'drafting'],
+  ] as [Sport, string][])('links each %s/%s tab to its first offered non-action row', (sport, status) => {
+    const c = ctx({ sport, status })
+    const tabs = tabsFor(c)
+    expect(tabs.length).toBeGreaterThan(0)
+    for (const t of tabs) {
+      const first = subTabsFor(c, t.tab).find((d) => !d.isAction)!
+      expect(t.href, `${sport}/${status}/${t.tab}`).toBe(first.href(c))
+      expect(t.label).toBe(nameOf(t.tab))
+    }
+  })
+
+  it('links the tabs to the pages the plan expects', () => {
+    const nfl = Object.fromEntries(tabsFor(ctx({ sport: 'nfl' })).map((t) => [t.tab, t.href]))
+    expect(nfl).toEqual({
+      home: '/leagues/L100',
+      matchups: '/leagues/L100/weekly-report',
+      season: '/leagues/L100/power',
+      draft: '/drafts/d100/board',
+      history: '/leagues/L100/history',
+    })
+    const nba = Object.fromEntries(tabsFor(ctx({ sport: 'nba' })).map((t) => [t.tab, t.href]))
+    expect(nba.players).toBe('/leagues/L100/stats')
+  })
+
+  it('offers football no Players tab, and basketball one', () => {
+    expect(tabsFor(ctx({ sport: 'nfl' })).map((t) => t.tab)).toEqual(['home', 'matchups', 'season', 'draft', 'history'])
+    expect(tabsFor(ctx({ sport: 'nba' })).map((t) => t.tab)).toEqual(['home', 'matchups', 'season', 'players', 'draft', 'history'])
+  })
+
+  it('points the Draft tab at the ADP page for an NBA auction league, and drops mock, live and adp', () => {
+    const c = ctx({ sport: 'nba', draftType: 'auction', status: 'drafting' })
+    expect(tabsFor(c).find((t) => t.tab === 'draft')!.href).toBe('/leagues/L100/adp')
+    expect(subTabsFor(c, 'draft').map((d) => d.key)).toEqual(['board'])
+  })
+
+  it('lists live only before and during a draft, and mock as an action at the end of Draft', () => {
+    const keys = (status: string) => subTabsFor(ctx({ sport: 'nfl', status }), 'draft').map((d) => d.key)
+    expect(keys('pre_draft')).toEqual(['board', 'live', 'mock'])
+    expect(keys('drafting')).toEqual(['board', 'live', 'mock'])
+    expect(keys('complete')).toEqual(['board', 'mock'])
+    expect(subTabsFor(ctx({ sport: 'nfl' }), 'draft').filter((d) => d.isAction).map((d) => d.key)).toEqual(['mock'])
+  })
+
+  it('never lists a row that is reached only from a link (the player page, compare)', () => {
+    const all = LEAGUE_TABS.flatMap((t) => subTabsFor(ctx({ sport: 'nba' }), t.key).map((d) => d.key))
+    expect(all).not.toContain('players')
+    expect(all).not.toContain('compare')
+  })
+
+  it('lights Players on the player page and on compare, and Draft on the board and the live room', () => {
+    expect(tabFromPath('/leagues/L1/players/1350')).toBe('players')
+    expect(tabFromPath('/leagues/L1/compare')).toBe('players')
+    expect(tabFromPath('/leagues/L1/stats/calculator')).toBe('players')
+    expect(tabFromPath('/drafts/D1')).toBe('draft')
+    expect(tabFromPath('/drafts/D1/live')).toBe('draft')
+    expect(tabFromPath('/leagues/L1/superlatives')).toBe('season')
+    expect(tabFromPath('/leagues/L1/weekly-pot')).toBe('matchups')
+    expect(tabFromPath('/leagues/L1')).toBe('home')
+  })
+
+  it('lights nothing on a page that is no league destination', () => {
+    for (const p of ['/', '/managers', '/managers/12/history', '/mock/4', '/nope']) expect(tabFromPath(p), p).toBeNull()
+  })
+
+  it("lights Draft on an auction league's ADP page through railKeyFor", () => {
+    const auction = destinationsFor(ctx({ sport: 'nba', draftType: 'auction', status: 'drafting' }))
+    expect(tabFromPath('/leagues/L100/adp', auction)).toBe('draft')
+  })
+})
+
+describe('no glyph characters stand in for icons', () => {
+  // The old set: the 20 destination glyphs plus the ones the rail and its league section drew.
+  const GLYPHS = '⌂◨▤↕◉⇄▲◫◑◱◔◈◎▥▦≈▶◷⚔◆●↺⌕⏻«»▾▸'.split('')
+
+  it.each(['destinations.ts', 'components/TopBar.tsx', 'components/LeagueHeader.tsx', 'components/BottomBar.tsx', 'components/NavSheet.tsx'])(
+    '%s contains none of them',
+    async (file) => {
+      // @ts-ignore -- test-only Node import; the app has no @types/node
+      const fs = await import('node:fs')
+      const text: string = fs.readFileSync(`src/${file}`, 'utf8') // vitest runs with cwd = web/
+      expect(text.length, `${file} read as empty`).toBeGreaterThan(500)
+      const found = GLYPHS.filter((g) => text.includes(g))
+      expect(found, `${file} contains ${found.join(' ')}`).toEqual([])
+    },
+  )
 })

@@ -171,10 +171,9 @@ export default function JumpTo({ index, loading, onClose }: Props) {
 
           {grouped.map((group) => (
             <div className="jumpto-group" key={group.kind}>
-              {/* Not `.cond`: the rail's own section labels ("League", "Menu")
-                  are the app's vocabulary for naming a group of navigation
-                  rows, and this shares their rule rather than inventing a
-                  second one -- see .app-rail-label in styles.css. */}
+              {/* Not `.cond`: a small tracked muted label is the app's vocabulary
+                  for naming a group of rows (`.jumpto-group-label` in styles.css,
+                  and the nav sheet's labels). */}
               <span className="jumpto-group-label">{GROUP_LABEL[group.kind]}</span>
               {group.rows.map(({ row, flatIndex }) => (
                 // An <a> with a real href, not a <button>: every row here

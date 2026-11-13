@@ -50,7 +50,7 @@ export function leagueRefFromPath(pathname: string): RailLeagueRef {
  *
  * `/mock/new` is excluded deliberately -- it is the seat-setup form, not a
  * room, and it has no session to take a league from. Same carve-out
- * railDefaultCollapsed makes for the same reason.
+ * isCompactChrome (AppShell) makes for the same reason.
  */
 /**
  * Route state that tells the page you are navigating TO which league you came

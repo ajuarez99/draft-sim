@@ -1,14 +1,14 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it } from 'vitest'
-import { draftSummary, getDraftsSpy, getManagersSpy, renderAtPath, resetRail } from '../testRailHelpers'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { draftSummary, getDraftsSpy, getManagersSpy, renderAtPath, resetShell } from '../testShellHelpers'
 
 /*
  * The palette as the shell actually wires it: the shortcut, the visible entry
  * point, and the promise that opening it costs no network on a warm cache.
  */
 
-afterEach(resetRail)
+afterEach(resetShell)
 
 const LEAGUE = draftSummary({ sleeperLeagueId: 'L1', sleeperDraftId: 'D1', leagueName: 'Ball Knowers' })
 
@@ -26,13 +26,19 @@ describe('the jump-to shortcut', () => {
     await openPalette(user)
   })
 
-  it('opens from the rail control too, for anyone who never learns the shortcut', async () => {
+  it('opens from the top bar search button too, for anyone who never learns the shortcut', async () => {
     const user = userEvent.setup()
     renderAtPath('/', { drafts: [LEAGUE] })
 
-    await user.click(screen.getByTitle('Jump to (Ctrl+K)'))
+    await user.click(screen.getByRole('button', { name: 'Jump to a league, page or manager' }))
 
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Jump to' })).toBeTruthy())
+  })
+
+  it('has no shortcut chip on the button: the key is in its tooltip, not drawn beside it', () => {
+    const { container } = renderAtPath('/', { drafts: [LEAGUE] })
+    expect(container.querySelector('kbd')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Jump to a league, page or manager' }).getAttribute('title')).toBe('Jump to (Ctrl+K)')
   })
 
   // A bare `k` must not open it: draft rooms have their own player search, and
@@ -59,40 +65,47 @@ describe('the jump-to shortcut', () => {
 
 describe('the phone return affordance', () => {
   /*
-   * At phone width the rail is a horizontal bar that scrolls away with the
-   * page -- deliberately, because pinning it measured 252px of an 812px
-   * viewport. That leaves the return trip: from the bottom of a long standings
-   * table there is no navigation on screen. This button is the whole fix.
-   *
-   * jsdom applies no media queries, so what is asserted here is the behaviour
-   * (it exists, it opens the palette). That it is hidden above 860px and
-   * occupies no permanent band is a CSS claim, verified in a real browser.
+   * On a phone the top bar is pinned (48px) and carries the search button, so from the bottom of a
+   * long standings table the palette is one tap away. The floating jump-to button this replaced is
+   * gone (claude/site-redesign.md); jsdom applies no media queries, so what is asserted is the
+   * behaviour: the button exists in the bar, outside the scrolling pane, and opens the palette.
    */
-  it('opens the palette from the fixed control', async () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function stubPhone() {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('860px'),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  }
+
+  it('opens the palette from the top bar on a phone', async () => {
+    stubPhone()
     const user = userEvent.setup()
     const { container } = renderAtPath('/leagues/L1/history', { drafts: [LEAGUE] })
 
-    const fab = container.querySelector<HTMLButtonElement>('.jumpto-fab')
-    expect(fab).not.toBeNull()
-
-    await user.click(fab!)
+    expect(container.querySelector('.jumpto-fab')).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Jump to a league, page or manager' }))
 
     await waitFor(() => expect(screen.getByRole('dialog', { name: 'Jump to' })).toBeTruthy())
   })
 
-  it('is outside the scrolling pane, so scroll position cannot hide it', () => {
+  it('keeps the search button outside the scrolling pane, so scroll position cannot hide it', () => {
+    stubPhone()
     const { container } = renderAtPath('/leagues/L1/history', { drafts: [LEAGUE] })
 
-    const fab = container.querySelector('.jumpto-fab')
-    // A child of .app-main would scroll with the content it is meant to rescue
-    // you from.
-    expect(fab?.closest('.app-main')).toBeNull()
-    expect(fab?.parentElement?.className).toContain('app-shell')
+    const button = screen.getByRole('button', { name: 'Jump to a league, page or manager' })
+    // A child of .app-main would scroll with the content it is meant to rescue you from.
+    expect(button.closest('.app-main')).toBeNull()
+    expect(button.closest('header.topbar')).not.toBeNull()
+    expect(container.querySelector('.app-shell')?.contains(button)).toBe(true)
   })
 })
 
 describe('what the palette offers', () => {
-  it('lists the league pages built from the same table the rail renders', async () => {
+  it('lists the league pages built from the same table the league header renders', async () => {
     const user = userEvent.setup()
     renderAtPath('/', { drafts: [LEAGUE] })
 
@@ -120,7 +133,7 @@ describe('what the palette offers', () => {
 
 describe('what opening it costs', () => {
   /*
-   * NFR-001. The rail has already fetched the draft list by the time anyone
+   * NFR-001. The league header has already fetched the draft list by the time anyone
    * opens the palette, and the palette reads that same cache rather than
    * fetching an identical copy. If this ever regresses, every Ctrl+K on a
    * league page becomes a round trip.

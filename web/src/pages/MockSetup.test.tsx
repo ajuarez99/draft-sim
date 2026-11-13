@@ -206,7 +206,7 @@ describe('MockSetup', () => {
     it('marks your seat and the one Start button with their own classes', async () => {
       render(<MockSetup />)
       await screen.findByLabelText('seat 2')
-      // "You" is the .mine seat (--crimson-fill in CSS); Start is the only button in the volt CTA bar.
+      // "You" is the .mine seat (--you-fill in CSS); Start is the only button in the brand CTA bar.
       expect(document.querySelectorAll('.mock-seat.mine')).toHaveLength(1)
       const bar = document.querySelector('.mock-seat-cta') as HTMLElement
       expect(bar.querySelectorAll('button')).toHaveLength(1)

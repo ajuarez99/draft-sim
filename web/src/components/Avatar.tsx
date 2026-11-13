@@ -23,8 +23,8 @@ type Props = {
   hue?: number
   /** Display name; its first character is the fallback initial. Defaults to `seed`. */
   label?: string | null
-  /** This avatar's person is the viewer. Crimson fill with no photo; a crimson
-   *  ring with one -- the same "crimson-when-it's-you" rule the board's column
+  /** This avatar's person is the viewer. You fill with no photo; a you-colour
+   *  ring with one -- the same "you-colour-when-it's-you" rule the board's column
    *  headers and on-clock strip already followed before there was a photo to
    *  show. */
   isMe?: boolean
@@ -45,7 +45,7 @@ export default function Avatar({ avatarId, seed, label, isMe, className, hue: gi
   const style = showPhoto
     ? undefined
     : isMe
-      ? { background: 'var(--crimson)', color: 'var(--bg)' }
+      ? { background: 'var(--you)', color: 'var(--bg)' }
       : { background: `oklch(28% 0.03 ${hue})`, color: `oklch(82% 0.1 ${hue})` }
   const initial = (label ?? seed ?? '?').trim().charAt(0).toUpperCase() || '?'
 
