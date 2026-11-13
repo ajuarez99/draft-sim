@@ -205,12 +205,13 @@ class HistoricalAchievementMvcIT {
         long old = oldGame(ALICE, 3);
         JsonNode p = profile(ALICE);
         // CR-04: a badge is dated when the game finished (three days ago), not when it was settled
-        assertEquals(2, count("select count(*) from historical_achievement where game_id = ?"
+        assertEquals(3, count("select count(*) from historical_achievement where game_id = ?"
                 + " and unlocked_at = (select completed_at from historical_game where id = ?)", old, old));
-        // 100 game + 7 wins * 10, plus FIRST_GAME 50 and WINS_1 50
-        assertEquals(270, p.get("xp").asInt());
-        assertEquals(2, p.get("level").asInt());
-        assertEquals(2, p.get("seenLevel").asInt(), "no level-up for a backfilled game");
+        // 100 game + 7 wins * 10, plus FIRST_GAME 50, WINS_1 50 and BEAT_HINDSIGHT 200: the fixture's user scored
+        // 6247 of the hindsight draft's 6510 (96%), over basketball's 85% bar (retuned 2026-11-13)
+        assertEquals(470, p.get("xp").asInt());
+        assertEquals(3, p.get("level").asInt());
+        assertEquals(3, p.get("seenLevel").asInt(), "no level-up for a backfilled game");
         assertEquals(1, p.get("totals").get("gamesFromSavedResults").asInt());
         int unlocked = 0;
         for (JsonNode b : p.get("badges")) {
@@ -219,7 +220,7 @@ class HistoricalAchievementMvcIT {
                 assertTrue(b.get("seen").asBoolean(), b.get("code").asText() + " must be quiet");
             }
         }
-        assertEquals(2, unlocked);
+        assertEquals(3, unlocked);
         JsonNode aw = award(ALICE, old);
         assertTrue(aw.get("fromSavedResult").asBoolean());
         assertTrue(aw.get("momentsSeen").asBoolean());
@@ -231,7 +232,7 @@ class HistoricalAchievementMvcIT {
         long old = oldGame(ALICE, 3);
         long fresh = finishedGame(ALICE, 4);
         JsonNode p = profile(ALICE);
-        assertEquals(2, p.get("seenLevel").asInt(), "raised to the level after the old game only");
+        assertEquals(3, p.get("seenLevel").asInt(), "raised to the level after the old game only");
         assertTrue(p.get("level").asInt() >= p.get("seenLevel").asInt());
         assertEquals(0, count("select count(*) from historical_achievement where game_id = ? and seen_at is null", old));
         assertEquals(count("select count(*) from historical_achievement where game_id = ?", fresh),

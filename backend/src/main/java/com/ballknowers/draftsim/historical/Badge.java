@@ -4,7 +4,9 @@ package com.ballknowers.draftsim.historical;
  * The Time Machine badge catalog (spec 064), in display order.
  *
  * <p><b>Every number here is hand-set and arbitrary</b>: the XP values, the thresholds in the rule text and the
- * thresholds {@link AchievementRules} applies. None is derived from data or tuned against play, in the same
+ * thresholds {@link AchievementRules} applies. None is derived from data, and only three were ever looked at against
+ * play: BEAT_HINDSIGHT, CLEAN_SHEET and BIG_BUST were retuned on 2026-11-13 from counts over 81 mostly auto-drafted
+ * games (see the comment in {@link AchievementRules}), which is a small sample and not a fit. The rest are in the same
  * spirit as {@code config/weights.yml}. They are shown to the fan as numbers so a change is visible. XP is frozen
  * onto the badge row at unlock, so retuning here never rewrites an earlier unlock.
  *
@@ -32,11 +34,15 @@ public enum Badge {
     TOP_SEED("Best record", "Finish the regular season in first place.", 100, Source.STORED),
     PERFECT_SEASON("Perfect regular season",
             "Finish a regular season of at least 10 weeks with no losses and no ties.", 300, Source.STORED),
-    BEAT_HINDSIGHT("Better than hindsight", "Outscore the greedy hindsight draft.", 200, Source.STORED),
-    CLEAN_SHEET("No busts", "No pick finished below the slot where it was taken.", 100, Source.STORED),
+    BEAT_HINDSIGHT("Near-perfect draft",
+            "Score at least 85% of the greedy hindsight draft's points in basketball, or 75% in football.", 200,
+            Source.STORED),
+    CLEAN_SHEET("Steady hands",
+            "No more than two of your picks finished a full round or more below the slot where you took them.", 100,
+            Source.NEW_GAMES),
     BIG_BUST("Swing and a miss",
-            "A pick in round 1 or 2 finished at least three full rounds of picks below his pick "
-                    + "number. Games finished before this was added only check your single biggest bust.", 50, Source.STORED),
+            "A pick in round 1 or 2 finished in the bottom third of all drafted players by season value. "
+                    + "Games finished before this was added only check your single biggest bust.", 50, Source.STORED),
     WOODEN_SPOON("Wooden spoon", "Finish last.", 50, Source.STORED),
     REACH_HIT("Called it",
             "Take a player in the first half of the draft at least a full round of picks ahead of his "

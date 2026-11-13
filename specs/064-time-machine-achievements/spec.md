@@ -116,3 +116,28 @@ See plan.md "Amended after review". What changes for the fan: reach, bust, late-
 pop every game** they happen (no XP), while the badge of the same name unlocks once (A4); "Called it" needs a
 first-half pick that beat its slot by a full round (A5); "Gone by week 3" reads "his last box score in our
 data came in week N" (A7); first place in a season with no playoffs is not a title (A8).
+
+## Retuned after measurement (2026-11-13)
+
+Allan asked for three badges to be retuned after verification showed two never firing and one firing in most
+football games. The catalog table above is left as first written; these three rows are superseded. All three
+are still hand-set. The counts come from the 81 games left in the verification database (42 basketball, 39
+football, almost all auto-drafted), counted with SQL over the stored results and pick facts. They are counts
+from a small, unrepresentative sample, not rates, and the new rules were not re-run through the live app.
+
+| Code | Was | Fired | Now | Would have fired |
+|---|---|---|---|---|
+| BIG_BUST "Swing and a miss" | Round 1-2 pick at least 3R places below his pick number | 15 of 41 NBA, 27 of 39 NFL | Round 1-2 pick in the bottom third of all drafted players by season value | 5 of 41 NBA, 7 of 39 NFL |
+| BEAT_HINDSIGHT, renamed "Near-perfect draft" | Outscore the greedy hindsight draft | 0 of 81 (best 87.8% NBA, 77.8% NFL) | Score at least 85% of it in basketball, 75% in football | 3 of 42 NBA, 4 of 39 NFL |
+| CLEAN_SHEET, renamed "Steady hands" | No pick finished below his slot | 0 of 80 (fewest was 3 picks) | At most two picks finished a full round or more below their slot | 5 of 41 NBA, 2 of 39 NFL |
+
+Consequences:
+
+- The hindsight bar differs by sport because football scores run lower against hindsight in this sample
+  (median 68% against basketball's 78%). One shared bar would be out of reach in one sport or routine in the other.
+- "Steady hands" now needs every pick's season rank, so it moved from Stored to New games: a game settled from
+  its saved result alone cannot earn it.
+- "Near-perfect draft" is still Stored, so a past game at or over the bar earns it quietly.
+- Badge codes are unchanged. Games already settled keep what they earned; nothing is re-settled.
+- The earlier counts in verification.md (13 of 36 and 25 of 36 for the bust) were over the 72 scripted games
+  only; the "Fired" column here recounts the old rule over all games with pick facts.

@@ -50,8 +50,30 @@ class AchievementRulesTest {
     }
 
     private static Hindsight hindsight(boolean userBeatIt) {
-        return new Hindsight("greedy hindsight, bots unchanged", userBeatIt ? 6000 : 7000, userBeatIt ? 7000 : 6000,
+        return new Hindsight("greedy hindsight, bots unchanged", userBeatIt ? 6000 : 7000, userBeatIt ? 7000 : 5000,
                 userBeatIt, List.of());
+    }
+
+    /** The user scored {@code share} of a 10,000-point hindsight draft. */
+    private static HistoricalResult withShare(double share) {
+        return result(standings(8, 6, 0, 5), 5, bust(70, 150),
+                new Hindsight("greedy hindsight, bots unchanged", 10000, 10000 * share, false, List.of()),
+                format(), null, HistoricalResult.MISSED_PLAYOFFS);
+    }
+
+    private static Set<Badge> badgesFor(String sport, HistoricalResult r, PickFact... picks) {
+        return badgesOf(AchievementRules.evaluate(new GameFacts(sport, TEAMS, ROUNDS, ME, r,
+                picks.length == 0 ? null : new PickFacts(19, List.of(picks)))));
+    }
+
+    /** All 14 of slot 1's picks; {@code gaps[i]} is how many places below his pick number pick i finished. */
+    private static PickFact[] fullDraft(int... gaps) {
+        PickFact[] out = new PickFact[ROUNDS];
+        for (int i = 0; i < ROUNDS; i++) {
+            int pickNo = i * TEAMS + 1;
+            out[i] = pick(pickNo, pickNo, Math.max(1, pickNo + (i < gaps.length ? gaps[i] : 0)), 19);
+        }
+        return out;
     }
 
     private static Bust bust(int pickNo, int rank) {
@@ -193,18 +215,37 @@ class AchievementRulesTest {
     }
 
     @Test
-    void beatingHindsightNeedsTheUserToHaveScoredMore() {
+    void aNearPerfectDraftNeedsTheSportsShareOfTheHindsightScore() {
         assertTrue(badgesOf(AchievementRules.evaluate(facts(result(standings(8, 6, 0, 5), 5, bust(70, 150),
-                hindsight(true), format(), null, HistoricalResult.MISSED_PLAYOFFS)))).contains(Badge.BEAT_HINDSIGHT));
-        assertFalse(badgesOf(AchievementRules.evaluate(facts(plain()))).contains(Badge.BEAT_HINDSIGHT));
+                hindsight(true), format(), null, HistoricalResult.MISSED_PLAYOFFS)))).contains(Badge.BEAT_HINDSIGHT),
+                "outscoring it still counts");
+        assertFalse(badgesOf(AchievementRules.evaluate(facts(plain()))).contains(Badge.BEAT_HINDSIGHT), "71%");
+        // basketball: 85% is in, 84.9% is out
+        assertTrue(badgesFor("NBA", withShare(0.85)).contains(Badge.BEAT_HINDSIGHT));
+        assertFalse(badgesFor("NBA", withShare(0.849)).contains(Badge.BEAT_HINDSIGHT));
+        // football runs lower: 75% is in, 74.9% is out
+        assertTrue(badgesFor("NFL", withShare(0.75)).contains(Badge.BEAT_HINDSIGHT));
+        assertFalse(badgesFor("NFL", withShare(0.749)).contains(Badge.BEAT_HINDSIGHT));
+        // the same 80% is enough in football and not in basketball, never the other way round
+        assertTrue(badgesFor("NFL", withShare(0.80)).contains(Badge.BEAT_HINDSIGHT));
+        assertFalse(badgesFor("NBA", withShare(0.80)).contains(Badge.BEAT_HINDSIGHT));
+        assertFalse(badgesFor("MLB", withShare(0.80)).contains(Badge.BEAT_HINDSIGHT), "unknown sport: stricter bar");
     }
 
     @Test
-    void aCleanSheetNeedsNoBustAtAll() {
+    void steadyHandsAllowsTwoPicksAFullRoundBelowAndNotThree() {
+        assertTrue(badgesFor("NBA", plain(), fullDraft()).contains(Badge.CLEAN_SHEET), "every pick at his slot");
+        assertTrue(badgesFor("NBA", plain(), fullDraft(12, 40)).contains(Badge.CLEAN_SHEET), "two a round below");
+        assertFalse(badgesFor("NBA", plain(), fullDraft(12, 40, 12)).contains(Badge.CLEAN_SHEET), "three is too many");
+        // 11 places is short of a full round, so it does not count against you
+        assertTrue(badgesFor("NBA", plain(), fullDraft(12, 40, 11, 11, 11)).contains(Badge.CLEAN_SHEET));
+        // finishing ABOVE the slot never counts against you (a sign flip would fail here)
+        assertTrue(badgesFor("NBA", plain(), fullDraft(0, 0, -20, -20, -20, -20)).contains(Badge.CLEAN_SHEET));
+        // not provable without every pick: a saved-result game, or partial facts, cannot earn it
         HistoricalResult noBust = result(standings(8, 6, 0, 5), 5, null, hindsight(false), format(), null,
                 HistoricalResult.MISSED_PLAYOFFS);
-        assertTrue(badgesOf(AchievementRules.evaluate(facts(noBust))).contains(Badge.CLEAN_SHEET));
-        assertFalse(badgesOf(AchievementRules.evaluate(facts(plain()))).contains(Badge.CLEAN_SHEET));
+        assertFalse(badgesOf(AchievementRules.evaluate(facts(noBust))).contains(Badge.CLEAN_SHEET));
+        assertFalse(badgesFor("NBA", plain(), pick(1, 1, 1, 19)).contains(Badge.CLEAN_SHEET));
     }
 
     @Test
@@ -229,17 +270,19 @@ class AchievementRulesTest {
     }
 
     @Test
-    void aBustNeedsRoundOneOrTwoAndAFullThreeRoundGap() {
-        // pick 24 (round 2) at rank 59: gap 35 < 36, not a bust; at rank 60: gap 36, a bust
-        assertFalse(momentCodes(AchievementRules.evaluate(facts(plain(), pick(24, 24, 59, 19)))).contains("BIG_BUST"));
-        assertTrue(momentCodes(AchievementRules.evaluate(facts(plain(), pick(24, 24, 60, 19)))).contains("BIG_BUST"));
+    void aBustNeedsRoundOneOrTwoAndABottomThirdFinish() {
+        // 168 drafted: rank 112 is the last place of the top two thirds, 113 the first of the bottom third
+        assertFalse(momentCodes(AchievementRules.evaluate(facts(plain(), pick(24, 24, 112, 19)))).contains("BIG_BUST"));
+        assertTrue(momentCodes(AchievementRules.evaluate(facts(plain(), pick(24, 24, 113, 19)))).contains("BIG_BUST"));
+        // the old rule (three rounds below) no longer fires on its own: pick 3 finishing 60th is not a bust
+        assertFalse(momentCodes(AchievementRules.evaluate(facts(plain(), pick(3, 3, 60, 19)))).contains("BIG_BUST"));
         // pick 25 is round 3: even a 100-place fall is outside the rule
         assertFalse(momentCodes(AchievementRules.evaluate(facts(plain(), pick(25, 25, 125, 19)))).contains("BIG_BUST"));
     }
 
     @Test
     void anOldGameChecksOnlyItsStoredBiggestBust() {
-        HistoricalResult early = result(standings(8, 6, 0, 5), 5, bust(5, 100), hindsight(false), format(), null,
+        HistoricalResult early = result(standings(8, 6, 0, 5), 5, bust(5, 120), hindsight(false), format(), null,
                 HistoricalResult.MISSED_PLAYOFFS);
         GameAward a = AchievementRules.evaluate(facts(early));
         assertTrue(badgesOf(a).contains(Badge.BIG_BUST));

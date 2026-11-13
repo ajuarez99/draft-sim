@@ -36,7 +36,20 @@ public final class AchievementRules {
 
     // Hand-set rule thresholds. Arbitrary. R = teams.
     static final int BUST_ROUNDS = 2;
-    static final int BUST_ROUNDS_OF_GAP = 3;
+    /*
+     * Retuned 2026-11-13 (spec 064 "Retuned after measurement"), still hand-set. Chosen from 81 stored games, almost
+     * all auto-drafted, so these are counts from a small, unrepresentative sample and not rates:
+     *  - a bust was "3 rounds below his pick number" and fired in 27 of 39 football games; it is now "bottom third
+     *    of all drafted players" (7 of 39 football, 5 of 41 basketball);
+     *  - "outscore hindsight" never fired (best 87.8% basketball, 77.8% football); it is now a share of the
+     *    hindsight score, per sport because football runs structurally lower (3 of 42 and 4 of 39);
+     *  - "no pick below his slot" never fired (fewest was 3 picks); it is now "at most two picks a full round or
+     *    more below" (5 of 41 and 2 of 39).
+     */
+    static final int BUST_BOTTOM_NUM = 2, BUST_BOTTOM_DEN = 3;      // rank > 2/3 of drafted players
+    static final double NEAR_HINDSIGHT_NBA = 0.85;
+    static final double NEAR_HINDSIGHT_NFL = 0.75;
+    static final int STEADY_MAX_ROUND_BELOW = 2;
     static final int MISS_ROUNDS_OF_GAP = 2;
     static final int GONE_EARLY_ROUNDS = 3;
     static final int GONE_EARLY_WEEK = 3;
@@ -127,13 +140,23 @@ public final class AchievementRules {
             badges.add(earn(Badge.PERFECT_SEASON, "You went " + record(mine) + " in the "
                     + (newFormat ? "regular season" : "season") + "."));
         }
-        if (r.hindsight() != null && r.hindsight().userBeatIt()) {
+        if (r.hindsight() != null && r.hindsight().pointsFor() > 0
+                && r.hindsight().userPointsFor() >= nearHindsightShare(f.sport()) * r.hindsight().pointsFor()) {
             badges.add(earn(Badge.BEAT_HINDSIGHT, "You scored " + oneDecimal(r.hindsight().userPointsFor())
-                    + " against the hindsight draft's " + oneDecimal(r.hindsight().pointsFor()) + "."));
+                    + " against the hindsight draft's " + oneDecimal(r.hindsight().pointsFor()) + ", "
+                    + (int) Math.floor(100 * r.hindsight().userPointsFor() / r.hindsight().pointsFor())
+                    + "% of it."));
         }
-        if (r.biggestBust() == null) {
-            badges.add(earn(Badge.CLEAN_SHEET,
-                    "None of your " + f.rounds() + " picks finished below where you took him."));
+        // Needs every pick's season rank, so a game settled from its saved result alone cannot earn it.
+        if (f.pickFacts() != null && f.pickFacts().picks().size() >= f.rounds()) {
+            long roundBelow = f.pickFacts().picks().stream()
+                    .filter(p -> p.seasonValueRank() - p.pickNo() >= f.teams()).count();
+            if (roundBelow <= STEADY_MAX_ROUND_BELOW) {
+                badges.add(earn(Badge.CLEAN_SHEET, roundBelow == 0
+                        ? "None of your " + f.rounds() + " picks finished a full round below where you took him."
+                        : "Only " + roundBelow + " of your " + f.rounds()
+                                + " picks finished a full round or more below where you took him."));
+            }
         }
         if (r.userFinish() == f.teams()) {
             badges.add(earn(Badge.WOODEN_SPOON, "You finished " + ordinal(f.teams()) + " of " + f.teams() + "."));
@@ -146,7 +169,7 @@ public final class AchievementRules {
             // No pick facts: only the single biggest bust is known, so only it can be checked.
             Bust b = r.biggestBust();
             int round = DraftSlot.round(b.pickNo(), f.teams());
-            if (round <= BUST_ROUNDS && b.seasonValueRank() - b.pickNo() >= BUST_ROUNDS_OF_GAP * f.teams()) {
+            if (round <= BUST_ROUNDS && isBust(b.seasonValueRank(), f.teams() * f.rounds())) {
                 badges.add(bustBadge(b.player() == null ? "Your pick" : b.player().name(), b.pickNo(),
                         b.seasonValueRank(), f.teams() * f.rounds()));
             }
@@ -199,7 +222,7 @@ public final class AchievementRules {
                                 + "): his last box score in our data came in week " + p.lastWeekPlayed() + ".",
                         p.pickNo(), who));
             }
-            if (p.round() <= BUST_ROUNDS && p.seasonValueRank() - p.pickNo() >= BUST_ROUNDS_OF_GAP * teams) {
+            if (p.round() <= BUST_ROUNDS && isBust(p.seasonValueRank(), total)) {
                 BadgeEarn e = bustBadge(who, p.pickNo(), p.seasonValueRank(), total);
                 out.add(new Moment(Badge.BIG_BUST.code(), Badge.BIG_BUST.displayName(),
                         (String) e.detail().get("text"), p.pickNo(), who));
@@ -218,10 +241,21 @@ public final class AchievementRules {
         return Math.min(teams, pickNo / 2);
     }
 
+    /** Bottom third of every drafted player by season value. A LARGER rank is worse. */
+    static boolean isBust(int seasonValueRank, int totalDrafted) {
+        return seasonValueRank * BUST_BOTTOM_DEN > totalDrafted * BUST_BOTTOM_NUM;
+    }
+
+    /** Share of the hindsight score that counts as near it. Football runs lower; an unknown sport gets the stricter bar. */
+    static double nearHindsightShare(String sport) {
+        return "NFL".equalsIgnoreCase(sport) ? NEAR_HINDSIGHT_NFL : NEAR_HINDSIGHT_NBA;
+    }
+
     private static BadgeEarn bustBadge(String who, int pickNo, int rank, int total) {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("text", who + ", pick " + pickNo + ", finished " + ordinal(rank) + " of " + total
-                + " drafted players by season value, " + (rank - pickNo) + " places below where you took him.");
+                + " drafted players by season value, in the bottom third and " + (rank - pickNo)
+                + " places below where you took him.");
         d.put("pickNo", pickNo);
         d.put("playerName", who);
         return new BadgeEarn(Badge.BIG_BUST, d);
