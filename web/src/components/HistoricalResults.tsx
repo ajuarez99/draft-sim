@@ -43,6 +43,87 @@ function Callouts({ game, result }: Props) {
   )
 }
 
+/**
+ * Spec 065: every pick of yours, "drafted as RB2, finished as RB1". Lower is better for both, so the change is
+ * drafted minus finished: positive means he finished ahead of where he was taken. The direction is said in a
+ * word as well as a colour.
+ */
+function PickFinishes({ game, result }: Props) {
+  const rows = result.pickFinishes
+  if (!rows || rows.length === 0) return null
+  const nfl = sportOf(game) === 'NFL'
+  const seasonWeeks = result.format?.seasonWeeks ?? null
+  return (
+    <section className="panel hist-pickfin" aria-label="Your picks, drafted and finished">
+      <h2>Where you drafted them, where they finished</h2>
+      <p className="muted small">
+        Drafted as: the order players at his position came off the board in this draft. Finished as: his rank at that
+        position among every player on the board, drafted or not, by{' '}
+        {nfl ? 'fantasy points over the whole real season' : "this game's points over the whole real season (each week's best single game)"}.
+      </p>
+      <div className="hist-table-wrap">
+        <table className="hist-table">
+          <thead>
+            <tr>
+              <th className="num">Pick</th>
+              <th>Player</th>
+              <th>Drafted as</th>
+              <th>Finished as</th>
+              <th>Change</th>
+              <th className="num">Points</th>
+              <th className="num">Weeks played</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const change = r.draftedPositionRank - r.finishPositionRank
+              const round = Math.ceil(r.pickNo / game.teams)
+              return (
+                <tr key={r.pickNo}>
+                  <td className="num">
+                    {r.pickNo}
+                    <span className="muted small"> · round {round}</span>
+                  </td>
+                  <td>{r.player.name}</td>
+                  <td>
+                    {r.position}
+                    {r.draftedPositionRank}
+                  </td>
+                  <td>
+                    <strong>
+                      {r.position}
+                      {r.finishPositionRank}
+                    </strong>
+                    <span className="muted small"> of {r.positionPlayers}</span>
+                  </td>
+                  <td>
+                    {change > 0 ? (
+                      <span className="hist-change up">
+                        <span aria-hidden="true">▲</span> {change} better
+                      </span>
+                    ) : change < 0 ? (
+                      <span className="hist-change down">
+                        <span aria-hidden="true">▼</span> {-change} worse
+                      </span>
+                    ) : (
+                      <span className="hist-change">Same spot</span>
+                    )}
+                  </td>
+                  <td className="num">{pts1(r.seasonValue)}</td>
+                  <td className="num">
+                    {r.weeksPlayed}
+                    {seasonWeeks != null ? <span className="muted small"> of {seasonWeeks}</span> : null}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 /** "Weeks 23 to 25 of the real season were not played." Null when every week was played. */
 function unplayedLine(unused: number, firstUnused: number): string | null {
   if (unused <= 0) return null
@@ -125,6 +206,8 @@ export default function HistoricalResults({ game, result }: Props) {
         </section>
       )}
 
+      <PickFinishes game={game} result={result} />
+
       {!old && playoffs && <HistoricalBracket playoffs={playoffs} userSlot={user} />}
 
       {!old && format && (
@@ -199,6 +282,11 @@ export default function HistoricalResults({ game, result }: Props) {
           </p>
         )}
         {old && <Callouts game={game} result={result} />}
+        {!result.pickFinishes && (
+          <p className="muted small">
+            This game finished before pick-by-pick finishes were saved, so there is no drafted-as and finished-as table for it.
+          </p>
+        )}
       </section>
 
       <section className="panel" aria-label="Weekly results">

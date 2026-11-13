@@ -82,6 +82,31 @@ function playoffResult(over: Partial<HistoricalResult> = {}): HistoricalResult {
 
 const renderIt = (g: HistoricalGameState, r: HistoricalResult) => render(<HistoricalResults game={g} result={r} />)
 
+describe('HistoricalResults, drafted as and finished as (spec 065)', () => {
+  const fin = (pickNo: number, name: string, drafted: number, finished: number, weeks: number) => ({
+    pickNo, player: { ...card(pickNo, name), positions: ['RB'] }, position: 'RB',
+    draftedPositionRank: drafted, finishPositionRank: finished, positionPlayers: 140, seasonValue: 391.3, weeksPlayed: weeks,
+  })
+
+  it('says a back taken second who finished first got better, and one who fell got worse', () => {
+    renderIt(game(3), playoffResult({ pickFinishes: [fin(2, 'Star Back', 2, 1, 16), fin(23, 'Hurt Back', 9, 61, 3), fin(26, 'Even Back', 12, 12, 17)] }))
+    const table = screen.getByRole('region', { name: 'Your picks, drafted and finished' })
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map((r) => Array.from(r.querySelectorAll('td')).map((c) => c.textContent))
+    expect(rows[0]).toEqual(['2 · round 1', 'Star Back', 'RB2', 'RB1 of 140', '▲ 1 better', '391.3', '16 of 25'])
+    expect(rows[1].slice(2, 5)).toEqual(['RB9', 'RB61 of 140', '▼ 52 worse'])
+    expect(rows[1][0]).toBe('23 · round 2')
+    expect(rows[2][4]).toBe('Same spot')
+    expect(table.querySelector('.hist-change.up')?.textContent).toMatch(/better/)
+    expect(table.querySelector('.hist-change.down')?.textContent).toMatch(/worse/)
+  })
+
+  it('says so, and draws no table, for a result saved before pick finishes existed', () => {
+    renderIt(game(3), playoffResult())
+    expect(screen.queryByRole('region', { name: 'Your picks, drafted and finished' })).toBeNull()
+    expect(screen.getByText(/finished before pick-by-pick finishes were saved/)).toBeInTheDocument()
+  })
+})
+
 describe('HistoricalResults, playoff format', () => {
   it('leads with the outcome in words and the bust and steal callouts, above the tables', () => {
     const { container } = renderIt(game(3), playoffResult())

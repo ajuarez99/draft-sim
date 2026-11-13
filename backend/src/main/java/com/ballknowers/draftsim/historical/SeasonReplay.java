@@ -96,6 +96,12 @@ public class SeasonReplay {
             return Math.round(t * 100.0) / 100.0;
         }
 
+        /** Weeks in which he has a game at all (a 0-point week counts: he played). */
+        public int weeksPlayed(long id) {
+            Map<Integer, Locked> m = byPlayer.get(id);
+            return m == null ? 0 : m.size();
+        }
+
         /** Sum of his positive weekly scores: an upper bound on what he can add to any roster. */
         public double positiveValue(long id) {
             double t = 0;
@@ -295,7 +301,7 @@ public class SeasonReplay {
         Map<String, List<LineupWeek>> lineupMap = new LinkedHashMap<>();
         lineupMap.put(String.valueOf(in.userSlot()), userLineups);
         return new HistoricalResult(weeks, standings, userFinish, lineupMap, cmp.hindsight(), cmp.bust(),
-                cmp.steal(), fmt.toResult(), playoffs, finalPlaces, userOutcome);
+                cmp.steal(), fmt.toResult(), playoffs, finalPlaces, userOutcome, cmp.pickFinishes());
     }
 
     public static final String PHASE_REGULAR = "REGULAR";

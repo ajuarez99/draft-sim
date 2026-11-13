@@ -4630,6 +4630,25 @@ export type HistoricalSteal = {
   passedOnValue: number
 }
 
+/**
+ * Spec 065. One of your picks at his primary position. Mirrors HistoricalResult.PickFinish.
+ * Lower is better for both ranks.
+ */
+export type HistoricalPickFinish = {
+  pickNo: number
+  player: HistoricalPlayerCard
+  position: string
+  /** 1 = the first player at this position taken in this game's draft, by any team. */
+  draftedPositionRank: number
+  /** 1 = the most season points at this position among every board player, drafted or not. Level values share a rank. */
+  finishPositionRank: number
+  /** How many players at this position are on the board. */
+  positionPlayers: number
+  seasonValue: number
+  /** Weeks of the real season with a box score. There is no injury data. */
+  weeksPlayed: number
+}
+
 /** Spec 063. The user's outcome vocabulary, also used per team in finalPlaces. */
 export type HistoricalOutcome =
   | 'CHAMPION'
@@ -4691,6 +4710,8 @@ export type HistoricalResult = {
   playoffs?: HistoricalPlayoffs | null
   finalPlaces?: HistoricalFinalPlace[] | null
   userOutcome?: HistoricalOutcome | null
+  /** Spec 065. Absent from a result stored before it; a stored result is never recomputed. */
+  pickFinishes?: HistoricalPickFinish[] | null
 }
 
 export type HistoricalGameState = {

@@ -318,7 +318,7 @@ function nflDrafting(): HistoricalGameState {
       statCoverage: {},
       rankingSource: 'PRIOR_SEASON_VORP',
       rankingLabel: "ranked by last season's points over replacement",
-      settingsSource: 'Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR',
+      settingsSource: 'Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, 2 FLEX + 7 bench · full PPR',
       dataNotes: ['Week 17 of 2007 is missing from the data'],
       attribution: 'Stats: nflverse (nflverse-data), CC BY 4.0',
     },

@@ -19,11 +19,15 @@ import java.util.Map;
  * @param finalPlaces every team ordered by final place; null only in an old stored result
  * @param userOutcome CHAMPION, LOST_FINAL, LOST_SEMIFINAL, LOST_ROUND_ONE, MISSED_PLAYOFFS or NO_PLAYOFFS; null
  *                    only in an old stored result
+ * @param pickFinishes spec 065: each of the user's picks, where he was drafted at his position and where he
+ *                    finished at it, in pick order. Null in a result stored before spec 065 (a stored result is
+ *                    never recomputed, so those games simply do not have it).
  */
 public record HistoricalResult(List<Week> weeks, List<Standing> standings, int userFinish,
                                Map<String, List<LineupWeek>> lineups, Hindsight hindsight, Bust biggestBust,
                                Steal bestStealPassedOn, Format format, Playoffs playoffs,
-                               List<FinalPlace> finalPlaces, String userOutcome) {
+                               List<FinalPlace> finalPlaces, String userOutcome,
+                               List<PickFinish> pickFinishes) {
 
     public static final String CHAMPION = "CHAMPION";
     public static final String LOST_FINAL = "LOST_FINAL";
@@ -89,4 +93,22 @@ public record HistoricalResult(List<Week> weeks, List<Standing> standings, int u
 
     /** @param outcome uses the {@code userOutcome} vocabulary, for every team */
     public record FinalPlace(int slot, int place, String outcome) {}
+
+    // ---- spec 065: drafted as, finished as -------------------------------------------------------------
+
+    /**
+     * One of the user's picks, at his primary position (the first one on his card).
+     *
+     * @param draftedPositionRank 1 = the first player at this position taken in THIS game's draft, by any team
+     *                            ("the second RB off the board" is 2)
+     * @param finishPositionRank  1 = the highest season value among every player at this position on the game's
+     *                            board, drafted or not. Level values share a rank (1 + how many scored strictly
+     *                            more), so players who never played all share the last one.
+     * @param positionPlayers     how many players at this position are on the board: the "of N" for the finish
+     * @param seasonValue         the sum of his weekly scores over the whole real season, as in the comparisons
+     * @param weeksPlayed         weeks of the real season in which he has a box score. There is no injury data; a
+     *                            low number says only that he did not play.
+     */
+    public record PickFinish(int pickNo, HistoricalPlayerCard player, String position, int draftedPositionRank,
+                             int finishPositionRank, int positionPlayers, double seasonValue, int weeksPlayed) {}
 }

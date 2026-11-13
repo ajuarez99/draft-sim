@@ -110,7 +110,7 @@ class NflGameFlowIT {
         assertEquals(15, s.get("rounds").asInt());
         assertEquals(5, s.get("currentPickNo").asInt(), "bots made picks 1..4, then it is the user's turn");
         assertEquals("1895", s.get("season").get("label").asText());
-        assertEquals("Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR", s.get("season").get("settingsSource").asText());
+        assertEquals("Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, 2 FLEX + 7 bench · full PPR", s.get("season").get("settingsSource").asText());
         assertEquals("ranked by last season's points over replacement", s.get("season").get("rankingLabel").asText());
         assertEquals(json.valueToTree(NflHistoricalSport.COUNTING), s.get("season").get("countedStats"));
         assertTrue(s.get("season").get("excludedStats").isEmpty());
@@ -228,6 +228,20 @@ class NflGameFlowIT {
         assertEquals(15, result.get("hindsight").get("picks").size());
         assertEquals("greedy hindsight, bots unchanged", result.get("hindsight").get("label").asText());
 
+        // spec 065: one drafted-as / finished-as row per user pick, in pick order, with ranks inside their bounds
+        JsonNode finishes = result.get("pickFinishes");
+        assertEquals(15, finishes.size());
+        int lastPick = 0;
+        for (JsonNode f : finishes) {
+            assertTrue(f.get("pickNo").asInt() > lastPick, "pick order");
+            lastPick = f.get("pickNo").asInt();
+            assertEquals(f.get("player").get("positions").get(0).asText(), f.get("position").asText());
+            int n = f.get("positionPlayers").asInt();
+            assertTrue(f.get("draftedPositionRank").asInt() >= 1 && f.get("draftedPositionRank").asInt() <= n);
+            assertTrue(f.get("finishPositionRank").asInt() >= 1 && f.get("finishPositionRank").asInt() <= n);
+            assertTrue(f.get("weeksPlayed").asInt() >= 0 && f.get("weeksPlayed").asInt() <= NflSyntheticSeason.WEEKS);
+        }
+
         // ---- the hand calculation (SC-003 shape): the user's roster, week by week, from the fixture alone ----
         List<Integer> roster = new ArrayList<>();
         for (JsonNode p : done.get("picks")) {
@@ -257,8 +271,11 @@ class NflGameFlowIT {
                     else if (!order[k].equals("QB")) leftover.add(l.get(j));   // a QB never flexes
                 }
             }
-            leftover.stream().max(Comparator.comparingDouble((double[] a) -> a[0]))
-                    .ifPresent(a -> expected.add(a[0]));
+            // One starter per FLEX slot in the config (two from spec 065), best leftovers first.
+            long flexSlots = props.roster().stream().filter("FLEX"::equals).count();
+            assertEquals(2, flexSlots, "the roster has two FLEX slots");
+            leftover.stream().sorted(Comparator.comparingDouble((double[] a) -> a[0]).reversed()).limit(flexSlots)
+                    .forEach(a -> expected.add(a[0]));
             expected.sort(Comparator.reverseOrder());
 
             List<Double> actual = new ArrayList<>();
