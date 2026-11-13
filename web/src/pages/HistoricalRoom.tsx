@@ -20,6 +20,7 @@ import HistoricalRosterPanel from '../components/HistoricalRosterPanel'
 import HistoricalClockBanner from '../components/HistoricalClockBanner'
 import HistoricalRoomLayout from '../components/HistoricalRoomLayout'
 import HistoricalResults from '../components/HistoricalResults'
+import HistoricalAwardPanel from '../components/HistoricalAwardPanel'
 import PageHeader from '../components/PageHeader'
 import { LoadingScreen } from '../components/Skeleton'
 import { cardToPlayerRef, coverageText, historicalSeats, sportOf, statLong, teamName } from '../historicalCopy'
@@ -290,7 +291,7 @@ export default function HistoricalRoom() {
       <div className="content">
         {header}
         <SeasonDisclosure game={state} />
-        <HistoricalResults game={state} result={state.result} />
+        <HistoricalResults game={state} result={state.result} afterFinish={<HistoricalAwardPanel gameId={state.id} />} />
         <details className="how">
           <summary>Your draft board</summary>
           {boardNode('full')}

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult, HistoricalWeek } from '../api'
 import {
   hindsightSeasonVerdict,
@@ -13,7 +13,12 @@ import {
 } from '../historicalCopy'
 import HistoricalBracket from './HistoricalBracket'
 
-type Props = { game: HistoricalGameState; result: HistoricalResult }
+type Props = {
+  game: HistoricalGameState
+  result: HistoricalResult
+  /** Spec 064: rendered right after the finish panel (the room passes the award panel here). */
+  afterFinish?: ReactNode
+}
 
 function nameOf(cards: Map<number, HistoricalPlayerCard>, id: number): string {
   return cards.get(id)?.name ?? `Player ${id}`
@@ -225,7 +230,7 @@ function unplayedLine(unused: number, firstUnused: number): string | null {
  * playoff weeks in the week picker. A result without one (stored before playoffs) renders as it always did, plus
  * one line saying so. `isOldFormat` is the only place that question is asked.
  */
-export default function HistoricalResults({ game, result }: Props) {
+export default function HistoricalResults({ game, result, afterFinish }: Props) {
   const user = game.userSlot
   const standings = useMemo(() => [...result.standings].sort((a, b) => a.place - b.place), [result])
   const userRow = standings.find((s) => s.slot === user)
@@ -283,6 +288,7 @@ export default function HistoricalResults({ game, result }: Props) {
         {old && <p className="muted small">Played under the old format: no playoffs, finish is the standings rank.</p>}
         {noPlayoffs && <p className="muted small">This season was too short for playoffs.</p>}
       </section>
+      {afterFinish}
 
       {!old && (
         <section className="panel hist-moments" aria-label="Your draft in two moments">

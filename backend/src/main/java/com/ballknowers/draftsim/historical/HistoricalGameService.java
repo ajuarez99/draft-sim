@@ -369,9 +369,45 @@ public class HistoricalGameService {
                 read(row.scoringJson(), SCORING), season.weekCount(), sport.regularSeasonWeeks(), row.rngSeed(), row.userSlot(), picks, byId,
                 played, sport.weekStarts(row.seasonStart()));
         HistoricalResult result = replay.replay(in);
-        games.writeResult(row.id(), write(result), OffsetDateTime.now());
+        games.writeResult(row.id(), write(result), capturePickFacts(row, picks, byId, played, season.weekCount(),
+                in.scoring()), OffsetDateTime.now());
         log.info("historical game {} replayed season {} in {} ms", row.id(), season.label(),
                 (System.nanoTime() - t0) / 1_000_000);
+    }
+
+    /**
+     * Spec 064 amendment A1: the user's per-pick season facts, captured here where they are guaranteed consistent
+     * with the frozen result, so a later settle never recomputes from reference tables a re-import may have
+     * changed. Never blocks completion: any failure is logged and the column stays null (the game then settles from
+     * its saved result alone). Returns the JSON text, or null.
+     */
+    private String capturePickFacts(GameRow row, List<SeasonReplay.Pick> picks, Map<Long, HistoricalPlayerCard> byId,
+                                    List<? extends WeekStatLine> played, int seasonWeeks,
+                                    Map<String, Double> scoring) {
+        try {
+            SeasonReplay.PlayerWeeks pw = replay.scorePlayerWeeks(scoring, played);
+            Map<Long, Double> value = new HashMap<>();
+            for (long id : byId.keySet()) value.put(id, pw.seasonValue(id));
+            Set<Long> drafted = new HashSet<>();
+            for (SeasonReplay.Pick p : picks) drafted.add(p.playerId());
+            Map<Long, Integer> rank = Comparisons.valueRanks(drafted, value);
+            Map<Long, Integer> lastWeek = new HashMap<>();
+            for (WeekStatLine g : played) lastWeek.merge(g.playerId(), g.week(), Math::max);
+
+            List<AchievementRules.PickFact> facts = new ArrayList<>();
+            for (SeasonReplay.Pick p : picks) {
+                if (p.slot() != row.userSlot()) continue;
+                HistoricalPlayerCard card = byId.get(p.playerId());
+                facts.add(new AchievementRules.PickFact(p.pickNo(), DraftSlot.round(p.pickNo(), row.teams()),
+                        p.playerId(), card.name(), card.rank(), rank.get(p.playerId()), value.get(p.playerId()),
+                        lastWeek.get(p.playerId())));
+            }
+            return write(new AchievementRules.PickFacts(seasonWeeks, facts));
+        } catch (RuntimeException e) {
+            log.error("historical game {}: pick facts could not be captured; its awards will settle from the saved"
+                    + " result only", row.id(), e);
+            return null;
+        }
     }
 
     // ---- state ------------------------------------------------------------------------------------------

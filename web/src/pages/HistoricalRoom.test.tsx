@@ -822,10 +822,12 @@ describe('HistoricalRoom: Auto-finish during the final reveal (CR-01)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
     fireEvent.click(screen.getAllByRole('button', { name: 'Draft' })[0])
     await tick(0)
-    const region = screen.getByRole('status')
+    // The room's own sentence region; the results also mount the (empty) achievement toast region, spec 064.
+    const room = () => screen.getAllByRole('status').find((el) => el.classList.contains('hist-sr-only'))!
+    const region = room()
     await tick(1000)
     expect(screen.getByText('You drafted 1995-96')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toBe(region)
+    expect(room()).toBe(region)
     expect(region).toHaveTextContent('The draft is complete.')
   })
 })

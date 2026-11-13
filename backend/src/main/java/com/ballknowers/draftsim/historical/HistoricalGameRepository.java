@@ -158,8 +158,19 @@ public class HistoricalGameRepository {
 
     /** Freeze the results: status COMPLETE, result written once, completion time stamped. */
     public void writeResult(long id, String resultJson, OffsetDateTime completedAt) {
-        db.sql("update historical_game set status = 'COMPLETE', result = ?::jsonb, completed_at = ? where id = ?")
-                .params(resultJson, completedAt, id)
+        writeResult(id, resultJson, null, completedAt);
+    }
+
+    /**
+     * As above, plus the spec 064 per-pick facts in the same statement ({@code pickFactsJson} null when the
+     * capture failed or was skipped: awards then settle from the saved result alone).
+     */
+    public void writeResult(long id, String resultJson, String pickFactsJson, OffsetDateTime completedAt) {
+        db.sql("""
+                update historical_game set status = 'COMPLETE', result = ?::jsonb, pick_facts = ?::jsonb,
+                    completed_at = ? where id = ?
+                """)
+                .params(resultJson, pickFactsJson, completedAt, id)
                 .update();
     }
 

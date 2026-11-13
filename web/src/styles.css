@@ -143,6 +143,8 @@
  *         its own) and deliberately still below a modal, even though the two
  *         can never be open at once in practice (an active drag holds pointer
  *         capture, and nothing that opens a modal can fire while it does).
+ *    52  `.ach-toasts`, the Time Machine achievement toasts (spec 064). Over the bottom
+ *         bar (it lifts itself above it), under the dropdowns and sheets.
  *    45  `.bottom-bar`, the phone's league tabs. Below every overlay it can
  *         open, and below a drag in progress. (It took the old jump-to FAB's
  *         slot; the FAB was 50 first, which tied the ghost and left DOM order
@@ -7113,4 +7115,60 @@ td.rv-po { border-left: 1px dashed var(--line); }
 @media (max-width: 720px) {
   .hist-bk-cols { grid-template-columns: minmax(0, 1fr); }
   .hist-champ-name { font-size: 22px; }
+}
+
+/* --- Spec 064: Time Machine achievements, levels and toasts. --- */
+.hist-award-lines { list-style: none; margin: 0 0 12px; padding: 0; }
+.hist-award-lines li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.hist-award-total { font-size: 16px; }
+.hist-award-sub { margin: 14px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.hist-award-moments { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+
+.ach-level { background: linear-gradient(135deg, color-mix(in oklab, var(--you) 10%, var(--raised)), var(--panel) 70%); }
+.ach-level-head { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.ach-level-head p, .ach-level-head h2 { margin: 0; }
+.ach-level-num {
+  flex: none; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%;
+  font-size: 30px; color: var(--bg); background: var(--you-fill); box-shadow: 0 0 0 4px color-mix(in oklab, var(--you) 22%, var(--panel));
+}
+.ach-bar-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.ach-bar { flex: 1 1 160px; min-width: 120px; height: 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; }
+.ach-bar span { display: block; height: 100%; background: var(--you); border-radius: 999px; }
+.ach-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 12px; margin: 0 0 8px; }
+.ach-totals dd { margin: 0; font-size: 26px; font-weight: 700; }
+.ach-totals dt { margin: 0; }
+
+.ach-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 10px; }
+.ach-badge { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); display: grid; gap: 4px; align-content: start; min-width: 0; overflow-wrap: anywhere; transition: transform 120ms, background 120ms; }
+.ach-badge p { margin: 0; }
+.ach-badge.earned { background: color-mix(in oklab, var(--fitted) 14%, var(--panel)); border-color: color-mix(in oklab, var(--fitted) 45%, var(--line)); box-shadow: 0 2px 8px color-mix(in oklab, black 35%, transparent); }
+.ach-badge.locked { background: var(--panel); border-style: dashed; }
+.ach-badge:hover { transform: translateY(-1px); }
+.ach-badge-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.ach-pill { flex: none; padding: 1px 9px; border-radius: 999px; font-size: 11px; font-weight: 600; border: 1px solid var(--line); background: var(--raised); }
+.ach-pill-earned { background: color-mix(in oklab, var(--fitted) 24%, var(--panel)); border-color: color-mix(in oklab, var(--fitted) 55%, var(--line)); }
+.ach-pill-moment { background: color-mix(in oklab, var(--you) 16%, var(--panel)); border-color: color-mix(in oklab, var(--you) 40%, var(--line)); }
+.ach-pill-locked { color: var(--muted); }
+
+/* Toasts sit at layer 52 (see STACKING above): over the bottom bar, under the dropdowns. */
+.ach-toasts {
+  position: fixed; z-index: 52; right: 16px; left: 16px; bottom: calc(var(--bottom-bar-h, 0px) + 16px);
+  display: grid; gap: 8px; justify-items: end; pointer-events: none;
+}
+.ach-toast {
+  pointer-events: auto; width: min(100%, 360px); display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  border-radius: 12px; background: var(--raised); border: 1px solid color-mix(in oklab, var(--you) 45%, var(--line));
+  box-shadow: 0 8px 24px color-mix(in oklab, black 55%, transparent); animation: ach-toast-in 180ms ease-out;
+}
+.ach-toast-body { display: grid; gap: 2px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.ach-toast-kind { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--you-text); }
+.ach-toast-text { font-size: 13px; color: var(--muted); }
+.ach-toast-xp { font-weight: 700; color: var(--you-text); white-space: nowrap; }
+.ach-toast-close { flex: none; min-width: 32px; min-height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.ach-toast-close:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@keyframes ach-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .ach-toast { animation: none; }
+  .ach-badge { transition: none; }
+  .ach-badge:hover { transform: none; }
 }
