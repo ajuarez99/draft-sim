@@ -16,14 +16,27 @@ import java.util.Map;
  * @param positionalRank rank within the primary position, in board order
  * @param rookiePick     football only (spec 056 F14): the overall NFL draft pick of a rookie with no prior line;
  *                       null for veterans and always null for basketball. A rookie's {@code prior} stays null.
+ * @param rookie         whether the drafted season is this player's first ({@link HistoricalRookies} has the
+ *                       rule). NULL means not known, never "no": a board snapshot written before this field
+ *                       existed, or a season with no earlier data to compare against.
  */
 public record HistoricalPlayerCard(long id, String name, List<String> positions, String team, Integer age,
-                                   int rank, int positionalRank, Prior prior, Integer rookiePick) {
+                                   int rank, int positionalRank, Prior prior, Integer rookiePick, Boolean rookie) {
+
+    /** As the board builder makes it: rookie status is decided afterwards, by {@link HistoricalRookies}. */
+    public HistoricalPlayerCard(long id, String name, List<String> positions, String team, Integer age,
+                                int rank, int positionalRank, Prior prior, Integer rookiePick) {
+        this(id, name, positions, team, age, rank, positionalRank, prior, rookiePick, null);
+    }
+
+    public HistoricalPlayerCard withRookie(Boolean value) {
+        return new HistoricalPlayerCard(id, name, positions, team, age, rank, positionalRank, prior, rookiePick, value);
+    }
 
     /** Basketball and veterans: no rookie pick. Absence of a pick is not a rule, so this is not a defaulted sport. */
     public HistoricalPlayerCard(long id, String name, List<String> positions, String team, Integer age,
                                 int rank, int positionalRank, Prior prior) {
-        this(id, name, positions, team, age, rank, positionalRank, prior, null);
+        this(id, name, positions, team, age, rank, positionalRank, prior, null, null);
     }
 
     /**

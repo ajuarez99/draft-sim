@@ -12,8 +12,8 @@ import {
 const IMAGE_URL = `${SITE_ORIGIN}/og-image.png`
 const IMAGE_WIDTH = 1200
 const IMAGE_HEIGHT = 630
-// Mirrors --bg in styles.css (oklch(12% 0.006 75)) as sRGB hex; a <meta> can't read a CSS variable.
-const THEME_COLOR = '#070604'
+// Mirrors --bg in styles.css (oklch(15% 0.03 280)) as sRGB hex; a <meta> can't read a CSS variable.
+const THEME_COLOR = '#090917'
 
 export function esc(s: string): string {
   return s

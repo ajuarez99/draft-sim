@@ -51,7 +51,10 @@ class EngineOutputFrozenTest {
                 MonteCarloRunnerTest.CONFIDENCE, null);
         // Spec 025 added PlayerRef.positions (wire-only). Strip that one field from the
         // text so the golden still proves the SIMULATION output is byte-identical.
-        String text = r.toString().replaceAll(", positions=\\[[^\\]]*\\]", "");
+        // PlayerRef.rookie (2026-11-13) is the same kind of field: read off the player for the
+        // wire, never by the engine. Stripped the same way, so the golden is unchanged.
+        String text = r.toString().replaceAll(", positions=\\[[^\\]]*\\]", "")
+                .replaceAll(", rookie=(true|false)", "");
         byte[] d = MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));
         return HexFormat.of().formatHex(d);
     }

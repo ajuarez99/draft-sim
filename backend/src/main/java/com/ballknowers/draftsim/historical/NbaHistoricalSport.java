@@ -89,9 +89,11 @@ public class NbaHistoricalSport implements HistoricalSport {
         int s = season.seasonStart();
         List<Map<Long, SeasonLine>> priors = new ArrayList<>(props.rankLookbackSeasons());
         for (int i = 1; i <= props.rankLookbackSeasons(); i++) priors.add(lines(s - i));   // S-1 first; an unimported season is just empty
-        return HistoricalBoardBuilder.build(s, seed, scoring, data.candidates(s), priors, lines(s),
+        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, data.candidates(s),
+                priors, lines(s),
                 new HistoricalBoardBuilder.RankConfig(props.rankStandardGames(), props.rankMinGames()),
                 HistoricalBoardBuilder.nba());
+        return HistoricalRookies.mark(board, data.playersWithLineBefore(s), Map.of(), s);
     }
 
     private Map<Long, SeasonLine> lines(int season) {

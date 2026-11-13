@@ -363,6 +363,13 @@ public class HistoricalDataRepository {
                 .list();
     }
 
+    /** Ids with a season line before this season: the veterans, for {@link HistoricalRookies}. */
+    public java.util.Set<Long> playersWithLineBefore(int seasonStart) {
+        return new java.util.HashSet<>(db.sql(
+                        "select distinct player_id from historical_player_season where season_start < ?")
+                .param(seasonStart).query(Long.class).list());
+    }
+
     /** Every player with at least one played game in the season (the board's candidates), by id. */
     public List<HistoricalBoardBuilder.Candidate> candidates(int seasonStart) {
         return db.sql("""
