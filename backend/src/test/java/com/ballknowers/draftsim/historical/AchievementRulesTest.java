@@ -87,7 +87,7 @@ class AchievementRulesTest {
     /** A new-format result with no playoffs and a plain 8-6 record unless overridden. */
     private static HistoricalResult result(List<Standing> standings, int finish, Bust bust, Hindsight h,
                                            Format fmt, Playoffs po, String outcome) {
-        return new HistoricalResult(List.of(), standings, finish, null, h, bust, null, fmt, po, null, outcome);
+        return new HistoricalResult(List.of(), standings, finish, null, h, bust, null, fmt, po, null, outcome, null, null);
     }
 
     private static HistoricalResult plain() {
@@ -193,7 +193,7 @@ class AchievementRulesTest {
     @Test
     void aFirstPlaceInAnOldResultIsNotATitle() {
         HistoricalResult old = new HistoricalResult(List.of(), standings(14, 8, 0, 1), 1, null, hindsight(false),
-                bust(70, 150), null, null, null, null, null);
+                bust(70, 150), null, null, null, null, null, null, null);
         GameAward a = AchievementRules.evaluate(facts(old));
         assertFalse(a.title());
         assertFalse(badgesOf(a).contains(Badge.CHAMPION));

@@ -15,7 +15,8 @@ import java.util.Map;
  * <p>Provenance of the numbers, kept as plainly here as in the yml. Nothing below was fitted to any data.
  * <ul>
  *   <li>{@code teams}, {@code rounds}, {@code roster}, {@code reversalRound} -- hand-set (spec 056 FR-002): a
- *       12-team, 15-round league with QB, 2 RB, 2 WR, TE, FLEX and 8 bench; reversal 0 is a plain snake.
+ *       12-team, 15-round league with QB, 2 RB, 2 WR, TE, 2 FLEX and 7 bench (the second FLEX took a bench
+ *       spot on 2026-11-13, Allan's call); reversal 0 is a plain snake.
  *   <li>{@code scoring} -- hand-set (FR-003 as amended after review): full PPR with INT -1 and fumble lost -2 (the
  *       real league's Sleeper values, review F13).
  *   <li>{@code rankStandardGames}, {@code rankMinGames}, {@code rankLookbackSeasons},

@@ -41,9 +41,9 @@ class NflHistoricalPropertiesTest {
         assertEquals(12, p.teams());
         assertEquals(15, p.rounds());
         assertEquals(0, p.reversalRound());
-        assertEquals(List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX"), p.roster().subList(0, 7));
-        assertEquals(15, p.roster().size(), "7 starters + 8 bench = one slot per round");
-        assertEquals(8, p.roster().stream().filter("BN"::equals).count());
+        assertEquals(List.of("QB", "RB", "RB", "WR", "WR", "TE", "FLEX", "FLEX"), p.roster().subList(0, 8));
+        assertEquals(15, p.roster().size(), "8 starters + 7 bench = one slot per round");
+        assertEquals(7, p.roster().stream().filter("BN"::equals).count());
         assertEquals(13, p.scoring().size());
         assertEquals(0.04, p.scoring().get("pass_yd"), 1e-12);
         assertEquals(-1.0, p.scoring().get("pass_int"), 1e-12);

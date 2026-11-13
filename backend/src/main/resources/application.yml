@@ -152,10 +152,10 @@ historical-nfl:
   stats-url-template: https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{season}.csv.gz   # nflverse, CC BY 4.0
   draft-picks-url: https://github.com/nflverse/nflverse-data/releases/download/draft_picks/draft_picks.csv
   teams: 12                  # hand-set (spec 056 FR-002)
-  rounds: 15                 # hand-set (spec 056 FR-002): 7 starters + 8 bench
+  rounds: 15                 # hand-set (spec 056 FR-002): 8 starters + 7 bench (second FLEX, spec 065)
   reversal-round: 0          # hand-set: plain snake
   regular-season-weeks: 14   # league-format choice (spec 063, Allan 2026-11-13), not a measurement
-  roster: [QB, RB, RB, WR, WR, TE, FLEX, BN, BN, BN, BN, BN, BN, BN, BN]   # hand-set (FR-002), no K/DEF
+  roster: [QB, RB, RB, WR, WR, TE, FLEX, FLEX, BN, BN, BN, BN, BN, BN, BN]   # hand-set (FR-002; second FLEX: Allan 2026-11-13), no K/DEF
   # Full PPR (FR-003 as amended after review, F13): INT -1 and fumble lost -2 are the real league's Sleeper values.
   scoring:                   # hand-set (spec 056 FR-003)
     pass_yd: 0.04

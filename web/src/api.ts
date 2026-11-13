@@ -4626,6 +4626,25 @@ export type HistoricalHindsight = {
   userBeatIt: boolean
   picks: HistoricalHindsightPick[]
 }
+/**
+ * The season replayed with the greedy hindsight roster in your seat. A team that lost a player to it gets the
+ * best free player at his position by the pre-draft board; every other team is unchanged. Mirrors
+ * HistoricalResult.HindsightSeason.
+ */
+export type HistoricalHindsightSeason = {
+  wins: number
+  losses: number
+  ties: number
+  /** Regular-season points, the same measure as a standings row. */
+  pointsFor: number
+  /** 1 = first after the regular season. */
+  regularSeasonRank: number
+  /** Final place after the playoffs. */
+  finish: number
+  outcome: HistoricalOutcome
+  /** How many of its players another team drafted later in the real draft, and loses (with a replacement) here. */
+  takenFromBots: number
+}
 export type HistoricalBust = {
   pickNo: number
   player: HistoricalPlayerCard
@@ -4639,6 +4658,25 @@ export type HistoricalSteal = {
   takenValue: number
   passedOn: HistoricalPlayerCard
   passedOnValue: number
+}
+
+/**
+ * Spec 065. One of your picks at his primary position. Mirrors HistoricalResult.PickFinish.
+ * Lower is better for both ranks.
+ */
+export type HistoricalPickFinish = {
+  pickNo: number
+  player: HistoricalPlayerCard
+  position: string
+  /** 1 = the first player at this position taken in this game's draft, by any team. */
+  draftedPositionRank: number
+  /** 1 = the most season points at this position among every board player, drafted or not. Level values share a rank. */
+  finishPositionRank: number
+  /** How many players at this position are on the board. */
+  positionPlayers: number
+  seasonValue: number
+  /** Weeks of the real season with a box score. There is no injury data. */
+  weeksPlayed: number
 }
 
 /** Spec 063. The user's outcome vocabulary, also used per team in finalPlaces. */
@@ -4702,6 +4740,10 @@ export type HistoricalResult = {
   playoffs?: HistoricalPlayoffs | null
   finalPlaces?: HistoricalFinalPlace[] | null
   userOutcome?: HistoricalOutcome | null
+  /** Spec 065. Absent from a result stored before it; a stored result is never recomputed. */
+  pickFinishes?: HistoricalPickFinish[] | null
+  /** Absent from a result stored before it existed; a stored result is never recomputed. */
+  hindsightSeason?: HistoricalHindsightSeason | null
 }
 
 export type HistoricalGameState = {

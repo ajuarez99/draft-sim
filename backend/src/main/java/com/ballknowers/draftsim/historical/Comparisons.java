@@ -4,6 +4,7 @@ import com.ballknowers.draftsim.engine.RealizedLineupService;
 import com.ballknowers.draftsim.historical.HistoricalResult.Bust;
 import com.ballknowers.draftsim.historical.HistoricalResult.Hindsight;
 import com.ballknowers.draftsim.historical.HistoricalResult.HindsightPick;
+import com.ballknowers.draftsim.historical.HistoricalResult.PickFinish;
 import com.ballknowers.draftsim.historical.HistoricalResult.Steal;
 import com.ballknowers.draftsim.historical.SeasonReplay.Pick;
 import com.ballknowers.draftsim.historical.SeasonReplay.PlayerWeeks;
@@ -39,7 +40,7 @@ public final class Comparisons {
         this.lineups = lineups;
     }
 
-    public record Computed(Hindsight hindsight, Bust bust, Steal steal) {}
+    public record Computed(Hindsight hindsight, Bust bust, Steal steal, List<PickFinish> pickFinishes) {}
 
     /** Runs all three from a replay's input and its already-scored team machinery. */
     Computed compute(SeasonReplay.Input in, TeamScorer team, double userPointsFor) {
@@ -57,7 +58,50 @@ public final class Comparisons {
         Steal steal = steal(userPicks, in.picks(), in.cards().keySet(), value, in.cards());
         Hindsight hindsight = hindsight(userPicks.stream().map(Pick::pickNo).sorted().toList(), in.picks(),
                 in.cards().keySet(), team, in.weekCount(), value, in.cards(), userPointsFor);
-        return new Computed(hindsight, bust, steal);
+        Map<Long, Integer> weeksPlayed = new HashMap<>();
+        for (long id : in.cards().keySet()) weeksPlayed.put(id, pw.weeksPlayed(id));
+        return new Computed(hindsight, bust, steal,
+                pickFinishes(userPicks, in.picks(), in.cards(), value, weeksPlayed));
+    }
+
+    /**
+     * Spec 065: for each of the user's picks, "drafted as the Nth at his position, finished as the Mth".
+     *
+     * <p>Drafted rank counts picks by EVERY team in this game's draft, in pick order, at the player's primary
+     * position (the first on his card). Finish rank is by season value among every board player with that primary
+     * position, drafted or not, so an undrafted breakout pushes a drafted player down, as it would in a real
+     * season. Level values share a rank: 1 + the number who scored strictly more. Lower is better for both; the
+     * test that pins the direction is the second RB taken who scored the most finishing 1, not last.
+     */
+    static List<PickFinish> pickFinishes(List<Pick> userPicks, List<Pick> allPicks,
+                                         Map<Long, HistoricalPlayerCard> cards, Map<Long, Double> value,
+                                         Map<Long, Integer> weeksPlayed) {
+        Map<String, List<Double>> valuesByPosition = new HashMap<>();
+        for (HistoricalPlayerCard c : cards.values()) {
+            valuesByPosition.computeIfAbsent(primary(c), k -> new ArrayList<>()).add(value.getOrDefault(c.id(), 0.0));
+        }
+        Map<Long, Integer> draftedRank = new HashMap<>();
+        Map<String, Integer> takenSoFar = new HashMap<>();
+        for (Pick p : allPicks.stream().sorted(Comparator.comparingInt(Pick::pickNo)).toList()) {
+            draftedRank.put(p.playerId(), takenSoFar.merge(primary(cards.get(p.playerId())), 1, Integer::sum));
+        }
+
+        List<PickFinish> out = new ArrayList<>();
+        for (Pick p : userPicks.stream().sorted(Comparator.comparingInt(Pick::pickNo)).toList()) {
+            HistoricalPlayerCard card = cards.get(p.playerId());
+            String pos = primary(card);
+            double mine = value.getOrDefault(p.playerId(), 0.0);
+            List<Double> pool = valuesByPosition.get(pos);
+            int ahead = 0;
+            for (double v : pool) if (v > mine + EPS) ahead++;
+            out.add(new PickFinish(p.pickNo(), card, pos, draftedRank.get(p.playerId()), ahead + 1, pool.size(), mine,
+                    weeksPlayed.getOrDefault(p.playerId(), 0)));
+        }
+        return out;
+    }
+
+    private static String primary(HistoricalPlayerCard c) {
+        return c.positions() == null || c.positions().isEmpty() ? "" : c.positions().get(0);
     }
 
     /** 1 = the highest season value; ties by player id ascending. Among {@code ids} only. */

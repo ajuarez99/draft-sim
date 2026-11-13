@@ -82,6 +82,31 @@ function playoffResult(over: Partial<HistoricalResult> = {}): HistoricalResult {
 
 const renderIt = (g: HistoricalGameState, r: HistoricalResult) => render(<HistoricalResults game={g} result={r} />)
 
+describe('HistoricalResults, drafted as and finished as (spec 065)', () => {
+  const fin = (pickNo: number, name: string, drafted: number, finished: number, weeks: number) => ({
+    pickNo, player: { ...card(pickNo, name), positions: ['RB'] }, position: 'RB',
+    draftedPositionRank: drafted, finishPositionRank: finished, positionPlayers: 140, seasonValue: 391.3, weeksPlayed: weeks,
+  })
+
+  it('says a back taken second who finished first got better, and one who fell got worse', () => {
+    renderIt(game(3), playoffResult({ pickFinishes: [fin(2, 'Star Back', 2, 1, 16), fin(23, 'Hurt Back', 9, 61, 3), fin(26, 'Even Back', 12, 12, 17)] }))
+    const table = screen.getByRole('region', { name: 'Your picks, drafted and finished' })
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map((r) => Array.from(r.querySelectorAll('td')).map((c) => c.textContent))
+    expect(rows[0]).toEqual(['2 · round 1', 'Star Back', 'RB2', 'RB1 of 140', '▲ 1 better', '391.3', '16 of 25'])
+    expect(rows[1].slice(2, 5)).toEqual(['RB9', 'RB61 of 140', '▼ 52 worse'])
+    expect(rows[1][0]).toBe('23 · round 2')
+    expect(rows[2][4]).toBe('Same spot')
+    expect(table.querySelector('.hist-change.up')?.textContent).toMatch(/better/)
+    expect(table.querySelector('.hist-change.down')?.textContent).toMatch(/worse/)
+  })
+
+  it('says so, and draws no table, for a result saved before pick finishes existed', () => {
+    renderIt(game(3), playoffResult())
+    expect(screen.queryByRole('region', { name: 'Your picks, drafted and finished' })).toBeNull()
+    expect(screen.getByText(/finished before pick-by-pick finishes were saved/)).toBeInTheDocument()
+  })
+})
+
 describe('HistoricalResults, playoff format', () => {
   it('leads with the outcome in words and the bust and steal callouts, above the tables', () => {
     const { container } = renderIt(game(3), playoffResult())
@@ -255,5 +280,55 @@ describe('HistoricalResults, a result stored before playoffs (the 062 fixture)',
     // every week is still in the picker, labelled the old way
     expect(screen.getByLabelText('Week').querySelectorAll('option')).toHaveLength(result.weeks.length)
     expect(screen.getByText('Biggest bust')).toBeInTheDocument()
+  })
+})
+
+describe('HistoricalResults, the hindsight roster and whether it would have won', () => {
+  const hindsight = {
+    label: 'greedy hindsight, bots unchanged', pointsFor: 900, userPointsFor: 700, userBeatIt: false,
+    picks: [
+      { pickNo: 3, player: card(21, 'Star One'), seasonValue: 1500.4 },
+      { pickNo: 22, player: card(11, 'Mine Two'), seasonValue: 800 },
+    ],
+  }
+  const withPicks = (g: HistoricalGameState): HistoricalGameState => ({
+    ...g,
+    picks: [
+      { pickNo: 3, round: 1, draftSlot: 3, seatType: 'USER', player: card(12, 'Bust Bobby') },
+      { pickNo: 4, round: 1, draftSlot: 4, seatType: 'BOT', player: card(40, 'Bot Guy') },
+      { pickNo: 22, round: 2, draftSlot: 3, seatType: 'USER', player: card(11, 'Mine Two') },
+    ],
+  })
+  const season = { wins: 17, losses: 2, ties: 0, pointsFor: 6000, regularSeasonRank: 1, finish: 1, outcome: 'CHAMPION' as const, takenFromBots: 0 }
+  const panel = () => screen.getByRole('region', { name: 'Your draft against hindsight' })
+
+  it('lists each hindsight pick beside the player you took at that pick, and marks a pick you got right', () => {
+    renderIt(withPicks(game(3)), playoffResult({ hindsight, hindsightSeason: season }))
+    const rows = Array.from(panel().querySelectorAll('tbody tr')).map((r) => Array.from(r.querySelectorAll('td')).map((c) => c.textContent))
+    expect(rows).toEqual([
+      ['3 · round 1', 'Star One · SF', '1,500.4', 'Bust Bobby'],
+      ['22 · round 2', 'Mine Two · SF', '800.0', 'Mine TwoSame pick'],
+    ])
+  })
+
+  it('says yes with the record when the hindsight roster won the title', () => {
+    renderIt(withPicks(game(3)), playoffResult({ hindsight, hindsightSeason: season }))
+    expect(within(panel()).getByText('Yes. It went 17-2, 1st after the regular season, and won the title.')).toBeInTheDocument()
+    expect(within(panel()).queryByText(/drafted later by another team/)).toBeNull()
+  })
+
+  it('says no when it lost, and says how many players it took from other teams', () => {
+    renderIt(withPicks(game(3)), playoffResult({
+      hindsight,
+      hindsightSeason: { ...season, wins: 14, losses: 4, ties: 1, regularSeasonRank: 2, finish: 3, outcome: 'LOST_SEMIFINAL', takenFromBots: 2 },
+    }))
+    expect(within(panel()).getByText('No. It went 14-4-1, 2nd after the regular season, and lost in the semifinal.')).toBeInTheDocument()
+    expect(within(panel()).getByText(/2 of its players were drafted later by another team\. That team loses them here/)).toBeInTheDocument()
+  })
+
+  it('still lists the roster for a result stored before the season was replayed, and says there is no answer', () => {
+    renderIt(withPicks(game(3)), playoffResult({ hindsight }))
+    expect(within(panel()).getByText('Star One')).toBeInTheDocument()
+    expect(within(panel()).getByText(/before the hindsight roster's season was replayed/)).toBeInTheDocument()
   })
 })
