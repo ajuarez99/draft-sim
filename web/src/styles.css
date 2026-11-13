@@ -3,7 +3,9 @@
  * House style. Read this before adding a component. These are the rules every
  * screen is checked against (specs/013-fan-first-redesign/contracts/ui-rules.md).
  * Palette and type were replaced 2026-11-10 ("Floodlight", claude/site-redesign.md
- * Phase 1): warm charcoal, one gold accent, Barlow. Fonts load from index.html,
+ * Phase 1): warm charcoal, one gold accent, Barlow. The palette (not the type)
+ * was replaced again 2026-11-13 ("Midnight indigo"): indigo dark, violet brand,
+ * yellow for "you". Fonts load from index.html,
  * not an import rule here, so the stylesheet does not block on a third-party host.
  * ============================================================================
  *
@@ -36,9 +38,9 @@
  *   URLs, hashes.
  *
  * COLOR: ONE MEANING EACH
- *   --brand / --you / --you-text / --you-fill are ONE gold on purpose (Allan's
- *   call, 2026-11-10) and stay four tokens so the roles can be split again
- *   without a second sweep.
+ *   Amended 2026-11-13 ("Midnight indigo", Allan's call): --brand is violet and
+ *   the three --you tokens are one yellow. From 2026-11-10 to then all four were
+ *   one gold; comments below that say "gold" mean the --you yellow.
  *   --brand          the primary action, the active chip / segment / tab, the
  *                    focus ring, links. Text on a solid brand fill is --bg.
  *   --you            YOU: rings, bars and other non-text marks, and tints
@@ -46,10 +48,10 @@
  *                    not the viewer's own. A hover or a selection is --raised,
  *                    never a gold tint, so only "yours" is ever gold-tinted.
  *   --you-text       YOU as text.
- *   --you-fill       YOU as a solid fill behind text; the text is --bg (12:1).
+ *   --you-fill       YOU as a solid fill behind text; the text is --bg (13.3:1; 7.2:1 on --brand).
  *                    Used for the controls that take your pick or show your seat.
  *   --data           bar, meter, progress and chart fills that are not yours,
- *                    and heat ramps. A neutral warm grey-white.
+ *                    and heat ramps. A neutral cool grey-white.
  *   --up / --down    better / worse. Never identity.
  *   --danger         errors, failed, stale, offline, destructive. Same value as
  *                    --down on purpose: "worse" and "broken" read as one signal.
@@ -175,40 +177,43 @@
  */
 
 :root {
-  --bg: oklch(12% 0.006 75);        /* the page */
-  --panel: oklch(17% 0.009 75);     /* the one raised surface */
-  --raised: oklch(21.5% 0.011 75);  /* hover, selected row, active tab, quiet tag background */
-  --line: oklch(28% 0.010 75);
-  --text: oklch(96% 0.008 85);
-  --muted: oklch(72% 0.012 80);
-  /* One gold for the brand and for "you". Four names so the roles can be split
-     again without a second sweep (claude/site-redesign.md). */
-  --brand: oklch(84% 0.15 85);      /* primary action, active chip/tab, focus ring, links (--bg text on it) */
-  --you: oklch(84% 0.15 85);        /* YOU: rings, bars, tints, non-text marks */
-  --you-text: oklch(84% 0.15 85);   /* YOU as text */
-  --you-fill: oklch(84% 0.15 85);   /* YOU behind text; the text is --bg */
-  --data: oklch(82% 0.03 85);       /* bar / meter / progress fills that are not yours */
-  --up: oklch(78% 0.16 150);        /* better / gained */
-  --down: oklch(68% 0.19 25);       /* worse / lost */
-  --danger: oklch(68% 0.19 25);     /* errors, stale, offline, destructive */
+  /* "Midnight indigo" (2026-11-13). Hand-set, not derived from anything. The
+     contrast figures in the header comment were computed from these oklch
+     values with a script, not measured in a browser. */
+  --bg: oklch(15% 0.03 280);        /* the page */
+  --panel: oklch(20% 0.036 280);    /* the one raised surface */
+  --raised: oklch(24.5% 0.042 280); /* hover, selected row, active tab, quiet tag background */
+  --line: oklch(31% 0.04 280);
+  --text: oklch(96% 0.01 285);
+  --muted: oklch(73% 0.035 280);
+  /* Violet is the app, yellow is you. Split 2026-11-13; they were one gold from
+     2026-11-10 until then. */
+  --brand: oklch(71% 0.155 282);    /* primary action, active chip/tab, focus ring, links (--bg text on it) */
+  --you: oklch(87% 0.14 90);        /* YOU: rings, bars, tints, non-text marks */
+  --you-text: oklch(87% 0.14 90);   /* YOU as text */
+  --you-fill: oklch(87% 0.14 90);   /* YOU behind text; the text is --bg */
+  --data: oklch(82% 0.03 280);      /* bar / meter / progress fills that are not yours */
+  --up: oklch(80% 0.15 160);        /* better / gained */
+  --down: oklch(70% 0.19 18);       /* worse / lost */
+  --danger: oklch(70% 0.19 18);     /* errors, stale, offline, destructive */
   /* Provenance of a seat's tendencies. FITTED = earned from real history, STATED =
      taken from what the manager said. Each has its own token because borrowing a
      position colour for an unrelated meaning breaks as soon as both are on screen
      (the original reason --fitted was split off --rb). Hue 165 is used by no
      position in either sport; STATED is a neutral. Both always carry a text label. */
   --fitted: oklch(84% 0.04 165);
-  --stated: oklch(72% 0.012 80);
+  --stated: oklch(73% 0.035 280);
   /* Football. Hand-set (claude/site-redesign.md), chosen to read as the familiar fantasy
-     convention; not fitted to anything. TE sits on violet to stay clear of
-     --down/--danger (hue 25) and the gold (85). K and DEF are low-chroma. */
+     convention; not fitted to anything. TE sits on purple (312) to stay clear of
+     --down/--danger (hue 18), the yellow (90) and the violet --brand (282). K and DEF are low-chroma. */
   --qb: oklch(72% 0.16 350); --rb: oklch(78% 0.13 185);
-  --wr: oklch(74% 0.13 240); --te: oklch(72% 0.14 300);
+  --wr: oklch(74% 0.13 240); --te: oklch(72% 0.14 312);
   --k: oklch(72% 0.02 260); --def: oklch(66% 0.06 55);
   /* Basketball's five, along the guard->center continuum. Hand-set, not derived;
-     PG/WR share a hue (240) and SF/TE share one (~295-300) because the two sports
-     never share a board. C at 120 stays off --up (150) and the gold (85). */
+     PG/WR share a hue (240) and SF/TE share one (~308-312, moved off --brand 2026-11-13) because the two sports
+     never share a board. C at 120 stays off --up (160) and the yellow (90). */
   --pg: oklch(74% 0.13 240); --sg: oklch(78% 0.11 200);
-  --sf: oklch(72% 0.14 295); --pf: oklch(72% 0.15 330);
+  --sf: oklch(72% 0.14 308); --pf: oklch(72% 0.15 335);
   --c: oklch(80% 0.14 120);
   /* "Which sport is this league" -- a card-level label, not a position. */
   --sport-nfl: oklch(76% 0.07 140); --sport-nba: oklch(76% 0.09 50);
@@ -1217,7 +1222,7 @@ td { padding: 6px 8px; border-top: 1px solid var(--line); }
   background: var(--raised); overflow: hidden;
 }
 .reach-zero { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
-.reach-band { position: absolute; top: 0; bottom: 0; background: oklch(34% 0.010 75); }
+.reach-band { position: absolute; top: 0; bottom: 0; background: oklch(36% 0.04 280); }
 .reach-se { font-weight: 400; font-size: 10px; }
 .reach-fill { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
 /* Two directions, two colors, because "reaches 5 early" and "waits 5 late"
@@ -2800,7 +2805,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .pr-move { display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 12px; font-weight: 600; }
 .pr-move.up { color: var(--up); }
 .pr-move.down { color: var(--down); }
-.pr-move.flat { color: oklch(52% 0.012 80); }
+.pr-move.flat { color: oklch(55% 0.03 280); }
 
 .pr-playoff-cell { display: flex; align-items: center; gap: 8px; }
 .pr-playoff-pct { font-size: 12px; color: var(--muted); flex: none; }
@@ -2960,7 +2965,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 }
 .pr-homer-name { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pr-homer-track { position: relative; height: 6px; background: var(--line); border-radius: 999px; }
-.pr-homer-mid { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: oklch(34% 0.010 75); }
+.pr-homer-mid { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: oklch(36% 0.04 280); }
 .pr-homer-fill { position: absolute; top: 0; bottom: 0; border-radius: 999px; }
 .pr-homer-fill.down { background: var(--down); }
 .pr-homer-fill.up { background: var(--up); }
@@ -4437,7 +4442,7 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .tx-trades > li.tx-tcard:hover {
   transform: translateY(-1px);
   border-color: color-mix(in oklab, var(--line) 60%, var(--text) 25%);
-  box-shadow: 0 6px 16px oklch(5% 0.01 75 / 0.45);
+  box-shadow: 0 6px 16px oklch(5% 0.02 280 / 0.45);
 }
 
 .tx-thead {

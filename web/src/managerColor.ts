@@ -32,7 +32,7 @@ import type { AnalysisRosterProjection } from './api'
  * the four lines were effectively the same colour. It took looking at the
  * rendered chart to notice. The command below includes `--you`:
  *
- *   node scripts/validate_palette.js "#f7c243,#3987e5,#199e70,#c98500"  *     --mode dark --surface "#070604" --pairs all
+ *   node scripts/validate_palette.js "#f8d05c,#3987e5,#199e70,#c98500"  *     --mode dark --surface "#090917" --pairs all
  *
  * <p><b>Status after the 2026-11-10 palette change (Floodlight): NOT re-run.</b>
  * `scripts/validate_palette.js` is not in this repo. What was recomputed, in
@@ -44,8 +44,8 @@ import type { AnalysisRosterProjection } from './api'
  * old surface. Every line still carries a direct name label at its right end,
  * which is the secondary encoding a low CVD figure requires.
  *
- * <p>`#f7c243` is `--you` (oklch(84% 0.15 85)) resolved to hex, and `#070604`
- * is `--bg` (oklch(12% 0.006 75)); the validator does not read CSS variables.
+ * <p>`#f8d05c` is `--you` (oklch(87% 0.14 90)) resolved to hex, and `#090917`
+ * is `--bg` (oklch(15% 0.03 280)); the validator does not read CSS variables.
  * If either moves in styles.css, re-run this.
  */
 export const FOCUS_SLOTS = ['#3987e5', '#199e70', '#c98500'] as const
