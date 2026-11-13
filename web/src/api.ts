@@ -4566,6 +4566,12 @@ export type HistoricalPlayerCard = {
    * and always null for basketball.
    */
   rookiePick: number | null
+  /**
+   * Whether the drafted season is this player's first (HistoricalRookies on the backend: no earlier season line,
+   * and for football the real draft year wins). Null or absent means NOT KNOWN, never "no": a game started before
+   * this field existed, an older backend, or a season with no earlier data to compare against.
+   */
+  rookie?: boolean | null
 }
 
 export type HistoricalSeasonView = {

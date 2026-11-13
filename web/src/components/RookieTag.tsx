@@ -2,7 +2,7 @@ import type { PlayerRef } from '../api'
 import { isRookie } from '../rookie'
 
 /** The "R" beside a first-season player's name in the draft rooms' player lists. Renders nothing for anyone else. */
-export default function RookieTag({ player }: { player: Pick<PlayerRef, 'rookie'> }) {
+export default function RookieTag({ player }: { player: { rookie?: PlayerRef['rookie'] | null } }) {
   if (!isRookie(player)) return null
   return (
     <span className="rookie-tag" title="Rookie: first season" aria-label="Rookie">

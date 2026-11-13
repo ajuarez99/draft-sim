@@ -128,8 +128,9 @@ public class NflHistoricalSport implements HistoricalSport {
         Options opts = new Options(Sport.NFL, COUNTING, this::label, RankMode.POINTS_OVER_REPLACEMENT,
                 nfl.draftPicks(s), new NflRank(replacementDepth(), props.rookiePositionalOffset(),
                 props.rookieMaxRound(), TOTAL_KEYS));
-        return HistoricalBoardBuilder.build(s, seed, scoring, nfl.candidates(s), priors, nfl.lines(s),
-                new RankConfig(props.rankStandardGames(), props.rankMinGames()), opts);
+        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, nfl.candidates(s),
+                priors, nfl.lines(s), new RankConfig(props.rankStandardGames(), props.rankMinGames()), opts);
+        return HistoricalRookies.mark(board, nfl.playersWithLineBefore(s), nfl.draftSeasons(), s);
     }
 
     @Override
