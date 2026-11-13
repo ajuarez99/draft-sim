@@ -32,6 +32,9 @@ public interface HistoricalSport {
 
     int rounds();
 
+    /** Weeks of round robin before the three playoff weeks (spec 063): a league-format choice, not a measurement. */
+    int regularSeasonWeeks();
+
     /** 0 is a plain snake (F8). */
     int reversalRound();
 

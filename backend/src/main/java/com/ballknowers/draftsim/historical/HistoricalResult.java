@@ -8,13 +8,36 @@ import java.util.Map;
  * {@code historical_game.result} at the last pick and never recomputed on read (FR-013).
  *
  * <p>Everything nullable is documented where it is declared; none of it may be built with {@code Map.of}.
+ *
+ * <p>Spec 063 appended {@code format}, {@code playoffs}, {@code finalPlaces} and {@code userOutcome}. A result
+ * stored before it has none of them (they read back null), and {@code format == null} is the one test for "old
+ * format". {@code standings} is the regular season only; {@code userFinish} is the user's final place after the
+ * playoffs (the standings rank in an old result or when there are no playoffs).
+ *
+ * @param format      null only in an old stored result; always set by the replay
+ * @param playoffs    null when the season had no playoff weeks (and in an old result)
+ * @param finalPlaces every team ordered by final place; null only in an old stored result
+ * @param userOutcome CHAMPION, LOST_FINAL, LOST_SEMIFINAL, LOST_ROUND_ONE, MISSED_PLAYOFFS or NO_PLAYOFFS; null
+ *                    only in an old stored result
  */
 public record HistoricalResult(List<Week> weeks, List<Standing> standings, int userFinish,
                                Map<String, List<LineupWeek>> lineups, Hindsight hindsight, Bust biggestBust,
-                               Steal bestStealPassedOn) {
+                               Steal bestStealPassedOn, Format format, Playoffs playoffs,
+                               List<FinalPlace> finalPlaces, String userOutcome) {
 
-    /** @param startDate the Monday of the week's first game date, ISO; null only if no board player played */
-    public record Week(int week, String startDate, List<Matchup> matchups) {}
+    public static final String CHAMPION = "CHAMPION";
+    public static final String LOST_FINAL = "LOST_FINAL";
+    public static final String LOST_SEMIFINAL = "LOST_SEMIFINAL";
+    public static final String LOST_ROUND_ONE = "LOST_ROUND_ONE";
+    public static final String MISSED_PLAYOFFS = "MISSED_PLAYOFFS";
+    public static final String NO_PLAYOFFS = "NO_PLAYOFFS";
+
+    /**
+     * @param startDate the Monday of the week's first game date, ISO; null only if no board player played
+     * @param phase     "REGULAR" or "PLAYOFF"; null only in an old stored result. A playoff week holds only that
+     *                  week's playoff matchups, home = the better seed.
+     */
+    public record Week(int week, String startDate, List<Matchup> matchups, String phase) {}
 
     public record Matchup(int homeSlot, int awaySlot, double homePoints, double awayPoints) {}
 
@@ -42,4 +65,28 @@ public record HistoricalResult(List<Week> weeks, List<Standing> standings, int u
     /** The best player available at one of the user's picks whom the user never drafted (F19). */
     public record Steal(int pickNo, HistoricalPlayerCard taken, double takenValue,
                         HistoricalPlayerCard passedOn, double passedOnValue) {}
+
+    // ---- spec 063: the season's shape and the bracket ---------------------------------------------------
+
+    /** Built from {@link SeasonFormat#toResult()}. {@code playoffWeeks} is empty when there is no bracket. */
+    public record Format(int version, int seasonWeeks, int configuredRegularSeasonWeeks, int regularSeasonWeeks,
+                         List<Integer> playoffWeeks, int unusedWeeks, boolean shortened) {}
+
+    /** The six-team bracket. Seeds are the regular-season standings places 1 to 6. */
+    public record Playoffs(List<Seed> seeds, List<Round> rounds, int championSlot) {}
+
+    public record Seed(int seed, int slot) {}
+
+    /** @param name ROUND_ONE, SEMIFINAL or FINAL; {@code byeSlots} is empty after round one */
+    public record Round(int round, int week, String name, List<Integer> byeSlots, List<PlayoffMatchup> matchups) {}
+
+    /**
+     * One playoff game. {@code high} is the better (lower-numbered) seed. {@code winnerSlot} is the higher score;
+     * level to the hundredth, the high seed advances and {@code decidedBySeed} is true.
+     */
+    public record PlayoffMatchup(int highSeed, int lowSeed, int highSlot, int lowSlot, double highPoints,
+                                 double lowPoints, int winnerSlot, boolean decidedBySeed) {}
+
+    /** @param outcome uses the {@code userOutcome} vocabulary, for every team */
+    public record FinalPlace(int slot, int place, String outcome) {}
 }

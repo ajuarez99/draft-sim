@@ -70,8 +70,11 @@ class TimeMachineBotStrengthHarnessIT {
         }
 
         List<String> out = new ArrayList<>();
-        out.add(String.format("%-26s %5s %6s %6s %7s %8s %8s %9s %9s %9s", "bots", "games", "win%", "top3%",
-                "avgFin", "reach1-3", "rank1by3", "noStarter", "thinTeams", "maxAtPos"));
+        // win%, top3% and avgFin read the user's REGULAR-SEASON standings place, as they did before spec 063 (when
+        // userFinish was that rank), so the 062 numbers stay comparable. champ% is new: the user won the bracket
+        // (userOutcome CHAMPION); it is 0 when a season is too short for playoffs.
+        out.add(String.format("%-26s %5s %6s %6s %7s %8s %8s %9s %9s %9s %7s", "bots", "games", "win%", "top3%",
+                "avgFin", "reach1-3", "rank1by3", "noStarter", "thinTeams", "maxAtPos", "champ%"));
         try {
             for (Variant v : variants) {
                 HistoricalSport sport = "NBA".equals(sportCode)
@@ -91,7 +94,7 @@ class TimeMachineBotStrengthHarnessIT {
     }
 
     private String run(String name, HistoricalGameService svc, HistoricalSport sport) {
-        int n = 0, wins = 0, top3 = 0, finishSum = 0;
+        int n = 0, wins = 0, top3 = 0, finishSum = 0, champions = 0;
         double reachSum = 0;
         int reachN = 0, rank1Gone = 0, rank1N = 0;
         int botTeams = 0, noStarter = 0, thin = 0, maxAtPos = 0;
@@ -105,7 +108,10 @@ class TimeMachineBotStrengthHarnessIT {
                 HistoricalGameState g = svc.create(USER, sport.code(), slot, season.seasonStart());
                 g = svc.auto(g.id(), HistoricalGameService.Scope.FINISH, USER).orElseThrow();
                 JsonNode r = g.result();
-                int finish = r.get("userFinish").asInt();
+                // The standings place (regular season), NOT userFinish: since spec 063 that is the final place
+                // after the playoffs, which would silently change what "win%" measured in spec 062.
+                int finish = standingsPlace(r, g.userSlot());
+                if (r.hasNonNull("userOutcome") && "CHAMPION".equals(r.get("userOutcome").asText())) champions++;
                 n++;
                 finishSum += finish;
                 if (finish == 1) wins++;
@@ -146,10 +152,17 @@ class TimeMachineBotStrengthHarnessIT {
                 }
             }
         }
-        return String.format("%-26s %5d %5.1f%% %5.1f%% %7.2f %8.1f %7.0f%% %8.1f%% %8.1f%% %9d", name, n,
+        return String.format("%-26s %5d %5.1f%% %5.1f%% %7.2f %8.1f %7.0f%% %8.1f%% %8.1f%% %9d %6.1f%%", name, n,
                 100.0 * wins / n, 100.0 * top3 / n, (double) finishSum / n, reachSum / reachN,
                 100.0 * rank1Gone / Math.max(1, rank1N), 100.0 * noStarter / botTeams, 100.0 * thin / botTeams,
-                maxAtPos);
+                maxAtPos, 100.0 * champions / n);
+    }
+
+    private static int standingsPlace(JsonNode result, int userSlot) {
+        for (JsonNode s : result.get("standings")) {
+            if (s.get("slot").asInt() == userSlot) return s.get("place").asInt();
+        }
+        throw new IllegalStateException("the user's slot " + userSlot + " is not in the standings");
     }
 
     private static boolean isPosition(String slot, HistoricalSport sport) {

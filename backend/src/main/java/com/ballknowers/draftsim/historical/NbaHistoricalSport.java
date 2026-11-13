@@ -63,6 +63,7 @@ public class NbaHistoricalSport implements HistoricalSport {
 
     @Override public int rounds() { return props.rounds(); }
 
+    @Override public int regularSeasonWeeks() { return props.regularSeasonWeeks(); }
     @Override public int reversalRound() { return props.reversalRound(); }
 
     @Override public List<String> rosterPositions() { return LeagueShape.NBA_ROSTER; }

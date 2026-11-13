@@ -1,15 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { act } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult } from '../api'
 import HistoricalRoom from './HistoricalRoom'
 
 const getHistoricalGame = vi.fn()
 const historicalPick = vi.fn()
+const historicalAuto = vi.fn()
 vi.mock('../api', async (orig) => ({
   ...(await orig<typeof import('../api')>()),
   getHistoricalGame: (...a: unknown[]) => getHistoricalGame(...a),
   historicalPick: (...a: unknown[]) => historicalPick(...a),
+  historicalAuto: (...a: unknown[]) => historicalAuto(...a),
 }))
 
 beforeAll(() => {
@@ -22,7 +25,10 @@ beforeAll(() => {
 beforeEach(() => {
   getHistoricalGame.mockReset()
   historicalPick.mockReset()
+  historicalAuto.mockReset()
+  localStorage.clear()
 })
+afterEach(() => vi.useRealTimers())
 
 export function card(id: number, name: string, over: Partial<HistoricalPlayerCard> = {}): HistoricalPlayerCard {
   return {
@@ -165,6 +171,7 @@ describe('HistoricalRoom review fixes', () => {
     })
     const { container } = renderRoom()
     await screen.findByText("You're drafting 1995-96")
+    fireEvent.click(screen.getByRole('button', { name: 'Board' }))
     expect(container.querySelectorAll('.cell').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/Ballard/).length).toBeGreaterThan(0)
     const srcs = Array.from(document.querySelectorAll('img')).map((i) => i.getAttribute('src') ?? '')
@@ -420,5 +427,436 @@ describe('HistoricalRoom, football', () => {
     })
     renderRoom()
     expect(await screen.findByText('did not play')).toBeInTheDocument()
+  })
+})
+
+// ---- Spec 063: pick pacing ------------------------------------------------------------------------------
+
+/** Two teams, you are slot 2: the computer made pick 1 before you opened the game, and you have not picked. */
+function botFirst(): HistoricalGameState {
+  const g = drafting()
+  const bot = card(21, 'Bot Pick')
+  return {
+    ...g,
+    userSlot: 2,
+    myPicks: [2, 3],
+    currentPickNo: 2,
+    onTheClockSlot: 2,
+    isUsersTurn: true,
+    picks: [{ pickNo: 1, round: 1, draftSlot: 1, seatType: 'BOT', player: bot }],
+    available: [card(1, 'Top Guy')],
+  }
+}
+
+async function renderPaced(speed: string) {
+  localStorage.setItem('bk.tm.revealSpeed', speed)
+  vi.useFakeTimers()
+  getHistoricalGame.mockResolvedValue(botFirst())
+  const utils = renderRoom()
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0)
+  })
+  return utils
+}
+
+const cellsWith = (container: HTMLElement, text: string) =>
+  // a filled board cell carries the player's name in its title
+  Array.from(container.querySelectorAll('.cell')).filter((c) => (c.getAttribute('title') ?? c.textContent ?? '').includes(text)).length
+
+describe('HistoricalRoom pick pacing', () => {
+  it('fills the board one pick per tick and offers no Draft button until the reveal catches up', async () => {
+    const { container } = await renderPaced('FAST')
+    const rail = () => screen.getByRole('region', { name: 'Pick order' })
+    expect(rail()).not.toHaveTextContent('Bot Pick')
+    // the player is still in the list: his pick has not been revealed
+    expect(screen.getByRole('region', { name: 'Available players' })).toHaveTextContent('Bot Pick')
+    expect(screen.queryByRole('button', { name: 'Draft' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Auto-pick/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Board' }))
+    expect(cellsWith(container, 'Bot Pick')).toBe(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Players' }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400)
+    })
+    expect(rail()).toHaveTextContent('Bot Pick')
+    fireEvent.click(screen.getByRole('button', { name: 'Board' }))
+    expect(cellsWith(container, 'Bot Pick')).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Players' }))
+    expect(screen.getByRole('region', { name: 'Available players' })).not.toHaveTextContent('Bot Pick')
+    expect(screen.getAllByRole('button', { name: 'Draft' }).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeDisabled()
+    // FAST announces only the end summary
+    expect(screen.getByRole('status')).toHaveTextContent('1 pick made. You are on the clock.')
+  })
+
+  it('NORMAL announces each pick by name', async () => {
+    await renderPaced('NORMAL')
+    expect(screen.getByRole('status')).toHaveTextContent('')
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    expect(screen.getByRole('status')).toHaveTextContent('Pick 1: Team 1 took Bot Pick. You are on the clock.')
+  })
+
+  it('Skip lands on your turn at once', async () => {
+    await renderPaced('SLOW')
+    expect(screen.queryByRole('button', { name: 'Draft' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(screen.getAllByRole('button', { name: 'Draft' }).length).toBeGreaterThan(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('reads the saved speed, saves a new one, and Instant shows the true state with no wait', async () => {
+    await renderPaced('FAST')
+    expect(screen.getByRole('button', { name: 'Fast' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Slow' }))
+    expect(localStorage.getItem('bk.tm.revealSpeed')).toBe('SLOW')
+    fireEvent.click(screen.getByRole('button', { name: 'Instant' }))
+    expect(localStorage.getItem('bk.tm.revealSpeed')).toBe('INSTANT')
+    expect(screen.getAllByRole('button', { name: 'Draft' }).length).toBeGreaterThan(0)
+  })
+})
+
+// ---- Spec 063: the room (banner, rail, queue, roster, layout) -------------------------------------------
+
+/** Four teams, you are slot 4 (the pick-4 seat in round 1); nothing picked yet, so the reveal replays picks 1-3. */
+function fourTeams(): HistoricalGameState {
+  const g = drafting()
+  const bots = [card(21, 'Bot One'), card(22, 'Bot Two'), card(23, 'Bot Three')]
+  return {
+    ...g,
+    teams: 4,
+    rounds: 3,
+    userSlot: 4,
+    myPicks: [4, 5, 12],
+    currentPickNo: 4,
+    onTheClockSlot: 4,
+    isUsersTurn: true,
+    rosterPositions: ['PG', 'SG', 'BN'],
+    picks: bots.map((b, i) => ({ pickNo: i + 1, round: 1, draftSlot: i + 1, seatType: 'BOT' as const, player: b })),
+    available: [card(1, 'Top Guy'), card(2, 'Second Guy'), card(3, 'Third Guy', { positions: ['PG'] })],
+  }
+}
+
+async function renderFour(speed = 'SLOW') {
+  localStorage.setItem('bk.tm.revealSpeed', speed)
+  vi.useFakeTimers()
+  getHistoricalGame.mockResolvedValue(fourTeams())
+  const utils = renderRoom()
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0)
+  })
+  return utils
+}
+const tick = (ms: number) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms)
+  })
+
+describe('HistoricalRoom: banner, rail, roster', () => {
+  it('says who is on the clock and how many picks until you, from the reveal view', async () => {
+    await renderFour()
+    const banner = screen.getByRole('region', { name: 'Draft clock' })
+    expect(banner).toHaveTextContent('Team 1 is on the clock')
+    expect(banner).toHaveTextContent('Your next pick in 3 picks')
+    await tick(2000)
+    expect(banner).toHaveTextContent('Team 2 is on the clock')
+    expect(banner).toHaveTextContent('Your next pick in 2 picks')
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    expect(banner).toHaveTextContent('Your turn')
+  })
+
+  it('marks the current pick in the rail and your own picks, and shows no computer-team needs', async () => {
+    const { container } = await renderFour()
+    const rail = screen.getByRole('region', { name: 'Pick order' })
+    const current = rail.querySelector('[aria-current="true"]')!
+    expect(current).toHaveTextContent('Team 1')
+    expect(current).toHaveTextContent('on the clock')
+    expect(rail.querySelectorAll('.hist-rail-pick.me').length).toBeGreaterThan(0)
+    expect(within(rail).getAllByText('You').length).toBeGreaterThan(0)
+    expect(container.textContent).not.toMatch(/needs?:/i)
+  })
+
+  it('shows your roster so far with empty slots, and fills a slot when your pick is shown', async () => {
+    getHistoricalGame.mockResolvedValue(fourTeams())
+    historicalPick.mockResolvedValue({
+      ...fourTeams(),
+      currentPickNo: 5,
+      isUsersTurn: false,
+      onTheClockSlot: 4,
+      picks: [...fourTeams().picks, { pickNo: 4, round: 1, draftSlot: 4, seatType: 'USER', player: card(3, 'Third Guy', { positions: ['PG'] }) }],
+      available: [card(1, 'Top Guy'), card(2, 'Second Guy')],
+    })
+    localStorage.setItem('bk.tm.revealSpeed', 'INSTANT')
+    renderRoom()
+    const roster = await screen.findByRole('region', { name: 'Your roster' })
+    expect(within(roster).getByText('Your roster so far')).toBeInTheDocument()
+    expect(within(roster).getAllByText('empty').length).toBe(2)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Draft' })[2])
+    await waitFor(() => expect(within(screen.getByRole('region', { name: 'Your roster' })).getByText('Third Guy')).toBeInTheDocument())
+  })
+
+  it('keeps the season disclosure closed under the room, with the counts in its summary', async () => {
+    getHistoricalGame.mockResolvedValue(drafting())
+    const { container } = renderRoom()
+    await screen.findByText("You're drafting 1995-96")
+    const details = container.querySelector('details.hist-counts') as HTMLDetailsElement
+    expect(details).not.toBeNull()
+    expect(details.open).toBe(false)
+    expect(details.querySelector('summary')).toHaveTextContent('What counts in 1995-96 · 2 stats not counted')
+    expect(details.querySelector('summary')!.textContent).not.toMatch(/data note/)
+    expect(details).toHaveTextContent('steals were not fully recorded')
+  })
+
+  it('offers the five views on a narrow screen, one pane at a time', async () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({
+      matches: q.includes('1279'),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia
+    try {
+      getHistoricalGame.mockResolvedValue(fourTeams())
+      localStorage.setItem('bk.tm.revealSpeed', 'INSTANT')
+      renderRoom()
+      await screen.findByText("You're drafting 1995-96")
+      const tabs = screen.getByRole('group', { name: 'Room view' })
+      expect(within(tabs).getAllByRole('button').map((b) => b.textContent)).toEqual(['Players', 'Queue (0)', 'Board', 'Picks', 'Roster'])
+      expect(screen.queryByRole('region', { name: 'Pick order' })).not.toBeInTheDocument()
+      fireEvent.click(within(tabs).getByRole('button', { name: 'Picks' }))
+      expect(screen.getByRole('region', { name: 'Pick order' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'Available players' })).not.toBeInTheDocument()
+      fireEvent.click(within(tabs).getByRole('button', { name: 'Roster' }))
+      expect(screen.getByRole('region', { name: 'Your roster' })).toBeInTheDocument()
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
+  it('collapses the rail and the roster when the board is chosen on a wide screen', async () => {
+    getHistoricalGame.mockResolvedValue(fourTeams())
+    localStorage.setItem('bk.tm.revealSpeed', 'INSTANT')
+    renderRoom()
+    await screen.findByText("You're drafting 1995-96")
+    expect(screen.getByRole('region', { name: 'Pick order' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Board' }))
+    expect(screen.queryByRole('region', { name: 'Pick order' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Your roster' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Draft clock' })).toBeInTheDocument()
+  })
+
+  it('every control is a real, focusable button: speeds, Skip, view tabs, Draft, star', async () => {
+    await renderFour('SLOW')
+    const controls = [
+      ...within(screen.getByRole('group', { name: 'Pick speed' })).getAllByRole('button'),
+      screen.getByRole('button', { name: 'Skip' }),
+      ...within(screen.getByRole('group', { name: 'Room view' })).getAllByRole('button'),
+      screen.getByRole('button', { name: 'Queue Top Guy' }),
+    ]
+    for (const c of controls) {
+      expect(c.tagName).toBe('BUTTON')
+      expect(c.tabIndex).not.toBe(-1)
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    const draft = screen.getAllByRole('button', { name: 'Draft' })[0]
+    expect(draft.tagName).toBe('BUTTON')
+    expect(draft.tabIndex).not.toBe(-1)
+  })
+
+  it('keeps Auto-finish available while picks are landing, and says it ignores the queue', async () => {
+    await renderFour()
+    const finish = screen.getByRole('button', { name: 'Auto-finish the draft' })
+    expect(finish).toBeEnabled()
+    expect(finish).toHaveAttribute('title', 'Makes every remaining pick, yours included. Ignores your queue.')
+  })
+})
+
+describe('HistoricalRoom: queue', () => {
+  const star = (name: string) => screen.getByRole('button', { name: `Queue ${name}` })
+
+  it('lets you queue during a reveal, drops a player the moment his pick is shown, and cannot draft until your turn', async () => {
+    await renderFour('SLOW')
+    fireEvent.click(star('Bot One'))
+    fireEvent.click(star('Top Guy'))
+    expect(screen.getByRole('button', { name: 'Queue (2)' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Draft/ })).not.toBeInTheDocument()
+    // Bot One is still in the list and the queue: pick 1 has not been revealed
+    await tick(1999)
+    expect(screen.getByRole('button', { name: 'Queue (2)' })).toBeInTheDocument()
+    await tick(1)
+    expect(screen.getByRole('button', { name: 'Queue (1)' })).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('bk.tm.queue.5')!)).toEqual([1])
+  })
+
+  it('shows the queue in order, reorders by buttons, and removes', async () => {
+    await renderFour('INSTANT')
+    fireEvent.click(star('Top Guy'))
+    fireEvent.click(star('Second Guy'))
+    fireEvent.click(screen.getByRole('button', { name: 'Queue (2)' }))
+    const rows = () =>
+      within(screen.getByRole('region', { name: 'Your queue' }))
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('strong')!.textContent)
+    expect(rows()).toEqual(['Top Guy', 'Second Guy'])
+    fireEvent.click(screen.getByRole('button', { name: 'Move Second Guy up' }))
+    expect(rows()).toEqual(['Second Guy', 'Top Guy'])
+    expect(screen.getByRole('button', { name: 'Move Second Guy up' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Second Guy from your queue' }))
+    expect(rows()).toEqual(['Top Guy'])
+  })
+
+  it('explains an empty queue', async () => {
+    await renderFour('INSTANT')
+    fireEvent.click(screen.getByRole('button', { name: 'Queue (0)' }))
+    expect(screen.getByText(/Nothing queued yet/)).toBeInTheDocument()
+  })
+
+  it('Auto-pick names the top queued player and picks him; with an empty queue it uses the server auto-pick', async () => {
+    await renderFour('INSTANT')
+    historicalPick.mockResolvedValue(fourTeams())
+    historicalAuto.mockResolvedValue(fourTeams())
+    // empty queue: plain label, server auto-pick
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-pick' }))
+    await tick(0)
+    expect(historicalAuto).toHaveBeenCalledWith(5, 'PICK')
+    expect(historicalPick).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Auto-pick' })).toBeEnabled()
+    // queue two; the top one is named and chosen
+    fireEvent.click(star('Second Guy'))
+    fireEvent.click(star('Top Guy'))
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-pick: Second Guy' }))
+    await tick(0)
+    expect(historicalPick).toHaveBeenCalledWith(5, 2)
+  })
+
+  it('deletes the stored queue once the game is complete', async () => {
+    localStorage.setItem('bk.tm.queue.5', JSON.stringify([1]))
+    getHistoricalGame.mockResolvedValue(complete(false))
+    renderRoom()
+    await screen.findByText('You drafted 1995-96')
+    expect(localStorage.getItem('bk.tm.queue.5')).toBeNull()
+  })
+})
+
+// ---- Spec 063 review fixes: CR-01, CR-08, CR-09 ---------------------------------------------------------
+
+describe('HistoricalRoom: Auto-finish during the final reveal (CR-01)', () => {
+  /** Two teams, you are slot 2 (picks 2 and 3); the computer makes pick 4, which ends the draft. */
+  function lastPickIsTheComputers(): { start: HistoricalGameState; end: HistoricalGameState } {
+    const done = complete(false)
+    const bot1 = card(21, 'Bot Pick')
+    const mine2 = card(1, 'Top Guy')
+    const mine3 = card(22, 'Mine Three')
+    const bot4 = card(23, 'Bot Last')
+    const start: HistoricalGameState = {
+      ...drafting(),
+      userSlot: 2,
+      myPicks: [2, 3],
+      currentPickNo: 2,
+      onTheClockSlot: 2,
+      isUsersTurn: true,
+      picks: [{ pickNo: 1, round: 1, draftSlot: 1, seatType: 'BOT', player: bot1 }],
+      available: [mine2, mine3, bot4],
+    }
+    const end: HistoricalGameState = {
+      ...done,
+      userSlot: 2,
+      myPicks: [2, 3],
+      currentPickNo: 5,
+      picks: [
+        { pickNo: 1, round: 1, draftSlot: 1, seatType: 'BOT', player: bot1 },
+        { pickNo: 2, round: 1, draftSlot: 2, seatType: 'USER', player: mine2 },
+        { pickNo: 3, round: 2, draftSlot: 2, seatType: 'USER', player: mine3 },
+        { pickNo: 4, round: 2, draftSlot: 1, seatType: 'BOT', player: bot4 },
+      ],
+    }
+    return { start, end }
+  }
+
+  it('makes no request, shows no error and lands on the results when the server has already finished', async () => {
+    const { start, end } = lastPickIsTheComputers()
+    localStorage.setItem('bk.tm.revealSpeed', 'SLOW')
+    vi.useFakeTimers()
+    getHistoricalGame.mockResolvedValue(start)
+    historicalPick.mockResolvedValue(end)
+    historicalAuto.mockRejectedValue(new Error('historical game 5 is COMPLETE, not DRAFTING'))
+    const { container } = renderRoom()
+    await tick(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Draft' })[0])
+    await tick(0)
+    // pick 4 is still being revealed: the view is DRAFTING, the server is COMPLETE
+    expect(screen.getByRole('button', { name: 'Skip' })).toBeEnabled()
+    expect(screen.queryByText('You drafted 1995-96')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-finish the draft' }))
+    await tick(0)
+    expect(historicalAuto).not.toHaveBeenCalled()
+    expect(container.querySelector('.error')).toBeNull()
+    expect(screen.getByText('You drafted 1995-96')).toBeInTheDocument()
+  })
+
+  it('still asks the server to finish while the server is DRAFTING', async () => {
+    const { start, end } = lastPickIsTheComputers()
+    localStorage.setItem('bk.tm.revealSpeed', 'SLOW')
+    vi.useFakeTimers()
+    getHistoricalGame.mockResolvedValue(start)
+    historicalAuto.mockResolvedValue(end)
+    renderRoom()
+    await tick(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Auto-finish the draft' }))
+    await tick(0)
+    expect(historicalAuto).toHaveBeenCalledWith(5, 'FINISH')
+    expect(screen.getByText('You drafted 1995-96')).toBeInTheDocument()
+  })
+
+  it('speaks the end of the draft: the live region is the same node before and after the results appear', async () => {
+    const { start, end } = lastPickIsTheComputers()
+    localStorage.setItem('bk.tm.revealSpeed', 'NORMAL')
+    vi.useFakeTimers()
+    getHistoricalGame.mockResolvedValue(start)
+    historicalPick.mockResolvedValue(end)
+    renderRoom()
+    await tick(0)
+    fireEvent.click(screen.getByRole('button', { name: 'Skip' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Draft' })[0])
+    await tick(0)
+    const region = screen.getByRole('status')
+    await tick(1000)
+    expect(screen.getByText('You drafted 1995-96')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBe(region)
+    expect(region).toHaveTextContent('The draft is complete.')
+  })
+})
+
+describe('HistoricalRoom: the players list keeps its state (CR-09)', () => {
+  it('keeps the search text and position filter across Players, Queue, Players, and hides the pane meanwhile', async () => {
+    getHistoricalGame.mockResolvedValue(fourTeams())
+    localStorage.setItem('bk.tm.revealSpeed', 'INSTANT')
+    renderRoom()
+    await screen.findByText("You're drafting 1995-96")
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search players' }), { target: { value: 'second' } })
+    fireEvent.click(within(screen.getByRole('group', { name: 'Position filter' })).getByRole('button', { name: 'SF' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Queue (0)' }))
+    expect(screen.queryByRole('region', { name: 'Available players' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('searchbox', { name: 'Search players' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Players' }))
+    expect(screen.getByRole('searchbox', { name: 'Search players' })).toHaveValue('second')
+    expect(within(screen.getByRole('group', { name: 'Position filter' })).getByRole('button', { name: 'SF' })).toHaveAttribute('aria-pressed', 'true')
+    const list = screen.getByRole('region', { name: 'Available players' })
+    expect(within(list).getByText('Second Guy')).toBeInTheDocument()
+    expect(within(list).queryByText('Top Guy')).not.toBeInTheDocument()
+  })
+
+  it('the star has one fixed name and carries its state in aria-pressed (CR-08)', async () => {
+    getHistoricalGame.mockResolvedValue(fourTeams())
+    localStorage.setItem('bk.tm.revealSpeed', 'INSTANT')
+    renderRoom()
+    await screen.findByText("You're drafting 1995-96")
+    const star = screen.getByRole('button', { name: 'Queue Top Guy' })
+    expect(star).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(star)
+    expect(screen.getByRole('button', { name: 'Queue Top Guy' })).toHaveAttribute('aria-pressed', 'true')
   })
 })

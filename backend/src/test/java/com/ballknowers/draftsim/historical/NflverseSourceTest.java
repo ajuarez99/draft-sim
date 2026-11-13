@@ -61,7 +61,7 @@ class NflverseSourceTest {
         for (int y = 2000; y <= 2025; y++) games.put(y, 256);
         return new NflHistoricalProperties("https://example.test/w_{season}.csv.gz", "https://example.test/d.csv", 12, 15,
                 List.of("QB", "RB", "WR", "TE", "FLEX", "BN"), 0, Map.of("pass_yd", 0.04), 17, 6, 3, 12, 2, games,
-                2000, 2025);
+                2000, 2025, 14);
     }
 
     private ParsedSeason parse() {

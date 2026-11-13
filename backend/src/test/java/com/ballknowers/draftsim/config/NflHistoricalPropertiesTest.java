@@ -71,7 +71,7 @@ class NflHistoricalPropertiesTest {
         Map<String, Double> scoring = new LinkedHashMap<>();
         scoring.put("rec", 1.0);
         return new NflHistoricalProperties(url, "https://example.test/draft_picks.csv", teams, 15,
-                List.of("QB", "BN"), 0, scoring, 17, 6, 3, 12, 2, games, 2000, 2001);
+                List.of("QB", "BN"), 0, scoring, 17, 6, 3, 12, 2, games, 2000, 2001, 14);
     }
 
     @Test

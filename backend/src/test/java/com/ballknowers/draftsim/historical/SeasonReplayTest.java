@@ -152,7 +152,7 @@ class SeasonReplayTest {
         for (int w = 1; w <= weekCount; w++) starts.put(w, DAY.plusDays(7L * (w - 1)));
         Map<String, Double> scoring = new LinkedHashMap<>();
         scoring.put("pts", 1.0);
-        return new SeasonReplay.Input(settings(teams), rules(), scoring, weekCount, seed, userSlot, picks, cards,
+        return new SeasonReplay.Input(settings(teams), rules(), scoring, weekCount, 19, seed, userSlot, picks, cards,
                 games, starts);
     }
 }

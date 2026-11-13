@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import HistoricalRoom from './HistoricalRoom'
 import HistoricalDraft from './HistoricalDraft'
+import old062 from '../__fixtures__/historical-result-062.json'
 
 /*
  * Spec 056 review B1: the web deploys BEFORE the backend, so for a while the new pages talk to the 053 backend.
@@ -59,6 +60,24 @@ describe('new web against the 053 backend (deploy order: web first)', () => {
     expect(screen.queryByRole('button', { name: 'QB' })).not.toBeInTheDocument()
   })
 
+  it('a finished game from the 062 backend (no format, playoffs, phase, reversalRound) renders as the old format', async () => {
+    const slot = Number(Object.keys(old062.lineups)[0])
+    getHistoricalGame.mockResolvedValue({
+      ...oldState, status: 'COMPLETE', teams: 12, rounds: 14, userSlot: slot, isUsersTurn: false, onTheClockSlot: null,
+      available: [], result: old062,
+    })
+    render(
+      <MemoryRouter initialEntries={['/history/5']}>
+        <Routes>
+          <Route path="/history/:gameId" element={<HistoricalRoom />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Played under the old format: no playoffs, finish is the standings rank.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Final standings' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Playoff bracket' })).not.toBeInTheDocument()
+  })
+
   it('the start page lists old-shape past games and offers no Football', async () => {
     // What the 053 backend answers for BOTH ?sport=NBA and ?sport=NFL: it ignores the parameter.
     historicalSeasons.mockReset().mockImplementation(() => Promise.resolve([oldSeason]))
@@ -75,6 +94,8 @@ describe('new web against the 053 backend (deploy order: web first)', () => {
     )
     expect(await screen.findByText('1995-96')).toBeTruthy()
     expect(screen.getAllByText('Basketball').length).toBe(2) // both rows read as NBA
+    // an old row carries no formatVersion: its number is a standings rank, and says so
+    expect(screen.getByText('Finished 2nd (old format)')).toBeInTheDocument()
     expect(await screen.findByText('Old backend settings line')).toBeTruthy()
     // Both requests carry an explicit sport ...
     await waitFor(() => expect(historicalSeasons).toHaveBeenCalledTimes(2))

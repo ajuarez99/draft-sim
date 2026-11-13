@@ -44,7 +44,7 @@ class SeasonReplayNullDateTest {
         Map<String, Double> scoring = new LinkedHashMap<>();
         scoring.put("pts", 1.0);
 
-        HistoricalResult r = REPLAY.replay(new SeasonReplay.Input(settings(2), rules(), scoring, 1, 7L, 1, picks,
+        HistoricalResult r = REPLAY.replay(new SeasonReplay.Input(settings(2), rules(), scoring, 1, 19, 7L, 1, picks,
                 cards, games, Map.of()));
 
         var starters = r.lineups().get("1").get(0).starters();

@@ -11,6 +11,12 @@ type Props = {
   canPick: boolean
   busy: boolean
   onPick: (c: HistoricalPlayerCard) => void
+  /**
+   * Spec 063: the fan's queue. Both optional and inert when absent: a list without them renders exactly as before.
+   * With them, each row gets a star toggle with an accessible name.
+   */
+  queued?: ReadonlySet<number>
+  onToggleQueue?: (c: HistoricalPlayerCard) => void
 }
 
 const FILTERS: Record<HistoricalSport, string[]> = {
@@ -24,7 +30,7 @@ const PAGE = 80
  * purpose: it tiers and labels by ADP and shows survival odds, and a historical game has neither
  * (the order is last season's points, and says so in the header via the API's own label).
  */
-export default function HistoricalPlayerList({ players, rankingLabel, sport = 'NBA', canPick, busy, onPick }: Props) {
+export default function HistoricalPlayerList({ players, rankingLabel, sport = 'NBA', canPick, busy, onPick, queued, onToggleQueue }: Props) {
   const [filter, setFilter] = useState('ALL')
   const [q, setQ] = useState('')
   const [shown, setShown] = useState(PAGE)
@@ -115,10 +121,30 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
                     )}
                   </div>
                 </div>
-                {canPick && (
-                  <button type="button" className="chip hist-draft" disabled={busy} onClick={() => onPick(p)}>
-                    Draft
-                  </button>
+                {onToggleQueue ? (
+                  <div className="hist-row-actions">
+                    <button
+                      type="button"
+                      className={`hist-star${queued?.has(p.id) ? ' on' : ''}`}
+                      aria-pressed={queued?.has(p.id) ?? false}
+                      aria-label={`Queue ${p.name}`}
+                      title={queued?.has(p.id) ? 'In your queue. Press to remove.' : 'Add to your queue'}
+                      onClick={() => onToggleQueue(p)}
+                    >
+                      <span aria-hidden="true">{queued?.has(p.id) ? '★' : '☆'}</span>
+                    </button>
+                    {canPick && (
+                      <button type="button" className="chip hist-draft" disabled={busy} onClick={() => onPick(p)}>
+                        Draft
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  canPick && (
+                    <button type="button" className="chip hist-draft" disabled={busy} onClick={() => onPick(p)}>
+                      Draft
+                    </button>
+                  )
                 )}
               </li>
             )

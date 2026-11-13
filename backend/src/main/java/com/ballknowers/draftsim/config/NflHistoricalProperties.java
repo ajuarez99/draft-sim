@@ -22,6 +22,8 @@ import java.util.Map;
  *       {@code rookiePositionalOffset}, {@code rookieMaxRound} -- hand-set (F6, F14), arbitrary, labelled so.
  *   <li>{@code expectedGames} -- a schedule fact, not a tuning knob: the regular-season games the NFL played that
  *       year (the import compares what it loaded against it, FR-014).
+ *   <li>{@code regularSeasonWeeks} -- a league-format choice (spec 063, Allan 2026-11-13), not a measurement:
+ *       the weeks of round robin before the three playoff weeks.
  *   <li>{@code firstOffered}, {@code lastOffered} -- the football seasons a user can be dealt.
  * </ul>
  */
@@ -31,7 +33,7 @@ public record NflHistoricalProperties(String statsUrlTemplate, String draftPicks
                                       Integer rankStandardGames, Integer rankMinGames, Integer rankLookbackSeasons,
                                       Integer rookiePositionalOffset, Integer rookieMaxRound,
                                       Map<Integer, Integer> expectedGames, Integer firstOffered,
-                                      Integer lastOffered) {
+                                      Integer lastOffered, Integer regularSeasonWeeks) {
 
     public NflHistoricalProperties {
         if (statsUrlTemplate == null || !statsUrlTemplate.contains("{season}")) {
@@ -61,6 +63,7 @@ public record NflHistoricalProperties(String statsUrlTemplate, String draftPicks
         positive("rookie-max-round", rookieMaxRound);
         positive("first-offered", firstOffered);
         positive("last-offered", lastOffered);
+        positive("regular-season-weeks", regularSeasonWeeks);
         if (firstOffered > lastOffered) {
             throw new IllegalArgumentException("historical-nfl.first-offered " + firstOffered
                     + " is after last-offered " + lastOffered);

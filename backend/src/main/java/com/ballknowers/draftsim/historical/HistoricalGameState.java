@@ -16,12 +16,14 @@ import java.util.Map;
  *
  * <p>{@code result} is the stored JSON passed through untouched (it is a {@link HistoricalResult} when parsed),
  * so a reopened game returns exactly what was frozen at completion (FR-013). Null until COMPLETE.
- * {@code available} is empty once the game is no longer DRAFTING.
+ * {@code available} is empty once the game is no longer DRAFTING. {@code reversalRound} is the game's stored value
+ * (0 is a plain snake), so the web can lay out upcoming picks without its own snake arithmetic (spec 063).
  */
 public record HistoricalGameState(long id, String sport, String status, SeasonView season, int teams, int rounds,
                                   List<String> rosterPositions, int userSlot, List<Integer> myPicks,
                                   int currentPickNo, Integer onTheClockSlot, boolean isUsersTurn,
-                                  List<PickView> picks, List<HistoricalPlayerCard> available, JsonNode result) {
+                                  List<PickView> picks, List<HistoricalPlayerCard> available, JsonNode result,
+                                  int reversalRound) {
 
     /**
      * @param countedStats the scoring keys this season counts, from the game's own frozen scoring snapshot
@@ -40,7 +42,11 @@ public record HistoricalGameState(long id, String sport, String status, SeasonVi
 
     public record PickView(int pickNo, int round, int draftSlot, String seatType, HistoricalPlayerCard player) {}
 
-    /** One row of {@code GET /api/history/games}; {@code finish} is null until COMPLETE. */
+    /**
+     * One row of {@code GET /api/history/games}; {@code finish} is null until COMPLETE.
+     * {@code formatVersion} and {@code outcome} (spec 063) are null for an unfinished game and for a game completed
+     * before playoffs existed, whose {@code finish} is a standings rank.
+     */
     public record GameSummary(long id, String sport, String seasonLabel, String status, int userSlot,
-                              Integer finish, OffsetDateTime createdAt) {}
+                              Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt) {}
 }

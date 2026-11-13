@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
-import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult } from '../api'
-import { ordinal, pts1, sportOf, teamName } from '../historicalCopy'
+import { Fragment, useMemo, useState } from 'react'
+import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult, HistoricalWeek } from '../api'
+import { isOldFormat, ordinal, outcomeHeadline, pointsPair, pts1, scheduleNote, sportOf, teamName } from '../historicalCopy'
+import HistoricalBracket from './HistoricalBracket'
 
 type Props = { game: HistoricalGameState; result: HistoricalResult }
 
@@ -8,9 +9,55 @@ function nameOf(cards: Map<number, HistoricalPlayerCard>, id: number): string {
   return cards.get(id)?.name ?? `Player ${id}`
 }
 
+const ROUND_WORDS: Record<string, string> = { ROUND_ONE: 'round one', SEMIFINAL: 'semifinal', FINAL: 'final' }
+
+/** The bust and the passed-on steal. On a playoff-format page these lead the page (spec 063, "Queued for later"). */
+function Callouts({ game, result }: Props) {
+  const bust = result.biggestBust
+  const steal = result.bestStealPassedOn
+  return (
+    <div className="hist-callouts">
+      <div className="hist-callout hist-callout-bust">
+        <h3>Biggest bust</h3>
+        {bust ? (
+          <p>
+            <strong>{bust.player.name}</strong>, taken {ordinal(bust.pickNo)} overall, finished {ordinal(bust.seasonValueRank)} of{' '}
+            {game.teams * game.rounds} drafted players on the season ({pts1(bust.seasonValue)} points).
+          </p>
+        ) : (
+          <p className="muted">None: every player you took finished at or above his draft position.</p>
+        )}
+      </div>
+      <div className="hist-callout hist-callout-steal">
+        <h3>Best steal you passed on</h3>
+        {steal ? (
+          <p>
+            At pick {steal.pickNo} you took <strong>{steal.taken.name}</strong> ({pts1(steal.takenValue)} points). Still there:{' '}
+            <strong>{steal.passedOn.name}</strong> ({pts1(steal.passedOnValue)} points), {pts1(steal.passedOnValue - steal.takenValue)} more.
+          </p>
+        ) : (
+          <p className="muted">Nobody left on the board outscored the player you took.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** "Weeks 23 to 25 of the real season were not played." Null when every week was played. */
+function unplayedLine(unused: number, firstUnused: number): string | null {
+  if (unused <= 0) return null
+  return unused === 1
+    ? `Week ${firstUnused} of the real season was not played.`
+    : `Weeks ${firstUnused} to ${firstUnused + unused - 1} of the real season were not played.`
+}
+
 /**
  * Spec 053 results: your finish, standings, the hindsight comparison (with its label, or "you beat
  * it"), bust and steal with the numbers, and the replay week by week with each starter's locked game.
+ *
+ * Spec 063: a result with a `format` also has a playoff bracket, a regular-season table with a playoff line and
+ * playoff weeks in the week picker. A result without one (stored before playoffs) renders as it always did, plus
+ * one line saying so. `isOldFormat` is the only place that question is asked.
  */
 export default function HistoricalResults({ game, result }: Props) {
   const user = game.userSlot
@@ -26,48 +73,107 @@ export default function HistoricalResults({ game, result }: Props) {
   }, [game.picks])
   const lineupWeek = (result.lineups[String(user)] ?? []).find((l) => l.week === weekNo)
   const h = result.hindsight
-  const bust = result.biggestBust
-  const steal = result.bestStealPassedOn
+
+  const old = isOldFormat(result)
+  const format = result.format ?? null
+  const playoffs = result.playoffs ?? null
+  const finalOf = useMemo(() => new Map((result.finalPlaces ?? []).map((f) => [f.slot, f.place])), [result.finalPlaces])
+  const roundOfWeek = useMemo(() => new Map((playoffs?.rounds ?? []).map((r) => [r.week, r])), [playoffs])
+  const noPlayoffs = format != null && format.playoffWeeks.length === 0
+  const lastPlayoffWeek = format && format.playoffWeeks.length > 0 ? Math.max(...format.playoffWeeks) : null
+  const scheduleLine = format ? scheduleNote(format.regularSeasonWeeks, game.teams) : null
+  const showFinishCol = !old && finalOf.size > 0
+
+  const weekOption = (w: HistoricalWeek) => {
+    const date = w.startDate ? ` (${w.startDate})` : ''
+    if (old) return `${w.week}${date}`
+    const r = roundOfWeek.get(w.week)
+    return `${w.week}${r ? ` · ${ROUND_WORDS[r.name] ?? 'playoffs'}` : ''}${date}`
+  }
+
+  // A playoff week the fan's team did not play: say why, instead of showing an empty lineup.
+  let noLineupWhy: string | null = null
+  if (!old && !lineupWeek && week?.phase === 'PLAYOFF') {
+    if (roundOfWeek.get(week.week)?.byeSlots.includes(user)) noLineupWhy = 'You had a bye this week.'
+    else if (result.userOutcome === 'MISSED_PLAYOFFS') noLineupWhy = 'Your team did not make the playoffs, so there is no lineup this week.'
+    else noLineupWhy = 'You were eliminated before this week.'
+  }
+
+  const unplayed = format ? unplayedLine(format.unusedWeeks, (lastPlayoffWeek ?? format.regularSeasonWeeks) + 1) : null
 
   return (
     <div className="hist-results">
       <section className="panel hist-finish" aria-label="Your finish">
         <p className="page-eyebrow">{game.season.label} season replayed</p>
-        <h2 className="hist-finish-title cond">
-          You finished {ordinal(result.userFinish)} of {game.teams}
+        <h2 className={`hist-finish-title cond${!old && result.userOutcome === 'CHAMPION' ? ' champion' : ''}`}>
+          {old ? `You finished ${ordinal(result.userFinish)} of ${game.teams}` : outcomeHeadline(result.userOutcome, result.userFinish, game.teams)}
         </h2>
         {userRow && (
           <p className="muted">
             {userRow.wins}-{userRow.losses}
-            {userRow.ties > 0 ? `-${userRow.ties}` : ''} · {pts1(userRow.pointsFor)} points
+            {userRow.ties > 0 ? `-${userRow.ties}` : ''} · {pts1(userRow.pointsFor)} points{old ? '' : ' in the regular season'}
           </p>
         )}
+        {old && <p className="muted small">Played under the old format: no playoffs, finish is the standings rank.</p>}
+        {noPlayoffs && <p className="muted small">This season was too short for playoffs.</p>}
       </section>
 
+      {!old && (
+        <section className="panel hist-moments" aria-label="Your draft in two moments">
+          <h2>Your draft in two moments</h2>
+          <Callouts game={game} result={result} />
+        </section>
+      )}
+
+      {!old && playoffs && <HistoricalBracket playoffs={playoffs} userSlot={user} />}
+
+      {!old && format && (
+        <p className="muted small hist-format-note">
+          {unplayed ? `${unplayed} ` : ''}
+          The draft comparisons below cover the whole real season.
+        </p>
+      )}
+
       <section className="panel" aria-label="Standings">
-        <h2>Final standings</h2>
+        <h2>{old ? 'Final standings' : 'Regular season'}</h2>
+        {format && (
+          <p className="muted small">
+            {format.regularSeasonWeeks} {format.regularSeasonWeeks === 1 ? 'week' : 'weeks'}.
+            {format.shortened ? ` The real season was only ${format.seasonWeeks} weeks long, so the regular season was cut short to fit the playoffs.` : ''}
+            {scheduleLine ? ` ${scheduleLine}` : ''}
+          </p>
+        )}
         <table className="hist-table">
           <thead>
             <tr>
-              <th className="num">Place</th>
+              <th className="num">{old ? 'Place' : 'Rank'}</th>
               <th>Team</th>
               <th className="num">W-L-T</th>
               <th className="num">Points for</th>
+              {showFinishCol && <th className="num">Finished</th>}
             </tr>
           </thead>
           <tbody>
-            {standings.map((s) => (
-              <tr key={s.slot} className={s.slot === user ? 'hist-me' : undefined} aria-current={s.slot === user ? 'true' : undefined}>
-                <td className="num">{s.place}</td>
-                <td>
-                  {teamName(s.slot, user)}
-                  <span className="muted small"> · drafted from slot {s.slot}</span>
-                </td>
-                <td className="num">
-                  {s.wins}-{s.losses}-{s.ties}
-                </td>
-                <td className="num">{pts1(s.pointsFor)}</td>
-              </tr>
+            {standings.map((s, i) => (
+              <Fragment key={s.slot}>
+                {playoffs && i === playoffs.seeds.length && (
+                  <tr className="hist-cutline">
+                    <td colSpan={showFinishCol ? 5 : 4}>Playoff line: the top {playoffs.seeds.length} advance</td>
+                  </tr>
+                )}
+                <tr className={s.slot === user ? 'hist-me' : undefined} aria-current={s.slot === user ? 'true' : undefined}>
+                  <td className="num">{s.place}</td>
+                  <td>
+                    {teamName(s.slot, user)}
+                    <span className="muted small"> · drafted from slot {s.slot}</span>
+                  </td>
+                  <td className="num">
+                    {s.wins}-{s.losses}-{s.ties}
+                  </td>
+                  <td className="num">{pts1(s.pointsFor)}</td>
+                  {showFinishCol && <td className="num">{finalOf.has(s.slot) ? ordinal(finalOf.get(s.slot)!) : ''}</td>}
+                </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -77,7 +183,7 @@ export default function HistoricalResults({ game, result }: Props) {
         <h2>How your draft compares</h2>
         <div className="hist-compare">
           <div className="hist-stat">
-            <span className="hist-stat-label muted small">You</span>
+            <span className="hist-stat-label muted small">{old ? 'You' : 'You, whole real season'}</span>
             <span className="hist-stat-num">{pts1(h.userPointsFor)}</span>
           </div>
           <div className="hist-stat">
@@ -92,30 +198,7 @@ export default function HistoricalResults({ game, result }: Props) {
             Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
           </p>
         )}
-        <div className="hist-callouts">
-          <div className="hist-callout">
-            <h3>Biggest bust</h3>
-            {bust ? (
-              <p>
-                <strong>{bust.player.name}</strong>, taken {ordinal(bust.pickNo)} overall, finished {ordinal(bust.seasonValueRank)} of{' '}
-                {game.teams * game.rounds} drafted players on the season ({pts1(bust.seasonValue)} points).
-              </p>
-            ) : (
-              <p className="muted">None: every player you took finished at or above his draft position.</p>
-            )}
-          </div>
-          <div className="hist-callout">
-            <h3>Best steal you passed on</h3>
-            {steal ? (
-              <p>
-                At pick {steal.pickNo} you took <strong>{steal.taken.name}</strong> ({pts1(steal.takenValue)} points). Still there:{' '}
-                <strong>{steal.passedOn.name}</strong> ({pts1(steal.passedOnValue)} points), {pts1(steal.passedOnValue - steal.takenValue)} more.
-              </p>
-            ) : (
-              <p className="muted">Nobody left on the board outscored the player you took.</p>
-            )}
-          </div>
-        </div>
+        {old && <Callouts game={game} result={result} />}
       </section>
 
       <section className="panel" aria-label="Weekly results">
@@ -127,8 +210,7 @@ export default function HistoricalResults({ game, result }: Props) {
               <select value={weekNo} onChange={(e) => setWeekNo(Number(e.target.value))} aria-label="Week">
                 {weeks.map((w) => (
                   <option key={w.week} value={w.week}>
-                    {w.week}
-                    {w.startDate ? ` (${w.startDate})` : ''}
+                    {weekOption(w)}
                   </option>
                 ))}
               </select>
@@ -136,20 +218,48 @@ export default function HistoricalResults({ game, result }: Props) {
           )}
         </div>
         {week ? (
-          <ul className="hist-matchups">
-            {week.matchups.map((m) => (
-              <li key={`${m.homeSlot}-${m.awaySlot}`} className={m.homeSlot === user || m.awaySlot === user ? 'hist-me' : undefined}>
-                <span>{teamName(m.homeSlot, user)}</span>
-                <b className={m.homePoints > m.awayPoints ? 'win' : ''}>{pts1(m.homePoints)}</b>
-                <span className="muted">vs</span>
-                <b className={m.awayPoints > m.homePoints ? 'win' : ''}>{pts1(m.awayPoints)}</b>
-                <span>{teamName(m.awaySlot, user)}</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            {!old && roundOfWeek.get(week.week) && (
+              <p className="muted small hist-week-round">
+                {ROUND_WORDS[roundOfWeek.get(week.week)!.name]?.replace(/^./, (c) => c.toUpperCase())}
+              </p>
+            )}
+            <ul className="hist-matchups">
+              {week.matchups.map((m) => {
+                // A playoff game's winner is the bracket's: a game level to the hundredth is decided by seed, which the
+                // scores alone cannot show (CR-06).
+                const pm = !old
+                  ? roundOfWeek
+                      .get(week.week)
+                      ?.matchups.find(
+                        (x) =>
+                          (x.highSlot === m.homeSlot && x.lowSlot === m.awaySlot) || (x.highSlot === m.awaySlot && x.lowSlot === m.homeSlot),
+                      )
+                  : undefined
+                const homeWon = pm ? pm.winnerSlot === m.homeSlot : m.homePoints > m.awayPoints
+                const awayWon = pm ? pm.winnerSlot === m.awaySlot : m.awayPoints > m.homePoints
+                const [homeText, awayText] = pointsPair(m.homePoints, m.awayPoints)
+                return (
+                  <li key={`${m.homeSlot}-${m.awaySlot}`} className={m.homeSlot === user || m.awaySlot === user ? 'hist-me' : undefined}>
+                    <span>{teamName(m.homeSlot, user)}</span>
+                    <b className={homeWon ? 'win' : ''}>{homeText}</b>
+                    <span className="muted">vs</span>
+                    <b className={awayWon ? 'win' : ''}>{awayText}</b>
+                    <span>{teamName(m.awaySlot, user)}</span>
+                    {pm?.decidedBySeed && (
+                      <span className="muted small hist-matchup-note">
+                        Level on points. {teamName(pm.winnerSlot, user)} advanced as the better seed.
+                      </span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </>
         ) : (
           <p className="muted">No weeks were played.</p>
         )}
+        {noLineupWhy && <p className="hist-bye">{noLineupWhy}</p>}
         {lineupWeek && (
           <>
             <h3>Your lineup, week {lineupWeek.week}</h3>

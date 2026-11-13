@@ -113,6 +113,7 @@ historical:
   teams: 12
   rounds: 14
   reversal-round: 0          # Sleeper default: plain snake (F8)
+  regular-season-weeks: 19   # league-format choice (spec 063, Allan 2026-11-13), not a measurement
   # Legacy Ball Knowers league scoring (FR-002, O1)
   scoring:
     pts: 0.5
@@ -136,6 +137,9 @@ historical:
 # and arbitrary, chosen from a measurement and not fitted: at 0.25 a user who only presses auto-finish won 11% of 168
 # basketball leagues and 9% of 78 football leagues (chance 8%); at the shared 1.0 it was 40% and 36%. Leave a sport
 # out to give its bots the shared value.
+# Note (spec 063, 2026-11-13): those 11% / 9% are STANDINGS-RANK wins (first in the regular season), measured before
+# playoffs existed. Since then userFinish is the final place after the bracket, so the harness reads standings[].place
+# for that figure and reports champion% separately; no champion figure has been measured at 0.25 yet.
 historical-bots:
   nba:
     temperature: 0.25
@@ -150,6 +154,7 @@ historical-nfl:
   teams: 12                  # hand-set (spec 056 FR-002)
   rounds: 15                 # hand-set (spec 056 FR-002): 7 starters + 8 bench
   reversal-round: 0          # hand-set: plain snake
+  regular-season-weeks: 14   # league-format choice (spec 063, Allan 2026-11-13), not a measurement
   roster: [QB, RB, RB, WR, WR, TE, FLEX, BN, BN, BN, BN, BN, BN, BN, BN]   # hand-set (FR-002), no K/DEF
   # Full PPR (FR-003 as amended after review, F13): INT -1 and fumble lost -2 are the real league's Sleeper values.
   scoring:                   # hand-set (spec 056 FR-003)

@@ -17,6 +17,8 @@ import java.util.Map;
  *       (S-1..S-n) whose newest qualifying per-game line ranks a player; 2 missed Jordan 1995-96.
  *   <li>{@code teams}, {@code rounds}, {@code reversalRound} -- the app's standard NBA shape; reversal 0 is
  *       a plain snake (F8).
+ *   <li>{@code regularSeasonWeeks} -- a league-format choice (spec 063, Allan 2026-11-13), not a measurement:
+ *       the weeks of round robin before the three playoff weeks.
  *   <li>{@code scoring} -- the Legacy Ball Knowers league scoring (FR-002, O1), keyed by Sleeper stat name.
  * </ul>
  */
@@ -24,7 +26,8 @@ import java.util.Map;
 public record HistoricalProperties(String kaggleZipUrl, String kaggleZipSha256, Double eraThreshold,
                                    Integer rankStandardGames, Integer rankMinGames,
                                    Integer rankLookbackSeasons, Integer teams,
-                                   Integer rounds, Integer reversalRound, Map<String, Double> scoring) {
+                                   Integer rounds, Integer reversalRound, Map<String, Double> scoring,
+                                   Integer regularSeasonWeeks) {
 
     public HistoricalProperties {
         if (kaggleZipUrl == null || kaggleZipUrl.isBlank()) {
@@ -41,6 +44,7 @@ public record HistoricalProperties(String kaggleZipUrl, String kaggleZipSha256, 
         positive("rank-lookback-seasons", rankLookbackSeasons);
         positive("teams", teams);
         positive("rounds", rounds);
+        positive("regular-season-weeks", regularSeasonWeeks);
         if (reversalRound == null || reversalRound < 0) {
             throw new IllegalArgumentException("historical.reversal-round must be >= 0, got " + reversalRound);
         }

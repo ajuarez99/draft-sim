@@ -164,7 +164,7 @@ public class HistoricalGameService {
     public List<HistoricalGameState.GameSummary> list(String sleeperUserId) {
         return games.summaries(sleeperUserId).stream()
                 .map(r -> new HistoricalGameState.GameSummary(r.id(), r.sport(), r.seasonLabel(), r.status(),
-                        r.userSlot(), r.finish(), r.createdAt()))
+                        r.userSlot(), r.finish(), r.formatVersion(), r.outcome(), r.createdAt()))
                 .toList();
     }
 
@@ -366,7 +366,7 @@ public class HistoricalGameService {
             }
         }
         SeasonReplay.Input in = new SeasonReplay.Input(settingsOf(row), rulesRegistry.get(sport.sport()),
-                read(row.scoringJson(), SCORING), season.weekCount(), row.rngSeed(), row.userSlot(), picks, byId,
+                read(row.scoringJson(), SCORING), season.weekCount(), sport.regularSeasonWeeks(), row.rngSeed(), row.userSlot(), picks, byId,
                 played, sport.weekStarts(row.seasonStart()));
         HistoricalResult result = replay.replay(in);
         games.writeResult(row.id(), write(result), OffsetDateTime.now());
@@ -423,7 +423,7 @@ public class HistoricalGameService {
         }
         return new HistoricalGameState(row.id(), row.sport(), row.status(), view, row.teams(), row.rounds(),
                 row.rosterPositions(), row.userSlot(), myPicks, row.currentPickNo(), onTheClock, usersTurn,
-                views, available, result);
+                views, available, result, row.reversalRound());
     }
 
     // ---- plumbing ---------------------------------------------------------------------------------------

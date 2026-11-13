@@ -1,4 +1,14 @@
-import type { HistoricalGameState, HistoricalPlayerCard, HistoricalPrior, HistoricalSport, MockSeat, PlayerRef } from './api'
+import type {
+  HistoricalGameState,
+  HistoricalGameSummary,
+  HistoricalOutcome,
+  HistoricalPlayerCard,
+  HistoricalPrior,
+  HistoricalResult,
+  HistoricalSport,
+  MockSeat,
+  PlayerRef,
+} from './api'
 
 /*
  * Spec 053: small mapping and wording helpers for the historical draft game, kept out of the
@@ -162,3 +172,94 @@ export function ordinal(n: number): string {
 }
 
 export const pts1 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+export const pts2 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+/**
+ * Two scores of one matchup, as text. Winners are decided on hundredths, so two scores that print the same at one
+ * decimal while one side won would read as an unexplained tie: print that matchup at two decimals instead (CR-06).
+ */
+export function pointsPair(a: number, b: number): [string, string] {
+  if (a !== b && pts1(a) === pts1(b)) return [pts2(a), pts2(b)]
+  return [pts1(a), pts1(b)]
+}
+
+/**
+ * Spec 063: the ONE test for "this result was stored before playoffs existed". A result with no `format` (an old
+ * stored game, or a 062-shaped response from an old backend) renders exactly as it did, plus one line. Nothing
+ * else in the web app asks this question another way.
+ */
+export function isOldFormat(result: Pick<HistoricalResult, 'format'>): boolean {
+  return result.format == null
+}
+
+/**
+ * The finish headline for a game played under the playoff format. NO_PLAYOFFS (and an outcome this build does not
+ * know) reads as the plain standings place; MISSED_PLAYOFFS says where the team ended up.
+ */
+export function outcomeHeadline(outcome: HistoricalOutcome | null | undefined, place: number, teams: number): string {
+  switch (outcome) {
+    case 'CHAMPION':
+      return 'Champion'
+    case 'LOST_FINAL':
+      return 'You lost the final'
+    case 'LOST_SEMIFINAL':
+      return 'You lost in the semifinal'
+    case 'LOST_ROUND_ONE':
+      return 'You lost in round one'
+    case 'MISSED_PLAYOFFS':
+      return `You missed the playoffs (${ordinal(place)} of ${teams})`
+    default:
+      return `You finished ${ordinal(place)} of ${teams}`
+  }
+}
+
+/**
+ * The status words on the past-games list. An old game's number is a standings rank and a new game's is a playoff
+ * finish, so the two are never printed as the same kind of thing (spec 063 FR-021).
+ */
+export function summaryStatus(g: Pick<HistoricalGameSummary, 'status' | 'finish' | 'formatVersion' | 'outcome'>): string {
+  if (g.status === 'DRAFTING') return 'Drafting'
+  if (g.status !== 'COMPLETE') return 'Abandoned'
+  if (g.finish == null) return 'Complete'
+  if (g.formatVersion == null) return `Finished ${ordinal(g.finish)} (old format)`
+  switch (g.outcome) {
+    case 'CHAMPION':
+      return 'Champion'
+    case 'LOST_FINAL':
+      return 'Lost the final'
+    case 'LOST_SEMIFINAL':
+      return 'Lost in the semifinal'
+    case 'LOST_ROUND_ONE':
+      return 'Lost in round one'
+    case 'MISSED_PLAYOFFS':
+      return `Missed the playoffs (${ordinal(g.finish)})`
+    case 'NO_PLAYOFFS':
+      return `Finished ${ordinal(g.finish)} (no playoffs)`
+    default:
+      return `Finished ${ordinal(g.finish)}`
+  }
+}
+
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve']
+const word = (n: number) => WORDS[n] ?? String(n)
+const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${word(n)} times`)
+
+/**
+ * Spec 063 PR-15: a regular season that is not a whole number of round robins is lopsided, and the results say so.
+ * Computed from the real week count and team count, never written as a literal. Null when every team plays every
+ * other the same number of times (nothing to warn about). The circle-method schedule repeats the same weekly
+ * cycle, so the first `rest` weeks of the cycle are the ones played one extra time.
+ */
+export function scheduleNote(regularSeasonWeeks: number, teams: number): string | null {
+  if (teams < 2 || regularSeasonWeeks < 1) return null
+  const opponents = teams - 1
+  const cycle = teams % 2 === 0 ? teams - 1 : teams
+  if (regularSeasonWeeks < opponents) {
+    return `${regularSeasonWeeks} weeks is shorter than one full round of ${cycle}, so you play ${word(regularSeasonWeeks)} of the other ${word(opponents)} teams once and skip the rest.`
+  }
+  const base = Math.floor(regularSeasonWeeks / cycle)
+  const extra = regularSeasonWeeks % cycle
+  if (extra === 0) return null
+  const fewer = opponents - extra
+  return `${regularSeasonWeeks} weeks over ${/^(8|11|18)/.test(String(cycle)) ? 'an' : 'a'} ${cycle}-week cycle: you play ${word(extra)} ${extra === 1 ? 'team' : 'teams'} ${times(base + 1)} and ${word(fewer)} ${times(base)}.`
+}
