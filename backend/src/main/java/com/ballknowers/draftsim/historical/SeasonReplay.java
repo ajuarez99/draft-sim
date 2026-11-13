@@ -7,6 +7,7 @@ import com.ballknowers.draftsim.engine.RealizedLineupService;
 import com.ballknowers.draftsim.engine.RealizedLineupService.ScoredPlayer;
 import com.ballknowers.draftsim.engine.RealizedLineupService.WeekLineup;
 import com.ballknowers.draftsim.historical.HistoricalResult.FinalPlace;
+import com.ballknowers.draftsim.historical.HistoricalResult.HindsightSeason;
 import com.ballknowers.draftsim.historical.HistoricalResult.LineupWeek;
 import com.ballknowers.draftsim.historical.HistoricalResult.Matchup;
 import com.ballknowers.draftsim.historical.HistoricalResult.PlayoffMatchup;
@@ -27,10 +28,12 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Replays one real season for a finished historical draft (spec 053), as lock-in best ball: every rostered
@@ -222,6 +225,113 @@ public class SeasonReplay {
             }
         }
 
+        Played real = play(in, fmt, points);
+        Playoffs playoffs = real.playoffs();
+        if (playoffs != null) {
+            for (Round r : playoffs.rounds()) {
+                boolean userPlays = false;
+                for (PlayoffMatchup m : r.matchups()) {
+                    if (m.highSlot() == in.userSlot() || m.lowSlot() == in.userSlot()) userPlays = true;
+                }
+                if (userPlays) {
+                    userLineups.add(lineupWeek(r.week(), team.week(rosters.get(in.userSlot()), r.week()), pw));
+                }
+            }
+        }
+        FinalPlace mine = real.finalPlaces().stream().filter(f -> f.slot() == in.userSlot()).findFirst().orElseThrow();
+
+        // The comparisons keep the WHOLE real season (spec 063 PR-13): the user's total is every season week, not the
+        // regular-season points for in the standings. Passing pf here would shrink "You" against a whole-season
+        // hindsight draft.
+        Comparisons.Computed cmp = comparisons.compute(in, team,
+                team.season(rosters.get(in.userSlot()), in.weekCount()));
+
+        Map<String, List<LineupWeek>> lineupMap = new LinkedHashMap<>();
+        lineupMap.put(String.valueOf(in.userSlot()), userLineups);
+        return new HistoricalResult(real.weeks(), real.standings(), mine.place(), lineupMap, cmp.hindsight(),
+                cmp.bust(), cmp.steal(), fmt.toResult(), playoffs, real.finalPlaces(), mine.outcome(),
+                cmp.pickFinishes(), hindsightSeason(in, fmt, team, points, rosters, cmp.hindsight()));
+    }
+
+    /**
+     * The season again with the hindsight roster in the user's seat, played strictly: a player can be on one
+     * roster only. Hindsight may take a player another team drafted LATER in the real draft; that team then loses
+     * him and takes a replacement, so nobody scores for two teams.
+     *
+     * <p>The replacement is a stand-in for a re-draft, not one: the best player by the pre-draft board
+     * ({@link HistoricalPlayerCard#rank}, which is what the bots draft from) at the lost player's primary position
+     * whom nobody holds in this replay; any position when that one is empty; nobody when the pool is empty. The
+     * pool includes the players the user really drafted and hindsight did not want. Losses are replaced in pick
+     * order. Everything else is as it was: the same pairings and the same coin (both come from the seed), and the
+     * same weekly scores for every team that lost nobody.
+     */
+    private static HindsightSeason hindsightSeason(Input in, SeasonFormat fmt, TeamScorer team, double[][] points,
+                                                   Map<Integer, List<Long>> rosters,
+                                                   HistoricalResult.Hindsight hindsight) {
+        List<Long> roster = hindsight.picks().stream().map(p -> p.player().id()).toList();
+        Set<Long> held = new HashSet<>(roster);
+        for (Pick p : in.picks()) if (p.slot() != in.userSlot()) held.add(p.playerId());
+
+        Map<Integer, List<Long>> changed = new HashMap<>();
+        changed.put(in.userSlot(), roster);
+        int taken = 0;
+        for (Pick p : in.picks().stream().sorted(Comparator.comparingInt(Pick::pickNo)).toList()) {
+            if (p.slot() == in.userSlot() || !roster.contains(p.playerId())) continue;
+            taken++;
+            List<Long> theirs = changed.computeIfAbsent(p.slot(), s -> new ArrayList<>(rosters.get(s)));
+            theirs.remove(Long.valueOf(p.playerId()));
+            Long replacement = replacement(in.cards(), held, primary(in.cards().get(p.playerId())));
+            if (replacement != null) {
+                theirs.add(replacement);
+                held.add(replacement);
+            }
+        }
+
+        double[][] alt = new double[points.length][];
+        for (int w = 0; w < points.length; w++) alt[w] = points[w].clone();
+        for (Map.Entry<Integer, List<Long>> e : changed.entrySet()) {
+            for (int w = 1; w <= fmt.lastPlayedWeek(); w++) alt[w][e.getKey()] = team.week(e.getValue(), w).points();
+        }
+
+        Played p = play(in, fmt, alt);
+        Standing st = p.standings().stream().filter(s -> s.slot() == in.userSlot()).findFirst().orElseThrow();
+        FinalPlace fp = p.finalPlaces().stream().filter(f -> f.slot() == in.userSlot()).findFirst().orElseThrow();
+        return new HindsightSeason(st.wins(), st.losses(), st.ties(), st.pointsFor(), st.place(), fp.place(),
+                fp.outcome(), taken);
+    }
+
+    /** The best free player by pre-draft rank at {@code position}; any position if none there; null if nobody. */
+    private static Long replacement(Map<Long, HistoricalPlayerCard> cards, Set<Long> held, String position) {
+        Comparator<HistoricalPlayerCard> byBoard =
+                Comparator.comparingInt(HistoricalPlayerCard::rank).thenComparingLong(HistoricalPlayerCard::id);
+        HistoricalPlayerCard samePosition = null, any = null;
+        for (HistoricalPlayerCard c : cards.values()) {
+            if (held.contains(c.id())) continue;
+            if (any == null || byBoard.compare(c, any) < 0) any = c;
+            if (primary(c).equals(position) && (samePosition == null || byBoard.compare(c, samePosition) < 0)) {
+                samePosition = c;
+            }
+        }
+        HistoricalPlayerCard pick = samePosition != null ? samePosition : any;
+        return pick == null ? null : pick.id();
+    }
+
+    private static String primary(HistoricalPlayerCard c) {
+        return c.positions() == null || c.positions().isEmpty() ? "" : c.positions().get(0);
+    }
+
+    /** One season's schedule, standings and bracket. */
+    private record Played(List<Week> weeks, List<Standing> standings, Playoffs playoffs,
+                          List<FinalPlace> finalPlaces) {}
+
+    /**
+     * Plays the schedule and the bracket from a table of weekly points ({@code points[week][slot]}). A function of
+     * the points and the seed only, so the same season can be played again with one team's scores swapped.
+     */
+    private static Played play(Input in, SeasonFormat fmt, double[][] points) {
+        int teams = in.settings().teams();
+        int regularWeeks = fmt.regularSeasonWeeks();
+
         // Seeded circle-method round robin: slot order shuffled once, then team 0 fixed and the rest rotate.
         List<Integer> order = new ArrayList<>();
         for (int s = 1; s <= teams; s++) order.add(s);
@@ -255,53 +365,30 @@ public class SeasonReplay {
                 .thenComparing(Comparator.comparingLong((Integer s) -> Math.round(pf[s] * 100)).reversed())
                 .thenComparing(Comparator.comparingDouble((Integer s) -> coin[s]).reversed()));
         List<Standing> standings = new ArrayList<>();
-        int userRank = 0;
         for (int i = 0; i < bySlot.size(); i++) {
             int s = bySlot.get(i);
             standings.add(new Standing(s, wins[s], losses[s], ties[s], Math.round(pf[s] * 100) / 100.0, i + 1));
-            if (s == in.userSlot()) userRank = i + 1;
         }
 
         Playoffs playoffs = null;
         List<FinalPlace> finalPlaces = new ArrayList<>();
-        int userFinish = userRank;
-        String userOutcome;
         if (fmt.hasPlayoffs()) {
             Bracket b = bracket(bySlot, fmt.playoffWeeks(), points);
             playoffs = b.playoffs();
             finalPlaces = b.finalPlaces();
             for (Round r : playoffs.rounds()) {
                 List<Matchup> matchups = new ArrayList<>();
-                boolean userPlays = false;
                 for (PlayoffMatchup m : r.matchups()) {
                     matchups.add(new Matchup(m.highSlot(), m.lowSlot(), m.highPoints(), m.lowPoints()));
-                    if (m.highSlot() == in.userSlot() || m.lowSlot() == in.userSlot()) userPlays = true;
                 }
                 weeks.add(new Week(r.week(), monday(in.weekStarts().get(r.week())), matchups, PHASE_PLAYOFF));
-                if (userPlays) {
-                    userLineups.add(lineupWeek(r.week(), team.week(rosters.get(in.userSlot()), r.week()), pw));
-                }
             }
-            FinalPlace mine = finalPlaces.stream().filter(f -> f.slot() == in.userSlot()).findFirst().orElseThrow();
-            userFinish = mine.place();
-            userOutcome = mine.outcome();
         } else {
             for (int i = 0; i < bySlot.size(); i++) {
                 finalPlaces.add(new FinalPlace(bySlot.get(i), i + 1, HistoricalResult.NO_PLAYOFFS));
             }
-            userOutcome = HistoricalResult.NO_PLAYOFFS;
         }
-
-        // The comparisons keep the WHOLE real season (spec 063 PR-13): the user's total is every season week, not the
-        // regular-season points for in the standings. Passing pf here would shrink "You" against a whole-season
-        // hindsight draft.
-        Comparisons.Computed cmp = comparisons.compute(in, team,
-                team.season(rosters.get(in.userSlot()), in.weekCount()));
-
-        Map<String, List<LineupWeek>> lineupMap = new LinkedHashMap<>();
-        lineupMap.put(String.valueOf(in.userSlot()), userLineups);
-        return new HistoricalResult(weeks, standings, userFinish, lineupMap, cmp.hindsight(), cmp.bust(),
-                cmp.steal(), fmt.toResult(), playoffs, finalPlaces, userOutcome, cmp.pickFinishes());
+        return new Played(weeks, standings, playoffs, finalPlaces);
     }
 
     public static final String PHASE_REGULAR = "REGULAR";

@@ -214,6 +214,34 @@ export function outcomeHeadline(outcome: HistoricalOutcome | null | undefined, p
 }
 
 /**
+ * "Would the hindsight roster have won?" in one sentence. The answer leads; the record follows. Third person,
+ * because it is a roster nobody drafted.
+ */
+export function hindsightSeasonVerdict(
+  s: { wins: number; losses: number; ties: number; regularSeasonRank: number; finish: number; outcome: HistoricalOutcome },
+  teams: number,
+): string {
+  const record = `${s.wins}-${s.losses}${s.ties > 0 ? `-${s.ties}` : ''}`
+  const seed = `${record}, ${ordinal(s.regularSeasonRank)} after the regular season`
+  switch (s.outcome) {
+    case 'CHAMPION':
+      return `Yes. It went ${seed}, and won the title.`
+    case 'LOST_FINAL':
+      return `No. It went ${seed}, and lost the final.`
+    case 'LOST_SEMIFINAL':
+      return `No. It went ${seed}, and lost in the semifinal.`
+    case 'LOST_ROUND_ONE':
+      return `No. It went ${seed}, and lost in round one.`
+    case 'MISSED_PLAYOFFS':
+      return `No. It went ${record} and missed the playoffs (${ordinal(s.finish)} of ${teams}).`
+    default:
+      return s.finish === 1
+        ? `Yes. It went ${record} and finished 1st of ${teams}.`
+        : `No. It went ${record} and finished ${ordinal(s.finish)} of ${teams}.`
+  }
+}
+
+/**
  * The status words on the past-games list. An old game's number is a standings rank and a new game's is a playoff
  * finish, so the two are never printed as the same kind of thing (spec 063 FR-021).
  */

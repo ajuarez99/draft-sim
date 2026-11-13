@@ -7057,6 +7057,13 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .hist-change { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 13px; font-variant-numeric: tabular-nums; background: color-mix(in oklab, var(--line) 45%, var(--panel)); color: var(--muted); }
 .hist-change.up { background: color-mix(in oklab, var(--up) 18%, var(--panel)); color: var(--up); }
 .hist-change.down { background: color-mix(in oklab, var(--down) 18%, var(--panel)); color: var(--down); }
+/* The hindsight roster under "How your draft compares": the roster table, then the would-it-have-won verdict. */
+.hist-hindsight { min-width: 0; margin-top: 16px; }
+.hist-hindsight h3 { margin: 16px 0 4px; }
+.hist-hindsight .hist-table { min-width: 480px; }
+.hist-hindsight td { white-space: nowrap; }
+.hist-hindsight .hist-verdict { font-size: 17px; margin: 4px 0; }
+.hist-same-pick { margin-left: 8px; }
 .hist-cutline td { padding: 4px 8px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-top: 2px dashed var(--brand); border-bottom: 0; background: var(--panel); }
 .hist-bye { margin: 8px 0; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
 .hist-week-round { margin: 0 0 6px; }

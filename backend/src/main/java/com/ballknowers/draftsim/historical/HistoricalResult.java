@@ -22,12 +22,14 @@ import java.util.Map;
  * @param pickFinishes spec 065: each of the user's picks, where he was drafted at his position and where he
  *                    finished at it, in pick order. Null in a result stored before spec 065 (a stored result is
  *                    never recomputed, so those games simply do not have it).
+ * @param hindsightSeason the same season replayed with the greedy hindsight roster in the user's seat. Null in a
+ *                    result stored before it existed, for the same reason.
  */
 public record HistoricalResult(List<Week> weeks, List<Standing> standings, int userFinish,
                                Map<String, List<LineupWeek>> lineups, Hindsight hindsight, Bust biggestBust,
                                Steal bestStealPassedOn, Format format, Playoffs playoffs,
                                List<FinalPlace> finalPlaces, String userOutcome,
-                               List<PickFinish> pickFinishes) {
+                               List<PickFinish> pickFinishes, HindsightSeason hindsightSeason) {
 
     public static final String CHAMPION = "CHAMPION";
     public static final String LOST_FINAL = "LOST_FINAL";
@@ -111,4 +113,24 @@ public record HistoricalResult(List<Week> weeks, List<Standing> standings, int u
      */
     public record PickFinish(int pickNo, HistoricalPlayerCard player, String position, int draftedPositionRank,
                              int finishPositionRank, int positionPlayers, double seasonValue, int weeksPlayed) {}
+
+    // ---- the hindsight roster's own season --------------------------------------------------------------
+
+    /**
+     * The season replayed with the greedy hindsight roster in the user's seat: same schedule, same seeded coin.
+     * Played strictly: a team that drafted one of its players later in the real draft loses him and takes the best
+     * free player by the pre-draft board at his position instead (see {@code SeasonReplay.hindsightSeason}); every
+     * other roster is unchanged. It answers "would that roster have won", and only that. The hindsight draft
+     * maximises whole-season points, not wins, so it is not the roster most likely to win the league, and the
+     * other teams are patched, not re-drafted.
+     *
+     * @param pointsFor         regular-season points, the same measure as {@link Standing#pointsFor}
+     * @param regularSeasonRank its standings place after the regular season, 1 = first
+     * @param finish            its final place after the playoffs (the standings rank when there are none)
+     * @param outcome           the {@code userOutcome} vocabulary
+     * @param takenFromBots     how many of its players another team drafted LATER in the real draft and so loses
+     *                          here. The page says how many, because each one is a roster this replay rewrote.
+     */
+    public record HindsightSeason(int wins, int losses, int ties, double pointsFor, int regularSeasonRank,
+                                  int finish, String outcome, int takenFromBots) {}
 }

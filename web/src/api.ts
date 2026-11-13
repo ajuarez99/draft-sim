@@ -4615,6 +4615,25 @@ export type HistoricalHindsight = {
   userBeatIt: boolean
   picks: HistoricalHindsightPick[]
 }
+/**
+ * The season replayed with the greedy hindsight roster in your seat. A team that lost a player to it gets the
+ * best free player at his position by the pre-draft board; every other team is unchanged. Mirrors
+ * HistoricalResult.HindsightSeason.
+ */
+export type HistoricalHindsightSeason = {
+  wins: number
+  losses: number
+  ties: number
+  /** Regular-season points, the same measure as a standings row. */
+  pointsFor: number
+  /** 1 = first after the regular season. */
+  regularSeasonRank: number
+  /** Final place after the playoffs. */
+  finish: number
+  outcome: HistoricalOutcome
+  /** How many of its players another team drafted later in the real draft, and loses (with a replacement) here. */
+  takenFromBots: number
+}
 export type HistoricalBust = {
   pickNo: number
   player: HistoricalPlayerCard
@@ -4712,6 +4731,8 @@ export type HistoricalResult = {
   userOutcome?: HistoricalOutcome | null
   /** Spec 065. Absent from a result stored before it; a stored result is never recomputed. */
   pickFinishes?: HistoricalPickFinish[] | null
+  /** Absent from a result stored before it existed; a stored result is never recomputed. */
+  hindsightSeason?: HistoricalHindsightSeason | null
 }
 
 export type HistoricalGameState = {

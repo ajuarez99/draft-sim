@@ -1,6 +1,16 @@
 import { Fragment, useMemo, useState } from 'react'
 import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult, HistoricalWeek } from '../api'
-import { isOldFormat, ordinal, outcomeHeadline, pointsPair, pts1, scheduleNote, sportOf, teamName } from '../historicalCopy'
+import {
+  hindsightSeasonVerdict,
+  isOldFormat,
+  ordinal,
+  outcomeHeadline,
+  pointsPair,
+  pts1,
+  scheduleNote,
+  sportOf,
+  teamName,
+} from '../historicalCopy'
 import HistoricalBracket from './HistoricalBracket'
 
 type Props = { game: HistoricalGameState; result: HistoricalResult }
@@ -121,6 +131,81 @@ function PickFinishes({ game, result }: Props) {
         </table>
       </div>
     </section>
+  )
+}
+
+/**
+ * The greedy hindsight roster, pick by pick, beside the player you took at the same pick. The picks have been in
+ * every stored result since spec 053, so this draws for old games too; only "would it have won" needs a result
+ * that carries `hindsightSeason`.
+ */
+function HindsightRoster({ game, result }: Props) {
+  const h = result.hindsight
+  if (!h.picks || h.picks.length === 0) return null
+  const season = result.hindsightSeason ?? null
+  const mine = new Map(game.picks.filter((p) => p.draftSlot === game.userSlot).map((p) => [p.pickNo, p.player]))
+  // Your own players' season points ride on pickFinishes; a result stored before it has no number to show.
+  const myPoints = new Map((result.pickFinishes ?? []).map((f) => [f.pickNo, f.seasonValue]))
+  const showMyPoints = myPoints.size > 0
+  return (
+    <div className="hist-hindsight">
+      <h3>The hindsight roster</h3>
+      <p className="muted small">
+        At each of your picks, the player still on the board who added the most to this roster's season total. Points are each player's
+        full-season total.
+      </p>
+      <div className="hist-table-wrap">
+        <table className="hist-table">
+          <thead>
+            <tr>
+              <th className="num">Pick</th>
+              <th>Hindsight took</th>
+              <th className="num">Points</th>
+              <th>You took</th>
+              {showMyPoints && <th className="num">Points</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {h.picks.map((p) => {
+              const took = mine.get(p.pickNo) ?? null
+              const same = took != null && took.id === p.player.id
+              return (
+                <tr key={p.pickNo}>
+                  <td className="num">
+                    {p.pickNo}
+                    <span className="muted small"> · round {Math.ceil(p.pickNo / game.teams)}</span>
+                  </td>
+                  <td>
+                    <strong>{p.player.name}</strong>
+                    <span className="muted small"> · {p.player.positions.join('/')}</span>
+                  </td>
+                  <td className="num">{pts1(p.seasonValue)}</td>
+                  <td>
+                    {took ? took.name : ''}
+                    {same && <span className="hist-change up hist-same-pick">Same pick</span>}
+                  </td>
+                  {showMyPoints && <td className="num">{myPoints.has(p.pickNo) ? pts1(myPoints.get(p.pickNo)!) : ''}</td>}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <h3>Would it have won?</h3>
+      {season ? (
+        <>
+          <p className={`hist-verdict${season.finish === 1 ? ' good' : ''}`}>{hindsightSeasonVerdict(season, game.teams)}</p>
+          <p className="muted small">
+            The same schedule with this roster in your seat. It was picked for the most points over the season, not the most wins.
+            {season.takenFromBots > 0
+              ? ` ${season.takenFromBots} of its players ${season.takenFromBots === 1 ? 'was' : 'were'} drafted later by another team. That team loses ${season.takenFromBots === 1 ? 'him' : 'them'} here and gets the best player left at his position by the pre-draft rankings. The other teams were not re-drafted.`
+              : ' Every other team is as it was.'}
+          </p>
+        </>
+      ) : (
+        <p className="muted small">This game finished before the hindsight roster's season was replayed, so there is no answer for it.</p>
+      )}
+    </div>
   )
 }
 
@@ -281,6 +366,7 @@ export default function HistoricalResults({ game, result }: Props) {
             Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
           </p>
         )}
+        <HindsightRoster game={game} result={result} />
         {old && <Callouts game={game} result={result} />}
         {!result.pickFinishes && (
           <p className="muted small">
