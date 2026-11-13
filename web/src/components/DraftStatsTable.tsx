@@ -5,6 +5,7 @@ import { posRank } from '../posRank'
 import { posPill } from '../positions'
 import { Cell } from '../statCells'
 import { COLUMNS, columnLabel, type SortState, type StatColumn, type StatMode } from '../statLeaderboard'
+import RookieTag from './RookieTag'
 import PlayerFace from './PlayerFace'
 
 type Props = {
@@ -111,6 +112,7 @@ const StatRow = memo(function StatRow({ r, columns, board, sleeperLeagueId, mode
           <a href={`/leagues/${sleeperLeagueId}/players/${p.sleeperId}`} target="_blank" rel="noopener">
             {p.name}
           </a>
+          <RookieTag player={p} />
           {taken && <span className="taken-tag">taken</span>}
           {fills && !taken && <span className="need-tag">{fills}</span>}
           <span className="ds-sub">

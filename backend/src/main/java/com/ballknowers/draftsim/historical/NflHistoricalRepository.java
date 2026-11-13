@@ -204,6 +204,24 @@ public class NflHistoricalRepository {
                 rs.getString("team"), stats(rs)));
     }
 
+    /** Ids with a season line before this season: the veterans, for {@link HistoricalRookies}. */
+    public java.util.Set<Long> playersWithLineBefore(int season) {
+        return new java.util.HashSet<>(db.sql(
+                        "select distinct player_id from historical_nfl_player_season where season < ?")
+                .param(season).query(Long.class).list());
+    }
+
+    /** Every drafted player's draft season, by player id: a drafted player is a rookie in that season only. */
+    public Map<Long, Integer> draftSeasons() {
+        Map<Long, Integer> out = new HashMap<>();
+        db.sql("select player_id, season from historical_nfl_draft_pick")
+                .query((rs, i) -> {
+                    out.put(rs.getLong("player_id"), rs.getInt("season"));
+                    return 0;
+                }).list();
+        return out;
+    }
+
     /** The players drafted INTO the NFL in this season, by player id (F14). */
     public Map<Long, RookiePick> draftPicks(int season) {
         Map<Long, RookiePick> out = new LinkedHashMap<>();

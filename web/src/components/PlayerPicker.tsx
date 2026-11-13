@@ -5,6 +5,8 @@ import { posRankOrAdp } from '../posRank'
 import { roundPickLabel } from '../roundPickLabel'
 import { computeTeamNeeds, makeFitFor } from '../teamNeeds'
 import TeamStrip from './TeamStrip'
+import RookieTag, { RookieChip } from './RookieTag'
+import { isRookie, rookieFlagKnown } from '../rookie'
 import PlayerFace from './PlayerFace'
 
 type Props = {
@@ -51,6 +53,9 @@ export default function PlayerPicker({
 }: Props) {
   const POSITIONS = useMemo(() => filterPositions(sport), [sport])
   const [filter, setFilter] = useState<string>('ALL')
+  const [rookiesWanted, setRookiesOnly] = useState(false)
+  const rookiesOffered = useMemo(() => rookieFlagKnown(availability.map((r) => r.player)), [availability])
+  const rookiesOnly = rookiesWanted && rookiesOffered
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -64,9 +69,10 @@ export default function PlayerPicker({
     const key = String(pausedAt)
     return availability
       .filter((r) => filter === 'ALL' || eligiblePositions(r.player, sport).includes(filter))
+      .filter((r) => !rookiesOnly || isRookie(r.player))
       .filter((r) => (r.survivalByPick[key] ?? 0) >= 0.2 && !alreadyPicked.has(r.player.id))
       .sort((a, b) => a.player.adp - b.player.adp)
-  }, [availability, filter, pausedAt, alreadyPicked, sport])
+  }, [availability, filter, rookiesOnly, pausedAt, alreadyPicked, sport])
 
   // Empty rosterPositions is a real (if degraded) state -- roster settings
   // that haven't synced, or a malformed ingest -- not just "no data yet".
@@ -101,6 +107,7 @@ export default function PlayerPicker({
               {p}
             </button>
           ))}
+          {rookiesOffered && <RookieChip on={rookiesOnly} onChange={setRookiesOnly} />}
         </div>
 
         <div className="picker-scroll">
@@ -132,6 +139,7 @@ export default function PlayerPicker({
                       <span {...posPill(r.player, sport)}>{positionLabel(r.player, sport)}</span>
                       <PlayerFace sport={sport} sleeperId={r.player.sleeperId} team={r.player.team} position={r.player.position} name={r.player.name} size={20} />
                       {r.player.name}
+                      <RookieTag player={r.player} />
                       <span className="team">{r.player.team}</span>
                     </td>
                     <td className="num">{posRankOrAdp(r.player, sport)}</td>
@@ -143,7 +151,7 @@ export default function PlayerPicker({
           </table>
           {rows.length === 0 && (
             <p className="muted">
-              Nothing survives above 20% here. Close this and take the model's suggested pick from the prompt behind
+              {rookiesOnly ? 'No rookies survive above 20% here.' : 'Nothing survives above 20% here.'} Close this and take the model's suggested pick from the prompt behind
               it instead.
             </p>
           )}

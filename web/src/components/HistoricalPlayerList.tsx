@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import type { HistoricalPlayerCard, HistoricalSport } from '../api'
 import { posPill } from '../positions'
 import { cardToPlayerRef, priorLine, pts1 } from '../historicalCopy'
+import { isRookie, rookieFlagKnown } from '../rookie'
+import RookieTag, { RookieChip } from './RookieTag'
 
 type Props = {
   players: HistoricalPlayerCard[]
@@ -34,13 +36,20 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
   const [filter, setFilter] = useState('ALL')
   const [q, setQ] = useState('')
   const [shown, setShown] = useState(PAGE)
+  // Rookies only narrows the position filter; offered only when this game's board knows who its rookies are.
+  const [rookiesWanted, setRookiesWanted] = useState(false)
+  const rookiesOffered = useMemo(() => rookieFlagKnown(players), [players])
+  const rookiesOnly = rookiesWanted && rookiesOffered
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return players.filter(
-      (p) => (filter === 'ALL' || p.positions.includes(filter)) && (needle === '' || p.name.toLowerCase().includes(needle)),
+      (p) =>
+        (filter === 'ALL' || p.positions.includes(filter)) &&
+        (!rookiesOnly || isRookie(p)) &&
+        (needle === '' || p.name.toLowerCase().includes(needle)),
     )
-  }, [players, filter, q])
+  }, [players, filter, rookiesOnly, q])
 
   return (
     <section className="panel hist-list" aria-label="Available players">
@@ -67,6 +76,15 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
               {f === 'ALL' ? 'All' : f}
             </button>
           ))}
+          {rookiesOffered && (
+            <RookieChip
+              on={rookiesOnly}
+              onChange={(on) => {
+                setRookiesWanted(on)
+                setShown(PAGE)
+              }}
+            />
+          )}
         </div>
         <input
           type="search"
@@ -81,7 +99,7 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
         />
       </div>
       {rows.length === 0 ? (
-        <p className="muted">No players match.</p>
+        <p className="muted">{rookiesOnly ? 'No rookies match.' : 'No players match.'}</p>
       ) : (
         <ul className="hist-rows">
           {rows.slice(0, shown).map((p) => {
@@ -94,6 +112,7 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
                 <div className="hist-main">
                   <div className="hist-name">
                     <strong>{p.name}</strong>
+                    <RookieTag player={p} />
                     {p.positions.length > 0 ? (
                       p.positions.map((pos) => (
                         <span key={pos} className={`pos ${pos}`}>

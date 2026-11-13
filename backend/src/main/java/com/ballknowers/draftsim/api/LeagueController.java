@@ -334,7 +334,7 @@ public class LeagueController {
         return new SimulationResult.PlayerRef(p.id(), p.sleeperId(), p.name(),
                 p.primary().name(),
                 p.positions() == null ? List.of() : p.positions().stream().map(Enum::name).toList(),
-                p.team(), 999, 999);
+                p.team(), 999, 999, p.isRookie());
     }
 
     /**

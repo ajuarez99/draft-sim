@@ -27,10 +27,10 @@ describe('FOCUS_SLOTS', () => {
       'FOCUS_SLOTS changed. Re-run the palette gate before accepting this:\n' +
         '  node scripts/validate_palette.js "' +
         FOCUS_SLOTS.join(',') +
-        '" --mode dark --surface "#070604" --pairs all\n' +
+        '" --mode dark --surface "#090917" --pairs all\n' +
         'It must report ALL CHECKS PASS. Three is the measured ceiling for crossing\n' +
         'lines on this surface, not a preference -- see research.md R2.\n' +
-        'Validate WITH the own colour of the reader (--you, #f7c243) in the set. The reader owns a --you line\n' +
+        'Validate WITH the own colour of the reader (--you, #f8d05c) in the set. The reader owns a --you line\n' +
         'that is on screen at the same time, so four colours are visible at once --\n' +
         'checking these three alone once hid an orange slot sitting delta-E 6.7 from\n' +
         'the old red "you", which is two lines the same colour.',
@@ -52,8 +52,8 @@ describe('FOCUS_SLOTS', () => {
    * validator: no pin slot may sit in the "you" colour's own corner of the hue wheel.
    */
   it('keeps every pin slot perceptually clear of the colour the reader wears', () => {
-    // --you, oklch(84% 0.15 85), resolved to hex for comparison (2026-11-10 palette).
-    const YOU = '#f7c243'
+    // --you, oklch(87% 0.14 90), resolved to hex for comparison (2026-11-13 palette).
+    const YOU = '#f8d05c'
 
     // OKLab, the same space the palette validator measures in. sRGB hue angle
     // is NOT a substitute: it rates the yellow slot 15deg from the old red while
