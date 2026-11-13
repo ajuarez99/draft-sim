@@ -2,16 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   abandonHistoricalGame,
+  getHistoricalProfile,
   historicalSeasons,
   listHistoricalGames,
   startHistoricalGame,
   type HistoricalGameSummary,
+  type HistoricalProfile,
   type HistoricalSport,
   type HistoricalSeasonSummary,
 } from '../api'
 import { useFailure } from '../useFailure'
 import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
+import HistoricalProfileCard from '../components/HistoricalProfileCard'
 import { sportOf, summaryStatus } from '../historicalCopy'
 import { clearDraftQueue } from '../useDraftQueue'
 
@@ -50,6 +53,8 @@ export default function HistoricalDraft() {
   const [games, setGames] = useState<HistoricalGameSummary[] | null>(null)
   const [nbaRows, setNbaRows] = useState<HistoricalSeasonSummary[] | null>(null)
   const [nflRows, setNflRows] = useState<HistoricalSeasonSummary[] | null>(null)
+  // Spec 064: a failed profile request shows nothing, so the page looks as it did before achievements.
+  const [profile, setProfile] = useState<HistoricalProfile | null>(null)
   const [seasonsFailed, setSeasonsFailed] = useState(false)
   const [starting, setStarting] = useState(false)
   // Basketball is only the preselected tab; every request still carries the sport explicitly.
@@ -59,6 +64,16 @@ export default function HistoricalDraft() {
     listHistoricalGames()
       .then(setGames)
       .catch((e) => fail(e))
+  }, [])
+
+  useEffect(() => {
+    let current = true
+    getHistoricalProfile()
+      .then((p) => current && setProfile(p))
+      .catch(() => {})
+    return () => {
+      current = false
+    }
   }, [])
 
   // The settings line is the same for every season of a sport; a failure here only loses that line.
@@ -178,6 +193,8 @@ export default function HistoricalDraft() {
           <p>{copy.how}</p>
         </HowThisWorks>
       </section>
+
+      {profile && <HistoricalProfileCard profile={profile} />}
 
       <section className="panel" aria-label="Your games">
         <h2>Your games</h2>

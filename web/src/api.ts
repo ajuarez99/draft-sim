@@ -4787,3 +4787,83 @@ export const abandonHistoricalGame = (id: number) =>
   apiFetch(`/api/history/games/${id}/abandon`, { method: 'POST' }).then(async (res) => {
     if (!res.ok) throw await apiError(res)
   })
+
+// ---- Spec 064: Time Machine achievements and levels. Mirrors the backend records field for field. ----
+
+/** One catalog entry, earned or not. `unlockedAt`, `gameId` and `detail` are null while locked (and `gameId` for a saved-result unlock). */
+export type HistoricalBadge = {
+  code: string
+  name: string
+  /** The rule in plain words, shown while locked. */
+  rule: string
+  xp: number
+  /** NEW_GAMES badges need pick-by-pick facts, which only games finished after achievements were added carry. */
+  source: 'STORED' | 'NEW_GAMES'
+  unlocked: boolean
+  /** ISO timestamp. */
+  unlockedAt: string | null
+  gameId: number | null
+  /** The player, pick and numbers that satisfied the rule. The shape is the backend's; read it defensively. */
+  detail: Record<string, unknown> | null
+  seen: boolean
+}
+
+/** A notable pick in one game. No XP; it shows every game, unlike a badge. */
+export type HistoricalMoment = {
+  code: string
+  name: string
+  text: string
+  pickNo: number
+  playerName: string
+}
+
+export type HistoricalProfile = {
+  xp: number
+  level: number
+  levelName: string
+  levelStartXp: number
+  nextLevelXp: number
+  seenLevel: number
+  totals: {
+    games: number
+    gamesFromSavedResults: number
+    weeklyWins: number
+    playoffWins: number
+    titles: number
+  }
+  /** The whole catalog in catalog order. */
+  badges: HistoricalBadge[]
+  /** Games that could not be settled on this call. */
+  settleFailures: number
+}
+
+export type HistoricalGameAward = {
+  gameId: number
+  /** False when this game's awards could not be worked out: zero XP and empty lists. */
+  settled: boolean
+  fromSavedResult: boolean
+  /** The game's own lines; they sum to this. */
+  xp: number
+  lines: { label: string; xp: number }[]
+  /** Badges this game unlocked. */
+  badges: HistoricalBadge[]
+  moments: HistoricalMoment[]
+  momentsSeen: boolean
+  /** `xp` plus the XP of the badges above. */
+  total: number
+}
+
+export const getHistoricalProfile = () => apiFetch('/api/history/profile').then(json<HistoricalProfile>)
+
+export const getHistoricalGameAward = (id: number) =>
+  apiFetch(`/api/history/games/${id}/award`).then(json<HistoricalGameAward>)
+
+/** 204 on success. `level` and `momentsGameId` are null when this call does not mark either. */
+export const markHistoricalSeen = (body: { codes: string[]; level: number | null; momentsGameId: number | null }) =>
+  apiFetch('/api/history/profile/seen', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(async (res) => {
+    if (!res.ok) throw await apiError(res)
+  })
