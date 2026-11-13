@@ -83,6 +83,13 @@ public interface HistoricalSport {
     /** First game date seen in each week; empty for football (no dates, F4). */
     Map<Integer, LocalDate> weekStarts(int seasonStart);
 
+    /**
+     * How this sport's computer teams differ from the shared draft engine (spec 062). The default changes nothing.
+     */
+    default BotTuning botTuning() {
+        return BotTuning.NONE;
+    }
+
     // ---- what the screen says ------------------------------------------------------------------------
 
     /** Where the league settings come from (FR-002). */

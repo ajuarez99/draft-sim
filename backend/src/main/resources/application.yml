@@ -131,6 +131,17 @@ historical:
     tf: -2
     ff: -2
 
+# Time Machine bots (claude/time-machine-bot-strength.md). The softmax temperature the game's computer teams draft
+# at, instead of the shared draftsim.scoring.*.temperature of 1.0 in config/weights.yml, which is left alone. Hand-set
+# and arbitrary, chosen from a measurement and not fitted: at 0.25 a user who only presses auto-finish won 11% of 168
+# basketball leagues and 9% of 78 football leagues (chance 8%); at the shared 1.0 it was 40% and 36%. Leave a sport
+# out to give its bots the shared value.
+historical-bots:
+  nba:
+    temperature: 0.25
+  nfl:
+    temperature: 0.25
+
 # Football Time Machine (specs/056-nfl-historical-draft-game). A separate block from `historical:` on purpose
 # (review F10). Every number is hand-set and arbitrary unless marked "schedule fact"; nothing is fitted.
 historical-nfl:

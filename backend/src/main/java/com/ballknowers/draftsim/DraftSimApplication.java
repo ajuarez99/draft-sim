@@ -28,6 +28,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         ProjectionAccuracyProperties.class,
         LockInProperties.class,
         RecapProperties.class,
+        HistoricalBotProperties.class,
         RivalryProperties.class,
         HistoricalProperties.class,
         NflHistoricalProperties.class

@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.historical;
 
+import com.ballknowers.draftsim.config.HistoricalBotProperties;
 import com.ballknowers.draftsim.config.NflHistoricalProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.historical.HistoricalBoardBuilder.NflRank;
@@ -7,6 +8,7 @@ import com.ballknowers.draftsim.historical.HistoricalBoardBuilder.Options;
 import com.ballknowers.draftsim.historical.HistoricalBoardBuilder.RankConfig;
 import com.ballknowers.draftsim.historical.HistoricalBoardBuilder.RankMode;
 import com.ballknowers.draftsim.historical.HistoricalDataRepository.SeasonRow;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
@@ -47,12 +49,29 @@ public class NflHistoricalSport implements HistoricalSport {
     private final HistoricalDataRepository data;
     private final NflHistoricalRepository nfl;
 
+    private final BotTuning botTuning;
+
+    /** The shared engine's bots, untuned: what every caller before spec 062 got. */
     public NflHistoricalSport(NflHistoricalProperties props, HistoricalDataRepository data,
                               NflHistoricalRepository nfl) {
+        this(props, data, nfl, BotTuning.NONE);
+    }
+
+    @Autowired
+    public NflHistoricalSport(NflHistoricalProperties props, HistoricalDataRepository data,
+                              NflHistoricalRepository nfl, HistoricalBotProperties bots) {
+        this(props, data, nfl, bots.nfl());
+    }
+
+    public NflHistoricalSport(NflHistoricalProperties props, HistoricalDataRepository data,
+                              NflHistoricalRepository nfl, BotTuning botTuning) {
         this.props = props;
         this.data = data;
         this.nfl = nfl;
+        this.botTuning = botTuning;
     }
+
+    @Override public BotTuning botTuning() { return botTuning; }
 
     @Override public String code() { return CODE; }
 

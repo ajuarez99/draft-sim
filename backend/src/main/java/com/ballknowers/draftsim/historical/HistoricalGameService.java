@@ -288,8 +288,9 @@ public class HistoricalGameService {
         // Bots only: no manager seats, so every profile is neutral, and positional priors are uniform because
         // fitted ones describe a 2024-26 league (research R9). DraftContext keeps the map it is given, so it
         // gets a copy.
-        return contexts.build(settingsOf(row), seats(row), Map.of(), PositionalPriors.uniform(sportOf(row).sport()),
-                board, new HashMap<>(completed));
+        HistoricalSport sport = sportOf(row);
+        return contexts.build(settingsOf(row), seats(row), Map.of(), PositionalPriors.uniform(sport.sport()),
+                board, new HashMap<>(completed), sport.botTuning()::apply);
     }
 
     private static List<SeatSpec> seats(GameRow row) {
