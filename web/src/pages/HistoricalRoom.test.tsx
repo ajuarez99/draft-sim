@@ -262,7 +262,7 @@ describe('HistoricalRoom when complete', () => {
     renderRoom()
     expect(await screen.findByText('greedy hindsight, bots unchanged')).toBeInTheDocument()
     expect(screen.getByText(/188\.5 points ahead/)).toBeInTheDocument()
-    expect(screen.queryByText('You beat the greedy hindsight draft.')).not.toBeInTheDocument()
+    expect(screen.queryByText('You beat the hindsight draft.')).not.toBeInTheDocument()
     expect(screen.getByText(/finished 150th of 4 drafted players/)).toBeInTheDocument()
     expect(screen.getByText(/500\.0 more/)).toBeInTheDocument()
   })
@@ -270,7 +270,7 @@ describe('HistoricalRoom when complete', () => {
   it('says you beat hindsight, with no negative gap, when userBeatIt', async () => {
     getHistoricalGame.mockResolvedValue(complete(true))
     renderRoom()
-    expect(await screen.findByText('You beat the greedy hindsight draft.')).toBeInTheDocument()
+    expect(await screen.findByText('You beat the hindsight draft.')).toBeInTheDocument()
     expect(screen.queryByText(/points ahead/)).not.toBeInTheDocument()
     expect(screen.queryByText(/-\d+\.\d/)).not.toBeInTheDocument()
   })

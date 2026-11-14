@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult } from '../api'
-import HistoricalResults from './HistoricalResults'
+import type { HistoricalGameState, HistoricalPickFinish, HistoricalPlayerCard, HistoricalResult } from '../api'
+import HistoricalResults, { gotRight } from './HistoricalResults'
 import old062 from '../__fixtures__/historical-result-062.json'
 
 function card(id: number, name: string): HistoricalPlayerCard {
@@ -276,7 +276,7 @@ describe('HistoricalResults, a result stored before playoffs (the 062 fixture)',
     expect(container.querySelector('.hist-cutline')).toBeNull()
     expect(screen.queryByText(/not played/)).not.toBeInTheDocument()
     expect(screen.queryByText(/whole real season/)).not.toBeInTheDocument()
-    expect(screen.queryByText('Your draft in two moments')).not.toBeInTheDocument()
+    expect(screen.queryByText('The story of your draft')).not.toBeInTheDocument()
     // every week is still in the picker, labelled the old way
     expect(screen.getByLabelText('Week').querySelectorAll('option')).toHaveLength(result.weeks.length)
     expect(screen.getByText('Biggest bust')).toBeInTheDocument()
@@ -330,5 +330,32 @@ describe('HistoricalResults, the hindsight roster and whether it would have won'
     renderIt(withPicks(game(3)), playoffResult({ hindsight }))
     expect(within(panel()).getByText('Star One')).toBeInTheDocument()
     expect(within(panel()).getByText(/before the hindsight roster's season was replayed/)).toBeInTheDocument()
+  })
+})
+
+describe('gotRight (spec 068): which picks beat their draft spot', () => {
+  const row = (pickNo: number, drafted: number, finished: number, seasonValue: number): HistoricalPickFinish => ({
+    pickNo, player: card(pickNo, `P${pickNo}`), position: 'SF', draftedPositionRank: drafted, finishPositionRank: finished,
+    positionPlayers: 80, seasonValue, weeksPlayed: 20,
+  })
+
+  it('counts only picks that finished AHEAD of where they were drafted, and names the biggest jump', () => {
+    // Drafted 28th, finished 13th is a jump of 15 (better). Drafted 3rd, finished 40th is a fall, never "right".
+    const r = gotRight([row(1, 3, 40, 900), row(2, 28, 13, 600), row(3, 10, 8, 700), row(4, 5, 5, 800)])!
+    expect(r.ahead).toBe(2)
+    expect(r.total).toBe(4)
+    expect(r.best?.pickNo).toBe(2)
+  })
+
+  it('breaks a tied jump by season points, and has no best when nobody beat his spot', () => {
+    expect(gotRight([row(1, 12, 10, 300), row(2, 9, 7, 500)])!.best?.pickNo).toBe(2)
+    const none = gotRight([row(1, 3, 40, 900), row(2, 5, 5, 800)])!
+    expect(none.ahead).toBe(0)
+    expect(none.best).toBeNull()
+  })
+
+  it('is null for a result stored before pick finishes existed', () => {
+    expect(gotRight(undefined)).toBeNull()
+    expect(gotRight([])).toBeNull()
   })
 })

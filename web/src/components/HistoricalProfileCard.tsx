@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import type { HistoricalProfile } from '../api'
+import type { HistoricalBadge, HistoricalProfile } from '../api'
 import { BadgeTile } from './HistoricalAwardPanel'
 
 function earnedOn(iso: string | null): string {
@@ -16,7 +16,29 @@ export default function HistoricalProfileCard({ profile }: { profile: Historical
   const size = Math.max(profile.nextLevelXp - profile.levelStartXp, 1)
   const into = Math.min(Math.max(profile.xp - profile.levelStartXp, 0), size)
   const t = profile.totals
-  const earned = profile.badges.filter((b) => b.unlocked).length
+  const earnedBadges = profile.badges.filter((b) => b.unlocked)
+  const lockedBadges = profile.badges.filter((b) => !b.unlocked)
+  const earned = earnedBadges.length
+  // Earned trophies show; the ones still locked sit behind one line, so the page is not a wall of locked boxes.
+  const tile = (b: HistoricalBadge) => (
+    <BadgeTile
+      key={b.code}
+      badge={b}
+      footer={
+        b.unlocked ? (
+          <>
+            {b.unlockedAt && <span className="muted"> · {earnedOn(b.unlockedAt)}</span>}
+            {b.gameId != null && (
+              <>
+                {' · '}
+                <Link to={`/history/${b.gameId}`}>See the game</Link>
+              </>
+            )}
+          </>
+        ) : undefined
+      }
+    />
+  )
 
   return (
     <>
@@ -26,7 +48,7 @@ export default function HistoricalProfileCard({ profile }: { profile: Historical
             {profile.level}
           </span>
           <div>
-            <p className="page-eyebrow">Level {profile.level}</p>
+            <p className="tm-over">Level {profile.level}</p>
             <h2 className="ach-level-name">{profile.levelName}</h2>
           </div>
         </div>
@@ -74,27 +96,15 @@ export default function HistoricalProfileCard({ profile }: { profile: Historical
         <p className="muted small">
           {earned} of {profile.badges.length} earned
         </p>
-        <ul className="ach-grid">
-          {profile.badges.map((b) => (
-            <BadgeTile
-              key={b.code}
-              badge={b}
-              footer={
-                b.unlocked ? (
-                  <>
-                    {b.unlockedAt && <span className="muted"> · {earnedOn(b.unlockedAt)}</span>}
-                    {b.gameId != null && (
-                      <>
-                        {' · '}
-                        <Link to={`/history/${b.gameId}`}>See the game</Link>
-                      </>
-                    )}
-                  </>
-                ) : undefined
-              }
-            />
-          ))}
-        </ul>
+        {earnedBadges.length > 0 && <ul className="ach-grid">{earnedBadges.map(tile)}</ul>}
+        {lockedBadges.length > 0 && (
+          <details className="how tm-more">
+            <summary>
+              {lockedBadges.length} still to unlock
+            </summary>
+            <ul className="ach-grid">{lockedBadges.map(tile)}</ul>
+          </details>
+        )}
       </section>
     </>
   )

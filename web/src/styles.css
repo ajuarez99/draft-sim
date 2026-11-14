@@ -7172,3 +7172,153 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .ach-badge { transition: none; }
   .ach-badge:hover { transform: none; }
 }
+
+/* --- Spec 068: Time Machine, the friendly look (claude/time-machine-friendly-look.md). -----------------------------
+   Time Machine is a game, so it reads like one: a rounded face, sentence case, one centred column, and surfaces
+   only where something repeats. Everything is scoped under `.tm`; nothing outside the three Time Machine screens
+   changes. `.tm` re-points the three font tokens, so shared pieces drawn inside it (chips, the draft board, `.cond`,
+   `.mono`) pick up the face without being edited. `.tm-page` (landing, results) is the single column and flattens
+   `.panel`; the draft room is `.tm` only and keeps its panels, because there they separate three working columns. */
+.tm {
+  --font-body: 'Nunito', ui-rounded, 'Segoe UI', system-ui, sans-serif;
+  --font-display: var(--font-body);
+  --font-num: var(--font-body);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+}
+.tm .cond { text-transform: none; letter-spacing: 0; font-weight: 900; }
+.tm .chip { font-size: 13px; font-weight: 700; padding: 5px 13px; }
+.tm .how { font-size: 13px; }
+.tm-over { margin: 0; font-size: 13px; font-weight: 700; color: var(--muted); }
+
+.tm-page { width: 100%; max-width: 760px; margin-inline: auto; gap: 44px; padding-bottom: 48px; }
+.tm-page .panel { background: none; box-shadow: none; padding: 0; border-radius: 0; }
+.tm-page h2, .tm-page .panel h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; margin: 0 0 14px; color: var(--text); }
+.tm-page h3 { font-size: 16px; font-weight: 800; }
+.tm-page .muted.small, .tm-page .small { font-size: 13px; }
+
+/* The hero: mark, name, one sentence, the sport, the one button. */
+.tm-hero { display: grid; justify-items: center; text-align: center; gap: 14px; padding-top: 20px; }
+.tm-mark { display: grid; place-items: center; width: 68px; height: 68px; border-radius: 20px; background: var(--you-fill); color: var(--bg); }
+.tm-title { margin: 0; font-size: 44px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.05; }
+.tm-tagline { margin: 0; max-width: 44ch; font-size: 17px; color: var(--muted); text-wrap: balance; }
+.tm-sports { display: inline-flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--panel); }
+.tm-sport { font: inherit; font-size: 15px; font-weight: 700; padding: 8px 20px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); cursor: pointer; }
+.tm-sport:hover { color: var(--text); }
+.tm-sport.on { background: var(--text); color: var(--bg); }
+.tm-play {
+  font: inherit; font-size: 17px; font-weight: 800; display: inline-block; min-width: 240px; padding: 14px 34px; margin-top: 4px;
+  border: 0; border-radius: 999px; background: var(--brand); color: var(--bg); text-align: center; text-decoration: none; cursor: pointer;
+  box-shadow: 0 4px 0 color-mix(in oklab, var(--brand) 55%, black);
+}
+.tm-play:hover { filter: brightness(1.08); color: var(--bg); }
+.tm-play:active { transform: translateY(3px); box-shadow: 0 1px 0 color-mix(in oklab, var(--brand) 55%, black); }
+.tm-play:disabled { opacity: 0.5; cursor: default; }
+.tm-btn { font: inherit; font-size: 14px; font-weight: 800; display: inline-block; padding: 8px 18px; border: 0; border-radius: 999px; background: var(--brand); color: var(--bg); text-decoration: none; cursor: pointer; white-space: nowrap; }
+.tm-btn:hover { filter: brightness(1.08); color: var(--bg); }
+.tm-btn.quiet { background: var(--raised); color: var(--text); }
+.tm-btn.quiet:hover { color: var(--text); }
+.tm-play:focus-visible, .tm-btn:focus-visible, .tm-sport:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+/* How to play: three numbered steps, no box. */
+.tm-steps { list-style: none; counter-reset: tm-step; margin: 0 0 14px; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 22px; }
+.tm-steps li { counter-increment: tm-step; display: grid; gap: 4px; align-content: start; }
+.tm-steps li::before {
+  content: counter(tm-step); display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 6px;
+  border-radius: 50%; background: var(--raised); color: var(--text); font-weight: 900; font-size: 16px;
+}
+.tm-steps strong { font-size: 17px; font-weight: 800; }
+.tm-steps span { color: var(--muted); font-size: 14.5px; }
+
+/* Level: the one card on the landing page. Trophies: tinted when earned, quiet when not, no outlines. */
+.tm-page .panel.ach-level { background: var(--panel); border-radius: 22px; padding: 22px 24px; }
+.tm-page .ach-level h2 { margin: 0; }
+.tm-page .ach-bar { height: 12px; border: 0; background: var(--raised); }
+.tm-page .ach-totals dd { font-size: 26px; font-weight: 900; }
+.tm-page .ach-badge { border: 0; border-radius: 16px; padding: 14px 16px; }
+.tm-page .ach-badge.earned { background: color-mix(in oklab, var(--fitted) 15%, var(--panel)); box-shadow: none; }
+.tm-page .ach-badge.locked { background: var(--panel); color: var(--muted); }
+.tm-page .ach-pill { border: 0; font-weight: 800; padding: 2px 10px; }
+.tm-page .hist-award-sub { font-size: 16px; font-weight: 800; text-transform: none; letter-spacing: 0; color: var(--text); margin: 20px 0 10px; }
+.tm-page .hist-award-lines li { border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent); }
+.tm-page .hist-award-lines li:last-child { border-bottom: 0; }
+
+/* Your games: one soft row each. */
+.tm-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tm-game { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 18px; background: var(--panel); }
+.tm-game-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-width: 0; }
+.tm-game-text strong { font-size: 16px; font-weight: 800; }
+.tm-game-sport { font-size: 16px; font-weight: 800; margin-left: -6px; }
+.tm-game-status { font-size: 14px; font-weight: 700; color: var(--muted); }
+.tm-game-status.status-drafting { color: var(--brand); }
+.tm-game-actions { display: flex; gap: 8px; flex: none; }
+
+/* Results: the finish is the headline, then the story of the draft, then everything else in reading order. */
+.tm-kicker { margin: 16px 0 -36px; text-align: center; font-size: 15px; font-weight: 700; color: var(--muted); }
+.tm-page .hist-results { gap: 44px; margin-bottom: 0; }
+.tm-page .hist-finish { display: grid; justify-items: center; text-align: center; gap: 6px; }
+.tm-page .hist-finish p { margin: 0; }
+.tm-page h2.hist-finish-title { font-size: 44px; font-weight: 900; line-height: 1.08; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.tm-page .hist-finish .tm-play { margin-top: 16px; }
+.tm-page .hist-callouts { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.tm-page .hist-moments .hist-callout, .tm-page .hist-callout { border-left: 0; border-radius: 20px; padding: 18px 20px; font-size: 15px; background: var(--panel); }
+.tm-page .hist-callout h3 { margin: 0 0 8px; font-size: 16px; font-weight: 800; text-transform: none; letter-spacing: 0; color: var(--text); }
+.tm-page .hist-callout p { margin: 0; }
+.tm-page .hist-callout-right { background: color-mix(in oklab, var(--up) 14%, var(--panel)); }
+.tm-page .hist-callout-right h3 { color: var(--up); }
+.tm-page .hist-callout-bust { background: color-mix(in oklab, var(--down) 14%, var(--panel)); }
+.tm-page .hist-callout-bust h3 { color: var(--down); }
+.tm-page .hist-callout-steal { background: color-mix(in oklab, var(--you) 12%, var(--panel)); }
+.tm-page .hist-callout-steal h3 { color: var(--you-text); }
+.tm-page .hist-stat-num { font-size: 32px; font-weight: 900; }
+.tm-page .hist-verdict { font-size: 16px; }
+.tm-page .hist-table th { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.tm-page .hist-table th, .tm-page .hist-table td { border-bottom-color: color-mix(in oklab, var(--line) 60%, transparent); }
+.tm-page .hist-cutline td { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 700; background: transparent; }
+.tm-page .hist-champ { background: color-mix(in oklab, var(--brand) 16%, var(--panel)); box-shadow: none; border-radius: 20px; }
+.tm-page .hist-champ.me { box-shadow: inset 0 0 0 2px var(--you); }
+.tm-page .hist-champ-label { text-transform: none; letter-spacing: 0; font-weight: 700; }
+.tm-page .hist-bk-head { text-transform: none; letter-spacing: 0; font-size: 16px; font-weight: 800; color: var(--text); }
+.tm-page .hist-bk-match { background: var(--panel); border-radius: 16px; }
+.tm-page .hist-bk-byes li { border: 0; background: var(--panel); border-radius: 12px; }
+.tm-page .hist-bk-win { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.tm-page select { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 12px; border: 0; background: var(--raised); color: var(--text); }
+.tm-more > summary { font-size: 15px; font-weight: 700; color: var(--text); }
+.tm-more .hist-disclosure { margin-top: 10px; }
+
+/* The draft room: same boxes (they are three working columns), friendlier type on them. */
+.tm .hist-banner { border-radius: 20px; }
+.tm .hist-banner-headline { text-transform: none; letter-spacing: -0.01em; font-weight: 900; font-size: 24px; }
+.tm .hist-rail .hist-rail-title, .tm .hist-bench-title { text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 800; color: var(--text); }
+.tm .hist-rail-round { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 700; }
+.tm .hist-rail-clock { text-transform: none; letter-spacing: 0; font-size: 12.5px; }
+.tm .hist-draft { background: var(--brand); border-color: var(--brand); color: var(--bg); font-weight: 800; padding: 6px 18px; }
+.tm .hist-draft:hover { color: var(--bg); filter: brightness(1.08); }
+.tm .hist-search { border: 0; background: var(--raised); border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 14px; }
+.tm .hist-row { border-bottom-color: color-mix(in oklab, var(--line) 60%, transparent); }
+.tm .hist-slot { border-radius: 12px; }
+
+@media (max-width: 640px) {
+  .tm-title, .tm-page h2.hist-finish-title { font-size: 34px; }
+  .tm-page { gap: 36px; }
+  .tm-game { flex-wrap: wrap; }
+  .tm-play { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tm-play:active { transform: none; }
+}
+.tm .ach-toast { border: 0; border-radius: 18px; }
+.tm .ach-toast-kind { text-transform: none; letter-spacing: 0; font-size: 12.5px; font-weight: 800; }
+/* Three bracket columns in a 760px page: the "Advances" word sits under the team so the name keeps one line. */
+.tm-page .hist-bk-side { grid-template-columns: 26px minmax(0, 1fr) auto; row-gap: 0; }
+.tm-page .hist-bk-side > span:empty { display: none; }
+.tm-page .hist-bk-team { grid-column: 2; grid-row: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-page .hist-bk-win { grid-column: 2; grid-row: 2; }
+.tm-page .hist-bk-score { grid-column: 3; grid-row: 1; }
+/* Room rows: the name leads, the stat line sits back; empty roster slots are quiet fills, not dashed boxes. */
+.tm .hist-line { color: color-mix(in oklab, var(--text) 70%, var(--muted)); }
+.tm .hist-name strong { font-size: 15.5px; font-weight: 800; }
+.tm .hist-slot { border: 0; background: color-mix(in oklab, var(--raised) 40%, transparent); }
+.tm .hist-slot.filled { background: var(--raised); }
+/* Grid and flex children default to min-width: auto, so one wide table would widen the whole page on a phone. */
+.tm-page > *, .tm-page .hist-results > * { min-width: 0; }
+.tm-page .hist-results { grid-template-columns: minmax(0, 1fr); }

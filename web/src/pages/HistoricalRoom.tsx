@@ -21,7 +21,6 @@ import HistoricalClockBanner from '../components/HistoricalClockBanner'
 import HistoricalRoomLayout from '../components/HistoricalRoomLayout'
 import HistoricalResults from '../components/HistoricalResults'
 import HistoricalAwardPanel from '../components/HistoricalAwardPanel'
-import PageHeader from '../components/PageHeader'
 import { LoadingScreen } from '../components/Skeleton'
 import { cardToPlayerRef, coverageText, historicalSeats, sportOf, statLong, teamName } from '../historicalCopy'
 import { usePickReveal } from '../usePickReveal'
@@ -229,30 +228,16 @@ export default function HistoricalRoom() {
   const picksUntilYou = nextOwnPick != null ? nextOwnPick - state.currentPickNo : null
   const clockTeam = drafting && state.onTheClockSlot != null ? teamName(state.onTheClockSlot, state.userSlot) : null
 
-  const header = (
-    <PageHeader
-      eyebrow="Time Machine"
-      title={
-        complete
-          ? `You drafted ${state.season.label}`
-          : state.status === 'ABANDONED'
-            ? `${state.season.label} (abandoned)`
-            : `You're drafting ${state.season.label}`
-      }
-      sub={
-        complete
-          ? 'The season is in the books. Here is how your team did.'
-          : "You see each player's line from the season before. The real season plays out once the draft is over."
-      }
-    />
-  )
-
   if (state.status === 'ABANDONED') {
     return (
-      <div className="content">
-        {header}
-        <p className="muted">This game was abandoned.</p>
-        <Link to="/history">Back to Time Machine</Link>
+      <div className="content tm tm-page">
+        <header className="tm-hero">
+          <h1 className="tm-title">{state.season.label} (abandoned)</h1>
+          <p className="tm-tagline">This game was abandoned.</p>
+          <Link className="tm-btn" to="/history">
+            Back to Time Machine
+          </Link>
+        </header>
       </div>
     )
   }
@@ -288,13 +273,26 @@ export default function HistoricalRoom() {
     return (
       <>
         {liveRegion}
-      <div className="content">
-        {header}
-        <SeasonDisclosure game={state} />
-        <HistoricalResults game={state} result={state.result} afterFinish={<HistoricalAwardPanel gameId={state.id} />} />
-        <details className="how">
+      <div className="content tm tm-page tm-results">
+        <h1 className="tm-kicker">You drafted {state.season.label}</h1>
+        <HistoricalResults
+          game={state}
+          result={state.result}
+          afterFinish={<HistoricalAwardPanel gameId={state.id} />}
+          finishAction={
+            <Link className="tm-play" to="/history">
+              Draft another year
+            </Link>
+          }
+        />
+        <details className="how tm-more">
           <summary>Your draft board</summary>
           {boardNode('full')}
+        </details>
+        {/* Closed, with the counts in its summary so a caveat is never invisible while collapsed (as in the room). */}
+        <details className="how tm-more">
+          <summary>{disclosureSummary(state)}</summary>
+          <SeasonDisclosure game={state} />
         </details>
         <p>
           <Link to="/history">Back to Time Machine</Link>
@@ -324,12 +322,10 @@ export default function HistoricalRoom() {
   return (
     <>
       {liveRegion}
-    <div className="content hist-content">
+    <div className="content hist-content tm">
       <header className="hist-head">
         <h1 className="page-title">{`You're drafting ${state.season.label}`}</h1>
-        <p className="muted small">
-          Time Machine. You see each player's line from the season before; the real season plays out after the draft.
-        </p>
+        <p className="muted small">You only know what each player did the season before. The real season plays out after the draft.</p>
       </header>
       <HistoricalRoomLayout
         queueCount={queuedCards.length}

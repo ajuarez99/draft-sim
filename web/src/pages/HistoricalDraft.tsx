@@ -12,7 +12,6 @@ import {
   type HistoricalSeasonSummary,
 } from '../api'
 import { useFailure } from '../useFailure'
-import PageHeader from '../components/PageHeader'
 import HowThisWorks from '../components/HowThisWorks'
 import HistoricalProfileCard from '../components/HistoricalProfileCard'
 import { sportOf, summaryStatus } from '../historicalCopy'
@@ -35,12 +34,12 @@ function nflRange(rows: HistoricalSeasonSummary[]): string {
 /** Per-sport wording. Football never mentions the NBA, 1970-71 or a draft-position feed. */
 const COPY: Record<HistoricalSport, (range: string) => { sub: string; scoring: string; how: string }> = {
   NBA: () => ({
-    sub: 'Pick a team out of a real NBA season, then watch that season play out.',
+    sub: 'Draft a team from a real NBA season, then watch that season play out.',
     scoring: "It runs as lock-in best ball: each starter's best game of the week counts, and your best legal lineup is set for you.",
     how: "Seasons run from 1970-71 to the latest complete one. Only stats the league tracked for essentially the whole season count, and each season says which. Opponents draft from last season's points, not from a real draft-position feed.",
   }),
   NFL: (range) => ({
-    sub: `Pick a team out of a real NFL season${range ? `, ${range},` : ''} then watch that season play out.`,
+    sub: `Draft a team from a real NFL season${range ? `, ${range},` : ''} then watch that season play out.`,
     scoring:
       'It runs as weekly best ball on real full-PPR scores: your best legal lineup is set for you each week. Quarterbacks, running backs, wide receivers and tight ends only; no kickers or defenses.',
     how: `Seasons run${range ? ` from ${range}` : ' over the years on offer'}. Scores come from the real weekly stat lines. Opponents draft from last season's points over replacement, not from a real draft-position feed.`,
@@ -138,93 +137,97 @@ export default function HistoricalDraft() {
   const settingsSource = seasons && seasons.length > 0 ? seasons[0].settingsSource : null
   const visible = (games ?? []).filter((g) => g.status !== 'ABANDONED')
 
+  // A first-timer reads the rules right under the button; once there are games, the games come first.
+  const howToPlay = (
+    <section className="tm-section" aria-label="How to play">
+      <h2>How to play</h2>
+      <ol className="tm-steps">
+        <li>
+          <strong>Draft your team</strong>
+          <span>You only see what each player did the year before, like a real drafter would have.</span>
+        </li>
+        <li>
+          <strong>The year plays out</strong>
+          <span>{copy.scoring}</span>
+        </li>
+        <li>
+          <strong>See how you did</strong>
+          <span>Your finish, the picks you nailed, the ones you missed, and how you stack up against hindsight.</span>
+        </li>
+      </ol>
+      <HowThisWorks>
+        <p>{copy.how}</p>
+        {settingsSource && <p>{settingsSource}</p>}
+      </HowThisWorks>
+    </section>
+  )
+
   return (
-    <div className="content">
-      <PageHeader
-        eyebrow="Time Machine"
-        title="Draft a random year"
-        sub={copy.sub}
-        actions={
-          <button
-            type="button"
-            className="chip on hist-start"
-            onClick={() => void start()}
-            disabled={starting || !loaded || nothingOffered}
-          >
-            {starting ? 'Starting…' : 'Draft a random year'}
-          </button>
-        }
-      />
-      {error && <div className="error">{error}</div>}
-      {nothingOffered && <div className="muted">No seasons are loaded yet, so there is nothing to draft.</div>}
+    <div className="content tm tm-page">
+      <header className="tm-hero">
+        <span className="tm-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 24a15 15 0 1 0 5-11.2" />
+            <path d="M8 7v7h7" />
+            <path d="M24 16v9l6 4" />
+          </svg>
+        </span>
+        <h1 className="tm-title">Time Machine</h1>
+        <p className="tm-tagline">{copy.sub}</p>
+        {offered.length > 1 && (
+          <div className="tm-sports" role="group" aria-label="Sport">
+            {offered.map((sp) => (
+              <button
+                key={sp}
+                type="button"
+                className={`tm-sport${sp === sport ? ' on' : ''}`}
+                aria-pressed={sp === sport}
+                disabled={starting}
+                onClick={() => setSport(sp)}
+              >
+                {SPORT_LABEL[sp]}
+              </button>
+            ))}
+          </div>
+        )}
+        <button type="button" className="tm-play" onClick={() => void start()} disabled={starting || !loaded || nothingOffered}>
+          {starting ? 'Starting…' : 'Draft a random year'}
+        </button>
+        {error && <div className="error">{error}</div>}
+        {nothingOffered && <p className="muted">No seasons are loaded yet, so there is nothing to draft.</p>}
+      </header>
 
-      {offered.length > 1 && (
-        <div className="hist-sports" role="group" aria-label="Sport">
-          {offered.map((sp) => (
-            <button
-              key={sp}
-              type="button"
-              className={`chip${sp === sport ? ' on' : ''}`}
-              aria-pressed={sp === sport}
-              disabled={starting}
-              onClick={() => setSport(sp)}
-            >
-              {SPORT_LABEL[sp]}
-            </button>
-          ))}
-        </div>
-      )}
+      {visible.length === 0 && howToPlay}
 
-      <section className="panel hist-hero">
-        <h2>How it works</h2>
-        <ol className="hist-steps">
-          <li>
-            <strong>Draft with last season&apos;s stats.</strong> You see what every player did the year before, like a real drafter would have.
-          </li>
-          <li>
-            <strong>The year plays out.</strong> {copy.scoring}
-          </li>
-          <li>
-            <strong>See how you did.</strong> Standings, your weekly lineups, and how you stack up against hindsight.
-          </li>
-        </ol>
-        {settingsSource && <p className="muted small">{settingsSource}</p>}
-        <HowThisWorks>
-          <p>{copy.how}</p>
-        </HowThisWorks>
-      </section>
-
-      {profile && <HistoricalProfileCard profile={profile} />}
-
-      <section className="panel" aria-label="Your games">
+      <section className="tm-section" aria-label="Your games">
         <h2>Your games</h2>
         {games == null && !error ? (
           <p className="muted">Loading…</p>
         ) : visible.length === 0 ? (
-          <p className="muted">No games yet. Start one above.</p>
+          <p className="muted">No games yet. Your first one will show up here.</p>
         ) : (
-          <ul className="hist-games row-list">
+          <ul className="tm-games">
             {visible.map((g) => (
-              <li key={g.id} className="hist-game">
-                <div>
-                  <strong className="cond">{g.seasonLabel}</strong>{' '}
-                  <span className={`chip hist-sport-tag sport-${sportOf(g).toLowerCase()}`}>{SPORT_LABEL[sportOf(g)]}</span>{' '}
-                  <span className={`chip status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
-                  <span className="muted small"> · {when(g.createdAt)}</span>
+              <li key={g.id} className="tm-game">
+                <div className="tm-game-text">
+                  <strong>{g.seasonLabel}</strong>
+                  <span className="tm-game-sport">{SPORT_LABEL[sportOf(g)]}</span>
+                  <span className={`tm-game-status status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
+                  <span className="muted small">{when(g.createdAt)}</span>
                 </div>
-                <div className="hist-game-actions">
+                <div className="tm-game-actions">
                   {g.status === 'DRAFTING' && (
                     <>
-                      <Link className="chip on" to={`/history/${g.id}`}>
-                        Resume
-                      </Link>
-                      <button type="button" className="chip" onClick={() => void abandon(g.id)}>
+                      <button type="button" className="tm-btn quiet" onClick={() => void abandon(g.id)}>
                         Abandon
                       </button>
+                      <Link className="tm-btn" to={`/history/${g.id}`}>
+                        Resume
+                      </Link>
                     </>
                   )}
                   {g.status === 'COMPLETE' && (
-                    <Link className="chip" to={`/history/${g.id}`}>
+                    <Link className="tm-btn quiet" to={`/history/${g.id}`}>
                       View
                     </Link>
                   )}
@@ -234,6 +237,10 @@ export default function HistoricalDraft() {
           </ul>
         )}
       </section>
+
+      {profile && <HistoricalProfileCard profile={profile} />}
+
+      {visible.length > 0 && howToPlay}
     </div>
   )
 }
