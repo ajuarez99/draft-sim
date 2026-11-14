@@ -1,5 +1,6 @@
 import type { HistoricalGameState, HistoricalResult } from './api'
 import { isOldFormat, ordinal, outcomeHeadline, sportOf } from './historicalCopy'
+import { dayLabel } from './historicalDaily'
 
 /**
  * Spec 070: the pieces a finished Time Machine game is summed up with (the draft score, one mark per pick, the
@@ -43,7 +44,9 @@ function finishLine(game: HistoricalGameState, result: HistoricalResult): string
  */
 export function shareText(game: HistoricalGameState, result: HistoricalResult, url: string): string {
   const sport = sportOf(game) === 'NFL' ? 'Football' : 'Basketball'
-  const lines = [`Time Machine · ${game.season.label} ${sport}`, finishLine(game, result)]
+  // A game of the day names its day, so two people comparing know they drafted the same season.
+  const title = game.dailyDate ? `Time Machine daily · ${dayLabel(game.dailyDate)}` : 'Time Machine'
+  const lines = [`${title} · ${game.season.label} ${sport}`, finishLine(game, result)]
   const score = draftScore(result.hindsight)
   if (score != null) lines.push(`Draft score ${score}`)
   const rows = result.pickFinishes ?? []

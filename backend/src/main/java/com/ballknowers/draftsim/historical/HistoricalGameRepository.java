@@ -9,6 +9,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -45,7 +46,7 @@ public class HistoricalGameRepository {
                           int reversalRound,
                           List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                           int currentPickNo, String boardJson, String status, String resultJson,
-                          OffsetDateTime createdAt, OffsetDateTime completedAt) {}
+                          OffsetDateTime createdAt, OffsetDateTime completedAt, LocalDate dailyDate) {}
 
     public record PickRow(long gameId, int pickNo, int round, int draftSlot, String seatType, long playerId) {}
 
@@ -53,13 +54,25 @@ public class HistoricalGameRepository {
     public long create(String sleeperUserId, String sport, int seasonStart, int teams, int rounds, int reversalRound,
                        List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                        String boardJson, OffsetDateTime createdAt) {
+        return create(sleeperUserId, sport, seasonStart, teams, rounds, reversalRound, rosterPositions, scoringJson,
+                userSlot, rngSeed, boardJson, createdAt, null);
+    }
+
+    /**
+     * As above, for the game of the day (spec 071) when {@code dailyDate} is not null. A second daily game for the
+     * same user, sport and date violates {@code historical_game_daily_once} and throws
+     * {@link org.springframework.dao.DuplicateKeyException}.
+     */
+    public long create(String sleeperUserId, String sport, int seasonStart, int teams, int rounds, int reversalRound,
+                       List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
+                       String boardJson, OffsetDateTime createdAt, LocalDate dailyDate) {
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement("""
                     insert into historical_game (sleeper_user_id, sport, season_start, teams, rounds,
                         reversal_round, roster_positions, scoring, user_slot, rng_seed, current_pick_no, board,
-                        status, created_at)
-                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?)
+                        status, created_at, daily_date)
+                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, sleeperUserId);
             ps.setString(2, sport);
@@ -73,6 +86,9 @@ public class HistoricalGameRepository {
             ps.setLong(10, rngSeed);
             ps.setString(11, boardJson);
             ps.setObject(12, createdAt);
+            // A LocalDate binds as DATE in pgjdbc; a null needs its type named.
+            if (dailyDate == null) ps.setNull(13, java.sql.Types.DATE);
+            else ps.setObject(13, dailyDate);
             return ps;
         }, keys);
         Number id = (Number) keys.getKeys().get("id");
@@ -98,14 +114,18 @@ public class HistoricalGameRepository {
 
     /** One row of the caller's games list: no board, no result, just what the list shows. */
     public record SummaryRow(long id, String sport, String seasonLabel, String status, int userSlot,
-                             Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt) {}
+                             Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt,
+                             Integer draftScore, LocalDate dailyDate) {}
 
     /** A user's games for the list screen, newest first. {@code finish} comes straight out of the frozen result. */
     public List<SummaryRow> summaries(String sleeperUserId) {
         return db.sql("""
                 select g.id, g.sport, s.label, g.status, g.user_slot, (g.result ->> 'userFinish')::int as finish,
                        (g.result -> 'format' ->> 'version')::int as format_version,
-                       g.result ->> 'userOutcome' as outcome, g.created_at
+                       g.result ->> 'userOutcome' as outcome, g.created_at,
+                       (g.result -> 'hindsight' ->> 'userPointsFor')::float8 as user_points,
+                       (g.result -> 'hindsight' ->> 'pointsFor')::float8 as hindsight_points,
+                       g.daily_date
                 from historical_game g
                 join historical_season s on s.sport = g.sport and s.season_start = g.season_start
                 where g.sleeper_user_id = ? order by g.created_at desc, g.id desc
@@ -119,7 +139,10 @@ public class HistoricalGameRepository {
                             rs.getString("status"),
                             rs.getInt("user_slot"), f, rs.getObject("format_version", Integer.class),
                             rs.getString("outcome"),
-                            rs.getObject("created_at", OffsetDateTime.class));
+                            rs.getObject("created_at", OffsetDateTime.class),
+                            DraftScore.of(rs.getObject("user_points", Double.class),
+                                    rs.getObject("hindsight_points", Double.class)),
+                            rs.getObject("daily_date", LocalDate.class));
                 })
                 .list();
     }
@@ -177,7 +200,7 @@ public class HistoricalGameRepository {
     private static final String SELECT = """
             select id, sleeper_user_id, sport, season_start, teams, rounds, reversal_round, roster_positions,
                    scoring::text as scoring, user_slot, rng_seed, current_pick_no, board::text as board, status,
-                   result::text as result, created_at, completed_at
+                   result::text as result, created_at, completed_at, daily_date
             from historical_game
             """;
 
@@ -190,6 +213,69 @@ public class HistoricalGameRepository {
                 rs.getLong("rng_seed"), rs.getInt("current_pick_no"), rs.getString("board"),
                 rs.getString("status"), rs.getString("result"),
                 rs.getObject("created_at", OffsetDateTime.class),
-                rs.getObject("completed_at", OffsetDateTime.class));
+                rs.getObject("completed_at", OffsetDateTime.class),
+                rs.getObject("daily_date", LocalDate.class));
+    }
+
+    // ---- spec 071: the game of the day ------------------------------------------------------------------
+
+    /** The caller's daily game for one sport and day, whatever its status. */
+    public Optional<GameRow> findDaily(String sleeperUserId, String sport, LocalDate dailyDate) {
+        return db.sql(SELECT + " where sleeper_user_id = ? and sport = ? and daily_date = ?")
+                .params(sleeperUserId, sport, dailyDate)
+                .query(this::map).optional();
+    }
+
+    /** The puzzle dates of the caller's COMPLETE daily games for one sport, in no particular order. */
+    public List<LocalDate> completedDailyDates(String sleeperUserId, String sport) {
+        return db.sql("""
+                select daily_date from historical_game
+                where sleeper_user_id = ? and sport = ? and daily_date is not null and status = 'COMPLETE'
+                """)
+                .params(sleeperUserId, sport)
+                .query((rs, i) -> rs.getObject("daily_date", LocalDate.class)).list();
+    }
+
+    /** The draft score of one COMPLETE game, or null (not complete, or no hindsight total). */
+    public Integer draftScore(long gameId) {
+        return db.sql("""
+                select (result -> 'hindsight' ->> 'userPointsFor')::float8 as user_points,
+                       (result -> 'hindsight' ->> 'pointsFor')::float8 as hindsight_points
+                from historical_game where id = ?
+                """)
+                .param(gameId)
+                .query((rs, i) -> java.util.Optional.ofNullable(DraftScore.of(
+                        rs.getObject("user_points", Double.class), rs.getObject("hindsight_points", Double.class))))
+                .optional().flatMap(o -> o).orElse(null);
+    }
+
+    /** One day's dealt puzzle. */
+    public record DailyRow(String sport, LocalDate dailyDate, int seasonStart, long rngSeed) {}
+
+    public Optional<DailyRow> findDailyPuzzle(String sport, LocalDate dailyDate) {
+        return db.sql("select sport, daily_date, season_start, rng_seed from historical_daily"
+                        + " where sport = ? and daily_date = ?")
+                .params(sport, dailyDate)
+                .query((rs, i) -> new DailyRow(rs.getString("sport"), rs.getObject("daily_date", LocalDate.class),
+                        rs.getInt("season_start"), rs.getLong("rng_seed")))
+                .optional();
+    }
+
+    /** Writes the day's puzzle unless one is already there; the caller reads back whichever row won. */
+    public void insertDailyPuzzleIfAbsent(DailyRow row) {
+        db.sql("""
+                insert into historical_daily (sport, daily_date, season_start, rng_seed) values (?, ?, ?, ?)
+                on conflict (sport, daily_date) do nothing
+                """)
+                .params(row.sport(), row.dailyDate(), row.seasonStart(), row.rngSeed())
+                .update();
+    }
+
+    /** The seasons this sport's most recent daily puzzles before {@code before} used, newest first. */
+    public List<Integer> recentDailySeasons(String sport, LocalDate before, int limit) {
+        return db.sql("select season_start from historical_daily where sport = ? and daily_date < ?"
+                        + " order by daily_date desc limit ?")
+                .params(sport, before, limit)
+                .query((rs, i) -> rs.getInt("season_start")).list();
     }
 }

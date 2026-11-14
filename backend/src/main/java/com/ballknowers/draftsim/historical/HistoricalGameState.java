@@ -18,12 +18,13 @@ import java.util.Map;
  * so a reopened game returns exactly what was frozen at completion (FR-013). Null until COMPLETE.
  * {@code available} is empty once the game is no longer DRAFTING. {@code reversalRound} is the game's stored value
  * (0 is a plain snake), so the web can lay out upcoming picks without its own snake arithmetic (spec 063).
+ * {@code dailyDate} (spec 071) is the ISO date of the game of the day this game is, or null for free play.
  */
 public record HistoricalGameState(long id, String sport, String status, SeasonView season, int teams, int rounds,
                                   List<String> rosterPositions, int userSlot, List<Integer> myPicks,
                                   int currentPickNo, Integer onTheClockSlot, boolean isUsersTurn,
                                   List<PickView> picks, List<HistoricalPlayerCard> available, JsonNode result,
-                                  int reversalRound) {
+                                  int reversalRound, String dailyDate) {
 
     /**
      * @param countedStats the scoring keys this season counts, from the game's own frozen scoring snapshot
@@ -46,7 +47,10 @@ public record HistoricalGameState(long id, String sport, String status, SeasonVi
      * One row of {@code GET /api/history/games}; {@code finish} is null until COMPLETE.
      * {@code formatVersion} and {@code outcome} (spec 063) are null for an unfinished game and for a game completed
      * before playoffs existed, whose {@code finish} is a standings rank.
+     * {@code draftScore} (spec 071) is {@link DraftScore}: null until COMPLETE and for a result with no hindsight
+     * total. {@code dailyDate} is the ISO date of the game of the day this game is, or null for free play.
      */
     public record GameSummary(long id, String sport, String seasonLabel, String status, int userSlot,
-                              Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt) {}
+                              Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt,
+                              Integer draftScore, String dailyDate) {}
 }

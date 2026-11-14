@@ -4767,6 +4767,8 @@ export type HistoricalGameState = {
   /** Rank order, best first; empty once the game is no longer DRAFTING. */
   available: HistoricalPlayerCard[]
   result: HistoricalResult | null
+  /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
+  dailyDate?: string | null
 }
 
 export type HistoricalGameSummary = {
@@ -4784,7 +4786,46 @@ export type HistoricalGameSummary = {
   outcome?: HistoricalOutcome | null
   /** ISO timestamp. */
   createdAt: string
+  /**
+   * Spec 071: your points as a whole-number share of the hindsight draft's (the server's DraftScore, the same
+   * arithmetic as draftScore() in historicalShare.ts). Null until COMPLETE; absent from an old backend.
+   */
+  draftScore?: number | null
+  /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
+  dailyDate?: string | null
 }
+
+/**
+ * Spec 071: one sport's game of the day as you see it. Mirrors HistoricalDailyService.DailyView field for field.
+ * Everyone gets the same season that day; the draft slot is random per player.
+ */
+export type HistoricalDaily = {
+  sport: HistoricalSport
+  /** The puzzle's ISO date, a calendar day in US Eastern time. */
+  date: string
+  seasonLabel: string
+  /** Your game for today; null if you have not started it. */
+  gameId: number | null
+  gameStatus: 'DRAFTING' | 'COMPLETE' | null
+  /** Your draft score once COMPLETE. */
+  draftScore: number | null
+  /** Finished days in a row, ending today, or yesterday while today's is unfinished. */
+  streak: number
+  bestStreak: number
+  /** ISO instant the next day's game starts. */
+  nextAt: string
+}
+
+/** One row per sport that has seasons to offer. An old backend answers 404 (thrown): show no daily game. */
+export const getHistoricalDaily = () => apiFetch('/api/history/daily').then(json<HistoricalDaily[]>)
+
+/** Starts today's game for `sport`, or returns the one you already started. */
+export const startHistoricalDaily = (sport: HistoricalSport) =>
+  apiFetch('/api/history/daily', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sport }),
+  }).then(json<HistoricalGameState>)
 
 /** One offered season, for the "about this game" panel (GET /api/history/seasons). */
 export type HistoricalSeasonSummary = {

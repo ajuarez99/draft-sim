@@ -7409,3 +7409,51 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .tm .hist-row > .hist-pts { grid-column: 3; grid-row: 1; display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
   .tm .hist-row > .hist-row-actions, .tm .hist-row > .hist-draft { grid-column: 3; grid-row: 2; justify-self: end; }
 }
+
+/* ---- Spec 071: game of the day, landing stats, season reveal (claude/time-machine-daily.md) ---- */
+.tm-daily { width: 100%; display: grid; gap: 10px; text-align: left; margin-top: 6px; }
+.tm-page .tm-daily h2 { margin: 0; text-align: center; }
+.tm-daily-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.tm-daily-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-radius: 20px; background: color-mix(in oklab, var(--brand) 14%, var(--panel)); }
+.tm-daily-card.done { background: var(--panel); }
+.tm-daily-text { display: grid; gap: 2px; min-width: 0; }
+.tm-daily-sport { font-size: 13px; font-weight: 800; color: var(--muted); }
+.tm-daily-season { font-size: 24px; font-weight: 900; line-height: 1.1; letter-spacing: -0.01em; }
+.tm-daily-state { font-size: 14px; font-weight: 700; color: var(--muted); }
+.tm-daily-streak { justify-self: start; margin-top: 4px; font-size: 12.5px; font-weight: 800; padding: 2px 10px; border-radius: 999px; background: color-mix(in oklab, var(--up) 18%, var(--panel)); color: var(--up); }
+.tm-daily-note { margin: 0; text-align: center; }
+.tm-daily-card .tm-btn { flex: none; }
+.tm-btn:disabled { opacity: 0.5; cursor: default; }
+
+.tm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 0 0 14px; }
+.tm-stats > div { padding: 14px 16px; border-radius: 18px; background: var(--panel); display: grid; gap: 2px; }
+.tm-stats dt { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.tm-stats dd { margin: 0; font-size: 30px; font-weight: 900; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.tm-stats-note { margin: -6px 0 14px; }
+.tm-game-score { font-size: 14px; font-weight: 800; }
+.tm-game-daily { font-size: 12.5px; font-weight: 800; padding: 1px 9px; border-radius: 999px; background: color-mix(in oklab, var(--brand) 16%, var(--panel)); color: var(--text); }
+
+.tm-reveal { display: grid; justify-items: center; text-align: center; gap: 16px; padding: 24px 0 40px; }
+.tm-reveal-kicker { margin: 0; font-size: 15px; font-weight: 700; color: var(--muted); }
+.tm-reveal-record { margin: 0; font-size: 72px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.tm-reveal-weeks { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 520px; }
+.tm-reveal-week { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 13px; font-weight: 900; background: var(--raised); color: transparent; }
+.tm-reveal-week.on { color: var(--bg); }
+.tm-reveal-week.win { background: var(--up); }
+.tm-reveal-week.loss { background: var(--down); }
+.tm-reveal-week.tie { background: var(--muted); }
+.tm-reveal-line { margin: 0; min-height: 1.5em; font-size: 16px; font-weight: 700; text-wrap: balance; }
+.tm-reveal-rounds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 16px; font-weight: 700; }
+.tm-reveal-rounds .won { color: var(--up); }
+.tm-reveal-rounds .lost { color: var(--down); }
+.tm-page h2.tm-reveal-final { margin: 8px 0 0; font-size: 40px; font-weight: 900; line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance; outline: none; }
+.tm-page h2.tm-reveal-final.champion { color: var(--brand); }
+@media (prefers-reduced-motion: no-preference) {
+  .tm-reveal-week.on { animation: tm-pop 0.22s ease-out both; }
+  .tm-reveal-rounds li, .tm-reveal-final { animation: tm-pop 0.3s ease-out both; }
+}
+@media (max-width: 640px) {
+  .tm-reveal-record { font-size: 56px; }
+  .tm-reveal-week { width: 26px; height: 26px; }
+  .tm-page h2.tm-reveal-final { font-size: 32px; }
+}

@@ -68,6 +68,11 @@ describe('shareText', () => {
       ['Time Machine · 2020 Football', '🏆 Champion · 13-1', 'Draft score 79', '🟩⬜🟥', 'https://example.test/history'].join('\n'),
     )
   })
+  it('names the day on a game of the day, so two people know they drafted the same season', () => {
+    const { game, result } = fixture()
+    const text = shareText({ ...game, dailyDate: '2026-11-14' }, result, 'u')
+    expect(text.split('\n')[0]).toBe('Time Machine daily · Nov 14 · 2020 Football')
+  })
   it('leaves out the squares for a game stored before pick finishes existed', () => {
     const { game, result } = fixture({ pickFinishes: null, userOutcome: 'MISSED_PLAYOFFS', userFinish: 7 })
     const text = shareText(game, result, 'u')

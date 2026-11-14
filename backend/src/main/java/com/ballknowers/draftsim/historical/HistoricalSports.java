@@ -24,6 +24,11 @@ public class HistoricalSports {
         }
     }
 
+    /** Every sport, in bean order. */
+    public List<HistoricalSport> all() {
+        return List.copyOf(byCode.values());
+    }
+
     public HistoricalSport get(String code) {
         HistoricalSport s = code == null ? null : byCode.get(code);
         if (s == null) {

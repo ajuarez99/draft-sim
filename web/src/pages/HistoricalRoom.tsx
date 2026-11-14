@@ -21,6 +21,8 @@ import HistoricalClockBanner from '../components/HistoricalClockBanner'
 import HistoricalRoomLayout from '../components/HistoricalRoomLayout'
 import HistoricalResults from '../components/HistoricalResults'
 import HistoricalAwardPanel from '../components/HistoricalAwardPanel'
+import HistoricalSeasonReveal from '../components/HistoricalSeasonReveal'
+import { dayLabel } from '../historicalDaily'
 import { LoadingScreen } from '../components/Skeleton'
 import { cardToPlayerRef, coverageText, historicalSeats, sportOf, statLong, teamName } from '../historicalCopy'
 import { usePickReveal } from '../usePickReveal'
@@ -44,6 +46,15 @@ function toBoardSeat(s: MockSeat): Seat {
     draftsObserved: 0,
     picksScored: 0,
   }
+}
+
+/**
+ * Spec 071: whether a timed reveal may run. With reduced motion on there is none, and where the browser cannot say
+ * (no matchMedia) there is none either: the results simply appear, as they did before the reveal existed.
+ */
+function motionAllowed(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 /** What counts, what does not, and why: the era disclosure (FR-007/FR-008), per sport (spec 056). */
@@ -119,10 +130,18 @@ export default function HistoricalRoom() {
   const [busy, setBusy] = useState<'PICK' | 'FINISH' | 'DRAFT' | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const announced = useRef<number | null>(null)
+  // Spec 071: the season plays out before the results, but only for a game seen DRAFTING in this visit. A game
+  // opened already finished goes straight to its results, where "Replay the season" can start it by hand.
+  const sawDrafting = useRef(false)
+  const [seasonDone, setSeasonDone] = useState(false)
+  const [replaying, setReplaying] = useState(false)
 
   const { load } = reveal
   useEffect(() => {
     announced.current = null
+    sawDrafting.current = false
+    setSeasonDone(false)
+    setReplaying(false)
     getHistoricalGame(id)
       .then(load)
       .catch((e) => fail(e))
@@ -207,6 +226,7 @@ export default function HistoricalRoom() {
   const sport = sportOf(state)
   const complete = state.status === 'COMPLETE'
   const drafting = state.status === 'DRAFTING'
+  if (drafting) sawDrafting.current = true
   const board: PredictedPick[] = state.picks
     .filter((p): p is typeof p & { player: HistoricalPlayerCard } => p.player != null)
     .map((p) => ({
@@ -270,19 +290,44 @@ export default function HistoricalRoom() {
   )
 
   if (complete && state.result) {
+    const kicker = `You drafted ${state.season.label}${state.dailyDate ? ` · game of the day, ${dayLabel(state.dailyDate)}` : ''}`
+    // The award panel is not mounted during the reveal, so an XP or badge toast cannot give the ending away.
+    if (replaying || (sawDrafting.current && !seasonDone && motionAllowed())) {
+      return (
+        <>
+          {liveRegion}
+          <div className="content tm tm-page tm-results">
+            <h1 className="tm-kicker">{kicker}</h1>
+            <HistoricalSeasonReveal
+              game={state}
+              result={state.result}
+              onDone={() => {
+                setSeasonDone(true)
+                setReplaying(false)
+              }}
+            />
+          </div>
+        </>
+      )
+    }
     return (
       <>
         {liveRegion}
       <div className="content tm tm-page tm-results">
-        <h1 className="tm-kicker">You drafted {state.season.label}</h1>
+        <h1 className="tm-kicker">{kicker}</h1>
         <HistoricalResults
           game={state}
           result={state.result}
           afterFinish={<HistoricalAwardPanel gameId={state.id} />}
           finishAction={
-            <Link className="tm-play" to="/history">
-              Draft another year
-            </Link>
+            <>
+              <Link className="tm-play" to="/history">
+                Draft another year
+              </Link>
+              <button type="button" className="tm-btn quiet" onClick={() => setReplaying(true)}>
+                Replay the season
+              </button>
+            </>
           }
         />
         <details className="how tm-more">

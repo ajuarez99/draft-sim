@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   abandonHistoricalGame,
+  getHistoricalDaily,
   getHistoricalProfile,
   historicalSeasons,
   listHistoricalGames,
+  startHistoricalDaily,
   startHistoricalGame,
+  type HistoricalDaily,
   type HistoricalGameSummary,
   type HistoricalProfile,
   type HistoricalSport,
@@ -16,6 +19,7 @@ import HowThisWorks from '../components/HowThisWorks'
 import HistoricalProfileCard from '../components/HistoricalProfileCard'
 import { sportOf, summaryStatus } from '../historicalCopy'
 import { clearDraftQueue } from '../useDraftQueue'
+import { countdown, dayLabel, landingStats } from '../historicalDaily'
 
 function when(iso: string): string {
   const d = new Date(iso)
@@ -56,6 +60,9 @@ export default function HistoricalDraft() {
   const [profile, setProfile] = useState<HistoricalProfile | null>(null)
   const [seasonsFailed, setSeasonsFailed] = useState(false)
   const [starting, setStarting] = useState(false)
+  // Spec 071. A failed request (an old backend has no such route) shows no game of the day, and nothing else changes.
+  const [daily, setDaily] = useState<HistoricalDaily[] | null>(null)
+  const [now, setNow] = useState(() => Date.now())
   // Basketball is only the preselected tab; every request still carries the sport explicitly.
   const [chosen, setSport] = useState<HistoricalSport>('NBA')
 
@@ -74,6 +81,25 @@ export default function HistoricalDraft() {
       current = false
     }
   }, [])
+
+  function loadDaily() {
+    getHistoricalDaily()
+      .then((d) => setDaily(Array.isArray(d) ? d : null))
+      .catch(() => setDaily(null))
+  }
+  useEffect(loadDaily, [])
+
+  // The countdown ticks twice a minute; when the day rolls over, ask for the new day's game.
+  const nextAt = daily && daily.length > 0 ? daily[0].nextAt : null
+  useEffect(() => {
+    if (!nextAt) return
+    const t = window.setInterval(() => {
+      const at = Date.now()
+      setNow(at)
+      if (new Date(nextAt).getTime() <= at) loadDaily()
+    }, 30_000)
+    return () => window.clearInterval(t)
+  }, [nextAt])
 
   // The settings line is the same for every season of a sport; a failure here only loses that line.
   // A 053 backend ignores ?sport= and returns basketball rows with no `sport` field, so football rows are kept only
@@ -123,6 +149,19 @@ export default function HistoricalDraft() {
     }
   }
 
+  async function startDaily(sp: HistoricalSport) {
+    if (starting) return
+    setStarting(true)
+    setError(null)
+    try {
+      const g = await startHistoricalDaily(sp)
+      navigate(`/history/${g.id}`)
+    } catch (e) {
+      fail(e)
+      setStarting(false)
+    }
+  }
+
   async function abandon(id: number) {
     setError(null)
     try {
@@ -136,6 +175,8 @@ export default function HistoricalDraft() {
 
   const settingsSource = seasons && seasons.length > 0 ? seasons[0].settingsSource : null
   const visible = (games ?? []).filter((g) => g.status !== 'ABANDONED')
+  const stats = landingStats(visible)
+  const left = nextAt ? countdown(nextAt, now) : null
 
   // A first-timer reads the rules right under the button; once there are games, the games come first.
   const howToPlay = (
@@ -174,6 +215,58 @@ export default function HistoricalDraft() {
         </span>
         <h1 className="tm-title">Time Machine</h1>
         <p className="tm-tagline">{copy.sub}</p>
+        {daily && daily.length > 0 && (
+          <section className="tm-daily" aria-label="Game of the day">
+            <h2>Game of the day</h2>
+            <ul className="tm-daily-cards">
+              {daily.map((d) => (
+                <li key={d.sport} className={`tm-daily-card${d.gameStatus === 'COMPLETE' ? ' done' : ''}`}>
+                  <div className="tm-daily-text">
+                    <span className="tm-daily-sport">{SPORT_LABEL[d.sport]}</span>
+                    <strong className="tm-daily-season">{d.seasonLabel}</strong>
+                    {d.gameStatus === 'COMPLETE' ? (
+                      <span className="tm-daily-state">
+                        {d.draftScore != null ? `Done. Draft score ${d.draftScore}` : 'Done'}
+                      </span>
+                    ) : d.gameStatus === 'DRAFTING' ? (
+                      <span className="tm-daily-state">You are mid-draft</span>
+                    ) : (
+                      <span className="tm-daily-state">Not played yet</span>
+                    )}
+                    {d.streak > 0 && (
+                      <span className="tm-daily-streak">
+                        {d.streak}-day streak
+                      </span>
+                    )}
+                  </div>
+                  {d.gameStatus === 'COMPLETE' && d.gameId != null ? (
+                    <Link className="tm-btn quiet" to={`/history/${d.gameId}`} aria-label={`View today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
+                      View
+                    </Link>
+                  ) : d.gameStatus === 'DRAFTING' && d.gameId != null ? (
+                    <Link className="tm-btn" to={`/history/${d.gameId}`} aria-label={`Resume today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
+                      Resume
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="tm-btn"
+                      disabled={starting}
+                      onClick={() => void startDaily(d.sport)}
+                      aria-label={`Play today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}
+                    >
+                      Play
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            <p className="muted small tm-daily-note">
+              {dayLabel(daily[0].date)}: the same season for everyone, from a random draft slot.
+              {left ? ` Next one in ${left}.` : ''}
+            </p>
+          </section>
+        )}
         {offered.length > 1 && (
           <div className="tm-sports" role="group" aria-label="Sport">
             {offered.map((sp) => (
@@ -206,6 +299,32 @@ export default function HistoricalDraft() {
         ) : visible.length === 0 ? (
           <p className="muted">No games yet. Your first one will show up here.</p>
         ) : (
+          <>
+          {stats.finished > 0 && (
+            <dl className="tm-stats" aria-label="Your numbers">
+              <div>
+                <dt>Finished</dt>
+                <dd>{stats.finished}</dd>
+              </div>
+              {stats.best != null && (
+                <div>
+                  <dt>Best draft score</dt>
+                  <dd>{stats.best}</dd>
+                </div>
+              )}
+              {stats.average != null && (
+                <div>
+                  <dt>Average draft score</dt>
+                  <dd>{stats.average}</dd>
+                </div>
+              )}
+            </dl>
+          )}
+          {stats.finished > 0 && stats.scored > 0 && stats.scored < stats.finished && (
+            <p className="muted small tm-stats-note">
+              The scores cover {stats.scored} of your {stats.finished} finished games; older ones were saved without one.
+            </p>
+          )}
           <ul className="tm-games">
             {visible.map((g) => (
               <li key={g.id} className="tm-game">
@@ -213,14 +332,22 @@ export default function HistoricalDraft() {
                   <strong>{g.seasonLabel}</strong>
                   <span className="tm-game-sport">{SPORT_LABEL[sportOf(g)]}</span>
                   <span className={`tm-game-status status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
-                  <span className="muted small">{when(g.createdAt)}</span>
+                  {g.status === 'COMPLETE' && g.draftScore != null && <span className="tm-game-score">Score {g.draftScore}</span>}
+                  {g.dailyDate ? (
+                    <span className="tm-game-daily">Daily · {dayLabel(g.dailyDate)}</span>
+                  ) : (
+                    <span className="muted small">{when(g.createdAt)}</span>
+                  )}
                 </div>
                 <div className="tm-game-actions">
                   {g.status === 'DRAFTING' && (
                     <>
-                      <button type="button" className="tm-btn quiet" onClick={() => void abandon(g.id)}>
-                        Abandon
-                      </button>
+                      {/* The game of the day cannot be abandoned (the server refuses it): it is the day's one go. */}
+                      {!g.dailyDate && (
+                        <button type="button" className="tm-btn quiet" onClick={() => void abandon(g.id)}>
+                          Abandon
+                        </button>
+                      )}
                       <Link className="tm-btn" to={`/history/${g.id}`}>
                         Resume
                       </Link>
@@ -235,6 +362,7 @@ export default function HistoricalDraft() {
               </li>
             ))}
           </ul>
+          </>
         )}
       </section>
 

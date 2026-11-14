@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.api;
 
+import com.ballknowers.draftsim.historical.HistoricalDailyService;
 import com.ballknowers.draftsim.historical.HistoricalGameService;
 import com.ballknowers.draftsim.historical.HistoricalGameState;
 import com.ballknowers.draftsim.historical.HistoricalSport;
@@ -39,12 +40,14 @@ public class HistoricalGameController {
 
     private final HistoricalSports sports;
     private final HistoricalGameService service;
+    private final HistoricalDailyService daily;
     private final ObjectMapper json;
 
     public HistoricalGameController(HistoricalSports sports, HistoricalGameService service,
-                                    ObjectMapper json) {
+                                    HistoricalDailyService daily, ObjectMapper json) {
         this.sports = sports;
         this.service = service;
+        this.daily = daily;
         this.json = json;
     }
 
@@ -134,6 +137,33 @@ public class HistoricalGameController {
         requireIdentity(sleeperUserId);
         return service.abandon(id, sleeperUserId) ? ResponseEntity.noContent().build()
                 : ResponseEntity.notFound().build();
+    }
+
+    // ---- the game of the day (spec 071) -----------------------------------------------------------------
+
+    /** @param sport "NBA" or "NFL", required: no default */
+    public record DailyRequest(String sport) {}
+
+    /**
+     * Today's game for each sport that has seasons to offer: the season, the caller's game if started, their
+     * score if finished, their streak, and when the next day starts. Deals the day's puzzle if nobody has asked
+     * yet, which is one idempotent insert.
+     */
+    @GetMapping("/daily")
+    public List<HistoricalDailyService.DailyView> daily(
+            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        requireIdentity(sleeperUserId);
+        return daily.status(sleeperUserId);
+    }
+
+    /** Starts the caller's game of the day (201), or returns the one they already started (200). */
+    @PostMapping("/daily")
+    public ResponseEntity<HistoricalGameState> startDaily(
+            @RequestBody(required = false) DailyRequest body,
+            @RequestHeader(value = "X-Sleeper-User", required = false) String sleeperUserId) {
+        requireIdentity(sleeperUserId);
+        HistoricalDailyService.Started s = daily.start(sleeperUserId, body == null ? null : body.sport());
+        return ResponseEntity.status(s.created() ? HttpStatus.CREATED : HttpStatus.OK).body(s.state());
     }
 
     private SeasonSummary summary(SeasonRow s, HistoricalSport sport) {

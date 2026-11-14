@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -107,6 +108,23 @@ public class HistoricalGameService {
     @Transactional
     public HistoricalGameState create(String sleeperUserId, String sportCode, Integer userSlot,
                                       Integer seasonOverride) {
+        return create(sleeperUserId, sportCode, userSlot, seasonOverride, null, null);
+    }
+
+    /**
+     * The game of the day (spec 071): the day's dealt season and seed, a random slot, and the puzzle date stamped
+     * on the row. A second one for the same user, sport and day throws
+     * {@link org.springframework.dao.DuplicateKeyException} (the unique index), which rolls this transaction back.
+     */
+    @Transactional
+    public HistoricalGameState createDaily(String sleeperUserId, String sportCode, int seasonStart, long seed,
+                                           LocalDate dailyDate) {
+        if (dailyDate == null) throw new IllegalArgumentException("dailyDate is required for a daily game");
+        return create(sleeperUserId, sportCode, null, seasonStart, seed, dailyDate);
+    }
+
+    private HistoricalGameState create(String sleeperUserId, String sportCode, Integer userSlot,
+                                       Integer seasonOverride, Long seedOverride, LocalDate dailyDate) {
         long t0 = System.nanoTime();
         HistoricalSport sport = sports.get(sportCode);
         int teams = sport.teams(), rounds = sport.rounds();
@@ -132,7 +150,7 @@ public class HistoricalGameService {
         // The scoring snapshot: the base map restricted to this season's counted keys.
         Map<String, Double> scoring = sport.scoringFor(season);
 
-        long seed = random.nextLong();
+        long seed = seedOverride != null ? seedOverride : random.nextLong();
         List<HistoricalPlayerCard> cards = sport.buildBoard(season, seed, scoring);
         if (cards.size() < teams * rounds) {
             throw new IllegalStateException("season " + s + " yields a board of " + cards.size() + " players but "
@@ -142,7 +160,7 @@ public class HistoricalGameService {
 
         long id = games.create(sleeperUserId, sport.code(), s, teams, rounds, sport.reversalRound(),
                 sport.rosterPositions(), write(scoring), slot, seed, writeSnapshot(cards, season, sport),
-                OffsetDateTime.now());
+                OffsetDateTime.now(), dailyDate);
         GameRow row = games.lockForUpdate(id).orElseThrow();
         List<BoardEntry> board = entries(cards, sport);
         advanceBots(row, cards, board, new HashMap<>());
@@ -165,7 +183,8 @@ public class HistoricalGameService {
     public List<HistoricalGameState.GameSummary> list(String sleeperUserId) {
         return games.summaries(sleeperUserId).stream()
                 .map(r -> new HistoricalGameState.GameSummary(r.id(), r.sport(), r.seasonLabel(), r.status(),
-                        r.userSlot(), r.finish(), r.formatVersion(), r.outcome(), r.createdAt()))
+                        r.userSlot(), r.finish(), r.formatVersion(), r.outcome(), r.createdAt(),
+                        r.draftScore(), r.dailyDate() == null ? null : r.dailyDate().toString()))
                 .toList();
     }
 
@@ -250,6 +269,10 @@ public class HistoricalGameService {
         Optional<GameRow> locked = lock(id, sleeperUserId);
         if (locked.isEmpty()) return false;
         requireDrafting(locked.get());
+        if (locked.get().dailyDate() != null) {
+            // One daily game per day: abandoning it would spend the day with nothing to show (spec 071).
+            throw new IllegalStateException("the game of the day cannot be abandoned");
+        }
         games.advance(id, locked.get().currentPickNo(), "ABANDONED");
         return true;
     }
@@ -460,7 +483,8 @@ public class HistoricalGameService {
         }
         return new HistoricalGameState(row.id(), row.sport(), row.status(), view, row.teams(), row.rounds(),
                 row.rosterPositions(), row.userSlot(), myPicks, row.currentPickNo(), onTheClock, usersTurn,
-                views, available, result, row.reversalRound());
+                views, available, result, row.reversalRound(),
+                row.dailyDate() == null ? null : row.dailyDate().toString());
     }
 
     // ---- plumbing ---------------------------------------------------------------------------------------
