@@ -1,6 +1,7 @@
 package com.ballknowers.draftsim.historical;
 
 import com.ballknowers.draftsim.config.HistoricalBotProperties;
+import com.ballknowers.draftsim.config.HistoricalSeasonPickProperties;
 import com.ballknowers.draftsim.config.HistoricalProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueShape;
@@ -36,6 +37,8 @@ public class NbaHistoricalSport implements HistoricalSport {
 
     private final BotTuning botTuning;
 
+    private final SeasonSkew seasonSkew;
+
     /** The shared engine's bots, untuned: what every caller before spec 062 got. */
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data) {
         this(props, data, BotTuning.NONE);
@@ -43,17 +46,26 @@ public class NbaHistoricalSport implements HistoricalSport {
 
     @Autowired
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data,
-                              HistoricalBotProperties bots) {
-        this(props, data, bots.nba());
+                              HistoricalBotProperties bots, HistoricalSeasonPickProperties seasonPick) {
+        this(props, data, bots.nba(), seasonPick.nba());
     }
 
+    /** A flat random-year draw: what every caller before the recent-season skew got. */
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data, BotTuning botTuning) {
+        this(props, data, botTuning, SeasonSkew.NONE);
+    }
+
+    public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data, BotTuning botTuning,
+                              SeasonSkew seasonSkew) {
         this.props = props;
         this.data = data;
         this.botTuning = botTuning;
+        this.seasonSkew = seasonSkew;
     }
 
     @Override public BotTuning botTuning() { return botTuning; }
+
+    @Override public SeasonSkew seasonSkew() { return seasonSkew; }
 
     @Override public String code() { return CODE; }
 

@@ -146,6 +146,16 @@ historical-bots:
   nfl:
     temperature: 0.25
 
+# Time Machine random-year draw (Allan 2026-11-14: "tired of 70s 80s drafts"). The newest `recent-seasons` offered
+# basketball seasons each count `recent-weight` times in the draw; every older season counts once. Both numbers are
+# hand-set and arbitrary, a taste call, not fitted to anything. With all 56 seasons offered (1970-2025) that is
+# 25 x 4 against 31 x 1: a 2001-or-later season about 76% of the time, up from 45% on a flat draw. Old seasons stay
+# possible on purpose. Football has no block: it offers 2000 onward, so its draw stays flat.
+historical-season-pick:
+  nba:
+    recent-seasons: 25
+    recent-weight: 4
+
 # Football Time Machine (specs/056-nfl-historical-draft-game). A separate block from `historical:` on purpose
 # (review F10). Every number is hand-set and arbitrary unless marked "schedule fact"; nothing is fitted.
 historical-nfl:

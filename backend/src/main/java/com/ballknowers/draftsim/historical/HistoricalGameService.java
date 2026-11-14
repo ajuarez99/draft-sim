@@ -96,7 +96,8 @@ public class HistoricalGameService {
     // ---- create -----------------------------------------------------------------------------------------
 
     /**
-     * Starts a game on a random offered season of the given sport, in a random slot unless one is given, and
+     * Starts a game on a random offered season of the given sport (weighted by the sport's {@link SeasonSkew},
+     * which is a flat draw unless configured), in a random slot unless one is given, and
      * advances the bots to the user's first turn.
      *
      * @param sportCode      "NBA" or "NFL"; anything else is an {@link IllegalArgumentException} (400). No default.
@@ -124,7 +125,7 @@ public class HistoricalGameService {
             if (offered.isEmpty()) {
                 throw new IllegalStateException("no historical " + sport.code() + " seasons have been imported yet");
             }
-            season = offered.get(random.nextInt(offered.size()));
+            season = sport.seasonSkew().pick(offered, random.nextDouble());
         }
         int s = season.seasonStart();
 

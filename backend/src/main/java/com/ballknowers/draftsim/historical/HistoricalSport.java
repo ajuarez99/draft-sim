@@ -63,6 +63,9 @@ public interface HistoricalSport {
 
     Optional<SeasonRow> findSeason(int seasonStart);
 
+    /** How the random-year draw leans toward recent seasons; a flat draw unless the sport says otherwise. */
+    default SeasonSkew seasonSkew() { return SeasonSkew.NONE; }
+
     /**
      * The scoring snapshot frozen into a game: the base map restricted to this season's counted keys, keys sorted so
      * the order {@code GameScoringService} sums in never depends on the JVM's hash seed.
