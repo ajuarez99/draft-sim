@@ -127,6 +127,19 @@ export default function HistoricalAwardPanel({ gameId }: { gameId: number }) {
       {region}
       <section className="panel hist-award" aria-label="What this game earned">
         <h2>What this game earned</h2>
+        <p className="tm-xp">
+          <strong className="tm-xp-num">+{award.total} XP</strong>
+          {award.badges.length > 0 && (
+            <span className="muted">
+              {' '}
+              and {award.badges.length} new {award.badges.length === 1 ? 'badge' : 'badges'}
+            </span>
+          )}
+        </p>
+        <details className="tm-fold">
+        <summary>
+          <span className="tm-fold-link">Where the XP came from</span>
+        </summary>
         <ul className="hist-award-lines row-list">
           {award.lines.map((l, i) => (
             <li key={i}>
@@ -145,6 +158,7 @@ export default function HistoricalAwardPanel({ gameId }: { gameId: number }) {
             <strong className="mono">+{award.total} XP</strong>
           </li>
         </ul>
+        </details>
 
         {award.badges.length > 0 && (
           <>

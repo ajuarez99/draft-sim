@@ -7322,3 +7322,90 @@ td.rv-po { border-left: 1px dashed var(--line); }
 /* Grid and flex children default to min-width: auto, so one wide table would widen the whole page on a phone. */
 .tm-page > *, .tm-page .hist-results > * { min-width: 0; }
 .tm-page .hist-results { grid-template-columns: minmax(0, 1fr); }
+
+/* ============================================================================================================
+   Spec 070: game feel. The results lead with one number (the draft score), one square per pick and a share
+   button; the long tables fold under their own headings. In the room a row's last-season points are its own
+   number, and on a phone the clock banner is two tight lines so the player list keeps the screen.
+   ============================================================================================================ */
+.tm-score { width: 100%; max-width: 420px; margin-top: 14px; display: grid; gap: 8px; }
+.tm-score-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.tm-score-label { font-size: 15px; font-weight: 800; color: var(--muted); }
+.tm-score-num { font-size: 40px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+.tm-score-bar { height: 12px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.tm-score-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
+.tm-finish-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; width: 100%; margin-top: 16px; }
+.tm-page .hist-finish .tm-finish-actions .tm-play { margin-top: 0; }
+.tm-share { padding: 12px 22px; font-size: 15px; }
+.tm-share-status { flex-basis: 100%; }
+.tm-share-status:empty { display: none; }
+.tm-share-text { flex-basis: 100%; width: 100%; font: inherit; font-size: 13px; padding: 10px 12px; border: 0; border-radius: 14px; background: var(--raised); color: var(--text); resize: none; }
+
+.tm-picks { margin-bottom: 16px; }
+.tm-pickgrid { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tm-pick {
+  font: inherit; width: 42px; height: 46px; padding: 0; border: 0; border-radius: 12px; cursor: pointer;
+  display: grid; place-items: center; align-content: center; gap: 1px; line-height: 1;
+  background: var(--raised); color: var(--muted);
+}
+.tm-pick.ahead { background: color-mix(in oklab, var(--up) 26%, var(--panel)); color: var(--up); }
+.tm-pick.behind { background: color-mix(in oklab, var(--down) 24%, var(--panel)); color: var(--down); }
+.tm-pick-mark { font-size: 13px; font-weight: 900; }
+.tm-pick-round { font-size: 13px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.tm-pick:hover { filter: brightness(1.15); }
+.tm-pick.on { box-shadow: inset 0 0 0 2px var(--text); }
+.tm-pick:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.tm-pick-detail { margin: 0; min-height: 2.9em; font-size: 15px; }
+.tm-key { font-weight: 900; }
+.tm-key.ahead { color: var(--up); }
+.tm-key.behind { color: var(--down); }
+@media (prefers-reduced-motion: no-preference) {
+  .tm-pickgrid li { animation: tm-pop 320ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both; animation-delay: calc(var(--i, 0) * 70ms + 150ms); }
+  .tm-score-bar > span { animation: tm-fill 700ms ease-out both; transform-origin: left; }
+}
+@keyframes tm-pop { from { opacity: 0; transform: scale(0.6) translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes tm-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* A folded section: the heading is the control. The chevron turns when it opens. */
+.tm-fold > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 12px; }
+.tm-fold > summary > * { grid-column: 1; }
+.tm-fold > summary::-webkit-details-marker { display: none; }
+.tm-fold > summary::after { content: '\203A'; grid-column: 2; grid-row: 1; line-height: 1; font-size: 22px; font-weight: 800; color: var(--muted); transition: transform 150ms; }
+.tm-fold[open] > summary::after { transform: rotate(90deg); }
+.tm-fold > summary h2, .tm-fold > summary h3, .tm-page .tm-fold > summary h2 { margin: 0; }
+.tm-fold[open] > summary { margin-bottom: 14px; }
+.tm-fold > summary:hover h2, .tm-fold > summary:hover h3, .tm-fold > summary:hover .tm-fold-link { color: var(--brand); }
+.tm-fold > summary:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; border-radius: 8px; }
+.tm-fold-link { font-size: 14px; font-weight: 700; color: var(--muted); }
+.tm-page .tm-fold .panel-head { margin-bottom: 10px; }
+.tm-xp { margin: 0 0 8px; font-size: 16px; }
+.tm-xp-num { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.tm-page .hist-hindsight .tm-fold { margin-top: 16px; }
+
+/* Room rows: last season's points as the row's own right-hand number. */
+.hist-row { grid-template-columns: 34px minmax(0, 1fr) auto auto; }
+.hist-pts { display: grid; justify-items: end; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.hist-pts strong { font-size: 15px; font-weight: 800; }
+.hist-pts .muted { font-size: 11.5px; }
+@media (max-width: 640px) {
+  .tm-score-num { font-size: 34px; }
+  .tm-pick { width: 38px; height: 44px; }
+  /* Phone room: the title keeps one line and the sentence under it goes (the how-to already said it). */
+  .tm .hist-head p { display: none; }
+  .tm .hist-head .page-title { font-size: 19px; }
+  .tm .hist-banner { padding: 8px 10px; gap: 6px 10px; border-radius: 16px; }
+  /* Row one: who is up, with Auto-finish beside it. Row two: the pace and the quiet buttons. The controls group
+     is dissolved (display: contents) so its children can sit on either row. */
+  .tm .hist-banner .room-controls-group { display: contents; }
+  .tm .hist-banner-clock { order: 1; flex: 1 1 0; }
+  .tm .hist-banner-headline { font-size: 17px; }
+  .tm .hist-banner .room-primary { order: 2; margin-left: 0; white-space: nowrap; font-size: 13px; padding: 7px 12px; }
+  .tm .hist-banner .segmented { order: 3; flex-wrap: nowrap; flex: none; }
+  .tm .hist-banner .segmented.sm .segment { padding: 6px 10px; }
+  .tm .hist-banner .chip:not(.room-primary) { order: 4; }
+  /* Phone rows: the points sit top right with the star and Draft under them, so the name keeps its width. */
+  .tm .hist-row { gap: 4px 8px; padding: 8px 4px; grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .tm .hist-row > .hist-rank, .tm .hist-row > .hist-main { grid-row: 1 / span 2; }
+  .tm .hist-row > .hist-pts { grid-column: 3; grid-row: 1; display: flex; align-items: baseline; justify-content: flex-end; gap: 4px; }
+  .tm .hist-row > .hist-row-actions, .tm .hist-row > .hist-draft { grid-column: 3; grid-row: 2; justify-self: end; }
+}

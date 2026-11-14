@@ -57,7 +57,8 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
         <h2>Available players</h2>
         <span className="muted small">
           {rankingLabel}
-          {sport === 'NBA' ? ' · fantasy points exclude bonuses' : ''}
+          {' · the number on each row is his fantasy points last season'}
+          {sport === 'NBA' ? ', which excludes bonuses' : ''}
         </span>
       </div>
       <div className="hist-list-tools">
@@ -131,15 +132,20 @@ export default function HistoricalPlayerList({ players, rankingLabel, sport = 'N
                   </div>
                   <div className={`hist-line small${p.prior ? '' : ' muted'}`}>
                     {priorLine(p.prior, sport, p.rookiePick)}
-                    {p.prior && (
-                      <span className="muted">
-                        {' '}
-                        · {pts1(p.prior.fantasyPoints)} fantasy pts{sport === 'NBA' ? ' (excludes bonuses)' : ''}
-                        {p.prior.bestOfTwo ? ` · ranked on ${p.prior.bestOfTwo}` : ''}
-                      </span>
+                    {p.prior && p.prior.bestOfTwo && p.prior.bestOfTwo !== p.prior.seasonLabel && (
+                      <span className="muted"> · ranked on {p.prior.bestOfTwo}</span>
                     )}
                   </div>
                 </div>
+                {/* Always in the row so the columns line up; empty for a player with no season to show. */}
+                <span className="hist-pts" title={sport === 'NBA' ? 'Fantasy points last season, excluding bonuses' : 'Fantasy points last season'}>
+                  {p.prior && (
+                    <>
+                      <strong>{pts1(p.prior.fantasyPoints)}</strong>
+                      <span className="muted">pts</span>
+                    </>
+                  )}
+                </span>
                 {onToggleQueue ? (
                   <div className="hist-row-actions">
                     <button

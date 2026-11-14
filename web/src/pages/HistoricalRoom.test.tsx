@@ -145,7 +145,8 @@ describe('HistoricalRoom while drafting', () => {
         expect(screen.getByText(/steals were not fully recorded/)).toBeInTheDocument()
     expect(screen.getAllByText(/ranked by last season's points/).length).toBeGreaterThan(0)
     expect(screen.getByText(/1994-95 · 79 G · 29.3 pts 8.1 reb 4.2 ast/)).toBeInTheDocument()
-    expect(screen.getAllByText(/excludes bonuses/).length).toBeGreaterThan(0)
+    // Spec 070: said once, in the list header, instead of on every row.
+    expect(screen.getAllByText(/excludes bonuses/).length).toBe(1)
     expect(screen.getByText('no NBA stats last season')).toBeInTheDocument()
     expect(container.textContent ?? '').not.toMatch(/ADP/i)
   })
@@ -400,8 +401,9 @@ describe('HistoricalRoom, football', () => {
     expect(line.textContent).toContain('115.8 rush yd 1.1 rush TD 3.5 rec 20.1 rec yd')
     expect(line.textContent).not.toMatch(/pass yd|pass TD|INT|rec TD/)
     expect(line.textContent).toContain('3 fum lost · 2 ret TD')
-    expect(line.textContent).toContain('476.9 fantasy pts')
-    expect(line.textContent).not.toMatch(/bonus/i)
+    // Spec 070: last season's points are the row's own number now, not the tail of the stat line.
+    expect(line.closest('li')!.querySelector('.hist-pts')!.textContent).toBe('476.9pts')
+    expect(line.closest('li')!.textContent).not.toMatch(/bonus/i)
     expect(within(list).getByText('rookie · NFL pick #5')).toBeInTheDocument()
     expect(within(list).getByText('no NFL stats last season')).toBeInTheDocument()
     expect(within(list).queryByText(/no NBA stats/)).not.toBeInTheDocument()
