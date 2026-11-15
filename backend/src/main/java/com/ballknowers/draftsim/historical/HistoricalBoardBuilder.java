@@ -20,8 +20,10 @@ import java.util.function.IntFunction;
  * <p>Ranking is the labelled fallback, never "ADP" (research R4): the most recent qualifying line of the last {@code lookback}
  * seasons (S-1, S-2, S-3 by default) among those with at least {@code minGames}, scored as counting-stat fantasy points PER GAME times
  * {@code standardGames} (both hand-set, F6). Counting stats under the drafted season's COUNTED keys only, and
- * no dd/td/bonuses (F12), the same for both sources. A player with no qualifying prior line (a rookie, or one
- * who sat out) ranks after everyone who has one, in a seeded random order, and the card says so.
+ * no dd/td/bonuses (F12), the same for both sources. A first-season player whose real draft pick is known is
+ * placed by that pick (football: {@link NflRank}; basketball: {@link RookieRank}). Anyone else with no
+ * qualifying prior line (an undrafted or late-drafted rookie, or a player who sat out) ranks after everyone who
+ * has one, in a seeded random order, and the card says so.
  *
  * <p><b>The returned list is sorted by rank ascending, rank 1 = best.</b> The engine's {@code PickDecider}
  * takes its candidates in list order and reads {@code adp} as a pick number, so this ordering is load-bearing
@@ -71,19 +73,33 @@ public final class HistoricalBoardBuilder {
                           java.util.Set<String> totalKeys) {}
 
     /**
+     * Basketball (Allan 2026-11-15): a first-season player with a known NBA draft pick p is ranked level with the
+     * veteran at board rank {@code firstRank + rankStep * (p - 1)}, and sits directly behind him. Both numbers
+     * are hand-set and arbitrary ({@code HistoricalRookieProperties}); there is no historical ADP to fit them to.
+     */
+    public record RookieRank(int firstRank, int rankStep) {}
+
+    /**
      * What differs per sport (spec 056 T010). {@code sport} is the domain sport every position must belong to,
      * {@code counting} the keys a card may show and the ranking may count, {@code label} names a season
      * ("1995-96" or "2007"), {@code mode} the ranking, {@code rookiePicks} (player id to his draft slot in the
-     * drafted season) feeds the football rookie placement and the card, and {@code nfl} carries the football-only
-     * inputs. Both are empty/null for basketball.
+     * drafted season) feeds the rookie placement and the card, {@code nfl} carries the football-only inputs
+     * (null for basketball) and {@code rookieRank} the basketball rookie placement (null for football, and for a
+     * basketball board that leaves its rookies in the random tail).
      */
     public record Options(Sport sport, List<String> counting, IntFunction<String> label, RankMode mode,
-                          Map<Long, RookiePick> rookiePicks, NflRank nfl) {}
+                          Map<Long, RookiePick> rookiePicks, NflRank nfl, RookieRank rookieRank) {}
 
-    /** The basketball options: today's behaviour exactly. */
+    /** The basketball options with no draft data: every rookie in the random tail, as spec 053 shipped it. */
     static Options nba() {
         return new Options(Sport.NBA, COUNTING, HistoricalBoardBuilder::label, RankMode.PRIOR_PER_GAME, Map.of(),
-                null);
+                null, null);
+    }
+
+    /** The basketball options with the first-season players' real draft picks, placed by {@code rookieRank}. */
+    static Options nba(Map<Long, RookiePick> rookiePicks, RookieRank rookieRank) {
+        return new Options(Sport.NBA, COUNTING, HistoricalBoardBuilder::label, RankMode.PRIOR_PER_GAME,
+                rookiePicks, null, rookieRank);
     }
 
     /**
@@ -139,12 +155,16 @@ public final class HistoricalBoardBuilder {
             RookiePick rp = opts.rookiePicks().get(c.id());
             boolean early = par && best == null && shown == null && rp != null
                     && rp.round() <= opts.nfl().rookieMaxRound();
+            // Basketball: any first-season player whose draft pick is known. No prior line at all, like football.
+            boolean byPick = !par && opts.rookieRank() != null && best == null && shown == null && rp != null;
+            boolean placed = early || byPick;
             Row row = new Row(c, shown, best == null ? null : opts.label().apply(best.seasonStart()), bestScore,
-                    positions, team, age, early, rp == null ? 0 : rp.pick());
-            (best != null ? ranked : early ? rookies : unranked).add(row);
+                    positions, team, age, placed, rp == null ? 0 : rp.pick());
+            (best != null ? ranked : placed ? rookies : unranked).add(row);
         }
 
         if (par) overReplacement(ranked, rookies, opts.nfl());
+        else if (!rookies.isEmpty()) byDraftPick(ranked, rookies, opts.rookieRank());
         ranked.addAll(rookies);
         // Veterans before a rookie on an equal score, then id (veteran) or draft pick (rookie): deterministic.
         ranked.sort(Comparator.comparingDouble(Row::score).reversed()
@@ -177,8 +197,8 @@ public final class HistoricalBoardBuilder {
     }
 
     /**
-     * One candidate on its way to a board position. {@code rookie} marks a football early draftee placed by his NFL
-     * pick ({@code pick}, the overall number); everyone else is placed by {@code score}.
+     * One candidate on its way to a board position. {@code rookie} marks a first-season player placed by his real
+     * draft pick ({@code pick}, the overall number); everyone else is placed by {@code score}.
      */
     private record Row(Candidate c, StatLine shown, String bestOfTwo, double score, List<String> positions,
                        String team, Integer age, boolean rookie, int pick) {
@@ -235,8 +255,31 @@ public final class HistoricalBoardBuilder {
         }
     }
 
-    /** A rookie's draft slot is shown only on a card with no prior line at all; null for veterans and basketball. */
+    /**
+     * Values the basketball rookies, in place: the player drafted at overall pick p takes the score of the veteran
+     * at rank {@code firstRank + rankStep * (p - 1)}, so the sort seats him directly behind that veteran (a veteran
+     * goes first on an equal score). Past the last veteran, rookies follow every veteran in draft order. An earlier
+     * pick therefore always ranks ahead of a later one; the test pins that direction.
+     */
+    private static void byDraftPick(List<Row> veterans, List<Row> rookies, RookieRank rule) {
+        List<Double> scores = new ArrayList<>();
+        veterans.stream().sorted(Comparator.comparingDouble(Row::score).reversed()
+                .thenComparingLong(r -> r.c().id())).forEach(r -> scores.add(r.score()));
+        int n = scores.size();
+        for (int i = 0; i < rookies.size(); i++) {
+            Row r = rookies.get(i);
+            long target = rule.firstRank() + (long) rule.rankStep() * (r.pick() - 1);
+            double value = n == 0 ? -r.pick() : target <= n ? scores.get((int) target - 1) : scores.get(n - 1) - r.pick();
+            rookies.set(i, r.withScore(value));
+        }
+    }
+
+    /**
+     * A rookie's draft slot is shown only on a card with no prior line at all; null for veterans. A basketball
+     * rookie the board does not place by his pick (no {@code rookieRank}) shows none either.
+     */
     private static Integer rookiePickOf(long id, StatLine shown, Options opts) {
+        if (opts.nfl() == null && opts.rookieRank() == null) return null;
         RookiePick rp = shown == null ? opts.rookiePicks().get(id) : null;
         return rp == null ? null : rp.pick();
     }

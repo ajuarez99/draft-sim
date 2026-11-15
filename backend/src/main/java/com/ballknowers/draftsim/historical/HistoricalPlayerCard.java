@@ -14,8 +14,10 @@ import java.util.Map;
  *
  * @param rank           1-based board position, ascending: 1 = the best (what the engine reads as adp)
  * @param positionalRank rank within the primary position, in board order
- * @param rookiePick     football only (spec 056 F14): the overall NFL draft pick of a rookie with no prior line;
- *                       null for veterans and always null for basketball. A rookie's {@code prior} stays null.
+ * @param rookiePick     the overall draft pick (NFL, spec 056 F14; NBA since 2026-11-15) of a first-season player
+ *                       with no prior line whose pick is known; null for veterans, for rookies the draft data
+ *                       does not find, and on every basketball board built before 2026-11-15. A rookie's
+ *                       {@code prior} stays null.
  * @param rookie         whether the drafted season is this player's first ({@link HistoricalRookies} has the
  *                       rule). NULL means not known, never "no": a board snapshot written before this field
  *                       existed, or a season with no earlier data to compare against.

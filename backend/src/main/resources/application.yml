@@ -156,6 +156,19 @@ historical-season-pick:
     recent-seasons: 25
     recent-weight: 4
 
+# Where a first-season basketball player goes on a Time Machine board (Allan 2026-11-15: rookies were shuffled at
+# random behind every veteran). The player drafted at overall NBA pick p is ranked level with the veteran at board
+# rank first-rank + rank-step * (p - 1): the first pick at 60 (round 5 of a 12-team draft), each later pick one round
+# further down, so pick 10 is the last pick of round 14. All three numbers are hand-set and arbitrary, a guess at
+# where rookies go in real fantasy drafts; nothing was fitted, and there is no historical ADP to fit it to. The draft
+# order is the bundled historical/nba-draft-picks.csv, matched to players BY NAME (see NbaDraftPicks). Football has
+# its own rule in the block below (rookie-positional-offset).
+historical-rookies:
+  nba:
+    first-rank: 60
+    rank-step: 12
+    max-seasons-since-draft: 3   # a draftee who sat out or stayed abroad is still placed by his pick this long after
+
 # Football Time Machine (specs/056-nfl-historical-draft-game). A separate block from `historical:` on purpose
 # (review F10). Every number is hand-set and arbitrary unless marked "schedule fact"; nothing is fitted.
 historical-nfl:

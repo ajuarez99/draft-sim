@@ -311,6 +311,20 @@ describe('HistoricalResults, the hindsight roster and whether it would have won'
     ])
   })
 
+  // A result stored before 2026-11-15 can show a hindsight pick rounds ahead of where you really took the player.
+  it('credits you when you took a hindsight player at a later pick than the one shown', () => {
+    const early = { ...hindsight, picks: [
+      { pickNo: 3, player: card(11, 'Mine Two'), seasonValue: 800 },
+      { pickNo: 22, player: card(21, 'Star One'), seasonValue: 1500.4 },
+    ] }
+    renderIt(withPicks(game(3)), playoffResult({ hindsight: early, hindsightSeason: season }))
+    const rows = Array.from(panel().querySelectorAll('tbody tr')).map((r) => Array.from(r.querySelectorAll('td')).map((c) => c.textContent))
+    expect(rows).toEqual([
+      ['3 · round 1', 'Mine Two · SFYou got him later: pick 22, round 2', '800.0', 'Bust Bobby'],
+      ['22 · round 2', 'Star One · SF', '1,500.4', 'Mine Two'],
+    ])
+  })
+
   it('says yes with the record when the hindsight roster won the title', () => {
     renderIt(withPicks(game(3)), playoffResult({ hindsight, hindsightSeason: season }))
     expect(within(panel()).getByText('Yes. It went 17-2, 1st after the regular season, and won the title.')).toBeInTheDocument()

@@ -36,7 +36,7 @@ class HistoricalBoardBuilderNflTest {
     /** Dedicated starter slots x teams, as NflHistoricalSport derives them: here a small league keeps it legible. */
     private static Options options(Map<String, Integer> depth, Map<Long, RookiePick> rookies) {
         return new Options(Sport.NFL, NflHistoricalSport.COUNTING, y -> String.valueOf(y), RankMode.POINTS_OVER_REPLACEMENT,
-                rookies, new NflRank(depth, 12, 2, NflHistoricalSport.TOTAL_KEYS));
+                rookies, new NflRank(depth, 12, 2, NflHistoricalSport.TOTAL_KEYS), null);
     }
 
     private static NflSeasonLine line(long id, int season, int games, double ppg, String pos) {

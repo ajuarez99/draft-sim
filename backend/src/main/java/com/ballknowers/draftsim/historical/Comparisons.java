@@ -176,34 +176,72 @@ public final class Comparisons {
     }
 
     /**
-     * The greedy hindsight draft (plan F4). At each of the user's pick numbers, in order, take the candidate that
+     * The greedy hindsight draft (plan F4). At each of the user's pick numbers take the candidate that
      * maximises the hindsight team's own SEASON best-ball total: lineup-aware, so a fourth centre who never
      * starts loses to a starter. Candidates are the players still available at that pick in the REAL draft,
-     * minus the hindsight team's earlier picks; a player a bot took later is allowed. The bots' picks are not
+     * minus the hindsight team's other picks; a player a bot took later is allowed. The bots' picks are not
      * changed, and the hindsight team is scored on its own, never against re-drafted rivals.
      *
-     * <p>Exact, and fast, by branch and bound: a candidate can add at most the sum of his positive weekly
-     * scores to any roster, so candidates are tried in that order and the search stops once no remaining
+     * <p>Two passes, and the higher total is kept (Allan 2026-11-15). The first walks the picks first to last,
+     * as it always has. That one spends an early pick on a player who was still there many rounds later (it
+     * took a fifth-round pick for a player the user really got in the eleventh), so the second walks the picks
+     * LAST to first: a late pick is filled from what was left at that point, and the early picks are kept for
+     * the players who were only there early. With plain additive values the backward walk is the optimal
+     * answer; with lineups it is still a greedy, so the forward result is kept when it scored more. The label
+     * says greedy either way.
+     *
+     * <p>The roster is then laid out so every player sits at the LATEST pick he could still be had at
+     * ({@link #layOutLate}), which is what a drafter with hindsight would do and what the page shows.
+     *
+     * <p>Each step is exact, and fast, by branch and bound: a candidate can add at most the sum of his positive
+     * weekly scores to any roster, so candidates are tried in that order and the search stops once no remaining
      * candidate can beat the best found. Ties break on season value, then player id.
      *
+     * @param userPickNos   the user's pick numbers, ascending
      * @param userPointsFor the user's own season total, for {@code userBeatIt}
      */
     Hindsight hindsight(List<Integer> userPickNos, List<Pick> allPicks, Collection<Long> boardIds,
                         TeamScorer team, int weekCount, Map<Long, Double> value,
                         Map<Long, HistoricalPlayerCard> cards, double userPointsFor) {
+        Map<Long, Integer> takenAt = new HashMap<>();
+        for (Pick p : allPicks) takenAt.put(p.playerId(), p.pickNo());
+
+        Set<Long> forward = greedy(userPickNos, takenAt, boardIds, team, weekCount, value);
+        Set<Long> backward = greedy(userPickNos.reversed(), takenAt, boardIds, team, weekCount, value);
+        double forwardTotal = team.season(forward, weekCount);
+        double backwardTotal = team.season(backward, weekCount);
+        Set<Long> chosen = backwardTotal > forwardTotal + EPS ? backward : forward;
+
+        List<HindsightPick> picks = new ArrayList<>();
+        Map<Integer, Long> slots = layOutLate(userPickNos, chosen, takenAt, value);
+        for (int pickNo : userPickNos) {
+            long id = slots.get(pickNo);
+            picks.add(new HindsightPick(pickNo, cards.get(id), value.get(id)));
+        }
+        double total = Math.round(team.season(chosen, weekCount) * 100.0) / 100.0;
+        return new Hindsight(HINDSIGHT_LABEL, total, userPointsFor, total < userPointsFor, picks);
+    }
+
+    /**
+     * One greedy pass over {@code order} (the user's pick numbers, in the order to fill them). A player is
+     * available at a pick when nobody took him at an EARLIER pick of the real draft; the user's own pick of him
+     * counts, so a player the user took at pick 127 can be had at 127 or before, never after.
+     */
+    private Set<Long> greedy(List<Integer> order, Map<Long, Integer> takenAt, Collection<Long> boardIds,
+                             TeamScorer team, int weekCount, Map<Long, Double> value) {
         PlayerWeeks pw = team.scores();
         Set<Long> chosen = new LinkedHashSet<>();
-        List<HindsightPick> picks = new ArrayList<>();
         double baseTotal = 0;
         // Each week's total is rounded to cents, so the bound below carries that much slack per week.
         double slack = 0.01 * weekCount + EPS;
 
-        for (int pickNo : userPickNos) {
-            Set<Long> unavailable = new HashSet<>(chosen);
-            for (Pick p : allPicks) if (p.pickNo() < pickNo) unavailable.add(p.playerId());
-
+        for (int pickNo : order) {
             List<Long> candidates = new ArrayList<>();
-            for (long id : boardIds) if (!unavailable.contains(id)) candidates.add(id);
+            for (long id : boardIds) {
+                if (chosen.contains(id)) continue;
+                Integer taken = takenAt.get(id);
+                if (taken == null || taken >= pickNo) candidates.add(id);
+            }
             candidates.sort(Comparator.comparingDouble((Long id) -> pw.positiveValue(id)).reversed()
                     .thenComparingLong(Long::longValue));
 
@@ -223,10 +261,45 @@ public final class Comparisons {
             if (bestId < 0) throw new IllegalStateException("no candidate available at pick " + pickNo);
             chosen.add(bestId);
             baseTotal = bestTotal;
-            picks.add(new HindsightPick(pickNo, cards.get(bestId), value.get(bestId)));
         }
-        double total = Math.round(team.season(chosen, weekCount) * 100.0) / 100.0;
-        return new Hindsight(HINDSIGHT_LABEL, total, userPointsFor, total < userPointsFor, picks);
+        return chosen;
+    }
+
+    /**
+     * Seats a hindsight roster on the user's picks, every player as late as he could still be had. Walking the
+     * picks last to first, each takes the unseated player who was gone soonest after it (the smallest real pick
+     * number at or after this one; a player nobody drafted counts as never gone). Among players gone at the same
+     * point, the lower season value goes later, so the better player reads as the earlier pick. Any choice among
+     * the players available at a pick leaves the rest seatable, because whoever is available at a pick was
+     * available at every earlier one, so this cannot paint itself into a corner.
+     *
+     * <p>A player the user drafted was "gone" at the user's own pick, so he lands on exactly that pick whenever
+     * the roster allows it, and the page can say "same pick" instead of charging hindsight an earlier one.
+     */
+    static Map<Integer, Long> layOutLate(List<Integer> userPickNos, Collection<Long> roster,
+                                         Map<Long, Integer> takenAt, Map<Long, Double> value) {
+        List<Long> open = new ArrayList<>(roster);
+        Map<Integer, Long> out = new HashMap<>();
+        for (int pickNo : userPickNos.stream().sorted(Comparator.reverseOrder()).toList()) {
+            long pick = -1;
+            for (long id : open) {
+                int gone = takenAt.getOrDefault(id, Integer.MAX_VALUE);
+                if (gone < pickNo) continue;
+                if (pick < 0) {
+                    pick = id;
+                    continue;
+                }
+                int bestGone = takenAt.getOrDefault(pick, Integer.MAX_VALUE);
+                double v = value.getOrDefault(id, 0.0), bv = value.getOrDefault(pick, 0.0);
+                if (gone < bestGone || (gone == bestGone && (v < bv - EPS || (Math.abs(v - bv) <= EPS && id > pick)))) {
+                    pick = id;
+                }
+            }
+            if (pick < 0) throw new IllegalStateException("no hindsight player can be seated at pick " + pickNo);
+            open.remove(Long.valueOf(pick));
+            out.put(pickNo, pick);
+        }
+        return out;
     }
 
     /** Tie-break between equal-total candidates: higher season value, then lower id. */

@@ -3,6 +3,7 @@ package com.ballknowers.draftsim.historical;
 import com.ballknowers.draftsim.config.HistoricalBotProperties;
 import com.ballknowers.draftsim.config.HistoricalSeasonPickProperties;
 import com.ballknowers.draftsim.config.HistoricalProperties;
+import com.ballknowers.draftsim.config.HistoricalRookieProperties;
 import com.ballknowers.draftsim.domain.Sport;
 import com.ballknowers.draftsim.engine.LeagueShape;
 import com.ballknowers.draftsim.historical.HistoricalDataRepository.GameLine;
@@ -39,6 +40,11 @@ public class NbaHistoricalSport implements HistoricalSport {
 
     private final SeasonSkew seasonSkew;
 
+    /** Null (with {@link #draftPicks}) when rookies are left in the random tail: every caller but the live app. */
+    private final HistoricalRookieProperties.Nba rookies;
+
+    private final NbaDraftPicks draftPicks;
+
     /** The shared engine's bots, untuned: what every caller before spec 062 got. */
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data) {
         this(props, data, BotTuning.NONE);
@@ -46,8 +52,10 @@ public class NbaHistoricalSport implements HistoricalSport {
 
     @Autowired
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data,
-                              HistoricalBotProperties bots, HistoricalSeasonPickProperties seasonPick) {
-        this(props, data, bots.nba(), seasonPick.nba());
+                              HistoricalBotProperties bots, HistoricalSeasonPickProperties seasonPick,
+                              HistoricalRookieProperties rookies) {
+        this(props, data, bots.nba(), seasonPick.nba(), rookies.nba(),
+                rookies.nba() == null ? null : NbaDraftPicks.fromClasspath());
     }
 
     /** A flat random-year draw: what every caller before the recent-season skew got. */
@@ -55,12 +63,24 @@ public class NbaHistoricalSport implements HistoricalSport {
         this(props, data, botTuning, SeasonSkew.NONE);
     }
 
+    /** Rookies in the random tail: what every caller before the draft-pick placement got. */
     public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data, BotTuning botTuning,
                               SeasonSkew seasonSkew) {
+        this(props, data, botTuning, seasonSkew, null, null);
+    }
+
+    public NbaHistoricalSport(HistoricalProperties props, HistoricalDataRepository data, BotTuning botTuning,
+                              SeasonSkew seasonSkew, HistoricalRookieProperties.Nba rookies,
+                              NbaDraftPicks draftPicks) {
+        if ((rookies == null) != (draftPicks == null)) {
+            throw new IllegalArgumentException("the rookie rule and the draft picks come together or not at all");
+        }
         this.props = props;
         this.data = data;
         this.botTuning = botTuning;
         this.seasonSkew = seasonSkew;
+        this.rookies = rookies;
+        this.draftPicks = draftPicks;
     }
 
     @Override public BotTuning botTuning() { return botTuning; }
@@ -101,11 +121,17 @@ public class NbaHistoricalSport implements HistoricalSport {
         int s = season.seasonStart();
         List<Map<Long, SeasonLine>> priors = new ArrayList<>(props.rankLookbackSeasons());
         for (int i = 1; i <= props.rankLookbackSeasons(); i++) priors.add(lines(s - i));   // S-1 first; an unimported season is just empty
-        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, data.candidates(s),
+        List<HistoricalBoardBuilder.Candidate> candidates = data.candidates(s);
+        java.util.Set<Long> veterans = data.playersWithLineBefore(s);
+        HistoricalBoardBuilder.Options opts = rookies == null
+                ? HistoricalBoardBuilder.nba()
+                : HistoricalBoardBuilder.nba(
+                        draftPicks.rookiesOf(s, candidates, veterans, rookies.maxSeasonsSinceDraft()),
+                        new HistoricalBoardBuilder.RookieRank(rookies.firstRank(), rookies.rankStep()));
+        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, candidates,
                 priors, lines(s),
-                new HistoricalBoardBuilder.RankConfig(props.rankStandardGames(), props.rankMinGames()),
-                HistoricalBoardBuilder.nba());
-        return HistoricalRookies.mark(board, data.playersWithLineBefore(s), Map.of(), s);
+                new HistoricalBoardBuilder.RankConfig(props.rankStandardGames(), props.rankMinGames()), opts);
+        return HistoricalRookies.mark(board, veterans, Map.of(), s);
     }
 
     private Map<Long, SeasonLine> lines(int season) {
@@ -124,7 +150,10 @@ public class NbaHistoricalSport implements HistoricalSport {
     @Override public String settingsSource() { return SETTINGS_SOURCE; }
 
     // Never "ADP" (FR-009): no trustworthy historical ADP exists (research R4).
-    @Override public String rankingLabel() { return "ranked by last season's points"; }
+    @Override public String rankingLabel() {
+        return rookies == null ? "ranked by last season's points"
+                : "ranked by last season's points, rookies by NBA draft pick";
+    }
 
     @Override public String attribution() { return null; }
 

@@ -326,7 +326,10 @@ function HindsightRoster({ game, result }: Props) {
   const h = result.hindsight
   if (!h.picks || h.picks.length === 0) return null
   const season = result.hindsightSeason ?? null
-  const mine = new Map(game.picks.filter((p) => p.draftSlot === game.userSlot).map((p) => [p.pickNo, p.player]))
+  const myPicks = game.picks.filter((p) => p.draftSlot === game.userSlot)
+  const mine = new Map(myPicks.map((p) => [p.pickNo, p.player]))
+  // Where you really took each of your players, to credit a hindsight player you got at a later pick.
+  const myPickOf = new Map(myPicks.flatMap((p) => (p.player ? [[p.player.id, p.pickNo] as const] : [])))
   // Your own players' season points ride on pickFinishes; a result stored before it has no number to show.
   const myPoints = new Map((result.pickFinishes ?? []).map((f) => [f.pickNo, f.seasonValue]))
   const showMyPoints = myPoints.size > 0
@@ -351,8 +354,8 @@ function HindsightRoster({ game, result }: Props) {
         <h3>The hindsight roster, pick by pick</h3>
       </summary>
       <p className="muted small">
-        At each of your picks, the player still on the board who added the most to this roster's season total. Points are each player's
-        full-season total.
+        The roster that scores the most over the season, drafted only from players who were still on the board at your picks. A player
+        you took later than the pick shown was the better deal, and the row says so. Points are each player's full-season total.
       </p>
       <div className="hist-table-wrap">
         <table className="hist-table">
@@ -369,6 +372,8 @@ function HindsightRoster({ game, result }: Props) {
             {h.picks.map((p) => {
               const took = mine.get(p.pickNo) ?? null
               const same = took != null && took.id === p.player.id
+              const gotAt = myPickOf.get(p.player.id)
+              const later = gotAt != null && gotAt > p.pickNo ? gotAt : null
               return (
                 <tr key={p.pickNo}>
                   <td className="num">
@@ -378,6 +383,11 @@ function HindsightRoster({ game, result }: Props) {
                   <td>
                     <strong>{p.player.name}</strong>
                     <span className="muted small"> · {p.player.positions.join('/')}</span>
+                    {later != null && (
+                      <span className="hist-change up hist-same-pick">
+                        You got him later: pick {later}, round {Math.ceil(later / game.teams)}
+                      </span>
+                    )}
                   </td>
                   <td className="num">{pts1(p.seasonValue)}</td>
                   <td>

@@ -152,7 +152,8 @@ class HistoricalGameMvcIT {
             assertEquals(4, s.get("picks").size());
             assertTrue(s.get("result").isNull());
             assertEquals(HistoricalSyntheticSeason.PLAYERS - 4, s.get("available").size());
-            assertEquals("ranked by last season's points", s.get("season").get("rankingLabel").asText());
+            assertEquals("ranked by last season's points, rookies by NBA draft pick",
+                    s.get("season").get("rankingLabel").asText());
 
             // The drafted season's own line is: team ZZZ, age 99, 91 games, 7777 pts, 8888 reb, 9999 ast.
             // Its games are also stamped ZZZ. None of it may appear anywhere in what a drafter sees.

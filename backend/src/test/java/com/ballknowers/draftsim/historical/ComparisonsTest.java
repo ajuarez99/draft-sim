@@ -159,6 +159,53 @@ class ComparisonsTest {
         assertEquals(2L, h.picks().get(0).player().id(), "player 1 was gone by pick 2");
     }
 
+    /**
+     * The round-5-for-a-round-11-player bug (Allan 2026-11-15). L (60) is the best player on the board at the
+     * user's first pick, but he lasted until the user's second pick, 24, where the user really took him. A (50)
+     * was only there at pick 1: a bot took him at 2. Walking the picks first to last takes L at 1 and is left
+     * with U (10) at 24, 70 points. Hindsight knows L lasts: A at 1, L at 24, 110 points.
+     */
+    @Test
+    void hindsightWaitsOnAPlayerWhoLastedAndSpendsTheEarlyPickOnOneWhoDidNot() {
+        Map<Long, HistoricalPlayerCard> cards = new LinkedHashMap<>();
+        List<GameLine> games = new ArrayList<>();
+        cards.put(1L, card(1, "C"));    // A
+        games.add(game(1, 1, 1, 50));
+        cards.put(2L, card(2, "PG"));   // L
+        games.add(game(2, 2, 1, 60));
+        cards.put(3L, card(3, "SF"));   // the junk the user took at pick 1
+        games.add(game(3, 3, 1, 5));
+        cards.put(4L, card(4, "SG"));   // U, never drafted
+        games.add(game(4, 4, 1, 10));
+        List<Pick> real = List.of(new Pick(1, 1, 3L), new Pick(2, 2, 1L), new Pick(24, 1, 2L));
+
+        PlayerWeeks pw = REPLAY.scorePlayerWeeks(Map.of("pts", 1.0), games);
+        Map<Long, Player> players = new HashMap<>();
+        cards.values().forEach(c -> players.put(c.id(), HistoricalBoardBuilder.toEntry(c).player()));
+        TeamScorer team = new TeamScorer(LINEUPS, settings(12), rules(), players, pw);
+        Map<Long, Double> value = new HashMap<>();
+        cards.keySet().forEach(id -> value.put(id, pw.seasonValue(id)));
+
+        Hindsight h = CMP.hindsight(List.of(1, 24), real, cards.keySet(), team, 1, value, cards, 65.0);
+
+        assertEquals(List.of(1L, 2L), h.picks().stream().map(p -> p.player().id()).toList(),
+                "A at pick 1 (gone by 2), L at pick 24 where he was still there");
+        assertEquals(24, h.picks().get(1).pickNo());
+        assertEquals(110.0, h.pointsFor(), "not the 70 the first-to-last walk settles for");
+    }
+
+    /** A drafted player sits on the pick he was gone at; the undrafted one, who could go anywhere, moves up. */
+    @Test
+    void theLayoutSeatsEachPlayerAtTheLatestPickHeCouldStillBeHadAt() {
+        // 7 was taken at pick 24 (by the user), 8 at pick 30 (by a bot), 9 by nobody.
+        Map<Long, Integer> takenAt = Map.of(7L, 24, 8L, 30);
+        Map<Long, Double> value = Map.of(7L, 60.0, 8L, 20.0, 9L, 90.0);
+        Map<Integer, Long> seats = Comparisons.layOutLate(List.of(1, 24, 25), List.of(7L, 8L, 9L), takenAt, value);
+        assertEquals(8L, seats.get(25), "8 lasted to 30, so he is the one who can wait until 25");
+        assertEquals(7L, seats.get(24), "7 was gone at 24: exactly the pick the user got him at");
+        assertEquals(9L, seats.get(1));
+    }
+
     // ---- football (spec 056 T026): the same comparisons, over QB/RB/WR/TE week lines with no dates ----------------
 
     private static NflHistoricalRepository.NflWeekLine nflWeek(long player, int week, double rushYd) {

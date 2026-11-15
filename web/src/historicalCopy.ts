@@ -115,7 +115,7 @@ export function totalsText(totals: Record<string, number> | null | undefined): s
  */
 export function priorLine(prior: HistoricalPrior | null, sport: HistoricalSport = 'NBA', rookiePick: number | null = null): string {
   if (!prior) {
-    if (sport === 'NFL' && rookiePick != null) return `rookie · NFL pick #${rookiePick}`
+    if (rookiePick != null) return `rookie · ${sport} pick #${rookiePick}`
     return `no ${sport} stats last season`
   }
   return [prior.seasonLabel, `${prior.games} G`, perGameText(prior.perGame, sport), sport === 'NFL' ? totalsText(prior.totals) : '']

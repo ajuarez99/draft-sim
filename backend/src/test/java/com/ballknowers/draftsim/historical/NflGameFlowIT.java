@@ -391,7 +391,8 @@ class NflGameFlowIT {
             assertTrue(nba.get("season").get("attribution").isNull());
             assertTrue(nba.get("season").get("dataNotes").isArray() && nba.get("season").get("dataNotes").isEmpty());
             assertEquals(NbaHistoricalSport.SETTINGS_SOURCE, nba.get("season").get("settingsSource").asText());
-            assertEquals("ranked by last season's points", nba.get("season").get("rankingLabel").asText());
+            assertEquals("ranked by last season's points, rookies by NBA draft pick",
+                    nba.get("season").get("rankingLabel").asText());
             assertEquals("1895-96", nba.get("season").get("label").asText());
             assertTrue(nba.get("season").get("excludedStats").has("stl"), "its 053 era disclosure is intact");
         } finally {

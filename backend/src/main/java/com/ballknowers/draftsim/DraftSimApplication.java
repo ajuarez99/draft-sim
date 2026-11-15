@@ -30,6 +30,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         RecapProperties.class,
         HistoricalBotProperties.class,
         HistoricalSeasonPickProperties.class,
+        HistoricalRookieProperties.class,
         RivalryProperties.class,
         HistoricalProperties.class,
         NflHistoricalProperties.class
