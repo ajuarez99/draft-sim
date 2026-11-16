@@ -13,6 +13,8 @@ import {
 } from '../historicalCopy'
 import HistoricalBracket from './HistoricalBracket'
 import { draftScore, pickMark, shareText, type PickMark } from '../historicalShare'
+import { tmHome } from '../site'
+import { currentSite } from '../siteEnv'
 
 type Props = {
   game: HistoricalGameState
@@ -79,7 +81,7 @@ function DraftScore({ result }: { result: HistoricalResult }) {
  */
 function ShareButton({ game, result }: { game: HistoricalGameState; result: HistoricalResult }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'manual'>('idle')
-  const text = () => shareText(game, result, `${window.location.origin}/history`)
+  const text = () => shareText(game, result, `${window.location.origin}${tmHome(currentSite())}`)
   async function share() {
     const body = text()
     try {

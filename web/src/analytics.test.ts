@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import appSource from './App.tsx?raw'
+import type { Site } from './site'
 import {
-  ROUTE_TEMPLATE_PATHS,
   __resetAnalyticsForTests,
   initAnalytics,
   routeTemplate,
+  routesFor,
   trackAction,
   trackLeagueView,
   trackPageView,
@@ -116,7 +117,8 @@ describe('the script element', () => {
     expect(el.async).toBe(true)
     expect(el.getAttribute('data-website-id')).toBe('site-123')
     expect(el.getAttribute('data-auto-track')).toBe('false')
-    expect(el.getAttribute('data-domains')).toBe('www.ballknowers.co,ballknowers.co')
+    // Spec 073: the league site reports too (its own hostname keeps the two streams apart).
+    expect(el.getAttribute('data-domains')).toBe('www.ballknowers.co,ballknowers.co,leagues.ballknowers.co')
     for (const a of ['data-errors', 'data-performance', 'data-distinct-id', 'data-host-url']) {
       expect(el.hasAttribute(a), a).toBe(false)
     }
@@ -193,16 +195,116 @@ describe('routeTemplate', () => {
   })
 })
 
+// Spec 073: App.tsx holds three route trees, each between @routes markers (the league pages once, shared).
+function region(name: string): string {
+  const begin = `// @routes:${name} begin`
+  const end = `// @routes:${name} end`
+  const from = appSource.indexOf(begin)
+  const to = appSource.indexOf(end)
+  if (from < 0 || to < from) throw new Error(`App.tsx has no @routes:${name} region`)
+  return appSource.slice(from + begin.length, to)
+}
+
+// path="/x", path='/x', path={'/x'} or path={"/x"}. A path held in a variable or a template literal
+// matches none of these, so the count check fails loudly instead of the route silently falling through
+// to /(not-found).
+function pathsIn(text: string): { paths: string[]; routeCount: number } {
+  const paths = [...text.matchAll(/\bpath=(?:\{\s*)?(?:"([^"]+)"|'([^']+)')(?:\s*\})?/g)].map((m) => m[1] ?? m[2])
+  return { paths, routeCount: [...text.matchAll(/<Route\b/g)].length }
+}
+
+// Redirect routes render no page, so they are in no table and send no page view. Listed here so a new
+// redirect has to be named on purpose.
+const REDIRECTS: Record<Site, string[]> = {
+  combined: ['/game/:gameId'],
+  leagues: ['/history', '/history/:gameId'],
+  timemachine: ['/history', '/history/:gameId', '/leagues/*', '/drafts/*', '/mock/*', '/managers/*', '/admin/*'],
+}
+
 describe('route table vs App.tsx', () => {
-  it('has a template for every <Route path> in App.tsx (two lists of one rule)', () => {
-    // path="/x", path='/x', path={'/x'} or path={"/x"}. A path held in a variable or a template
-    // literal matches none of these, so the count check below fails loudly instead of the route
-    // silently falling through to /(not-found).
-    const paths = [...appSource.matchAll(/\bpath=(?:\{\s*)?(?:"([^"]+)"|'([^']+)')(?:\s*\})?/g)].map((m) => m[1] ?? m[2])
-    const routeCount = [...appSource.matchAll(/<Route\b/g)].length
-    expect(paths.length).toBeGreaterThan(20)
-    expect(paths.length, 'a <Route> whose path this test cannot parse').toBe(routeCount)
-    for (const p of paths) expect(ROUTE_TEMPLATE_PATHS, `no template for ${p}`).toContain(p)
+  const leagueRegion = region('league-pages')
+  const trees: Record<Site, string> = {
+    combined: leagueRegion + region('combined'),
+    leagues: leagueRegion + region('leagues'),
+    timemachine: region('timemachine'),
+  }
+
+  it.each(['combined', 'leagues', 'timemachine'] as const)(
+    '%s: every <Route path> is a template in the site table or a named redirect, and every template has a route',
+    (site) => {
+      const { paths, routeCount } = pathsIn(trees[site])
+      expect(paths.length).toBeGreaterThan(site === 'timemachine' ? 5 : 20)
+      expect(paths.length, 'a <Route> whose path this test cannot parse').toBe(routeCount)
+      const table = routesFor(site).map((r) => r.path)
+      for (const p of paths) {
+        expect(table.includes(p) || REDIRECTS[site].includes(p), `${site}: no template or redirect for ${p}`).toBe(true)
+      }
+      for (const t of table) expect(paths, `${site}: table entry ${t} has no <Route>`).toContain(t)
+      for (const r of REDIRECTS[site]) expect(paths, `${site}: redirect ${r} has no <Route>`).toContain(r)
+    },
+  )
+
+  it('every <Route> in App.tsx is inside a marked region or listed here (CR-07)', () => {
+    // Routes deliberately outside any @routes region. None today; add one here on purpose.
+    const OUTSIDE_REGIONS: string[] = []
+    const inRegions = ['league-pages', 'combined', 'leagues', 'timemachine']
+      .map((name) => pathsIn(region(name)).routeCount)
+      .reduce((a, b) => a + b, 0)
+    // Comment lines name <Route> too, so they are left out of the whole-file count.
+    const code = appSource.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n')
+    const whole = [...code.matchAll(/<Route\b/g)].length
+    expect(whole, 'a <Route> outside every @routes region is never compared with a table').toBe(inRegions + OUTSIDE_REGIONS.length)
+  })
+
+  it('no redirect path is in any table (a redirecting path sends no page view)', () => {
+    for (const site of ['combined', 'leagues', 'timemachine'] as const) {
+      const table = routesFor(site).map((r) => r.path)
+      for (const r of REDIRECTS[site]) expect(table, `${site} ${r}`).not.toContain(r)
+    }
+  })
+
+  it('the Time Machine table is only the two Time Machine pages and the catch-all', () => {
+    expect(routesFor('timemachine').map((r) => r.path)).toEqual(['/', '/game/:gameId', '*'])
+  })
+
+  it('the league table has no Time Machine route; the combined table keeps both /history routes', () => {
+    expect(routesFor('leagues').map((r) => r.path)).not.toContain('/history')
+    expect(routesFor('leagues').map((r) => r.path)).not.toContain('/history/:gameId')
+    expect(routesFor('combined').map((r) => r.path)).toEqual(expect.arrayContaining(['/history', '/history/:gameId']))
+  })
+})
+
+describe('routeTemplate per site', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('timemachine: / is Time Machine, /game/:id is the game template, anything else is not found', () => {
+    vi.stubEnv('VITE_SITE', 'timemachine')
+    expect(routeTemplate('/', true)).toEqual({ url: '/', title: 'Time Machine' })
+    expect(routeTemplate('/game/123456789', true)).toEqual({ url: '/game/:game', title: 'Time Machine game' })
+    expect(routeTemplate('/leagues/123456789/power', true).url).toBe('/(not-found)')
+    expect(routeTemplate('/game/123456789', false)).toEqual({ url: '/(landing)/game/:game', title: 'Landing (from Time Machine game)' })
+    expect(routeTemplate('/', false)).toEqual({ url: '/(landing)', title: 'Landing' })
+  })
+
+  it('leagues: no Time Machine template; /history is not a page there', () => {
+    vi.stubEnv('VITE_SITE', 'leagues')
+    expect(routeTemplate('/history', true).url).toBe('/(not-found)')
+    expect(routeTemplate('/leagues/1/power', true).url).toBe('/leagues/:league/power')
+    expect(routeTemplate('/', true)).toEqual({ url: '/', title: 'Home' })
+  })
+
+  it('combined: /history and /history/:id keep their templates', () => {
+    expect(routeTemplate('/history', true)).toEqual({ url: '/history', title: 'Time Machine' })
+    expect(routeTemplate('/history/42', true)).toEqual({ url: '/history/:game', title: 'Time Machine game' })
+  })
+})
+
+describe('the league site reports under its own host', () => {
+  it('runs on leagues.ballknowers.co and sends that hostname', () => {
+    onProduction('leagues.ballknowers.co')
+    initAndLoad()
+    trackPageView('/leagues/1122386008709910528/power', true)
+    expect(sentPayloads()[0]).toMatchObject({ hostname: 'leagues.ballknowers.co', url: '/leagues/:league/power' })
   })
 })
 

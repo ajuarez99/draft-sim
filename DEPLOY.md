@@ -310,6 +310,74 @@ flag behaviour is stable. Verified locally, not yet on production.
 - The backend (`api.ballknowers.co`) is a separate service and sends none of
   these; that is a separate decision.
 
+## Two sites (spec 073)
+
+One `web/` codebase, built in one of three modes by the build variable `VITE_SITE`:
+
+| `VITE_SITE` | Serves | Address |
+|---|---|---|
+| unset | The combined single site, Time Machine at `/history` | Today's web service until you flip it |
+| `timemachine` | Only the Time Machine, at `/` and `/game/:gameId` | `www.ballknowers.co` |
+| `leagues` | Everything except the Time Machine | `leagues.ballknowers.co` |
+
+Anything else (a typo such as `leauges`) fails the build with a message naming the value. A trailing space
+from a Windows `set VITE_SITE=x && ...` is trimmed. All three variables below are **build** variables, like
+`VITE_API_BASE`: change one and rebuild.
+
+| Variable | Notes |
+|---|---|
+| `VITE_SITE` | `timemachine`, `leagues`, or unset (combined) |
+| `VITE_TM_ORIGIN` | Time Machine site origin, no trailing slash. Default `https://www.ballknowers.co` |
+| `VITE_LEAGUES_ORIGIN` | League site origin, no trailing slash. Default `https://leagues.ballknowers.co` |
+
+Merging this change to `main` shows nothing new: the existing web service has no `VITE_SITE`, so it keeps
+building the combined site. The split happens when you set variables, in this order.
+
+**Rollout**
+
+1. **Check first (unconfirmed):** whether your Railway plan allows another custom domain on a second web
+   service. This was not looked up. If it does not, stop here; nothing else depends on it.
+2. **Backend service:** append `,https://leagues.ballknowers.co` to `CORS_ORIGINS` (comma-separated, exact
+   origins, no trailing slash). Redeploys the backend; harmless on its own.
+3. **New Railway web service** from the same repo, Root Directory `web`, build variables `VITE_SITE=leagues`,
+   `VITE_API_BASE` (same value as the existing web service) and optionally `VITE_UMAMI_WEBSITE_ID`.
+4. **Custom domain** `leagues.ballknowers.co` on that service, with the CNAME Railway shows added in Squarespace.
+5. **Check the league site** at its real address: sign in, open a league, a draft board and a mock. If sign-in
+   answers "Couldn't reach Sleeper just now", the backend does not allow that origin: step 2 was missed or
+   mistyped (the browser blocks the call, and the page can only report that it failed).
+6. **Flip the main site:** set `VITE_SITE=timemachine` on the existing web service and redeploy. From then on
+   `www.ballknowers.co` is the Time Machine, old league links forward to `leagues.ballknowers.co`, and old
+   `/history` links land on the Time Machine home or game. Do steps 5 and 6 in one sitting: between them the
+   league site forwards `/history/<id>` to the main address, which still serves it under `/history` (the league
+   site forwards to `/history`, not `/game`, so a forwarded link works in either state), and nobody has the
+   league address until you hand it out.
+7. **Re-set your analytics opt-out** on `leagues.ballknowers.co` (open it in each browser you use and set
+   `localStorage['umami.disabled']`). The opt-out is stored per address and is not carried.
+
+**What carries across and what does not.** Sign-in is a Sleeper username kept per address, so each site asks
+once. Time Machine games, achievements and streaks live in the backend against the Sleeper user and need no
+move. Saved stat-calculator formulas live in the browser per address: they ride along only when someone is
+**forwarded** from the main address to the league site (an old league link, or the one-time "your leagues
+moved" notice's link), and only when the league site has **never saved formulas** of its own (a person who
+deleted theirs there is not given the old ones back). A league-mate who types the league address directly
+starts with none there; their old ones stay on the main address and are carried the first time a forward
+happens. The carry is capped at 24,000 characters of URL fragment (roughly 320 per formula, so a full store of
+50 fits); a store bigger than that sends the newest formulas that fit. Display preferences reset on the league
+site (they default); the analytics opt-out is not carried.
+
+**Analytics.** Each site reports under its own hostname (`www.ballknowers.co`, `leagues.ballknowers.co`).
+Whether they share one Umami website id or use two is your call: `VITE_UMAMI_WEBSITE_ID` on each service.
+Known, accepted change (code review CR-08): a visitor forwarded between the two sites is recorded with no
+outside referrer, because the forward leg sends no view and the destination sees the other site as its
+referrer, which counts as inside. Their original source (a group chat, a search) is not kept.
+
+**Rolling back.** Remove `VITE_SITE` from the main web service and redeploy: the main address is the combined
+site again. The league service can stay up (its `/history` forwards land on the combined site's `/history`) or be
+deleted.
+
+**Not checkable before the switch:** real DNS, Railway's build of each mode, production CORS, Umami receiving
+the league host, and how link-preview bots render the Time Machine tags and image (`og-image-tm.png`).
+
 ## Analytics (spec 052)
 
 Cookie-free usage counts through Umami Cloud's free plan. Front end only; nothing in the

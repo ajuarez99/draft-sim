@@ -1,6 +1,7 @@
-import { useEffect, type ComponentType } from 'react'
+import { useEffect, type ComponentType, type ReactNode } from 'react'
 import { Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
+import TimeMachineSignIn from './pages/TimeMachineSignIn'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
 import CompletedDraftBoard from './pages/CompletedDraftBoard'
@@ -32,11 +33,17 @@ import ManagerHistory from './pages/ManagerHistory'
 import ManagerComparison from './pages/ManagerComparison'
 import AdminDigest from './pages/AdminDigest'
 import AppShell from './components/AppShell'
+import TimeMachineShell from './components/TimeMachineShell'
+import CrossSiteRedirect from './components/CrossSiteRedirect'
+import InAppRedirect from './components/InAppRedirect'
 import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import PlatformGate from './components/PlatformGate'
 import { useUser } from './user'
 import { title as landingTitle } from './landingCopy'
+import { title as tmLandingTitle } from './tmLandingCopy'
+import { tmGame, tmHome } from './site'
+import { currentSite } from './siteEnv'
 
 // Forces a full remount of DraftView on every draft change. Without this,
 // React Router does not remount on a :draftId param change alone -- result/
@@ -105,15 +112,95 @@ function KeyedByLeagueAndPlayer({ page: Page, gate }: { page: ComponentType; gat
   return <PlatformGate page={gate} leagueKey={sleeperLeagueId}>{page}</PlatformGate>
 }
 
-export default function App() {
+// Spec 073: three route trees, one per build mode (VITE_SITE). Each is a <Routes>; analytics.test.ts reads
+// the regions between the @routes markers and checks each tree's <Route path> values against that site's
+// route table (analytics.ts). Every path is a string literal on its own <Route> line, because that test
+// parses this file's text. Redirect routes sit OUTSIDE each tree's shell and sign-in gate: a signed-out
+// visitor holding an old link is not asked to sign in just to be sent away, and a redirecting path sends
+// no page view (the shells' effects are inside).
+
+// Every league page, written once and shared by the combined tree and the league tree.
+// @routes:league-pages begin
+const leaguePages = (
+  <>
+    <Route path="/" element={<DraftPicker />} />
+    <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
+    <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
+    <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
+    <Route path="/mock/new" element={<MockSetup />} />
+    <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
+    <Route path="/managers" element={<ManagerTendencies />} />
+    <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
+    {/* specs/006-deeper-history-both-sports US4: manager-scoped, not
+        league-scoped -- addressed by two manager ids, not a league,
+        so it lives beside /managers/:managerId/history rather than in
+        destinations.ts. That registry's own LeagueDestination.href
+        takes a LeagueContext (a lineage + a viewed season); a
+        comparison between two people has neither, and
+        destinations.test.ts's "does not claim routes that belong to
+        no league" already asserts /managers/... routes match no row
+        there (contracts/head-to-head-api.md's own wording talks
+        about destinations.ts, but the registry it names is strictly
+        for pages reached from inside one league -- see that file's
+        own header comment). */}
+    <Route path="/managers/:aId/versus/:bId" element={<ManagerComparison />} />
+    <Route path="/leagues/:sleeperLeagueId" element={<KeyedByLeague page={LeagueHome} />} />
+    <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
+    <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
+    <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} gate="analysis" />} />
+    <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} gate="schedule" />} />
+    <Route path="/leagues/:sleeperLeagueId/rivalries" element={<KeyedByLeague page={Rivalries} />} />
+    {/* Spec 046: no gate on purpose -- the ADP sources are sport-wide, so an ESPN NBA league gets the compare
+        half too (the auction half needs a Sleeper draft and says so itself). */}
+    <Route path="/leagues/:sleeperLeagueId/adp" element={<KeyedByLeague page={AdpCompare} />} />
+    <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} gate="stats" />} />
+    <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} gate="stats" />} />
+    {/* specs/032: the stat calculator, a sibling view of Player stats (same rail row). */}
+    <Route path="/leagues/:sleeperLeagueId/stats/calculator" element={<KeyedByLeague page={StatCalculator} gate="stats" />} />
+    {/* specs/022: addressed by a league AND a player, so it is keyed on both (N4):
+        moving from one player to another is a fresh page, not a re-render that
+        leaves the last player's numbers up while the next one loads. */}
+    <Route
+      path="/leagues/:sleeperLeagueId/players/:sleeperPlayerId"
+      element={<KeyedByLeagueAndPlayer page={PlayerPage} gate="stats" />}
+    />
+    {/* specs/049: two players side by side. Addressed by a league; the players ride in ?a=&b=. */}
+    <Route path="/leagues/:sleeperLeagueId/compare" element={<KeyedByLeague page={PlayerCompare} gate="stats" />} />
+    <Route
+      path="/leagues/:sleeperLeagueId/roster-management"
+      element={<KeyedByLeague page={RosterManagement} />}
+    />
+    <Route
+      path="/leagues/:sleeperLeagueId/expected-wins"
+      element={<KeyedByLeague page={ExpectedWins} gate="expectedWins" />}
+    />
+    <Route
+      path="/leagues/:sleeperLeagueId/forecast"
+      element={<KeyedByLeague page={SeasonForecast} gate="forecast" />}
+    />
+    <Route
+      path="/leagues/:sleeperLeagueId/weekly-report"
+      element={<KeyedByLeague page={WeeklyReport} gate="weeklyReport" />}
+    />
+    <Route
+      path="/leagues/:sleeperLeagueId/superlatives"
+      element={<KeyedByLeague page={Superlatives} gate="superlatives" />}
+    />
+    <Route
+      path="/leagues/:sleeperLeagueId/weekly-pot"
+      element={<KeyedByLeague page={WeeklyPot} gate="weeklyPot" />}
+    />
+    {/* Spec 043: unlisted on purpose (no nav link anywhere); the backend's admin token is the gate. */}
+    <Route path="/admin/digest" element={<AdminDigest />} />
+  </>
+)
+// @routes:league-pages end
+
+/**
+ * The league tree's chrome: the shell, the signed-in gate and the error boundary.
+ */
+function LeagueGate({ children }: { children: ReactNode }) {
   const user = useUser()
-
-  // Spec 050: index.html carries the long SEO title for crawlers and the signed-out landing
-  // page. Signed-in tabs, bookmarks and history entries keep the short name they always had.
-  useEffect(() => {
-    document.title = user ? 'Ball Knowers' : landingTitle
-  }, [user])
-
   // One shell for the whole site. The horizontal `.top` header this replaced
   // was suppressed on "/" only (`0c6f0ab`), which left the app with two
   // different chromes split one route wide -- see
@@ -131,88 +218,116 @@ export default function App() {
           // rendering keeps the rail and the league switcher on screen, so
           // there is still a way out. Before this, one TypeError blanked the
           // entire document.
-          <ErrorBoundary>
-            <Routes>
-              <Route path="/" element={<DraftPicker />} />
-              <Route path="/drafts/:draftId" element={<KeyedDraftView />} />
-              <Route path="/drafts/:draftId/board" element={<KeyedCompletedDraftBoard />} />
-              <Route path="/drafts/:draftId/live" element={<KeyedLiveDraftView />} />
-              <Route path="/mock/new" element={<MockSetup />} />
-              <Route path="/mock/:sessionId" element={<KeyedMockDraftView />} />
-              <Route path="/history" element={<HistoricalDraft />} />
-              <Route path="/history/:gameId" element={<KeyedHistoricalRoom />} />
-              <Route path="/managers" element={<ManagerTendencies />} />
-              <Route path="/managers/:managerId/history" element={<ManagerHistory />} />
-              {/* specs/006-deeper-history-both-sports US4: manager-scoped, not
-                  league-scoped -- addressed by two manager ids, not a league,
-                  so it lives beside /managers/:managerId/history rather than in
-                  destinations.ts. That registry's own LeagueDestination.href
-                  takes a LeagueContext (a lineage + a viewed season); a
-                  comparison between two people has neither, and
-                  destinations.test.ts's "does not claim routes that belong to
-                  no league" already asserts /managers/... routes match no row
-                  there (contracts/head-to-head-api.md's own wording talks
-                  about destinations.ts, but the registry it names is strictly
-                  for pages reached from inside one league -- see that file's
-                  own header comment). */}
-              <Route path="/managers/:aId/versus/:bId" element={<ManagerComparison />} />
-              <Route path="/leagues/:sleeperLeagueId" element={<KeyedByLeague page={LeagueHome} />} />
-              <Route path="/leagues/:sleeperLeagueId/history" element={<KeyedByLeague page={LeagueHistory} />} />
-              <Route path="/leagues/:sleeperLeagueId/power" element={<KeyedByLeague page={PowerRankings} />} />
-              <Route path="/leagues/:sleeperLeagueId/analysis" element={<KeyedByLeague page={LeagueAnalysis} gate="analysis" />} />
-              <Route path="/leagues/:sleeperLeagueId/schedule" element={<KeyedByLeague page={ScheduleGrid} gate="schedule" />} />
-              <Route path="/leagues/:sleeperLeagueId/rivalries" element={<KeyedByLeague page={Rivalries} />} />
-              {/* Spec 046: no gate on purpose -- the ADP sources are sport-wide, so an ESPN NBA league gets the compare
-                  half too (the auction half needs a Sleeper draft and says so itself). */}
-              <Route path="/leagues/:sleeperLeagueId/adp" element={<KeyedByLeague page={AdpCompare} />} />
-              <Route path="/leagues/:sleeperLeagueId/trends" element={<KeyedByLeague page={PlayerTrends} gate="stats" />} />
-              <Route path="/leagues/:sleeperLeagueId/stats" element={<KeyedByLeague page={StatLeaderboard} gate="stats" />} />
-              {/* specs/032: the stat calculator, a sibling view of Player stats (same rail row). */}
-              <Route path="/leagues/:sleeperLeagueId/stats/calculator" element={<KeyedByLeague page={StatCalculator} gate="stats" />} />
-              {/* specs/022: addressed by a league AND a player, so it is keyed on both (N4):
-                  moving from one player to another is a fresh page, not a re-render that
-                  leaves the last player's numbers up while the next one loads. */}
-              <Route
-                path="/leagues/:sleeperLeagueId/players/:sleeperPlayerId"
-                element={<KeyedByLeagueAndPlayer page={PlayerPage} gate="stats" />}
-              />
-              {/* specs/049: two players side by side. Addressed by a league; the players ride in ?a=&b=. */}
-              <Route path="/leagues/:sleeperLeagueId/compare" element={<KeyedByLeague page={PlayerCompare} gate="stats" />} />
-              <Route
-                path="/leagues/:sleeperLeagueId/roster-management"
-                element={<KeyedByLeague page={RosterManagement} />}
-              />
-              <Route
-                path="/leagues/:sleeperLeagueId/expected-wins"
-                element={<KeyedByLeague page={ExpectedWins} gate="expectedWins" />}
-              />
-              <Route
-                path="/leagues/:sleeperLeagueId/forecast"
-                element={<KeyedByLeague page={SeasonForecast} gate="forecast" />}
-              />
-              <Route
-                path="/leagues/:sleeperLeagueId/weekly-report"
-                element={<KeyedByLeague page={WeeklyReport} gate="weeklyReport" />}
-              />
-              <Route
-                path="/leagues/:sleeperLeagueId/superlatives"
-                element={<KeyedByLeague page={Superlatives} gate="superlatives" />}
-              />
-              <Route
-                path="/leagues/:sleeperLeagueId/weekly-pot"
-                element={<KeyedByLeague page={WeeklyPot} gate="weeklyPot" />}
-              />
-              {/* Spec 043: unlisted on purpose (no nav link anywhere); the backend's admin token is the gate. */}
-              <Route path="/admin/digest" element={<AdminDigest />} />
-              {/* React Router's own fallback renders a bare "Not Found" with no
-                  way back -- on a mistyped draft id that was the whole screen. */}
-              <Route path="*" element={<NotFound what="page" />} />
-            </Routes>
-          </ErrorBoundary>
+          <ErrorBoundary>{children}</ErrorBoundary>
         ) : (
           <SignIn />
         )}
       </AppShell>
     </div>
   )
+}
+
+// The single site as it was before the split, plus one in-app redirect: `/game/:gameId` -> `/history/:gameId`,
+// so a Time Machine link forwarded during the rollout window (or after a rollback) still lands (PR-06).
+// @routes:combined begin
+function CombinedTree() {
+  return (
+    <Routes>
+      <Route path="/game/:gameId" element={<InAppRedirect to={(p) => tmGame(currentSite(), p.gameId ?? '')} />} />
+      <Route
+        path="*"
+        element={
+          <LeagueGate>
+            <Routes>
+              {leaguePages}
+              <Route path="/history" element={<HistoricalDraft />} />
+              <Route path="/history/:gameId" element={<KeyedHistoricalRoom />} />
+              {/* React Router's own fallback renders a bare "Not Found" with no
+                  way back -- on a mistyped draft id that was the whole screen. */}
+              <Route path="*" element={<NotFound what="page" />} />
+            </Routes>
+          </LeagueGate>
+        }
+      />
+    </Routes>
+  )
+}
+// @routes:combined end
+
+// The league site: the single site without the Time Machine. Its old Time Machine paths go to the
+// Time Machine site's /history, which both the combined and the Time Machine site understand (PR-06).
+// @routes:leagues begin
+function LeaguesTree() {
+  return (
+    <Routes>
+      <Route path="/history" element={<CrossSiteRedirect target="tm" />} />
+      <Route path="/history/:gameId" element={<CrossSiteRedirect target="tm" />} />
+      <Route
+        path="*"
+        element={
+          <LeagueGate>
+            <Routes>
+              {leaguePages}
+              <Route path="*" element={<NotFound what="page" />} />
+            </Routes>
+          </LeagueGate>
+        }
+      />
+    </Routes>
+  )
+}
+// @routes:leagues end
+
+// The Time Machine site: its own shell and front door. Old Time Machine paths redirect in-app, old league
+// paths are forwarded to the league site with path, query and hash.
+// @routes:timemachine begin
+function TimeMachineTree() {
+  const user = useUser()
+  return (
+    <Routes>
+      <Route path="/history" element={<InAppRedirect to={() => tmHome(currentSite())} />} />
+      <Route path="/history/:gameId" element={<InAppRedirect to={(p) => tmGame(currentSite(), p.gameId ?? '')} />} />
+      <Route path="/leagues/*" element={<CrossSiteRedirect target="leagues" />} />
+      <Route path="/drafts/*" element={<CrossSiteRedirect target="leagues" />} />
+      <Route path="/mock/*" element={<CrossSiteRedirect target="leagues" />} />
+      <Route path="/managers/*" element={<CrossSiteRedirect target="leagues" />} />
+      <Route path="/admin/*" element={<CrossSiteRedirect target="leagues" />} />
+      <Route
+        path="*"
+        element={
+          <div className="app">
+            <TimeMachineShell>
+              {user ? (
+                <Routes>
+                  <Route path="/" element={<HistoricalDraft />} />
+                  <Route path="/game/:gameId" element={<KeyedHistoricalRoom />} />
+                  <Route path="*" element={<NotFound what="page" />} />
+                </Routes>
+              ) : (
+                <TimeMachineSignIn />
+              )}
+            </TimeMachineShell>
+          </div>
+        }
+      />
+    </Routes>
+  )
+}
+// @routes:timemachine end
+
+export default function App() {
+  const user = useUser()
+  const { site } = currentSite()
+
+  // Spec 050: index.html carries the long SEO title for crawlers and the signed-out landing
+  // page. Signed-in tabs, bookmarks and history entries keep the short name they always had.
+  // Spec 073: the Time Machine site has its own pair.
+  useEffect(() => {
+    if (site === 'timemachine') document.title = user ? 'Time Machine' : tmLandingTitle
+    else document.title = user ? 'Ball Knowers' : landingTitle
+  }, [user, site])
+
+  if (site === 'timemachine') return <TimeMachineTree />
+  if (site === 'leagues') return <LeaguesTree />
+  return <CombinedTree />
 }

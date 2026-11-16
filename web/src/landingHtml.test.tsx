@@ -4,13 +4,17 @@ import source from '../index.html?raw'
 import SignIn from './pages/SignIn'
 import { analyticsLine, groups } from './landingCopy'
 import { staticBody, transform } from './landingHtml'
+import { makeConfig } from './site'
 
 vi.mock('./api', () => ({ getSleeperUser: vi.fn() }))
 vi.mock('./user', () => ({ setUser: vi.fn() }))
 
 // Spec 050. The delivered HTML is what a bot reads, so it is tested as a string, from
 // the real index.html source (the built dist/ is checked live, not here -- plan A8).
-const out = transform(source)
+// Spec 073: transform() takes the site config. These are the combined (unset) site, byte-for-byte what
+// the single site delivered before the split.
+const COMBINED = makeConfig({})
+const out = transform(source, COMBINED)
 const head = out.slice(0, out.indexOf('</head>'))
 
 const norm = (s: string | null | undefined) => (s ?? '').replace(/\s+/g, ' ').trim()
@@ -34,8 +38,8 @@ describe('landingHtml transform', () => {
   })
 
   it('throws instead of silently shipping an unfilled template', () => {
-    expect(() => transform('<html><head></head><body></body></html>')).toThrow()
-    expect(() => transform('<html><body><div id="root"></div></body></html>')).toThrow()
+    expect(() => transform('<html><head></head><body></body></html>', COMBINED)).toThrow()
+    expect(() => transform('<html><body><div id="root"></div></body></html>', COMBINED)).toThrow()
   })
 
   it('JSON-LD parses and carries no rating or review (FR-017)', () => {

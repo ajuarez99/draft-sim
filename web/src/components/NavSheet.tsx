@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import type { LeagueTab } from '../destinations'
+import { currentSite } from '../siteEnv'
 
 type Props = {
   /** League tabs the bottom bar does not show; listed above the global links. Empty outside a league. */
@@ -101,9 +102,11 @@ export default function NavSheet({ leagueTabs, currentTab, name, managersLeagueI
           >
             Managers
           </Link>
-          <Link to="/history" className="nav-sheet-item">
-            Time Machine
-          </Link>
+          {currentSite().site === 'combined' && (
+            <Link to="/history" className="nav-sheet-item">
+              Time Machine
+            </Link>
+          )}
         </nav>
 
         <div className="nav-sheet-foot">

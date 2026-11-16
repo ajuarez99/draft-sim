@@ -291,3 +291,38 @@ export function scheduleNote(regularSeasonWeeks: number, teams: number): string 
   const fewer = opponents - extra
   return `${regularSeasonWeeks} weeks over ${/^(8|11|18)/.test(String(cycle)) ? 'an' : 'a'} ${cycle}-week cycle: you play ${word(extra)} ${extra === 1 ? 'team' : 'teams'} ${times(base + 1)} and ${word(fewer)} ${times(base)}.`
 }
+
+// Spec 073: the "How to play" steps, written once. HistoricalDraft renders them with its per-sport
+// scoring sentence; the Time Machine front door (tmLandingCopy.ts, also baked into the delivered HTML)
+// renders them with the sport-neutral one below. Pure data: this module is read in Node at build time.
+export interface HowToStep {
+  title: string
+  body: string
+}
+
+/** The middle step's body when no sport is chosen yet (the front door). */
+export const NEUTRAL_SCORING =
+  'Every week of that real season is scored for you, best ball style: your best legal lineup is set for you.'
+
+export function howToPlaySteps(scoring: string): HowToStep[] {
+  return [
+    {
+      title: 'Draft your team',
+      body: 'You only see what each player did the year before, like a real drafter would have.',
+    },
+    { title: 'The year plays out', body: scoring },
+    {
+      title: 'See how you did',
+      body: 'Your finish, the picks you nailed, the ones you missed, and how you stack up against hindsight.',
+    },
+  ]
+}
+
+/**
+ * The reason a stat is "Not counted", as shown. The backend freezes "not tracked by the league that season" into
+ * each stored season and game snapshot (EraScoring.java); it means the NBA, and the Time Machine does not use the
+ * word league. Rewritten here, at display, so old rows read right too. Any other reason passes through unchanged.
+ */
+export function notCountedReason(reason: string): string {
+  return reason.replace('not tracked by the league that season', 'not tracked by the NBA that season')
+}

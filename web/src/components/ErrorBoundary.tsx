@@ -1,5 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { siteCopy } from '../siteCopy'
+import { currentSite } from '../siteEnv'
 
 /**
  * The app had no boundary at all, so ANY TypeError thrown while rendering a
@@ -48,7 +50,7 @@ class Boundary extends Component<Props, State> {
           </div>
           <p className="muted">
             Something in this screen failed to render. The rest of the app still works —{' '}
-            <Link to="/">back to your leagues</Link>.
+            <Link to="/">back to {siteCopy(currentSite()).homeLabel}</Link>.
           </p>
           <div className="error">{this.state.error.message}</div>
         </section>

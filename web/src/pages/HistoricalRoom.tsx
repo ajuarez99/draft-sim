@@ -12,6 +12,8 @@ import {
 } from '../api'
 import { useFailure } from '../useFailure'
 import NotFound from '../components/NotFound'
+import { tmHome } from '../site'
+import { currentSite } from '../siteEnv'
 import DraftBoard from '../components/DraftBoard'
 import HistoricalPlayerList from '../components/HistoricalPlayerList'
 import HistoricalQueue from '../components/HistoricalQueue'
@@ -24,7 +26,7 @@ import HistoricalAwardPanel from '../components/HistoricalAwardPanel'
 import HistoricalSeasonReveal from '../components/HistoricalSeasonReveal'
 import { dayLabel } from '../historicalDaily'
 import { LoadingScreen } from '../components/Skeleton'
-import { cardToPlayerRef, coverageText, historicalSeats, sportOf, statLong, teamName } from '../historicalCopy'
+import { cardToPlayerRef, coverageText, historicalSeats, notCountedReason, sportOf, statLong, teamName } from '../historicalCopy'
 import { usePickReveal } from '../usePickReveal'
 import { loadRevealSpeed, saveRevealSpeed, type RevealSpeed } from '../revealSpeed'
 import { useDraftQueue } from '../useDraftQueue'
@@ -82,7 +84,7 @@ function SeasonDisclosure({ game }: { game: HistoricalGameState }) {
             <ul className="hist-excluded">
               {excluded.map(([k, why]) => (
                 <li key={k}>
-                  <strong>{statLong(k)}</strong> <span className="muted">{why}</span>
+                  <strong>{statLong(k)}</strong> <span className="muted">{notCountedReason(why)}</span>
                 </li>
               ))}
             </ul>
@@ -254,7 +256,7 @@ export default function HistoricalRoom() {
         <header className="tm-hero">
           <h1 className="tm-title">{state.season.label} (abandoned)</h1>
           <p className="tm-tagline">This game was abandoned.</p>
-          <Link className="tm-btn" to="/history">
+          <Link className="tm-btn" to={tmHome(currentSite())}>
             Back to Time Machine
           </Link>
         </header>
@@ -321,7 +323,7 @@ export default function HistoricalRoom() {
           afterFinish={<HistoricalAwardPanel gameId={state.id} />}
           finishAction={
             <>
-              <Link className="tm-play" to="/history">
+              <Link className="tm-play" to={tmHome(currentSite())}>
                 Draft another year
               </Link>
               <button type="button" className="tm-btn quiet" onClick={() => setReplaying(true)}>
@@ -340,7 +342,7 @@ export default function HistoricalRoom() {
           <SeasonDisclosure game={state} />
         </details>
         <p>
-          <Link to="/history">Back to Time Machine</Link>
+          <Link to={tmHome(currentSite())}>Back to Time Machine</Link>
         </p>
       </div>
       </>

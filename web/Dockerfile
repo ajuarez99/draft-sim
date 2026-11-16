@@ -15,6 +15,16 @@ ENV VITE_API_BASE=$VITE_API_BASE
 # absent means analytics is off (no tracker script is added to the page).
 ARG VITE_UMAMI_WEBSITE_ID
 ENV VITE_UMAMI_WEBSITE_ID=$VITE_UMAMI_WEBSITE_ID
+# Spec 073: which site this service builds, and where each site lives. All three are build
+# variables like the ones above (Vite inlines them). VITE_SITE is "timemachine", "leagues", or unset
+# for the combined single site; any other value FAILS the build on purpose. The two origins default to
+# https://www.ballknowers.co and https://leagues.ballknowers.co. DEPLOY.md "Two sites".
+ARG VITE_SITE
+ENV VITE_SITE=$VITE_SITE
+ARG VITE_TM_ORIGIN
+ENV VITE_TM_ORIGIN=$VITE_TM_ORIGIN
+ARG VITE_LEAGUES_ORIGIN
+ENV VITE_LEAGUES_ORIGIN=$VITE_LEAGUES_ORIGIN
 RUN npm run build
 
 FROM node:20-alpine AS runtime

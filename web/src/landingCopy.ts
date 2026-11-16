@@ -11,8 +11,8 @@ import {
 // same words into the HTML a crawler or link-preview bot receives. So this module may
 // import types and destinations.ts (pure data) but never React or a browser global.
 
-/** No trailing slash. Absolute because link-preview bots will not resolve a relative og:image. */
-export const SITE_ORIGIN = 'https://www.ballknowers.co'
+// Spec 073: the canonical origin is no longer a constant here. It depends on which site is being
+// built (site.ts siteOrigin(cfg)), and landingHtml.ts takes the config.
 
 export const title = 'Ball Knowers: Fantasy Football & Basketball for Sleeper Leagues'
 
@@ -35,6 +35,10 @@ export const imageAlt =
   'Ball Knowers: fantasy football and basketball tools for your Sleeper league, for the NFL and NBA.'
 
 export const footerLine = 'Free. No password.'
+
+// The note under the sign-in field. SignIn.tsx and the static landing (landingHtml.ts) both read it.
+export const signInNote =
+  'Enter your Sleeper username (or paste your Sleeper profile link) to see your own leagues and get your seat highlighted at the table. No password -- this app never asks Sleeper for anything private.'
 
 // Spec 052 FR-012: what the site counts, said where people sign in. Shared by SignIn.tsx and the
 // static landing (landingHtml.ts) so the two copies cannot drift.
@@ -120,7 +124,7 @@ export function featureSports(f: Pick<LandingFeature, 'destination'>): Sport[] {
 /** Every string the page and its head tags can say, for the banned-words guard. */
 export function allCopyStrings(): string[] {
   return [
-    title, description, headline, subheadline, platformsNote, imageAlt, footerLine, analyticsLine,
+    title, description, headline, subheadline, platformsNote, imageAlt, footerLine, signInNote, analyticsLine,
     ...sports,
     ...groups.flatMap((g) => [headingOf(g.key), ...g.features.flatMap((f) => [f.name, f.line])]),
   ]

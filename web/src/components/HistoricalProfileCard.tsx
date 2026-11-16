@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 import type { HistoricalBadge, HistoricalProfile } from '../api'
 import { BadgeTile } from './HistoricalAwardPanel'
+import { tmGame } from '../site'
+import { currentSite } from '../siteEnv'
 
 function earnedOn(iso: string | null): string {
   if (!iso) return ''
@@ -31,7 +33,7 @@ export default function HistoricalProfileCard({ profile }: { profile: Historical
             {b.gameId != null && (
               <>
                 {' · '}
-                <Link to={`/history/${b.gameId}`}>See the game</Link>
+                <Link to={tmGame(currentSite(), b.gameId)}>See the game</Link>
               </>
             )}
           </>

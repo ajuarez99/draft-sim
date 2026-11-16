@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import Avatar from './Avatar'
-import { usePopup } from '../popupFocus'
+import AccountMenu from './AccountMenu'
+import { currentSite } from '../siteEnv'
 
 type Props = {
   username: string
@@ -76,17 +76,9 @@ export default function TopBar({
   leagueSlotRef,
 }: Props) {
   const location = useLocation()
-  const name = displayName || username
-  const [accountOpen, setAccountOpen] = useState(false)
-  const accountMenu = useRef<HTMLDivElement>(null)
-  const accountBtn = useRef<HTMLButtonElement>(null)
   const menuBtn = useRef<HTMLButtonElement>(null)
-
-  // A menu, not a mode: navigating closes it.
-  useEffect(() => {
-    setAccountOpen(false)
-  }, [location.pathname])
-  usePopup(accountOpen, () => setAccountOpen(false), accountMenu, accountBtn)
+  // Spec 073: the Time Machine link exists only on the single combined site.
+  const showTimeMachine = currentSite().site === 'combined'
 
   // `.startsWith` on Managers so its own sub-route (/managers/:id/history) still marks the link
   // current, the same way a browser tab would.
@@ -117,9 +109,11 @@ export default function TopBar({
           >
             Managers
           </Link>
-          <Link to="/history" className="topbar-link" {...here(path.startsWith('/history'))}>
-            Time Machine
-          </Link>
+          {showTimeMachine && (
+            <Link to="/history" className="topbar-link" {...here(path.startsWith('/history'))}>
+              Time Machine
+            </Link>
+          )}
         </nav>
       )}
 
@@ -151,36 +145,7 @@ export default function TopBar({
           </button>
         )}
 
-        <div className="topbar-account">
-          <button
-            type="button"
-            ref={accountBtn}
-            className="topbar-account-button"
-            onClick={() => setAccountOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={accountOpen}
-            aria-label={`Account: ${name}`}
-            title={name}
-          >
-            <Avatar avatarId={avatarId} seed={username} label={name} />
-          </button>
-          {accountOpen && (
-            <div className="topbar-account-menu" role="menu" ref={accountMenu}>
-              <span className="topbar-account-name">{name}</span>
-              <button
-                type="button"
-                role="menuitem"
-                className="topbar-account-item"
-                onClick={() => {
-                  setAccountOpen(false)
-                  onSignOut()
-                }}
-              >
-                Sign out
-              </button>
-            </div>
-          )}
-        </div>
+        <AccountMenu username={username} displayName={displayName} avatarId={avatarId} onSignOut={onSignOut} />
       </div>
     </header>
   )

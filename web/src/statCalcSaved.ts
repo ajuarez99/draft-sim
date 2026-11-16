@@ -72,7 +72,7 @@ function cleanSettings(raw: unknown): SavedSettings {
 }
 
 /** Parses the stored value; malformed entries are skipped, never thrown on. `null` = the store reads as empty. */
-function parseStore(raw: string | null): SavedFormula[] {
+export function parseStore(raw: string | null): SavedFormula[] {
   if (raw == null) return []
   const parsed: unknown = JSON.parse(raw)
   if (!isObj(parsed) || parsed.v !== 1 || !Array.isArray(parsed.formulas)) return []

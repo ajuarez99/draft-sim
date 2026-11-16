@@ -1,5 +1,7 @@
 import { matchRoutes, type RouteObject } from 'react-router-dom'
 import type { Sport } from './api'
+import type { Site } from './site'
+import { currentSite } from './siteEnv'
 
 /*
  * Spec 052: cookie-free usage counts, through Umami Cloud. The ONLY module that knows the
@@ -30,7 +32,9 @@ declare global {
 export type KeyAction = 'sign-in' | 'league-added' | 'mock-started'
 
 const SCRIPT_SRC = 'https://cloud.umami.is/script.js'
-const OWN_HOSTS = ['www.ballknowers.co', 'ballknowers.co']
+// Spec 073: the league site reports too. Each site sends its own hostname (basePayload), which is what keeps
+// the two streams apart (FR-016).
+const OWN_HOSTS = ['www.ballknowers.co', 'ballknowers.co', 'leagues.ballknowers.co']
 const QUEUE_CAP = 20
 
 // ---- Route templates ------------------------------------------------------------------------
@@ -41,15 +45,17 @@ const QUEUE_CAP = 20
 // /stats/calculator beats /stats.
 type RouteEntry = { path: string; url: string; title: string }
 
-const ROUTES: RouteEntry[] = [
+// Spec 073: one table per site. A path appears in a table only if that site renders a PAGE there; the
+// redirect paths (/history on the Time Machine and league sites, /game/:gameId on the combined one, the
+// forwarded league prefixes) are in no table and send no page view -- they sit outside the shells' tracking
+// in App.tsx. analytics.test.ts checks each tree's <Route path> values against its table.
+const LEAGUE_ROUTES: RouteEntry[] = [
   { path: '/', url: '/', title: 'Home' },
   { path: '/drafts/:draftId', url: '/drafts/:draft', title: 'Draft room' },
   { path: '/drafts/:draftId/board', url: '/drafts/:draft/board', title: 'Completed draft board' },
   { path: '/drafts/:draftId/live', url: '/drafts/:draft/live', title: 'Live draft' },
   { path: '/mock/new', url: '/mock/new', title: 'Mock draft setup' },
   { path: '/mock/:sessionId', url: '/mock/:session', title: 'Mock draft' },
-  { path: '/history', url: '/history', title: 'Time Machine' },
-  { path: '/history/:gameId', url: '/history/:game', title: 'Time Machine game' },
   { path: '/managers', url: '/managers', title: 'Managers' },
   { path: '/managers/:managerId/history', url: '/managers/:manager/history', title: 'Manager history' },
   { path: '/managers/:aId/versus/:bId', url: '/managers/:a/versus/:b', title: 'Manager comparison' },
@@ -72,14 +78,37 @@ const ROUTES: RouteEntry[] = [
   { path: '/leagues/:sleeperLeagueId/superlatives', url: '/leagues/:league/superlatives', title: 'Season superlatives' },
   { path: '/leagues/:sleeperLeagueId/weekly-pot', url: '/leagues/:league/weekly-pot', title: 'Weekly pot' },
   { path: '/admin/digest', url: '/admin/digest', title: 'Admin digest' },
-  // App.tsx's catch-all. Never the real path: a mistyped URL could contain anything.
-  { path: '*', url: '/(not-found)', title: 'Not found' },
 ]
 
-/** Exported so the coverage test can compare it with App.tsx's <Route path> values. */
-export const ROUTE_TEMPLATE_PATHS: string[] = ROUTES.map((r) => r.path)
+const HISTORY_ROUTES: RouteEntry[] = [
+  { path: '/history', url: '/history', title: 'Time Machine' },
+  { path: '/history/:gameId', url: '/history/:game', title: 'Time Machine game' },
+]
 
-const ROUTE_OBJECTS: RouteObject[] = ROUTES.map((r) => ({ path: r.path, handle: r }))
+// App.tsx's catch-all. Never the real path: a mistyped URL could contain anything.
+const NOT_FOUND: RouteEntry = { path: '*', url: '/(not-found)', title: 'Not found' }
+
+const TIME_MACHINE_ROUTES: RouteEntry[] = [
+  { path: '/', url: '/', title: 'Time Machine' },
+  { path: '/game/:gameId', url: '/game/:game', title: 'Time Machine game' },
+]
+
+const TABLES: Record<Site, RouteEntry[]> = {
+  combined: [...LEAGUE_ROUTES, ...HISTORY_ROUTES, NOT_FOUND],
+  leagues: [...LEAGUE_ROUTES, NOT_FOUND],
+  timemachine: [...TIME_MACHINE_ROUTES, NOT_FOUND],
+}
+
+/** Exported so the coverage test can compare each site's table with its tree's <Route path> values. */
+export function routesFor(site: Site): { path: string; url: string; title: string }[] {
+  return TABLES[site]
+}
+
+const OBJECTS: Record<Site, RouteObject[]> = {
+  combined: TABLES.combined.map((r) => ({ path: r.path, handle: r })),
+  leagues: TABLES.leagues.map((r) => ({ path: r.path, handle: r })),
+  timemachine: TABLES.timemachine.map((r) => ({ path: r.path, handle: r })),
+}
 
 /**
  * The route template and label for a pathname. Pure. Signed out, the app renders SignIn at
@@ -88,8 +117,8 @@ const ROUTE_OBJECTS: RouteObject[] = ROUTES.map((r) => ({ path: r.path, handle: 
  * view (plan F1).
  */
 export function routeTemplate(pathname: string, signedIn: boolean): { url: string; title: string } {
-  const hit = matchRoutes(ROUTE_OBJECTS, pathname)
-  const entry = (hit?.[hit.length - 1]?.route.handle as RouteEntry | undefined) ?? ROUTES[ROUTES.length - 1]
+  const hit = matchRoutes(OBJECTS[currentSite().site], pathname)
+  const entry = (hit?.[hit.length - 1]?.route.handle as RouteEntry | undefined) ?? NOT_FOUND
   if (signedIn) return { url: entry.url, title: entry.title }
   if (entry.url === '/') return { url: '/(landing)', title: 'Landing' }
   return { url: `/(landing)${entry.url}`, title: `Landing (from ${entry.title})` }

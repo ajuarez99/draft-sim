@@ -17,7 +17,10 @@ import {
 import { useFailure } from '../useFailure'
 import HowThisWorks from '../components/HowThisWorks'
 import HistoricalProfileCard from '../components/HistoricalProfileCard'
-import { sportOf, summaryStatus } from '../historicalCopy'
+import LeaguesMovedNotice from '../components/LeaguesMovedNotice'
+import { howToPlaySteps, sportOf, summaryStatus } from '../historicalCopy'
+import { tmGame } from '../site'
+import { currentSite } from '../siteEnv'
 import { clearDraftQueue } from '../useDraftQueue'
 import { countdown, dayLabel, landingStats } from '../historicalDaily'
 
@@ -40,7 +43,7 @@ const COPY: Record<HistoricalSport, (range: string) => { sub: string; scoring: s
   NBA: () => ({
     sub: 'Draft a team from a real NBA season, then watch that season play out.',
     scoring: "It runs as lock-in best ball: each starter's best game of the week counts, and your best legal lineup is set for you.",
-    how: "Seasons run from 1970-71 to the latest complete one. Only stats the league tracked for essentially the whole season count, and each season says which. Opponents draft from last season's points, not from a real draft-position feed.",
+    how: "Seasons run from 1970-71 to the latest complete one. Only stats the NBA tracked for essentially the whole season count, and each season says which. Opponents draft from last season's points, not from a real draft-position feed.",
   }),
   NFL: (range) => ({
     sub: `Draft a team from a real NFL season${range ? `, ${range},` : ''} then watch that season play out.`,
@@ -142,7 +145,7 @@ export default function HistoricalDraft() {
     setError(null)
     try {
       const g = await startHistoricalGame(sport)
-      navigate(`/history/${g.id}`)
+      navigate(tmGame(currentSite(), g.id))
     } catch (e) {
       fail(e)
       setStarting(false)
@@ -155,7 +158,7 @@ export default function HistoricalDraft() {
     setError(null)
     try {
       const g = await startHistoricalDaily(sp)
-      navigate(`/history/${g.id}`)
+      navigate(tmGame(currentSite(), g.id))
     } catch (e) {
       fail(e)
       setStarting(false)
@@ -183,18 +186,12 @@ export default function HistoricalDraft() {
     <section className="tm-section" aria-label="How to play">
       <h2>How to play</h2>
       <ol className="tm-steps">
-        <li>
-          <strong>Draft your team</strong>
-          <span>You only see what each player did the year before, like a real drafter would have.</span>
-        </li>
-        <li>
-          <strong>The year plays out</strong>
-          <span>{copy.scoring}</span>
-        </li>
-        <li>
-          <strong>See how you did</strong>
-          <span>Your finish, the picks you nailed, the ones you missed, and how you stack up against hindsight.</span>
-        </li>
+        {howToPlaySteps(copy.scoring).map((s) => (
+          <li key={s.title}>
+            <strong>{s.title}</strong>
+            <span>{s.body}</span>
+          </li>
+        ))}
       </ol>
       <HowThisWorks>
         <p>{copy.how}</p>
@@ -205,6 +202,7 @@ export default function HistoricalDraft() {
 
   return (
     <div className="content tm tm-page">
+      <LeaguesMovedNotice />
       <header className="tm-hero">
         <span className="tm-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
@@ -240,11 +238,11 @@ export default function HistoricalDraft() {
                     )}
                   </div>
                   {d.gameStatus === 'COMPLETE' && d.gameId != null ? (
-                    <Link className="tm-btn quiet" to={`/history/${d.gameId}`} aria-label={`View today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
+                    <Link className="tm-btn quiet" to={tmGame(currentSite(), d.gameId)} aria-label={`View today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
                       View
                     </Link>
                   ) : d.gameStatus === 'DRAFTING' && d.gameId != null ? (
-                    <Link className="tm-btn" to={`/history/${d.gameId}`} aria-label={`Resume today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
+                    <Link className="tm-btn" to={tmGame(currentSite(), d.gameId)} aria-label={`Resume today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
                       Resume
                     </Link>
                   ) : (
@@ -348,13 +346,13 @@ export default function HistoricalDraft() {
                           Abandon
                         </button>
                       )}
-                      <Link className="tm-btn" to={`/history/${g.id}`}>
+                      <Link className="tm-btn" to={tmGame(currentSite(), g.id)}>
                         Resume
                       </Link>
                     </>
                   )}
                   {g.status === 'COMPLETE' && (
-                    <Link className="tm-btn quiet" to={`/history/${g.id}`}>
+                    <Link className="tm-btn quiet" to={tmGame(currentSite(), g.id)}>
                       View
                     </Link>
                   )}
