@@ -10,12 +10,10 @@ import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import TimeMachineShell from './components/TimeMachineShell'
 import { clearUser, setUser } from './user'
-import { SIGNED_IN_HERE_KEY } from './tmSignedInHere'
 import { LEAGUE_WORDS } from './leagueWords'
 
 // Spec 073 SC-001 / FR-003 / FR-004: on the Time Machine site no screen a visitor can reach says
-// league, leagues, mock or manager. Case-insensitive. The FR-019 "your leagues moved" notice is the
-// one allowed exception (it is hidden here: the marker is set, as for someone who signed in on this site).
+// league, leagues, mock or manager. Case-insensitive.
 
 const api = vi.hoisted(() => ({
   listHistoricalGames: vi.fn(),
@@ -128,7 +126,6 @@ beforeAll(() => {
 
 function renderRoom() {
   setUser(SIGNED_IN)
-  localStorage.setItem(SIGNED_IN_HERE_KEY, '1')
   return render(
     <MemoryRouter initialEntries={['/game/5']}>
       <TimeMachineShell>
@@ -169,7 +166,6 @@ describe('the Time Machine site has no league wording', () => {
   })
 
   it('the home, signed in, inside the shell', async () => {
-    localStorage.setItem(SIGNED_IN_HERE_KEY, '1')
     setUser(SIGNED_IN)
     const { container } = render(
       <MemoryRouter initialEntries={['/']}>
@@ -241,5 +237,31 @@ describe('the Time Machine site has no league wording', () => {
     render(<MemoryRouter><NotFound what="league" /></MemoryRouter>)
     expect(screen.getByText(/No league here/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to your leagues' })).toBeInTheDocument()
+  })
+})
+
+// Spec 073 FR-019 was withdrawn 2026-11-16: the league site is private, so the Time Machine no longer
+// tells anyone their leagues moved. Whatever the storage holds, the home shows no such notice.
+describe('the Time Machine home shows no "leagues moved" notice, in any storage state', () => {
+  const states: [string, () => void][] = [
+    ['empty storage', () => {}],
+    ['the old marker set', () => localStorage.setItem('bk.tm.signedInHere.v1', '1')],
+    ['the old dismissed key set', () => localStorage.setItem('bk.tm.movedNotice.dismissed.v1', '1')],
+    ['both old keys absent after a league-era sign-in', () => localStorage.setItem('bk.statCalc.saved.v1', '{"v":1,"formulas":[]}')],
+  ]
+  it.each(states)('%s', async (_name, prepare) => {
+    prepare()
+    setUser(SIGNED_IN)
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <TimeMachineShell>
+          <HistoricalDraft />
+        </TimeMachineShell>
+      </MemoryRouter>,
+    )
+    await screen.findByText('1971-72')
+    expect(screen.queryByRole('complementary', { name: 'Your leagues moved' })).toBeNull()
+    expect(container.querySelector('.tm-moved')).toBeNull()
+    expect(container.textContent).not.toMatch(/moved to|Looking for your leagues/i)
   })
 })

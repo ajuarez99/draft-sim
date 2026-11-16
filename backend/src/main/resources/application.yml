@@ -41,6 +41,14 @@ draftsim:
     # DISABLED and every admin-only route refuses (fail closed) -- unlike
     # `security.token` above, where blank turns the gate off. Never a VITE_ var.
     token: ${ADMIN_TOKEN:}
+  # Spec 073 follow-up (second pass): locks the league API behind a session that expires after idle-seconds.
+  # OFF by default; every route behaves as before. Turn on at deploy only AFTER the league site is split off
+  # (DEPLOY.md "Two sites"): the live combined site shares this backend. Needs ADMIN_TOKEN: it signs the sessions.
+  league-lock:
+    enabled: ${LEAGUE_LOCK:false}
+    idle-seconds: ${LEAGUE_LOCK_IDLE_SECONDS:300}   # ARBITRARY: hand-set, Allan asked for "5 min or something"
+    # Absolute session lifetime from the original unlock, however often it is renewed. ARBITRARY: hand-set, 12 hours.
+    max-session-seconds: ${LEAGUE_LOCK_MAX_SESSION_SECONDS:43200}
   # Spec 045 A4: how long the live Matchups read (Sleeper /league/{id} + /matchups/{leg}, together) may take
   # before it counts as "unavailable". ARBITRARY: hand-set, not measured against Sleeper's latency tail.
   # Its cache TTLs are spec 044's draftsim.lock-in.live-ttl-seconds / live-failure-ttl-seconds.

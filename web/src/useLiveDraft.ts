@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { apiUrl, type LiveState } from './api'
+import { holdsSession } from './leaguesLock'
+import { apiUrl, getStreamTicket, type LiveState } from './api'
 import { currentUserId } from './user'
 
 // Past this, the freshness pill flips from "live" to "stale". Heartbeats come
@@ -75,6 +76,10 @@ export function useLiveDraft(draftId: string): LiveDraft {
       setSecondsSinceContact(0)
     }
 
+    // Bumped by every connect(): a ticket answer that lands after a newer connect() started (the watchdog firing
+    // while a ticket call was pending) is dropped instead of opening a second stream.
+    let generation = 0
+
     function connect() {
       if (cancelled) return
       // A watchdog-triggered call can land while a stuck-but-not-yet-CLOSED
@@ -102,7 +107,38 @@ export function useLiveDraft(draftId: string): LiveDraft {
       // LeagueController.liveStream). Omitted when signed out, which the backend
       // treats as the unscoped pre-identity case -- same as a missing header.
       const userId = currentUserId()
-      const query = userId ? `?user=${encodeURIComponent(userId)}` : ''
+      // The league site's lock (leaguesLock.ts) has the same problem and does NOT put the session in the URL (a URL
+      // lands in request logs, and the session would be a full credential there). Instead, immediately before EVERY
+      // EventSource, including this hook's own reconnects, it asks POST /api/league-session/stream-ticket (through
+      // apiFetch, so the session rides in a header) for a 60-second ticket bound to this draft, and the URL carries
+      // that. Only when a session record is held (the `leagues` build behind the lock): with none, which is every
+      // other build and a league site whose backend has the lock off, this opens synchronously with no extra call.
+      const gen = ++generation
+      if (!holdsSession()) {
+        open(userId, null)
+        return
+      }
+      getStreamTicket(draftId)
+        .then((issued) => {
+          if (cancelled || gen !== generation) return
+          open(userId, issued.ticket)
+        })
+        .catch((err: unknown) => {
+          // A 401 has already locked the site inside apiFetch (this room unmounts). Anything else follows the
+          // hook's existing failure path: say so, and try again after RETRY_MS.
+          if (cancelled || gen !== generation) return
+          setConnected(false)
+          setError(err instanceof Error ? err.message : 'could not get a live stream ticket')
+          retryTimer = window.setTimeout(connect, RETRY_MS)
+        })
+    }
+
+    function open(userId: string | null | undefined, ticket: string | null) {
+      if (cancelled) return
+      const params: string[] = []
+      if (userId) params.push(`user=${encodeURIComponent(userId)}`)
+      if (ticket) params.push(`ticket=${encodeURIComponent(ticket)}`)
+      const query = params.length ? `?${params.join('&')}` : ''
       const es = new EventSource(apiUrl(`/api/drafts/${draftId}/live-stream${query}`))
       source = es
 

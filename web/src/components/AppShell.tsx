@@ -12,6 +12,8 @@ import { acceptsLeagueHint, invalidateRailLeagues, leagueRefFromPath, useAllLeag
 import { trackLeagueView, trackPageView } from '../analytics'
 import { useSearchIndex } from '../searchIndex'
 import { clearUser, useUser } from '../user'
+import { lock } from '../leaguesLock'
+import { currentSite } from '../siteEnv'
 import { LeagueDataVersionProvider } from '../leagueDataVersion'
 import type { Sport } from '../api'
 
@@ -162,6 +164,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   function signOut() {
     clearUser()
+    // The league site's front-door lock (leaguesLock.ts) closes again with the sign-out. Other builds have none.
+    if (currentSite().site === 'leagues') lock()
     navigate('/', { replace: true })
   }
 

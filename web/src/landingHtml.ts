@@ -168,6 +168,20 @@ export function staticTmBody(): string {
   )
 }
 
+/**
+ * The delivered head of the locked league site (2026-11-16): a bare title, a noindex, the theme colour and
+ * nothing else. No description, canonical, preview-card tags or JSON-LD: a private site gives a crawler or
+ * a link-preview bot nothing to describe it with. noindex is a request that well-behaved crawlers honour,
+ * not protection (the site is a front-door lock, see leaguesLock.ts).
+ */
+export function lockedHeadTags(): string {
+  return [
+    `    <title>Ball Knowers</title>`,
+    `    <meta name="robots" content="noindex, nofollow" />`,
+    `    <meta name="theme-color" content="${THEME_COLOR}" />`,
+  ].join('\n')
+}
+
 const HEAD_ANCHOR = '</head>'
 const ROOT_ANCHOR = '<div id="root"></div>'
 
@@ -175,6 +189,12 @@ const ROOT_ANCHOR = '<div id="root"></div>'
 export function transform(html: string, cfg: SiteConfig): string {
   if (!html.includes(HEAD_ANCHOR)) throw new Error('landingHtml: index.html has no </head>')
   if (!html.includes(ROOT_ANCHOR)) throw new Error('landingHtml: index.html has no empty <div id="root"></div>')
+  // The locked league site delivers an empty root: the lock screen is drawn by React, and the marketing
+  // landing is no longer part of it (a crawler gets nothing to index). Every other site is unchanged.
+  if (cfg.site === 'leagues') {
+    const lockedHead = `${lockedHeadTags()}\n    <script src="/boot.js"></script>\n  `
+    return html.replace(HEAD_ANCHOR, () => `${lockedHead}${HEAD_ANCHOR}`)
+  }
   const head = `${headTags(cfg)}\n${jsonLd(cfg)}\n    <script src="/boot.js"></script>\n  `
   const body = cfg.site === 'timemachine' ? staticTmBody() : staticBody()
   return html

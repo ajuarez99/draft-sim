@@ -18,6 +18,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
         CorsProperties.class,
         OwnerProperties.class,
         AdminProperties.class,
+        LeagueLockProperties.class,
         RefreshProperties.class,
         GradeProperties.class,
         DraftGradeProperties.class,

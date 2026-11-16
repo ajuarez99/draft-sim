@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { getDrafts, type DraftSummary } from './api'
 import { leagueIdForSeason, leagueLineages, type LeagueLineage } from './leagueLineage'
 import { leagueIdFromPath } from './destinations'
+import { onLock } from './leaguesLock'
 
 /**
  * Which league, if any, the current URL is inside -- resolved from the path
@@ -101,6 +102,13 @@ function loadDrafts(force: boolean): Promise<DraftSummary[]> {
 export function invalidateRailLeagues() {
   cached = null
 }
+
+// The league list is league data: when the site locks it must not be what the next unlock shows (CR-11).
+// An in-flight read is dropped too, so its late answer is not reused as if it were fresh.
+onLock(() => {
+  cached = null
+  inFlight = null
+})
 
 /**
  * The draft list the rail already holds, cache and all.

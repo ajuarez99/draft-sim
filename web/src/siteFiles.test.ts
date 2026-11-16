@@ -4,7 +4,6 @@ import { robotsTxt, sitemapXml } from './siteFiles'
 
 // Spec 073 SC-007 / T005: each site's robots.txt and sitemap.xml name only its own address.
 const TM = 'https://www.ballknowers.co'
-const LG = 'https://leagues.ballknowers.co'
 
 describe('robots.txt and sitemap.xml per site', () => {
   it('combined (unset) and timemachine name the main address only', () => {
@@ -16,11 +15,11 @@ describe('robots.txt and sitemap.xml per site', () => {
     }
   })
 
-  it('leagues names the league address only', () => {
+  it('leagues is locked: robots says Disallow for everyone, names no sitemap, and there is no sitemap', () => {
     const cfg = makeConfig({ VITE_SITE: 'leagues' })
-    expect(robotsTxt(cfg)).toContain(`Sitemap: ${LG}/sitemap.xml`)
-    expect(sitemapXml(cfg)).toContain(`<loc>${LG}/</loc>`)
-    expect(robotsTxt(cfg) + sitemapXml(cfg)).not.toContain('www.ballknowers.co')
+    expect(robotsTxt(cfg)).toBe('User-agent: *\nDisallow: /\n')
+    expect(robotsTxt(cfg)).not.toMatch(/Sitemap|Allow:/)
+    expect(sitemapXml(cfg)).toBeNull()
   })
 
   it('combined matches the files that used to live in public/ byte for byte', () => {
@@ -32,7 +31,9 @@ describe('robots.txt and sitemap.xml per site', () => {
   })
 
   it('follows a configured origin', () => {
-    const cfg = makeConfig({ VITE_SITE: 'leagues', VITE_LEAGUES_ORIGIN: 'http://localhost:5185/' })
-    expect(robotsTxt(cfg)).toContain('Sitemap: http://localhost:5185/sitemap.xml')
+    const cfg = makeConfig({ VITE_SITE: 'timemachine', VITE_TM_ORIGIN: 'http://localhost:5184/' })
+    expect(robotsTxt(cfg)).toContain('Sitemap: http://localhost:5184/sitemap.xml')
+    // The locked league site names no origin at all, configured or not.
+    expect(robotsTxt(makeConfig({ VITE_SITE: 'leagues', VITE_LEAGUES_ORIGIN: 'http://localhost:5185/' }))).not.toContain('5185')
   })
 })

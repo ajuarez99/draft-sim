@@ -72,21 +72,29 @@ describe('the Time Machine build', () => {
   })
 })
 
-describe('the league build', () => {
+describe('the league build (locked, 2026-11-16)', () => {
   const out = transform(source, makeConfig({ VITE_SITE: 'leagues' }))
   const head = headOf(out)
 
-  it('names the league address in every tag and keeps the league image and wording', () => {
-    expect(head).toContain(`<link rel="canonical" href="${LG}/" />`)
-    expect(head).toContain(`property="og:url" content="${LG}/"`)
-    expect(head).toContain(`property="og:image" content="${LG}/og-image.png"`)
-    expect(out).not.toContain(TM)
-    expect(head).toContain('Fantasy Football &amp; Basketball for Sleeper Leagues')
+  it('is titled just Ball Knowers and asks crawlers not to index or follow', () => {
+    expect(head).toContain('<title>Ball Knowers</title>')
+    expect(head).toContain('<meta name="robots" content="noindex, nofollow" />')
+    expect(head).toContain('<script src="/boot.js"></script>')
   })
 
-  it('has the league landing body and no Time Machine wording', () => {
-    expect(out).toContain(staticBody())
-    expect(bodyText(out) + ' ' + head).not.toMatch(/time machine/i)
+  it('carries no marketing tags: no description, canonical, og, twitter or JSON-LD', () => {
+    expect(out).not.toMatch(/name="description"|rel="canonical"|property="og:|name="twitter:|ld\+json|og-image/)
+    expect(out).not.toContain(LG)
+    expect(out).not.toContain(TM)
+    expect(head).not.toContain('Sleeper')
+  })
+
+  it('has an empty root: no pre-rendered landing for a crawler to read', () => {
+    expect(out).toContain('<div id="root"></div>')
+    expect(out).not.toContain(staticBody())
+    expect(out).not.toContain('landing-prerender')
+    expect(bodyText(out)).toBe('')
+    expect(out).not.toMatch(/Fantasy Football|Sleeper|time machine/i)
   })
 })
 
@@ -96,5 +104,6 @@ describe('the combined build', () => {
     expect(headOf(out)).toContain(`<link rel="canonical" href="${TM}/" />`)
     expect(headOf(out)).toContain(`property="og:image" content="${TM}/og-image.png"`)
     expect(out).toContain(staticBody())
+    expect(headOf(out)).not.toContain('noindex')
   })
 })

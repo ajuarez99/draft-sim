@@ -7,6 +7,7 @@ import { clearUser, setUser, type BkUser } from './user'
 import { headline as leagueHeadline } from './landingCopy'
 import { headline as tmHeadline } from './tmLandingCopy'
 import { invalidateRailLeagues } from './railLeague'
+import { lock, startSession } from './leaguesLock'
 
 // Spec 073, contracts/site-routes.md: the route table, row by row, for each build mode, signed in and
 // signed out, with a query string and a hash. VITE_SITE is stubbed per case: currentSite() reads it at call time.
@@ -26,6 +27,8 @@ vi.mock('./api', () => ({
   getSleeperUser: vi.fn(),
   getDrafts: vi.fn(async () => []),
   getLeagueAvailability: vi.fn(),
+  unlockLeagueSite: vi.fn(),
+  renewLeagueSession: vi.fn(async () => true),
 }))
 
 const TM_ORIGIN = 'http://tm.test'
@@ -57,6 +60,7 @@ function mode(site: string | undefined) {
 }
 
 beforeEach(() => {
+  lock()
   clearUser()
   localStorage.clear()
   invalidateRailLeagues()
@@ -164,8 +168,12 @@ describe('timemachine', () => {
   })
 })
 
+// These cases are about the route table, so the door is already open (the lock itself: App.lock.test.tsx).
 describe('leagues', () => {
-  beforeEach(() => mode('leagues'))
+  beforeEach(() => {
+    mode('leagues')
+    startSession('sess-tok', 300)
+  })
 
   it('/ is the league picker signed in, the league landing signed out', () => {
     renderAt('/', true)

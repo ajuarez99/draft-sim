@@ -1,5 +1,6 @@
 import { getStatLeaderboard } from './api'
 import type { PlayerWindowKind, StatLeaderboard } from './api'
+import { onLock } from './leaguesLock'
 
 /**
  * Leaderboard responses for the draft room's Stats view, shared across panel mounts (spec 023,
@@ -40,3 +41,6 @@ export function clearDraftStatsCache(): void {
   cache.clear()
   versions.clear()
 }
+
+// A leaderboard is league data: emptied when the site locks (CR-11).
+onLock(clearDraftStatsCache)

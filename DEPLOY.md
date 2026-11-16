@@ -166,7 +166,10 @@ Set on the `draft-sim` (backend) service unless noted.
 |---|---|
 | `DB_URL` / `DB_USER` / `DB_PASSWORD` | Railway reference variables off the Postgres plugin |
 | `API_TOKEN` | **Currently blank in production — the shared bearer gate is OFF.** See below |
-| `ADMIN_TOKEN` | **The operator secret.** Sent as `X-Admin-Token`; gates `/api/ingest/**` and the commissioner-only actions, and overrides the membership checks for curl. **Blank means admin is DISABLED and every one of those refuses** (fail closed, the opposite of `API_TOKEN`). Server-side only: never a `VITE_` variable. **Not yet set in production** — set it before the next ingest, or none can be run |
+| `ADMIN_TOKEN` | **The operator secret.** Generate it with `openssl rand -base64 32` and keep it in a password manager: with the lock on it is also typed (pasted, not memorised) into the league site's lock screen, and the backend logs one WARN at startup if it is shorter than 32 characters. League sessions and stream tickets are signed with keys derived from it, so a captured session token is an offline guessing oracle for a short token, and **rotating it ends every session at once** (the only revocation there is). There is **no rate limit** on the unlock route (`POST /api/admin/session`) or on any other `X-Admin-Token` check: a long random token is the defence. Sent as `X-Admin-Token`; gates `/api/ingest/**` and the commissioner-only actions, and overrides the membership checks for curl. **Blank means admin is DISABLED and every one of those refuses** (fail closed, the opposite of `API_TOKEN`). Server-side only: never a `VITE_` variable. **Not yet set in production** — set it before the next ingest, or none can be run |
+| `LEAGUE_LOCK` | `true` locks the league API behind a session (spec 073, second pass). **Default off.** Needs `ADMIN_TOKEN` set (it signs the sessions). Turn on only **after** the league site is split off, see "Two sites". Unset = rollback |
+| `LEAGUE_LOCK_IDLE_SECONDS` | Idle window of a league session, default `300` (5 minutes, hand-set: "5 min or something") |
+| `LEAGUE_LOCK_MAX_SESSION_SECONDS` | Absolute lifetime of a session from the original unlock, however often it is renewed, default `43200` (12 hours, hand-set). A leaked or scripted token cannot be kept alive past this |
 | `REFRESH_SECRET` | The daily GitHub Action's secret, `X-Refresh-Secret`; blank means `/api/refresh/daily` does not exist. Deliberately separate from `ADMIN_TOKEN`: the cron should not hold a secret that can rewrite picks |
 | `BK_CREDENTIAL_KEY` | Spec 035. 32 random bytes, base64 (`openssl rand -base64 32`); seals the ESPN cookies a user pastes for a private ESPN league (AES-256-GCM). **Absent = private ESPN leagues disabled** (public ESPN leagues still work; there is no plaintext fallback). Server-side only: never a `VITE_` variable, never logged. Rotating it makes every stored cookie set unreadable, so users re-paste them |
 | `CORS_ORIGINS` | Exact frontend origin, scheme included, no trailing slash |
@@ -333,16 +336,40 @@ from a Windows `set VITE_SITE=x && ...` is trimmed. All three variables below ar
 Merging this change to `main` shows nothing new: the existing web service has no `VITE_SITE`, so it keeps
 building the combined site. The split happens when you set variables, in this order.
 
+**The league site is locked to Allan (2026-11-16).** The `leagues` build asks for the backend's admin token
+before it shows anything, and that is a **required step before the flip: set `ADMIN_TOKEN` on the backend
+service in production.** The variables table in this file still says it is **not yet set in production**.
+With it unset (blank), the backend refuses every token, so the league site cannot be opened by anyone,
+including you. Set it, redeploy the backend, and check the lock screen accepts it before step 6.
+
+This is a **front-door lock only**, by your choice, and it is not security. The league site's pages stay
+behind the prompt, but every league API route answers as openly as it did before, with or without the token,
+and the "unlocked" marker is a browser-storage value that can be set by hand. The site also asks search
+engines not to index it (`noindex`, `Disallow: /`, no sitemap), which well-behaved crawlers honour and
+nothing enforces. The Time Machine site and the combined site have no lock.
+
+**Amended 2026-11-16 (second pass): the league API is locked too.** The paragraph above describes the first pass and is kept as written. Allan reversed it the same day: with `LEAGUE_LOCK=true` on the backend, every league API route needs a league session (minted by `POST /api/admin/session` from the admin token, 5 minutes idle, renewed while you are active), the admin token, or, on the live draft stream only, `?session=`. The Time Machine (`/api/history/**`), sign-in's username lookup, `/api/health`, the daily refresh job (its own `X-Refresh-Secret`) and the admin/ingest routes stay as they are. Operator `curl` uses `X-Admin-Token` exactly as before. See `specs/073-split-sites/plan.md` for what this does and does not protect.
+
+**Amended 2026-11-16 (lock fix pass, CR-01..CR-12): the stream no longer takes `?session=`.** The live draft stream's URL carries a separate 60-second, single-draft `?ticket=` the web fetches from `POST /api/league-session/stream-ticket` right before each connection; a session token in a query string is refused everywhere, and a ticket is refused everywhere except its own draft's stream. Sessions also have an absolute lifetime (`LEAGUE_LOCK_MAX_SESSION_SECONDS`). Two consequences for deploying:
+
+- **The backend must be deployed with this change before the league site's lock screen can work.** An older backend answers `POST /api/admin/session` with 404, which the lock screen reports as "Couldn't reach the server"; and a backend from before this pass would not know tickets, so the live room of a new web build cannot open its stream against it. Deploy the backend first, then the league web service.
+- **Once `LEAGUE_LOCK=true`, every operator script or curl that reads a league route needs `X-Admin-Token`** (for example `scripts/check-weeks-vs-sleeper.py` and the capture scripts read `/api/leagues/...`). Without it they get `401 league_session_required`. The ingest and admin routes were already behind that header and are unchanged. A browser tab still open on the old combined site gets errors, not a lock screen, once the lock is on.
+
+> **Do not set `LEAGUE_LOCK=true` before the flip.** The live combined site shares this backend: turning the lock on first locks every league page (leagues, drafts, mocks, managers) on the still-combined site **for everyone**, because their browsers hold no session. Only the `leagues` build knows how to ask for one. Set it after step 6.
+
 **Rollout**
 
 1. **Check first (unconfirmed):** whether your Railway plan allows another custom domain on a second web
    service. This was not looked up. If it does not, stop here; nothing else depends on it.
+   *Amended 2026-11-16: Allan reports the Hobby plan ($5/month) allows up to 2 custom domains **per service**,
+   so a domain on the second web service does not count against the first. Reported by Allan, not checked
+   against Railway by the session that wrote this.*
 2. **Backend service:** append `,https://leagues.ballknowers.co` to `CORS_ORIGINS` (comma-separated, exact
    origins, no trailing slash). Redeploys the backend; harmless on its own.
 3. **New Railway web service** from the same repo, Root Directory `web`, build variables `VITE_SITE=leagues`,
    `VITE_API_BASE` (same value as the existing web service) and optionally `VITE_UMAMI_WEBSITE_ID`.
 4. **Custom domain** `leagues.ballknowers.co` on that service, with the CNAME Railway shows added in Squarespace.
-5. **Check the league site** at its real address: sign in, open a league, a draft board and a mock. If sign-in
+5. **Set `ADMIN_TOKEN` on the backend** if it is still blank (required, see above), then **check the league site** at its real address: enter the token at the lock screen, sign in, open a league, a draft board and a mock. If sign-in
    answers "Couldn't reach Sleeper just now", the backend does not allow that origin: step 2 was missed or
    mistyped (the browser blocks the call, and the page can only report that it failed).
 6. **Flip the main site:** set `VITE_SITE=timemachine` on the existing web service and redeploy. From then on
@@ -351,14 +378,14 @@ building the combined site. The split happens when you set variables, in this or
    league site forwards `/history/<id>` to the main address, which still serves it under `/history` (the league
    site forwards to `/history`, not `/game`, so a forwarded link works in either state), and nobody has the
    league address until you hand it out.
-7. **Re-set your analytics opt-out** on `leagues.ballknowers.co` (open it in each browser you use and set
+7. **Lock the API:** set `LEAGUE_LOCK=true` on the backend (and `ADMIN_TOKEN`, already required) and redeploy it, **only after step 6**. Check: the league site accepts the token, you can browse, and 5 minutes without touching it returns the lock screen; `www.ballknowers.co` (Time Machine) still plays. The external daily refresh job keeps working (its own secret). `LEAGUE_LOCK_IDLE_SECONDS` changes the window.
+8. **Re-set your analytics opt-out** on `leagues.ballknowers.co` (open it in each browser you use and set
    `localStorage['umami.disabled']`). The opt-out is stored per address and is not carried.
 
 **What carries across and what does not.** Sign-in is a Sleeper username kept per address, so each site asks
 once. Time Machine games, achievements and streaks live in the backend against the Sleeper user and need no
 move. Saved stat-calculator formulas live in the browser per address: they ride along only when someone is
-**forwarded** from the main address to the league site (an old league link, or the one-time "your leagues
-moved" notice's link), and only when the league site has **never saved formulas** of its own (a person who
+**forwarded** from the main address to the league site (an old league link), and only when the league site has **never saved formulas** of its own (a person who
 deleted theirs there is not given the old ones back). A league-mate who types the league address directly
 starts with none there; their old ones stay on the main address and are carried the first time a forward
 happens. The carry is capped at 24,000 characters of URL fragment (roughly 320 per formula, so a full store of
@@ -371,7 +398,12 @@ Known, accepted change (code review CR-08): a visitor forwarded between the two 
 outside referrer, because the forward leg sends no view and the destination sees the other site as its
 referrer, which counts as inside. Their original source (a group chat, a search) is not kept.
 
-**Rolling back.** Remove `VITE_SITE` from the main web service and redeploy: the main address is the combined
+There is no "your leagues moved" notice on the Time Machine site (spec FR-019, withdrawn 2026-11-16): the
+league site is private, so league-mates are not sent there. Old league links on the Time Machine site still
+forward to the league address, which shows the lock screen to anyone but you. The league site sends no page
+view while locked.
+
+**Rolling back.** To unlock the API, unset `LEAGUE_LOCK` and redeploy the backend (nothing else needs to change). To undo the split, remove `VITE_SITE` from the main web service and redeploy: the main address is the combined
 site again. The league service can stay up (its `/history` forwards land on the combined site's `/history`) or be
 deleted.
 

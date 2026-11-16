@@ -36,6 +36,10 @@ public class AdminAccess {
         return props.enabled();
     }
 
+    public boolean tokenShorterThanRecommended() {
+        return props.shorterThanRecommended();
+    }
+
     public boolean matches(String presentedToken) {
         return props.matches(presentedToken);
     }

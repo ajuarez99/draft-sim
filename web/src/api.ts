@@ -3,6 +3,7 @@
 import { AdminTokenRequiredError, ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
+import { getSessionToken, holdsSession, lock, renewSession, startSession } from './leaguesLock'
 
 export type PlayerRef = {
   id: number
@@ -226,7 +227,10 @@ export const apiUrl = (path: string) => `${API_BASE}${path}`
  * query-string token the backend also accepts, most likely) before it can be
  * deployed. Not needed for same-origin or auth-off deploys.
  */
-function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+/** The league-session header, both directions (backend LeagueLockInterceptor.SESSION_HEADER). */
+const SESSION_HEADER = 'X-League-Session'
+
+async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
   if (API_TOKEN) headers.set('Authorization', `Bearer ${API_TOKEN}`)
   // Read synchronously off user.ts's module-level variable rather than a React
@@ -234,7 +238,33 @@ function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   // when signed out, matching the backend's own no-header default.
   const userId = currentUserId()
   if (userId) headers.set('X-Sleeper-User', userId)
-  return fetch(apiUrl(path), { ...init, headers })
+  // The league site's session (leaguesLock.ts). Only the `leagues` build ever holds one, so on every other
+  // build this is a no-op: no header, no behaviour change.
+  const session = getSessionToken()
+  if (session) headers.set(SESSION_HEADER, session)
+  // A session RECORD held at send time, even an expired one that therefore sent no header: a 401 below still
+  // means the server refuses the session this tab was working under, so it locks (CR-05).
+  const heldAtSend = holdsSession()
+  const sentAt = Date.now()
+  const res = await fetch(apiUrl(path), { ...init, headers })
+  await noteSessionOutcome(res, heldAtSend, sentAt)
+  return res
+}
+
+/**
+ * Sliding window and the refusal. A response that carries a renewed session is adopted (leaguesLock
+ * decides whether the user was active enough to deserve it). A 401 `league_session_required` means the
+ * server no longer honours the session we hold, so the site locks and the lock screen appears at the same
+ * URL; the caller still gets its failed response and rejects as an ApiError like any other failure. The
+ * body is read from a clone, so no caller's .json()/.text() is affected. Only reads when a session was
+ * sent or held, so a build with no lock does nothing here.
+ */
+async function noteSessionOutcome(res: Response, heldAtSend: boolean, sentAt: number) {
+  const renewed = res.headers?.get?.(SESSION_HEADER)
+  if (renewed) renewSession(renewed, sentAt)
+  if (!heldAtSend || !holdsSession() || res.status !== 401 || typeof res.clone !== 'function') return
+  const body: { code?: string } | null = await res.clone().json().catch(() => null)
+  if (body && body.code === 'league_session_required') lock('idle')
 }
 
 export const getSeats = (draftId: string) =>
@@ -4347,6 +4377,49 @@ export const getAdminDigest = (token: string, date?: string) =>
   apiFetch(`/api/admin/digest${date ? `?date=${encodeURIComponent(date)}` : ''}`, {
     headers: { 'X-Admin-Token': token },
   }).then(adminJson<AdminDigest>)
+
+/** POST /api/admin/session. Mirrors LeagueSessionController.SessionIssued. */
+export type LeagueSessionIssued = { token: string; expiresInSeconds: number }
+
+/**
+ * The league site's unlock (spec 073 follow-up, second pass): trades the admin token for a short-lived league
+ * session. POST /api/admin/session sits behind the admin gate, so a wrong or missing token is a 403
+ * `admin_token_required` ("wrong"). The right token answers 200 with the session, which is stored
+ * (leaguesLock.startSession) before this returns "ok". Anything else, including a 200 whose body is not a
+ * session (a proxy's page, an older backend), is "unreachable": failing to find out is not a yes. Works
+ * whether or not the backend lock is enabled.
+ */
+export async function unlockLeagueSite(adminToken: string): Promise<'ok' | 'wrong' | 'unreachable'> {
+  try {
+    const sentAt = Date.now()
+    const res = await apiFetch('/api/admin/session', { method: 'POST', headers: { 'X-Admin-Token': adminToken } })
+    const body: unknown = await res.json().catch(() => null)
+    const obj = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+    if (res.status === 403 && obj.code === 'admin_token_required') return 'wrong'
+    if (res.status === 200 && typeof obj.token === 'string' && obj.token && typeof obj.expiresInSeconds === 'number' && obj.expiresInSeconds > 0) {
+      startSession(obj.token, obj.expiresInSeconds, sentAt)
+      return 'ok'
+    }
+    return 'unreachable'
+  } catch {
+    return 'unreachable'
+  }
+}
+
+/** POST /api/league-session/stream-ticket. Mirrors LeagueSessionController.StreamTicketIssued. */
+export type StreamTicketIssued = { ticket: string; expiresInSeconds: number }
+
+/**
+ * A single-purpose, 60-second ticket for one draft's live stream. EventSource cannot send a header, so the stream
+ * URL carries this ticket (`?ticket=`) instead of the session, and the session never appears in a URL. Goes
+ * through apiFetch, so it carries the session header and a 401 locks the site like any other call.
+ */
+export const getStreamTicket = (draftId: string) =>
+  apiFetch(`/api/league-session/stream-ticket?draftId=${encodeURIComponent(draftId)}`, { method: 'POST' })
+    .then(json<StreamTicketIssued>)
+
+/** GET /api/league-session (locked, 204): the idle watcher's renewal; the new token rides on the response header. */
+export const renewLeagueSession = () => apiFetch('/api/league-session').then((res) => res.ok)
 
 export const refreshDigestStats = (token: string) =>
   apiFetch('/api/admin/digest/refresh-stats', {

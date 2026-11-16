@@ -4,18 +4,20 @@
 
 ## Route table
 
+*Amended 2026-11-16: in the `leagues` column, "lock →" means the visitor first sees only the admin-token lock screen at that same URL (spec FR-021) and, once unlocked, the gate behaviour that follows. The two `/history` rows are outside the lock: they show nothing and still redirect. `combined` and `timemachine` have no lock.*
+
 | Path | `combined` | `timemachine` | `leagues` |
 |---|---|---|---|
-| `/` | gate → league picker | gate → Time Machine home | gate → league picker |
-| `/game/:gameId` | no gate → `/history/:gameId` (in-app) | gate → Time Machine game | not found |
+| `/` | gate → league picker | gate → Time Machine home | lock → gate → league picker |
+| `/game/:gameId` | no gate → `/history/:gameId` (in-app) | gate → Time Machine game | lock → not found |
 | `/history` | gate → Time Machine home | no gate → `/` (in-app) | no gate → `TM/history` |
 | `/history/:gameId` | gate → Time Machine game | no gate → `/game/:gameId` (in-app) | no gate → `TM/history/:gameId` |
-| `/leagues/*` | gate → league pages | no gate → `LG` + same path, query, hash | gate → league pages |
-| `/drafts/*` | gate → draft pages | no gate → `LG` + same path, query, hash | gate → draft pages |
-| `/mock/*` | gate → mock pages | no gate → `LG` + same path, query, hash | gate → mock pages |
-| `/managers`, `/managers/*` | gate → manager pages | no gate → `LG` + same path, query, hash | gate → manager pages |
-| `/admin/*` | as today | no gate → `LG` + same path, query, hash | as today |
-| anything else | gate → not found | gate → not found | gate → not found |
+| `/leagues/*` | gate → league pages | no gate → `LG` + same path, query, hash | lock → gate → league pages |
+| `/drafts/*` | gate → draft pages | no gate → `LG` + same path, query, hash | lock → gate → draft pages |
+| `/mock/*` | gate → mock pages | no gate → `LG` + same path, query, hash | lock → gate → mock pages |
+| `/managers`, `/managers/*` | gate → manager pages | no gate → `LG` + same path, query, hash | lock → gate → manager pages |
+| `/admin/*` | as today | no gate → `LG` + same path, query, hash | lock → as today |
+| anything else | gate → not found | gate → not found | lock → gate → not found |
 
 Notes:
 
@@ -32,18 +34,20 @@ Notes:
 | Shell | `AppShell` | `TimeMachineShell` | `AppShell` |
 | Top-bar / menu links | Leagues, Mock drafts, Managers, Time Machine | none (wordmark + account) | Leagues, Mock drafts, Managers |
 | League header, jump-to search, Ctrl+K | yes | no | yes |
-| Signed-out screen | league landing | Time Machine landing | league landing |
+| Signed-out screen | league landing | Time Machine landing | lock screen, then league landing (2026-11-16) |
 
 ## Delivered files (read as text, no scripts)
 
+*Amended 2026-11-16: the `leagues` column is the locked site (spec FR-021). Its earlier entries are superseded as shown; `combined` and `timemachine` are unchanged.*
+
 | | `combined` | `timemachine` | `leagues` |
 |---|---|---|---|
-| `<title>`, description, og/twitter | league wording | Time Machine wording | league wording |
-| canonical, `og:url` | `TM/` | `TM/` | `LG/` |
-| `og:image` | `TM/og-image.png` | `TM/og-image-tm.png` | `LG/og-image.png` |
-| pre-rendered body | league landing | Time Machine landing | league landing |
-| `robots.txt` sitemap line | `TM/sitemap.xml` | `TM/sitemap.xml` | `LG/sitemap.xml` |
-| `sitemap.xml` single URL | `TM/` | `TM/` | `LG/` |
+| `<title>`, description, og/twitter | league wording | Time Machine wording | title "Ball Knowers" only; `noindex, nofollow`; no description, og or twitter |
+| canonical, `og:url` | `TM/` | `TM/` | none |
+| `og:image` | `TM/og-image.png` | `TM/og-image-tm.png` | none |
+| pre-rendered body | league landing | Time Machine landing | none (empty root); no JSON-LD |
+| `robots.txt` | `Allow: /`, sitemap line `TM/sitemap.xml` | `Allow: /`, sitemap line `TM/sitemap.xml` | `Disallow: /`, no sitemap line |
+| `sitemap.xml` single URL | `TM/` | `TM/` | not emitted (dev server: 404) |
 
 ## Time Machine path helpers
 
@@ -61,3 +65,21 @@ Notes:
 | `timemachine` | `timemachine` |
 | `leagues` | `leagues` |
 | anything else | build fails with a message naming the value and the three accepted ones |
+
+## API access (added 2026-11-16, second pass; backend `LEAGUE_LOCK=true`)
+
+With the lock off (the default) every row is open exactly as before. With it on:
+
+| Route family | Access | Notes |
+|---|---|---|
+| `/api/health` | public | |
+| `/api/history/**` (Time Machine) | public | its own `X-Sleeper-User` identity rule still applies |
+| `/api/sleeper/user/{name}` | public | sign-in lookup, both sites |
+| `/api/refresh/daily` | public | own `X-Refresh-Secret` |
+| `/api/admin/**`, `/api/ingest/**` | admin token | `X-Admin-Token`, 403 `admin_token_required`; unchanged |
+| `POST /api/admin/session` | admin token | mints a session, `{token, expiresInSeconds}` |
+| `/api/league-session` | locked | 204; renews |
+| `POST /api/league-session/stream-ticket?draftId=` | locked | `{ticket, expiresInSeconds: 60}`; a single-purpose ticket for that draft's live stream (CR-02) |
+| `/api/drafts/**`, `/api/leagues/**`, `/api/mocks/**`, `/api/managers/**`, `/api/sims/**`, `/api/setup/**`, `/api/targets/**`, `/api/board`, `/api/sleeper/users/{id}/leagues`, `/api/refresh/players`, `/api/leagues/{id}/refresh` and every other `/api/**` route | **locked** | session, admin token, or (live stream only) a `?ticket=` bound to that draft; else 401 `league_session_required` |
+
+Headers: request `X-League-Session`; response `X-League-Session` (renewed token, CORS-exposed). Query `ticket=` only on `GET /api/drafts/{id}/live-stream`, and only a ticket issued for that same draft id (60 s, never renewable, never valid as `X-League-Session`). A session token in any query parameter, on any route, is refused. *(Amended 2026-11-16, lock review CR-02: this line used to say `session=`.)* A session expires `idle-seconds` after its last renewal and at most `LEAGUE_LOCK_MAX_SESSION_SECONDS` (12 h) after the unlock.

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getLeagueAvailability, type LeagueAvailability, type LeagueUnavailable } from './api'
+import { onLock } from './leaguesLock'
 
 /**
  * Spec 035 FR-008: "which pages can this league honestly show?", read once per league route.
@@ -40,6 +41,9 @@ export function invalidateLeagueAvailability(leagueKey?: string): void {
   if (leagueKey) cache.delete(leagueKey)
   else cache.clear()
 }
+
+// Which pages a league can show is league data: emptied when the site locks (CR-11).
+onLock(() => invalidateLeagueAvailability())
 
 /**
  * @param version the league's data version (`useLeagueDataVersion`): a finished background refresh can change

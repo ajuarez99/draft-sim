@@ -17,7 +17,6 @@ import {
 import { useFailure } from '../useFailure'
 import HowThisWorks from '../components/HowThisWorks'
 import HistoricalProfileCard from '../components/HistoricalProfileCard'
-import LeaguesMovedNotice from '../components/LeaguesMovedNotice'
 import { howToPlaySteps, sportOf, summaryStatus } from '../historicalCopy'
 import { tmGame } from '../site'
 import { currentSite } from '../siteEnv'
@@ -202,7 +201,6 @@ export default function HistoricalDraft() {
 
   return (
     <div className="content tm tm-page">
-      <LeaguesMovedNotice />
       <header className="tm-hero">
         <span className="tm-mark" aria-hidden="true">
           <svg viewBox="0 0 48 48" width="34" height="34" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">

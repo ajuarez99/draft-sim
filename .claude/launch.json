@@ -144,6 +144,15 @@
         "set CORS_ORIGINS=http://localhost:5173,http://localhost:5184,http://localhost:5185&& cd backend && .\\gradlew.bat bootRun"
       ],
       "port": 8080
+    },
+    {
+      "name": "draft-sim-api-locked",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set LEAGUE_LOCK=true&& set ADMIN_TOKEN=local-admin-test&& set CORS_ORIGINS=http://localhost:5173,http://localhost:5184,http://localhost:5185&& cd backend && .\\gradlew.bat bootRun"
+      ],
+      "port": 8080
     }
   ]
 }

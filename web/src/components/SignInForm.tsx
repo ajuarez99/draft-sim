@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getSleeperUser, type SleeperUser } from '../api'
+import { getSleeperUser } from '../api'
 import { setUser } from '../user'
 import { trackAction } from '../analytics'
 
@@ -20,12 +20,6 @@ type Status = 'idle' | 'resolving' | 'not-found' | 'unreachable'
 type Props = {
   /** Paragraphs shown under the field, before any error. Each site passes its own words (siteCopy.ts). */
   notes: string[]
-  /**
-   * Runs once Sleeper has recognised the name, immediately BEFORE the user is stored. That order is
-   * deliberate: storing the user mounts the signed-in screen, so anything that screen reads (the Time
-   * Machine's "signed in here" marker) has to be written first.
-   */
-  onSignedIn?: (user: SleeperUser) => void
 }
 
 /**
@@ -35,7 +29,7 @@ type Props = {
  * just means Sleeper recognizes the name. setUser() is enough to move on -- App renders the signed-in
  * screen the instant a user exists, no navigation call needed.
  */
-export default function SignInForm({ notes, onSignedIn }: Props) {
+export default function SignInForm({ notes }: Props) {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [lastTried, setLastTried] = useState('')
@@ -51,7 +45,6 @@ export default function SignInForm({ notes, onSignedIn }: Props) {
         setStatus('not-found')
         return
       }
-      onSignedIn?.(found)
       setUser(found)
       // Spec 052: counted once, only after Sleeper recognised the name.
       trackAction('sign-in')

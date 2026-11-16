@@ -18,8 +18,8 @@ Follow the plan's "Acceptance criteria for the verification pass", using [contra
 
 1. 5173: nothing has changed.
 2. 5184: only the Time Machine. `/history` and `/history/<id>` rewrite in place; `/leagues/<id>/power?x=1` lands on 5185 with the path and query intact.
-3. 5185: every league page works; no Time Machine link; `/history/<id>` lands on `5184/history/<id>`, which then rewrites in place to `5184/game/<id>`.
-4. Build each mode and read `dist/index.html`, `dist/robots.txt`, `dist/sitemap.xml`:
+3. 5185: the lock screen first (the admin token; the backend needs `ADMIN_TOKEN` set, for example `ADMIN_TOKEN=dev ./gradlew bootRun`); after unlocking every league page works; no Time Machine link; `/history/<id>` lands on `5184/history/<id>`, which then rewrites in place to `5184/game/<id>`.
+4. Build each mode and read `dist/index.html`, `dist/robots.txt`, `dist/sitemap.xml` (the `leagues` build has no sitemap, a `Disallow: /` robots file and a bare `noindex` page):
 
 ```bash
 cd web && npm run build
@@ -41,9 +41,12 @@ The full version, with the variables and the rollback, is DEPLOY.md "Two sites".
 2. **Backend service**: append `,https://leagues.ballknowers.co` to `CORS_ORIGINS`. Harmless on its own.
 3. **New Railway web service** from the same repo, Root Directory `web`, build variables `VITE_SITE=leagues`, `VITE_API_BASE` (same as the existing web service) and, if wanted, `VITE_UMAMI_WEBSITE_ID`.
 4. **Custom domain** `leagues.ballknowers.co` on that service, and the CNAME Railway shows, in Squarespace DNS.
-5. **Check the league site** at its real address: sign in, open a league, a draft board and a mock. If sign-in says "Couldn't reach Sleeper just now", step 2 was missed or mistyped.
+5. **Set `ADMIN_TOKEN` on the backend service** if it is still blank. This is required: with it unset every token is refused and the league site cannot be opened by anyone, including you. Then **check the league site** at its real address: enter the token at the lock screen, sign in, open a league, a draft board and a mock. If sign-in says "Couldn't reach Sleeper just now", step 2 was missed or mistyped.
 6. **Flip the main site**: set `VITE_SITE=timemachine` on the existing web service and redeploy. Do 5 and 6 in one sitting. The league site forwards `/history/<id>` to `www.ballknowers.co/history/<id>`, which both the combined and the Time Machine build understand, so a forwarded link works before and after the flip (after it, with one more in-app hop to `/game/<id>`).
-7. **Re-set your own analytics opt-out** on `leagues.ballknowers.co`: it is stored per address.
+7. **Lock the API** (added 2026-11-16, second pass): set `LEAGUE_LOCK=true` on the backend and redeploy, **only after step 6**. Turning it on before the flip locks the league pages on the still-combined live site for everyone. `ADMIN_TOKEN` must already be set (step 5); the daily refresh job and operator `curl` with `X-Admin-Token` are unaffected; rollback is unsetting `LEAGUE_LOCK`.
+8. **Re-set your own analytics opt-out** on `leagues.ballknowers.co`: it is stored per address.
+
+The lock was a front door only on the first pass (2026-11-16); the second pass the same day locks the API too, behind a 5-minute idle session (step 7). There is no "your leagues moved" notice on the Time Machine site any more (FR-019 withdrawn).
 
 Formulas saved in the stat calculator travel only on a forward from the main address to the league site, and only when the league site has never saved formulas (a person who deleted theirs there is not given them back). Someone who types the league address directly starts without them there. When the store is very large, the newest formulas that fit in the 24,000-character fragment are carried (50 ordinary ones fit). A visitor forwarded between the sites is recorded with no outside referrer (CR-08, accepted).
 

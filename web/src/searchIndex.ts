@@ -3,6 +3,7 @@ import { destinationsFor, labelOf, type LeagueContext } from './destinations'
 import { crestLetter, hueForName } from './hue'
 import { leagueLineages } from './leagueLineage'
 import { cachedDrafts } from './railLeague'
+import { onLock } from './leaguesLock'
 import { getManagers, type DraftSummary, type ManagerSummary, type Sport } from './api'
 
 /**
@@ -196,6 +197,9 @@ export function invalidateSearchIndex() {
   cachedIndex = null
   inFlight = null
 }
+
+// The jump-to index lists every league and manager: emptied when the site locks (CR-11).
+onLock(invalidateSearchIndex)
 
 async function loadIndex(): Promise<SearchDestination[]> {
   const [drafts, ...managerLists] = await Promise.all([

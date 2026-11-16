@@ -1,6 +1,5 @@
 import SignInForm from '../components/SignInForm'
 import { analyticsLine, footerLine, headline, howHeading, signInNote, sports, steps, subheadline } from '../tmLandingCopy'
-import { markSignedInHere } from '../tmSignedInHere'
 
 /**
  * Spec 073: the Time Machine site's front door, shown at whatever URL the visitor opened until they
@@ -29,8 +28,7 @@ export default function TimeMachineSignIn() {
           ))}
         </p>
 
-        {/* The marker goes in before the user is stored: that mounts the home, which reads it (FR-019). */}
-        <SignInForm notes={[signInNote, analyticsLine]} onSignedIn={markSignedInHere} />
+        <SignInForm notes={[signInNote, analyticsLine]} />
       </header>
 
       <section className="tm-section" aria-label={howHeading}>

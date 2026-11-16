@@ -21,6 +21,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "draftsim.admin")
 public record AdminProperties(String token) {
 
+    /** Below this many characters a configured token earns a startup WARN. A guess, not a standard: 32 is 256 bits as hex. */
+    public static final int RECOMMENDED_MIN_LENGTH = 32;
+
+    /** A configured token (not a blank one) shorter than {@link #RECOMMENDED_MIN_LENGTH}. */
+    public boolean shorterThanRecommended() {
+        return enabled() && token.length() < RECOMMENDED_MIN_LENGTH;
+    }
+
     public boolean enabled() {
         return token != null && !token.isBlank();
     }

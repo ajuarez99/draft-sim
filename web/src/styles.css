@@ -7458,7 +7458,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .tm-page h2.tm-reveal-final { font-size: 32px; }
 }
 
-/* --- Spec 073: the Time Machine site (own front door, slim bar, "your leagues moved" notice). -------------------------
+/* --- Spec 073: the Time Machine site (own front door, slim bar). -------------------------
    Reuses the .tm hero, steps and the shared sign-in form classes; only what those lack is here. The front door has no
    .app-main above it, so it scrolls itself: the box is full width (scrollbar at the viewport edge) and its children
    make the single column. */
@@ -7470,10 +7470,14 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm .signin-continue { border-radius: 999px; font-weight: 800; }
 .tm .signin-note { text-align: center; }
 .tm .landing-footer { text-align: center; }
-/* The notice sits above the hero: one soft row, like a game row, wrapping on a phone. */
-.tm-moved { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 12px 18px; border-radius: 18px; background: var(--panel); font-size: 14.5px; font-weight: 600; }
-.tm-moved p { margin: 0; min-width: 0; }
-.tm-moved a { color: var(--text); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
-@media (max-width: 640px) {
-  .tm-moved { padding: 12px 14px; }
+
+/* Spec 073 follow-up: the league site's front-door lock (components/LeaguesLock.tsx). One centered card; scrolls itself on a short phone. */
+.lock-door { align-items: center; justify-content: center; overflow-y: auto; }
+.lock-card { width: 100%; max-width: 420px; box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 28px 24px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); }
+.lock-title { margin: 0; font-size: 28px; line-height: 1.1; }
+.lock-line { margin: 0; color: var(--muted); }
+.lock-form { max-width: none; }
+.lock-alert .error { margin: 8px 0 0; }
+@media (max-width: 480px) {
+  .lock-card { padding: 22px 16px; }
 }

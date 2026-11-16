@@ -15,8 +15,11 @@ import { robotsTxt, sitemapXml } from './src/siteFiles'
 function landingHtml(cfg: SiteConfig): Plugin {
   const files: Record<string, { type: string; body: string }> = {
     '/robots.txt': { type: 'text/plain; charset=utf-8', body: robotsTxt(cfg) },
-    '/sitemap.xml': { type: 'application/xml; charset=utf-8', body: sitemapXml(cfg) },
   }
+  // The locked league site has no sitemap: not emitted, and the dev server answers 404 for it rather than
+  // falling through to index.html (which would hand a crawler a 200 HTML page for a sitemap URL).
+  const sitemap = sitemapXml(cfg)
+  if (sitemap !== null) files['/sitemap.xml'] = { type: 'application/xml; charset=utf-8', body: sitemap }
   return {
     name: 'landing-html',
     transformIndexHtml: { order: 'pre', handler: (html) => transform(html, cfg) },
@@ -27,7 +30,13 @@ function landingHtml(cfg: SiteConfig): Plugin {
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        const f = files[(req.url ?? '').split('?')[0]]
+        const path = (req.url ?? '').split('?')[0]
+        if (sitemap === null && path === '/sitemap.xml') {
+          res.statusCode = 404
+          res.end()
+          return
+        }
+        const f = files[path]
         if (!f) return next()
         res.setHeader('Content-Type', f.type)
         res.end(f.body)

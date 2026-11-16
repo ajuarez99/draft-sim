@@ -40,6 +40,9 @@ import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import PlatformGate from './components/PlatformGate'
 import { useUser } from './user'
+import { useUnlocked } from './leaguesLock'
+import { useIdleLock } from './useIdleLock'
+import LeaguesLock from './components/LeaguesLock'
 import { title as landingTitle } from './landingCopy'
 import { title as tmLandingTitle } from './tmLandingCopy'
 import { tmGame, tmHome } from './site'
@@ -258,6 +261,13 @@ function CombinedTree() {
 // Time Machine site's /history, which both the combined and the Time Machine site understand (PR-06).
 // @routes:leagues begin
 function LeaguesTree() {
+  // The lock (leaguesLock.ts): until a league session is held, LeaguesLock takes the
+  // place of everything inside the gate -- landing page, sign-in, shell, every league route -- at whatever
+  // URL was asked for, and the URL is left alone so that page renders after unlocking. The two redirect
+  // routes stay outside it: they show nothing, and an old Time Machine link still has to land.
+  const unlocked = useUnlocked()
+  // While unlocked: renew the session as long as the user is active, lock after the idle window.
+  useIdleLock(unlocked)
   return (
     <Routes>
       <Route path="/history" element={<CrossSiteRedirect target="tm" />} />
@@ -265,12 +275,16 @@ function LeaguesTree() {
       <Route
         path="*"
         element={
-          <LeagueGate>
-            <Routes>
-              {leaguePages}
-              <Route path="*" element={<NotFound what="page" />} />
-            </Routes>
-          </LeagueGate>
+          unlocked ? (
+            <LeagueGate>
+              <Routes>
+                {leaguePages}
+                <Route path="*" element={<NotFound what="page" />} />
+              </Routes>
+            </LeagueGate>
+          ) : (
+            <LeaguesLock />
+          )
         }
       />
     </Routes>
@@ -317,6 +331,7 @@ function TimeMachineTree() {
 
 export default function App() {
   const user = useUser()
+  const unlocked = useUnlocked()
   const { site } = currentSite()
 
   // Spec 050: index.html carries the long SEO title for crawlers and the signed-out landing
@@ -324,8 +339,10 @@ export default function App() {
   // Spec 073: the Time Machine site has its own pair.
   useEffect(() => {
     if (site === 'timemachine') document.title = user ? 'Time Machine' : tmLandingTitle
+    // The locked league site carries no marketing title (its delivered HTML says just "Ball Knowers").
+    else if (site === 'leagues' && !unlocked) document.title = 'Ball Knowers'
     else document.title = user ? 'Ball Knowers' : landingTitle
-  }, [user, site])
+  }, [user, site, unlocked])
 
   if (site === 'timemachine') return <TimeMachineTree />
   if (site === 'leagues') return <LeaguesTree />

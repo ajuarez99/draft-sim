@@ -57,6 +57,7 @@ import PickInsightCard from '../components/PickInsightCard'
 import { prime, readSoundPref, speechSupported, writeSoundPref } from '../sound'
 import { useAnnouncer } from '../useAnnouncer'
 import { useLiveDraft } from '../useLiveDraft'
+import { useWatching } from '../useIdleLock'
 import { trackAction } from '../analytics'
 import type { FeedPick } from '../components/PickFeed'
 
@@ -128,6 +129,8 @@ export default function LiveDraftView() {
   const navigate = useNavigate()
 
   const { live, connected, secondsSinceContact, error: liveError } = useLiveDraft(draftId)
+  // A draft is watched, not clicked: an open, visible room counts as activity for the league site's idle lock.
+  useWatching()
   // One target list per draft, shared with the projection room (scope is the Sleeper draft).
   const targets = useTargets(useMemo(() => ({ sleeperDraftId: draftId }), [draftId]))
 
