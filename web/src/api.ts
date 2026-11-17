@@ -3,6 +3,7 @@
 import { AdminTokenRequiredError, ApiError, isNotFound } from './apiError'
 
 import { currentUserId } from './user'
+import { dropGuestId, guestId, peekGuestId } from './guest'
 import { getSessionToken, holdsSession, lock, renewSession, startSession } from './leaguesLock'
 
 export type PlayerRef = {
@@ -185,7 +186,7 @@ export { ApiError, isNotFound }
 
 async function apiError(res: Response): Promise<ApiError> {
   // Several controllers answer 404 with an empty body, so a parse failure is normal.
-  const body: { error?: string; message?: string } = await res.json().catch(() => ({}))
+  const body: { error?: string; message?: string; code?: string } = await res.json().catch(() => ({}))
   const retryAfter = Number(res.headers?.get?.('Retry-After'))
   // Spec 046 C10: a 409 auction_draft carries a CODE in `error` and the sentence in `message`; the sentence is
   // what a reader should see (a football auction's live room shows the thrown message in its banner). Other
@@ -195,6 +196,9 @@ async function apiError(res: Response): Promise<ApiError> {
     res.status,
     text ?? undefined,
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+    // Spec 074 (PR-25): GUEST_LIMIT rides the `{"error": <sentence>, "code": "GUEST_LIMIT"}` body of the history
+    // controllers (backend ErrorHandler); the sentence is `error`. Other 4xx bodies from those routes carry no code.
+    typeof body.code === 'string' ? body.code : undefined,
   )
 }
 
@@ -229,6 +233,11 @@ export const apiUrl = (path: string) => `${API_BASE}${path}`
  */
 /** The league-session header, both directions (backend LeagueLockInterceptor.SESSION_HEADER). */
 const SESSION_HEADER = 'X-League-Session'
+const GUEST_HEADER = 'X-Guest-Id'
+/** The routes the guest header may ride on: the Redraft game's, and nothing else. */
+export const isHistoryPath = (path: string) => path === '/api/history' || path.startsWith('/api/history/')
+/** The public pages (season pages, yesterday, a shared result) read no identity, so a read there never makes a guest id. */
+const wantsGuestId = (path: string) => isHistoryPath(path) && !path.startsWith('/api/history/public/')
 
 async function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
@@ -238,6 +247,10 @@ async function apiFetch(path: string, init: RequestInit = {}): Promise<Response>
   // when signed out, matching the backend's own no-header default.
   const userId = currentUserId()
   if (userId) headers.set('X-Sleeper-User', userId)
+  // Spec 074 (T032): a visitor who is not signed in carries a guest id, but ONLY to the Redraft routes. The
+  // league API never sees it, and a signed-in visitor never sends it (claimGuestGames passes both on purpose,
+  // through init.headers, which wins because it is already set here).
+  if (!headers.has('X-Sleeper-User') && !headers.has(GUEST_HEADER) && wantsGuestId(path)) headers.set(GUEST_HEADER, guestId())
   // The league site's session (leaguesLock.ts). Only the `leagues` build ever holds one, so on every other
   // build this is a no-op: no header, no behaviour change.
   const session = getSessionToken()
@@ -4694,7 +4707,13 @@ export type HistoricalHindsightPick = { pickNo: number; player: HistoricalPlayer
 /** Greedy, lineup-aware, bots unchanged. userBeatIt = hindsight scored LESS than you: show that, not a negative gap. */
 export type HistoricalHindsight = {
   label: string
-  pointsFor: number
+  /**
+   * The hindsight roster's season total. ABSENT in a reduced public game (today's daily shared result): that total
+   * is the day's answer, so the server sends `draftScore` instead. Read it through hindsightTotal().
+   */
+  pointsFor?: number | null
+  /** Spec 074: the server's DraftScore, sent only in a reduced public game, where `pointsFor` is withheld. */
+  draftScore?: number | null
   userPointsFor: number
   userBeatIt: boolean
   picks: HistoricalHindsightPick[]
@@ -4739,6 +4758,12 @@ export type HistoricalSteal = {
  */
 export type HistoricalPickFinish = {
   pickNo: number
+  /**
+   * In a reduced public game (`PublicGame.reducedUntil` set) a row is ONLY `pickNo` and `mark`: every other field below is
+   * absent, because a position and an exact finish rank would resolve the pick to a player on the public season page
+   * (CR-03). Read the mark with historicalShare.markOf(), which works for both shapes.
+   */
+  mark?: 'ahead' | 'same' | 'behind'
   player: HistoricalPlayerCard
   position: string
   /** 1 = the first player at this position taken in this game's draft, by any team. */
@@ -4842,6 +4867,8 @@ export type HistoricalGameState = {
   result: HistoricalResult | null
   /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
   dailyDate?: string | null
+  /** Spec 074: true when the player picked this season from a season page. Always sent (backend deploys first). */
+  chosenSeason: boolean
 }
 
 export type HistoricalGameSummary = {
@@ -4866,6 +4893,8 @@ export type HistoricalGameSummary = {
   draftScore?: number | null
   /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
   dailyDate?: string | null
+  /** Spec 074: true when the player picked this season from a season page. Always sent (backend deploys first). */
+  chosenSeason: boolean
 }
 
 /**
@@ -5018,6 +5047,8 @@ export type HistoricalGameAward = {
   momentsSeen: boolean
   /** `xp` plus the XP of the badges above. */
   total: number
+  /** Spec 074 (PR-17): true for a chosen-season game, which earns nothing. Not a failure. Always sent. */
+  notCounted: boolean
 }
 
 export const getHistoricalProfile = () => apiFetch('/api/history/profile').then(json<HistoricalProfile>)
@@ -5034,3 +5065,166 @@ export const markHistoricalSeen = (body: { codes: string[]; level: number | null
   }).then(async (res) => {
     if (!res.ok) throw await apiError(res)
   })
+
+// --- spec 074: public season pages and shared results ---------------------------------------------------
+// Mirrors historical/SeasonPage and its nested records, and api/RedraftPublicController's wrappers, field for
+// field (plan.md "Data model, amended after review"); checked against the Java records and the real JSON on
+// 2026-11-17 (code-review.md). Nothing here carries an owner, Sleeper or guest id.
+
+/** One player on a season page's lists. `goingInRank` is null for a player with no pre-season rank. */
+export type Finisher = {
+  playerId: number
+  name: string
+  /** Engine positions, as on a card: PG..C for basketball, exactly one of QB RB WR TE for football. */
+  positions: string[]
+  /** Null for a free agent or a player with no team that season. */
+  team: string | null
+  /**
+   * TWO meanings, by list (backend-records.md, T018): in `topOverall` (and `busts` / `steals`, on Mover) it is the
+   * OVERALL rank among every board player (1 + how many scored strictly more; level scores share a rank); inside
+   * `topByPosition` it is the rank WITHIN THAT POSITION, the number a game reports as `finishPositionRank`.
+   * `goingInRank` is the overall board rank in both.
+   */
+  finishRank: number
+  points: number
+  weeksPlayed: number
+  goingInRank: number | null
+}
+
+/** A bust or a steal: both ranks are present by construction (unranked players are never movers). */
+export type Mover = {
+  playerId: number
+  name: string
+  positions: string[]
+  team: string | null
+  goingInRank: number
+  finishRank: number
+  points: number
+  weeksPlayed: number
+}
+
+/** One row of the dream roster. No slot: weekly best ball has no fixed slot. */
+export type DreamPlayer = {
+  playerId: number
+  name: string
+  positions: string[]
+  points: number
+}
+
+export type SeasonPage = {
+  sport: HistoricalSport
+  seasonStart: number
+  /** "2016-17" | "2007". */
+  label: string
+  /** Equal to `label`; the address segment. */
+  slug: string
+  /** Null at the first offered season. */
+  prevSlug: string | null
+  /** Null at the last offered season. */
+  nextSlug: string | null
+  teams: number
+  rounds: number
+  /** Roster slots in lineup order, bench included as BN. */
+  rosterPositions: string[]
+  /** sport.settingsSource(): where the roster and scoring settings come from. */
+  scoringNote: string
+  /** One sentence saying what "points" are for this sport. Shown before the first points number. */
+  pointsNote: string
+  /** sport.rankingLabel(); never "ADP". */
+  rankingLabel: string
+  /** Plain-language data caveats; empty when none, never null. */
+  dataNotes: string[]
+  /** Stats this season does not count, with the reason (basketball's era caveat lives here). Never null. */
+  excludedStats: Record<string, string>
+  /** Share of played box-score rows carrying each stat, 0..1. Never null. */
+  statCoverage: Record<string, number>
+  /** The data-licence line; null for basketball. */
+  attribution: string | null
+  /** Players on the board: the denominator in "finished 131st of 412". */
+  boardPlayers: number
+  rankedPlayers: number
+  topOverall: Finisher[]
+  /** Keyed by base position (PG SG SF PF C / QB RB WR TE), roster order; five each. */
+  topByPosition: Record<string, Finisher[]>
+  busts: Mover[]
+  steals: Mover[]
+  /** Unranked players who finished in the top teams x 5: not listed, only counted. */
+  unrankedLeftOut: number
+  dreamRoster: DreamPlayer[]
+  /** The best-ball team total from TeamScorer.season: the rows above do not add up to it. */
+  dreamRosterPoints: number
+}
+
+export type SeasonRef = {
+  sport: HistoricalSport
+  seasonStart: number
+  label: string
+  slug: string
+}
+
+/** GET /api/history/public/seasons?sport=. `schema` is 1; the build fails on any other value. */
+export type SeasonList = {
+  schema: number
+  sport: HistoricalSport
+  seasons: SeasonRef[]
+}
+
+/** GET /api/history/public/daily/yesterday: null fields when no game was dealt for that day. */
+export type YesterdayDaily = {
+  sport: HistoricalSport
+  date: string
+  seasonLabel: string | null
+  slug: string | null
+}
+
+/** GET /api/history/public/games/{id}: a finished game with no owner. `reducedUntil` is set while today's daily is still live. */
+export type PublicGame = {
+  state: HistoricalGameState
+  /** ISO instant the full result shows; null when the state is full. */
+  reducedUntil: string | null
+}
+
+/** POST /api/history/claim. */
+export type ClaimResult = { moved: number; leftBehind: number }
+
+/** The fixture and the build's fetch result: what the static pages are made from. */
+export type RedraftSportSeasons = { list: SeasonList; pages: SeasonPage[] }
+export type RedraftSeasonData = { NBA: RedraftSportSeasons; NFL: RedraftSportSeasons }
+
+/** Starts a game on the season the player picked from a season page. `seasonStart` is required: a missing one would be the random year. */
+export const startChosenSeasonGame = (sport: HistoricalSport, seasonStart: number, userSlot?: number) =>
+  apiFetch('/api/history/games', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userSlot != null ? { sport, seasonStart, userSlot } : { sport, seasonStart }),
+  }).then(json<HistoricalGameState>)
+
+/**
+ * Moves the games made under this browser's guest id to a Sleeper user (spec 074 T032). Sends BOTH headers on
+ * purpose. The guest id is dropped only after the server answered 200; any other answer throws and keeps it, so
+ * the next attempt (the home page tries again when signed in) still has something to claim. Null when this browser
+ * never made a guest id (nothing to claim). `sleeperUserId` is passed in because sign-in calls this BEFORE it sets
+ * the user, so no refetch can run first.
+ */
+export async function claimGuestGames(sleeperUserId: string): Promise<ClaimResult | null> {
+  const guest = peekGuestId()
+  if (!guest) return null
+  const res = await apiFetch('/api/history/claim', {
+    method: 'POST',
+    headers: { 'X-Sleeper-User': sleeperUserId, [GUEST_HEADER]: guest },
+  })
+  const claimed = await json<ClaimResult>(res)
+  dropGuestId()
+  return claimed
+}
+
+/** The public Redraft endpoints read no identity. 404 (thrown) for an unoffered season or a game that is not finished. */
+export const getPublicSeasonList = (sport: HistoricalSport) =>
+  apiFetch(`/api/history/public/seasons?sport=${sport}`).then(json<SeasonList>)
+
+export const getPublicSeasonPage = (sport: HistoricalSport, slug: string) =>
+  apiFetch(`/api/history/public/seasons/${sport}/${encodeURIComponent(slug)}`).then(json<SeasonPage>)
+
+export const getYesterdayDaily = () => apiFetch('/api/history/public/daily/yesterday').then(json<YesterdayDaily[]>)
+
+export const getPublicGame = (id: number) => apiFetch(`/api/history/public/games/${id}`).then(json<PublicGame>)

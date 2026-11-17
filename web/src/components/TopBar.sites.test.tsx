@@ -27,11 +27,11 @@ function stubPhone() {
 const labels = (root: HTMLElement) => [...root.querySelectorAll('a, button')].map((e) => (e.textContent ?? '').trim())
 
 describe('the desktop top bar', () => {
-  it('combined: Leagues, Mock drafts, Managers, Time Machine', async () => {
+  it('combined: Leagues, Mock drafts, Managers, Redraft', async () => {
     const { topBar } = renderAtPath('/', { drafts: [LEAGUE] })
     await waitFor(() => expect(topBar()).not.toBeNull())
     const nav = within(topBar()!).getByRole('navigation', { name: 'Main' })
-    expect(labels(nav)).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Time Machine'])
+    expect(labels(nav)).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Redraft'])
   })
 
   it('leagues: Leagues, Mock drafts, Managers and no Time Machine', async () => {
@@ -40,18 +40,18 @@ describe('the desktop top bar', () => {
     await waitFor(() => expect(topBar()).not.toBeNull())
     const nav = within(topBar()!).getByRole('navigation', { name: 'Main' })
     expect(labels(nav)).toEqual(['Leagues', 'Mock drafts', 'Managers'])
-    expect(screen.queryByText('Time Machine')).toBeNull()
+    expect(screen.queryByText('Redraft')).toBeNull()
   })
 })
 
 describe('the phone menu', () => {
-  it('combined: the sheet lists Time Machine', async () => {
+  it('combined: the sheet lists Redraft', async () => {
     stubPhone()
     const user = userEvent.setup()
     const { topBar } = renderAtPath('/managers', { drafts: [LEAGUE] })
     await waitFor(() => expect(topBar()).not.toBeNull())
     await user.click(screen.getByRole('button', { name: 'Menu' }))
-    expect(labels(screen.getByRole('dialog', { name: 'Menu' }))).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Time Machine', 'Sign out'])
+    expect(labels(screen.getByRole('dialog', { name: 'Menu' }))).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Redraft', 'Sign out'])
   })
 
   it('leagues: the sheet has no Time Machine', async () => {

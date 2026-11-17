@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { HistoricalGameState, HistoricalResult } from './api'
-import { draftScore, pickMark, shareText } from './historicalShare'
+import { draftScore, markOf, pickMark, shareText } from './historicalShare'
 
 describe('pickMark', () => {
   // Lower rank is better. A sign flip here would paint every bust green, so the direction is pinned.
@@ -12,6 +12,15 @@ describe('pickMark', () => {
   })
   it('calls an unchanged rank "same"', () => {
     expect(pickMark(1, 1)).toBe('same')
+  })
+})
+
+describe('markOf', () => {
+  it('uses the mark a reduced public row ships, and the ranks otherwise (CR-03)', () => {
+    expect(markOf({ mark: 'behind' })).toBe('behind')
+    expect(markOf({ mark: 'ahead', draftedPositionRank: 1, finishPositionRank: 9 })).toBe('ahead')
+    expect(markOf({ draftedPositionRank: 35, finishPositionRank: 8 })).toBe('ahead')
+    expect(markOf({ draftedPositionRank: 43, finishPositionRank: 179 })).toBe('behind')
   })
 })
 
@@ -64,14 +73,33 @@ function fixture(over: Partial<HistoricalResult> = {}): { game: HistoricalGameSt
 describe('shareText', () => {
   it('prints the season, the finish, the score and one square per pick in draft order', () => {
     const { game, result } = fixture()
-    expect(shareText(game, result, 'https://example.test/history')).toBe(
-      ['Time Machine · 2020 Football', '🏆 Champion · 13-1', 'Draft score 79', '🟩⬜🟥', 'https://example.test/history'].join('\n'),
+    expect(shareText(game, result, 'https://example.test/game/42')).toBe(
+      ['Ball Knowers Redraft · 2020 NFL', '🏆 Champion · 13-1', 'Draft score 79%', '🟩⬜🟥', 'https://example.test/game/42'].join('\n'),
     )
   })
   it('names the day on a game of the day, so two people know they drafted the same season', () => {
     const { game, result } = fixture()
     const text = shareText({ ...game, dailyDate: '2026-11-14' }, result, 'u')
-    expect(text.split('\n')[0]).toBe('Time Machine daily · Nov 14 · 2020 Football')
+    expect(text.split('\n')[0]).toBe('Ball Knowers Redraft daily · Nov 14 · 2020 NFL')
+  })
+  it('says "Chosen season" on the line under the title when the player picked the season, and not otherwise', () => {
+    const { game, result } = fixture()
+    expect(shareText({ ...game, chosenSeason: true }, result, 'u').split(String.fromCharCode(10)).slice(0, 2)).toEqual([
+      'Ball Knowers Redraft · 2020 NFL',
+      'Chosen season, not the game of the day',
+    ])
+    expect(shareText({ ...game, chosenSeason: false }, result, 'u')).not.toContain('Chosen season')
+    expect(shareText(game, result, 'u')).not.toContain('Chosen season')
+  })
+  it('ends on the link it was given (the results page passes the game address built with tmGame)', () => {
+    const { game, result } = fixture()
+    expect(shareText(game, result, 'https://x.test/game/9').split(String.fromCharCode(10)).at(-1)).toBe('https://x.test/game/9')
+  })
+  it('draws squares from a reduced row that carries only a mark', () => {
+    const { game, result } = fixture({
+      pickFinishes: [{ pickNo: 2, mark: 'behind' }, { pickNo: 1, mark: 'ahead' }] as unknown as HistoricalResult['pickFinishes'],
+    })
+    expect(shareText(game, result, 'u')).toContain('🟩🟥')
   })
   it('leaves out the squares for a game stored before pick finishes existed', () => {
     const { game, result } = fixture({ pickFinishes: null, userOutcome: 'MISSED_PLAYOFFS', userFinish: 7 })

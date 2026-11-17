@@ -51,6 +51,7 @@ class TimeMachineBotStrengthHarnessIT {
     @Autowired private NflHistoricalProperties nflProps;
     @Autowired private ObjectMapper json;
     @Autowired private JdbcTemplate jdbc;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager txManager;
 
     private record Variant(String name, BotTuning tuning) {}
 
@@ -81,7 +82,7 @@ class TimeMachineBotStrengthHarnessIT {
                         ? new NbaHistoricalSport(nbaProps, data, v.tuning())
                         : new NflHistoricalSport(nflProps, data, nflRepo, v.tuning());
                 HistoricalGameService svc = new HistoricalGameService(data, games, contexts, engine, rulesRegistry,
-                        replay, new HistoricalSports(List.of(sport)), json);
+                        replay, new HistoricalSports(List.of(sport)), json, nbaProps, java.time.Clock.systemUTC(), txManager);
                 out.add(run(v.name(), svc, sport));
                 System.out.println(out.get(out.size() - 1));
             }

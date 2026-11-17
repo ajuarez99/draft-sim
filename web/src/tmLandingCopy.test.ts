@@ -21,12 +21,14 @@ describe('tmLandingCopy', () => {
     }
   })
 
-  it('keeps search-result lengths and names the game and Sleeper', () => {
+  it('keeps search-result lengths and names the game and a past season (spec 074 FR-002)', () => {
     expect(title.length).toBeLessThanOrEqual(70)
     expect(description.length).toBeGreaterThan(70)
     expect(description.length).toBeLessThanOrEqual(160)
-    expect(title).toContain('Time Machine')
-    expect(description).toContain('Sleeper')
+    expect(title).toContain('Redraft')
+    expect(title).toMatch(/past/i)
+    expect(description).toContain('Redraft')
+    expect(description).toMatch(/past/i)
   })
 
   it('its how-to-play steps are the shared list, with the sport-neutral scoring line', () => {
@@ -36,10 +38,10 @@ describe('tmLandingCopy', () => {
 })
 
 describe('siteCopy', () => {
-  it('timemachine speaks of Time Machine, never of leagues', () => {
+  it('timemachine speaks of Redraft, never of leagues', () => {
     const c = siteCopy(makeConfig({ VITE_SITE: 'timemachine' }))
     for (const s of [c.homeLabel, c.notFoundBody ?? '', c.signInNote, c.analyticsLine]) expect(s).not.toMatch(LEAGUE_WORDS)
-    expect(c.homeLabel).toBe('Time Machine')
+    expect(c.homeLabel).toBe('Redraft')
   })
 
   it('combined and leagues keep the wording the single site had', () => {

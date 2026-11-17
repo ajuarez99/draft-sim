@@ -18,11 +18,11 @@ function StateProbe() {
 const LEAGUE = draftSummary({ sleeperLeagueId: 'L1', sleeperDraftId: 'D1', leagueName: 'Ball Knowers' })
 
 describe('the global links', () => {
-  it('are Leagues, Mock drafts, Managers and Time Machine, in that order, with text labels only', async () => {
+  it('are Leagues, Mock drafts, Managers and Redraft, in that order, with text labels only', async () => {
     const { topBar } = renderAtPath('/', { drafts: [LEAGUE] })
     await waitFor(() => expect(topBar()).not.toBeNull())
     const nav = within(topBar()!).getByRole('navigation', { name: 'Main' })
-    expect([...nav.querySelectorAll('a, button')].map((e) => e.textContent)).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Time Machine'])
+    expect([...nav.querySelectorAll('a, button')].map((e) => e.textContent)).toEqual(['Leagues', 'Mock drafts', 'Managers', 'Redraft'])
   })
 
   it('mark the current one with aria-current, and keep Managers current on its own sub-route', async () => {
@@ -31,7 +31,7 @@ describe('the global links', () => {
     const bar = within(topBar()!)
     expect(bar.getByRole('link', { name: 'Managers' }).getAttribute('aria-current')).toBe('page')
     expect(bar.getByRole('link', { name: 'Leagues' }).hasAttribute('aria-current')).toBe(false)
-    expect(bar.getByRole('link', { name: 'Time Machine' }).hasAttribute('aria-current')).toBe(false)
+    expect(bar.getByRole('link', { name: 'Redraft' }).hasAttribute('aria-current')).toBe(false)
   })
 
   it('lights Leagues only on the picker', async () => {

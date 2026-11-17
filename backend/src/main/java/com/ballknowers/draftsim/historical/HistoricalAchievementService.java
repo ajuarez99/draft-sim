@@ -73,8 +73,13 @@ public class HistoricalAchievementService {
     public record ProfileView(long xp, int level, String levelName, int levelStartXp, int nextLevelXp, int seenLevel,
                               TotalsView totals, List<BadgeView> badges, int settleFailures) {}
 
+    /**
+     * @param notCounted spec 074: true for a game whose season the player picked. It never settles, and that is not a
+     *                   failure: the page says "seasons you pick don't count" instead of offering a retry
+     */
     public record AwardView(long gameId, boolean settled, boolean fromSavedResult, int xp, List<XpLine> lines,
-                            List<BadgeView> badges, List<Moment> moments, boolean momentsSeen, int total) {}
+                            List<BadgeView> badges, List<Moment> moments, boolean momentsSeen, int total,
+                            boolean notCounted) {}
 
     public record SeenRequest(List<String> codes, Integer level, Long momentsGameId) {}
 
@@ -153,10 +158,14 @@ public class HistoricalAchievementService {
             throw new IllegalStateException("historical game " + gameId + " is " + row.get().status()
                     + ", so it has no award yet");
         }
+        if (row.get().chosenSeason()) {
+            return Optional.of(new AwardView(gameId, false, false, 0, List.of(), List.of(), List.of(), true, 0, true));
+        }
         settle(sleeperUserId);
         Optional<AwardRow> award = repo.award(gameId);
         if (award.isEmpty()) {
-            return Optional.of(new AwardView(gameId, false, false, 0, List.of(), List.of(), List.of(), true, 0));
+            return Optional.of(new AwardView(gameId, false, false, 0, List.of(), List.of(), List.of(), true, 0,
+                    false));
         }
         AwardRow a = award.get();
         List<BadgeView> unlockedHere = new ArrayList<>();
@@ -165,7 +174,7 @@ public class HistoricalAchievementService {
         }
         int total = a.xp() + unlockedHere.stream().mapToInt(BadgeView::xp).sum();
         return Optional.of(new AwardView(gameId, true, a.fromSavedResult(), a.xp(), read(a.xpLinesJson(), LINES),
-                unlockedHere, read(a.momentsJson(), MOMENTS), a.momentsSeen(), total));
+                unlockedHere, read(a.momentsJson(), MOMENTS), a.momentsSeen(), total, false));
     }
 
     /**

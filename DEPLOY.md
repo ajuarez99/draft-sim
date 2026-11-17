@@ -287,6 +287,11 @@ Two things break, both known:
 - **Any token shipped to a browser is readable in devtools**, so it is a shared
   secret every visitor holds. The real fix is a server-side proxy or real auth,
   not a longer string.
+- **The Redraft site's web build stops working** (spec 074). Its build fetches the season pages' data from
+  `/api/history/public/**` with no bearer, so a gate that is on answers 401 and the build fails. Before
+  switching `API_TOKEN` on, exempt `/api/history/public/**` in `ApiTokenFilter`. Never solve it with a
+  `VITE_` token: that would put the secret in the build output. (Review-fixes B3: read from the code, not
+  tried, because the gate has never been on in production.)
 
 ### Security headers
 
@@ -409,6 +414,104 @@ deleted.
 
 **Not checkable before the switch:** real DNS, Railway's build of each mode, production CORS, Umami receiving
 the league host, and how link-preview bots render the Time Machine tags and image (`og-image-tm.png`).
+
+## Ball Knowers Redraft: static season pages and search (spec 074)
+
+The public game that was called "Time Machine" is now **Ball Knowers Redraft**. The `VITE_SITE` value is
+still `timemachine` (the variable name did not change). On that site the web build now writes real HTML
+files: `/nba/<season>`, `/nfl/<season>`, `/nba`, `/nfl`, `/daily`, a home page, `sitemap.xml`, `404.html`
+and a noindex app shell. It gets their data from the backend while it builds.
+
+**State when this was written (2026-11-17): built and verified locally, nothing committed, merged or
+deployed.** Everything below is a plan for the deploy, plus what was measured on a laptop. See
+`specs/074-redraft-seo/verification.md`.
+
+### Deploy order
+
+1. **Backend first.** It carries migration **V50** (`chosen_season` on `historical_game`; guest ids are stored
+   in the same owner column as `guest:<uuid>`) and the new routes under `/api/history/public/**`. The backend
+   must also allow the `X-Guest-Id` header in CORS (already in the code).
+2. **Check the backend**: `curl https://api.ballknowers.co/api/history/public/seasons?sport=NBA` answers
+   200 with `"schema":1` and a season list.
+3. **Then the web service.** Its build now needs the backend **up and already carrying
+   `/api/history/public`**. If the backend is down or still the old build, the web build fails loudly
+   and names the URL and the reason (a 404 means an old backend; a wrong `schema` says so).
+   **A failed web build is safe to re-run, and the previous web deploy keeps serving** while it fails.
+   Merging to `main` starts both services at once, so the first time expect the web build to fail once
+   if it starts before the backend is ready: re-run it when step 2 passes.
+
+### The build-time fetch
+
+- It reads `VITE_API_BASE` (already set on the web service), asks for one season at a time, and gives each
+  request a **3-minute retry budget**. It checks the response's `schema` number, validates every field it
+  uses (a season label or slug that is not a year such as `2016-17` is refused), and fails the whole build
+  with the URL and reason if anything is off.
+- A sport with no seasons fails the build **unless** `REDRAFT_ALLOW_EMPTY_SPORT=1` is set. Production
+  should have both sports, so a failure there means a missing import, and you want to see it.
+- **`REDRAFT_SEASON_DATA` (a fixture file) and `REDRAFT_ALLOW_EMPTY_SPORT=1` are for local and test builds
+  only. Do not set either on Railway.** The first would publish fixture data as real pages; the second
+  would let a half-imported site go live without football.
+- **Cost measured on the dev machine** (`specs/074-redraft-seo/t017-measurements.md`, `verification.md`):
+  47 NBA seasons fetched one after another, cold, took **about 39 s** (median 853 ms, slowest 1.1 s).
+  The JVM there ran with only the C1 compiler and the default heap, **not production's `-Xmx1024m`**, and
+  against a local database. Football was **not measured** (no NFL seasons locally). Production's 56 NBA seasons
+  and 26 NFL seasons are therefore an extrapolation, not a number. How much heap the season summaries take
+  alongside real traffic under 1 GB is **unmeasured**; locally 47 cached summaries held under about 2 MB after a GC.
+
+### Redeploy the web service after the data changes
+
+The pages are files, built once. **After any historical import, or any config change that alters which
+seasons are offered** (`first-offered` / `last-offered`), redeploy the web service, or the static pages,
+the sitemap and the sport indexes go stale. The backend drops its own cached summaries when an import
+finishes; the files do not follow by themselves.
+
+### How the web container serves it now
+
+- The Dockerfile runs `serve dist --config ../serve.site.json` with **no `-s`**. The build generates
+  `serve.site.json` beside `dist/` (git-ignored, never published) for whichever `VITE_SITE` it built, and it
+  carries `web/serve.json`'s security headers. The leagues and combined sites get one `**` rewrite to
+  `index.html`, which behaves like `-s` did (measured identical on 15 of 15 paths, t027-serve.md).
+- On the Redraft site (measured on a fixture build with the real command, `t027-serve.md`, and again on
+  the real local data, `verification.md`): a real page answers **200**; `/nba/`, `/nba/2016-17/` and the
+  `.html` forms answer **301** to the slashless address; an unknown path, an unoffered season, a bare year
+  and `/assets` answer a real **404** with the "Page not found" page; the old app addresses (`/game/<id>`,
+  `/history/**`, the league prefixes) answer 200 with an **app shell that carries a noindex meta**.
+- **Why a separate shell file:** `serve`'s `headers` rules match the *rewritten* file, not the URL asked for,
+  so an `X-Robots-Tag` on `/game/**` never appears. The noindex is a meta tag in `app-shell.html` and
+  `404.html` instead (lessons #56). `/404` and `/app-shell` answer 200 at their own addresses; both are noindex
+  and neither is linked.
+- The 404 carries the security headers; the 301 responses carry none (serve sends headers only with a file).
+  The CSP stays report-only.
+- **Not measured:** Railway's edge in front of `serve`, and any response from production.
+
+### After deploy: check this
+
+1. `curl -sI https://www.ballknowers.co/nba/2016-17` is 200, and the body has its own `<title>`, a
+   canonical equal to that address, and the season's numbers without running scripts.
+2. `curl -sI https://www.ballknowers.co/nba/not-a-season` (and `/xyz`) is **404**, and the body has the noindex meta.
+3. `https://www.ballknowers.co/sitemap.xml`: the number of `<loc>` lines equals the offered seasons of both
+   sports **plus 4** (`/`, `/daily`, `/nba`, `/nfl`). Locally, with NBA only, 47 seasons plus 3 gave 50. It
+   must hold no `/game/` address.
+4. `https://www.ballknowers.co/game/1` answers 200 and its HTML has `<meta name="robots" content="noindex">`.
+5. `curl https://api.ballknowers.co/api/history/public/seasons?sport=NFL` lists football seasons, and `/nfl`
+   on the site links them. (This is the one thing nobody has run: there was no football data locally.)
+6. **The league site is unchanged and still locked**: `leagues.ballknowers.co` shows the token prompt, and a
+   league API route without a session still answers 401 (`LEAGUE_LOCK` on). The new public routes must
+   answer without a session: they live under `/api/history/public/**`, which the lock already lets through.
+7. One real play-through as a guest: today's game and one chosen season, then a second chosen season is
+   refused with the sign-in panel.
+
+### Owed manual steps (Allan)
+
+- **Make `ballknowers.co` redirect to `www` with a permanent 301** at the registrar. It answered **302** when
+  measured on 2026-11-17.
+- **Verify the site in Google Search Console and in Bing Webmaster Tools, and submit `sitemap.xml`.** Nothing
+  in the repo can do this.
+- **After two to four weeks**, check how many pages Search Console says are indexed, and the visits to the
+  season-page route as a whole. The analytics record route templates (such as `/nba/:season`), not individual
+  seasons, so per-season visits cannot be read from them.
+- No ranking and no traffic is expected or promised. Whether search engines pick the pages up, and how
+  they rank them, is not known.
 
 ## Analytics (spec 052)
 

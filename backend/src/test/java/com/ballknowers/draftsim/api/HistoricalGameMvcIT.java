@@ -29,7 +29,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -74,6 +76,7 @@ class HistoricalGameMvcIT {
     @Autowired private MockDraftEngine engine;
     @Autowired private SportRulesRegistry rules;
     @Autowired private SeasonReplay replay;
+    @Autowired private org.springframework.transaction.PlatformTransactionManager txManager;
 
     private static boolean seeded;
 
@@ -128,12 +131,15 @@ class HistoricalGameMvcIT {
     /** A real browser preflights every POST that sends X-Sleeper-User (bug class 6: curl never does). */
     @Test
     void aBrowserPreflightPassesForEveryGameRoute() throws Exception {
+        // Spec 074: x-guest-id is allowed too, and POST /claim sends both identity headers (PR-03: production is
+        // cross-origin, and a header missing from the allow-list fails every guest request at its preflight).
         for (String path : new String[]{"/api/history/games", "/api/history/games/1/pick",
-                "/api/history/games/1/auto", "/api/history/games/1/abandon"}) {
+                "/api/history/games/1/auto", "/api/history/games/1/abandon", "/api/history/claim",
+                "/api/history/daily"}) {
             mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options(path)
                             .header("Origin", "http://localhost:5173")
                             .header("Access-Control-Request-Method", "POST")
-                            .header("Access-Control-Request-Headers", "content-type,x-sleeper-user"))
+                            .header("Access-Control-Request-Headers", "content-type,x-sleeper-user,x-guest-id"))
                     .andExpect(status().isOk())
                     .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
                             .header().string("Access-Control-Allow-Origin", "http://localhost:5173"));
@@ -157,10 +163,13 @@ class HistoricalGameMvcIT {
 
             // The drafted season's own line is: team ZZZ, age 99, 91 games, 7777 pts, 8888 reb, 9999 ast.
             // Its games are also stamped ZZZ. None of it may appear anywhere in what a drafter sees.
-            String text = s.toString();
-            for (String leak : new String[]{"ZZZ", "\"age\":99", "\"games\":91", "7777", "8888", "9999"}) {
-                assertFalse(text.contains(leak), "drafted-season value leaked into the DRAFTING state: " + leak);
-            }
+            // (V-07) The stat values are matched as numbers in the fields a stat could sit in, never as substrings of the
+            // whole JSON: ids (player, game, pick) come from database sequences, which pass through 7777/8888/9999 sooner
+            // or later, and a substring check then fails with nothing leaked.
+            assertFalse(s.toString().contains("ZZZ"), "drafted-season team leaked into the DRAFTING state");
+            List<String> leaks = new ArrayList<>();
+            findDraftedSeasonNumbers(s, "", leaks);
+            assertTrue(leaks.isEmpty(), "drafted-season value leaked into the DRAFTING state: " + leaks);
             // ...and the prior season IS there: a card for the best player shows the 1894-95 line.
             JsonNode top = s.get("available").get(0);
             assertEquals("1894-95", top.get("prior").get("seasonLabel").asText());
@@ -173,6 +182,20 @@ class HistoricalGameMvcIT {
             }
         } finally {
             cleanup();
+        }
+    }
+
+    /** Numbers equal to the drafted season's line (age 99, 91 games, 7777/8888/9999) in any field that is not an id. */
+    private static void findDraftedSeasonNumbers(JsonNode node, String field, List<String> out) {
+        if (node.isObject()) {
+            node.fields().forEachRemaining(e -> findDraftedSeasonNumbers(e.getValue(), e.getKey(), out));
+        } else if (node.isArray()) {
+            node.forEach(n -> findDraftedSeasonNumbers(n, field, out));
+        } else if (node.isNumber() && !field.toLowerCase().endsWith("id") && !field.equals("pickNo")) {
+            double v = node.asDouble();
+            if (v == 7777 || v == 8888 || v == 9999 || ("age".equals(field) && v == 99) || ("games".equals(field) && v == 91)) {
+                out.add(field + "=" + node);
+            }
         }
     }
 
@@ -328,9 +351,11 @@ class HistoricalGameMvcIT {
             for (var e : props.scoring().entrySet()) other.put(e.getKey(), e.getValue() * 10 + 1);
             HistoricalProperties changed = new HistoricalProperties(props.kaggleZipUrl(), props.kaggleZipSha256(),
                     props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(),
-                    props.teams(), props.rounds(), props.reversalRound(), other, props.regularSeasonWeeks());
+                    props.teams(), props.rounds(), props.reversalRound(), other, props.regularSeasonWeeks(),
+                    props.guestChosenSeasons());
             HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
-                    new HistoricalSports(java.util.List.of(new NbaHistoricalSport(changed, data))), json);
+                    new HistoricalSports(java.util.List.of(new NbaHistoricalSport(changed, data))), json, changed,
+                    java.time.Clock.systemUTC(), txManager);
             JsonNode viaChanged = json.valueToTree(svc.get(id, ALICE).orElseThrow().result());
             assertEquals(json.readTree(stored), viaChanged, "reopen under changed scoring config must not re-score");
 
@@ -355,9 +380,10 @@ class HistoricalGameMvcIT {
         // A service built with reversal round 3, over the same beans (plan F8).
         HistoricalProperties rev3 = new HistoricalProperties(props.kaggleZipUrl(), props.kaggleZipSha256(),
                 props.eraThreshold(), props.rankStandardGames(), props.rankMinGames(), props.rankLookbackSeasons(), props.teams(), props.rounds(),
-                3, props.scoring(), props.regularSeasonWeeks());
+                3, props.scoring(), props.regularSeasonWeeks(), props.guestChosenSeasons());
         HistoricalGameService svc = new HistoricalGameService(data, gameRepo, contexts, engine, rules, replay,
-                new HistoricalSports(java.util.List.of(new NbaHistoricalSport(rev3, data))), json);
+                new HistoricalSports(java.util.List.of(new NbaHistoricalSport(rev3, data))), json, rev3,
+                java.time.Clock.systemUTC(), txManager);
         try {
             ensureSeeded();
             long id = svc.create(ALICE, "NBA", 4, HistoricalSyntheticSeason.S).id();

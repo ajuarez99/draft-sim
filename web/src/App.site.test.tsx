@@ -5,7 +5,7 @@ import App from './App'
 import { goTo } from './goTo'
 import { clearUser, setUser, type BkUser } from './user'
 import { headline as leagueHeadline } from './landingCopy'
-import { headline as tmHeadline } from './tmLandingCopy'
+import { notFoundH1, notFoundTitle } from './redraftCopy'
 import { invalidateRailLeagues } from './railLeague'
 import { lock, startSession } from './leaguesLock'
 
@@ -29,6 +29,12 @@ vi.mock('./api', () => ({
   getLeagueAvailability: vi.fn(),
   unlockLeagueSite: vi.fn(),
   renewLeagueSession: vi.fn(async () => true),
+  // The new Redraft pages (spec 074) fetch on mount; a rejected request is what they handle ("didn't load").
+  getHistoricalDaily: vi.fn(() => Promise.reject(new Error('stub'))),
+  getYesterdayDaily: vi.fn(() => Promise.reject(new Error('stub'))),
+  getPublicSeasonList: vi.fn(() => Promise.reject(new Error('stub'))),
+  getPublicSeasonPage: vi.fn(() => Promise.reject(new Error('stub'))),
+  listHistoricalGames: vi.fn(() => Promise.resolve([])),
 }))
 
 const TM_ORIGIN = 'http://tm.test'
@@ -77,14 +83,17 @@ const BOTH = [true, false] as const
 describe('timemachine', () => {
   beforeEach(() => mode('timemachine'))
 
-  it('/ is the Time Machine home when signed in, the front door when signed out', () => {
+  it('/ is the Redraft home when signed in', () => {
     renderAt('/', true)
     expect(screen.getByText('tm home page')).toBeInTheDocument()
   })
 
-  it('signed out, / is the Time Machine front door, not the league landing', () => {
+  // PINNED RULE REWRITTEN (T041, spec 074): spec 073 pinned "signed out, / is the sign-in front door, not the league landing".
+  // A guest now gets the real home page inside the shell (with a "Sign in" link in the bar), and still never the league landing.
+  it('signed out, / is the home page in the shell for a guest, not the league landing', () => {
     renderAt('/', false)
-    expect(screen.getByRole('heading', { level: 1, name: tmHeadline })).toBeInTheDocument()
+    expect(screen.getByText('tm home page')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/#sign-in')
     expect(screen.queryByText(leagueHeadline)).toBeNull()
   })
 
@@ -93,19 +102,34 @@ describe('timemachine', () => {
     expect(screen.getByText('tm room page 7')).toBeInTheDocument()
   })
 
-  it('signed out, a game link shows the front door at the SAME url and the game after sign-in (FR-013)', () => {
+  // PINNED RULE REWRITTEN (T041, FR-013 of spec 073): signed out used to show the sign-in front door at the game's URL, and
+  // the game after sign-in. A guest now reaches the game page itself at that URL (the room decides what a stranger may see:
+  // the owner's room, a shared result, or "No finished game here"), and signing in does not move them off it.
+  it('signed out, a game link renders the game page at the SAME url, and signing in keeps the url', () => {
     renderAt('/game/7?x=1#y', false)
-    expect(screen.getByRole('heading', { level: 1, name: tmHeadline })).toBeInTheDocument()
+    expect(screen.getByText('tm room page 7')).toBeInTheDocument()
     expect(where()).toBe('/game/7?x=1#y')
     act(() => setUser(user))
     expect(screen.getByText('tm room page 7')).toBeInTheDocument()
     expect(where()).toBe('/game/7?x=1#y')
   })
 
+  it.each(['/daily', '/nba', '/nfl', '/nba/2016-17', '/nfl/2007'])('%s is a route for a guest and for a signed-in visitor', (path) => {
+    // Not rendered here (they fetch); the route table (analytics.test.ts) and the page tests cover their content. This only
+    // pins that the path is NOT the not-found page and does not redirect.
+    for (const signedIn of [false, true]) {
+      clearUser()
+      const { unmount } = renderAt(path, signedIn)
+      expect(where()).toBe(path)
+      expect(screen.queryByRole('heading', { name: notFoundH1 })).toBeNull()
+      unmount()
+    }
+  })
+
   it('anything else is the not-found page, with no league wording', () => {
     renderAt('/nope', true)
-    expect(screen.getByRole('heading', { name: 'Nothing here' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to Time Machine' })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('heading', { name: notFoundH1 })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/')
     expect(screen.queryByText(/league/i)).toBeNull()
   })
 
@@ -261,13 +285,15 @@ describe('combined (VITE_SITE unset)', () => {
 })
 
 describe('document title', () => {
-  it('timemachine: the Time Machine title signed out, "Time Machine" signed in', () => {
+  // PINNED RULE REWRITTEN (T041): the title used to be "the long SEO title signed out, the short name signed in", set by App.
+  // Each Redraft page now sets its own (pageTitle.ts), the same words its static file's <title> carries, so signing in does
+  // not change it, and App's own effect does not overwrite it.
+  it('timemachine: a page sets its own title, and signing in leaves it alone', () => {
     mode('timemachine')
-    renderAt('/', false)
-    expect(document.title).toContain('Time Machine')
-    expect(document.title).not.toBe('Time Machine')
+    renderAt('/nope', false)
+    expect(document.title).toBe(notFoundTitle)
     act(() => setUser(user))
-    expect(document.title).toBe('Time Machine')
+    expect(document.title).toBe(notFoundTitle)
   })
 
   it('combined: unchanged, "Ball Knowers" signed in', () => {

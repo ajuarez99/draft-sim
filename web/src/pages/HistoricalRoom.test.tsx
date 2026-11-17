@@ -79,6 +79,7 @@ export function drafting(): HistoricalGameState {
     picks: [],
     available: [card(1, 'Top Guy'), card(2, 'Rookie Rick', { prior: null, team: null, age: null })],
     result: null,
+    chosenSeason: false,
   }
 }
 

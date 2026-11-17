@@ -20,6 +20,9 @@ import java.util.Map;
  *   <li>{@code regularSeasonWeeks} -- a league-format choice (spec 063, Allan 2026-11-13), not a measurement:
  *       the weeks of round robin before the three playoff weeks.
  *   <li>{@code scoring} -- the Legacy Ball Knowers league scoring (FR-002, O1), keyed by Sleeper stat name.
+ *   <li>{@code guestChosenSeasons} -- a PRODUCT RULE from Allan's answer (spec 074), not a measurement: how many
+ *       seasons of their own choosing a player who has not signed in may draft, in total, abandoned ones included.
+ *       The game of the day is always open to them; a random season and everything that counts is not.
  * </ul>
  */
 @ConfigurationProperties(prefix = "historical")
@@ -27,7 +30,7 @@ public record HistoricalProperties(String kaggleZipUrl, String kaggleZipSha256, 
                                    Integer rankStandardGames, Integer rankMinGames,
                                    Integer rankLookbackSeasons, Integer teams,
                                    Integer rounds, Integer reversalRound, Map<String, Double> scoring,
-                                   Integer regularSeasonWeeks) {
+                                   Integer regularSeasonWeeks, Integer guestChosenSeasons) {
 
     public HistoricalProperties {
         if (kaggleZipUrl == null || kaggleZipUrl.isBlank()) {
@@ -45,6 +48,7 @@ public record HistoricalProperties(String kaggleZipUrl, String kaggleZipSha256, 
         positive("teams", teams);
         positive("rounds", rounds);
         positive("regular-season-weeks", regularSeasonWeeks);
+        positive("guest-chosen-seasons", guestChosenSeasons);
         if (reversalRound == null || reversalRound < 0) {
             throw new IllegalArgumentException("historical.reversal-round must be >= 0, got " + reversalRound);
         }

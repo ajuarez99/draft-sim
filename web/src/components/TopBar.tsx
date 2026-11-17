@@ -111,7 +111,7 @@ export default function TopBar({
           </Link>
           {showTimeMachine && (
             <Link to="/history" className="topbar-link" {...here(path.startsWith('/history'))}>
-              Time Machine
+              Redraft
             </Link>
           )}
         </nav>

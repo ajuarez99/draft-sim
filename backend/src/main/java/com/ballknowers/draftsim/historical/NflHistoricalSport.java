@@ -120,7 +120,7 @@ public class NflHistoricalSport implements HistoricalSport {
     }
 
     @Override
-    public List<HistoricalPlayerCard> buildBoard(SeasonRow season, long seed, Map<String, Double> scoring) {
+    public HistoricalBoardBuilder.Board buildBoardRanked(SeasonRow season, long seed, Map<String, Double> scoring) {
         int s = season.seasonStart();
         List<Map<Long, NflHistoricalRepository.NflSeasonLine>> priors = new ArrayList<>(props.rankLookbackSeasons());
         // S-1 first; an unimported season is just empty (1999 is the prior-only season behind 2000).
@@ -128,9 +128,11 @@ public class NflHistoricalSport implements HistoricalSport {
         Options opts = new Options(Sport.NFL, COUNTING, this::label, RankMode.POINTS_OVER_REPLACEMENT,
                 nfl.draftPicks(s), new NflRank(replacementDepth(), props.rookiePositionalOffset(),
                 props.rookieMaxRound(), TOTAL_KEYS), null);
-        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, nfl.candidates(s),
+        HistoricalBoardBuilder.Board board = HistoricalBoardBuilder.buildRanked(s, seed, scoring, nfl.candidates(s),
                 priors, nfl.lines(s), new RankConfig(props.rankStandardGames(), props.rankMinGames()), opts);
-        return HistoricalRookies.mark(board, nfl.playersWithLineBefore(s), nfl.draftSeasons(), s);
+        return new HistoricalBoardBuilder.Board(
+                HistoricalRookies.mark(board.cards(), nfl.playersWithLineBefore(s), nfl.draftSeasons(), s),
+                board.rankedCount());
     }
 
     @Override
@@ -154,6 +156,14 @@ public class NflHistoricalSport implements HistoricalSport {
         long bench = props.roster().stream().filter("BN"::equals).count();
         return "Hand-set " + props.teams() + "-team, " + props.rounds() + "-round roster: " + String.join(", ", parts)
                 + (bench > 0 ? " + " + bench + " bench" : "") + " · full PPR";
+    }
+
+    /** Football has one game a week and the nflverse import keeps regular-season rows only (NflverseSource). */
+    @Override public String pointsNote() {
+        // "Over the regular season": the import keeps regular-season rows only. A season whose file lacks some games
+        // says so in its own data notes ("N of M regular-season games are in the data"), which the page prints.
+        return "Points are each player's weekly fantasy points under this season's scoring (full PPR), added up"
+                + " over the regular season.";
     }
 
     // Never "ADP" (FR-009): there is no historical ADP here, and the ranking is not one.

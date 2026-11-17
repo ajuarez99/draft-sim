@@ -1,5 +1,6 @@
 package com.ballknowers.draftsim.historical;
 
+import com.ballknowers.draftsim.config.HistoricalProperties;
 import com.ballknowers.draftsim.domain.BoardEntry;
 import com.ballknowers.draftsim.domain.DraftSlot;
 import com.ballknowers.draftsim.domain.LeagueSettings;
@@ -18,12 +19,18 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -78,12 +85,16 @@ public class HistoricalGameService {
     private final SeasonReplay replay;
     private final HistoricalSports sports;
     private final ObjectMapper json;
+    private final HistoricalProperties props;
+    private final Clock clock;
+    private final TransactionTemplate claimTx;
     private final SecureRandom random = new SecureRandom();
 
     public HistoricalGameService(HistoricalDataRepository data, HistoricalGameRepository games,
                                  DraftContextFactory contexts, MockDraftEngine engine,
                                  SportRulesRegistry rulesRegistry, SeasonReplay replay,
-                                 HistoricalSports sports, ObjectMapper json) {
+                                 HistoricalSports sports, ObjectMapper json, HistoricalProperties props, Clock clock,
+                                 PlatformTransactionManager txManager) {
         this.data = data;
         this.games = games;
         this.contexts = contexts;
@@ -92,6 +103,9 @@ public class HistoricalGameService {
         this.replay = replay;
         this.sports = sports;
         this.json = json;
+        this.props = props;
+        this.clock = clock;
+        this.claimTx = new TransactionTemplate(txManager);
     }
 
     // ---- create -----------------------------------------------------------------------------------------
@@ -108,7 +122,82 @@ public class HistoricalGameService {
     @Transactional
     public HistoricalGameState create(String sleeperUserId, String sportCode, Integer userSlot,
                                       Integer seasonOverride) {
-        return create(sleeperUserId, sportCode, userSlot, seasonOverride, null, null);
+        return create(sleeperUserId, sportCode, userSlot, seasonOverride, null, null, false);
+    }
+
+    /**
+     * The HTTP create (spec 074): the owner key may be a guest's, and the player may pick the season.
+     *
+     * <ul>
+     *   <li>{@code seasonStart == null}: a random season. Refused to a guest ({@link GuestLimitException}).
+     *   <li>{@code seasonStart != null}: that season, stored with {@code chosen_season = true}, so it never counts
+     *       toward achievements or records. It must be OFFERED: committed with prior-season lines (the same rule as
+     *       the season list) AND inside the sport's offered range, which a season imported for tooling may not be
+     *       (PR-16). A guest may do this only while they own no game that is not a game of the day, in any status.
+     * </ul>
+     *
+     * @throws IllegalArgumentException unknown sport, a bad slot, or a season that is not offered (400)
+     * @throws GuestLimitException      a guest asking for a random season, or for a second chosen one (403)
+     */
+    @Transactional
+    public HistoricalGameState createFor(String ownerKey, String sportCode, Integer userSlot, Integer seasonStart) {
+        HistoricalSport sport = sports.get(sportCode);
+        boolean guest = Identity.isGuest(ownerKey);
+        if (seasonStart == null) {
+            if (guest) {
+                throw new GuestLimitException("Sign in to draft a random season. You can play the game of the day,"
+                        + " or one season you choose.");
+            }
+            return create(ownerKey, sportCode, userSlot, null, null, null, false);
+        }
+        boolean offered = seasonStart >= sport.firstOffered() && seasonStart <= sport.lastOffered()
+                && sport.offeredSeasons().stream().anyMatch(s -> s.seasonStart() == seasonStart);
+        if (!offered) {
+            throw new IllegalArgumentException("season " + seasonStart + " is not offered for " + sport.code());
+        }
+        if (guest) {
+            // The count and the insert must not interleave with the same guest's other tab.
+            games.lockOwner(ownerKey);
+            if (games.countNonDaily(ownerKey) >= props.guestChosenSeasons()) {
+                throw new GuestLimitException("You've used your free season draft. Sign in with your Sleeper username to"
+                        + " draft any season, or play today's game.");
+            }
+        }
+        return create(ownerKey, sportCode, userSlot, seasonStart, null, null, true);
+    }
+
+    /**
+     * Moves a guest's games to the Sleeper id they just signed in as (spec 074). One transaction: it takes the
+     * target's owner lock, locks the guest's rows, then moves every one that does not collide with a game of the day
+     * the Sleeper id already played, and counts the rest. A second call moves nothing. A unique-index race (the
+     * Sleeper id starting that day's game in another tab at the same instant) rolls that attempt back and is run
+     * again, where the collision is now visible; it is never a 500 (PR-18).
+     *
+     * <p>Known property, accepted (CR-02, specs/074-redraft-seo/code-review.md): a guest id costs nothing, so the
+     * game of the day can be replayed under throwaway guest ids before signing in, and the best attempt claimed. There
+     * is no leaderboard, so nobody is ranked against it; the decision is recorded in that file and the behaviour is
+     * deliberately unchanged.
+     */
+    public ClaimResult claim(String guestKey, String sleeperId) {
+        if (!Identity.isGuest(guestKey) || sleeperId == null || sleeperId.isBlank() || Identity.isGuest(sleeperId)) {
+            throw new IllegalArgumentException("claim needs a guest key and a Sleeper id");
+        }
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            try {
+                return claimTx.execute(status -> {
+                    games.lockOwner(sleeperId);
+                    games.lockOwnedGames(guestKey);
+                    int moved = games.moveOwner(guestKey, sleeperId);
+                    return new ClaimResult(moved, games.countOwned(guestKey));
+                });
+            } catch (DuplicateKeyException race) {
+                // The guest key is a bearer credential (CR-11): log a short hash of it, never the key itself.
+                log.info("historical claim {} -> {} lost a race on the daily index (attempt {}); running it again",
+                        Identity.shortHash(guestKey), sleeperId, attempt);
+            }
+        }
+        // Three losses in a row cannot be a race any more. Report what is true now, without a write.
+        return new ClaimResult(0, games.countOwned(guestKey));
     }
 
     /**
@@ -120,11 +209,17 @@ public class HistoricalGameService {
     public HistoricalGameState createDaily(String sleeperUserId, String sportCode, int seasonStart, long seed,
                                            LocalDate dailyDate) {
         if (dailyDate == null) throw new IllegalArgumentException("dailyDate is required for a daily game");
-        return create(sleeperUserId, sportCode, null, seasonStart, seed, dailyDate);
+        return create(sleeperUserId, sportCode, null, seasonStart, seed, dailyDate, false);
     }
 
+    /**
+     * @param chosenSeason true only when the player picked the season ({@link #createFor}); a required argument with
+     *                     no default, because inferring it from {@code seasonOverride} would mark every game of the
+     *                     day (and every test's season) as chosen and take it out of achievements (PR-16)
+     */
     private HistoricalGameState create(String sleeperUserId, String sportCode, Integer userSlot,
-                                       Integer seasonOverride, Long seedOverride, LocalDate dailyDate) {
+                                       Integer seasonOverride, Long seedOverride, LocalDate dailyDate,
+                                       boolean chosenSeason) {
         long t0 = System.nanoTime();
         HistoricalSport sport = sports.get(sportCode);
         int teams = sport.teams(), rounds = sport.rounds();
@@ -160,7 +255,7 @@ public class HistoricalGameService {
 
         long id = games.create(sleeperUserId, sport.code(), s, teams, rounds, sport.reversalRound(),
                 sport.rosterPositions(), write(scoring), slot, seed, writeSnapshot(cards, season, sport),
-                OffsetDateTime.now(), dailyDate);
+                OffsetDateTime.now(), dailyDate, chosenSeason);
         GameRow row = games.lockForUpdate(id).orElseThrow();
         List<BoardEntry> board = entries(cards, sport);
         advanceBots(row, cards, board, new HashMap<>());
@@ -184,8 +279,92 @@ public class HistoricalGameService {
         return games.summaries(sleeperUserId).stream()
                 .map(r -> new HistoricalGameState.GameSummary(r.id(), r.sport(), r.seasonLabel(), r.status(),
                         r.userSlot(), r.finish(), r.formatVersion(), r.outcome(), r.createdAt(),
-                        r.draftScore(), r.dailyDate() == null ? null : r.dailyDate().toString()))
+                        r.draftScore(), r.dailyDate() == null ? null : r.dailyDate().toString(),
+                        r.chosenSeason()))
                 .toList();
+    }
+
+    // ---- the shared result (spec 074) -------------------------------------------------------------------
+
+    /**
+     * A finished game for anyone to read, with no owner in it. Empty unless the game is COMPLETE: a drafting,
+     * abandoned or missing game is the same answer (404). While the game is today's game of the day (everyone
+     * drafts the same season and seed, so a full result is that day's answer key) it is reduced: see
+     * {@link PublicGame}. Read-only.
+     */
+    @Transactional(readOnly = true)
+    public Optional<PublicGame> publicGame(long id) {
+        Optional<GameRow> found = games.find(id).filter(r -> "COMPLETE".equals(r.status()));
+        if (found.isEmpty()) return Optional.empty();
+        GameRow row = found.get();
+        HistoricalGameState full = state(row);
+        LocalDate today = LocalDate.now(clock.withZone(HistoricalDailyService.ZONE));
+        if (row.dailyDate() == null || row.dailyDate().isBefore(today)) {
+            return Optional.of(new PublicGame(full, null));
+        }
+        String until = row.dailyDate().plusDays(1).atStartOfDay(HistoricalDailyService.ZONE).toInstant().toString();
+        return Optional.of(new PublicGame(new HistoricalGameState(full.id(), full.sport(), full.status(), full.season(),
+                full.teams(), full.rounds(), full.rosterPositions(), full.userSlot(), full.myPicks(),
+                full.currentPickNo(), full.onTheClockSlot(), full.isUsersTurn(), List.of(), List.of(),
+                reduced(full.result(), full.userSlot()), full.reversalRound(), full.dailyDate(),
+                full.chosenSeason()), until));
+    }
+
+    /**
+     * The part of a result that does not give away the day's answer: the finish, the user's own record and the
+     * inputs of the draft score and the pick squares. No player, lineup, hindsight roster, bust or steal.
+     */
+    private ObjectNode reduced(JsonNode result, int userSlot) {
+        ObjectNode out = json.createObjectNode();
+        if (result == null || !result.isObject()) return out;
+        for (String k : List.of("userFinish", "userOutcome", "format")) {
+            out.set(k, result.has(k) ? result.get(k) : json.nullNode());
+        }
+        ArrayNode mine = json.createArrayNode();
+        if (result.has("standings")) {
+            for (JsonNode s : result.get("standings")) if (s.path("slot").asInt() == userSlot) mine.add(s);
+        }
+        out.set("standings", mine);
+        ObjectNode hindsight = json.createObjectNode();
+        JsonNode h = result.path("hindsight");
+        // The best roster's own total (hindsight.pointsFor) IS today's puzzle answer, so it is not sent. The draft
+        // score is the already-computed share of it, so the page can still show how the game went.
+        // Accepted (review-fixes B2): "userPointsFor" with the draft score still lets a reader back-calculate the best
+        // roster's total. That is one number, not a roster, and the season pages are the open answer key by Allan's
+        // choice (spec 074 clarifications), so this is not closed further.
+        for (String k : List.of("label", "userPointsFor", "userBeatIt")) {
+            hindsight.set(k, h.has(k) ? h.get(k) : json.nullNode());
+        }
+        Integer score = DraftScore.of(h.path("userPointsFor").isNumber() ? h.get("userPointsFor").asDouble() : null,
+                h.path("pointsFor").isNumber() ? h.get("pointsFor").asDouble() : null);
+        if (score == null) hindsight.set("draftScore", json.nullNode());
+        else hindsight.put("draftScore", score.intValue());
+        hindsight.set("picks", json.createArrayNode());
+        out.set("hindsight", hindsight);
+        // pickFinishes: absent in a result stored before spec 065. A row keeps only the pick number and one mark
+        // (ahead / same / behind): the raw position and exact finish rank would let a reader resolve the pick to a
+        // player on the public season page (CR-03), and a square needs nothing more.
+        if (result.has("pickFinishes") && result.get("pickFinishes").isArray()) {
+            ArrayNode rows = json.createArrayNode();
+            for (JsonNode f : result.get("pickFinishes")) {
+                ObjectNode r = json.createObjectNode();
+                r.set("pickNo", f.has("pickNo") ? f.get("pickNo") : json.nullNode());
+                r.put("mark", markOf(f.path("draftedPositionRank").asInt(), f.path("finishPositionRank").asInt()));
+                rows.add(r);
+            }
+            out.set("pickFinishes", rows);
+        }
+        out.set("weeks", json.createArrayNode());
+        out.set("lineups", json.createObjectNode());
+        out.set("finalPlaces", json.createArrayNode());
+        return out;
+    }
+
+    /** Lower rank is better: a finish at a smaller rank than the draft rank is "ahead". Mirrors web pickMark(). */
+    static String markOf(int draftedPositionRank, int finishPositionRank) {
+        if (finishPositionRank < draftedPositionRank) return "ahead";
+        if (finishPositionRank > draftedPositionRank) return "behind";
+        return "same";
     }
 
     // ---- the user's moves -------------------------------------------------------------------------------
@@ -484,7 +663,7 @@ public class HistoricalGameService {
         return new HistoricalGameState(row.id(), row.sport(), row.status(), view, row.teams(), row.rounds(),
                 row.rosterPositions(), row.userSlot(), myPicks, row.currentPickNo(), onTheClock, usersTurn,
                 views, available, result, row.reversalRound(),
-                row.dailyDate() == null ? null : row.dailyDate().toString());
+                row.dailyDate() == null ? null : row.dailyDate().toString(), row.chosenSeason());
     }
 
     // ---- plumbing ---------------------------------------------------------------------------------------

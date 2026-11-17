@@ -58,7 +58,7 @@ Built so far:
   and makes a trade "not comparable by points" when a side got nothing else. Reversed and restored
   trades say so. Each trade expands into its players' season stretches, a reconciliation
   count checks the transaction log against the scoring rows, and the trade log downloads as CSV.
-- **Time Machine** (specs/053-historical-draft-game). A basketball draft game on real history: pick a random
+- **Ball Knowers Redraft** (specs/053-historical-draft-game; called "Time Machine" until spec 074, still the name in the spec folders, `VITE_SITE=timemachine` and some file names). A basketball draft game on real history: pick a random
   NBA season (1970-71 to 2025-26), draft a 12-team, 14-round snake against bots, then watch that season's real box
   scores play out as a fantasy season under the Legacy Ball Knowers scoring. Cards show only the stats a season
   actually recorded (steals and blocks before 1973-74, turnovers before 1977-78, three-pointers before 1979-80,
@@ -67,7 +67,13 @@ Built so far:
   possible lineup, your worst pick and the best player you passed on. Data: a CC0 Kaggle box-score set
   (1946-2022) plus Sleeper weekly stats (2017+), loaded by an admin import (migration V43, `historical_*` tables).
   Reference data only: it never touches a league.
-- **Football Time Machine** (specs/056-nfl-historical-draft-game). The same game for the NFL, 2000 to 2025:
+- **Redraft season pages and guests** (specs/074-redraft-seo; built and locally verified, not deployed). The Redraft
+  site's build now writes a static page per offered season (`/nba/2016-17`, `/nfl/2007`), sport indexes, `/daily`, a real
+  404 and a sitemap, from data it fetches from the backend while it builds (so the backend deploys first; see
+  `DEPLOY.md`). Guests can play the game of the day and one season of their choice without signing in, and their
+  games move to their account when they sign in. A season they pick never counts toward achievements or streaks.
+  Finished games can be read at `/game/<id>`. No search ranking or traffic is claimed anywhere.
+- **Football Redraft** (specs/056-nfl-historical-draft-game; "Football Time Machine" before spec 074). The same game for the NFL, 2000 to 2025:
   a 12-team, 15-round snake (QB, 2 RB, 2 WR, TE, 2 FLEX, 7 bench; no K/DEF) under full PPR with INT −1, then that
   season's real weeks replayed. Bots rank by last season's points over replacement (a hand-set ranking, labelled
   as such, never ADP), and rookies from NFL rounds 1-2 are slotted by their real draft pick. Positions are

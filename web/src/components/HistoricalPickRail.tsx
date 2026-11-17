@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { HistoricalPickView, HistoricalSport } from '../api'
-import { cardToPlayerRef, teamName } from '../historicalCopy'
+import { cardToPlayerRef, type Voice } from '../historicalCopy'
+import { drafterClass, drafterSuffix, voiceWords } from '../redraftVoice'
 import { positionLabel, posPill } from '../positions'
 import { roundPickLabel } from '../roundPickLabel'
 import { slotForPick } from '../draftSlot'
@@ -17,6 +18,8 @@ type Props = {
   sport: HistoricalSport
   /** Whether the draft is still going. Once it is over there is no current pick. */
   drafting: boolean
+  /** Spec 074: the room is always the owner's (`you`); a shared result passes `shared` and gets `.tm-drafter` and "this team". Required. */
+  voice: Voice
 }
 
 /** How many already-made picks stay above the current one. */
@@ -30,7 +33,8 @@ const LAST_MADE = 4
  * It deliberately shows no "what this computer team needs": nothing here has checked that the computer teams draft
  * for need, and printing it would imply they do.
  */
-export default function HistoricalPickRail({ picks, teams, rounds, userSlot, currentPickNo, reversalRound, sport, drafting }: Props) {
+export default function HistoricalPickRail({ picks, teams, rounds, userSlot, currentPickNo, reversalRound, sport, drafting, voice }: Props) {
+  const w = voiceWords(voice)
   const total = teams * rounds
   const listRef = useRef<HTMLOListElement>(null)
   const byNo = new Map(picks.map((p) => [p.pickNo, p]))
@@ -78,13 +82,14 @@ export default function HistoricalPickRail({ picks, teams, rounds, userSlot, cur
             head,
             <li
               key={n}
-              className={`hist-rail-pick${made ? ' made' : ' upcoming'}${mine ? ' me' : ''}${isCurrent ? ' current' : ''}${drafting && made && n === current - 1 ? ' fresh' : ''}`}
+              className={`hist-rail-pick${made ? ' made' : ' upcoming'}${mine ? ` ${drafterClass(voice, true, 'me')}` : ''}${isCurrent ? ' current' : ''}${drafting && made && n === current - 1 ? ' fresh' : ''}`}
               aria-current={isCurrent ? 'true' : undefined}
             >
               <span className="hist-rail-no mono">{roundPickLabel(n, teams)}</span>
               <span className="hist-rail-body">
                 <span className="hist-rail-team">
-                  {teamName(slot, userSlot)}
+                  {w.teamCell(slot, userSlot)}
+                  {mine ? drafterSuffix(voice) : ''}
                   {isCurrent && <span className="hist-rail-clock"> · on the clock</span>}
                 </span>
                 {ref && (

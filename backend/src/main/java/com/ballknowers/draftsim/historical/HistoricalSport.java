@@ -81,7 +81,12 @@ public interface HistoricalSport {
     // ---- the board and the replay --------------------------------------------------------------------
 
     /** The rank-ascending board for one season, built from PRIOR seasons only (FR-004). */
-    List<HistoricalPlayerCard> buildBoard(SeasonRow season, long seed, Map<String, Double> scoring);
+    default List<HistoricalPlayerCard> buildBoard(SeasonRow season, long seed, Map<String, Double> scoring) {
+        return buildBoardRanked(season, seed, scoring).cards();
+    }
+
+    /** The same board plus how many of its cards are ranked rather than in the seeded tail (spec 074 PR-12). */
+    HistoricalBoardBuilder.Board buildBoardRanked(SeasonRow season, long seed, Map<String, Double> scoring);
 
     /** The played games of the drafted season for the given players, ordered for a deterministic replay. */
     List<? extends WeekStatLine> playedWeeks(int seasonStart, Collection<Long> playerIds);
@@ -100,6 +105,13 @@ public interface HistoricalSport {
 
     /** Where the league settings come from (FR-002). */
     String settingsSource();
+
+    /**
+     * One sentence saying what a "points" figure on a season page is, per sport (spec 074 PR-06). It rides in the
+     * payload so the static page and the app print the same words. For basketball a player's weekly score is his
+     * best single game of the week ({@link SeasonReplay}), so the total is NOT a season fantasy total.
+     */
+    String pointsNote();
 
     /** What to call the board order. Never "ADP" (FR-009). */
     String rankingLabel();

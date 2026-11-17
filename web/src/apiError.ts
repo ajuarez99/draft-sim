@@ -7,11 +7,14 @@ export class ApiError extends Error {
   readonly status: number
   /** Seconds from a `Retry-After` header, when the server sent a numeric one. */
   readonly retryAfterSeconds?: number
-  constructor(status: number, message?: string, retryAfterSeconds?: number) {
+  /** Spec 074 (PR-25): the `code` of a `{"code": ..., "message": ...}` body, e.g. GUEST_LIMIT. Absent otherwise. */
+  readonly code?: string
+  constructor(status: number, message?: string, retryAfterSeconds?: number, code?: string) {
     super(message || `HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
+    this.code = code
   }
 }
 

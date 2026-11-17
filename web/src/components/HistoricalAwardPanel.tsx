@@ -7,6 +7,8 @@ import {
   type HistoricalGameAward,
   type HistoricalProfile,
 } from '../api'
+import { isNotFound } from '../apiError'
+import { awardLeftBehind, notCountedNote } from '../redraftCopy'
 import AchievementToasts, { type AchievementToast } from './AchievementToasts'
 
 const SAVED_NOTE =
@@ -54,12 +56,14 @@ export default function HistoricalAwardPanel({ gameId }: { gameId: number }) {
   const [award, setAward] = useState<HistoricalGameAward | null>(null)
   const [profile, setProfile] = useState<HistoricalProfile | null>(null)
   const [failed, setFailed] = useState(false)
+  // A 404 here is a game this player does not own: a game of the day that a sign-in left behind (claim moved the others).
+  const [leftBehind, setLeftBehind] = useState(false)
 
   useEffect(() => {
     let current = true
     getHistoricalGameAward(gameId)
       .then((a) => current && setAward(a))
-      .catch(() => current && setFailed(true))
+      .catch((e) => current && (isNotFound(e) ? setLeftBehind(true) : setFailed(true)))
     // The profile only feeds the level-up toast; losing it loses that one toast.
     getHistoricalProfile()
       .then((p) => current && setProfile(p))
@@ -98,6 +102,14 @@ export default function HistoricalAwardPanel({ gameId }: { gameId: number }) {
   // watching it when the first toast arrives (a region inserted together with its content is not announced).
   const region = <AchievementToasts toasts={toasts} onShown={onShown} />
 
+  if (leftBehind) {
+    return (
+      <>
+        {region}
+        <p className="muted small tm-not-counted">{awardLeftBehind}</p>
+      </>
+    )
+  }
   if (failed) {
     return (
       <>
@@ -109,6 +121,16 @@ export default function HistoricalAwardPanel({ gameId }: { gameId: number }) {
     )
   }
   if (!award) return region
+
+  // Spec 074 (PR-17): a season the player picked earns nothing. That is a rule, said as one, not "could not be worked out".
+  if (award.notCounted) {
+    return (
+      <>
+        {region}
+        <p className="muted small tm-not-counted">{notCountedNote}</p>
+      </>
+    )
+  }
 
   if (!award.settled) {
     return (

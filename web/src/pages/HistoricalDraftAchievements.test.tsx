@@ -1,26 +1,32 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearUser, setUser } from '../user'
 import type { HistoricalProfile } from '../api'
 import HistoricalDraft from './HistoricalDraft'
 
 const listHistoricalGames = vi.fn()
-const historicalSeasons = vi.fn()
+const getPublicSeasonList = vi.fn()
 const getHistoricalProfile = vi.fn()
 vi.mock('../api', async (orig) => ({
   ...(await orig<typeof import('../api')>()),
   listHistoricalGames: (...a: unknown[]) => listHistoricalGames(...a),
-  historicalSeasons: (...a: unknown[]) => historicalSeasons(...a),
+  getPublicSeasonList: (...a: unknown[]) => getPublicSeasonList(...a),
+  getHistoricalDaily: () => Promise.reject(new Error('404')),
+  claimGuestGames: () => Promise.resolve(null),
   getHistoricalProfile: (...a: unknown[]) => getHistoricalProfile(...a),
 }))
 
 beforeEach(() => {
+  // Spec 074: the level card and trophy case are a signed-in visitor's (a guest earns nothing and the server answers 403).
+  setUser({ sleeperUserId: 'u1', username: 'u1', displayName: 'U One', avatar: null })
   listHistoricalGames.mockReset()
-  historicalSeasons.mockReset()
+  getPublicSeasonList.mockReset()
   getHistoricalProfile.mockReset()
   listHistoricalGames.mockResolvedValue([])
-  historicalSeasons.mockResolvedValue([])
+  getPublicSeasonList.mockResolvedValue({ schema: 1, sport: 'NBA', seasons: [] })
 })
+afterEach(() => clearUser())
 
 const profile: HistoricalProfile = {
   xp: 340, level: 3, levelName: 'Rookie', levelStartXp: 300, nextLevelXp: 600, seenLevel: 3,

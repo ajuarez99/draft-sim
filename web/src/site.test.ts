@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  LEAGUE_PREFIXES, crossSiteUrl, makeConfig, parseSite, siteOrigin, tmGame, tmHome,
+  LEAGUE_PREFIXES, crossSiteUrl, makeConfig, parseSite, siteOrigin, tmDaily, tmGame, tmHome, tmSeason, tmSportIndex,
 } from './site'
 
 // Spec 073, contracts/site-routes.md: "Build variable" and "Time Machine path helpers".
@@ -78,6 +78,27 @@ describe('Time Machine path helpers', () => {
   it('leagues throws', () => {
     expect(() => tmHome(lg)).toThrow()
     expect(() => tmGame(lg, 42)).toThrow()
+  })
+})
+
+// CR-04: the Redraft pages are routes of the Redraft site only. A shared page takes its links from here, and a null
+// is "no such route on this site", so the component renders no link rather than one that lands on "Nothing here".
+describe('Redraft page paths (spec 074 CR-04)', () => {
+  const combined = makeConfig({})
+  const tm = makeConfig({ VITE_SITE: 'timemachine' })
+  const lg = makeConfig({ VITE_SITE: 'leagues' })
+  it('timemachine has /daily, the sport indexes and every season', () => {
+    expect(tmDaily(tm)).toBe('/daily')
+    expect(tmSportIndex(tm, 'NBA')).toBe('/nba')
+    expect(tmSportIndex(tm, 'NFL')).toBe('/nfl')
+    expect(tmSeason(tm, 'NBA', '2016-17')).toBe('/nba/2016-17')
+    expect(tmSeason(tm, 'NFL', '2007')).toBe('/nfl/2007')
+  })
+  it.each([['combined', combined], ['leagues', lg]])('%s has none of them: each helper answers null, never a path that is not a route', (_n, cfg) => {
+    expect(tmDaily(cfg)).toBeNull()
+    expect(tmSportIndex(cfg, 'NBA')).toBeNull()
+    expect(tmSportIndex(cfg, 'NFL')).toBeNull()
+    expect(tmSeason(cfg, 'NBA', '2016-17')).toBeNull()
   })
 })
 

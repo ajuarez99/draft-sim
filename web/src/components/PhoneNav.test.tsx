@@ -116,7 +116,7 @@ describe('the bottom tab bar', () => {
     await user.click(screen.getByRole('button', { name: 'More' }))
 
     const sheet = screen.getByRole('dialog', { name: 'Menu' })
-    expect(labels(sheet)).toEqual(['History', 'Leagues', 'Mock drafts', 'Managers', 'Time Machine', 'Sign out'])
+    expect(labels(sheet)).toEqual(['History', 'Leagues', 'Mock drafts', 'Managers', 'Redraft', 'Sign out'])
   })
 
   it('lists Players and History behind More for a basketball league', async () => {
@@ -154,7 +154,7 @@ describe('the bottom tab bar', () => {
 describe('the menu button outside a league (plan review PR-01)', () => {
   beforeEach(stubPhone)
 
-  it('reaches Leagues, Mock drafts, Managers, Time Machine and Sign out from the top bar', async () => {
+  it('reaches Leagues, Mock drafts, Managers, Redraft and Sign out from the top bar', async () => {
     const user = userEvent.setup()
     const { topBar } = renderAtPath('/managers', { drafts: [NFL] })
     await waitFor(() => expect(topBar()).not.toBeNull())
@@ -167,7 +167,7 @@ describe('the menu button outside a league (plan review PR-01)', () => {
       'Leagues',
       'Mock drafts',
       'Managers',
-      'Time Machine',
+      'Redraft',
       'Sign out',
     ])
   })
@@ -215,7 +215,7 @@ describe('the menu button outside a league (plan review PR-01)', () => {
     const user = userEvent.setup()
     renderAtPath('/managers', { drafts: [NFL] })
     await user.click(await screen.findByRole('button', { name: 'Menu' }))
-    await user.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('link', { name: 'Time Machine' }))
+    await user.click(within(screen.getByRole('dialog', { name: 'Menu' })).getByRole('link', { name: 'Redraft' }))
     // MemoryRouter navigated; the sheet is a menu, not a mode.
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Menu' })).toBeNull())
   })

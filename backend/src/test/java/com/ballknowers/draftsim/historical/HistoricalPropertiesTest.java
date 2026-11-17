@@ -32,6 +32,7 @@ class HistoricalPropertiesTest {
         assertEquals(12, p.teams());
         assertEquals(14, p.rounds());
         assertEquals(0, p.reversalRound());
+        assertEquals(1, p.guestChosenSeasons(), "the product rule: a signed-out player may pick one season");
         assertEquals(15, p.scoring().size());
         assertEquals(2.0, p.scoring().get("bonus_pt_40p"), 1e-12);
         assertEquals(-1.0, p.scoring().get("to"), 1e-12);

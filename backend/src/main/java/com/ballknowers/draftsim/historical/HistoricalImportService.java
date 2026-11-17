@@ -49,12 +49,13 @@ public class HistoricalImportService {
     private final NflHistoricalProperties nflProps;
     private final TransactionTemplate tx;
     private final ObjectMapper json;
+    private final SeasonSummaryService summaries;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
     public HistoricalImportService(HistoricalDataRepository data, KaggleHistoricalSource kaggle,
                                    SleeperHistoricalSource sleeper, NflverseSource nflverse,
                                    NflHistoricalRepository nflData, NflHistoricalProperties nflProps,
-                                   TransactionTemplate tx, ObjectMapper json) {
+                                   TransactionTemplate tx, ObjectMapper json, SeasonSummaryService summaries) {
         this.data = data;
         this.kaggle = kaggle;
         this.sleeper = sleeper;
@@ -63,6 +64,7 @@ public class HistoricalImportService {
         this.nflProps = nflProps;
         this.tx = tx;
         this.json = json;
+        this.summaries = summaries;
     }
 
     /** Starts the job and returns its id at once. */
@@ -135,6 +137,9 @@ public class HistoricalImportService {
             try {
                 data.finishJob(jobId, status, now(), toJson(report));
             } finally {
+                // Spec 074: a season summary is computed from the reference data this job just changed (a part-way
+                // FAILED job changed some of it too), so none of the cached ones can be trusted any more.
+                summaries.clear();
                 running.set(false);
             }
         }

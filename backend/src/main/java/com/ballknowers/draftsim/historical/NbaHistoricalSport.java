@@ -117,7 +117,7 @@ public class NbaHistoricalSport implements HistoricalSport {
     @Override public Optional<SeasonRow> findSeason(int seasonStart) { return data.findSeason(CODE, seasonStart); }
 
     @Override
-    public List<HistoricalPlayerCard> buildBoard(SeasonRow season, long seed, Map<String, Double> scoring) {
+    public HistoricalBoardBuilder.Board buildBoardRanked(SeasonRow season, long seed, Map<String, Double> scoring) {
         int s = season.seasonStart();
         List<Map<Long, SeasonLine>> priors = new ArrayList<>(props.rankLookbackSeasons());
         for (int i = 1; i <= props.rankLookbackSeasons(); i++) priors.add(lines(s - i));   // S-1 first; an unimported season is just empty
@@ -128,10 +128,11 @@ public class NbaHistoricalSport implements HistoricalSport {
                 : HistoricalBoardBuilder.nba(
                         draftPicks.rookiesOf(s, candidates, veterans, rookies.maxSeasonsSinceDraft()),
                         new HistoricalBoardBuilder.RookieRank(rookies.firstRank(), rookies.rankStep()));
-        List<HistoricalPlayerCard> board = HistoricalBoardBuilder.build(s, seed, scoring, candidates,
+        HistoricalBoardBuilder.Board board = HistoricalBoardBuilder.buildRanked(s, seed, scoring, candidates,
                 priors, lines(s),
                 new HistoricalBoardBuilder.RankConfig(props.rankStandardGames(), props.rankMinGames()), opts);
-        return HistoricalRookies.mark(board, veterans, Map.of(), s);
+        return new HistoricalBoardBuilder.Board(HistoricalRookies.mark(board.cards(), veterans, Map.of(), s),
+                board.rankedCount());
     }
 
     private Map<Long, SeasonLine> lines(int season) {
@@ -148,6 +149,12 @@ public class NbaHistoricalSport implements HistoricalSport {
     @Override public Map<Integer, LocalDate> weekStarts(int seasonStart) { return data.weekStarts(seasonStart); }
 
     @Override public String settingsSource() { return SETTINGS_SOURCE; }
+
+    /** Checked against {@link SeasonReplay#scorePlayerWeeks}: a week's score is the MAX over that week's games. */
+    @Override public String pointsNote() {
+        return "Each week only a player's best single game counts, and the weeks add up. That is not the season total"
+                + " you would see on a fantasy site.";
+    }
 
     // Never "ADP" (FR-009): no trustworthy historical ADP exists (research R4).
     @Override public String rankingLabel() {

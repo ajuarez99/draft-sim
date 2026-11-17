@@ -1,0 +1,2891 @@
+{
+  "NBA": {
+    "list": {
+      "schema": 1,
+      "sport": "NBA",
+      "seasons": [
+        {
+          "sport": "NBA",
+          "seasonStart": 1976,
+          "label": "1976-77",
+          "slug": "1976-77"
+        },
+        {
+          "sport": "NBA",
+          "seasonStart": 2016,
+          "label": "2016-17",
+          "slug": "2016-17"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "sport": "NBA",
+        "seasonStart": 1976,
+        "label": "1976-77",
+        "slug": "1976-77",
+        "prevSlug": null,
+        "nextSlug": "2016-17",
+        "teams": 12,
+        "rounds": 14,
+        "rosterPositions": [
+          "PG",
+          "SG",
+          "SF",
+          "PF",
+          "C",
+          "G",
+          "F",
+          "UTIL",
+          "UTIL",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN"
+        ],
+        "scoringNote": "App standard 12-team NBA roster · Legacy Ball Knowers scoring",
+        "pointsNote": "Points are fantasy points under this season's scoring, counting only each player's best single game of each week and adding the weeks up. That is a lock-in best-ball measure, not the sum of every game he played.",
+        "rankingLabel": "ranked by last season's points, rookies by NBA draft pick",
+        "dataNotes": [],
+        "excludedStats": {
+          "to": "not tracked by the league that season",
+          "tpm": "not tracked by the league that season"
+        },
+        "statCoverage": {
+          "pts": 0.98,
+          "reb": 0.97,
+          "ast": 0.97,
+          "stl": 0.95,
+          "blk": 0.95
+        },
+        "attribution": null,
+        "boardPlayers": 412,
+        "rankedPlayers": 330,
+        "topOverall": [
+          {
+            "playerId": 1001,
+            "name": "Evan Sandoval",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "finishRank": 1,
+            "points": 3387.2,
+            "weeksPlayed": 23,
+            "goingInRank": 2
+          },
+          {
+            "playerId": 1002,
+            "name": "Yusuf Okafor",
+            "positions": [
+              "SG"
+            ],
+            "team": "MIA",
+            "finishRank": 2,
+            "points": 3374.8,
+            "weeksPlayed": 21,
+            "goingInRank": 5
+          },
+          {
+            "playerId": 1003,
+            "name": "Dario Prescott",
+            "positions": [
+              "SF"
+            ],
+            "team": "BOS",
+            "finishRank": 3,
+            "points": 3361.9,
+            "weeksPlayed": 23,
+            "goingInRank": 8
+          },
+          {
+            "playerId": 1004,
+            "name": "Nolan Thorne",
+            "positions": [
+              "PF"
+            ],
+            "team": "BOS",
+            "finishRank": 4,
+            "points": 3347.7,
+            "weeksPlayed": 22,
+            "goingInRank": 11
+          },
+          {
+            "playerId": 1005,
+            "name": "Xander Hargrove",
+            "positions": [
+              "C"
+            ],
+            "team": "DEN",
+            "finishRank": 5,
+            "points": 3334.8,
+            "weeksPlayed": 22,
+            "goingInRank": 14
+          },
+          {
+            "playerId": 1006,
+            "name": "Aron Ashby",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "finishRank": 6,
+            "points": 3320.3,
+            "weeksPlayed": 20,
+            "goingInRank": 17
+          },
+          {
+            "playerId": 1007,
+            "name": "Mateo Vasquez",
+            "positions": [
+              "SG"
+            ],
+            "team": "LAL",
+            "finishRank": 7,
+            "points": 3307.7,
+            "weeksPlayed": 25,
+            "goingInRank": 20
+          },
+          {
+            "playerId": 1008,
+            "name": "Aron Quarles",
+            "positions": [
+              "SF"
+            ],
+            "team": "LAL",
+            "finishRank": 8,
+            "points": 3293.5,
+            "weeksPlayed": 23,
+            "goingInRank": null
+          },
+          {
+            "playerId": 1009,
+            "name": "Rafe Hargrove",
+            "positions": [
+              "PF"
+            ],
+            "team": "CHI",
+            "finishRank": 9,
+            "points": 3278.3,
+            "weeksPlayed": 21,
+            "goingInRank": 26
+          },
+          {
+            "playerId": 1010,
+            "name": "Jonah Ashby",
+            "positions": [
+              "C"
+            ],
+            "team": "MIA",
+            "finishRank": 10,
+            "points": 3266.5,
+            "weeksPlayed": 24,
+            "goingInRank": 29
+          },
+          {
+            "playerId": 1011,
+            "name": "Ulric Dunmore",
+            "positions": [
+              "PG"
+            ],
+            "team": "LAL",
+            "finishRank": 11,
+            "points": 3252.3,
+            "weeksPlayed": 25,
+            "goingInRank": 32
+          },
+          {
+            "playerId": 1012,
+            "name": "Jonah Dunmore",
+            "positions": [
+              "SG"
+            ],
+            "team": null,
+            "finishRank": 12,
+            "points": 3237.8,
+            "weeksPlayed": 25,
+            "goingInRank": 35
+          }
+        ],
+        "topByPosition": {
+          "PG": [
+            {
+              "playerId": 1013,
+              "name": "Wes Quarles",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 1,
+              "points": 3060,
+              "weeksPlayed": 25,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 1014,
+              "name": "Gideon Jessup",
+              "positions": [
+                "PG"
+              ],
+              "team": "CHI",
+              "finishRank": 2,
+              "points": 2958,
+              "weeksPlayed": 23,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 1015,
+              "name": "Quinn Mercer",
+              "positions": [
+                "PG"
+              ],
+              "team": "DEN",
+              "finishRank": 3,
+              "points": 2856,
+              "weeksPlayed": 23,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 1016,
+              "name": "Hugo Yoder",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 4,
+              "points": 2754,
+              "weeksPlayed": 21,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 1017,
+              "name": "Leo Rourke",
+              "positions": [
+                "PG"
+              ],
+              "team": null,
+              "finishRank": 5,
+              "points": 2652,
+              "weeksPlayed": 25,
+              "goingInRank": 24
+            }
+          ],
+          "SG": [
+            {
+              "playerId": 1018,
+              "name": "Leo Calloway",
+              "positions": [
+                "SG"
+              ],
+              "team": "MIA",
+              "finishRank": 1,
+              "points": 3059,
+              "weeksPlayed": 20,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 1019,
+              "name": "Yusuf Farrow",
+              "positions": [
+                "SG"
+              ],
+              "team": "DEN",
+              "finishRank": 2,
+              "points": 2957,
+              "weeksPlayed": 22,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 1020,
+              "name": "Pascal Yoder",
+              "positions": [
+                "SG"
+              ],
+              "team": "BOS",
+              "finishRank": 3,
+              "points": 2855,
+              "weeksPlayed": 22,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 1021,
+              "name": "Wes Thorne",
+              "positions": [
+                "SG"
+              ],
+              "team": "DEN",
+              "finishRank": 4,
+              "points": 2753,
+              "weeksPlayed": 25,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 1022,
+              "name": "Felix Farrow",
+              "positions": [
+                "SG"
+              ],
+              "team": "DEN",
+              "finishRank": 5,
+              "points": 2651,
+              "weeksPlayed": 20,
+              "goingInRank": 24
+            }
+          ],
+          "SF": [
+            {
+              "playerId": 1023,
+              "name": "Yusuf Galloway",
+              "positions": [
+                "SF"
+              ],
+              "team": "DEN",
+              "finishRank": 1,
+              "points": 3058,
+              "weeksPlayed": 24,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 1024,
+              "name": "Hugo Mercer",
+              "positions": [
+                "SF"
+              ],
+              "team": "DEN",
+              "finishRank": 2,
+              "points": 2956,
+              "weeksPlayed": 24,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 1025,
+              "name": "Leo Okafor",
+              "positions": [
+                "SF"
+              ],
+              "team": "CHI",
+              "finishRank": 3,
+              "points": 2854,
+              "weeksPlayed": 24,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 1026,
+              "name": "Xander Ashby",
+              "positions": [
+                "SF"
+              ],
+              "team": "MIA",
+              "finishRank": 4,
+              "points": 2752,
+              "weeksPlayed": 25,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 1027,
+              "name": "Quinn Estrada",
+              "positions": [
+                "SF"
+              ],
+              "team": "DEN",
+              "finishRank": 5,
+              "points": 2650,
+              "weeksPlayed": 21,
+              "goingInRank": 24
+            }
+          ],
+          "PF": [
+            {
+              "playerId": 1028,
+              "name": "Nolan Brandt",
+              "positions": [
+                "PF"
+              ],
+              "team": "MIA",
+              "finishRank": 1,
+              "points": 3057,
+              "weeksPlayed": 24,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 1029,
+              "name": "Rafe Galloway",
+              "positions": [
+                "PF"
+              ],
+              "team": "DEN",
+              "finishRank": 2,
+              "points": 2955,
+              "weeksPlayed": 22,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 1030,
+              "name": "Nolan Lowell",
+              "positions": [
+                "PF"
+              ],
+              "team": "BOS",
+              "finishRank": 3,
+              "points": 2853,
+              "weeksPlayed": 24,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 1031,
+              "name": "Zane Thorne",
+              "positions": [
+                "PF"
+              ],
+              "team": "CHI",
+              "finishRank": 4,
+              "points": 2751,
+              "weeksPlayed": 20,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 1032,
+              "name": "Zane Hargrove",
+              "positions": [
+                "PF"
+              ],
+              "team": null,
+              "finishRank": 5,
+              "points": 2649,
+              "weeksPlayed": 24,
+              "goingInRank": 24
+            }
+          ],
+          "C": [
+            {
+              "playerId": 1033,
+              "name": "Felix Calloway",
+              "positions": [
+                "C"
+              ],
+              "team": "DEN",
+              "finishRank": 1,
+              "points": 3056,
+              "weeksPlayed": 22,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 1034,
+              "name": "Bram Vasquez",
+              "positions": [
+                "C"
+              ],
+              "team": "BOS",
+              "finishRank": 2,
+              "points": 2954,
+              "weeksPlayed": 20,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 1035,
+              "name": "Orrin Ashby",
+              "positions": [
+                "C"
+              ],
+              "team": "CHI",
+              "finishRank": 3,
+              "points": 2852,
+              "weeksPlayed": 20,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 1036,
+              "name": "Felix Lowell",
+              "positions": [
+                "C"
+              ],
+              "team": "CHI",
+              "finishRank": 4,
+              "points": 2750,
+              "weeksPlayed": 21,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 1037,
+              "name": "Ivan Quarles",
+              "positions": [
+                "C"
+              ],
+              "team": "LAL",
+              "finishRank": 5,
+              "points": 2648,
+              "weeksPlayed": 25,
+              "goingInRank": 24
+            }
+          ]
+        },
+        "busts": [
+          {
+            "playerId": 1038,
+            "name": "Wes Jessup",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "goingInRank": 2,
+            "finishRank": 150,
+            "points": 1670,
+            "weeksPlayed": 19
+          },
+          {
+            "playerId": 1039,
+            "name": "Wes Kimura",
+            "positions": [
+              "SG"
+            ],
+            "team": "BOS",
+            "goingInRank": 5,
+            "finishRank": 131,
+            "points": 1673.8,
+            "weeksPlayed": 20
+          },
+          {
+            "playerId": 1040,
+            "name": "Pascal Dunmore",
+            "positions": [
+              "SF"
+            ],
+            "team": "BOS",
+            "goingInRank": 9,
+            "finishRank": 97,
+            "points": 1680.6,
+            "weeksPlayed": 5
+          },
+          {
+            "playerId": 1041,
+            "name": "Jonah Mercer",
+            "positions": [
+              "PF"
+            ],
+            "team": null,
+            "goingInRank": 14,
+            "finishRank": 88,
+            "points": 1682.4,
+            "weeksPlayed": 15
+          },
+          {
+            "playerId": 1042,
+            "name": "Nolan Galloway",
+            "positions": [
+              "PG"
+            ],
+            "team": null,
+            "goingInRank": 21,
+            "finishRank": 66,
+            "points": 1686.8,
+            "weeksPlayed": 13
+          }
+        ],
+        "steals": [
+          {
+            "playerId": 1043,
+            "name": "Dario Ingram",
+            "positions": [
+              "SG"
+            ],
+            "team": "BOS",
+            "goingInRank": 200,
+            "finishRank": 3,
+            "points": 1699.4,
+            "weeksPlayed": 21
+          },
+          {
+            "playerId": 1044,
+            "name": "Gideon Thorne",
+            "positions": [
+              "SF"
+            ],
+            "team": "BOS",
+            "goingInRank": 143,
+            "finishRank": 9,
+            "points": 1698.2,
+            "weeksPlayed": 18
+          },
+          {
+            "playerId": 1045,
+            "name": "Aron Hargrove",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "goingInRank": 97,
+            "finishRank": 12,
+            "points": 1697.6,
+            "weeksPlayed": 5
+          },
+          {
+            "playerId": 1046,
+            "name": "Mateo Estrada",
+            "positions": [
+              "PF"
+            ],
+            "team": "BOS",
+            "goingInRank": 81,
+            "finishRank": 20,
+            "points": 1696,
+            "weeksPlayed": 6
+          },
+          {
+            "playerId": 1047,
+            "name": "Xander Farrow",
+            "positions": [
+              "SG"
+            ],
+            "team": null,
+            "goingInRank": 70,
+            "finishRank": 31,
+            "points": 1693.8,
+            "weeksPlayed": 19
+          }
+        ],
+        "unrankedLeftOut": 2,
+        "dreamRoster": [
+          {
+            "playerId": 1048,
+            "name": "Vance Novak",
+            "positions": [
+              "PG"
+            ],
+            "points": 2890
+          },
+          {
+            "playerId": 1049,
+            "name": "Ulric Whitlock",
+            "positions": [
+              "SG"
+            ],
+            "points": 2788
+          },
+          {
+            "playerId": 1050,
+            "name": "Quinn Okafor",
+            "positions": [
+              "SF"
+            ],
+            "points": 2686
+          },
+          {
+            "playerId": 1051,
+            "name": "Hugo Quarles",
+            "positions": [
+              "PF"
+            ],
+            "points": 2584
+          },
+          {
+            "playerId": 1052,
+            "name": "Ulric Ashby",
+            "positions": [
+              "C"
+            ],
+            "points": 2482
+          },
+          {
+            "playerId": 1053,
+            "name": "Silas Kimura",
+            "positions": [
+              "PG"
+            ],
+            "points": 2380
+          },
+          {
+            "playerId": 1054,
+            "name": "Vance Underhill",
+            "positions": [
+              "SG"
+            ],
+            "points": 2278
+          },
+          {
+            "playerId": 1055,
+            "name": "Xander Jessup",
+            "positions": [
+              "SF"
+            ],
+            "points": 2176
+          },
+          {
+            "playerId": 1056,
+            "name": "Evan Galloway",
+            "positions": [
+              "PF"
+            ],
+            "points": 2074
+          },
+          {
+            "playerId": 1057,
+            "name": "Bram Jessup",
+            "positions": [
+              "C"
+            ],
+            "points": 1972
+          },
+          {
+            "playerId": 1058,
+            "name": "Cade Calloway",
+            "positions": [
+              "PG"
+            ],
+            "points": 1870
+          },
+          {
+            "playerId": 1059,
+            "name": "Jonah Jessup",
+            "positions": [
+              "SG"
+            ],
+            "points": 1768
+          },
+          {
+            "playerId": 1060,
+            "name": "Nolan Sandoval",
+            "positions": [
+              "SF"
+            ],
+            "points": 1666
+          },
+          {
+            "playerId": 1160,
+            "name": "Nolan Sandoval Jr.",
+            "positions": [
+              "SF"
+            ],
+            "points": 1646
+          }
+        ],
+        "dreamRosterPoints": 27541
+      },
+      {
+        "sport": "NBA",
+        "seasonStart": 2016,
+        "label": "2016-17",
+        "slug": "2016-17",
+        "prevSlug": "1976-77",
+        "nextSlug": null,
+        "teams": 12,
+        "rounds": 14,
+        "rosterPositions": [
+          "PG",
+          "SG",
+          "SF",
+          "PF",
+          "C",
+          "G",
+          "F",
+          "UTIL",
+          "UTIL",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN"
+        ],
+        "scoringNote": "App standard 12-team NBA roster · Legacy Ball Knowers scoring",
+        "pointsNote": "Points are fantasy points under this season's scoring, counting only each player's best single game of each week and adding the weeks up. That is a lock-in best-ball measure, not the sum of every game he played.",
+        "rankingLabel": "ranked by last season's points, rookies by NBA draft pick",
+        "dataNotes": [],
+        "excludedStats": {},
+        "statCoverage": {
+          "pts": 1,
+          "reb": 1,
+          "ast": 1,
+          "stl": 1,
+          "blk": 1,
+          "to": 1,
+          "tpm": 1
+        },
+        "attribution": null,
+        "boardPlayers": 412,
+        "rankedPlayers": 330,
+        "topOverall": [
+          {
+            "playerId": 2001,
+            "name": "Bram Calloway",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "finishRank": 1,
+            "points": 3885.5,
+            "weeksPlayed": 21,
+            "goingInRank": 2
+          },
+          {
+            "playerId": 2002,
+            "name": "Xander Vasquez",
+            "positions": [
+              "SG"
+            ],
+            "team": "CHI",
+            "finishRank": 2,
+            "points": 3869.6,
+            "weeksPlayed": 21,
+            "goingInRank": 5
+          },
+          {
+            "playerId": 2003,
+            "name": "Tobias Brandt",
+            "positions": [
+              "SF"
+            ],
+            "team": "DEN",
+            "finishRank": 3,
+            "points": 3855.2,
+            "weeksPlayed": 23,
+            "goingInRank": 8
+          },
+          {
+            "playerId": 2004,
+            "name": "Ulric Mercer",
+            "positions": [
+              "PF"
+            ],
+            "team": null,
+            "finishRank": 4,
+            "points": 3840.2,
+            "weeksPlayed": 24,
+            "goingInRank": 11
+          },
+          {
+            "playerId": 2005,
+            "name": "Leo Rourke",
+            "positions": [
+              "C"
+            ],
+            "team": "MIA",
+            "finishRank": 5,
+            "points": 3823.5,
+            "weeksPlayed": 20,
+            "goingInRank": 14
+          },
+          {
+            "playerId": 2006,
+            "name": "Aron Lowell",
+            "positions": [
+              "PG"
+            ],
+            "team": "MIA",
+            "finishRank": 6,
+            "points": 3809.2,
+            "weeksPlayed": 23,
+            "goingInRank": 17
+          },
+          {
+            "playerId": 2007,
+            "name": "Nolan Quarles",
+            "positions": [
+              "SG"
+            ],
+            "team": "LAL",
+            "finishRank": 7,
+            "points": 3792.5,
+            "weeksPlayed": 21,
+            "goingInRank": 20
+          },
+          {
+            "playerId": 2008,
+            "name": "Hugo Ashby",
+            "positions": [
+              "SF"
+            ],
+            "team": "LAL",
+            "finishRank": 8,
+            "points": 3776.2,
+            "weeksPlayed": 21,
+            "goingInRank": null
+          },
+          {
+            "playerId": 2009,
+            "name": "Quinn Quarles",
+            "positions": [
+              "PF"
+            ],
+            "team": "CHI",
+            "finishRank": 9,
+            "points": 3762.6,
+            "weeksPlayed": 25,
+            "goingInRank": 26
+          },
+          {
+            "playerId": 2010,
+            "name": "Rafe Farrow",
+            "positions": [
+              "C"
+            ],
+            "team": "MIA",
+            "finishRank": 10,
+            "points": 3746.4,
+            "weeksPlayed": 25,
+            "goingInRank": 29
+          },
+          {
+            "playerId": 2011,
+            "name": "Quinn Zeller",
+            "positions": [
+              "PG"
+            ],
+            "team": "CHI",
+            "finishRank": 11,
+            "points": 3730.8,
+            "weeksPlayed": 22,
+            "goingInRank": 32
+          },
+          {
+            "playerId": 2012,
+            "name": "Leo Okafor",
+            "positions": [
+              "SG"
+            ],
+            "team": "LAL",
+            "finishRank": 12,
+            "points": 3715.7,
+            "weeksPlayed": 23,
+            "goingInRank": 35
+          }
+        ],
+        "topByPosition": {
+          "PG": [
+            {
+              "playerId": 2013,
+              "name": "Wes Yoder",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 1,
+              "points": 3510,
+              "weeksPlayed": 21,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 2014,
+              "name": "Pascal Ingram",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 2,
+              "points": 3393,
+              "weeksPlayed": 22,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 2015,
+              "name": "Vance Okafor",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 3,
+              "points": 3276,
+              "weeksPlayed": 25,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 2016,
+              "name": "Rafe Yoder",
+              "positions": [
+                "PG"
+              ],
+              "team": "MIA",
+              "finishRank": 4,
+              "points": 3159,
+              "weeksPlayed": 21,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 2017,
+              "name": "Kellan Whitlock",
+              "positions": [
+                "PG"
+              ],
+              "team": "LAL",
+              "finishRank": 5,
+              "points": 3042,
+              "weeksPlayed": 24,
+              "goingInRank": 24
+            }
+          ],
+          "SG": [
+            {
+              "playerId": 2018,
+              "name": "Ivan Zeller",
+              "positions": [
+                "SG"
+              ],
+              "team": "MIA",
+              "finishRank": 1,
+              "points": 3509,
+              "weeksPlayed": 25,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 2019,
+              "name": "Quinn Rourke",
+              "positions": [
+                "SG"
+              ],
+              "team": "DEN",
+              "finishRank": 2,
+              "points": 3392,
+              "weeksPlayed": 24,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 2020,
+              "name": "Silas Novak",
+              "positions": [
+                "SG"
+              ],
+              "team": "CHI",
+              "finishRank": 3,
+              "points": 3275,
+              "weeksPlayed": 23,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 2021,
+              "name": "Quinn Lowell",
+              "positions": [
+                "SG"
+              ],
+              "team": null,
+              "finishRank": 4,
+              "points": 3158,
+              "weeksPlayed": 20,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 2022,
+              "name": "Zane Kimura",
+              "positions": [
+                "SG"
+              ],
+              "team": null,
+              "finishRank": 5,
+              "points": 3041,
+              "weeksPlayed": 21,
+              "goingInRank": 24
+            }
+          ],
+          "SF": [
+            {
+              "playerId": 2023,
+              "name": "Xander Dunmore",
+              "positions": [
+                "SF"
+              ],
+              "team": "BOS",
+              "finishRank": 1,
+              "points": 3508,
+              "weeksPlayed": 20,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 2024,
+              "name": "Ivan Sandoval",
+              "positions": [
+                "SF"
+              ],
+              "team": "LAL",
+              "finishRank": 2,
+              "points": 3391,
+              "weeksPlayed": 20,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 2025,
+              "name": "Yusuf Quarles",
+              "positions": [
+                "SF"
+              ],
+              "team": "LAL",
+              "finishRank": 3,
+              "points": 3274,
+              "weeksPlayed": 21,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 2026,
+              "name": "Gideon Brandt",
+              "positions": [
+                "SF"
+              ],
+              "team": "MIA",
+              "finishRank": 4,
+              "points": 3157,
+              "weeksPlayed": 20,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 2027,
+              "name": "Bram Lowell",
+              "positions": [
+                "SF"
+              ],
+              "team": "CHI",
+              "finishRank": 5,
+              "points": 3040,
+              "weeksPlayed": 25,
+              "goingInRank": 24
+            }
+          ],
+          "PF": [
+            {
+              "playerId": 2028,
+              "name": "Aron Calloway",
+              "positions": [
+                "PF"
+              ],
+              "team": "BOS",
+              "finishRank": 1,
+              "points": 3507,
+              "weeksPlayed": 20,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 2029,
+              "name": "Bram Yoder",
+              "positions": [
+                "PF"
+              ],
+              "team": "BOS",
+              "finishRank": 2,
+              "points": 3390,
+              "weeksPlayed": 21,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 2030,
+              "name": "Felix Yoder",
+              "positions": [
+                "PF"
+              ],
+              "team": "LAL",
+              "finishRank": 3,
+              "points": 3273,
+              "weeksPlayed": 20,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 2031,
+              "name": "Mateo Sandoval",
+              "positions": [
+                "PF"
+              ],
+              "team": "BOS",
+              "finishRank": 4,
+              "points": 3156,
+              "weeksPlayed": 21,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 2032,
+              "name": "Evan Brandt",
+              "positions": [
+                "PF"
+              ],
+              "team": "BOS",
+              "finishRank": 5,
+              "points": 3039,
+              "weeksPlayed": 24,
+              "goingInRank": 24
+            }
+          ],
+          "C": [
+            {
+              "playerId": 2033,
+              "name": "Ulric Yoder",
+              "positions": [
+                "C"
+              ],
+              "team": null,
+              "finishRank": 1,
+              "points": 3506,
+              "weeksPlayed": 22,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 2034,
+              "name": "Pascal Ashby",
+              "positions": [
+                "C"
+              ],
+              "team": "CHI",
+              "finishRank": 2,
+              "points": 3389,
+              "weeksPlayed": 24,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 2035,
+              "name": "Xander Brandt",
+              "positions": [
+                "C"
+              ],
+              "team": "CHI",
+              "finishRank": 3,
+              "points": 3272,
+              "weeksPlayed": 24,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 2036,
+              "name": "Wes Estrada",
+              "positions": [
+                "C"
+              ],
+              "team": "MIA",
+              "finishRank": 4,
+              "points": 3155,
+              "weeksPlayed": 20,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 2037,
+              "name": "Vance Vasquez",
+              "positions": [
+                "C"
+              ],
+              "team": "CHI",
+              "finishRank": 5,
+              "points": 3038,
+              "weeksPlayed": 20,
+              "goingInRank": 24
+            }
+          ]
+        },
+        "busts": [
+          {
+            "playerId": 2038,
+            "name": "Orrin Estrada",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "goingInRank": 2,
+            "finishRank": 150,
+            "points": 1920,
+            "weeksPlayed": 21
+          },
+          {
+            "playerId": 2039,
+            "name": "Silas Zeller",
+            "positions": [
+              "SG"
+            ],
+            "team": "BOS",
+            "goingInRank": 5,
+            "finishRank": 131,
+            "points": 1923.8,
+            "weeksPlayed": 17
+          },
+          {
+            "playerId": 2040,
+            "name": "Pascal Quarles",
+            "positions": [
+              "SF"
+            ],
+            "team": "BOS",
+            "goingInRank": 9,
+            "finishRank": 97,
+            "points": 1930.6,
+            "weeksPlayed": 15
+          },
+          {
+            "playerId": 2041,
+            "name": "Evan Kimura",
+            "positions": [
+              "PF"
+            ],
+            "team": null,
+            "goingInRank": 14,
+            "finishRank": 88,
+            "points": 1932.4,
+            "weeksPlayed": 13
+          },
+          {
+            "playerId": 2042,
+            "name": "Ivan Thorne",
+            "positions": [
+              "PG"
+            ],
+            "team": null,
+            "goingInRank": 21,
+            "finishRank": 66,
+            "points": 1936.8,
+            "weeksPlayed": 18
+          }
+        ],
+        "steals": [
+          {
+            "playerId": 2043,
+            "name": "Ulric Ashby",
+            "positions": [
+              "SG"
+            ],
+            "team": "BOS",
+            "goingInRank": 200,
+            "finishRank": 3,
+            "points": 1949.4,
+            "weeksPlayed": 22
+          },
+          {
+            "playerId": 2044,
+            "name": "Evan Vasquez",
+            "positions": [
+              "SF"
+            ],
+            "team": "BOS",
+            "goingInRank": 143,
+            "finishRank": 9,
+            "points": 1948.2,
+            "weeksPlayed": 6
+          },
+          {
+            "playerId": 2045,
+            "name": "Ivan Brandt",
+            "positions": [
+              "PG"
+            ],
+            "team": "BOS",
+            "goingInRank": 97,
+            "finishRank": 12,
+            "points": 1947.6,
+            "weeksPlayed": 9
+          },
+          {
+            "playerId": 2046,
+            "name": "Felix Farrow",
+            "positions": [
+              "PF"
+            ],
+            "team": "BOS",
+            "goingInRank": 81,
+            "finishRank": 20,
+            "points": 1946,
+            "weeksPlayed": 8
+          },
+          {
+            "playerId": 2047,
+            "name": "Orrin Underhill",
+            "positions": [
+              "SG"
+            ],
+            "team": null,
+            "goingInRank": 70,
+            "finishRank": 31,
+            "points": 1943.8,
+            "weeksPlayed": 12
+          }
+        ],
+        "unrankedLeftOut": 0,
+        "dreamRoster": [
+          {
+            "playerId": 2048,
+            "name": "Quinn Whitlock",
+            "positions": [
+              "PG"
+            ],
+            "points": 3315
+          },
+          {
+            "playerId": 2049,
+            "name": "Bram Hargrove",
+            "positions": [
+              "SG"
+            ],
+            "points": 3198
+          },
+          {
+            "playerId": 2050,
+            "name": "Hugo Whitlock",
+            "positions": [
+              "SF"
+            ],
+            "points": 3081
+          },
+          {
+            "playerId": 2051,
+            "name": "Orrin Calloway",
+            "positions": [
+              "PF"
+            ],
+            "points": 2964
+          },
+          {
+            "playerId": 2052,
+            "name": "Ivan Calloway",
+            "positions": [
+              "C"
+            ],
+            "points": 2847
+          },
+          {
+            "playerId": 2053,
+            "name": "Silas Hargrove",
+            "positions": [
+              "PG"
+            ],
+            "points": 2730
+          },
+          {
+            "playerId": 2054,
+            "name": "Tobias Thorne",
+            "positions": [
+              "SG"
+            ],
+            "points": 2613
+          },
+          {
+            "playerId": 2055,
+            "name": "Wes Lowell",
+            "positions": [
+              "SF"
+            ],
+            "points": 2496
+          },
+          {
+            "playerId": 2056,
+            "name": "Ivan Vasquez",
+            "positions": [
+              "PF"
+            ],
+            "points": 2379
+          },
+          {
+            "playerId": 2057,
+            "name": "Nolan Ingram",
+            "positions": [
+              "C"
+            ],
+            "points": 2262
+          },
+          {
+            "playerId": 2058,
+            "name": "Aron Estrada",
+            "positions": [
+              "PG"
+            ],
+            "points": 2145
+          },
+          {
+            "playerId": 2059,
+            "name": "Bram Mercer",
+            "positions": [
+              "SG"
+            ],
+            "points": 2028
+          },
+          {
+            "playerId": 2060,
+            "name": "Nolan Farrow",
+            "positions": [
+              "SF"
+            ],
+            "points": 1911
+          },
+          {
+            "playerId": 2160,
+            "name": "Nolan Farrow Jr.",
+            "positions": [
+              "SF"
+            ],
+            "points": 1891
+          }
+        ],
+        "dreamRosterPoints": 31591.2
+      }
+    ]
+  },
+  "NFL": {
+    "list": {
+      "schema": 1,
+      "sport": "NFL",
+      "seasons": [
+        {
+          "sport": "NFL",
+          "seasonStart": 2006,
+          "label": "2006",
+          "slug": "2006"
+        },
+        {
+          "sport": "NFL",
+          "seasonStart": 2007,
+          "label": "2007",
+          "slug": "2007"
+        }
+      ]
+    },
+    "pages": [
+      {
+        "sport": "NFL",
+        "seasonStart": 2006,
+        "label": "2006",
+        "slug": "2006",
+        "prevSlug": null,
+        "nextSlug": "2007",
+        "teams": 12,
+        "rounds": 15,
+        "rosterPositions": [
+          "QB",
+          "RB",
+          "RB",
+          "WR",
+          "WR",
+          "TE",
+          "FLEX",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN"
+        ],
+        "scoringNote": "Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR",
+        "pointsNote": "Full-PPR fantasy points over the whole real season, one game a week.",
+        "rankingLabel": "ranked by last season's points over replacement",
+        "dataNotes": [
+          "Kicker and defense scoring is not part of this game."
+        ],
+        "excludedStats": {},
+        "statCoverage": {},
+        "attribution": "Data from nflverse, CC BY 4.0.",
+        "boardPlayers": 380,
+        "rankedPlayers": 300,
+        "topOverall": [
+          {
+            "playerId": 3001,
+            "name": "Hugo Sandoval",
+            "positions": [
+              "QB"
+            ],
+            "team": "SF",
+            "finishRank": 1,
+            "points": 329.1,
+            "weeksPlayed": 17,
+            "goingInRank": 2
+          },
+          {
+            "playerId": 3002,
+            "name": "Ulric Sandoval",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "finishRank": 2,
+            "points": 329.2,
+            "weeksPlayed": 17,
+            "goingInRank": 5
+          },
+          {
+            "playerId": 3003,
+            "name": "Ivan Rourke",
+            "positions": [
+              "WR"
+            ],
+            "team": "BUF",
+            "finishRank": 3,
+            "points": 326.6,
+            "weeksPlayed": 17,
+            "goingInRank": 8
+          },
+          {
+            "playerId": 3004,
+            "name": "Rafe Rourke",
+            "positions": [
+              "TE"
+            ],
+            "team": "GB",
+            "finishRank": 4,
+            "points": 325.9,
+            "weeksPlayed": 15,
+            "goingInRank": 11
+          },
+          {
+            "playerId": 3005,
+            "name": "Hugo Underhill",
+            "positions": [
+              "QB"
+            ],
+            "team": "BUF",
+            "finishRank": 5,
+            "points": 326,
+            "weeksPlayed": 17,
+            "goingInRank": 14
+          },
+          {
+            "playerId": 3006,
+            "name": "Xander Ashby",
+            "positions": [
+              "RB"
+            ],
+            "team": null,
+            "finishRank": 6,
+            "points": 324.4,
+            "weeksPlayed": 15,
+            "goingInRank": 17
+          },
+          {
+            "playerId": 3007,
+            "name": "Yusuf Sandoval",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "finishRank": 7,
+            "points": 321.7,
+            "weeksPlayed": 14,
+            "goingInRank": 20
+          },
+          {
+            "playerId": 3008,
+            "name": "Ivan Prescott",
+            "positions": [
+              "TE"
+            ],
+            "team": "SF",
+            "finishRank": 8,
+            "points": 321.6,
+            "weeksPlayed": 17,
+            "goingInRank": null
+          },
+          {
+            "playerId": 3009,
+            "name": "Wes Novak",
+            "positions": [
+              "QB"
+            ],
+            "team": "GB",
+            "finishRank": 9,
+            "points": 320.3,
+            "weeksPlayed": 17,
+            "goingInRank": 26
+          },
+          {
+            "playerId": 3010,
+            "name": "Evan Lowell",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "finishRank": 10,
+            "points": 316.9,
+            "weeksPlayed": 17,
+            "goingInRank": 29
+          },
+          {
+            "playerId": 3011,
+            "name": "Gideon Ingram",
+            "positions": [
+              "WR"
+            ],
+            "team": null,
+            "finishRank": 11,
+            "points": 316.8,
+            "weeksPlayed": 16,
+            "goingInRank": 32
+          },
+          {
+            "playerId": 3012,
+            "name": "Nolan Quarles",
+            "positions": [
+              "TE"
+            ],
+            "team": "GB",
+            "finishRank": 12,
+            "points": 315.9,
+            "weeksPlayed": 17,
+            "goingInRank": 35
+          }
+        ],
+        "topByPosition": {
+          "QB": [
+            {
+              "playerId": 3013,
+              "name": "Silas Hargrove",
+              "positions": [
+                "QB"
+              ],
+              "team": "DAL",
+              "finishRank": 1,
+              "points": 297,
+              "weeksPlayed": 14,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 3014,
+              "name": "Ivan Thorne",
+              "positions": [
+                "QB"
+              ],
+              "team": null,
+              "finishRank": 2,
+              "points": 287.1,
+              "weeksPlayed": 16,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 3015,
+              "name": "Rafe Sandoval",
+              "positions": [
+                "QB"
+              ],
+              "team": "SF",
+              "finishRank": 3,
+              "points": 277.2,
+              "weeksPlayed": 15,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 3016,
+              "name": "Ivan Jessup",
+              "positions": [
+                "QB"
+              ],
+              "team": "KC",
+              "finishRank": 4,
+              "points": 267.3,
+              "weeksPlayed": 17,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 3017,
+              "name": "Cade Lowell",
+              "positions": [
+                "QB"
+              ],
+              "team": "KC",
+              "finishRank": 5,
+              "points": 257.4,
+              "weeksPlayed": 15,
+              "goingInRank": 24
+            }
+          ],
+          "RB": [
+            {
+              "playerId": 3018,
+              "name": "Aron Jessup",
+              "positions": [
+                "RB"
+              ],
+              "team": "GB",
+              "finishRank": 1,
+              "points": 296,
+              "weeksPlayed": 14,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 3019,
+              "name": "Bram Thorne",
+              "positions": [
+                "RB"
+              ],
+              "team": "SF",
+              "finishRank": 2,
+              "points": 286.1,
+              "weeksPlayed": 17,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 3020,
+              "name": "Wes Sandoval",
+              "positions": [
+                "RB"
+              ],
+              "team": "DAL",
+              "finishRank": 3,
+              "points": 276.2,
+              "weeksPlayed": 16,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 3021,
+              "name": "Quinn Hargrove",
+              "positions": [
+                "RB"
+              ],
+              "team": "KC",
+              "finishRank": 4,
+              "points": 266.3,
+              "weeksPlayed": 14,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 3022,
+              "name": "Dario Thorne",
+              "positions": [
+                "RB"
+              ],
+              "team": "SF",
+              "finishRank": 5,
+              "points": 256.4,
+              "weeksPlayed": 15,
+              "goingInRank": 24
+            }
+          ],
+          "WR": [
+            {
+              "playerId": 3023,
+              "name": "Nolan Jessup",
+              "positions": [
+                "WR"
+              ],
+              "team": "SF",
+              "finishRank": 1,
+              "points": 295,
+              "weeksPlayed": 14,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 3024,
+              "name": "Kellan Kimura",
+              "positions": [
+                "WR"
+              ],
+              "team": "DAL",
+              "finishRank": 2,
+              "points": 285.1,
+              "weeksPlayed": 17,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 3025,
+              "name": "Mateo Okafor",
+              "positions": [
+                "WR"
+              ],
+              "team": "SF",
+              "finishRank": 3,
+              "points": 275.2,
+              "weeksPlayed": 14,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 3026,
+              "name": "Tobias Quarles",
+              "positions": [
+                "WR"
+              ],
+              "team": "DAL",
+              "finishRank": 4,
+              "points": 265.3,
+              "weeksPlayed": 15,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 3027,
+              "name": "Jonah Novak",
+              "positions": [
+                "WR"
+              ],
+              "team": "DAL",
+              "finishRank": 5,
+              "points": 255.4,
+              "weeksPlayed": 16,
+              "goingInRank": 24
+            }
+          ],
+          "TE": [
+            {
+              "playerId": 3028,
+              "name": "Aron Novak",
+              "positions": [
+                "TE"
+              ],
+              "team": "SF",
+              "finishRank": 1,
+              "points": 294,
+              "weeksPlayed": 17,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 3029,
+              "name": "Tobias Sandoval",
+              "positions": [
+                "TE"
+              ],
+              "team": null,
+              "finishRank": 2,
+              "points": 284.1,
+              "weeksPlayed": 16,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 3030,
+              "name": "Orrin Lowell",
+              "positions": [
+                "TE"
+              ],
+              "team": null,
+              "finishRank": 3,
+              "points": 274.2,
+              "weeksPlayed": 16,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 3031,
+              "name": "Xander Prescott",
+              "positions": [
+                "TE"
+              ],
+              "team": "KC",
+              "finishRank": 4,
+              "points": 264.3,
+              "weeksPlayed": 14,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 3032,
+              "name": "Leo Ingram",
+              "positions": [
+                "TE"
+              ],
+              "team": null,
+              "finishRank": 5,
+              "points": 254.4,
+              "weeksPlayed": 16,
+              "goingInRank": 24
+            }
+          ]
+        },
+        "busts": [
+          {
+            "playerId": 3033,
+            "name": "Felix Lowell",
+            "positions": [
+              "QB"
+            ],
+            "team": "KC",
+            "goingInRank": 2,
+            "finishRank": 150,
+            "points": 135,
+            "weeksPlayed": 5
+          },
+          {
+            "playerId": 3034,
+            "name": "Kellan Zeller",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "goingInRank": 5,
+            "finishRank": 131,
+            "points": 138.8,
+            "weeksPlayed": 8
+          },
+          {
+            "playerId": 3035,
+            "name": "Tobias Ingram",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "goingInRank": 9,
+            "finishRank": 97,
+            "points": 145.6,
+            "weeksPlayed": 7
+          },
+          {
+            "playerId": 3036,
+            "name": "Zane Mercer",
+            "positions": [
+              "TE"
+            ],
+            "team": null,
+            "goingInRank": 14,
+            "finishRank": 88,
+            "points": 147.4,
+            "weeksPlayed": 4
+          },
+          {
+            "playerId": 3037,
+            "name": "Yusuf Ashby",
+            "positions": [
+              "QB"
+            ],
+            "team": null,
+            "goingInRank": 21,
+            "finishRank": 66,
+            "points": 151.8,
+            "weeksPlayed": 12
+          }
+        ],
+        "steals": [
+          {
+            "playerId": 3038,
+            "name": "Vance Yoder",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "goingInRank": 200,
+            "finishRank": 3,
+            "points": 164.4,
+            "weeksPlayed": 5
+          },
+          {
+            "playerId": 3039,
+            "name": "Jonah Quarles",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "goingInRank": 143,
+            "finishRank": 9,
+            "points": 163.2,
+            "weeksPlayed": 6
+          },
+          {
+            "playerId": 3040,
+            "name": "Ulric Ingram",
+            "positions": [
+              "QB"
+            ],
+            "team": "KC",
+            "goingInRank": 97,
+            "finishRank": 12,
+            "points": 162.6,
+            "weeksPlayed": 6
+          },
+          {
+            "playerId": 3041,
+            "name": "Kellan Farrow",
+            "positions": [
+              "TE"
+            ],
+            "team": "KC",
+            "goingInRank": 81,
+            "finishRank": 20,
+            "points": 161,
+            "weeksPlayed": 13
+          },
+          {
+            "playerId": 3042,
+            "name": "Nolan Underhill",
+            "positions": [
+              "RB"
+            ],
+            "team": null,
+            "goingInRank": 70,
+            "finishRank": 31,
+            "points": 158.8,
+            "weeksPlayed": 14
+          }
+        ],
+        "unrankedLeftOut": 2,
+        "dreamRoster": [
+          {
+            "playerId": 3043,
+            "name": "Dario Dunmore",
+            "positions": [
+              "QB"
+            ],
+            "points": 280.5
+          },
+          {
+            "playerId": 3044,
+            "name": "Tobias Kimura",
+            "positions": [
+              "RB"
+            ],
+            "points": 270.6
+          },
+          {
+            "playerId": 3045,
+            "name": "Kellan Vasquez",
+            "positions": [
+              "WR"
+            ],
+            "points": 260.7
+          },
+          {
+            "playerId": 3046,
+            "name": "Hugo Okafor",
+            "positions": [
+              "TE"
+            ],
+            "points": 250.8
+          },
+          {
+            "playerId": 3047,
+            "name": "Zane Farrow",
+            "positions": [
+              "QB"
+            ],
+            "points": 240.9
+          },
+          {
+            "playerId": 3048,
+            "name": "Cade Kimura",
+            "positions": [
+              "RB"
+            ],
+            "points": 231
+          },
+          {
+            "playerId": 3049,
+            "name": "Xander Underhill",
+            "positions": [
+              "WR"
+            ],
+            "points": 221.1
+          },
+          {
+            "playerId": 3050,
+            "name": "Gideon Sandoval",
+            "positions": [
+              "TE"
+            ],
+            "points": 211.2
+          },
+          {
+            "playerId": 3051,
+            "name": "Orrin Ingram",
+            "positions": [
+              "QB"
+            ],
+            "points": 201.3
+          },
+          {
+            "playerId": 3052,
+            "name": "Hugo Dunmore",
+            "positions": [
+              "RB"
+            ],
+            "points": 191.4
+          },
+          {
+            "playerId": 3053,
+            "name": "Bram Quarles",
+            "positions": [
+              "WR"
+            ],
+            "points": 181.5
+          },
+          {
+            "playerId": 3054,
+            "name": "Gideon Kimura",
+            "positions": [
+              "TE"
+            ],
+            "points": 171.6
+          },
+          {
+            "playerId": 3055,
+            "name": "Zane Sandoval",
+            "positions": [
+              "QB"
+            ],
+            "points": 161.7
+          },
+          {
+            "playerId": 3056,
+            "name": "Felix Ingram",
+            "positions": [
+              "RB"
+            ],
+            "points": 151.8
+          },
+          {
+            "playerId": 3057,
+            "name": "Kellan Underhill",
+            "positions": [
+              "WR"
+            ],
+            "points": 141.9
+          }
+        ],
+        "dreamRosterPoints": 2946.2
+      },
+      {
+        "sport": "NFL",
+        "seasonStart": 2007,
+        "label": "2007",
+        "slug": "2007",
+        "prevSlug": "2006",
+        "nextSlug": null,
+        "teams": 12,
+        "rounds": 15,
+        "rosterPositions": [
+          "QB",
+          "RB",
+          "RB",
+          "WR",
+          "WR",
+          "TE",
+          "FLEX",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN",
+          "BN"
+        ],
+        "scoringNote": "Hand-set 12-team, 15-round roster: QB, 2 RB, 2 WR, TE, FLEX + 8 bench · full PPR",
+        "pointsNote": "Full-PPR fantasy points over the whole real season, one game a week.",
+        "rankingLabel": "ranked by last season's points over replacement",
+        "dataNotes": [],
+        "excludedStats": {},
+        "statCoverage": {},
+        "attribution": "Data from nflverse, CC BY 4.0.",
+        "boardPlayers": 380,
+        "rankedPlayers": 300,
+        "topOverall": [
+          {
+            "playerId": 4001,
+            "name": "Hugo Jessup",
+            "positions": [
+              "QB"
+            ],
+            "team": "KC",
+            "finishRank": 1,
+            "points": 340.8,
+            "weeksPlayed": 17,
+            "goingInRank": 2
+          },
+          {
+            "playerId": 4002,
+            "name": "Evan Calloway",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "finishRank": 2,
+            "points": 337.3,
+            "weeksPlayed": 16,
+            "goingInRank": 5
+          },
+          {
+            "playerId": 4003,
+            "name": "Zane Zeller",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "finishRank": 3,
+            "points": 336.6,
+            "weeksPlayed": 16,
+            "goingInRank": 8
+          },
+          {
+            "playerId": 4004,
+            "name": "Ivan Zeller",
+            "positions": [
+              "TE"
+            ],
+            "team": "BUF",
+            "finishRank": 4,
+            "points": 337,
+            "weeksPlayed": 16,
+            "goingInRank": 11
+          },
+          {
+            "playerId": 4005,
+            "name": "Gideon Ashby",
+            "positions": [
+              "QB"
+            ],
+            "team": null,
+            "finishRank": 5,
+            "points": 335.6,
+            "weeksPlayed": 16,
+            "goingInRank": 14
+          },
+          {
+            "playerId": 4006,
+            "name": "Gideon Farrow",
+            "positions": [
+              "RB"
+            ],
+            "team": "DAL",
+            "finishRank": 6,
+            "points": 332.7,
+            "weeksPlayed": 16,
+            "goingInRank": 17
+          },
+          {
+            "playerId": 4007,
+            "name": "Cade Thorne",
+            "positions": [
+              "WR"
+            ],
+            "team": "DAL",
+            "finishRank": 7,
+            "points": 332.5,
+            "weeksPlayed": 15,
+            "goingInRank": 20
+          },
+          {
+            "playerId": 4008,
+            "name": "Felix Hargrove",
+            "positions": [
+              "TE"
+            ],
+            "team": "GB",
+            "finishRank": 8,
+            "points": 330,
+            "weeksPlayed": 16,
+            "goingInRank": null
+          },
+          {
+            "playerId": 4009,
+            "name": "Aron Jessup",
+            "positions": [
+              "QB"
+            ],
+            "team": "SF",
+            "finishRank": 9,
+            "points": 329.9,
+            "weeksPlayed": 16,
+            "goingInRank": 26
+          },
+          {
+            "playerId": 4010,
+            "name": "Yusuf Quarles",
+            "positions": [
+              "RB"
+            ],
+            "team": "BUF",
+            "finishRank": 10,
+            "points": 327.6,
+            "weeksPlayed": 16,
+            "goingInRank": 29
+          },
+          {
+            "playerId": 4011,
+            "name": "Nolan Okafor",
+            "positions": [
+              "WR"
+            ],
+            "team": "BUF",
+            "finishRank": 11,
+            "points": 325.7,
+            "weeksPlayed": 16,
+            "goingInRank": 32
+          },
+          {
+            "playerId": 4012,
+            "name": "Zane Brandt",
+            "positions": [
+              "TE"
+            ],
+            "team": "KC",
+            "finishRank": 12,
+            "points": 323.8,
+            "weeksPlayed": 16,
+            "goingInRank": 35
+          }
+        ],
+        "topByPosition": {
+          "QB": [
+            {
+              "playerId": 4013,
+              "name": "Quinn Rourke",
+              "positions": [
+                "QB"
+              ],
+              "team": null,
+              "finishRank": 1,
+              "points": 306,
+              "weeksPlayed": 16,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 4014,
+              "name": "Evan Vasquez",
+              "positions": [
+                "QB"
+              ],
+              "team": "BUF",
+              "finishRank": 2,
+              "points": 295.8,
+              "weeksPlayed": 15,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 4015,
+              "name": "Ulric Underhill",
+              "positions": [
+                "QB"
+              ],
+              "team": "GB",
+              "finishRank": 3,
+              "points": 285.6,
+              "weeksPlayed": 16,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 4016,
+              "name": "Nolan Yoder",
+              "positions": [
+                "QB"
+              ],
+              "team": "SF",
+              "finishRank": 4,
+              "points": 275.4,
+              "weeksPlayed": 15,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 4017,
+              "name": "Kellan Dunmore",
+              "positions": [
+                "QB"
+              ],
+              "team": "KC",
+              "finishRank": 5,
+              "points": 265.2,
+              "weeksPlayed": 16,
+              "goingInRank": 24
+            }
+          ],
+          "RB": [
+            {
+              "playerId": 4018,
+              "name": "Yusuf Sandoval",
+              "positions": [
+                "RB"
+              ],
+              "team": "SF",
+              "finishRank": 1,
+              "points": 305,
+              "weeksPlayed": 14,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 4019,
+              "name": "Kellan Farrow",
+              "positions": [
+                "RB"
+              ],
+              "team": "DAL",
+              "finishRank": 2,
+              "points": 294.8,
+              "weeksPlayed": 14,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 4020,
+              "name": "Leo Whitlock",
+              "positions": [
+                "RB"
+              ],
+              "team": "KC",
+              "finishRank": 3,
+              "points": 284.6,
+              "weeksPlayed": 16,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 4021,
+              "name": "Xander Vasquez",
+              "positions": [
+                "RB"
+              ],
+              "team": "DAL",
+              "finishRank": 4,
+              "points": 274.4,
+              "weeksPlayed": 16,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 4022,
+              "name": "Kellan Estrada",
+              "positions": [
+                "RB"
+              ],
+              "team": null,
+              "finishRank": 5,
+              "points": 264.2,
+              "weeksPlayed": 14,
+              "goingInRank": 24
+            }
+          ],
+          "WR": [
+            {
+              "playerId": 4023,
+              "name": "Jonah Thorne",
+              "positions": [
+                "WR"
+              ],
+              "team": "BUF",
+              "finishRank": 1,
+              "points": 304,
+              "weeksPlayed": 16,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 4024,
+              "name": "Evan Ingram",
+              "positions": [
+                "WR"
+              ],
+              "team": "GB",
+              "finishRank": 2,
+              "points": 293.8,
+              "weeksPlayed": 15,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 4025,
+              "name": "Kellan Sandoval",
+              "positions": [
+                "WR"
+              ],
+              "team": "KC",
+              "finishRank": 3,
+              "points": 283.6,
+              "weeksPlayed": 17,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 4026,
+              "name": "Felix Lowell",
+              "positions": [
+                "WR"
+              ],
+              "team": "DAL",
+              "finishRank": 4,
+              "points": 273.4,
+              "weeksPlayed": 14,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 4027,
+              "name": "Orrin Galloway",
+              "positions": [
+                "WR"
+              ],
+              "team": "GB",
+              "finishRank": 5,
+              "points": 263.2,
+              "weeksPlayed": 14,
+              "goingInRank": 24
+            }
+          ],
+          "TE": [
+            {
+              "playerId": 4028,
+              "name": "Bram Brandt",
+              "positions": [
+                "TE"
+              ],
+              "team": "KC",
+              "finishRank": 1,
+              "points": 303,
+              "weeksPlayed": 15,
+              "goingInRank": 4
+            },
+            {
+              "playerId": 4029,
+              "name": "Tobias Brandt",
+              "positions": [
+                "TE"
+              ],
+              "team": "SF",
+              "finishRank": 2,
+              "points": 292.8,
+              "weeksPlayed": 15,
+              "goingInRank": 9
+            },
+            {
+              "playerId": 4030,
+              "name": "Kellan Brandt",
+              "positions": [
+                "TE"
+              ],
+              "team": "KC",
+              "finishRank": 3,
+              "points": 282.6,
+              "weeksPlayed": 16,
+              "goingInRank": 14
+            },
+            {
+              "playerId": 4031,
+              "name": "Yusuf Novak",
+              "positions": [
+                "TE"
+              ],
+              "team": null,
+              "finishRank": 4,
+              "points": 272.4,
+              "weeksPlayed": 17,
+              "goingInRank": 19
+            },
+            {
+              "playerId": 4032,
+              "name": "Gideon Hargrove",
+              "positions": [
+                "TE"
+              ],
+              "team": "GB",
+              "finishRank": 5,
+              "points": 262.2,
+              "weeksPlayed": 14,
+              "goingInRank": 24
+            }
+          ]
+        },
+        "busts": [
+          {
+            "playerId": 4033,
+            "name": "Hugo Novak",
+            "positions": [
+              "QB"
+            ],
+            "team": "KC",
+            "goingInRank": 2,
+            "finishRank": 150,
+            "points": 140,
+            "weeksPlayed": 10
+          },
+          {
+            "playerId": 4034,
+            "name": "Hugo Underhill",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "goingInRank": 5,
+            "finishRank": 131,
+            "points": 143.8,
+            "weeksPlayed": 17
+          },
+          {
+            "playerId": 4035,
+            "name": "Nolan Galloway",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "goingInRank": 9,
+            "finishRank": 97,
+            "points": 150.6,
+            "weeksPlayed": 10
+          },
+          {
+            "playerId": 4036,
+            "name": "Gideon Brandt",
+            "positions": [
+              "TE"
+            ],
+            "team": null,
+            "goingInRank": 14,
+            "finishRank": 88,
+            "points": 152.4,
+            "weeksPlayed": 3
+          },
+          {
+            "playerId": 4037,
+            "name": "Ivan Ingram",
+            "positions": [
+              "QB"
+            ],
+            "team": null,
+            "goingInRank": 21,
+            "finishRank": 66,
+            "points": 156.8,
+            "weeksPlayed": 6
+          }
+        ],
+        "steals": [
+          {
+            "playerId": 4038,
+            "name": "Quinn Galloway",
+            "positions": [
+              "RB"
+            ],
+            "team": "KC",
+            "goingInRank": 200,
+            "finishRank": 3,
+            "points": 169.4,
+            "weeksPlayed": 15
+          },
+          {
+            "playerId": 4039,
+            "name": "Ivan Estrada",
+            "positions": [
+              "WR"
+            ],
+            "team": "KC",
+            "goingInRank": 143,
+            "finishRank": 9,
+            "points": 168.2,
+            "weeksPlayed": 8
+          },
+          {
+            "playerId": 4040,
+            "name": "Bram Kimura",
+            "positions": [
+              "QB"
+            ],
+            "team": "KC",
+            "goingInRank": 97,
+            "finishRank": 12,
+            "points": 167.6,
+            "weeksPlayed": 12
+          },
+          {
+            "playerId": 4041,
+            "name": "Dario Sandoval",
+            "positions": [
+              "TE"
+            ],
+            "team": "KC",
+            "goingInRank": 81,
+            "finishRank": 20,
+            "points": 166,
+            "weeksPlayed": 9
+          },
+          {
+            "playerId": 4042,
+            "name": "Zane Whitlock",
+            "positions": [
+              "RB"
+            ],
+            "team": null,
+            "goingInRank": 70,
+            "finishRank": 31,
+            "points": 163.8,
+            "weeksPlayed": 14
+          }
+        ],
+        "unrankedLeftOut": 0,
+        "dreamRoster": [
+          {
+            "playerId": 4043,
+            "name": "Bram Prescott",
+            "positions": [
+              "QB"
+            ],
+            "points": 289
+          },
+          {
+            "playerId": 4044,
+            "name": "Mateo Calloway",
+            "positions": [
+              "RB"
+            ],
+            "points": 278.8
+          },
+          {
+            "playerId": 4045,
+            "name": "Silas Farrow",
+            "positions": [
+              "WR"
+            ],
+            "points": 268.6
+          },
+          {
+            "playerId": 4046,
+            "name": "Kellan Jessup",
+            "positions": [
+              "TE"
+            ],
+            "points": 258.4
+          },
+          {
+            "playerId": 4047,
+            "name": "Vance Prescott",
+            "positions": [
+              "QB"
+            ],
+            "points": 248.2
+          },
+          {
+            "playerId": 4048,
+            "name": "Zane Underhill",
+            "positions": [
+              "RB"
+            ],
+            "points": 238
+          },
+          {
+            "playerId": 4049,
+            "name": "Kellan Novak",
+            "positions": [
+              "WR"
+            ],
+            "points": 227.8
+          },
+          {
+            "playerId": 4050,
+            "name": "Ulric Vasquez",
+            "positions": [
+              "TE"
+            ],
+            "points": 217.6
+          },
+          {
+            "playerId": 4051,
+            "name": "Zane Ingram",
+            "positions": [
+              "QB"
+            ],
+            "points": 207.4
+          },
+          {
+            "playerId": 4052,
+            "name": "Kellan Mercer",
+            "positions": [
+              "RB"
+            ],
+            "points": 197.2
+          },
+          {
+            "playerId": 4053,
+            "name": "Pascal Calloway",
+            "positions": [
+              "WR"
+            ],
+            "points": 187
+          },
+          {
+            "playerId": 4054,
+            "name": "Ivan Underhill",
+            "positions": [
+              "TE"
+            ],
+            "points": 176.8
+          },
+          {
+            "playerId": 4055,
+            "name": "Vance Galloway",
+            "positions": [
+              "QB"
+            ],
+            "points": 166.6
+          },
+          {
+            "playerId": 4056,
+            "name": "Bram Mercer",
+            "positions": [
+              "RB"
+            ],
+            "points": 156.4
+          },
+          {
+            "playerId": 4057,
+            "name": "Tobias Estrada",
+            "positions": [
+              "WR"
+            ],
+            "points": 146.2
+          }
+        ],
+        "dreamRosterPoints": 3035.5
+      }
+    ]
+  }
+}

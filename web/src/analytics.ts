@@ -81,16 +81,22 @@ const LEAGUE_ROUTES: RouteEntry[] = [
 ]
 
 const HISTORY_ROUTES: RouteEntry[] = [
-  { path: '/history', url: '/history', title: 'Time Machine' },
-  { path: '/history/:gameId', url: '/history/:game', title: 'Time Machine game' },
+  { path: '/history', url: '/history', title: 'Redraft' },
+  { path: '/history/:gameId', url: '/history/:game', title: 'Redraft game' },
 ]
 
 // App.tsx's catch-all. Never the real path: a mistyped URL could contain anything.
 const NOT_FOUND: RouteEntry = { path: '*', url: '/(not-found)', title: 'Not found' }
 
 const TIME_MACHINE_ROUTES: RouteEntry[] = [
-  { path: '/', url: '/', title: 'Time Machine' },
-  { path: '/game/:gameId', url: '/game/:game', title: 'Time Machine game' },
+  { path: '/', url: '/', title: 'Redraft' },
+  { path: '/daily', url: '/daily', title: 'Game of the day' },
+  { path: '/nba', url: '/nba', title: 'NBA seasons' },
+  { path: '/nfl', url: '/nfl', title: 'NFL seasons' },
+  // One template per sport, never the slug: the owed check is "visits to the season-page route as a whole" (PR-28).
+  { path: '/nba/:season', url: '/nba/:season', title: 'NBA season page' },
+  { path: '/nfl/:season', url: '/nfl/:season', title: 'NFL season page' },
+  { path: '/game/:gameId', url: '/game/:game', title: 'Redraft game' },
 ]
 
 const TABLES: Record<Site, RouteEntry[]> = {
@@ -119,7 +125,9 @@ const OBJECTS: Record<Site, RouteObject[]> = {
 export function routeTemplate(pathname: string, signedIn: boolean): { url: string; title: string } {
   const hit = matchRoutes(OBJECTS[currentSite().site], pathname)
   const entry = (hit?.[hit.length - 1]?.route.handle as RouteEntry | undefined) ?? NOT_FOUND
-  if (signedIn) return { url: entry.url, title: entry.title }
+  // Spec 074 (PR-09): the Redraft site has real pages for a guest, so a guest's view is recorded under its route like
+  // anyone's. The "landing" record is for the other sites, where signed out means one landing page at every URL.
+  if (signedIn || currentSite().site === 'timemachine') return { url: entry.url, title: entry.title }
   if (entry.url === '/') return { url: '/(landing)', title: 'Landing' }
   return { url: `/(landing)${entry.url}`, title: `Landing (from ${entry.title})` }
 }

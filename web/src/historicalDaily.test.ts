@@ -25,7 +25,11 @@ describe('countdown', () => {
 })
 
 describe('landingStats', () => {
-  const g = (status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED', draftScore?: number | null) => ({ status, draftScore })
+  const g = (status: 'DRAFTING' | 'COMPLETE' | 'ABANDONED', draftScore?: number | null, chosenSeason = false) => ({
+    status,
+    draftScore,
+    chosenSeason,
+  })
   it('takes the best and the mean over finished games that have a score', () => {
     expect(landingStats([g('COMPLETE', 79), g('COMPLETE', 64), g('COMPLETE', 91)])).toEqual({
       finished: 3,
@@ -46,5 +50,11 @@ describe('landingStats', () => {
   it('has no best or average with nothing scored', () => {
     expect(landingStats([g('COMPLETE'), g('DRAFTING')])).toEqual({ finished: 1, scored: 0, best: null, average: null })
     expect(landingStats([])).toEqual({ finished: 0, scored: 0, best: null, average: null })
+  })
+  it('ignores chosen-season games entirely: not finished, not in the best, not in the average (spec 074 FR-011)', () => {
+    // A 100 on a season the player picked must not become the "best draft score", and must not move the mean.
+    const games = [g('COMPLETE', 70), g('COMPLETE', 100, true), g('COMPLETE', 90, true), g('COMPLETE', 50)]
+    expect(landingStats(games)).toEqual({ finished: 2, scored: 2, best: 70, average: 60 })
+    expect(landingStats([g('COMPLETE', 88, true)])).toEqual({ finished: 0, scored: 0, best: null, average: null })
   })
 })

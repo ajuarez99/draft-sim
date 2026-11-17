@@ -61,13 +61,37 @@ export function siteOrigin(cfg: SiteConfig): string {
 
 /** The Time Machine home path. The league site has none. */
 export function tmHome(cfg: SiteConfig): string {
-  if (cfg.site === 'leagues') throw new Error('tmHome: the league site has no Time Machine')
+  if (cfg.site === 'leagues') throw new Error('tmHome: the league site has no Redraft game')
   return cfg.site === 'timemachine' ? '/' : '/history'
 }
 
 export function tmGame(cfg: SiteConfig, gameId: string | number): string {
-  if (cfg.site === 'leagues') throw new Error('tmGame: the league site has no Time Machine')
+  if (cfg.site === 'leagues') throw new Error('tmGame: the league site has no Redraft game')
   return cfg.site === 'timemachine' ? `/game/${gameId}` : `/history/${gameId}`
+}
+
+// Spec 074 CR-04: the Redraft pages (/daily, /nba, /nfl, a season) are routes of the Redraft site ONLY. A component
+// shared with the combined build (the home, the game room, a shared result) takes these paths from here, and a null
+// means "no such route on this site": the component does not render the link. A path literal would assert that the
+// route exists on every site. (redraftPages.ts keeps its own literals for the static build, which is Redraft-only.)
+
+export type SportCode = 'NBA' | 'NFL'
+
+const onRedraft = (cfg: SiteConfig) => cfg.site === 'timemachine'
+
+/** The game-of-the-day page, or null where the site has none (combined, leagues). */
+export function tmDaily(cfg: SiteConfig): string | null {
+  return onRedraft(cfg) ? '/daily' : null
+}
+
+/** A sport's season index (`/nba`), or null where the site has none. */
+export function tmSportIndex(cfg: SiteConfig, sport: SportCode): string | null {
+  return onRedraft(cfg) ? `/${sport.toLowerCase()}` : null
+}
+
+/** One season's page (`/nba/2016-17`), or null where the site has none. */
+export function tmSeason(cfg: SiteConfig, sport: SportCode, slug: string): string | null {
+  return onRedraft(cfg) ? `/${sport.toLowerCase()}/${slug}` : null
 }
 
 /** Old league-site paths the Time Machine site forwards to the league site. */

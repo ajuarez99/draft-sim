@@ -46,7 +46,8 @@ public class HistoricalGameRepository {
                           int reversalRound,
                           List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                           int currentPickNo, String boardJson, String status, String resultJson,
-                          OffsetDateTime createdAt, OffsetDateTime completedAt, LocalDate dailyDate) {}
+                          OffsetDateTime createdAt, OffsetDateTime completedAt, LocalDate dailyDate,
+                          boolean chosenSeason) {}
 
     public record PickRow(long gameId, int pickNo, int round, int draftSlot, String seatType, long playerId) {}
 
@@ -66,13 +67,25 @@ public class HistoricalGameRepository {
     public long create(String sleeperUserId, String sport, int seasonStart, int teams, int rounds, int reversalRound,
                        List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
                        String boardJson, OffsetDateTime createdAt, LocalDate dailyDate) {
+        return create(sleeperUserId, sport, seasonStart, teams, rounds, reversalRound, rosterPositions, scoringJson,
+                userSlot, rngSeed, boardJson, createdAt, dailyDate, false);
+    }
+
+    /**
+     * The full form (spec 074). {@code chosenSeason} is true only for a game whose player picked the season; the
+     * service passes it explicitly and never infers it. The two shorter forms above are for tooling and tests and
+     * always mean "dealt, not chosen". The table forbids chosen and daily together.
+     */
+    public long create(String sleeperUserId, String sport, int seasonStart, int teams, int rounds, int reversalRound,
+                       List<String> rosterPositions, String scoringJson, int userSlot, long rngSeed,
+                       String boardJson, OffsetDateTime createdAt, LocalDate dailyDate, boolean chosenSeason) {
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement("""
                     insert into historical_game (sleeper_user_id, sport, season_start, teams, rounds,
                         reversal_round, roster_positions, scoring, user_slot, rng_seed, current_pick_no, board,
-                        status, created_at, daily_date)
-                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?, ?)
+                        status, created_at, daily_date, chosen_season)
+                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, sleeperUserId);
             ps.setString(2, sport);
@@ -89,6 +102,7 @@ public class HistoricalGameRepository {
             // A LocalDate binds as DATE in pgjdbc; a null needs its type named.
             if (dailyDate == null) ps.setNull(13, java.sql.Types.DATE);
             else ps.setObject(13, dailyDate);
+            ps.setBoolean(14, chosenSeason);
             return ps;
         }, keys);
         Number id = (Number) keys.getKeys().get("id");
@@ -115,7 +129,7 @@ public class HistoricalGameRepository {
     /** One row of the caller's games list: no board, no result, just what the list shows. */
     public record SummaryRow(long id, String sport, String seasonLabel, String status, int userSlot,
                              Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt,
-                             Integer draftScore, LocalDate dailyDate) {}
+                             Integer draftScore, LocalDate dailyDate, boolean chosenSeason) {}
 
     /** A user's games for the list screen, newest first. {@code finish} comes straight out of the frozen result. */
     public List<SummaryRow> summaries(String sleeperUserId) {
@@ -125,7 +139,7 @@ public class HistoricalGameRepository {
                        g.result ->> 'userOutcome' as outcome, g.created_at,
                        (g.result -> 'hindsight' ->> 'userPointsFor')::float8 as user_points,
                        (g.result -> 'hindsight' ->> 'pointsFor')::float8 as hindsight_points,
-                       g.daily_date
+                       g.daily_date, g.chosen_season
                 from historical_game g
                 join historical_season s on s.sport = g.sport and s.season_start = g.season_start
                 where g.sleeper_user_id = ? order by g.created_at desc, g.id desc
@@ -142,7 +156,7 @@ public class HistoricalGameRepository {
                             rs.getObject("created_at", OffsetDateTime.class),
                             DraftScore.of(rs.getObject("user_points", Double.class),
                                     rs.getObject("hindsight_points", Double.class)),
-                            rs.getObject("daily_date", LocalDate.class));
+                            rs.getObject("daily_date", LocalDate.class), rs.getBoolean("chosen_season"));
                 })
                 .list();
     }
@@ -200,7 +214,7 @@ public class HistoricalGameRepository {
     private static final String SELECT = """
             select id, sleeper_user_id, sport, season_start, teams, rounds, reversal_round, roster_positions,
                    scoring::text as scoring, user_slot, rng_seed, current_pick_no, board::text as board, status,
-                   result::text as result, created_at, completed_at, daily_date
+                   result::text as result, created_at, completed_at, daily_date, chosen_season
             from historical_game
             """;
 
@@ -214,7 +228,52 @@ public class HistoricalGameRepository {
                 rs.getString("status"), rs.getString("result"),
                 rs.getObject("created_at", OffsetDateTime.class),
                 rs.getObject("completed_at", OffsetDateTime.class),
-                rs.getObject("daily_date", LocalDate.class));
+                rs.getObject("daily_date", LocalDate.class), rs.getBoolean("chosen_season"));
+    }
+
+    // ---- spec 074: guests, chosen seasons and claim -----------------------------------------------------
+
+    /**
+     * Serialises everything that decides something about one owner key: a guest's allowance check against their
+     * create, and a claim into one Sleeper id. Held until the caller's transaction ends.
+     */
+    public void lockOwner(String ownerKey) {
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?, 0))", "tm-owner:" + ownerKey);
+    }
+
+    /** Games this owner has that are not a game of the day, whatever their status (an abandoned one still counts). */
+    public int countNonDaily(String ownerKey) {
+        return db.sql("select count(*) from historical_game where sleeper_user_id = ? and daily_date is null")
+                .param(ownerKey).query(Integer.class).single();
+    }
+
+    public int countOwned(String ownerKey) {
+        return db.sql("select count(*) from historical_game where sleeper_user_id = ?")
+                .param(ownerKey).query(Integer.class).single();
+    }
+
+    /** Takes the row locks on every game this owner has, held to the end of the caller's transaction. */
+    public void lockOwnedGames(String ownerKey) {
+        db.sql("select id from historical_game where sleeper_user_id = ? order by id for update")
+                .param(ownerKey).query(Long.class).list();
+    }
+
+    /**
+     * Moves every game of {@code from} to {@code to} except a game of the day that {@code to} already has for the
+     * same sport and day (the unique index {@code historical_game_daily_once} allows one). Returns how many moved.
+     * Two claims into one id at once can both pass the {@code not exists}; the loser hits the index and throws
+     * {@link org.springframework.dao.DuplicateKeyException}, which the service answers by running it again.
+     */
+    public int moveOwner(String from, String to) {
+        return db.sql("""
+                update historical_game g set sleeper_user_id = ?
+                where g.sleeper_user_id = ?
+                  and not (g.daily_date is not null and exists (
+                        select 1 from historical_game o
+                        where o.sleeper_user_id = ? and o.sport = g.sport and o.daily_date = g.daily_date))
+                """)
+                .params(to, from, to)
+                .update();
     }
 
     // ---- spec 071: the game of the day ------------------------------------------------------------------

@@ -60,11 +60,33 @@ public class HistoricalDailyService {
     public record DailyView(String sport, String date, String seasonLabel, Long gameId, String gameStatus,
                             Integer draftScore, int streak, int bestStreak, String nextAt) {}
 
+    /**
+     * Yesterday's game of the day for one sport, as anyone may read it (spec 074, no identity). {@code seasonLabel}
+     * and {@code slug} (the season page's address segment, which is the label) are null when no puzzle was dealt for
+     * that day. Mirrored in {@code web/src/api.ts}.
+     */
+    public record YesterdayDaily(String sport, String date, String seasonLabel, String slug) {}
+
     /** What {@link #start} did: the game, and whether this call created it. */
     public record Started(HistoricalGameState state, boolean created) {}
 
     public LocalDate today() {
         return LocalDate.now(clock.withZone(ZONE));
+    }
+
+    /**
+     * Yesterday's puzzle per sport, in the registry's order. READ-ONLY: it never deals a puzzle (a day nobody asked
+     * about stays empty), unlike {@link #status}, which deals today's.
+     */
+    public List<YesterdayDaily> yesterday() {
+        LocalDate date = today().minusDays(1);
+        List<YesterdayDaily> out = new ArrayList<>();
+        for (HistoricalSport sport : sports.all()) {
+            Optional<DailyRow> puzzle = games.findDailyPuzzle(sport.code(), date);
+            String label = puzzle.map(p -> sport.label(p.seasonStart())).orElse(null);
+            out.add(new YesterdayDaily(sport.code(), date.toString(), label, label));
+        }
+        return out;
     }
 
     /** Every sport that has seasons to offer, in the registry's order. A sport with none is left out. */

@@ -1,6 +1,7 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearUser, setUser } from '../user'
 import HistoricalRoom from './HistoricalRoom'
 import HistoricalDraft from './HistoricalDraft'
 import old062 from '../__fixtures__/historical-result-062.json'
@@ -14,12 +15,15 @@ import old062 from '../__fixtures__/historical-result-062.json'
 
 const getHistoricalGame = vi.fn()
 const listHistoricalGames = vi.fn()
-const historicalSeasons = vi.fn()
+const getPublicSeasonList = vi.fn()
 vi.mock('../api', async (orig) => ({
   ...(await orig<typeof import('../api')>()),
   getHistoricalGame: (...a: unknown[]) => getHistoricalGame(...a),
   listHistoricalGames: (...a: unknown[]) => listHistoricalGames(...a),
-  historicalSeasons: (...a: unknown[]) => historicalSeasons(...a),
+  getPublicSeasonList: (...a: unknown[]) => getPublicSeasonList(...a),
+  getHistoricalDaily: () => Promise.reject(new Error('404')),
+  getHistoricalProfile: () => Promise.reject(new Error('404')),
+  claimGuestGames: () => Promise.resolve(null),
 }))
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
@@ -40,10 +44,9 @@ const oldState = {
   teams: 2, rounds: 2, rosterPositions: ['PG', 'SG', 'BN'], userSlot: 1, myPicks: [1, 4], currentPickNo: 1,
   onTheClockSlot: 1, isUsersTurn: true, picks: [], available: [oldCard(1, 'Top Guy')], result: null,
 }
-const oldSeason = {
-  seasonStart: 1995, label: '1995-96', source: 'KAGGLE', countedStats: ['pts'], excludedStats: {},
-  statCoverage: { pts: 1 }, rankingSource: 'PRIOR_SEASON_POINTS', settingsSource: 'Old backend settings line',
-}
+
+beforeEach(() => setUser({ sleeperUserId: 'u1', username: 'u1', displayName: 'U One', avatar: null }))
+afterEach(() => clearUser())
 
 describe('new web against the 053 backend (deploy order: web first)', () => {
   it('the room renders a basketball game from an old-shape state', async () => {
@@ -79,8 +82,10 @@ describe('new web against the 053 backend (deploy order: web first)', () => {
   })
 
   it('the start page lists old-shape past games and offers no Football', async () => {
-    // What the 053 backend answers for BOTH ?sport=NBA and ?sport=NFL: it ignores the parameter.
-    historicalSeasons.mockReset().mockImplementation(() => Promise.resolve([oldSeason]))
+    // Spec 074 (T041, rewritten): the home page's season list is the PUBLIC endpoint, which a 053 backend does not have
+    // (404). The deploy order for this feature is backend first (DEPLOY.md), so this is the window where it is not:
+    // the page must still list the old-shape games, name no Football tile or tab, and show no failure for the missing list.
+    getPublicSeasonList.mockReset().mockRejectedValue(new Error('404'))
     listHistoricalGames.mockResolvedValue([
       { id: 1, seasonLabel: '1995-96', status: 'COMPLETE', userSlot: 3, finish: 2, createdAt: '2026-11-01T12:00:00Z' },
       { id: 2, seasonLabel: '1996-97', status: 'DRAFTING', userSlot: 3, finish: 0, createdAt: '2026-11-02T12:00:00Z' },
@@ -96,14 +101,19 @@ describe('new web against the 053 backend (deploy order: web first)', () => {
     expect(screen.getAllByText('Basketball').length).toBe(2) // both rows read as NBA
     // an old row carries no formatVersion: its number is a standings rank, and says so
     expect(screen.getByText('Finished 2nd (old format)')).toBeInTheDocument()
-    expect(await screen.findByText('Old backend settings line')).toBeTruthy()
     // Both requests carry an explicit sport ...
-    await waitFor(() => expect(historicalSeasons).toHaveBeenCalledTimes(2))
-    expect(historicalSeasons).toHaveBeenCalledWith('NBA')
-    expect(historicalSeasons).toHaveBeenCalledWith('NFL')
-    // ... and the NFL one came back as NBA rows without a sport, so Football is not offered.
+    await waitFor(() => expect(getPublicSeasonList).toHaveBeenCalledTimes(2))
+    expect(getPublicSeasonList).toHaveBeenCalledWith('NBA')
+    expect(getPublicSeasonList).toHaveBeenCalledWith('NFL')
+    // ... and nothing came back, so Football is not offered, and no tile is: nothing is invented to fill the gap.
     expect(screen.queryByRole('button', { name: 'Football' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Football/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('group', { name: 'Sport' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Draft a random year' })).toBeInTheDocument()
+    // CR-09: the old page kept "Draft a random year" for a signed-in player when it could not tell which seasons exist
+    // ("we can't tell, so the old behaviour stands"). It still does, and the failed list is said, with a way to retry.
+    expect(await screen.findByRole('button', { name: 'Draft a random year' })).toBeInTheDocument()
+    expect(screen.getByText(/The season list didn't load\./)).toBeInTheDocument()
+    // (this default site has no sport index pages, so there is no "Pick a season" section to hold it, V-08h)
+    expect(within(screen.getByText(/The season list didn't load\./).closest('div')!).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
   })
 })

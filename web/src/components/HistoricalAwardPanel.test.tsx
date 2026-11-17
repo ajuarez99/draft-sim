@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HistoricalBadge, HistoricalGameAward, HistoricalProfile } from '../api'
+import { ApiError } from '../apiError'
+import { awardLeftBehind } from '../redraftCopy'
 import HistoricalAwardPanel from './HistoricalAwardPanel'
 
 const getHistoricalGameAward = vi.fn()
@@ -47,10 +49,40 @@ const award = (over: Partial<HistoricalGameAward> = {}): HistoricalGameAward => 
   moments: [{ code: 'BIG_BUST', name: 'Big bust', text: 'Pick 3 finished far down the list.', pickNo: 3, playerName: 'Some Guy' }],
   momentsSeen: false,
   total: 200,
+  notCounted: false,
   ...over,
 })
 
 describe('HistoricalAwardPanel', () => {
+  // CR-12: a guest signs in from "Keep this result" and the claim leaves that game of the day behind (the Sleeper id had
+  // already played the day), so the award request is for a game this player does not own: a 404 that is not a failure.
+  it('a 404 for the game says it stayed behind and earns nothing, not "could not be loaded"', async () => {
+    getHistoricalGameAward.mockRejectedValue(new ApiError(404))
+    getHistoricalProfile.mockRejectedValue(new Error('none'))
+    render(<HistoricalAwardPanel gameId={7} />)
+    expect(await screen.findByText(awardLeftBehind)).toBeInTheDocument()
+    expect(screen.queryByText(/could not be loaded|could not be worked out/)).toBeNull()
+    expect(screen.queryByRole('region', { name: 'What this game earned' })).toBeNull()
+  })
+
+  it('any other failure is still the muted "could not be loaded" line', async () => {
+    getHistoricalGameAward.mockRejectedValue(new ApiError(500))
+    getHistoricalProfile.mockRejectedValue(new Error('none'))
+    render(<HistoricalAwardPanel gameId={7} />)
+    expect(await screen.findByText(/could not be loaded/)).toBeInTheDocument()
+    expect(screen.queryByText(awardLeftBehind)).toBeNull()
+  })
+
+  it('says a chosen season does not count, as a rule and not as a failure, and shows no XP', async () => {
+    getHistoricalGameAward.mockResolvedValue(award({ settled: false, xp: 0, lines: [], badges: [], moments: [], total: 0, notCounted: true }))
+    getHistoricalProfile.mockResolvedValue(profile())
+    render(<HistoricalAwardPanel gameId={7} />)
+    expect(await screen.findByText("Seasons you pick don't count toward achievements, your daily streak, or your best and average draft score.")).toBeInTheDocument()
+    expect(screen.queryByText(/could not be worked out|could not be loaded/)).toBeNull()
+    expect(screen.queryByText(/XP/)).toBeNull()
+    expect(markHistoricalSeen).not.toHaveBeenCalled()
+  })
+
   it('shows the lines, the badge, the total and the moments', async () => {
     getHistoricalGameAward.mockResolvedValue(award())
     getHistoricalProfile.mockResolvedValue(profile())

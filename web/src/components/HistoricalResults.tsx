@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState, type ReactNode } from 'react'
 import type { HistoricalGameState, HistoricalPlayerCard, HistoricalResult, HistoricalWeek } from '../api'
 import {
+  type Voice,
   hindsightSeasonVerdict,
   isOldFormat,
   ordinal,
@@ -9,16 +10,24 @@ import {
   pts1,
   scheduleNote,
   sportOf,
-  teamName,
 } from '../historicalCopy'
 import HistoricalBracket from './HistoricalBracket'
-import { draftScore, pickMark, shareText, type PickMark } from '../historicalShare'
-import { tmHome } from '../site'
+import { draftScore, markOf, shareText, type PickMark } from '../historicalShare'
+import { drafterClass, drafterSuffix, voiceWords } from '../redraftVoice'
+import { sharedReduced } from '../redraftCopy'
+import { tmGame } from '../site'
 import { currentSite } from '../siteEnv'
 
 type Props = {
   game: HistoricalGameState
   result: HistoricalResult
+  /**
+   * Spec 074: whose page this is. `you` is the owner's; `shared` is a finished result somebody else opened by link: third
+   * person, no Share button, `.tm-drafter` instead of the `--you` tints. Required: a defaulted voice would say "you" to a stranger.
+   */
+  voice: Voice
+  /** A public game dated today (`PublicGame.reducedUntil` set): no picks, lineups or hindsight roster. Only the finish, record and score. */
+  reduced?: boolean
   /** Spec 064: the award panel. It follows the draft story (or the finish, on a game stored before playoffs). */
   afterFinish?: ReactNode
   /** The one next step, shown under the finish (the room passes "Draft another year"). */
@@ -53,10 +62,12 @@ export function gotRight(rows: HistoricalResult['pickFinishes']): { ahead: numbe
  * Spec 070: the draft score, the one number a game is summed up with. It is your whole-season points as a share
  * of the hindsight draft's, and the sentence under it prints both totals so the number can be checked.
  */
-function DraftScore({ result }: { result: HistoricalResult }) {
+function DraftScore({ result, voice }: { result: HistoricalResult; voice: Voice }) {
   const h = result.hindsight
   const score = draftScore(h)
   if (score == null) return null
+  const w = voiceWords(voice)
+  const total = h.pointsFor ?? null
   return (
     <div className="tm-score">
       <div className="tm-score-head">
@@ -67,9 +78,13 @@ function DraftScore({ result }: { result: HistoricalResult }) {
         <span style={{ width: `${Math.max(2, Math.min(100, score))}%` }} />
       </div>
       <p className="muted small">
-        {h.userBeatIt
-          ? `You outscored the hindsight draft, ${pts1(h.userPointsFor)} points to ${pts1(h.pointsFor)}.`
-          : `Your ${pts1(h.userPointsFor)} points are ${score}% of the hindsight draft's ${pts1(h.pointsFor)}.`}
+        {total == null
+          ? h.userBeatIt
+            ? w.scoreOutscoredReduced(pts1(h.userPointsFor))
+            : w.scoreShareReduced(pts1(h.userPointsFor), score)
+          : h.userBeatIt
+            ? w.scoreOutscored(pts1(h.userPointsFor), pts1(total))
+            : w.scoreShare(pts1(h.userPointsFor), score, pts1(total))}
       </p>
     </div>
   )
@@ -81,7 +96,7 @@ function DraftScore({ result }: { result: HistoricalResult }) {
  */
 function ShareButton({ game, result }: { game: HistoricalGameState; result: HistoricalResult }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'manual'>('idle')
-  const text = () => shareText(game, result, `${window.location.origin}${tmHome(currentSite())}`)
+  const text = () => shareText(game, result, `${window.location.origin}${tmGame(currentSite(), game.id)}`)
   async function share() {
     const body = text()
     try {
@@ -121,27 +136,23 @@ function ShareButton({ game, result }: { game: HistoricalGameState; result: Hist
 }
 
 const MARK_GLYPH: Record<PickMark, string> = { ahead: '▲', same: '=', behind: '▼' }
-const MARK_WORDS: Record<PickMark, string> = {
-  ahead: 'finished ahead of where you drafted him',
-  same: 'finished where you drafted him',
-  behind: 'finished behind where you drafted him',
-}
 
 /**
  * Spec 070: every pick as one square, in draft order, so the whole draft reads at a glance. A square's colour and
  * arrow are the sign of the Change column in the pick table (drafted position rank against finished position
  * rank); pressing one prints that pick's row in a sentence.
  */
-function PickGrid({ game, result }: Props) {
+function PickGrid({ game, result, voice, reduced }: Props) {
+  const w = voiceWords(voice)
   const rows = useMemo(() => [...(result.pickFinishes ?? [])].sort((a, b) => a.pickNo - b.pickNo), [result.pickFinishes])
   const [open, setOpen] = useState<number | null>(null)
   if (rows.length === 0) return null
   const sel = rows.find((r) => r.pickNo === open) ?? null
   return (
     <div className="tm-picks">
-      <ul className="tm-pickgrid" aria-label="Your picks, one square each">
+      <ul className="tm-pickgrid" aria-label={w.picksGridAria}>
         {rows.map((r, i) => {
-          const mark = pickMark(r.draftedPositionRank, r.finishPositionRank)
+          const mark = markOf(r)
           const round = Math.ceil(r.pickNo / game.teams)
           return (
             <li key={r.pickNo} style={{ ['--i' as string]: i }}>
@@ -149,7 +160,7 @@ function PickGrid({ game, result }: Props) {
                 type="button"
                 className={`tm-pick ${mark}${open === r.pickNo ? ' on' : ''}`}
                 aria-pressed={open === r.pickNo}
-                aria-label={`Round ${round}, ${r.player.name}: ${MARK_WORDS[mark]}`}
+                aria-label={reduced ? `Round ${round}: ${w.markWords[mark]}` : `Round ${round}, ${r.player.name}: ${w.markWords[mark]}`}
                 onClick={() => setOpen(open === r.pickNo ? null : r.pickNo)}
               >
                 <span className="tm-pick-mark" aria-hidden="true">
@@ -166,15 +177,24 @@ function PickGrid({ game, result }: Props) {
       <p className="tm-pick-detail" aria-live="polite">
         {sel ? (
           <>
-            <strong>{sel.player.name}</strong>, round {Math.ceil(sel.pickNo / game.teams)}: drafted as {sel.position}
-            {sel.draftedPositionRank}, finished as {sel.position}
-            {sel.finishPositionRank} ({pts1(sel.seasonValue)} points).
+            {reduced ? (
+              // A reduced row has only a mark (CR-03): no position, no rank, no name.
+              <>
+                Round {Math.ceil(sel.pickNo / game.teams)}: {w.markWords[markOf(sel)]}.
+              </>
+            ) : (
+              <>
+                <strong>{sel.player.name}</strong>, round {Math.ceil(sel.pickNo / game.teams)}: drafted as {sel.position}
+                {sel.draftedPositionRank}, finished as {sel.position}
+                {sel.finishPositionRank} ({pts1(sel.seasonValue)} points).
+              </>
+            )}
           </>
         ) : (
           <span className="muted">
-            One square per round. <span className="tm-key ahead">▲</span> finished ahead of where you drafted him,{' '}
-            <span className="tm-key behind">▼</span> behind, <span className="tm-key same">=</span> the same spot. Tap one to see the
-            player.
+            One square per round. <span className="tm-key ahead">▲</span> {w.markWords.ahead},{' '}
+            <span className="tm-key behind">▼</span> behind, <span className="tm-key same">=</span> the same spot.{' '}
+            {reduced ? w.gridTapReduced : w.gridTap}
           </span>
         )}
       </p>
@@ -183,7 +203,8 @@ function PickGrid({ game, result }: Props) {
 }
 
 /** What you got right, the bust and the passed-on steal. On a playoff-format page these lead the page. */
-function Callouts({ game, result }: Props) {
+function Callouts({ game, result, voice }: Props) {
+  const w = voiceWords(voice)
   const bust = result.biggestBust
   const steal = result.bestStealPassedOn
   const right = gotRight(result.pickFinishes)
@@ -191,19 +212,17 @@ function Callouts({ game, result }: Props) {
     <div className="hist-callouts">
       {right && (
         <div className="hist-callout hist-callout-right">
-          <h3>What you got right</h3>
+          <h3>{w.gotRightHeading}</h3>
           {right.best ? (
             <p>
-              <strong>
-                {right.ahead} of your {right.total} picks
-              </strong>{' '}
-              finished ahead of where you drafted them. The biggest jump: <strong>{right.best.player.name}</strong>, drafted as{' '}
+              <strong>{w.gotRightLead(right.ahead, right.total)[0]}</strong>
+              {w.gotRightLead(right.ahead, right.total)[1]} <strong>{right.best.player.name}</strong>, drafted as{' '}
               {right.best.position}
               {right.best.draftedPositionRank}, finished as {right.best.position}
               {right.best.finishPositionRank} ({pts1(right.best.seasonValue)} points).
             </p>
           ) : (
-            <p className="muted">None of your {right.total} picks finished ahead of where you drafted them.</p>
+            <p className="muted">{w.gotRightNone(right.total)}</p>
           )}
         </div>
       )}
@@ -215,19 +234,19 @@ function Callouts({ game, result }: Props) {
             {game.teams * game.rounds} drafted players on the season ({pts1(bust.seasonValue)} points).
           </p>
         ) : (
-          <p className="muted">None: every player you took finished at or above his draft position.</p>
+          <p className="muted">{w.bustNone}</p>
         )}
       </div>
-      <div className="hist-callout hist-callout-steal">
-        <h3>Best steal you passed on</h3>
+      <div className={`hist-callout hist-callout-steal${voice === 'shared' ? ' shared' : ''}`}>
+        <h3>{w.stealHeading}</h3>
         {steal ? (
           <p>
-            At pick {steal.pickNo} you took <strong>{steal.taken.name}</strong> ({pts1(steal.takenValue)} points).{' '}
+            {w.stealLead(steal.pickNo)} <strong>{steal.taken.name}</strong> ({pts1(steal.takenValue)} points).{' '}
             <strong>{steal.passedOn.name}</strong> was still there and scored {pts1(steal.passedOnValue - steal.takenValue)} more (
             {pts1(steal.passedOnValue)} points).
           </p>
         ) : (
-          <p className="muted">Nobody left on the board outscored the player you took.</p>
+          <p className="muted">{w.stealNone}</p>
         )}
       </div>
     </div>
@@ -239,13 +258,14 @@ function Callouts({ game, result }: Props) {
  * drafted minus finished: positive means he finished ahead of where he was taken. The direction is said in a
  * word as well as a colour.
  */
-function PickFinishes({ game, result }: Props) {
+function PickFinishes({ game, result, voice }: Props) {
+  const w = voiceWords(voice)
   const rows = result.pickFinishes
   if (!rows || rows.length === 0) return null
   const nfl = sportOf(game) === 'NFL'
   const seasonWeeks = result.format?.seasonWeeks ?? null
   return (
-    <section className="panel hist-pickfin" aria-label="Your picks, drafted and finished">
+    <section className="panel hist-pickfin" aria-label={w.pickFinishesAria}>
       <details className="tm-fold">
       <summary>
         <h2>Every pick: drafted as, finished as</h2>
@@ -253,19 +273,19 @@ function PickFinishes({ game, result }: Props) {
       <p className="muted small">
         Drafted as: the order players at his position came off the board in this draft. Finished as: his rank at that
         position among every player on the board, drafted or not, by{' '}
-        {nfl ? 'fantasy points over the whole real season' : "this game's points over the whole real season (each week's best single game)"}.
+        {nfl ? 'fantasy points over the whole real season' : "Redraft's scoring over the whole real season (each week's best single game)"}.
       </p>
       <div className="hist-table-wrap">
         <table className="hist-table">
           <thead>
             <tr>
-              <th className="num">Pick</th>
-              <th>Player</th>
-              <th>Drafted as</th>
-              <th>Finished as</th>
-              <th>Change</th>
-              <th className="num">Points</th>
-              <th className="num">Weeks played</th>
+              <th scope="col" className="num">Pick</th>
+              <th scope="col">Player</th>
+              <th scope="col">Drafted as</th>
+              <th scope="col">Finished as</th>
+              <th scope="col">Change</th>
+              <th scope="col" className="num">Points</th>
+              <th scope="col" className="num">Weeks played</th>
             </tr>
           </thead>
           <tbody>
@@ -324,7 +344,8 @@ function PickFinishes({ game, result }: Props) {
  * every stored result since spec 053, so this draws for old games too; only "would it have won" needs a result
  * that carries `hindsightSeason`.
  */
-function HindsightRoster({ game, result }: Props) {
+function HindsightRoster({ game, result, voice }: Props) {
+  const w = voiceWords(voice)
   const h = result.hindsight
   if (!h.picks || h.picks.length === 0) return null
   const season = result.hindsightSeason ?? null
@@ -342,7 +363,7 @@ function HindsightRoster({ game, result }: Props) {
         <>
           <p className={`hist-verdict${season.finish === 1 ? ' good' : ''}`}>{hindsightSeasonVerdict(season, game.teams)}</p>
           <p className="muted small">
-            The same schedule with this roster in your seat. It was picked for the most points over the season, not the most wins.
+            {w.hindsightSeat} It was picked for the most points over the season, not the most wins.
             {season.takenFromBots > 0
               ? ` ${season.takenFromBots} of its players ${season.takenFromBots === 1 ? 'was' : 'were'} drafted later by another team. That team loses ${season.takenFromBots === 1 ? 'him' : 'them'} here and gets the best player left at his position by the pre-draft rankings. The other teams were not re-drafted.`
               : ' Every other team is as it was.'}
@@ -355,19 +376,16 @@ function HindsightRoster({ game, result }: Props) {
       <summary>
         <h3>The hindsight roster, pick by pick</h3>
       </summary>
-      <p className="muted small">
-        The roster that scores the most over the season, drafted only from players who were still on the board at your picks. A player
-        you took later than the pick shown was the better deal, and the row says so. Points are each player's full-season total.
-      </p>
+      <p className="muted small">{w.hindsightRosterNote}</p>
       <div className="hist-table-wrap">
         <table className="hist-table">
           <thead>
             <tr>
-              <th className="num">Pick</th>
-              <th>Hindsight took</th>
-              <th className="num">Points</th>
-              <th>You took</th>
-              {showMyPoints && <th className="num">Points</th>}
+              <th scope="col" className="num">Pick</th>
+              <th scope="col">Hindsight took</th>
+              <th scope="col" className="num">Points</th>
+              <th scope="col">{w.hindsightYouTook}</th>
+              {showMyPoints && <th scope="col" className="num">Points</th>}
             </tr>
           </thead>
           <tbody>
@@ -387,7 +405,7 @@ function HindsightRoster({ game, result }: Props) {
                     <span className="muted small"> · {p.player.positions.join('/')}</span>
                     {later != null && (
                       <span className="hist-change up hist-same-pick">
-                        You got him later: pick {later}, round {Math.ceil(later / game.teams)}
+                        {w.gotHimLater(later, Math.ceil(later / game.teams))}
                       </span>
                     )}
                   </td>
@@ -424,7 +442,9 @@ function unplayedLine(unused: number, firstUnused: number): string | null {
  * playoff weeks in the week picker. A result without one (stored before playoffs) renders as it always did, plus
  * one line saying so. `isOldFormat` is the only place that question is asked.
  */
-export default function HistoricalResults({ game, result, afterFinish, finishAction }: Props) {
+export default function HistoricalResults({ game, result, voice, reduced = false, afterFinish, finishAction }: Props) {
+  const w = voiceWords(voice)
+  const you = voice === 'you'
   const user = game.userSlot
   const standings = useMemo(() => [...result.standings].sort((a, b) => a.place - b.place), [result])
   const userRow = standings.find((s) => s.slot === user)
@@ -446,7 +466,7 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
   const roundOfWeek = useMemo(() => new Map((playoffs?.rounds ?? []).map((r) => [r.week, r])), [playoffs])
   const noPlayoffs = format != null && format.playoffWeeks.length === 0
   const lastPlayoffWeek = format && format.playoffWeeks.length > 0 ? Math.max(...format.playoffWeeks) : null
-  const scheduleLine = format ? scheduleNote(format.regularSeasonWeeks, game.teams) : null
+  const scheduleLine = format ? scheduleNote(format.regularSeasonWeeks, game.teams, voice) : null
   const showFinishCol = !old && finalOf.size > 0
 
   const weekOption = (w: HistoricalWeek) => {
@@ -459,18 +479,18 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
   // A playoff week the fan's team did not play: say why, instead of showing an empty lineup.
   let noLineupWhy: string | null = null
   if (!old && !lineupWeek && week?.phase === 'PLAYOFF') {
-    if (roundOfWeek.get(week.week)?.byeSlots.includes(user)) noLineupWhy = 'You had a bye this week.'
-    else if (result.userOutcome === 'MISSED_PLAYOFFS') noLineupWhy = 'Your team did not make the playoffs, so there is no lineup this week.'
-    else noLineupWhy = 'You were eliminated before this week.'
+    if (roundOfWeek.get(week.week)?.byeSlots.includes(user)) noLineupWhy = w.byeLine
+    else if (result.userOutcome === 'MISSED_PLAYOFFS') noLineupWhy = w.missedPlayoffsLine
+    else noLineupWhy = w.eliminatedLine
   }
 
   const unplayed = format ? unplayedLine(format.unusedWeeks, (lastPlayoffWeek ?? format.regularSeasonWeeks) + 1) : null
 
   return (
     <div className="hist-results">
-      <section className="panel hist-finish" aria-label="Your finish">
+      <section className="panel hist-finish" aria-label={w.finishAria}>
         <h2 className={`hist-finish-title cond${!old && result.userOutcome === 'CHAMPION' ? ' champion' : ''}`}>
-          {old ? `You finished ${ordinal(result.userFinish)} of ${game.teams}` : outcomeHeadline(result.userOutcome, result.userFinish, game.teams)}
+          {old ? w.oldFinish(result.userFinish, game.teams) : outcomeHeadline(result.userOutcome, result.userFinish, game.teams, voice)}
         </h2>
         {userRow && (
           <p className="muted">
@@ -480,69 +500,73 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
         )}
         {old && <p className="muted small">Played under the old format: no playoffs, finish is the standings rank.</p>}
         {noPlayoffs && <p className="muted small">This season was too short for playoffs.</p>}
-        {!old && <DraftScore result={result} />}
+        {!old && <DraftScore result={result} voice={voice} />}
         <div className="tm-finish-actions">
           {finishAction}
-          <ShareButton game={game} result={result} />
+          {/* Share is the owner's: somebody else's result already has a link, and "Share your result" is not theirs to press. */}
+          {you && <ShareButton game={game} result={result} />}
         </div>
+        {reduced && <p className="muted small tm-reduced">{sharedReduced}</p>}
       </section>
 
       {!old && (
-        <section className="panel hist-moments" aria-label="The story of your draft">
-          <h2>The story of your draft</h2>
-          <PickGrid game={game} result={result} />
-          <Callouts game={game} result={result} />
+        <section className="panel hist-moments" aria-label={w.momentsHeading}>
+          <h2>{w.momentsHeading}</h2>
+          <PickGrid game={game} result={result} voice={voice} reduced={reduced} />
+          {!reduced && <Callouts game={game} result={result} voice={voice} />}
         </section>
       )}
       {afterFinish}
 
-      {!old && playoffs && <HistoricalBracket playoffs={playoffs} userSlot={user} />}
+      {!old && playoffs && !reduced && <HistoricalBracket playoffs={playoffs} userSlot={user} voice={voice} />}
 
-      {!old && format && (
+      {/* A reduced (still-today) shared result has no comparisons below, so the sentence that points at them is left out. */}
+      {!old && format && (!reduced || unplayed) && (
         <p className="muted small hist-format-note">
-          {unplayed ? `${unplayed} ` : ''}
-          The draft comparisons below cover the whole real season.
+          {[unplayed, reduced ? null : 'The draft comparisons below cover the whole real season.'].filter(Boolean).join(' ')}
         </p>
       )}
 
-      <section className="panel" aria-label="Your draft against hindsight">
-        <h2>You against hindsight</h2>
-        <div className="hist-compare">
-          <div className="hist-stat">
-            <span className="hist-stat-label muted small">{old ? 'You' : 'You, whole real season'}</span>
-            <span className="hist-stat-num">{pts1(h.userPointsFor)}</span>
+      {!reduced && h.pointsFor != null && (
+        <section className="panel" aria-label={w.againstAria}>
+          <h2>{w.againstHeading}</h2>
+          <div className="hist-compare">
+            <div className="hist-stat">
+              <span className="hist-stat-label muted small">{w.mineWhole(old)}</span>
+              <span className="hist-stat-num">{pts1(h.userPointsFor)}</span>
+            </div>
+            <div className="hist-stat">
+              <span className="hist-stat-label muted small">{h.label}</span>
+              <span className="hist-stat-num">{pts1(h.pointsFor)}</span>
+            </div>
           </div>
-          <div className="hist-stat">
-            <span className="hist-stat-label muted small">{h.label}</span>
-            <span className="hist-stat-num">{pts1(h.pointsFor)}</span>
-          </div>
-        </div>
-        {h.userBeatIt ? (
-          <p className="hist-verdict good">You beat the hindsight draft.</p>
-        ) : (
-          <p className="hist-verdict">
-            Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
-          </p>
-        )}
-        <HindsightRoster game={game} result={result} />
-        {old && <Callouts game={game} result={result} />}
-        {!result.pickFinishes && (
-          <p className="muted small">
-            This game finished before pick-by-pick finishes were saved, so there is no drafted-as and finished-as table for it.
-          </p>
-        )}
-      </section>
+          {h.userBeatIt ? (
+            <p className="hist-verdict good">{w.beatIt}</p>
+          ) : (
+            <p className="hist-verdict">
+              Hindsight finished {pts1(h.pointsFor - h.userPointsFor)} points ahead, with the other teams unchanged.
+            </p>
+          )}
+          <HindsightRoster game={game} result={result} voice={voice} />
+          {old && <Callouts game={game} result={result} voice={voice} />}
+          {!result.pickFinishes && (
+            <p className="muted small">
+              This game finished before pick-by-pick finishes were saved, so there is no drafted-as and finished-as table for it.
+            </p>
+          )}
+        </section>
+      )}
 
-      <PickFinishes game={game} result={result} />
+      {!reduced && <PickFinishes game={game} result={result} voice={voice} />}
 
+      {!reduced && (
       <section className="panel" aria-label="Standings">
         <details className="tm-fold">
         <summary>
           <h2>{old ? 'Final standings' : 'Regular season'}</h2>
           {userRow && (
             <span className="muted small tm-fold-hint">
-              You: {ordinal(userRow.place)}, {userRow.wins}-{userRow.losses}
-              {userRow.ties > 0 ? `-${userRow.ties}` : ''}
+              {w.standingsHint(ordinal(userRow.place), `${userRow.wins}-${userRow.losses}${userRow.ties > 0 ? `-${userRow.ties}` : ''}`)}
             </span>
           )}
         </summary>
@@ -556,11 +580,11 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
         <table className="hist-table">
           <thead>
             <tr>
-              <th className="num">{old ? 'Place' : 'Rank'}</th>
-              <th>Team</th>
-              <th className="num">W-L-T</th>
-              <th className="num">Points for</th>
-              {showFinishCol && <th className="num">Finished</th>}
+              <th scope="col" className="num">{old ? 'Place' : 'Rank'}</th>
+              <th scope="col">Team</th>
+              <th scope="col" className="num">W-L-T</th>
+              <th scope="col" className="num">Points for</th>
+              {showFinishCol && <th scope="col" className="num">Finished</th>}
             </tr>
           </thead>
           <tbody>
@@ -571,10 +595,11 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
                     <td colSpan={showFinishCol ? 5 : 4}>Playoff line: the top {playoffs.seeds.length} advance</td>
                   </tr>
                 )}
-                <tr className={s.slot === user ? 'hist-me' : undefined} aria-current={s.slot === user ? 'true' : undefined}>
+                <tr className={drafterClass(voice, s.slot === user)}>
                   <td className="num">{s.place}</td>
                   <td>
-                    {teamName(s.slot, user)}
+                    {w.teamCell(s.slot, user)}
+                    {s.slot === user ? drafterSuffix(voice) : ''}
                     <span className="muted small"> · drafted from slot {s.slot}</span>
                   </td>
                   <td className="num">
@@ -589,13 +614,15 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
         </table>
         </details>
       </section>
+      )}
 
+      {!reduced && (
       <section className="panel" aria-label="Weekly results">
         <details className="tm-fold">
         <summary>
           <h2>Week by week</h2>
           <span className="muted small tm-fold-hint">
-            {weeks.length} {weeks.length === 1 ? 'week' : 'weeks'}, every score and your lineup
+            {w.weeksHint(weeks.length)}
           </span>
         </summary>
         <div className="panel-head">
@@ -635,15 +662,21 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
                 const awayWon = pm ? pm.winnerSlot === m.awaySlot : m.awayPoints > m.homePoints
                 const [homeText, awayText] = pointsPair(m.homePoints, m.awayPoints)
                 return (
-                  <li key={`${m.homeSlot}-${m.awaySlot}`} className={m.homeSlot === user || m.awaySlot === user ? 'hist-me' : undefined}>
-                    <span>{teamName(m.homeSlot, user)}</span>
+                  <li key={`${m.homeSlot}-${m.awaySlot}`} className={drafterClass(voice, m.homeSlot === user || m.awaySlot === user)}>
+                    <span>
+                      {w.teamCell(m.homeSlot, user)}
+                      {m.homeSlot === user ? drafterSuffix(voice) : ''}
+                    </span>
                     <b className={homeWon ? 'win' : ''}>{homeText}</b>
                     <span className="muted">vs</span>
                     <b className={awayWon ? 'win' : ''}>{awayText}</b>
-                    <span>{teamName(m.awaySlot, user)}</span>
+                    <span>
+                      {w.teamCell(m.awaySlot, user)}
+                      {m.awaySlot === user ? drafterSuffix(voice) : ''}
+                    </span>
                     {pm?.decidedBySeed && (
                       <span className="muted small hist-matchup-note">
-                        Level on points. {teamName(pm.winnerSlot, user)} advanced as the better seed.
+                        Level on points. {w.teamInline(pm.winnerSlot, user)} advanced as the better seed.
                       </span>
                     )}
                   </li>
@@ -657,19 +690,19 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
         {noLineupWhy && <p className="hist-bye">{noLineupWhy}</p>}
         {lineupWeek && (
           <>
-            <h3>Your lineup, week {lineupWeek.week}</h3>
+            <h3>{w.lineupHeading(lineupWeek.week)}</h3>
             <p className="muted small">
               {sportOf(game) === 'NFL'
-                ? "Each starter counts his score for the week; your best legal lineup is set for you."
+                ? w.lineupNoteNfl
                 : 'Each starter counts his single best game of the week; the date is the game that was locked.'}
             </p>
             <table className="hist-table">
               <thead>
                 <tr>
-                  <th>Slot</th>
-                  <th>Player</th>
-                  <th>{sportOf(game) === 'NFL' ? 'Game' : 'Locked game'}</th>
-                  <th className="num">Points</th>
+                  <th scope="col">Slot</th>
+                  <th scope="col">Player</th>
+                  <th scope="col">{sportOf(game) === 'NFL' ? 'Game' : 'Locked game'}</th>
+                  <th scope="col" className="num">Points</th>
                 </tr>
               </thead>
               <tbody>
@@ -687,6 +720,7 @@ export default function HistoricalResults({ game, result, afterFinish, finishAct
         )}
         </details>
       </section>
+      )}
     </div>
   )
 }

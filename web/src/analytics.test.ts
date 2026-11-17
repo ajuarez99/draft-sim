@@ -263,8 +263,12 @@ describe('route table vs App.tsx', () => {
     }
   })
 
-  it('the Time Machine table is only the two Time Machine pages and the catch-all', () => {
-    expect(routesFor('timemachine').map((r) => r.path)).toEqual(['/', '/game/:gameId', '*'])
+  // PINNED RULE REWRITTEN (T041, spec 074): was "only the two Time Machine pages and the catch-all". The Redraft site now has
+  // seven pages; the season pages are one template per sport (never the slug, PR-28).
+  it('the Redraft table is its seven pages and the catch-all', () => {
+    expect(routesFor('timemachine').map((r) => r.path)).toEqual([
+      '/', '/daily', '/nba', '/nfl', '/nba/:season', '/nfl/:season', '/game/:gameId', '*',
+    ])
   })
 
   it('the league table has no Time Machine route; the combined table keeps both /history routes', () => {
@@ -277,13 +281,21 @@ describe('route table vs App.tsx', () => {
 describe('routeTemplate per site', () => {
   afterEach(() => vi.unstubAllEnvs())
 
-  it('timemachine: / is Time Machine, /game/:id is the game template, anything else is not found', () => {
+  // PINNED RULE REWRITTEN (T041): signed out used to be recorded as "/(landing)" plus the template, because the site showed one
+  // landing page at every URL. A guest on the Redraft site now views real pages and is recorded under their route (PR-09).
+  it('timemachine: each page has its template, a guest is recorded under it, anything else is not found', () => {
     vi.stubEnv('VITE_SITE', 'timemachine')
-    expect(routeTemplate('/', true)).toEqual({ url: '/', title: 'Time Machine' })
-    expect(routeTemplate('/game/123456789', true)).toEqual({ url: '/game/:game', title: 'Time Machine game' })
-    expect(routeTemplate('/leagues/123456789/power', true).url).toBe('/(not-found)')
-    expect(routeTemplate('/game/123456789', false)).toEqual({ url: '/(landing)/game/:game', title: 'Landing (from Time Machine game)' })
-    expect(routeTemplate('/', false)).toEqual({ url: '/(landing)', title: 'Landing' })
+    for (const signedIn of [true, false]) {
+      expect(routeTemplate('/', signedIn)).toEqual({ url: '/', title: 'Redraft' })
+      expect(routeTemplate('/game/123456789', signedIn)).toEqual({ url: '/game/:game', title: 'Redraft game' })
+      expect(routeTemplate('/daily', signedIn)).toEqual({ url: '/daily', title: 'Game of the day' })
+      expect(routeTemplate('/nba', signedIn).url).toBe('/nba')
+      // One template per sport, never the slug: a season is not a thing the analytics should be able to list.
+      expect(routeTemplate('/nba/2016-17', signedIn)).toEqual({ url: '/nba/:season', title: 'NBA season page' })
+      expect(routeTemplate('/nfl/2007', signedIn)).toEqual({ url: '/nfl/:season', title: 'NFL season page' })
+      expect(routeTemplate('/leagues/123456789/power', signedIn).url).toBe('/(not-found)')
+    }
+    expect(JSON.stringify([routeTemplate('/nba/2016-17', false), routeTemplate('/nfl/2007', false)])).not.toMatch(/2016|2007/)
   })
 
   it('leagues: no Time Machine template; /history is not a page there', () => {
@@ -294,8 +306,8 @@ describe('routeTemplate per site', () => {
   })
 
   it('combined: /history and /history/:id keep their templates', () => {
-    expect(routeTemplate('/history', true)).toEqual({ url: '/history', title: 'Time Machine' })
-    expect(routeTemplate('/history/42', true)).toEqual({ url: '/history/:game', title: 'Time Machine game' })
+    expect(routeTemplate('/history', true)).toEqual({ url: '/history', title: 'Redraft' })
+    expect(routeTemplate('/history/42', true)).toEqual({ url: '/history/:game', title: 'Redraft game' })
   })
 })
 

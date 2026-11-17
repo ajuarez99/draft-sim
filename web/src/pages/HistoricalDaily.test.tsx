@@ -1,14 +1,17 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HistoricalDaily, HistoricalGameSummary, HistoricalSeasonSummary } from '../api'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HistoricalDaily, HistoricalGameSummary } from '../api'
+import { __resetRedraftDataForTests } from '../redraftData'
+import { clearUser, setUser } from '../user'
 import HistoricalDraft from './HistoricalDraft'
 
-// Spec 071: the game of the day and the landing stats on the Time Machine landing page.
+// Spec 071: the game of the day and the landing stats on the Redraft home page. Spec 074: signed in here (the games list, the
+// streak and Abandon are a signed-in visitor's; HistoricalDraft.test.tsx covers the guest's home).
 
 const listHistoricalGames = vi.fn()
-const historicalSeasons = vi.fn()
+const getPublicSeasonList = vi.fn()
 const startHistoricalGame = vi.fn()
 const abandonHistoricalGame = vi.fn()
 const getHistoricalDaily = vi.fn()
@@ -17,7 +20,8 @@ const getHistoricalProfile = vi.fn()
 vi.mock('../api', async (orig) => ({
   ...(await orig<typeof import('../api')>()),
   listHistoricalGames: (...a: unknown[]) => listHistoricalGames(...a),
-  historicalSeasons: (...a: unknown[]) => historicalSeasons(...a),
+  getPublicSeasonList: (...a: unknown[]) => getPublicSeasonList(...a),
+  claimGuestGames: () => Promise.resolve(null),
   startHistoricalGame: (...a: unknown[]) => startHistoricalGame(...a),
   abandonHistoricalGame: (...a: unknown[]) => abandonHistoricalGame(...a),
   getHistoricalDaily: (...a: unknown[]) => getHistoricalDaily(...a),
@@ -25,18 +29,7 @@ vi.mock('../api', async (orig) => ({
   getHistoricalProfile: (...a: unknown[]) => getHistoricalProfile(...a),
 }))
 
-const season: HistoricalSeasonSummary = {
-  sport: 'NBA',
-  seasonStart: 1995,
-  label: '1995-96',
-  source: 'KAGGLE',
-  countedStats: ['pts'],
-  excludedStats: {},
-  statCoverage: { pts: 1 },
-  rankingSource: 'PRIOR_SEASON_POINTS',
-  settingsSource: 'Settings: the Legacy Ball Knowers league.',
-  dataNotes: [],
-}
+const SEASONS = { schema: 1, sport: 'NBA', seasons: [{ sport: 'NBA', seasonStart: 1995, label: '1995-96', slug: '1995-96' }] }
 
 // Far in the future, so the countdown is always there whatever day the test runs.
 const NEXT = '2999-01-02T05:00:00Z'
@@ -63,18 +56,22 @@ const game = (id: number, over: Partial<HistoricalGameSummary> = {}): Historical
   formatVersion: 2,
   outcome: 'LOST_FINAL',
   createdAt: '2026-11-01T12:00:00Z',
+  chosenSeason: false,
   ...over,
 })
 
 beforeEach(() => {
+  __resetRedraftDataForTests()
+  setUser({ sleeperUserId: 'u1', username: 'u1', displayName: 'U One', avatar: null })
   listHistoricalGames.mockReset().mockResolvedValue([])
-  historicalSeasons.mockReset().mockResolvedValue([season])
+  getPublicSeasonList.mockReset().mockResolvedValue(SEASONS)
   startHistoricalGame.mockReset()
   abandonHistoricalGame.mockReset()
   getHistoricalDaily.mockReset().mockResolvedValue([])
   startHistoricalDaily.mockReset()
   getHistoricalProfile.mockReset().mockRejectedValue(new Error('no profile'))
 })
+afterEach(() => clearUser())
 
 function renderPage() {
   return render(
@@ -128,13 +125,26 @@ describe('Time Machine landing: the game of the day', () => {
     expect(within(section).queryByRole('button', { name: /Play today/ })).toBeNull()
   })
 
-  it('shows no game of the day when the server has none to offer or does not know the route', async () => {
-    getHistoricalDaily.mockRejectedValue(new Error('404'))
+  it('says the games did not load, with Try again, when the request fails (spec 074: it used to show nothing)', async () => {
+    // PINNED RULE REWRITTEN (T041): spec 071 hid the whole section on a failed request (an old backend has no such route).
+    // The Redraft home is a public page with real content under it, so a missing game of the day is said, and can be retried.
+    getHistoricalDaily.mockRejectedValueOnce(new Error('404')).mockResolvedValue([daily()])
     renderPage()
-    await screen.findByRole('button', { name: 'Draft a random year' })
-    await waitFor(() => expect(getHistoricalDaily).toHaveBeenCalled())
-    expect(screen.queryByRole('region', { name: 'Game of the day' })).toBeNull()
-    expect(screen.queryByText(/went wrong|404/i)).toBeNull()
+    expect(await screen.findByText("Today's games didn't load.")).toBeInTheDocument()
+    expect(screen.queryByText(/404/)).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByText('1988-89')).toBeInTheDocument()
+    expect(getHistoricalDaily).toHaveBeenCalledTimes(2)
+  })
+
+  it('shows a guest the sign-in line for the streak and no streak pill', async () => {
+    clearUser()
+    getHistoricalDaily.mockResolvedValue([daily({ streak: 4 })])
+    renderPage()
+    const section = await dailySection()
+    await within(section).findByText('1988-89')
+    expect(within(section).getByText(/Sign in to keep a daily streak\./)).toBeInTheDocument()
+    expect(within(section).queryByText(/streak$/)).toBeNull()
   })
 
   it('shows the failure when starting the daily game fails, and keeps the page usable', async () => {

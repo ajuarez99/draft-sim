@@ -59,6 +59,7 @@ class LeagueLockMappingsIT {
     ));
     /** Public by prefix: the Time Machine and the sign-in username lookup. Listed one by one on purpose. */
     private static final Set<String> EXPECTED_PUBLIC_HISTORY_AND_LOOKUP = new TreeSet<>(Set.of(
+            "/api/history/claim",
             "/api/history/daily",
             "/api/history/games",
             "/api/history/games/{id}",
@@ -68,6 +69,10 @@ class LeagueLockMappingsIT {
             "/api/history/games/{id}/pick",
             "/api/history/profile",
             "/api/history/profile/seen",
+            "/api/history/public/daily/yesterday",
+            "/api/history/public/games/{id}",
+            "/api/history/public/seasons",
+            "/api/history/public/seasons/{sport}/{slug}",
             "/api/history/seasons",
             "/api/sleeper/user/{usernameOrId}"
     ));
@@ -164,5 +169,39 @@ class LeagueLockMappingsIT {
         }
         assertTrue(checked > 100, "expected to walk the whole API, walked " + checked);
         assertTrue(failures.isEmpty(), "routes that did not refuse an anonymous caller: " + failures);
+    }
+
+    /**
+     * Spec 074 PR-01: the Redraft's public routes under /api/history/public answer WITHOUT a session while the lock is
+     * ON. Production runs with the lock on and every local test with it off, so a route outside the allowlist would
+     * pass everywhere except where it matters. Each call carries no credentials of any kind; the status is the
+     * route's own (200, 400, 404 or 403), never the lock's 401 league_session_required.
+     */
+    @Test
+    void everyRedraftPublicRouteAnswersWithoutASessionWhileTheLockIsOn() throws Exception {
+        String[][] calls = {
+                {"GET", "/api/history/public/seasons?sport=NBA", "200"},
+                {"GET", "/api/history/public/seasons", "400"},
+                {"GET", "/api/history/public/seasons/NBA/not-a-season", "404"},
+                {"GET", "/api/history/public/seasons/XXX/2016-17", "404"},
+                {"GET", "/api/history/public/daily/yesterday", "200"},
+                {"GET", "/api/history/public/games/2147483000", "404"},
+                // the changed history routes: 401 is the ROUTE'S (no identity at all), not the lock's
+                {"GET", "/api/history/games", "401"},
+                {"POST", "/api/history/claim", "400"},
+        };
+        for (String[] c : calls) {
+            MockHttpServletRequestBuilder b = MockMvcRequestBuilders.request(HttpMethod.valueOf(c[0]), c[1])
+                    .contentType(MediaType.APPLICATION_JSON).accept(MediaType.ALL);
+            MvcResult res = mvc.perform(b).andReturn();
+            String body = res.getResponse().getContentAsString();
+            assertEquals(Integer.parseInt(c[2]), res.getResponse().getStatus(), c[0] + " " + c[1] + " -> " + body);
+            assertTrue(!body.contains("league_session_required"), c[0] + " " + c[1] + " was refused by the lock: " + body);
+        }
+        // a guest id alone reaches the controller and is refused as a GUEST, not by the lock
+        MvcResult guest = mvc.perform(MockMvcRequestBuilders.get("/api/history/profile")
+                .header("X-Guest-Id", "123e4567-e89b-12d3-a456-426614174000")).andReturn();
+        assertEquals(403, guest.getResponse().getStatus());
+        assertTrue(guest.getResponse().getContentAsString().contains("GUEST_LIMIT"));
     }
 }

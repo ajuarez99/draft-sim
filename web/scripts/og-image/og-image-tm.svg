@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <!-- Spec 073 share-preview source for the Time Machine site. Rendered to ../../public/og-image-tm.png by render.mjs
+  <!-- Spec 073 share-preview source for the Ball Knowers Redraft site (named Time Machine until spec 074). Rendered to ../../public/og-image-tm.png by render.mjs
        (see that file's header). Same style as og-image.svg: all text sits inside the centred 630x630 square
        (x 285..915) so a square crop keeps it, colours are the app's dark tokens as sRGB, and there are no real
-       names or data. Wording matches src/tmLandingCopy.ts. -->
+       names or data. Wording matches src/redraftCopy.ts (brand, home tagline). "Ball Knowers" and "Redraft" are two lines because the full name does not fit the square at this size. -->
   <rect width="1200" height="630" fill="#040913"/>
   <!-- abstract tiles, behind the text and clear of the square: a row of "weeks" each side, the win/loss tints of the reveal -->
   <g opacity="0.9">
@@ -15,17 +15,17 @@
     <rect x="960" y="310" width="200" height="120" rx="14" fill="#0d2a1b" stroke="#37a05a" stroke-width="2"/>
     <rect x="960" y="450" width="200" height="120" rx="14" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
   </g>
-  <!-- the clock mark from the Time Machine hero -->
+  <!-- the clock mark from the Redraft hero -->
   <g transform="translate(570 92) scale(1.25)" fill="none" stroke="#4fd1c5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
     <path d="M9 24a15 15 0 1 0 5-11.2"/>
     <path d="M8 7v7h7"/>
     <path d="M24 16v9l6 4"/>
   </g>
   <text x="600" y="190" text-anchor="middle" font-family="Bahnschrift, 'Arial Narrow', Arial, sans-serif" font-size="40" letter-spacing="7" fill="#8d96a5">BALL KNOWERS</text>
-  <text x="600" y="276" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="64" fill="#f1f3f6">Time Machine</text>
-  <text x="600" y="346" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="38" fill="#f1f3f6">Draft a real season.</text>
-  <text x="600" y="396" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="38" fill="#f1f3f6">See how it played out.</text>
-  <text x="600" y="440" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="24" fill="#8d96a5">Free with a Sleeper username</text>
+  <text x="600" y="276" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="64" fill="#f1f3f6">Redraft</text>
+  <text x="600" y="346" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="38" fill="#f1f3f6">Draft a past</text>
+  <text x="600" y="396" text-anchor="middle" font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="38" fill="#f1f3f6">NBA or NFL season</text>
+  <text x="600" y="440" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="24" fill="#8d96a5">Free, no sign-up</text>
   <g font-family="Bahnschrift, 'Segoe UI', Arial, sans-serif" font-weight="700" font-size="26" letter-spacing="3" text-anchor="middle">
     <rect x="450" y="476" width="130" height="52" rx="26" fill="#0b2a2b" stroke="#1f9d94" stroke-width="2"/>
     <text x="515" y="512" fill="#4fd1c5">NBA</text>

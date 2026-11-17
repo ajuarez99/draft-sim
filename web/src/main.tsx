@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useLayoutEffect, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
@@ -30,10 +30,24 @@ if (currentSite().site === 'leagues') {
 // Spec 052: a no-op unless this build has a website id and the page is on the production host.
 initAnalytics()
 
+/**
+ * public/boot.js marks a signed-in visitor (html[data-bk-user]) so styles.css can hide the signed-out parts of the delivered
+ * static page until the bundle mounts. Once React's tree has replaced that markup the mark is spent: it is taken off in the
+ * commit that does the replacing, so a visitor who later signs out sees the signed-out controls the app renders.
+ */
+function BootMarkSpent({ children }: { children: ReactNode }) {
+  useLayoutEffect(() => {
+    document.documentElement.removeAttribute('data-bk-user')
+  }, [])
+  return children
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <BootMarkSpent>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </BootMarkSpent>
   </StrictMode>,
 )

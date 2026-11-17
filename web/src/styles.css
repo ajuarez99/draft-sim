@@ -5476,6 +5476,11 @@ th .grade-early { text-transform: none; letter-spacing: 0; font-weight: 500; mar
 .app > .landing-prerender { flex: 1 1 auto; min-height: 0; min-width: 0; display: flex; flex-direction: column; }
 .landing-prerender > .content { padding: 16px 20px; }
 html[data-bk-user] .landing-prerender { display: none; }
+/* Spec 074 V-04: the same for the Redraft static pages. Their signed-out parts (the top bar's Sign in link and the home
+   page's "Keep your games" panel) are hidden for a signed-in visitor until the bundle mounts; main.tsx takes the mark off
+   in the commit that replaces this markup, so nothing here applies to the mounted app. */
+html[data-bk-user] .topbar-signin,
+html[data-bk-user] .app-main .tm-signin { display: none; }
 
 @media (max-width: 560px) {
   .landing { gap: 22px; }
@@ -7253,7 +7258,8 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm-game-actions { display: flex; gap: 8px; flex: none; }
 
 /* Results: the finish is the headline, then the story of the draft, then everything else in reading order. */
-.tm-kicker { margin: 16px 0 -36px; text-align: center; font-size: 15px; font-weight: 700; color: var(--muted); }
+/* The kicker is the page's h1 (C8). Normal flow spacing: a negative margin overlapped the title when it wrapped (C14). */
+.tm-kicker { margin: 16px 0 8px; text-align: center; font-size: 15px; font-weight: 700; line-height: 1.3; color: var(--muted); }
 .tm-page .hist-results { gap: 44px; margin-bottom: 0; }
 .tm-page .hist-finish { display: grid; justify-items: center; text-align: center; gap: 6px; }
 .tm-page .hist-finish p { margin: 0; }
@@ -7269,6 +7275,9 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm-page .hist-callout-bust h3 { color: var(--down); }
 .tm-page .hist-callout-steal { background: color-mix(in oklab, var(--you) 12%, var(--panel)); }
 .tm-page .hist-callout-steal h3 { color: var(--you-text); }
+/* --you means "you, the person reading": on somebody else's page nobody reading is that team (A2). */
+.tm-page .hist-callout-steal.shared { background: var(--raised); }
+.tm-page .hist-callout-steal.shared h3 { color: var(--text); }
 .tm-page .hist-stat-num { font-size: 32px; font-weight: 900; }
 .tm-page .hist-verdict { font-size: 16px; }
 .tm-page .hist-table th { font-size: 12.5px; font-weight: 700; color: var(--muted); }
@@ -7349,7 +7358,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
   background: var(--raised); color: var(--muted);
 }
 .tm-pick.ahead { background: color-mix(in oklab, var(--up) 26%, var(--panel)); color: var(--up); }
-.tm-pick.behind { background: color-mix(in oklab, var(--down) 24%, var(--panel)); color: var(--down); }
+.tm-pick.behind { background: color-mix(in oklab, var(--down) 24%, var(--panel)); color: color-mix(in oklab, var(--down) 85%, var(--text)); } /* V-06: --down itself measured 4.45:1 on this tint; this is 5.21:1 */
 .tm-pick-mark { font-size: 13px; font-weight: 900; }
 .tm-pick-round { font-size: 13px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
 .tm-pick:hover { filter: brightness(1.15); }
@@ -7376,7 +7385,7 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm-fold[open] > summary { margin-bottom: 14px; }
 .tm-fold > summary:hover h2, .tm-fold > summary:hover h3, .tm-fold > summary:hover .tm-fold-link { color: var(--brand); }
 .tm-fold > summary:focus-visible { outline: 2px solid var(--text); outline-offset: 4px; border-radius: 8px; }
-.tm-fold-link { font-size: 14px; font-weight: 700; color: var(--muted); }
+.tm-fold-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 700; color: var(--muted); }
 .tm-page .tm-fold .panel-head { margin-bottom: 10px; }
 .tm-xp { margin: 0 0 8px; font-size: 16px; }
 .tm-xp-num { font-size: 30px; font-weight: 900; font-variant-numeric: tabular-nums; }
@@ -7415,6 +7424,8 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm-page .tm-daily h2 { margin: 0; text-align: center; }
 .tm-daily-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
 .tm-daily-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-radius: 20px; background: color-mix(in oklab, var(--brand) 14%, var(--panel)); }
+.tm-daily-card.nba { background: color-mix(in oklab, var(--sport-nba) 14%, var(--panel)); }
+.tm-daily-card.nfl { background: color-mix(in oklab, var(--sport-nfl) 14%, var(--panel)); }
 .tm-daily-card.done { background: var(--panel); }
 .tm-daily-text { display: grid; gap: 2px; min-width: 0; }
 .tm-daily-sport { font-size: 13px; font-weight: 800; color: var(--muted); }
@@ -7424,6 +7435,9 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .tm-daily-note { margin: 0; text-align: center; }
 .tm-daily-card .tm-btn { flex: none; }
 .tm-btn:disabled { opacity: 0.5; cursor: default; }
+/* aria-disabled, not disabled, on a button that is busy or limited: a disabled button drops the focus it holds (C3). */
+.tm-play[aria-disabled="true"], .tm-btn[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+.tm-play[aria-disabled="true"]:active { transform: none; box-shadow: 0 4px 0 color-mix(in oklab, var(--brand) 55%, black); }
 
 .tm-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin: 0 0 14px; }
 .tm-stats > div { padding: 14px 16px; border-radius: 18px; background: var(--panel); display: grid; gap: 2px; }
@@ -7480,4 +7494,114 @@ td.rv-po { border-left: 1px dashed var(--line); }
 .lock-alert .error { margin: 8px 0 0; }
 @media (max-width: 480px) {
   .lock-card { padding: 22px 16px; }
+}
+
+/* --- Spec 074: Redraft public pages (season page, sport index, daily, home, shared result, 404). ---------------------
+   design.md. Everything is inside the `.tm` scope and uses existing tokens: no new colour, no new fixed layer (nothing
+   here is pinned to the viewport, so the layer ladder at the top is untouched). Navigation is a pill LINK (never brand-filled); the one
+   brand-filled control on a page is its primary action (.tm-play / .tm-btn), per the control hierarchy above. */
+.tm-pill-link {
+  display: inline-block; padding: 10px 14px; border-radius: 12px; background: var(--raised); color: var(--text);
+  font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; text-decoration: none; min-height: 20px;
+}
+.tm-pill-link:hover { color: var(--text); filter: brightness(1.12); }
+.tm-pill-link:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+.tm-facts { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); }
+.tm-going-in { margin: 6px 0 0; max-width: 62ch; }
+.tm-points-note { margin: 0; max-width: 62ch; }
+.tm-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+
+/* Season page: the spoiler fold, its lists and the rank rows. Ranks are text; there are no bars. */
+.tm-spoilers { background: var(--panel); border-radius: 22px; padding: 20px 22px; }
+.tm-spoilers > summary h2 { font-size: 20px; }
+.tm-fold-hint { font-weight: 600; }
+.tm-spoilers h3 { margin: 22px 0 4px; }
+.tm-spoilers > .tm-fold { margin-top: 20px; }
+.tm-rank-list, .tm-movers { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.tm-rank-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 4px; }
+.tm-rank-num { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--muted); text-align: center; }
+.tm-rank-list.tm-top > .tm-rank-row:first-child { padding-block: 12px; }
+.tm-rank-list.tm-top > .tm-rank-row:first-child .tm-rank-num { font-size: 26px; color: var(--text); }
+.tm-rank-list.tm-top > .tm-rank-row:first-child .tm-rank-who strong, .tm-movers > .tm-mover:first-child .tm-rank-who strong { font-size: 18px; }
+.tm-rank-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.tm-rank-who strong { font-weight: 800; }
+.tm-rank-sub { flex-basis: 100%; }
+.tm-rank-pts { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tm-mover { padding: 8px 12px 10px; border-radius: 16px; }
+.tm-movers.bust > .tm-mover { background: color-mix(in oklab, var(--down) 14%, var(--panel)); }
+.tm-movers.steal > .tm-mover { background: color-mix(in oklab, var(--up) 14%, var(--panel)); }
+.tm-mover-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 4px 0; }
+.tm-move-nums { display: flex; flex-wrap: wrap; gap: 4px 20px; margin: 0; }
+.tm-move-nums > div { display: flex; gap: 6px; align-items: baseline; }
+.tm-move-nums dt { font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.tm-move-nums dd { margin: 0; font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tm-move-delta { margin: 2px 0 0; font-size: 14px; font-weight: 800; }
+.tm-slot-pts { float: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tm-page .hist-slots > li { padding: 4px 2px; }
+.tm-dream-total { margin: 6px 0 0; }
+.tm-pos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.tm-pos-grid h4 { margin: 0 0 4px; font-size: 15px; font-weight: 800; }
+.tm-pos-grid .tm-rank-row { grid-template-columns: 24px minmax(0, 1fr) auto; padding: 4px 0; }
+.tm-pos-grid .tm-rank-num { font-size: 15px; }
+.tm-neighbours { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.tm-foot { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 18px; font-size: 14px; font-weight: 700; padding-top: 8px; }
+.tm-foot a { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; color: var(--muted); text-decoration: none; padding: 11px 4px; }
+.tm-foot a:hover { color: var(--text); }
+.tm-foot a:focus-visible, .tm-sport-tile:focus-visible, .tm-newest:focus-visible, .tm-fold-link:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+.tm-spoilers > .tm-fold > summary { padding-block: 10px; }
+
+/* The guest limit panel: inline, never a modal. */
+.tm-limit { width: 100%; max-width: 520px; box-sizing: border-box; display: grid; gap: 10px; text-align: left; padding: 20px 22px; border-radius: 22px; background: color-mix(in oklab, var(--brand) 12%, var(--panel)); }
+.tm-page .tm-limit h2 { margin: 0; font-size: 18px; }
+.tm-limit h2:focus { outline: 2px solid var(--text); outline-offset: 3px; border-radius: 4px; }
+.tm-limit p { margin: 0; }
+.tm-limit-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Sport index. */
+.tm-newest { display: grid; gap: 2px; justify-items: center; padding: 16px 28px; border-radius: 22px; text-decoration: none; color: var(--text); background: var(--panel); }
+.tm-newest strong { font-size: 28px; font-weight: 900; }
+.tm-newest.nba, .tm-sport-tile.nba { background: color-mix(in oklab, var(--sport-nba) 14%, var(--panel)); }
+.tm-newest.nfl, .tm-sport-tile.nfl { background: color-mix(in oklab, var(--sport-nfl) 14%, var(--panel)); }
+.tm-newest:hover, .tm-sport-tile:hover { color: var(--text); filter: brightness(1.1); }
+.tm-decade-head { display: flex; align-items: baseline; gap: 10px; }
+.tm-years { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+.tm-years .tm-pill-link { display: block; text-align: center; }
+/* Phone width: the controls a thumb has to hit are at least 44px tall (C12). */
+@media (max-width: 640px) {
+  .tm-btn, .tm-sport, .topbar-signin, .tm-pill-link { min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; }
+  .tm-years .tm-pill-link { display: flex; }
+}
+
+/* Home: the sport tiles, the sign-in panel, the chosen-season pill, the bar's Sign in link. */
+.tm-daily-block { display: grid; gap: 10px; }
+.tm-random { display: grid; justify-items: center; gap: 12px; }
+.tm-sport-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.tm-sport-tile { display: grid; gap: 4px; padding: 20px 22px; border-radius: 22px; text-decoration: none; color: var(--text); }
+.tm-sport-tile strong { font-size: 24px; font-weight: 900; }
+.tm-signin { display: grid; gap: 10px; padding: 24px; border-radius: 22px; background: var(--panel); scroll-margin-top: 12px; }
+.tm-signin h2 { margin: 0; }
+.tm-signin p { margin: 0; }
+.tm-signin .signin-note { text-align: left; }
+.tm-signin .signin-input { background: var(--bg); }
+.tm-claim { outline-offset: 3px; }
+.tm-game-chosen { font-size: 12.5px; font-weight: 800; padding: 1px 9px; border-radius: 999px; background: var(--raised); color: var(--text); }
+.tm-claim { text-align: center; margin: 0; }
+.tm-not-counted { margin: 0; text-align: center; }
+.topbar-signin { margin-left: auto; padding: 8px 14px; border-radius: 999px; background: var(--raised); color: var(--text); font-size: 14px; font-weight: 800; text-decoration: none; }
+.topbar-signin:hover { color: var(--text); filter: brightness(1.12); }
+.topbar-signin:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
+
+/* A shared result: the drafter is marked by a bar and a raised surface in the text colour, never the viewer's --you.
+   (--you means "you, the person reading"; on someone else's page nobody reading is that team.) */
+.tm-page .tm-drafter { background: var(--raised); box-shadow: inset 3px 0 0 var(--text); }
+.tm-reduced { margin: 4px 0 0; }
+
+/* The fold chevron turns; with reduced motion it only changes. */
+@media (prefers-reduced-motion: reduce) {
+  .tm-fold > summary::after { transition: none; }
+}
+@media (max-width: 640px) {
+  .tm-spoilers { padding: 16px 14px; }
+  .tm-rank-row { grid-template-columns: 32px minmax(0, 1fr) auto; }
 }

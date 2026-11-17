@@ -56,6 +56,7 @@ function fixture(): HistoricalGameState[] {
       picks: picks.map((p) => ({ ...p })),
       available: done ? [] : [...available],
       result: null,
+      chosenSeason: false,
     }
   }
   const take = (seat: 'USER' | 'BOT') => {

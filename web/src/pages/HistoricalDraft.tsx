@@ -1,27 +1,37 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   abandonHistoricalGame,
-  getHistoricalDaily,
+  claimGuestGames,
   getHistoricalProfile,
-  historicalSeasons,
   listHistoricalGames,
-  startHistoricalDaily,
   startHistoricalGame,
-  type HistoricalDaily,
   type HistoricalGameSummary,
   type HistoricalProfile,
   type HistoricalSport,
-  type HistoricalSeasonSummary,
 } from '../api'
 import { useFailure } from '../useFailure'
-import HowThisWorks from '../components/HowThisWorks'
+import DailyCards, { useDailyGames, useStartDaily } from '../components/DailyCards'
 import HistoricalProfileCard from '../components/HistoricalProfileCard'
-import { howToPlaySteps, sportOf, summaryStatus } from '../historicalCopy'
-import { tmGame } from '../site'
+import ClaimLine from '../components/ClaimLine'
+import RedraftFoot from '../components/RedraftFoot'
+import { noteClaim, peekGuestId } from '../guest'
+import { sportOf, summaryStatus } from '../historicalCopy'
+import { usePageTitle } from '../pageTitle'
+import * as copy from '../redraftCopy'
+import { useHomeLists } from '../redraftData'
+import { SPORTS } from '../redraftPages'
+import { tmDaily, tmGame, tmSportIndex } from '../site'
 import { currentSite } from '../siteEnv'
 import { clearDraftQueue } from '../useDraftQueue'
-import { countdown, dayLabel, landingStats } from '../historicalDaily'
+import { dayLabel, landingStats } from '../historicalDaily'
+import { useUser } from '../user'
+import TimeMachineSignIn from './TimeMachineSignIn'
+
+// Spec 074 T038 / design.md §4: ONE home for a guest and a signed-in visitor. A guest sees the game of the day, the
+// season tiles, the games kept in this browser (only if there are any) and a "Keep your games" sign-in panel; a
+// signed-in visitor also gets the random-year control, the games list and the profile. The element tree for the
+// guest's first paint mirrors homeBody() in seasonPageHtml.ts (what index.html delivers).
 
 function when(iso: string): string {
   const d = new Date(iso)
@@ -30,51 +40,52 @@ function when(iso: string): string {
 
 const SPORT_LABEL: Record<HistoricalSport, string> = { NBA: 'Basketball', NFL: 'Football' }
 
-/** The offered football range, from the seasons the server actually offers (never a literal): "2000 to 2025". */
-function nflRange(rows: HistoricalSeasonSummary[]): string {
-  if (rows.length === 0) return ''
-  const starts = rows.map((r) => r.seasonStart)
-  return `${Math.min(...starts)} to ${Math.max(...starts)}`
-}
-
-/** Per-sport wording. Football never mentions the NBA, 1970-71 or a draft-position feed. */
-const COPY: Record<HistoricalSport, (range: string) => { sub: string; scoring: string; how: string }> = {
-  NBA: () => ({
-    sub: 'Draft a team from a real NBA season, then watch that season play out.',
-    scoring: "It runs as lock-in best ball: each starter's best game of the week counts, and your best legal lineup is set for you.",
-    how: "Seasons run from 1970-71 to the latest complete one. Only stats the NBA tracked for essentially the whole season count, and each season says which. Opponents draft from last season's points, not from a real draft-position feed.",
-  }),
-  NFL: (range) => ({
-    sub: `Draft a team from a real NFL season${range ? `, ${range},` : ''} then watch that season play out.`,
-    scoring:
-      'It runs as weekly best ball on real full-PPR scores: your best legal lineup is set for you each week. Quarterbacks, running backs, wide receivers and tight ends only; no kickers or defenses.',
-    how: `Seasons run${range ? ` from ${range}` : ' over the years on offer'}. Scores come from the real weekly stat lines. Opponents draft from last season's points over replacement, not from a real draft-position feed.`,
-  }),
-}
-
 export default function HistoricalDraft() {
+  usePageTitle(copy.homeTitle)
+  const user = useUser()
   const navigate = useNavigate()
+  const location = useLocation()
   const { error, fail, setError } = useFailure()
   const [games, setGames] = useState<HistoricalGameSummary[] | null>(null)
-  const [nbaRows, setNbaRows] = useState<HistoricalSeasonSummary[] | null>(null)
-  const [nflRows, setNflRows] = useState<HistoricalSeasonSummary[] | null>(null)
-  // Spec 064: a failed profile request shows nothing, so the page looks as it did before achievements.
   const [profile, setProfile] = useState<HistoricalProfile | null>(null)
-  const [seasonsFailed, setSeasonsFailed] = useState(false)
-  const [starting, setStarting] = useState(false)
-  // Spec 071. A failed request (an old backend has no such route) shows no game of the day, and nothing else changes.
-  const [daily, setDaily] = useState<HistoricalDaily[] | null>(null)
-  const [now, setNow] = useState(() => Date.now())
+  const [startingRandom, setStartingRandom] = useState(false)
   // Basketball is only the preselected tab; every request still carries the sport explicitly.
   const [chosen, setSport] = useState<HistoricalSport>('NBA')
+  const { lists, status: listsStatus, retry: retryLists } = useHomeLists()
+  const daily = useDailyGames()
+  const startDaily = useStartDaily()
+
+  // Games: a signed-in visitor always; a guest only when this browser has made a guest id (no id, no games).
+  // A claim left over from an earlier sign-in (it failed then) is tried again first, so the list is the merged one.
+  useEffect(() => {
+    if (!user && !peekGuestId()) {
+      setGames([])
+      return
+    }
+    let current = true
+    ;(async () => {
+      if (user && peekGuestId()) {
+        try {
+          const c = await claimGuestGames(user.sleeperUserId)
+          if (c) noteClaim(c)
+        } catch {
+          // Kept for the next visit: the id is only dropped after a 200.
+        }
+      }
+      const g = await listHistoricalGames()
+      if (current) setGames(g)
+    })().catch((e) => current && fail(e))
+    return () => {
+      current = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.sleeperUserId])
 
   useEffect(() => {
-    listHistoricalGames()
-      .then(setGames)
-      .catch((e) => fail(e))
-  }, [])
-
-  useEffect(() => {
+    if (!user) {
+      setProfile(null)
+      return
+    }
     let current = true
     getHistoricalProfile()
       .then((p) => current && setProfile(p))
@@ -82,85 +93,41 @@ export default function HistoricalDraft() {
     return () => {
       current = false
     }
-  }, [])
+  }, [user?.sleeperUserId])
 
-  function loadDaily() {
-    getHistoricalDaily()
-      .then((d) => setDaily(Array.isArray(d) ? d : null))
-      .catch(() => setDaily(null))
-  }
-  useEffect(loadDaily, [])
-
-  // The countdown ticks twice a minute; when the day rolls over, ask for the new day's game.
-  const nextAt = daily && daily.length > 0 ? daily[0].nextAt : null
+  // `/#sign-in` (the bar's "Sign in" link from any page) scrolls the panel into view once the page has it, and moves
+  // focus to the panel's heading (not the input: a phone would open its keyboard). `location.key` is in the list so a
+  // second tap on "Sign in", which changes no hash, does it again (C4).
   useEffect(() => {
-    if (!nextAt) return
-    const t = window.setInterval(() => {
-      const at = Date.now()
-      setNow(at)
-      if (new Date(nextAt).getTime() <= at) loadDaily()
-    }, 30_000)
-    return () => window.clearInterval(t)
-  }, [nextAt])
-
-  // The settings line is the same for every season of a sport; a failure here only loses that line.
-  // A 053 backend ignores ?sport= and returns basketball rows with no `sport` field, so football rows are kept only
-  // when they say NFL themselves: that is what decides whether the Football choice is offered at all (it also stays
-  // hidden until the post-deploy NFLVERSE import has put at least one season in).
-  useEffect(() => {
-    let current = true
-    historicalSeasons('NBA')
-      .then((x) => current && setNbaRows(x.filter((r) => sportOf(r) === 'NBA')))
-      .catch(() => {
-        if (!current) return
-        setSeasonsFailed(true)
-        setNbaRows([])
-      })
-    historicalSeasons('NFL')
-      .then((x) => current && setNflRows(x.filter((r) => r.sport === 'NFL')))
-      .catch(() => {
-        if (!current) return
-        setSeasonsFailed(true)
-        setNflRows([])
-      })
-    return () => {
-      current = false
+    if (location.hash !== '#sign-in') return
+    const el = document.getElementById('sign-in')
+    if (!el) return
+    if (typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'start' })
+    const h = el.querySelector('h2')
+    if (h) {
+      h.setAttribute('tabindex', '-1')
+      h.focus({ preventScroll: true })
     }
-  }, [])
+  }, [location.hash, location.key, user])
 
-  // A sport is offered only once the server lists at least one of its seasons: prod ran with football imported
-  // and basketball not (2026-11-08), and the Basketball tab then failed every start. If a seasons request failed we
-  // can't tell, so the old behaviour stands (basketball preselected, start allowed) rather than locking the page.
-  const loaded = nbaRows !== null && nflRows !== null
-  const offered = (['NBA', 'NFL'] as const).filter((sp) => ((sp === 'NFL' ? nflRows : nbaRows) ?? []).length > 0)
-  const sport: HistoricalSport = offered.includes(chosen) || seasonsFailed ? chosen : (offered[0] ?? chosen)
-  const nothingOffered = loaded && !seasonsFailed && offered.length === 0
-  const seasons = sport === 'NFL' ? nflRows : nbaRows
-  const copy = COPY[sport](nflRange(nflRows ?? []))
+  // A sport is offered for the random year only once the server lists at least one of its seasons.
+  const offered = SPORTS.filter((sp) => (lists[sp]?.seasons.length ?? 0) > 0)
+  const sport: HistoricalSport = offered.includes(chosen) ? chosen : (offered[0] ?? chosen)
+  // The random year needs no list to work (the server picks the season); it is only hidden when the lists loaded and
+  // offered nothing. While they are still loading it waits; if they failed it stays available (CR-09).
+  const cfg = currentSite()
+  const dailyPath = tmDaily(cfg)
 
-  async function start() {
-    if (starting) return
-    setStarting(true)
+  async function startRandom() {
+    if (startingRandom) return
+    setStartingRandom(true)
     setError(null)
     try {
       const g = await startHistoricalGame(sport)
       navigate(tmGame(currentSite(), g.id))
     } catch (e) {
       fail(e)
-      setStarting(false)
-    }
-  }
-
-  async function startDaily(sp: HistoricalSport) {
-    if (starting) return
-    setStarting(true)
-    setError(null)
-    try {
-      const g = await startHistoricalDaily(sp)
-      navigate(tmGame(currentSite(), g.id))
-    } catch (e) {
-      fail(e)
-      setStarting(false)
+      setStartingRandom(false)
     }
   }
 
@@ -175,29 +142,9 @@ export default function HistoricalDraft() {
     }
   }
 
-  const settingsSource = seasons && seasons.length > 0 ? seasons[0].settingsSource : null
   const visible = (games ?? []).filter((g) => g.status !== 'ABANDONED')
   const stats = landingStats(visible)
-  const left = nextAt ? countdown(nextAt, now) : null
-
-  // A first-timer reads the rules right under the button; once there are games, the games come first.
-  const howToPlay = (
-    <section className="tm-section" aria-label="How to play">
-      <h2>How to play</h2>
-      <ol className="tm-steps">
-        {howToPlaySteps(copy.scoring).map((s) => (
-          <li key={s.title}>
-            <strong>{s.title}</strong>
-            <span>{s.body}</span>
-          </li>
-        ))}
-      </ol>
-      <HowThisWorks>
-        <p>{copy.how}</p>
-        {settingsSource && <p>{settingsSource}</p>}
-      </HowThisWorks>
-    </section>
-  )
+  const busy = startingRandom || startDaily.starting
 
   return (
     <div className="content tm tm-page">
@@ -209,162 +156,206 @@ export default function HistoricalDraft() {
             <path d="M24 16v9l6 4" />
           </svg>
         </span>
-        <h1 className="tm-title">Time Machine</h1>
-        <p className="tm-tagline">{copy.sub}</p>
-        {daily && daily.length > 0 && (
-          <section className="tm-daily" aria-label="Game of the day">
-            <h2>Game of the day</h2>
-            <ul className="tm-daily-cards">
-              {daily.map((d) => (
-                <li key={d.sport} className={`tm-daily-card${d.gameStatus === 'COMPLETE' ? ' done' : ''}`}>
-                  <div className="tm-daily-text">
-                    <span className="tm-daily-sport">{SPORT_LABEL[d.sport]}</span>
-                    <strong className="tm-daily-season">{d.seasonLabel}</strong>
-                    {d.gameStatus === 'COMPLETE' ? (
-                      <span className="tm-daily-state">
-                        {d.draftScore != null ? `Done. Draft score ${d.draftScore}` : 'Done'}
-                      </span>
-                    ) : d.gameStatus === 'DRAFTING' ? (
-                      <span className="tm-daily-state">You are mid-draft</span>
-                    ) : (
-                      <span className="tm-daily-state">Not played yet</span>
-                    )}
-                    {d.streak > 0 && (
-                      <span className="tm-daily-streak">
-                        {d.streak}-day streak
-                      </span>
-                    )}
-                  </div>
-                  {d.gameStatus === 'COMPLETE' && d.gameId != null ? (
-                    <Link className="tm-btn quiet" to={tmGame(currentSite(), d.gameId)} aria-label={`View today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
-                      View
-                    </Link>
-                  ) : d.gameStatus === 'DRAFTING' && d.gameId != null ? (
-                    <Link className="tm-btn" to={tmGame(currentSite(), d.gameId)} aria-label={`Resume today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}>
-                      Resume
-                    </Link>
-                  ) : (
-                    <button
-                      type="button"
-                      className="tm-btn"
-                      disabled={starting}
-                      onClick={() => void startDaily(d.sport)}
-                      aria-label={`Play today's ${SPORT_LABEL[d.sport].toLowerCase()} game`}
-                    >
-                      Play
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <p className="muted small tm-daily-note">
-              {dayLabel(daily[0].date)}: the same season for everyone, from a random draft slot.
-              {left ? ` Next one in ${left}.` : ''}
-            </p>
-          </section>
-        )}
-        {offered.length > 1 && (
-          <div className="tm-sports" role="group" aria-label="Sport">
-            {offered.map((sp) => (
-              <button
-                key={sp}
-                type="button"
-                className={`tm-sport${sp === sport ? ' on' : ''}`}
-                aria-pressed={sp === sport}
-                disabled={starting}
-                onClick={() => setSport(sp)}
-              >
-                {SPORT_LABEL[sp]}
-              </button>
-            ))}
-          </div>
-        )}
-        <button type="button" className="tm-play" onClick={() => void start()} disabled={starting || !loaded || nothingOffered}>
-          {starting ? 'Starting…' : 'Draft a random year'}
-        </button>
-        {error && <div className="error">{error}</div>}
-        {nothingOffered && <p className="muted">No seasons are loaded yet, so there is nothing to draft.</p>}
+        <p className="tm-over">{copy.dailyOver}</p>
+        <h1 className="tm-title tm-title-sm">{copy.homeH1}</h1>
+        <p className="tm-tagline">{copy.homeTagline}</p>
       </header>
 
-      {visible.length === 0 && howToPlay}
-
-      <section className="tm-section" aria-label="Your games">
-        <h2>Your games</h2>
-        {games == null && !error ? (
-          <p className="muted">Loading…</p>
-        ) : visible.length === 0 ? (
-          <p className="muted">No games yet. Your first one will show up here.</p>
-        ) : (
-          <>
-          {stats.finished > 0 && (
-            <dl className="tm-stats" aria-label="Your numbers">
-              <div>
-                <dt>Finished</dt>
-                <dd>{stats.finished}</dd>
-              </div>
-              {stats.best != null && (
-                <div>
-                  <dt>Best draft score</dt>
-                  <dd>{stats.best}</dd>
-                </div>
-              )}
-              {stats.average != null && (
-                <div>
-                  <dt>Average draft score</dt>
-                  <dd>{stats.average}</dd>
-                </div>
-              )}
-            </dl>
-          )}
-          {stats.finished > 0 && stats.scored > 0 && stats.scored < stats.finished && (
-            <p className="muted small tm-stats-note">
-              The scores cover {stats.scored} of your {stats.finished} finished games; older ones were saved without one.
-            </p>
-          )}
-          <ul className="tm-games">
-            {visible.map((g) => (
-              <li key={g.id} className="tm-game">
-                <div className="tm-game-text">
-                  <strong>{g.seasonLabel}</strong>
-                  <span className="tm-game-sport">{SPORT_LABEL[sportOf(g)]}</span>
-                  <span className={`tm-game-status status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
-                  {g.status === 'COMPLETE' && g.draftScore != null && <span className="tm-game-score">Score {g.draftScore}</span>}
-                  {g.dailyDate ? (
-                    <span className="tm-game-daily">Daily · {dayLabel(g.dailyDate)}</span>
-                  ) : (
-                    <span className="muted small">{when(g.createdAt)}</span>
-                  )}
-                </div>
-                <div className="tm-game-actions">
-                  {g.status === 'DRAFTING' && (
-                    <>
-                      {/* The game of the day cannot be abandoned (the server refuses it): it is the day's one go. */}
-                      {!g.dailyDate && (
-                        <button type="button" className="tm-btn quiet" onClick={() => void abandon(g.id)}>
-                          Abandon
-                        </button>
-                      )}
-                      <Link className="tm-btn" to={tmGame(currentSite(), g.id)}>
-                        Resume
-                      </Link>
-                    </>
-                  )}
-                  {g.status === 'COMPLETE' && (
-                    <Link className="tm-btn quiet" to={tmGame(currentSite(), g.id)}>
-                      View
-                    </Link>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-          </>
+      <section className="tm-daily" aria-label={copy.dailyHeading}>
+        <h2>{copy.dailyHeading}</h2>
+        <DailyCards
+          daily={daily.daily}
+          status={daily.status}
+          rollover={daily.rollover}
+          starting={busy}
+          onPlay={(s) => void startDaily.start(s)}
+          onRetry={daily.retry}
+          signedIn={user != null}
+          left={daily.left}
+        />
+        {dailyPath ? (
+          <Link className="tm-fold-link" to={dailyPath}>
+            {copy.dailyAbout}
+          </Link>
+        ) : null}
+        {startDaily.error && (
+          <div className="error" role="alert">
+            {startDaily.error}
+          </div>
         )}
       </section>
 
-      {profile && <HistoricalProfileCard profile={profile} />}
+      {/* "Draft a random year" is for a signed-in visitor only: the server refuses it for a guest, and a button that always fails is a trap. */}
+      {user && (offered.length > 0 || listsStatus === 'error') && (
+        <div className="tm-random">
+          {offered.length > 1 && (
+            <div className="tm-sports" role="group" aria-label="Sport">
+              {offered.map((sp) => (
+                <button
+                  key={sp}
+                  type="button"
+                  className={`tm-sport${sp === sport ? ' on' : ''}`}
+                  aria-pressed={sp === sport}
+                  disabled={busy}
+                  onClick={() => setSport(sp)}
+                >
+                  {SPORT_LABEL[sp]}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" className="tm-play" onClick={() => void startRandom()} disabled={busy || listsStatus === 'loading'}>
+            {startingRandom ? copy.draftStarting : 'Draft a random year'}
+          </button>
+        </div>
+      )}
+      {error && (
+        <div className="error" role="alert">
+          {error}
+        </div>
+      )}
 
-      {visible.length > 0 && howToPlay}
+      {/* V-08h: the tiles link to the Redraft site's sport indexes; where no such page exists (the combined build) the section would be a bare heading. */}
+      {!SPORTS.some((s) => tmSportIndex(cfg, s)) && listsStatus === 'error' && (
+        <div className="error" role="alert">
+          {copy.seasonsError}{' '}
+          <button type="button" className="link-button" onClick={retryLists}>
+            {copy.tryAgain}
+          </button>
+        </div>
+      )}
+      {SPORTS.some((s) => tmSportIndex(cfg, s)) && (
+      <section className="tm-section" aria-label={copy.pickASeason}>
+        <h2>{copy.pickASeason}</h2>
+        {listsStatus === 'loading' && (
+          <p className="muted small" role="status">
+            {copy.seasonsLoading}
+          </p>
+        )}
+        {listsStatus === 'error' && (
+          <div className="error" role="alert">
+            {copy.seasonsError}{' '}
+            <button type="button" className="link-button" onClick={retryLists}>
+              {copy.tryAgain}
+            </button>
+          </div>
+        )}
+        <div className="tm-sport-tiles">
+          {SPORTS.map((s) => {
+            const seasons = lists[s]?.seasons ?? []
+            const to = tmSportIndex(cfg, s)
+            if (seasons.length === 0 || !to) return null
+            return (
+              <Link key={s} className={`tm-sport-tile ${s.toLowerCase()}`} to={to}>
+                <strong>{copy.sportTile(s)}</strong>
+                <span>{copy.sportTileRange(seasons[0].label, seasons[seasons.length - 1].label)}</span>
+                <span className="muted small">{copy.sportTileCount(seasons.length)}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </section>
+      )}
+
+      <ClaimLine />
+
+      {(user || visible.length > 0) && (
+        <section className="tm-section" aria-label="Your games">
+          <h2>Your games</h2>
+          {!user && <p className="muted small">{copy.savedHere}</p>}
+          {games == null && !error ? (
+            <p className="muted" role="status">
+              Loading…
+            </p>
+          ) : visible.length === 0 ? (
+            <p className="muted">No games yet. Your first one will show up here.</p>
+          ) : (
+            <>
+              {stats.finished > 0 && (
+                <dl className="tm-stats" aria-label="Your numbers">
+                  <div>
+                    <dt>Finished</dt>
+                    <dd>{stats.finished}</dd>
+                  </div>
+                  {stats.best != null && (
+                    <div>
+                      <dt>Best draft score</dt>
+                      <dd>{stats.best}</dd>
+                    </div>
+                  )}
+                  {stats.average != null && (
+                    <div>
+                      <dt>Average draft score</dt>
+                      <dd>{stats.average}</dd>
+                    </div>
+                  )}
+                </dl>
+              )}
+              {stats.finished > 0 && stats.scored > 0 && stats.scored < stats.finished && (
+                <p className="muted small tm-stats-note">
+                  The scores cover {stats.scored} of your {stats.finished} finished games; older ones were saved without one.
+                </p>
+              )}
+              <ul className="tm-games">
+                {visible.map((g) => (
+                  <li key={g.id} className="tm-game">
+                    <div className="tm-game-text">
+                      <strong>{g.seasonLabel}</strong>
+                      <span className="tm-game-sport">{SPORT_LABEL[sportOf(g)]}</span>
+                      <span className={`tm-game-status status-${g.status.toLowerCase()}`}>{summaryStatus(g)}</span>
+                      {g.chosenSeason && <span className="tm-game-chosen">{copy.chosenPill}</span>}
+                      {g.status === 'COMPLETE' && g.draftScore != null && <span className="tm-game-score">Score {g.draftScore}</span>}
+                      {g.dailyDate ? (
+                        <span className="tm-game-daily">Daily · {dayLabel(g.dailyDate)}</span>
+                      ) : (
+                        <span className="muted small">{when(g.createdAt)}</span>
+                      )}
+                    </div>
+                    <div className="tm-game-actions">
+                      {g.status === 'DRAFTING' && (
+                        <>
+                          {/* The game of the day cannot be abandoned (the server refuses it): it is the day's one go. */}
+                          {!g.dailyDate && (
+                            <button type="button" className="tm-btn quiet" onClick={() => void abandon(g.id)}>
+                              Abandon
+                            </button>
+                          )}
+                          <Link className="tm-btn" to={tmGame(currentSite(), g.id)}>
+                            Resume
+                          </Link>
+                        </>
+                      )}
+                      {g.status === 'COMPLETE' && (
+                        <Link className="tm-btn quiet" to={tmGame(currentSite(), g.id)}>
+                          View
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
+
+      {user && profile && <HistoricalProfileCard profile={profile} />}
+
+      <section className="tm-section" aria-label={copy.howHeading}>
+        <h2>{copy.howHeading}</h2>
+        <ol className="tm-steps">
+          {copy.howSteps.map((s) => (
+            <li key={s.title}>
+              <strong>{s.title}</strong>
+              <span>{s.body}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {!user && <TimeMachineSignIn />}
+
+      <RedraftFoot />
     </div>
   )
 }

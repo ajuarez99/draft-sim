@@ -4,8 +4,17 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import HistoricalDraft from './pages/HistoricalDraft'
 import HistoricalRoom from './pages/HistoricalRoom'
 import old062 from './__fixtures__/historical-result-062.json'
-import type { HistoricalDaily, HistoricalGameState, HistoricalGameSummary, HistoricalPlayerCard, HistoricalProfile, HistoricalSeasonSummary } from './api'
-import TimeMachineSignIn from './pages/TimeMachineSignIn'
+import type { HistoricalDaily, HistoricalGameState, HistoricalGameSummary, HistoricalPlayerCard, HistoricalProfile, HistoricalSeasonSummary, PublicGame, RedraftSeasonData } from './api'
+import fixtureJson from './__fixtures__/redraft-seasons.json'
+import DailyPage from './pages/DailyPage'
+import SeasonPage from './pages/SeasonPage'
+import SharedResult, { NoFinishedGame } from './pages/SharedResult'
+import SportIndex from './pages/SportIndex'
+import RedraftNotFound from './components/RedraftNotFound'
+import { __resetRedraftDataForTests } from './redraftData'
+import { pageParts } from './landingHtml'
+import { appShellPage, indexablePages, notFoundPage } from './redraftPages'
+import { makeConfig } from './site'
 import NotFound from './components/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 import TimeMachineShell from './components/TimeMachineShell'
@@ -22,6 +31,10 @@ const api = vi.hoisted(() => ({
   getHistoricalProfile: vi.fn(),
   getHistoricalGame: vi.fn(),
   getHistoricalGameAward: vi.fn(),
+  getPublicSeasonList: vi.fn(),
+  getPublicSeasonPage: vi.fn(),
+  getYesterdayDaily: vi.fn(),
+  getPublicGame: vi.fn(),
 }))
 vi.mock('./api', async (orig) => ({
   ...(await orig<typeof import('./api')>()),
@@ -137,9 +150,20 @@ function renderRoom() {
   )
 }
 
+const seasonData = fixtureJson as unknown as RedraftSeasonData
+
 beforeEach(() => {
   localStorage.clear()
+  __resetRedraftDataForTests()
   vi.stubEnv('VITE_SITE', 'timemachine')
+  api.getPublicSeasonList.mockReset().mockImplementation(async (sport: 'NBA' | 'NFL') => seasonData[sport].list)
+  api.getPublicSeasonPage.mockReset().mockImplementation(async (sport: 'NBA' | 'NFL', slug: string) =>
+    seasonData[sport].pages.find((p) => p.slug === slug))
+  api.getYesterdayDaily.mockReset().mockResolvedValue([
+    { sport: 'NBA', date: '2999-01-01', seasonLabel: '2016-17', slug: '2016-17' },
+    { sport: 'NFL', date: '2999-01-01', seasonLabel: null, slug: null },
+  ])
+  api.getPublicGame.mockReset()
   api.listHistoricalGames.mockReset().mockResolvedValue(homeGames)
   api.historicalSeasons.mockReset().mockImplementation(async (sport: string) =>
     sport === 'NFL' ? [seasonOf('NFL', '1999', 1999, NFL_SETTINGS)] : [seasonOf('NBA', '1972-73', 1972, NBA_SETTINGS)])
@@ -148,7 +172,7 @@ beforeEach(() => {
   api.getHistoricalGame.mockReset()
   api.getHistoricalGameAward.mockReset().mockResolvedValue({
     gameId: 5, settled: true, fromSavedResult: false, xp: 120, lines: [{ label: '9 wins', xp: 90 }],
-    badges: [profile.badges[0]], moments: [], momentsSeen: true, total: 200,
+    badges: [profile.badges[0]], moments: [], momentsSeen: true, total: 200, notCounted: false,
   })
 })
 
@@ -159,9 +183,20 @@ afterEach(() => {
 })
 
 describe('the Time Machine site has no league wording', () => {
-  it('the front door', () => {
-    const { container } = render(<MemoryRouter><TimeMachineSignIn /></MemoryRouter>)
+  // PINNED SCREEN REWRITTEN (T041): "the front door" was a sign-in page at every URL for a guest. A guest now sees the home
+  // page, in the shell, with the sign-in panel at its end.
+  it('the home, as a guest, inside the shell', async () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <TimeMachineShell>
+          <HistoricalDraft />
+        </TimeMachineShell>
+      </MemoryRouter>,
+    )
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument()
+    await screen.findByText('1988-89') // a game of the day card
+    await screen.findByRole('link', { name: /Basketball/ }) // a sport tile
+    expect(screen.getByRole('heading', { name: 'Keep your games' })).toBeInTheDocument()
     expectNoLeagueWords(container)
   })
 
@@ -174,9 +209,9 @@ describe('the Time Machine site has no league wording', () => {
         </TimeMachineShell>
       </MemoryRouter>,
     )
-    await waitFor(() => expect(screen.getByText('Time Machine')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1, name: 'Redraft a past NBA or NFL season' })).toBeInTheDocument())
     await screen.findByText('1971-72') // a past game row
-    await screen.findByText(NBA_SETTINGS)
+    await screen.findByRole('link', { name: /Basketball/ })
     await screen.findAllByText('Champion') // the profile's badge
     expectNoLeagueWords(container)
   })
@@ -213,7 +248,7 @@ describe('the Time Machine site has no league wording', () => {
     for (const what of ['league', 'mock', 'draft', 'page'] as const) {
       const { container, unmount } = render(<MemoryRouter><NotFound what={what} /></MemoryRouter>)
       expectNoLeagueWords(container)
-      expect(screen.getByRole('link', { name: 'Back to Time Machine' })).toHaveAttribute('href', '/')
+      expect(screen.getByRole('link', { name: 'Back to Redraft' })).toHaveAttribute('href', '/')
       unmount()
     }
   })
@@ -237,6 +272,79 @@ describe('the Time Machine site has no league wording', () => {
     render(<MemoryRouter><NotFound what="league" /></MemoryRouter>)
     expect(screen.getByText(/No league here/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to your leagues' })).toBeInTheDocument()
+  })
+})
+
+// Spec 074 T041 (FR-004): every NEW page, mounted by React and as the static HTML the build writes, says nothing about leagues,
+// mock drafts or managers, and nothing about the old name.
+describe('the Redraft pages have no league wording, mounted and static', () => {
+  const shell = (el: React.ReactElement, at: string) =>
+    render(
+      <MemoryRouter initialEntries={[at]}>
+        <TimeMachineShell>{el}</TimeMachineShell>
+      </MemoryRouter>,
+    )
+
+  it('a season page (React)', async () => {
+    const { container } = shell(<SeasonPage sport="NBA" slug="2016-17" />, '/nba/2016-17')
+    await screen.findByRole('heading', { level: 1, name: '2016-17 NBA Redraft' })
+    expectNoLeagueWords(container)
+  })
+
+  it('an early season page with excluded stats (React)', async () => {
+    const { container } = shell(<SeasonPage sport="NBA" slug="1976-77" />, '/nba/1976-77')
+    await screen.findByRole('heading', { level: 1, name: '1976-77 NBA Redraft' })
+    expect(container.querySelector('.hist-excluded')).not.toBeNull()
+    expectNoLeagueWords(container)
+  })
+
+  it('a sport index (React)', async () => {
+    const { container } = shell(<SportIndex sport="NFL" />, '/nfl')
+    await screen.findByRole('heading', { level: 1, name: 'NFL Redraft: every past season' })
+    expectNoLeagueWords(container)
+  })
+
+  it('the daily page, as a guest (React)', async () => {
+    const { container } = shell(<DailyPage />, '/daily')
+    await screen.findByText('1988-89')
+    await screen.findByText(/^How .+ played out$/)
+    expectNoLeagueWords(container)
+  })
+
+  it('the not-found page (React)', () => {
+    const { container } = shell(<RedraftNotFound />, '/nope')
+    expect(screen.getByRole('heading', { name: 'Nothing at this address' })).toBeInTheDocument()
+    expectNoLeagueWords(container)
+  })
+
+  it('a shared result and "No finished game here" (React)', () => {
+    const game = finishedGame()
+    const pub: PublicGame = { state: game, reducedUntil: null }
+    const a = shell(<SharedResult pub={pub} />, '/game/5')
+    expect(screen.getByText(/^Shared result · /)).toBeInTheDocument()
+    expectNoLeagueWords(a.container)
+    a.unmount()
+    const b = shell(<NoFinishedGame />, '/game/5')
+    expect(screen.getByRole('heading', { name: 'No finished game here' })).toBeInTheDocument()
+    expectNoLeagueWords(b.container)
+  })
+
+  it('every page the build writes, static: indexable, 404 and the app shell', () => {
+    const cfg = makeConfig({ VITE_SITE: 'timemachine' })
+    const pages = [...indexablePages(cfg, seasonData), notFoundPage(cfg), appShellPage(cfg)]
+    expect(pages.length).toBeGreaterThan(8)
+    for (const p of pages) {
+      const parts = pageParts(p, cfg, seasonData)
+      const doc = new DOMParser().parseFromString(`<body>${parts.body}</body>`, 'text/html')
+      const text = (doc.body.textContent ?? '').replace(/\s+/g, ' ')
+      const aria = [...doc.querySelectorAll('[aria-label], [title], [placeholder]')]
+        .map((e) => [e.getAttribute('aria-label'), e.getAttribute('title'), e.getAttribute('placeholder')].join(' '))
+        .join(' ')
+      expect(text, p.path).not.toMatch(LEAGUE_WORDS)
+      expect(aria, p.path).not.toMatch(LEAGUE_WORDS)
+      // The head too: title, description and preview tags are words a reader sees in a result list.
+      expect(parts.head.replace(/<script[\s\S]*?<\/script>/g, ''), p.path).not.toMatch(LEAGUE_WORDS)
+    }
   })
 })
 

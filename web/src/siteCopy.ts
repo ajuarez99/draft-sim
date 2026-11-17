@@ -1,3 +1,4 @@
+import { notFoundBody as redraftNotFoundBody } from './redraftCopy'
 import { analyticsLine as leagueAnalyticsLine, signInNote as leagueSignInNote } from './landingCopy'
 import { analyticsLine as tmAnalyticsLine, signInNote as tmSignInNote } from './tmLandingCopy'
 import type { SiteConfig } from './site'
@@ -18,8 +19,8 @@ export interface SiteCopy {
 export function siteCopy(cfg: SiteConfig): SiteCopy {
   if (cfg.site === 'timemachine') {
     return {
-      homeLabel: 'Time Machine',
-      notFoundBody: 'No page at this address.',
+      homeLabel: 'Redraft',
+      notFoundBody: redraftNotFoundBody,
       signInNote: tmSignInNote,
       analyticsLine: tmAnalyticsLine,
     }

@@ -19,12 +19,14 @@ import java.util.Map;
  * {@code available} is empty once the game is no longer DRAFTING. {@code reversalRound} is the game's stored value
  * (0 is a plain snake), so the web can lay out upcoming picks without its own snake arithmetic (spec 063).
  * {@code dailyDate} (spec 071) is the ISO date of the game of the day this game is, or null for free play.
+ * {@code chosenSeason} (spec 074) is true when the player picked the season from a season page: the game is real
+ * play but never counts toward achievements or records.
  */
 public record HistoricalGameState(long id, String sport, String status, SeasonView season, int teams, int rounds,
                                   List<String> rosterPositions, int userSlot, List<Integer> myPicks,
                                   int currentPickNo, Integer onTheClockSlot, boolean isUsersTurn,
                                   List<PickView> picks, List<HistoricalPlayerCard> available, JsonNode result,
-                                  int reversalRound, String dailyDate) {
+                                  int reversalRound, String dailyDate, boolean chosenSeason) {
 
     /**
      * @param countedStats the scoring keys this season counts, from the game's own frozen scoring snapshot
@@ -49,8 +51,9 @@ public record HistoricalGameState(long id, String sport, String status, SeasonVi
      * before playoffs existed, whose {@code finish} is a standings rank.
      * {@code draftScore} (spec 071) is {@link DraftScore}: null until COMPLETE and for a result with no hindsight
      * total. {@code dailyDate} is the ISO date of the game of the day this game is, or null for free play.
+     * {@code chosenSeason} (spec 074) marks a game whose season the player picked: it is left out of records.
      */
     public record GameSummary(long id, String sport, String seasonLabel, String status, int userSlot,
                               Integer finish, Integer formatVersion, String outcome, OffsetDateTime createdAt,
-                              Integer draftScore, String dailyDate) {}
+                              Integer draftScore, String dailyDate, boolean chosenSeason) {}
 }

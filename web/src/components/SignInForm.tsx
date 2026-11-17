@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { getSleeperUser } from '../api'
+import { useId, useState } from 'react'
+import { claimGuestGames, getSleeperUser } from '../api'
+import { noteClaim } from '../guest'
+import { signInContinue, signInLabel, signInPlaceholder } from '../redraftCopy'
 import { setUser } from '../user'
 import { trackAction } from '../analytics'
 
@@ -20,6 +22,8 @@ type Status = 'idle' | 'resolving' | 'not-found' | 'unreachable'
 type Props = {
   /** Paragraphs shown under the field, before any error. Each site passes its own words (siteCopy.ts). */
   notes: string[]
+  /** Spec 074: focus the field on mount. Off wherever the form sits below the fold (a phone would scroll to it and open the keyboard). Defaults to on. */
+  autoFocus?: boolean
 }
 
 /**
@@ -29,10 +33,12 @@ type Props = {
  * just means Sleeper recognizes the name. setUser() is enough to move on -- App renders the signed-in
  * screen the instant a user exists, no navigation call needed.
  */
-export default function SignInForm({ notes }: Props) {
+export default function SignInForm({ notes, autoFocus = true }: Props) {
   const [input, setInput] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [lastTried, setLastTried] = useState('')
+  const errorId = useId()
+  const failed = status === 'not-found' || status === 'unreachable'
 
   async function submit() {
     const usernameOrId = usernameFrom(input)
@@ -44,6 +50,14 @@ export default function SignInForm({ notes }: Props) {
       if (found == null) {
         setStatus('not-found')
         return
+      }
+      // Spec 074 (PR-18): games made as a guest move to this user BEFORE anything refetches (setUser re-renders
+      // every page that reads the user). Nothing to claim on the league site: only /api/history requests ever
+      // make a guest id. A failed claim does not stop sign-in; the id stays and the home page tries again.
+      try {
+        noteClaim(await claimGuestGames(found.sleeperUserId))
+      } catch {
+        // Kept for the next try.
       }
       setUser(found)
       // Spec 052: counted once, only after Sleeper recognised the name.
@@ -66,18 +80,24 @@ export default function SignInForm({ notes }: Props) {
         }}
       >
         <label className="signin-label">
-          Your Sleeper username
+          {signInLabel}
           <input
             className="signin-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Username or profile link"
-            autoFocus
+            placeholder={signInPlaceholder}
+            autoFocus={autoFocus}
+            aria-invalid={failed ? true : undefined}
+            aria-describedby={failed ? errorId : undefined}
           />
         </label>
         <button className="signin-continue" type="submit" disabled={status === 'resolving' || !input.trim()}>
-          {status === 'resolving' ? 'Checking…' : 'Continue'}
+          {status === 'resolving' ? 'Checking…' : signInContinue}
         </button>
+        {/* Progress is announced; the button's own text change is not reliably read. */}
+        <span className="hist-sr-only" role="status">
+          {status === 'resolving' ? 'Checking that username with Sleeper.' : ''}
+        </span>
       </form>
 
       {notes.map((n) => (
@@ -85,13 +105,13 @@ export default function SignInForm({ notes }: Props) {
       ))}
 
       {status === 'not-found' && (
-        <div className="error">
+        <div className="error" id={errorId} role="alert">
           No Sleeper user called “{lastTried}”. Check the spelling and try again.
         </div>
       )}
       {status === 'unreachable' && (
-        <div className="error">
-          Couldn’t reach Sleeper just now -- that’s not on you.{' '}
+        <div className="error" id={errorId} role="alert">
+          Couldn’t reach Sleeper just now. That’s not on you.{' '}
           <button className="link-button" onClick={submit}>Try again</button>
         </div>
       )}

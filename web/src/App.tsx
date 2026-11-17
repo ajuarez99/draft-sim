@@ -1,7 +1,10 @@
 import { useEffect, type ComponentType, type ReactNode } from 'react'
 import { Route, Routes, useParams } from 'react-router-dom'
 import SignIn from './pages/SignIn'
-import TimeMachineSignIn from './pages/TimeMachineSignIn'
+import SeasonPage from './pages/SeasonPage'
+import SportIndex from './pages/SportIndex'
+import DailyPage from './pages/DailyPage'
+import RedraftNotFound from './components/RedraftNotFound'
 import DraftPicker from './pages/DraftPicker'
 import DraftView from './pages/DraftView'
 import CompletedDraftBoard from './pages/CompletedDraftBoard'
@@ -44,7 +47,6 @@ import { useUnlocked } from './leaguesLock'
 import { useIdleLock } from './useIdleLock'
 import LeaguesLock from './components/LeaguesLock'
 import { title as landingTitle } from './landingCopy'
-import { title as tmLandingTitle } from './tmLandingCopy'
 import { tmGame, tmHome } from './site'
 import { currentSite } from './siteEnv'
 
@@ -80,6 +82,13 @@ function KeyedLiveDraftView() {
 function KeyedMockDraftView() {
   const { sessionId } = useParams<{ sessionId: string }>()
   return <MockDraftView key={sessionId} />
+}
+
+// Spec 074: a season page is keyed by its slug, so a client-side move from one season to the next starts clean
+// (the embedded copy of the first one must not be shown for the second).
+function KeyedSeasonPage({ sport }: { sport: 'NBA' | 'NFL' }) {
+  const { season = '' } = useParams<{ season: string }>()
+  return <SeasonPage key={`${sport}/${season}`} sport={sport} slug={season} />
 }
 
 // Spec 053: same reason for the historical room -- a param-only change must not keep the old game's state alive.
@@ -296,7 +305,6 @@ function LeaguesTree() {
 // paths are forwarded to the league site with path, query and hash.
 // @routes:timemachine begin
 function TimeMachineTree() {
-  const user = useUser()
   return (
     <Routes>
       <Route path="/history" element={<InAppRedirect to={() => tmHome(currentSite())} />} />
@@ -311,15 +319,18 @@ function TimeMachineTree() {
         element={
           <div className="app">
             <TimeMachineShell>
-              {user ? (
-                <Routes>
-                  <Route path="/" element={<HistoricalDraft />} />
-                  <Route path="/game/:gameId" element={<KeyedHistoricalRoom />} />
-                  <Route path="*" element={<NotFound what="page" />} />
-                </Routes>
-              ) : (
-                <TimeMachineSignIn />
-              )}
+              {/* Spec 074: every page renders for a guest and a signed-in visitor alike (the front door at every URL is gone).
+                  Each indexable page sets its own document.title from redraftCopy, the words its static file's <title> uses. */}
+              <Routes>
+                <Route path="/" element={<HistoricalDraft />} />
+                <Route path="/daily" element={<DailyPage />} />
+                <Route path="/nba" element={<SportIndex sport="NBA" />} />
+                <Route path="/nfl" element={<SportIndex sport="NFL" />} />
+                <Route path="/nba/:season" element={<KeyedSeasonPage sport="NBA" />} />
+                <Route path="/nfl/:season" element={<KeyedSeasonPage sport="NFL" />} />
+                <Route path="/game/:gameId" element={<KeyedHistoricalRoom />} />
+                <Route path="*" element={<RedraftNotFound />} />
+              </Routes>
             </TimeMachineShell>
           </div>
         }
@@ -336,11 +347,12 @@ export default function App() {
 
   // Spec 050: index.html carries the long SEO title for crawlers and the signed-out landing
   // page. Signed-in tabs, bookmarks and history entries keep the short name they always had.
-  // Spec 073: the Time Machine site has its own pair.
+  // Spec 074: the Redraft site has no title here: each of its pages sets its own (pageTitle.ts), so this effect, which
+  // runs after the children's, cannot overwrite them.
   useEffect(() => {
-    if (site === 'timemachine') document.title = user ? 'Time Machine' : tmLandingTitle
+    if (site === 'timemachine') return
     // The locked league site carries no marketing title (its delivered HTML says just "Ball Knowers").
-    else if (site === 'leagues' && !unlocked) document.title = 'Ball Knowers'
+    if (site === 'leagues' && !unlocked) document.title = 'Ball Knowers'
     else document.title = user ? 'Ball Knowers' : landingTitle
   }, [user, site, unlocked])
 

@@ -122,6 +122,7 @@ historical:
   rounds: 14
   reversal-round: 0          # Sleeper default: plain snake (F8)
   regular-season-weeks: 19   # league-format choice (spec 063, Allan 2026-11-13), not a measurement
+  guest-chosen-seasons: 1    # PRODUCT RULE (spec 074, Allan): seasons a signed-out player may pick; abandoned ones still count
   # Legacy Ball Knowers league scoring (FR-002, O1)
   scoring:
     pts: 0.5

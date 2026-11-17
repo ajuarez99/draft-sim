@@ -46,6 +46,10 @@ public class HistoricalAchievementRepository {
         jdbc.queryForList("select pg_advisory_xact_lock(hashtextextended(?, 0))", "tm-ach:" + sleeperUserId);
     }
 
+    /**
+     * Spec 074: a game whose season the player picked is never settled, so it has no award row, and the totals, XP
+     * and badges (which read award rows only) cannot include it.
+     */
     public List<UnsettledGame> unsettled(String sleeperUserId) {
         return db.sql("""
                 select g.id, g.sport, g.teams, g.rounds, g.user_slot, g.result::text as result,
@@ -54,6 +58,7 @@ public class HistoricalAchievementRepository {
                 left join historical_game_award a on a.game_id = g.id
                 where g.sleeper_user_id = ? and g.status = 'COMPLETE' and g.result is not null
                   and a.game_id is null
+                  and not g.chosen_season
                 order by g.completed_at, g.id
                 """)
                 .param(sleeperUserId)

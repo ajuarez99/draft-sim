@@ -80,7 +80,7 @@ function playoffResult(over: Partial<HistoricalResult> = {}): HistoricalResult {
   } as HistoricalResult
 }
 
-const renderIt = (g: HistoricalGameState, r: HistoricalResult) => render(<HistoricalResults game={g} result={r} />)
+const renderIt = (g: HistoricalGameState, r: HistoricalResult) => render(<HistoricalResults game={g} result={r} voice="you" />)
 
 describe('HistoricalResults, drafted as and finished as (spec 065)', () => {
   const fin = (pickNo: number, name: string, drafted: number, finished: number, weeks: number) => ({
@@ -371,5 +371,122 @@ describe('gotRight (spec 068): which picks beat their draft spot', () => {
   it('is null for a result stored before pick finishes existed', () => {
     expect(gotRight(undefined)).toBeNull()
     expect(gotRight([])).toBeNull()
+  })
+})
+
+// Spec 074 T042/T044: the same results, written to someone who is not the drafter.
+describe('HistoricalResults, shared voice (spec 074)', () => {
+  const YOU = /\byou(r|rs|rself|'re|'ve|'ll)?\b/i
+  const fin = (pickNo: number, name: string, drafted: number, finished: number) => ({
+    pickNo, player: { ...card(pickNo, name), positions: ['RB'] }, position: 'RB',
+    draftedPositionRank: drafted, finishPositionRank: finished, positionPlayers: 140, seasonValue: 391.3, weeksPlayed: 16,
+  })
+  const rich = (over: Partial<HistoricalResult> = {}) =>
+    playoffResult({
+      pickFinishes: [fin(3, 'Star Back', 2, 1), fin(23, 'Hurt Back', 9, 61)],
+      hindsight: {
+        label: 'greedy hindsight, bots unchanged', pointsFor: 900, userPointsFor: 700, userBeatIt: false,
+        picks: [
+          { pickNo: 3, player: card(11, 'Mine One'), seasonValue: 650 },
+          { pickNo: 4, player: card(14, 'Late Gem'), seasonValue: 500 },
+        ],
+      },
+      hindsightSeason: { wins: 15, losses: 4, ties: 0, pointsFor: 5200, regularSeasonRank: 1, finish: 1, outcome: 'CHAMPION', takenFromBots: 1 },
+      ...over,
+    })
+  const withPicks = (g: HistoricalGameState): HistoricalGameState => ({
+    ...g,
+    picks: [
+      { pickNo: 3, round: 1, draftSlot: g.userSlot, seatType: 'USER', player: card(11, 'Mine One') },
+      { pickNo: 28, round: 3, draftSlot: g.userSlot, seatType: 'USER', player: card(14, 'Late Gem') },
+    ],
+  })
+
+  /** Everything a reader could read: the text, and every aria-label / title, across every week the picker offers. */
+  function everyWord(container: HTMLElement): string {
+    const read = () =>
+      [
+        container.textContent ?? '',
+        ...[...container.querySelectorAll('[aria-label], [title]')].map((e) => `${e.getAttribute('aria-label') ?? ''} ${e.getAttribute('title') ?? ''}`),
+      ].join(' ')
+    const select = container.querySelector('select[aria-label="Week"]') as HTMLSelectElement | null
+    let all = read()
+    if (select) {
+      for (const o of Array.from(select.options)) {
+        fireEvent.change(select, { target: { value: o.value } })
+        all += ' ' + read()
+      }
+    }
+    return all
+  }
+
+  it.each([
+    ['lost in round one (seed 3)', 3, 'LOST_ROUND_ONE'],
+    ['had a bye (seed 1)', 1, 'LOST_FINAL'],
+    ['missed the playoffs (slot 9)', 9, 'MISSED_PLAYOFFS'],
+  ] as const)('says "you" nowhere in the whole page when the drafter %s', (_name, slot, outcome) => {
+    const { container } = render(<HistoricalResults game={withPicks(game(slot))} result={rich({ userOutcome: outcome })} voice="shared" />)
+    const words = everyWord(container)
+    expect(words.length).toBeGreaterThan(2000) // the guard is reading the page, not an empty shell
+    expect(words.match(new RegExp(YOU.source, 'gi'))).toBeNull()
+    expect(words).toMatch(/This team/)
+  })
+
+  it('has no Share button, and marks the drafter with .tm-drafter and never the viewer tint', () => {
+    const { container } = render(<HistoricalResults game={withPicks(game(3))} result={rich()} voice="shared" />)
+    expect(screen.queryByRole('button', { name: /share/i })).toBeNull()
+    expect(container.querySelector('.hist-me, .hist-bk-side.me, .hist-champ.me')).toBeNull()
+    const standings = screen.getByRole('region', { name: 'Standings' })
+    const mine = standings.querySelector('tr.tm-drafter')!
+    expect(mine.textContent).toContain('Team 3 · this team')
+    expect(standings.querySelectorAll('tr.tm-drafter')).toHaveLength(1)
+    // the bracket marks the drafter's team too, in the same way
+    expect(container.querySelector('.hist-bracket .tm-drafter')).not.toBeNull()
+  })
+
+  it('the finish headline is third person, and the draft-score sentence prints both totals', () => {
+    render(<HistoricalResults game={withPicks(game(3))} result={rich()} voice="shared" />)
+    expect(screen.getByText('This team lost in round one')).toBeInTheDocument()
+    expect(screen.getByText("This team's 700.0 points are 77% of the hindsight draft's 900.0.")).toBeInTheDocument()
+  })
+
+  it('the owner voice is unchanged: it still says You, shows the Share button and the viewer tint', () => {
+    const { container } = render(<HistoricalResults game={withPicks(game(3))} result={rich()} voice="you" />)
+    expect(screen.getByText('You lost in round one')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Share your result' })).toBeInTheDocument()
+    expect(container.querySelector('.hist-me')).not.toBeNull()
+    expect(container.querySelector('.tm-drafter')).toBeNull()
+    expect(screen.getByText('The story of your draft')).toBeInTheDocument()
+    expect(screen.getByText('Best steal you passed on')).toBeInTheDocument()
+  })
+
+  it('a reduced view (today\'s daily) shows the finish, score and squares only: no names, no totals, and says when the rest shows', () => {
+    // CR-03: a reduced row is a pick number and a mark, never the position or the ranks it was made from.
+    const reducedRow = (pickNo: number, mark: 'ahead' | 'same' | 'behind') => ({ pickNo, mark }) as unknown as HistoricalPickFinish
+    const result = playoffResult({
+      weeks: [], lineups: {}, finalPlaces: [], playoffs: undefined, biggestBust: null, bestStealPassedOn: null,
+      standings: [{ slot: 3, wins: 12, losses: 7, ties: 0, pointsFor: 4800, place: 5 }],
+      hindsight: { label: 'greedy hindsight, bots unchanged', userPointsFor: 700, userBeatIt: false, draftScore: 77, picks: [] },
+      pickFinishes: [reducedRow(3, 'ahead'), reducedRow(23, 'behind')],
+    })
+    const { container } = render(<HistoricalResults game={game(3)} result={result} voice="shared" reduced />)
+    const words = container.textContent ?? ''
+    expect(screen.getByText("The picks and lineups show tomorrow, once today's game is over.")).toBeInTheDocument()
+    expect(screen.getByText('77')).toBeInTheDocument() // the server's draft score
+    expect(screen.getByText("This team's 700.0 points are 77% of the hindsight draft's.")).toBeInTheDocument()
+    expect(words).not.toMatch(/900/) // the best roster's total is the day's answer
+    expect(container.querySelectorAll('.tm-pickgrid li')).toHaveLength(2)
+    expect(screen.queryByRole('region', { name: 'Standings' })).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Weekly results' })).toBeNull()
+    expect(words.match(new RegExp(YOU.source, 'gi'))).toBeNull()
+    // pressing a square names no player (it has none)
+    fireEvent.click(container.querySelector('.tm-pick')!)
+    const detail = container.querySelector('.tm-pick-detail')?.textContent ?? ''
+    expect(detail).toBe('Round 1: finished ahead of where he was drafted.')
+    // the square's colour and arrow come from the mark alone, and the second one is the other way round
+    const squares = [...container.querySelectorAll('.tm-pick')]
+    expect(squares[0].className).toMatch(/\bahead\b/)
+    expect(squares[1].className).toMatch(/\bbehind\b/)
+    expect(container.textContent).not.toMatch(/RB\d|drafted as/)
   })
 })

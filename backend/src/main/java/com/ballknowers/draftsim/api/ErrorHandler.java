@@ -18,6 +18,20 @@ public class ErrorHandler {
         return ResponseEntity.badRequest().body(Map.of("error", message(e)));
     }
 
+    /**
+     * Spec 074: a signed-out player asked for something only a signed-in one gets. 403 in this controller's existing
+     * body shape ({@code error} holds the sentence) plus {@code code}, which the web reads to offer sign-in. Built
+     * mutably, never Map.of, per the repo rule for response bodies.
+     */
+    @ExceptionHandler(com.ballknowers.draftsim.historical.GuestLimitException.class)
+    public ResponseEntity<Map<String, String>> guestLimit(com.ballknowers.draftsim.historical.GuestLimitException e) {
+        Map<String, String> body = new java.util.LinkedHashMap<>();
+        body.put("error", message(e));
+        body.put("code", com.ballknowers.draftsim.historical.GuestLimitException.CODE);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .body(body);
+    }
+
     /** Almost always "you have not run ingest yet". Say so rather than a 500. */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, String>> conflict(IllegalStateException e) {

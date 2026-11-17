@@ -33,9 +33,11 @@ export type LandingStats = {
   average: number | null
 }
 
-/** What the landing page says about your finished games. Abandoned and unfinished games count for nothing. */
-export function landingStats(games: Pick<HistoricalGameSummary, 'status' | 'draftScore'>[]): LandingStats {
-  const done = games.filter((g) => g.status === 'COMPLETE')
+/** What the landing page says about your finished games. Abandoned, unfinished and chosen-season games count for nothing. */
+export function landingStats(games: Pick<HistoricalGameSummary, 'status' | 'draftScore' | 'chosenSeason'>[]): LandingStats {
+  // Spec 074 FR-011: a season the player picked is practice. It is out of "Finished", the best score and the average
+  // (the server leaves it out of achievements and the streak the same way).
+  const done = games.filter((g) => g.status === 'COMPLETE' && !g.chosenSeason)
   const scores = done.map((g) => g.draftScore).filter((s): s is number => typeof s === 'number')
   if (scores.length === 0) return { finished: done.length, scored: 0, best: null, average: null }
   const sum = scores.reduce((a, b) => a + b, 0)

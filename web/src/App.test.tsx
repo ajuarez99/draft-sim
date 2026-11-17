@@ -191,7 +191,7 @@ describe('App sign-out gating', () => {
       // rather than as the two-shell regression it would actually be.
       expect(await screen.findAllByRole('navigation', { name: 'Main' })).toHaveLength(1)
       const main = screen.getByRole('navigation', { name: 'Main' })
-      expect(within(main).getAllByRole('link').map((l) => l.textContent)).toEqual(['Leagues', 'Managers', 'Time Machine'])
+      expect(within(main).getAllByRole('link').map((l) => l.textContent)).toEqual(['Leagues', 'Managers', 'Redraft'])
       expect(within(main).getByRole('button', { name: 'Mock drafts' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /^account:/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Jump to a league, page or manager' })).toBeInTheDocument()

@@ -1157,3 +1157,94 @@ back by season (LAC→SD up to 2016, LA→STL up to 2015, LV→OAK up to 2019), 
 **Rule:** for any "as of then" data, ask which columns the source re-keys to the present (team codes,
 positions, names), and check one known old fact against a real row before trusting it. Positions have
 the same problem here (Pryor 2012 shows as WR). That one was left as-is and disclosed, by Allan's call.
+
+## 56. `serve`'s `headers` rules match the rewritten file, not the URL that was asked for
+
+**2026-11-17.** Spec 074's plan put `X-Robots-Tag: noindex` on `source: "/game/**"` in `serve.site.json`, so
+private app paths would carry it while real pages did not. Measured with serve@14.2.6
+(`specs/074-redraft-seo/research.md` R4 amended): the header never appears on `/game/1`, because `/game/**`
+is rewritten to `index.html` and the rule is matched against `/index.html`. Putting it on `/index.html`
+would have marked the home page noindex too.
+
+**What caught it:** the plan review ran the real handler instead of trusting the plan's reading of the docs
+(`plan-review.md`); `t027-serve.md` then measured every path with the production command.
+
+**The rule:** a header you want on an SPA path needs its own shell file. Here `app-shell.html` is a byte
+copy of `index.html` with a static noindex meta, and the rewrites point at it. Read a hosting tool's
+matching rules by running it, and curl the headers of a rewritten path.
+
+## 57. A route added outside the league lock's public list passes every local run and answers 401 in production
+
+**2026-11-17.** The plan for spec 074 mounted its public routes at `/api/redraft/public/**`, claiming "the
+league lock does not apply". It does: `LeagueLockInterceptor.PUBLIC_PATHS` lists `/api/history/**` and a
+few others, not that prefix. `LEAGUE_LOCK` defaults to off, so every test, the quickstart and a local build
+would have passed. In production the season list, every season summary and every shared result would have
+answered 401, and the web build, which fetches them, would have failed (`plan-review.md` PR-01, the one
+critical finding).
+
+**What caught it:** the plan reviewer read `WebConfig` and the interceptor and found the allowlist.
+
+**The rule:** put a new public route under a prefix that is already public (here
+`/api/history/public/**`), and add a case with the lock **on** for each new route to
+`LeagueLockMappingsIT`. A default-off switch hides every bug behind it.
+
+## 58. A Vite plugin's normal-order `generateBundle` does not see `index.html`
+
+**2026-11-17.** The plan said to emit every static page "in `generateBundle`, by running the built
+`index.html` through `transform`". The reviewer ran a real build: in a plugin with no `enforce`,
+`generateBundle` runs before Vite's own HTML plugin has emitted `index.html`, so the file is not in the
+bundle (`plan-review.md` PR-02: "index.html in bundle = false"; with `enforce: 'post'` it is true).
+`transform` also throws on an already-filled template.
+
+**What caught it:** the plan review, by running a build and printing what the hook could see.
+
+**The rule:** capture the built template in a `transformIndexHtml` hook with `order: 'post'`, and write the
+extra pages from `closeBundle` with `fs`. Check a hook's input by logging it in a real build before
+designing around it. A build that fails part-way must not still write files (CR-07).
+
+## 59. A rendered asset is not shipped by editing its source, and a text guard cannot see pixels
+
+**2026-11-17.** Spec 074 renamed the game to "Redraft" and reworded `og-image-tm.svg`, but
+`web/public/og-image-tm.png`, the file every page's `og:image` points at, was never re-rendered and still
+read "Time Machine" and "Free with a Sleeper username". The "Time Machine" naming test and
+`grep -ril "time machine" web/dist` both passed, because they read text (`code-review.md` CR-01;
+`verification.md` V-01, which opened the PNG). At the time of writing it is still open: re-rendering needs
+`@resvg/resvg-js`, and the install was not approved.
+
+**What caught it:** the code reviewer opened the image; the live verification confirmed it from `dist/`.
+
+**The rule:** a name change is not done until every rendered asset (images, PDFs) has been rendered again
+and looked at. Pin source and output together, for example a stored hash of the SVG beside the PNG, so an
+edit to one fails a test until the other follows.
+
+## 60. "Move my games to my account" is also a way around every one-per-user rule
+
+**2026-11-17.** Spec 074 lets a guest play and then claim their games on sign-in. The daily game is one go
+per person per day, but a guest id costs nothing (a private window gives a new one). So a player can play
+today's daily as several guests until it goes well, then sign in from the browser holding the best attempt;
+claim moves that game to the Sleeper id, where it settles like any daily (`code-review.md` CR-02). Verified:
+a finished guest daily claimed into a Sleeper id settled at once (XP 500, one game). The repetition itself
+is reasoned, not run. **Accepted by the session, 2026-11-17, and Allan can overrule it** (HANDOFF, spec 074): the cost is XP and
+a streak for a free game.
+
+**What caught it:** the bug-hunt review listed what claim transfers, not only what it moves.
+
+**The rule:** before building a claim, merge or transfer, list every one-per-user rule the things were
+limited by and decide for each whether the transfer keeps it. The version that accepts the gap must say so
+in the code and in HANDOFF.
+
+## 61. A page shared by two site trees must take its links from `site.ts`
+
+**2026-11-17.** Spec 074's shared home, footer and result pages linked to `/daily`, `/nba` and `/nfl` as
+path literals. Those routes exist on the Redraft site only, so on the combined build (`VITE_SITE` unset,
+which every `npm run dev` uses) `/history` rendered links that landed on "Nothing here". A non-owner at
+`/history/<id>` also began seeing the shared result, and the Redraft tab title stuck on league pages
+(`code-review.md` CR-04, found by reading). The same class as lessons that name a second copy of one rule:
+a literal path asserts the route exists everywhere the page renders.
+
+**What caught it:** the bug-hunt review diffed the shared components against the routes of each tree. The
+verification then confirmed the combined build's `/history` links resolve (`verification.md`, "Combined build").
+
+**The rule:** a component that renders on more than one site gets every link from a `site.ts` helper that
+returns null where the route does not exist, and renders no link on null. Test it by collecting every
+`a[href]` on each build's page and resolving them.

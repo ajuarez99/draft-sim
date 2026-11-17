@@ -104,7 +104,7 @@ export default function NavSheet({ leagueTabs, currentTab, name, managersLeagueI
           </Link>
           {currentSite().site === 'combined' && (
             <Link to="/history" className="nav-sheet-item">
-              Time Machine
+              Redraft
             </Link>
           )}
         </nav>

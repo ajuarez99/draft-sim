@@ -223,12 +223,15 @@ public final class Comparisons {
     }
 
     /**
-     * One greedy pass over {@code order} (the user's pick numbers, in the order to fill them). A player is
+     * (Package-visible since spec 074: the season page's dream roster calls it with nothing taken, so every board
+     * player is a candidate at every step.)
+     *
+     * <p>One greedy pass over {@code order} (the user's pick numbers, in the order to fill them). A player is
      * available at a pick when nobody took him at an EARLIER pick of the real draft; the user's own pick of him
      * counts, so a player the user took at pick 127 can be had at 127 or before, never after.
      */
-    private Set<Long> greedy(List<Integer> order, Map<Long, Integer> takenAt, Collection<Long> boardIds,
-                             TeamScorer team, int weekCount, Map<Long, Double> value) {
+    Set<Long> greedy(List<Integer> order, Map<Long, Integer> takenAt, Collection<Long> boardIds,
+                     TeamScorer team, int weekCount, Map<Long, Double> value) {
         PlayerWeeks pw = team.scores();
         Set<Long> chosen = new LinkedHashSet<>();
         double baseTotal = 0;

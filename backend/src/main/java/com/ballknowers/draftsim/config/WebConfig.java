@@ -69,7 +69,10 @@ public class WebConfig implements WebMvcConfigurer {
                 // X-Admin-Token: the operator's key (AdminAccess). The web app stopped
                 // sending it on 2026-10-05, when commissioner writes dropped it; still
                 // allowed so an operator calling from a browser isn't preflight-rejected.
-                .allowedHeaders("Authorization", "Content-Type", "X-Sleeper-User", "X-Admin-Token",
+                // X-Guest-Id (spec 074): a signed-out Redraft player's browser-kept id, sent on /api/history requests.
+                // Production is cross-origin, so without it here every guest request fails its preflight, which
+                // the same-origin dev proxy never shows.
+                .allowedHeaders("Authorization", "Content-Type", "X-Sleeper-User", "X-Guest-Id", "X-Admin-Token",
                         LeagueLockInterceptor.SESSION_HEADER)
                 // A cross-origin browser cannot read the renewed session off a response unless it is exposed.
                 .exposedHeaders(LeagueLockInterceptor.SESSION_HEADER)

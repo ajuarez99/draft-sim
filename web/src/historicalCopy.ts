@@ -165,6 +165,12 @@ export function historicalSeats(g: Pick<HistoricalGameState, 'teams' | 'userSlot
 
 export const teamName = (slot: number, userSlot: number) => (slot === userSlot ? 'You' : `Team ${slot}`)
 
+/**
+ * Spec 074: who a result page is written to. `you` is the owner's page; `shared` is a result somebody else sent a link to,
+ * which says "this team" and never "you" (redraftVoice.ts holds the rest of the words).
+ */
+export type Voice = 'you' | 'shared'
+
 export function ordinal(n: number): string {
   const v = n % 100
   if (v >= 11 && v <= 13) return `${n}th`
@@ -196,20 +202,26 @@ export function isOldFormat(result: Pick<HistoricalResult, 'format'>): boolean {
  * The finish headline for a game played under the playoff format. NO_PLAYOFFS (and an outcome this build does not
  * know) reads as the plain standings place; MISSED_PLAYOFFS says where the team ended up.
  */
-export function outcomeHeadline(outcome: HistoricalOutcome | null | undefined, place: number, teams: number): string {
+export function outcomeHeadline(
+  outcome: HistoricalOutcome | null | undefined,
+  place: number,
+  teams: number,
+  voice: Voice = 'you',
+): string {
+  const who = voice === 'you' ? 'You' : 'This team'
   switch (outcome) {
     case 'CHAMPION':
       return 'Champion'
     case 'LOST_FINAL':
-      return 'You lost the final'
+      return `${who} lost the final`
     case 'LOST_SEMIFINAL':
-      return 'You lost in the semifinal'
+      return `${who} lost in the semifinal`
     case 'LOST_ROUND_ONE':
-      return 'You lost in round one'
+      return `${who} lost in round one`
     case 'MISSED_PLAYOFFS':
-      return `You missed the playoffs (${ordinal(place)} of ${teams})`
+      return `${who} missed the playoffs (${ordinal(place)} of ${teams})`
     default:
-      return `You finished ${ordinal(place)} of ${teams}`
+      return `${who} finished ${ordinal(place)} of ${teams}`
   }
 }
 
@@ -278,18 +290,19 @@ const times = (n: number) => (n === 1 ? 'once' : n === 2 ? 'twice' : `${word(n)}
  * other the same number of times (nothing to warn about). The circle-method schedule repeats the same weekly
  * cycle, so the first `rest` weeks of the cycle are the ones played one extra time.
  */
-export function scheduleNote(regularSeasonWeeks: number, teams: number): string | null {
+export function scheduleNote(regularSeasonWeeks: number, teams: number, voice: Voice = 'you'): string | null {
   if (teams < 2 || regularSeasonWeeks < 1) return null
+  const plays = voice === 'you' ? 'you play' : 'this team plays'
   const opponents = teams - 1
   const cycle = teams % 2 === 0 ? teams - 1 : teams
   if (regularSeasonWeeks < opponents) {
-    return `${regularSeasonWeeks} weeks is shorter than one full round of ${cycle}, so you play ${word(regularSeasonWeeks)} of the other ${word(opponents)} teams once and skip the rest.`
+    return `${regularSeasonWeeks} weeks is shorter than one full round of ${cycle}, so ${plays} ${word(regularSeasonWeeks)} of the other ${word(opponents)} teams once and ${voice === 'you' ? 'skip' : 'skips'} the rest.`
   }
   const base = Math.floor(regularSeasonWeeks / cycle)
   const extra = regularSeasonWeeks % cycle
   if (extra === 0) return null
   const fewer = opponents - extra
-  return `${regularSeasonWeeks} weeks over ${/^(8|11|18)/.test(String(cycle)) ? 'an' : 'a'} ${cycle}-week cycle: you play ${word(extra)} ${extra === 1 ? 'team' : 'teams'} ${times(base + 1)} and ${word(fewer)} ${times(base)}.`
+  return `${regularSeasonWeeks} weeks over ${/^(8|11|18)/.test(String(cycle)) ? 'an' : 'a'} ${cycle}-week cycle: ${plays} ${word(extra)} ${extra === 1 ? 'team' : 'teams'} ${times(base + 1)} and ${word(fewer)} ${times(base)}.`
 }
 
 // Spec 073: the "How to play" steps, written once. HistoricalDraft renders them with its per-sport
@@ -313,7 +326,7 @@ export function howToPlaySteps(scoring: string): HowToStep[] {
     { title: 'The year plays out', body: scoring },
     {
       title: 'See how you did',
-      body: 'Your finish, the picks you nailed, the ones you missed, and how you stack up against hindsight.',
+      body: 'Your finish, the picks you nailed and the ones you missed.',
     },
   ]
 }
@@ -323,6 +336,8 @@ export function howToPlaySteps(scoring: string): HowToStep[] {
  * each stored season and game snapshot (EraScoring.java); it means the NBA, and the Time Machine does not use the
  * word league. Rewritten here, at display, so old rows read right too. Any other reason passes through unchanged.
  */
-export function notCountedReason(reason: string): string {
-  return reason.replace('not tracked by the league that season', 'not tracked by the NBA that season')
+export function notCountedReason(reason: string, stat: string): string {
+  const swapped = reason.replace('not tracked by the league that season', 'not tracked by the NBA that season')
+  // The backend words one reason for both double stats ("double-doubles need ..."); the triple-doubles line must say its own.
+  return stat === 'td' ? swapped.replace(/^double-doubles need/, 'triple-doubles need') : swapped
 }

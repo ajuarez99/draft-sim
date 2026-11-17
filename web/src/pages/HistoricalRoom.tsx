@@ -1,16 +1,26 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import {
   getHistoricalGame,
+  getPublicGame,
   historicalAuto,
   historicalPick,
   type HistoricalGameState,
   type HistoricalPlayerCard,
+  type PublicGame,
   type PredictedPick,
   type Seat,
   type MockSeat,
 } from '../api'
 import { useFailure } from '../useFailure'
+import { ApiError } from '../apiError'
+import SharedResult, { NoFinishedGame, useNoindex } from './SharedResult'
+import ClaimLine from '../components/ClaimLine'
+import { brand, keepResultBody, keepResultHeading, notCountedNote } from '../redraftCopy'
+import SignInForm from '../components/SignInForm'
+import { peekGuestId } from '../guest'
+import { useUser } from '../user'
+import { usePageTitle } from '../pageTitle'
 import NotFound from '../components/NotFound'
 import { tmHome } from '../site'
 import { currentSite } from '../siteEnv'
@@ -84,7 +94,7 @@ function SeasonDisclosure({ game }: { game: HistoricalGameState }) {
             <ul className="hist-excluded">
               {excluded.map(([k, why]) => (
                 <li key={k}>
-                  <strong>{statLong(k)}</strong> <span className="muted">{notCountedReason(why)}</span>
+                  <strong>{statLong(k)}</strong> <span className="muted">{notCountedReason(why, k)}</span>
                 </li>
               ))}
             </ul>
@@ -122,6 +132,7 @@ export function disclosureSummary(game: Pick<HistoricalGameState, 'season'>): st
 
 export default function HistoricalRoom() {
   const { gameId = '' } = useParams<{ gameId: string }>()
+  const user = useUser()
   const id = Number(gameId)
   const [speed, setSpeed] = useState<RevealSpeed>(loadRevealSpeed)
   const reveal = usePickReveal(speed)
@@ -137,16 +148,61 @@ export default function HistoricalRoom() {
   const sawDrafting = useRef(false)
   const [seasonDone, setSeasonDone] = useState(false)
   const [replaying, setReplaying] = useState(false)
+  // Spec 074 T043: a game that is not the viewer's own (the owner endpoint answers 404, or 403) may be somebody's shared
+  // result. 'pending' holds the loading screen until the public answer settles, so the owner never sees the shared
+  // page flash and a stranger never sees a not-found flash. 'none' is the "No finished game here" page.
+  const [shared, setShared] = useState<PublicGame | 'none' | null>(null)
+  usePageTitle(brand)
+  // A game page is never worth indexing, whoever is looking (owner room, shared result or "no game"): V-08g.
+  useNoindex()
 
   const { load } = reveal
+  // Somebody else's finished game is a Redraft-site page (CR-04). The combined build keeps what it always did: a game
+  // that is not yours is not found, and nothing is requested from the public route.
+  const publicPages = currentSite().site === 'timemachine'
+  // A reduced result (today's game of the day) is asked for again once its "reduced until" instant has passed (CR-10).
+  const refetchShared = useCallback(() => {
+    getPublicGame(id)
+      .then((p) => setShared(p))
+      .catch(() => {})
+  }, [id])
   useEffect(() => {
     announced.current = null
     sawDrafting.current = false
     setSeasonDone(false)
     setReplaying(false)
+    setShared(null)
+    let current = true
+    const asStranger = async () => {
+      try {
+        const p = await getPublicGame(id)
+        if (current) setShared(p)
+      } catch (e2) {
+        if (!current) return
+        if (e2 instanceof ApiError && e2.status === 404) setShared('none')
+        else fail(e2)
+      }
+    }
+    // V-08j: a viewer with no identity at all (not signed in, no stored guest id) owns no game, so the private request could
+    // only 404 and show as a console error. With any identity the owner route still goes first.
+    if (publicPages && !user && !peekGuestId()) {
+      void asStranger()
+      return () => {
+        current = false
+      }
+    }
     getHistoricalGame(id)
       .then(load)
-      .catch((e) => fail(e))
+      .catch(async (e) => {
+        if (publicPages && e instanceof ApiError && (e.status === 404 || e.status === 403)) {
+          await asStranger()
+          return
+        }
+        if (current) fail(e)
+      })
+    return () => {
+      current = false
+    }
     // `load` changes with the speed; a speed change must not refetch the game.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
@@ -215,6 +271,8 @@ export default function HistoricalRoom() {
     }
   }
 
+  if (shared === 'none') return <NoFinishedGame />
+  if (shared) return <SharedResult pub={shared} onReducedEnd={refetchShared} />
   if (notFound && !state) return <NotFound what="page" />
   if (error && !state) {
     return (
@@ -257,7 +315,7 @@ export default function HistoricalRoom() {
           <h1 className="tm-title">{state.season.label} (abandoned)</h1>
           <p className="tm-tagline">This game was abandoned.</p>
           <Link className="tm-btn" to={tmHome(currentSite())}>
-            Back to Time Machine
+            Back to Redraft
           </Link>
         </header>
       </div>
@@ -320,7 +378,25 @@ export default function HistoricalRoom() {
         <HistoricalResults
           game={state}
           result={state.result}
-          afterFinish={<HistoricalAwardPanel gameId={state.id} />}
+          voice="you"
+          afterFinish={
+            // Spec 074 T039: achievements are for a signed-in player's own free-play and daily games. A guest has none to
+            // earn (the server answers 403), and a season the player picked earns nothing; neither mounts the panel.
+            <>
+              <ClaimLine />
+              {!user ? (
+              <section className="panel tm-signin tm-keep" aria-label={keepResultHeading}>
+                <h2>{keepResultHeading}</h2>
+                <p>{keepResultBody}</p>
+                <SignInForm autoFocus={false} notes={[]} />
+              </section>
+            ) : state.chosenSeason ? (
+              <p className="muted small tm-not-counted">{notCountedNote}</p>
+            ) : (
+              <HistoricalAwardPanel gameId={state.id} />
+            )}
+            </>
+          }
           finishAction={
             <>
               <Link className="tm-play" to={tmHome(currentSite())}>
@@ -342,7 +418,7 @@ export default function HistoricalRoom() {
           <SeasonDisclosure game={state} />
         </details>
         <p>
-          <Link to={tmHome(currentSite())}>Back to Time Machine</Link>
+          <Link to={tmHome(currentSite())}>Back to Redraft</Link>
         </p>
       </div>
       </>
@@ -422,6 +498,7 @@ export default function HistoricalRoom() {
         board={boardNode('full')}
         rail={
           <HistoricalPickRail
+            voice="you"
             picks={state.picks}
             teams={state.teams}
             rounds={state.rounds}

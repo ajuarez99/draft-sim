@@ -1,7 +1,9 @@
 import type { HistoricalPlayoffMatchup, HistoricalPlayoffs, HistoricalRound } from '../api'
-import { pointsPair, teamName } from '../historicalCopy'
+import { pointsPair, type Voice } from '../historicalCopy'
+import { drafterClass, drafterSuffix, voiceWords } from '../redraftVoice'
 
-type Props = { playoffs: HistoricalPlayoffs; userSlot: number }
+/** `voice` is required (spec 074): the owner's page marks the drafter with `me` and says "You"; a shared one with `tm-drafter` and "this team". */
+type Props = { playoffs: HistoricalPlayoffs; userSlot: number; voice: Voice }
 
 const ROUND_NAME: Record<HistoricalRound['name'], string> = {
   ROUND_ONE: 'Round one',
@@ -19,6 +21,7 @@ function Side({
   won,
   isFinal,
   userSlot,
+  voice,
 }: {
   seed: number
   slot: number
@@ -26,14 +29,19 @@ function Side({
   won: boolean
   isFinal: boolean
   userSlot: number
+  voice: Voice
 }) {
   const me = slot === userSlot
+  const w = voiceWords(voice)
   return (
-    <li className={`hist-bk-side${won ? ' won' : ' lost'}${me ? ' me' : ''}`}>
+    <li className={`hist-bk-side${won ? ' won' : ' lost'}${me ? ` ${drafterClass(voice, true, 'me')}` : ''}`}>
       <span className="hist-bk-seed" title={`Seed ${seed}`}>
         {seedLabel(seed)}
       </span>
-      <span className="hist-bk-team">{teamName(slot, userSlot)}</span>
+      <span className="hist-bk-team">
+        {w.teamCell(slot, userSlot)}
+        {me ? drafterSuffix(voice) : ''}
+      </span>
       {/* The winner is marked by a word and a glyph as well as weight and tint, so colour is never the only cue. */}
       {won && (
         <span className="hist-bk-win">
@@ -47,14 +55,14 @@ function Side({
   )
 }
 
-function Matchup({ m, isFinal, userSlot }: { m: HistoricalPlayoffMatchup; isFinal: boolean; userSlot: number }) {
+function Matchup({ m, isFinal, userSlot, voice }: { m: HistoricalPlayoffMatchup; isFinal: boolean; userSlot: number; voice: Voice }) {
   const involvesMe = m.highSlot === userSlot || m.lowSlot === userSlot
   const [highText, lowText] = pointsPair(m.highPoints, m.lowPoints)
   return (
-    <li className={`hist-bk-match${involvesMe ? ' me' : ''}${isFinal ? ' final' : ''}`}>
+    <li className={`hist-bk-match${involvesMe ? ` ${drafterClass(voice, true, 'me')}` : ''}${isFinal ? ' final' : ''}`}>
       <ul className="hist-bk-sides">
-        <Side seed={m.highSeed} slot={m.highSlot} points={highText} won={m.winnerSlot === m.highSlot} isFinal={isFinal} userSlot={userSlot} />
-        <Side seed={m.lowSeed} slot={m.lowSlot} points={lowText} won={m.winnerSlot === m.lowSlot} isFinal={isFinal} userSlot={userSlot} />
+        <Side seed={m.highSeed} slot={m.highSlot} points={highText} won={m.winnerSlot === m.highSlot} isFinal={isFinal} userSlot={userSlot} voice={voice} />
+        <Side seed={m.lowSeed} slot={m.lowSlot} points={lowText} won={m.winnerSlot === m.lowSlot} isFinal={isFinal} userSlot={userSlot} voice={voice} />
       </ul>
       {m.decidedBySeed && <p className="hist-bk-tie small">Level on points. The better seed advanced on a tie.</p>}
     </li>
@@ -66,21 +74,22 @@ function Matchup({ m, isFinal, userSlot }: { m: HistoricalPlayoffMatchup; isFina
  * scores; the user's team is marked everywhere it appears; the champion gets the biggest line on the page.
  * Columns stack below 720px (styles.css).
  */
-export default function HistoricalBracket({ playoffs, userSlot }: Props) {
+export default function HistoricalBracket({ playoffs, userSlot, voice }: Props) {
+  const w = voiceWords(voice)
   const rounds = [...playoffs.rounds].sort((a, b) => a.round - b.round)
   const champ = playoffs.championSlot
   const seedOf = (slot: number) => playoffs.seeds.find((s) => s.slot === slot)?.seed
   const champIsMe = champ === userSlot
   return (
     <section className="panel hist-bracket" aria-label="Playoff bracket">
-      <div className={`hist-champ${champIsMe ? ' me' : ''}`}>
+      <div className={`hist-champ${champIsMe ? ` ${drafterClass(voice, true, 'me')}` : ''}`}>
         <span className="hist-champ-trophy" aria-hidden="true">
           ★
         </span>
         <div>
           <p className="hist-champ-label small">Champion</p>
           <p className="hist-champ-name cond">
-            {champIsMe ? 'You won it all' : `${teamName(champ, userSlot)} won it all`}
+            {w.bracketWon(`Team ${champ}`, champIsMe)}
             {seedOf(champ) != null && <span className="muted small"> · seed {seedOf(champ)}</span>}
           </p>
         </div>
@@ -96,9 +105,12 @@ export default function HistoricalBracket({ playoffs, userSlot }: Props) {
               {r.byeSlots.length > 0 && (
                 <ul className="hist-bk-byes">
                   {r.byeSlots.map((slot) => (
-                    <li key={slot} className={slot === userSlot ? 'me' : undefined}>
+                    <li key={slot} className={drafterClass(voice, slot === userSlot, 'me')}>
                       <span className="hist-bk-seed">{seedOf(slot) != null ? seedLabel(seedOf(slot)!) : ''}</span>
-                      <span className="hist-bk-team">{teamName(slot, userSlot)}</span>
+                      <span className="hist-bk-team">
+                        {w.teamCell(slot, userSlot)}
+                        {slot === userSlot ? drafterSuffix(voice) : ''}
+                      </span>
                       <span className="muted small">bye</span>
                     </li>
                   ))}
@@ -106,7 +118,7 @@ export default function HistoricalBracket({ playoffs, userSlot }: Props) {
               )}
               <ul className="hist-bk-matches">
                 {r.matchups.map((m) => (
-                  <Matchup key={`${m.highSlot}-${m.lowSlot}`} m={m} isFinal={isFinal} userSlot={userSlot} />
+                  <Matchup key={`${m.highSlot}-${m.lowSlot}`} m={m} isFinal={isFinal} userSlot={userSlot} voice={voice} />
                 ))}
               </ul>
             </div>

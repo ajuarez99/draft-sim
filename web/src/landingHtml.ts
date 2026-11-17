@@ -2,8 +2,12 @@ import {
   analyticsLine, description, featureSports, footerLine, groups, headingOf, headline, imageAlt,
   platformsNote, signInNote, sports, subheadline, title,
 } from './landingCopy'
-import * as tm from './tmLandingCopy'
+import { esc, jsonForScript } from './htmlEscape'
+import { embeddedDataFor, staticBodyFor } from './seasonPageHtml'
+import * as redraft from './redraftCopy'
+import { EMPTY_REDRAFT_DATA, SPORTS, homePageEntry, offeredSportsOf, type RedraftPage } from './redraftPages'
 import { siteOrigin, type SiteConfig } from './site'
+import type { RedraftSeasonData } from './api'
 
 // Spec 050: pure string renderers for the HTML a visitor who doesn't run scripts
 // receives -- link-preview bots, search crawlers, a slow first paint. vite.config.ts
@@ -20,23 +24,21 @@ const IMAGE_HEIGHT = 630
 // Mirrors --bg in styles.css (oklch(15% 0.03 280)) as sRGB hex; a <meta> can't read a CSS variable.
 const THEME_COLOR = '#090917'
 
-export function esc(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-}
+// esc() lives in htmlEscape.ts now (seasonPageHtml.ts needs it too); re-exported so existing imports keep working.
+export { esc }
 
-/** What a site's tags say: the Time Machine's own words, or the league landing's. */
+/**
+ * What the league landing's tags say. (Spec 074: the Redraft site's index.html is its home page, written by pageHeadTags
+ * from the page list like every other page of that site, so it has no entry here.)
+ */
 function pageFor(cfg: SiteConfig) {
-  const timeMachine = cfg.site === 'timemachine'
   return {
-    title: timeMachine ? tm.title : title,
-    description: timeMachine ? tm.description : description,
-    imageAlt: timeMachine ? tm.imageAlt : imageAlt,
-    imageFile: timeMachine ? 'og-image-tm.png' : 'og-image.png',
-    name: timeMachine ? 'Ball Knowers Time Machine' : 'Ball Knowers',
+    title,
+    description,
+    imageAlt,
+    imageFile: 'og-image.png',
+    name: 'Ball Knowers',
+    origin: siteOrigin(cfg),
   }
 }
 
@@ -82,7 +84,7 @@ export function jsonLd(cfg: SiteConfig): string {
     name: p.name,
     url: `${siteOrigin(cfg)}/`,
     description: p.description,
-    applicationCategory: cfg.site === 'timemachine' ? 'GameApplication' : 'SportsApplication',
+    applicationCategory: 'SportsApplication',
     operatingSystem: 'Web',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
   }
@@ -136,38 +138,6 @@ export function staticBody(): string {
   )
 }
 
-/** The mark drawn in pages/TimeMachineSignIn.tsx and the Time Machine home. Not text, so the parity test skips it. */
-const TM_MARK =
-  `<span class="tm-mark" aria-hidden="true"><svg viewBox="0 0 48 48" width="34" height="34" fill="none" stroke="currentColor" ` +
-  `stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 24a15 15 0 1 0 5-11.2"></path>` +
-  `<path d="M8 7v7h7"></path><path d="M24 16v9l6 4"></path></svg></span>`
-
-/** The Time Machine front door, same element tree and class names as pages/TimeMachineSignIn.tsx. */
-export function staticTmBody(): string {
-  const sportPills = tm.sports.map((s) => `<span class="landing-sport">${esc(s)}</span>`).join('')
-  const steps = tm.steps
-    .map((s) => `<li><strong>${esc(s.title)}</strong><span>${esc(s.body)}</span></li>`)
-    .join('')
-  return (
-    `<div class="app"><div class="landing-prerender"><div class="content tm tm-page tm-door">` +
-    `<header class="tm-hero">` +
-    TM_MARK +
-    `<p class="tm-over">Ball Knowers</p>` +
-    `<h1 class="tm-title tm-title-sm">${esc(tm.headline)}</h1>` +
-    `<p class="tm-tagline">${esc(tm.subheadline)}</p>` +
-    `<p class="landing-sports">${sportPills}</p>` +
-    `<form class="signin-form"><label class="signin-label">Your Sleeper username` +
-    `<input class="signin-input" placeholder="Username or profile link" disabled /></label>` +
-    `<button class="signin-continue" type="submit" disabled>Continue</button></form>` +
-    `<p class="signin-note muted small">${esc(tm.signInNote)}</p>` +
-    `<p class="signin-note muted small">${esc(tm.analyticsLine)}</p>` +
-    `</header>` +
-    `<section class="tm-section" aria-label="${esc(tm.howHeading)}"><h2>${esc(tm.howHeading)}</h2><ol class="tm-steps">${steps}</ol></section>` +
-    `<p class="landing-footer muted small">${esc(tm.footerLine)}</p>` +
-    `</div></div></div>`
-  )
-}
-
 /**
  * The delivered head of the locked league site (2026-11-16): a bare title, a noindex, the theme colour and
  * nothing else. No description, canonical, preview-card tags or JSON-LD: a private site gives a crawler or
@@ -182,21 +152,106 @@ export function lockedHeadTags(): string {
   ].join('\n')
 }
 
+/**
+ * Spec 074: the head and body of one Redraft page, made from the page list. `after` is markup that follows the
+ * root element (a season page's embedded JSON), kept out of `#root` so React's mount does not replace it.
+ */
+export type PageParts = { head: string; body: string; after: string }
+
+/** Head tags for one page of the page list. Indexable pages get the full set; 404.html and the app shell get noindex and no canonical. */
+export function pageHeadTags(page: RedraftPage, cfg: SiteConfig): string {
+  const origin = siteOrigin(cfg)
+  const imageUrl = `${origin}/og-image-tm.png`
+  const meta = (attr: 'name' | 'property', key: string, value: string | number) =>
+    `    <meta ${attr}="${key}" content="${esc(String(value))}" />`
+  const lines = [`    <title>${esc(page.title)}</title>`]
+  if (page.noindex) {
+    // Static, not a header: serve matches `headers` against the rewritten file, so a header cannot do this (R4).
+    lines.push(`    <meta name="robots" content="noindex">`)
+    lines.push(meta('name', 'theme-color', THEME_COLOR))
+    if (page.kind === 'appShell') {
+      // Generic preview for a shared game link: a static host serves one file for every game (PR-23).
+      lines.push(meta('name', 'description', page.description))
+      lines.push(meta('property', 'og:title', page.title))
+      lines.push(meta('property', 'og:description', page.description))
+      lines.push(meta('property', 'og:type', 'website'))
+      lines.push(meta('property', 'og:site_name', 'Ball Knowers'))
+      lines.push(meta('property', 'og:image', imageUrl))
+      lines.push(meta('name', 'twitter:card', 'summary_large_image'))
+      lines.push(meta('name', 'twitter:image', imageUrl))
+    }
+  } else {
+    lines.push(
+      meta('name', 'description', page.description),
+      `    <link rel="canonical" href="${esc(page.canonical)}" />`,
+      meta('name', 'theme-color', THEME_COLOR),
+      meta('property', 'og:title', page.title),
+      meta('property', 'og:description', page.description),
+      meta('property', 'og:url', page.canonical),
+      meta('property', 'og:type', 'website'),
+      meta('property', 'og:site_name', 'Ball Knowers'),
+      meta('property', 'og:image', imageUrl),
+      meta('property', 'og:image:width', IMAGE_WIDTH),
+      meta('property', 'og:image:height', IMAGE_HEIGHT),
+      meta('property', 'og:image:type', 'image/png'),
+      meta('property', 'og:image:alt', redraft.imageAlt),
+      meta('name', 'twitter:card', 'summary_large_image'),
+      meta('name', 'twitter:title', page.title),
+      meta('name', 'twitter:description', page.description),
+      meta('name', 'twitter:image', imageUrl),
+      meta('name', 'twitter:image:alt', redraft.imageAlt),
+    )
+  }
+  for (const block of page.jsonLd) lines.push(`    <script type="application/ld+json">${jsonForScript(block)}</script>`)
+  return lines.join('\n')
+}
+
+export function pageParts(page: RedraftPage, cfg: SiteConfig, data: RedraftSeasonData): PageParts {
+  const embedded = embeddedDataFor(page, data)
+  // CR-08: when a sport has no seasons the mounted footer, 404 and shared-result links must leave it out too, and
+  // those pages do not embed the lists. Said in the head only when a sport is missing; absent means "both".
+  const offered = offeredSportsOf(data)
+  const sportsMeta =
+    offered.length < SPORTS.length ? `\n    <meta name="redraft-sports" content="${esc(offered.join(','))}" />` : ''
+  return {
+    head: pageHeadTags(page, cfg) + sportsMeta,
+    body: staticBodyFor(page, cfg, data),
+    after: embedded == null ? '' : `<script type="application/json" id="redraft-data">${jsonForScript(embedded)}</script>`,
+  }
+}
+
 const HEAD_ANCHOR = '</head>'
 const ROOT_ANCHOR = '<div id="root"></div>'
 
-/** Fills index.html. Throws on a missing anchor so a changed template fails the build loudly. */
-export function transform(html: string, cfg: SiteConfig): string {
+/**
+ * Fills the built template. Throws on a missing anchor so a changed template fails the build loudly, and on
+ * a template that is already filled (no empty root), so filling twice cannot pass quietly.
+ *
+ * With no `parts` it writes index.html as before (the league landing or the locked league site; the Redraft site's home page). With `parts` (spec 074) it writes one page of the Redraft page list;
+ * the leagues and combined builds never pass any.
+ */
+export function transform(html: string, cfg: SiteConfig, parts?: PageParts): string {
   if (!html.includes(HEAD_ANCHOR)) throw new Error('landingHtml: index.html has no </head>')
   if (!html.includes(ROOT_ANCHOR)) throw new Error('landingHtml: index.html has no empty <div id="root"></div>')
+  if (parts) {
+    const head = `${parts.head}
+    <script src="/boot.js"></script>
+  `
+    return html
+      .replace(HEAD_ANCHOR, () => `${head}${HEAD_ANCHOR}`)
+      .replace(ROOT_ANCHOR, () => `<div id="root">${parts.body}</div>${parts.after}`)
+  }
   // The locked league site delivers an empty root: the lock screen is drawn by React, and the marketing
   // landing is no longer part of it (a crawler gets nothing to index). Every other site is unchanged.
   if (cfg.site === 'leagues') {
     const lockedHead = `${lockedHeadTags()}\n    <script src="/boot.js"></script>\n  `
     return html.replace(HEAD_ANCHOR, () => `${lockedHead}${HEAD_ANCHOR}`)
   }
+  // The Redraft site's index.html is its home page. With no season data in hand (a dev server, a test) the home page's
+  // season tiles are simply absent; the build passes the real parts (vite.config.ts), tiles included.
+  if (cfg.site === 'timemachine') return transform(html, cfg, pageParts(homePageEntry(cfg), cfg, EMPTY_REDRAFT_DATA))
   const head = `${headTags(cfg)}\n${jsonLd(cfg)}\n    <script src="/boot.js"></script>\n  `
-  const body = cfg.site === 'timemachine' ? staticTmBody() : staticBody()
+  const body = staticBody()
   return html
     .replace(HEAD_ANCHOR, () => `${head}${HEAD_ANCHOR}`)
     .replace(ROOT_ANCHOR, () => `<div id="root">${body}</div>`)

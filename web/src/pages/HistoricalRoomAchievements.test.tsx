@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HistoricalGameState, HistoricalPlayerCard } from '../api'
+import { clearUser, setUser } from '../user'
 import HistoricalRoom from './HistoricalRoom'
 
 const getHistoricalGame = vi.fn()
@@ -20,11 +21,14 @@ beforeAll(() => {
   } as unknown as typeof ResizeObserver
 })
 beforeEach(() => {
+  // Spec 074 T039: the award panel is a signed-in player's (a guest has none to earn), so these rooms are signed in.
+  setUser({ sleeperUserId: 'u1', username: 'u1', displayName: 'U One', avatar: null })
   getHistoricalGame.mockReset()
   historicalPick.mockReset()
   localStorage.clear()
 })
 afterEach(() => {
+  clearUser()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

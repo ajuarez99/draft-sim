@@ -115,6 +115,23 @@ public final class HistoricalBoardBuilder {
                                                    List<? extends Map<Long, ? extends StatLine>> priors,
                                                    Map<Long, ? extends StatLine> drafted,
                                                    RankConfig cfg, Options opts) {
+        return buildRanked(seasonStart, seed, scoring, candidates, priors, drafted, cfg, opts).cards();
+    }
+
+    /**
+     * The board and how much of it is ordered by something other than the seed (spec 074 PR-12). The first
+     * {@code rankedCount} cards are ranked: a veteran by his newest qualifying prior line, or a first-season player
+     * placed by his draft pick. Everyone after them is the unranked tail, in seeded random order, so a card's
+     * {@code rank} past {@code rankedCount} says nothing about him. A card has no marker for this and football's
+     * cannot be derived from one (a round-3 rookie carries a pick and sits in the tail), so the builder reports it.
+     */
+    public record Board(List<HistoricalPlayerCard> cards, int rankedCount) {}
+
+    public static Board buildRanked(int seasonStart, long seed, Map<String, Double> scoring,
+                                    List<Candidate> candidates,
+                                    List<? extends Map<Long, ? extends StatLine>> priors,
+                                    Map<Long, ? extends StatLine> drafted,
+                                    RankConfig cfg, Options opts) {
         List<String> counted = new ArrayList<>();
         for (String k : opts.counting()) if (scoring.containsKey(k)) counted.add(k);
 
@@ -174,6 +191,7 @@ public final class HistoricalBoardBuilder {
         Collections.shuffle(unranked, new Random(seed));
 
         List<Row> all = new ArrayList<>(ranked);
+        int rankedCount = ranked.size();
         all.addAll(unranked);
 
         List<HistoricalPlayerCard> out = new ArrayList<>(all.size());
@@ -193,7 +211,7 @@ public final class HistoricalBoardBuilder {
                     opts.nfl() == null ? java.util.Set.of() : opts.nfl().totalKeys()),
                     rookiePickOf(r.c().id(), r.shown(), opts)));
         }
-        return out;
+        return new Board(out, rankedCount);
     }
 
     /**

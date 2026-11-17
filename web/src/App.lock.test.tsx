@@ -290,11 +290,14 @@ describe.each([
   beforeEach(() => mode(site))
 
   it('signed out, no session: the normal front door, never the lock, and the unlock is never asked', () => {
+    // T041 (spec 074): on the Redraft build "the normal front door" is the home page for a guest, whose way in is the bar's
+    // "Sign in" link (the username form is a panel at the end of the real home page, which this file stubs out).
     expect(localStorage.getItem(SESSION_KEY)).toBeNull()
     renderAt('/')
     expect(screen.queryByLabelText('Admin token')).toBeNull()
     expect(screen.queryByText('This site is private.')).toBeNull()
-    expect(screen.getByLabelText(/your sleeper username/i)).toBeInTheDocument()
+    if (site === 'timemachine') expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument()
+    else expect(screen.getByLabelText(/your sleeper username/i)).toBeInTheDocument()
     expect(check).not.toHaveBeenCalled()
   })
 
