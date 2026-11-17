@@ -41,7 +41,7 @@ in `claude/lessons.md` come from this spec.
 - Cold cost of the season fetch: 47 NBA seasons in 39.4 s, one after another. The JVM ran C1-only with the
   default heap, **not `-Xmx1024m`** (`t017-measurements.md`).
 
-**FAILS a requirement until done: the link-preview image.** `web/public/og-image-tm.png` still reads "Time
+**Corrected 2026-11-17, after this block was written: the link-preview image is now re-rendered and reads "Ball Knowers Redraft" (Allan approved the renderer install; the PNG was opened and checked; T030 ticked). What follows is the earlier state, kept as written.** Was: FAILS a requirement until done: the link-preview image. `web/public/og-image-tm.png` still reads "Time
 Machine" and "Free with a Sleeper username". The SVG source is reworded; the PNG was never re-rendered, and
 every page's `og:image` points at it. That breaks spec FR-001 and US2.1 (verification V-01, code-review CR-01;
 task T030 is unticked). Re-rendering needs `@resvg/resvg-js`, whose install was denied to a subagent and
@@ -100,7 +100,7 @@ has no V50. Run the backend with `DB_URL=jdbc:postgresql://localhost:5433/drafts
 deleted the 12 games it made; the sequences were not reset.
 
 **Next:**
-1. Allan: say yes or no to installing `@resvg/resvg-js`; then re-render `og-image-tm.png`, look at it, tick T030.
+1. DONE 2026-11-17 (image re-rendered, see the correction above). Was: Allan: say yes or no to installing `@resvg/resvg-js`; then re-render `og-image-tm.png`, look at it, tick T030.
 2. Re-check fix pass 2 in the browser (V-02 focus after moving between season pages, V-04 no guest flash for a signed-in visitor, V-05 touch heights); the suites were run after it, the browser was not.
 3. Import NFL seasons into `draftsim_074` (or run the checks on a copy of production's data) and re-verify the
    football pages, the football daily and the sitemap count; then close T047.

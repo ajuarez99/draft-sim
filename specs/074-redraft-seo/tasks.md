@@ -69,7 +69,7 @@
 
 - [x] T028 [US2] Replace every reader-facing "Time Machine" with the Redraft wording in design.md: `tmLandingCopy.ts`, `historicalCopy.ts`, `historicalShare.ts`, `siteCopy.ts`, `App.tsx` titles, `TimeMachineShell.tsx`, `AccountMenu.tsx`, `NotFound.tsx`, `PageHeader.tsx`, `HistoricalRoomLayout.tsx`, `HistoricalProfileCard.tsx`, `SignInForm.tsx`, `analytics.ts` labels, and the rest of the 28 files `grep -ril "time machine" web/src` lists. File, class and CSS names stay.
 - [x] T029 [US2] `historicalShare.ts` + test: title "Ball Knowers Redraft"; season and sport; "Chosen season" when set; link is the game's own address through `tmGame` (never a path literal).
-- [ ] T030 [US2] `web/scripts/og-image/og-image-tm.svg` reworded and re-rendered to `web/public/og-image-tm.png` with the existing `render.mjs`; look at the PNG before calling it done.
+- [x] T030 [US2] `web/scripts/og-image/og-image-tm.svg` reworded and re-rendered to `web/public/og-image-tm.png` with the existing `render.mjs`; look at the PNG before calling it done.
 - [x] T031 [US2] New test `web/src/redraft.naming.test.ts`: no "Time Machine" (any case) in any string exported by the copy modules or in the static HTML of every page built from the fixture; every indexable title contains "Redraft" and a year or "past"/"Past". Update the tests that pinned the old name.
 
 ---
