@@ -15,6 +15,9 @@ import {
 // analytics.ts refuses to run anywhere but the production hosts.
 
 const track = vi.fn()
+// Spec 076: the own sink's bare fetch. Every case stubs it, because the production-host cases now reach it.
+const fetchMock = vi.fn()
+const ownBodies = () => fetchMock.mock.calls.map((c) => JSON.parse((c[1] as RequestInit).body as string) as Record<string, unknown>)
 const sentPayloads = () => track.mock.calls.map((c) => c[0] as Record<string, unknown>)
 
 function scriptEl(): HTMLScriptElement | null {
@@ -37,6 +40,9 @@ function setReferrer(value: string) {
 }
 
 beforeEach(() => {
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+  vi.stubGlobal('fetch', fetchMock)
   track.mockReset()
   ;(window as unknown as { umami?: unknown }).umami = { track }
   __resetAnalyticsForTests()
@@ -72,6 +78,7 @@ describe('when analytics is off', () => {
     trackPageView('/managers', true)
     expect(scriptEl()).toBeNull()
     expect(track).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('with umami.disabled set (the owner opt-out)', () => {
@@ -81,6 +88,7 @@ describe('when analytics is off', () => {
     trackPageView('/managers', true)
     expect(scriptEl()).toBeNull()
     expect(track).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('blocked storage counts as not opted out', () => {
@@ -104,6 +112,9 @@ describe('when analytics is off', () => {
     expect(scriptEl()).toBeNull()
     expect(track).not.toHaveBeenCalled()
     expect(debug).toHaveBeenCalledWith('[analytics]', expect.objectContaining({ url: '/managers' }))
+    // The own sink logs its body too, and sends nothing.
+    expect(debug).toHaveBeenCalledWith('[analytics:own]', { kind: 'view', site: 'combined', route: '/managers' })
+    expect(fetchMock).not.toHaveBeenCalled()
     debug.mockRestore()
   })
 })
@@ -155,6 +166,7 @@ describe('routeTemplate', () => {
     ['/leagues/1122386008709910528/superlatives', '/leagues/:league/superlatives', 'Season superlatives'],
     ['/leagues/1122386008709910528/weekly-pot', '/leagues/:league/weekly-pot', 'Weekly pot'],
     ['/admin/digest', '/admin/digest', 'Admin digest'],
+    ['/admin/usage', '/admin/usage', 'Admin usage'],
   ]
 
   it.each(cases)('%s -> %s', (path, url, title) => {
@@ -479,5 +491,152 @@ describe('referrer', () => {
       expect(sentPayloads()[0], r).not.toHaveProperty('referrer')
       scriptEl()?.remove()
     }
+  })
+})
+
+// ---- Spec 076: the own sink ---------------------------------------------------------------------
+
+const FORBIDDEN_HEADERS = ['x-sleeper-user', 'x-guest-id', 'x-league-session', 'x-admin-token']
+const sentHeaders = (i = 0) => (fetchMock.mock.calls[i][1] as RequestInit).headers as Record<string, string>
+
+describe('the own sink (spec 076)', () => {
+  it('sends with no website id at all: Umami off, own counts on', () => {
+    vi.stubGlobal('location', { ...window.location, hostname: 'www.ballknowers.co', pathname: '/' })
+    vi.stubEnv('VITE_UMAMI_WEBSITE_ID', '')
+    initAnalytics()
+    trackPageView('/managers', true)
+    expect(scriptEl()).toBeNull()
+    expect(track).not.toHaveBeenCalled()
+    expect(ownBodies()).toEqual([{ kind: 'view', site: 'combined', route: '/managers' }])
+  })
+
+  it('both sinks on: one view reaches both, from the same latch', () => {
+    onProduction()
+    initAndLoad()
+    trackPageView('/leagues/1122386008709910528/power', true)
+    trackPageView('/leagues/1122386008709910528/power', true)
+    expect(track).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(ownBodies()[0]).toEqual({ kind: 'view', site: 'combined', route: '/leagues/:league/power' })
+  })
+
+  it('the request is a bare keepalive POST with no identity header and no referrer', () => {
+    onProduction()
+    trackPageView('/managers', true)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('/api/usage')
+    expect(init.method).toBe('POST')
+    expect(init.keepalive).toBe(true)
+    expect(init.referrerPolicy).toBe('no-referrer')
+    expect(Object.keys(sentHeaders())).toEqual(['Content-Type'])
+    for (const h of FORBIDDEN_HEADERS) expect(Object.keys(sentHeaders()).map((k) => k.toLowerCase())).not.toContain(h)
+  })
+
+  it('a signed-in user, a guest id and a league session never ride on it', () => {
+    onProduction()
+    localStorage.setItem('bk.user.v1', JSON.stringify({ sleeperUserId: '999', username: 'popsharky', displayName: 'P', avatar: null }))
+    localStorage.setItem('bk.guestId', 'guest-abc')
+    trackLeagueView('/leagues/1122386008709910528/power', true, 'nba', '1122386008709910528')
+    const text = JSON.stringify(fetchMock.mock.calls[0])
+    expect(text).not.toContain('999')
+    expect(text).not.toContain('popsharky')
+    expect(text).not.toContain('guest-abc')
+  })
+
+  it('the body holds only vocabulary fields for each of the three kinds', () => {
+    onProduction()
+    trackPageView('/managers', false)
+    trackLeagueView('/leagues/1122386008709910528/power', true, 'nba', '1122386008709910528')
+    trackAction('result-shared', { sport: 'nfl', who: 'guest', daily: 'no' })
+    const [view, league, event] = ownBodies()
+    expect(view).toEqual({ kind: 'view', site: 'combined', route: '/(landing)/managers' })
+    // No sport on the wire for a league view: the server reads it from its own league table.
+    expect(league).toEqual({ kind: 'league-view', site: 'combined', route: '/leagues/:league/power', league: '1122386008709910528' })
+    expect(event).toEqual({ kind: 'event', site: 'combined', name: 'result-shared', props: { sport: 'nfl', who: 'guest', daily: 'no' } })
+    for (const body of ownBodies()) {
+      expect(JSON.stringify(body)).not.toMatch(/website|hostname|language|screen|title|referrer|pathname/)
+    }
+  })
+
+  it('an event with no props sends an empty props object', () => {
+    onProduction()
+    trackAction('sign-in')
+    expect(ownBodies()[0]).toMatchObject({ kind: 'event', name: 'sign-in', props: {} })
+  })
+
+  it('the site is the one this build is', () => {
+    onProduction('leagues.ballknowers.co')
+    vi.stubEnv('VITE_SITE', 'leagues')
+    trackPageView('/', true)
+    vi.stubEnv('VITE_SITE', 'timemachine')
+    trackPageView('/daily', true)
+    expect(ownBodies()).toEqual([
+      { kind: 'view', site: 'leagues', route: '/' },
+      { kind: 'view', site: 'timemachine', route: '/daily' },
+    ])
+  })
+
+  it('the bearer token is the only extra header, and only when the build has one', async () => {
+    vi.resetModules()
+    vi.stubEnv('VITE_API_TOKEN', 'tok-123')
+    const fresh = await import('./analytics')
+    onProduction()
+    fresh.trackPageView('/managers', true)
+    expect(sentHeaders()).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer tok-123' })
+  })
+
+  it('opting out stops both sinks', () => {
+    onProduction()
+    localStorage.setItem('umami.disabled', '1')
+    initAnalytics()
+    trackPageView('/managers', true)
+    trackLeagueView('/leagues/1/power', true, 'nfl', '1')
+    trackAction('sign-in')
+    expect(track).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('localhost sends nothing without the dev switch, and sends with it', () => {
+    expect(window.location.hostname).toBe('localhost')
+    trackPageView('/managers', true)
+    expect(fetchMock).not.toHaveBeenCalled()
+    vi.stubEnv('VITE_USAGE_COLLECT', '1')
+    trackPageView('/mock/new', true)
+    expect(ownBodies()).toEqual([{ kind: 'view', site: 'combined', route: '/mock/new' }])
+  })
+
+  it('the dev switch is exactly "1"', () => {
+    vi.stubEnv('VITE_USAGE_COLLECT', 'true')
+    trackPageView('/managers', true)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('a rejecting fetch never throws into the caller', async () => {
+    onProduction()
+    fetchMock.mockRejectedValue(new Error('offline'))
+    expect(() => {
+      trackPageView('/managers', true)
+      trackLeagueView('/leagues/1/power', true, 'nfl', '1')
+      trackAction('sign-in')
+    }).not.toThrow()
+    await Promise.resolve() // the swallowed rejection settles without an unhandled one
+  })
+
+  it('a fetch that throws synchronously never reaches the caller either', () => {
+    onProduction()
+    fetchMock.mockImplementation(() => {
+      throw new Error('sync boom')
+    })
+    expect(() => trackPageView('/managers', true)).not.toThrow()
+  })
+
+  it('a throwing Umami tracker does not stop the own send', () => {
+    onProduction()
+    initAndLoad()
+    track.mockImplementation(() => {
+      throw new Error('tracker bug')
+    })
+    trackPageView('/managers', true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

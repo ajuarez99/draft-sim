@@ -1,5 +1,74 @@
 # Ball Knowers — handoff
 
+## UPDATE 2026-11-17: spec 076 (usage analytics we own) built, reviewed and live-verified locally; NOT committed, NOT merged, NOT deployed
+
+**State in plain words:** built, bug-hunt reviewed (0 high, 2 medium, 6 low, all fixed), live-verified locally
+2026-11-17. **Uncommitted** in worktree `.claude/worktrees/076-usage-analytics`, branch `076-usage-analytics`, on
+top of `origin/main` `d6a2ac4`. Not merged, not deployed. Commit, push and deploy wait for Allan. Spec folder:
+`specs/076-usage-analytics/` (`spec.md`, `plan.md`, `plan-review.md`, `code-review.md`, `verification.md`).
+Lessons 62 to 65 in `claude/lessons.md` come from this spec.
+
+**What it is.** Our own daily counters in Postgres (migration **V51**, table `usage_daily`), fed by a no-identity
+`POST /api/usage` from `web/src/analytics.ts` (no user id, guest id, league session or token is sent or stored).
+The Redraft funnel (started, finished, gave up, left open, guest vs signed in, game of the day) is **not counted
+in the browser**: it is read from `historical_game` rows plus a new nullable `started_as_guest` column. The
+owner page is `/admin/usage`, behind the admin token. One new browser event: `result-shared`. **Spec 052's Umami
+sink is a separate thing and is still inert without `VITE_UMAMI_WEBSITE_ID`; 076's own counters need no id.**
+
+**VERIFIED by running it** (`specs/076-usage-analytics/verification.md`, local backend on port 8086, vite on
+5186/5187, the built-in browser, a scratch logging proxy, shared local Postgres 5433):
+- Views counted by in-app navigation on the Redraft, combined and league builds (five Redraft sends, five rows);
+  a game room left open counts once; the signed-out landing is stored, not rejected.
+- Nothing identifying: 42 captured `/api/usage` requests, none carrying `X-Sleeper-User`, `X-Guest-Id`,
+  `X-League-Session`, `X-Admin-Token`, `Authorization`, `Cookie` or `Referer`; the stored columns are day, site,
+  kind, route, name, props, league_id, sport, count.
+- Abuse: 1,000 junk sends made 0 new rows; a 200-send burst from one address counted 60; 700 addresses counted
+  600 (the site-wide ceiling); odd shapes and a crawler user agent were not counted; 28 rows after 2,622
+  scripted and 43 browser sends.
+- A failing collection address leaves the game working (three sends lost, no analytics exception). Opt-out
+  (`localStorage['umami.disabled']`) stops sends. A locked league site sends nothing.
+- Owner page numbers match psql row for row; days before counting read "not counted", never 0; the owner's
+  signed-in games are left out when `APP_OWNER_SLEEPER_USER_ID` is set (5 started, 4 finished, 1 not finished,
+  against 8 / 6 / 2 with it blank), and claimed guest games are not subtracted twice.
+- Gate: `GET /api/admin/usage` is 403 without the token; bad ranges are 400. CORS preflight by curl only.
+- Suites at verification time: web `tsc -b` clean, vitest 218 files, 3,607 passed, build passed. Backend full
+  suite **3,070 tests, 48 skipped, 12 failed**. The same 12 (`TargetControllerIT` 8,
+  `LeagueRepositorySuccessorIT` 2, `AdminDigestControllerIT` 1, `AccessControlMvcIT` 1) fail on unchanged main
+  `d6a2ac4` against the same local database (run 2026-11-17), so they are local-data failures, not this change.
+  The feature's own classes all pass.
+
+**Fixed after verification, NOT re-checked in a browser:** V-02 long route templates now wrap on the owner page
+(CSS, `.us-table`); V-01 the owner line now says shares include the owner's own; V-03 days before counting
+collapse to one line. Web `tsc` clean, vitest 3,607 passed and build passed after those edits. One earlier full
+vitest run showed 1 failure that was not identified and did not recur in two re-runs.
+
+**NOT VERIFIED / not run:** a real clipboard or share-sheet share (clipboard was stubbed); an NFL Redraft game
+(no NFL season is loaded locally); an NBA league view or two leagues; the 10,000-address cap, a database failure
+during a send and the vocabulary guard; SC-009 (not timed); a production build (only `vite dev` was driven); the
+phone layout after the V-02 fix.
+
+**Owed after deploy:**
+- **Deploy the backend before the web.** Apply V51 and the `started_as_guest` backfill on production, and check
+  both landed.
+- `X-Real-IP` is what Railway delivers. If not, the whole site shares one 60 a minute bucket; watch the
+  "usage sends not counted" INFO line (`limited=`).
+- A real cross-origin keepalive send from `www.ballknowers.co` and `leagues.ballknowers.co` lands a row (every
+  browser send in verification was same-origin through the vite proxy).
+- CSP report-only shows nothing new.
+- `APP_OWNER_SLEEPER_USER_ID` set in production if the owner's games should be left out of the funnel.
+
+**Hand-set guesses, not measured:** 60 sends a minute per address, 10,000 tracked addresses, 600 writes a minute
+site-wide, the crawler word list.
+
+**Decisions the session took that Allan can overrule:**
+- The owner's signed-in games are left out of the funnel numbers (shares cannot be, they carry no identity).
+- No game-started or draft-finished browser events: the rows count them.
+- The wording "finished" vs "not finished".
+
+**Local database.** Verification left `historical_game` ids 605 to 609 (NBA, owned by the made-up id
+`verify076-owner`) in the shared `draftsim` database on 5433. V51 is applied there too; `usage_daily` was
+emptied again.
+
 ## UPDATE 2026-11-17: spec 074 (Ball Knowers Redraft: rename, static season pages, guests) built and verified locally; NOT committed, NOT deployed
 
 **Read this block first for 074.** The sections below it do not cover specs 063 to 073 either. Check
@@ -120,7 +189,7 @@ looked at, the line says so.
 
 **Merged to main:** 044 lock-ins (prod checked), 045 matchups live season (prod not checked), 046 ADP
 compare + auction board, 047 hall of fame, 048 weekly pot (prod checked), 049 compare two players, 050
-landing page, 051 Trending Tony, 052 analytics (inert until Allan sets `VITE_UMAMI_WEBSITE_ID`), 054
+landing page, 051 Trending Tony, 052 analytics (the Umami sink is inert until Allan sets `VITE_UMAMI_WEBSITE_ID`; spec 076's own counters do not need it), 054
 weekly median what-if (prod checked 11-03: drift 2025=4 / 2024=0, two 2024 playoff-line crossings).
 Also merged earlier: 032–037, 039–041, 043.
 
@@ -268,6 +337,8 @@ the pre-renumber V45 row, so recreate it before reuse or remove it (`docker rm -
   anything in a real browser, the script actually loading, the real payloads reaching Umami, the CSP in a browser.
 - **Owed:** Allan creates the Umami account and website and sets `VITE_UMAMI_WEBSITE_ID` as a build variable on the
   frontend service; then the production checks in `specs/052-site-analytics/quickstart.md`. Off until that variable exists.
+  *(Amended 2026-11-17 after spec 076: that covers the Umami sink only. Spec 076 adds our own counters in Postgres
+  that need no id; see the 076 block at the top.)*
 
 ## UPDATE 2026-10-28: spec 051 (The Trending Tony award) built, reviewed and live-verified locally; NOT committed
 

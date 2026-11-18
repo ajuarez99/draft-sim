@@ -1,8 +1,12 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { clearUser, setUser } from '../user'
 import type { HistoricalGameState, HistoricalPickFinish, HistoricalPlayerCard, HistoricalResult } from '../api'
 import HistoricalResults, { gotRight } from './HistoricalResults'
 import old062 from '../__fixtures__/historical-result-062.json'
+
+const trackAction = vi.fn()
+vi.mock('../analytics', () => ({ trackAction: (...a: unknown[]) => trackAction(...a) }))
 
 function card(id: number, name: string): HistoricalPlayerCard {
   return { id, name, positions: ['SF'], team: 'CHI', age: 28, rank: id, positionalRank: id, prior: null, rookiePick: null }
@@ -488,5 +492,62 @@ describe('HistoricalResults, shared voice (spec 074)', () => {
     expect(squares[0].className).toMatch(/\bahead\b/)
     expect(squares[1].className).toMatch(/\bbehind\b/)
     expect(container.textContent).not.toMatch(/RB\d|drafted as/)
+  })
+})
+
+// Spec 076 (T018): a share is counted only when it really happened.
+describe('HistoricalResults, the Share button counts a real share', () => {
+  const TOUCH = { matches: true } as MediaQueryList
+  function renderOwner(g = game(3)) {
+    render(<HistoricalResults game={g} result={playoffResult()} voice="you" />)
+    return screen.getByRole('button', { name: 'Share your result' })
+  }
+
+  beforeEach(() => {
+    trackAction.mockReset()
+    clearUser()
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false }) as MediaQueryList))
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    clearUser()
+  })
+
+  it('counts after the clipboard write succeeds, as a guest on an ordinary game', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    fireEvent.click(renderOwner())
+    await screen.findByText('Copied. Paste it anywhere.')
+    expect(trackAction).toHaveBeenCalledTimes(1)
+    expect(trackAction).toHaveBeenCalledWith('result-shared', { sport: 'nba', who: 'guest', daily: 'no' })
+  })
+
+  it('counts after the phone share sheet resolves, as a member on a game of the day', async () => {
+    setUser({ sleeperUserId: '1', username: 'u', displayName: 'U', avatar: null })
+    const share = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('matchMedia', vi.fn(() => TOUCH))
+    vi.stubGlobal('navigator', { ...navigator, share })
+    fireEvent.click(renderOwner({ ...game(3), dailyDate: '2026-11-17' } as HistoricalGameState))
+    await vi.waitFor(() => expect(trackAction).toHaveBeenCalledTimes(1))
+    expect(trackAction).toHaveBeenCalledWith('result-shared', { sport: 'nba', who: 'member', daily: 'yes' })
+  })
+
+  it('does not count a dismissed share sheet', async () => {
+    const share = vi.fn().mockRejectedValue(new DOMException('dismissed', 'AbortError'))
+    vi.stubGlobal('matchMedia', vi.fn(() => TOUCH))
+    vi.stubGlobal('navigator', { ...navigator, share })
+    fireEvent.click(renderOwner())
+    await vi.waitFor(() => expect(share).toHaveBeenCalled())
+    await Promise.resolve()
+    expect(trackAction).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Your result, to copy')).toBeNull()
+  })
+
+  it('does not count the by-hand fallback', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('blocked'))
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    fireEvent.click(renderOwner())
+    await screen.findByLabelText('Your result, to copy')
+    expect(trackAction).not.toHaveBeenCalled()
   })
 })

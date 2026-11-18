@@ -550,6 +550,41 @@ backend or the database. The numbers are read on Umami's own dashboard, behind y
 - The sign-in screen says all of this in one sentence (`analyticsLine` in
   `web/src/landingCopy.ts`).
 
+### Our own counters (spec 076)
+
+The same page views and key actions are also counted by the backend itself, into the
+`usage_daily` table, and read at `/admin/usage` (token gate, no nav link). This needs no
+setup and no website id.
+
+- **Deploy the backend before the web.** The address (`POST /api/usage`) and V51 must exist
+  before a browser sends to it. A web build that goes first sends into a 404, which the page
+  swallows, and those days are simply not counted.
+- **`VITE_USAGE_COLLECT=1` is dev-only.** It lets `localhost` send to the local backend so you
+  can see rows land. Never set it on a deployed service: production hosts send without it.
+- **The vocabulary guard is a local run, and nothing in the build runs it.** The backend
+  accepts only the routes and actions listed in `backend/src/main/resources/usage-vocabulary.json`.
+  After any route change (a new page, a renamed path, a new key action) run
+  `cd web && npx vitest run src/usageVocabulary.test.ts`. If it fails because the file is
+  stale, regenerate it with `USAGE_VOCAB_WRITE=1 npx vitest run src/usageVocabulary.test.ts`,
+  review the diff, and ship the JSON with the route change. Skip it and the new page's sends
+  are refused (they show up as "sends turned away" on the page).
+- **The owner opt-out also stops these sends.** `localStorage.setItem('umami.disabled','1')`
+  is per browser and per site, and now stops our own sends as well as Umami's. It never
+  touches the Redraft funnel, which is read from saved games.
+- **`APP_OWNER_SLEEPER_USER_ID`** (already used by the digest) decides whether your own
+  signed-in games are left out of the funnel. Unset, the page says so and counts them with
+  everyone's.
+- **Owed after the first deploy:**
+  1. Check that `X-Real-IP` is what the per-address limiter keys on. If production does not
+     deliver it, every visitor shares one address and the whole site is capped at 60 counted
+     sends a minute. The backend logs one INFO line a minute, counts only, when anything was
+     turned away (`usage sends not counted in the last minute: limited=..., overCeiling=...,
+     crawler=...`). A steady `limited` count on a quiet site means the header is missing.
+  2. Open a page on the real site and confirm a row lands (the page's views for today go
+     up by one).
+  3. Confirm `APP_OWNER_SLEEPER_USER_ID` is set on the backend if your own games should be
+     left out of the funnel.
+
 ## Things that will probably bite
 
 **Memory.** *(Amended 2026-10-20, spec 041. The old paragraph guessed that "512MB is comfortable,

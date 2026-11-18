@@ -84,8 +84,8 @@ public class HistoricalGameRepository {
             PreparedStatement ps = con.prepareStatement("""
                     insert into historical_game (sleeper_user_id, sport, season_start, teams, rounds,
                         reversal_round, roster_positions, scoring, user_slot, rng_seed, current_pick_no, board,
-                        status, created_at, daily_date, chosen_season)
-                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?, ?, ?)
+                        status, created_at, daily_date, chosen_season, started_as_guest)
+                    values (?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, 1, ?::jsonb, 'DRAFTING', ?, ?, ?, ?)
                     """, Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, sleeperUserId);
             ps.setString(2, sport);
@@ -103,6 +103,9 @@ public class HistoricalGameRepository {
             if (dailyDate == null) ps.setNull(13, java.sql.Types.DATE);
             else ps.setObject(13, dailyDate);
             ps.setBoolean(14, chosenSeason);
+            // Spec 076: whether this game was started signed-out, fixed at insert and never updated, so a later
+            // claim cannot change it. The one insert site for this table.
+            ps.setBoolean(15, Identity.isGuest(sleeperUserId));
             return ps;
         }, keys);
         Number id = (Number) keys.getKeys().get("id");

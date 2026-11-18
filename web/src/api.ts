@@ -217,7 +217,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE ?? '').replace(/\/$/, '')
 // to send and every route stays open, matching the backend's own default. See
 // DEPLOY.md's warning: this ships to every browser that loads the page, which
 // is fine for a private tool and not fine for one you hand out a link to.
-const API_TOKEN = import.meta.env.VITE_API_TOKEN
+export const API_TOKEN = import.meta.env.VITE_API_TOKEN
 
 /** `/api/...` -> the full request URL, honoring VITE_API_BASE. */
 export const apiUrl = (path: string) => `${API_BASE}${path}`
@@ -4390,6 +4390,69 @@ export const getAdminDigest = (token: string, date?: string) =>
   apiFetch(`/api/admin/digest${date ? `?date=${encodeURIComponent(date)}` : ''}`, {
     headers: { 'X-Admin-Token': token },
   }).then(adminJson<AdminDigest>)
+
+// ---- Usage analytics (spec 076). Mirrors the UsageReport records field for field (contracts/usage-api.md). ----
+
+/** The three sites a count can come from (the `site` column's check constraint). */
+export type UsageSite = 'timemachine' | 'leagues' | 'combined'
+
+export type UsageViewsByDay = { day: string; site: UsageSite; views: number }
+export type UsageViewsByRoute = { site: UsageSite; route: string; views: number }
+/** leagueName is null when the league row has been deleted since the view. */
+export type UsageLeagueViews = { leagueId: string; leagueName: string | null; sport: string; views: number }
+export type UsageEvent = { site: UsageSite; name: string; props: Record<string, string>; count: number }
+/** One start day and sport, read from the saved Redraft games. sport is lowercase. */
+export type UsageFunnelRow = {
+  day: string
+  sport: 'nba' | 'nfl'
+  started: number
+  finished: number
+  abandoned: number
+  drafting: number
+  guestStarted: number
+  guestFinished: number
+  unknownStarted: number
+  dailyStarted: number
+  dailyFinished: number
+  /** The owner's SIGNED-IN games (started_as_guest false); all 0 when no owner is configured. A claimed guest game is not here. */
+  ownerStarted: number
+  ownerFinished: number
+  ownerAbandoned: number
+  ownerDrafting: number
+  ownerDailyStarted: number
+  ownerDailyFinished: number
+}
+
+/** A site's first counted day (a view, league view or event). A site with none has no entry. */
+export type UsageSiteSince = { site: UsageSite; since: string }
+
+export type UsageReport = {
+  timezone: string
+  from: string
+  to: string
+  /** Per site, the earliest day with a counted view, league view or event, all time. Empty: nothing counted yet. */
+  countingSince: UsageSiteSince[]
+  /** ET date of the oldest saved Redraft game. Null: no games. */
+  gamesSince: string | null
+  /** Whether draftsim.owner.sleeper-user-id is set on the server. */
+  ownerConfigured: boolean
+  viewsByDay: UsageViewsByDay[]
+  viewsByRoute: UsageViewsByRoute[]
+  leagueViews: UsageLeagueViews[]
+  events: UsageEvent[]
+  rejected: number
+  funnel: UsageFunnelRow[]
+}
+
+export const getAdminUsage = (token: string, from?: string, to?: string) => {
+  const q = new URLSearchParams()
+  if (from) q.set('from', from)
+  if (to) q.set('to', to)
+  const qs = q.toString()
+  return apiFetch(`/api/admin/usage${qs ? `?${qs}` : ''}`, {
+    headers: { 'X-Admin-Token': token },
+  }).then(adminJson<UsageReport>)
+}
 
 /** POST /api/admin/session. Mirrors LeagueSessionController.SessionIssued. */
 export type LeagueSessionIssued = { token: string; expiresInSeconds: number }

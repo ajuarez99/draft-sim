@@ -16,6 +16,8 @@ import { draftScore, markOf, shareText, type PickMark } from '../historicalShare
 import { drafterClass, drafterSuffix, voiceWords } from '../redraftVoice'
 import { sharedReduced } from '../redraftCopy'
 import { tmGame } from '../site'
+import { trackAction } from '../analytics'
+import { useUser } from '../user'
 import { currentSite } from '../siteEnv'
 
 type Props = {
@@ -96,17 +98,28 @@ function DraftScore({ result, voice }: { result: HistoricalResult; voice: Voice 
  */
 function ShareButton({ game, result }: { game: HistoricalGameState; result: HistoricalResult }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'manual'>('idle')
+  const user = useUser()
   const text = () => shareText(game, result, `${window.location.origin}${tmGame(currentSite(), game.id)}`)
+  // Spec 076: counted once a share really happened (the sheet resolved or the clipboard took it), never on a dismissed
+  // sheet or the by-hand fallback. Only three coarse facts ride along; no game id, no guest id.
+  const counted = () =>
+    trackAction('result-shared', {
+      sport: sportOf(game) === 'NFL' ? 'nfl' : 'nba',
+      who: user ? 'member' : 'guest',
+      daily: game.dailyDate ? 'yes' : 'no',
+    })
   async function share() {
     const body = text()
     try {
       const touch = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches
       if (touch && typeof navigator.share === 'function') {
         await navigator.share({ text: body })
+        counted()
         return
       }
       await navigator.clipboard.writeText(body)
       setStatus('copied')
+      counted()
     } catch (e) {
       // Closing the share sheet is not a failure.
       if (e instanceof DOMException && e.name === 'AbortError') return

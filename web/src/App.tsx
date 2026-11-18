@@ -35,6 +35,7 @@ import Superlatives from './pages/Superlatives'
 import ManagerHistory from './pages/ManagerHistory'
 import ManagerComparison from './pages/ManagerComparison'
 import AdminDigest from './pages/AdminDigest'
+import AdminUsage from './pages/AdminUsage'
 import AppShell from './components/AppShell'
 import TimeMachineShell from './components/TimeMachineShell'
 import CrossSiteRedirect from './components/CrossSiteRedirect'
@@ -204,6 +205,8 @@ const leaguePages = (
     />
     {/* Spec 043: unlisted on purpose (no nav link anywhere); the backend's admin token is the gate. */}
     <Route path="/admin/digest" element={<AdminDigest />} />
+    {/* Spec 076: the owner's usage counts, unlisted the same way. */}
+    <Route path="/admin/usage" element={<AdminUsage />} />
   </>
 )
 // @routes:league-pages end

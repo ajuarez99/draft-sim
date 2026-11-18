@@ -7605,3 +7605,31 @@ td.rv-po { border-left: 1px dashed var(--line); }
   .tm-spoilers { padding: 16px 14px; }
   .tm-rank-row { grid-template-columns: 32px minmax(0, 1fr) auto; }
 }
+
+/* Spec 076: the owner's usage page (an unlisted page). Tables and rows on the panel surface, CSS bars for the per-day series. */
+.us-page { min-width: 0; }
+.us-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+.us-ranges { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.us-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.us-headline { display: flex; flex-wrap: wrap; gap: 8px 40px; margin: 4px 0 12px; }
+.us-big { font-size: 32px; font-weight: 700; line-height: 1.1; }
+.us-big-warn { color: var(--down); }
+.us-table { margin: 0 0 8px; }
+.us-table caption { text-align: left; padding: 0 8px 4px; }
+.us-table th[scope="row"] { color: var(--text); font-size: 13px; font-weight: 500; }
+.us-table th, .us-table td { vertical-align: baseline; overflow-wrap: anywhere; }
+/* Live verification V-02: a long route template (the /(landing)/leagues/... forms) must wrap, or the page scrolls sideways on a phone. */
+.us-table .code, .us-table code { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+.us-num { text-align: right; white-space: nowrap; }
+.us-days { padding: 0; }
+.us-day { display: grid; grid-template-columns: 110px minmax(0, 1fr) 90px; align-items: center; gap: 10px; padding: 3px 8px; font-size: 12px; }
+.us-bar-track { display: block; height: 10px; border-radius: 999px; background: var(--raised); overflow: hidden; }
+.us-bar { display: block; height: 100%; min-width: 0; border-radius: 999px; background: var(--data); }
+.us-day-num { text-align: right; white-space: nowrap; }
+.us-day-note { grid-column: 2 / 4; font-size: 12px; }
+.us-empty { margin: 0; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--raised); }
+.us-rejected { margin: 8px 0 0; }
+@media (max-width: 560px) {
+  .us-day { grid-template-columns: 90px minmax(0, 1fr) 70px; gap: 6px; }
+  .us-big { font-size: 26px; }
+}

@@ -55,7 +55,8 @@ class LeagueLockMappingsIT {
      */
     private static final Set<String> EXPECTED_PUBLIC = new TreeSet<>(Set.of(
             "/api/health",
-            "/api/refresh/daily"
+            "/api/refresh/daily",
+            "/api/usage"
     ));
     /** Public by prefix: the Time Machine and the sign-in username lookup. Listed one by one on purpose. */
     private static final Set<String> EXPECTED_PUBLIC_HISTORY_AND_LOOKUP = new TreeSet<>(Set.of(

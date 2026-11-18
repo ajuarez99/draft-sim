@@ -46,6 +46,7 @@ public class LeagueLockInterceptor implements HandlerInterceptor {
             "/api/refresh/daily",       // the external daily job; guarded by its own X-Refresh-Secret
             "/api/history/**",          // the Time Machine (games, daily, seasons, profile, award): public by design
             "/api/sleeper/user/**",     // username lookup behind sign-in on both sites; NOT /users/{id}/leagues
+            "/api/usage",               // usage collection (spec 076): the send carries no session header, so a locked league site could never count a view
             "/api/admin/**",            // already behind the admin-token gate (AdminGateInterceptor)
             OPS_PREFIX + "/**");          // the operator routes, same gate
 

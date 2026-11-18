@@ -217,7 +217,7 @@ export const keepBody =
 export const keepNote = 'No password. This site never asks Sleeper for anything private.'
 // Tasks.md T021d (PR-27): the site keeps one random id in this browser. The older "no cookies" line stays true.
 export const analyticsLine =
-  'We count page visits and a few actions, like signing in. We never record your username. No cookies. We keep a random id in this browser so your games stay yours.'
+  'We count page visits and a few actions, like signing in or sharing a result, ourselves. The counts hold no username, address or id of yours, and we set no cookies. We keep a random id in this browser so your games stay yours.'
 /** The results page of a game of the day that a sign-in left behind (the Sleeper id had already played that day): it earns nothing. */
 export const awardLeftBehind =
   "This game of the day stayed in this browser when you signed in, because you had already played that day's game in that sport. It earns nothing here."

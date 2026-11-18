@@ -15,6 +15,12 @@ import { setUser } from '../user'
 // The sink is a fake window.umami, enabled the way analytics.test.ts enables the module.
 
 const track = vi.fn()
+// Spec 076: this hostname is one of ours, so the own sink reaches fetch too. Stubbed, and read back below.
+const fetchMock = vi.fn()
+const usageSends = () =>
+  fetchMock.mock.calls
+    .filter((c) => String(c[0]).endsWith('/api/usage'))
+    .map((c) => c[1] as RequestInit)
 const sent = () =>
   track.mock.calls.map((c) => {
     const p = c[0] as { name?: string; url: string }
@@ -26,6 +32,9 @@ function scriptEl() {
 }
 
 beforeEach(() => {
+  fetchMock.mockReset()
+  fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+  vi.stubGlobal('fetch', fetchMock)
   track.mockReset()
   ;(window as unknown as { umami?: unknown }).umami = { track }
   __resetAnalyticsForTests()
@@ -76,5 +85,20 @@ describe('AppShell with the real analytics module', () => {
       'pv:/leagues/:league/power',
       'league-view:/leagues/:league/power',
     ])
+    // Spec 076: the own sink sees the same five events from the same latch, signed in, with no identity on the wire.
+    const sends = usageSends()
+    expect(sends.map((i) => JSON.parse(i.body as string))).toEqual([
+      { kind: 'view', site: 'combined', route: '/leagues/:league/power' },
+      { kind: 'league-view', site: 'combined', route: '/leagues/:league/power', league: 'L1' },
+      { kind: 'view', site: 'combined', route: '/managers' },
+      { kind: 'view', site: 'combined', route: '/leagues/:league/power' },
+      { kind: 'league-view', site: 'combined', route: '/leagues/:league/power', league: 'L1' },
+    ])
+    for (const init of sends) {
+      const names = Object.keys(init.headers as Record<string, string>).map((k) => k.toLowerCase())
+      expect(names).toEqual(['content-type'])
+      expect(JSON.stringify(init)).not.toContain('U1')
+      expect(JSON.stringify(init)).not.toContain('tester')
+    }
   })
 })

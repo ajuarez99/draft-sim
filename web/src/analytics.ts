@@ -1,23 +1,28 @@
 import { matchRoutes, type RouteObject } from 'react-router-dom'
-import type { Sport } from './api'
+import { API_TOKEN, apiUrl, type Sport } from './api'
 import type { Site } from './site'
 import { currentSite } from './siteEnv'
 
 /*
- * Spec 052: cookie-free usage counts, through Umami Cloud. The ONLY module that knows the
- * service exists -- nothing else touches window.umami or the service's URL.
+ * Spec 052 + spec 076: cookie-free usage counts, two sinks. The ONLY module that knows either sink exists --
+ * nothing else touches window.umami, the service's URL or POST /api/usage.
  *
- * What may leave the browser is exactly specs/052-site-analytics/data-model.md: a route
- * TEMPLATE (never the pathname), the template's label (never document.title), an outside
- * referrer's origin on the first view, and for league views a sport and a league id. Every
- * payload is built here and handed to `umami.track(object)`. The string form
- * `track(name, data)` is never used: in Umami's own script it merges in the raw URL and
- * document.title, which carry draft, player and manager ids (plan F4).
+ * Sink 1, Umami Cloud (spec 052, optional): what may leave the browser is exactly
+ * specs/052-site-analytics/data-model.md: a route TEMPLATE (never the pathname), the template's label (never
+ * document.title), an outside referrer's origin on the first view, and for league views a sport and a league
+ * id. Every payload is built here and handed to `umami.track(object)`. The string form `track(name, data)` is
+ * never used: in Umami's own script it merges in the raw URL and document.title, which carry draft, player and
+ * manager ids (plan F4). On only when ALL hold: a build-time website id, a production hostname, and no
+ * `localStorage['umami.disabled']`.
  *
- * Off unless ALL hold: a build-time website id, a production hostname, and no
- * `localStorage['umami.disabled']` (the same switch the script honours itself, so the owner's
- * opt-out works in both layers). Every call is wrapped: a failure in the tracker must never
- * reach React (FR-007).
+ * Sink 2, our own counters (spec 076): a bare `fetch` to POST /api/usage with the vocabulary fields and nothing
+ * else (specs/076-usage-analytics/data-model.md). Never apiFetch: that adds the signed-in user, the guest id
+ * and the league session, and the whole point is that the send carries no identity. The own body is built by
+ * its own function, never from the Umami payload. On when not opted out (the same `umami.disabled` switch)
+ * AND the host is one of ours, or this is a dev build with VITE_USAGE_COLLECT=1. It needs no website id.
+ *
+ * The dedupe latches are shared, so both sinks see the same events. Every call is wrapped: a failure in either
+ * sink must never reach React (FR-007).
  */
 
 type Payload = Record<string, unknown>
@@ -29,7 +34,7 @@ declare global {
   }
 }
 
-export type KeyAction = 'sign-in' | 'league-added' | 'mock-started'
+export type KeyAction = 'sign-in' | 'league-added' | 'mock-started' | 'result-shared'
 
 const SCRIPT_SRC = 'https://cloud.umami.is/script.js'
 // Spec 073: the league site reports too. Each site sends its own hostname (basePayload), which is what keeps
@@ -78,6 +83,7 @@ const LEAGUE_ROUTES: RouteEntry[] = [
   { path: '/leagues/:sleeperLeagueId/superlatives', url: '/leagues/:league/superlatives', title: 'Season superlatives' },
   { path: '/leagues/:sleeperLeagueId/weekly-pot', url: '/leagues/:league/weekly-pot', title: 'Weekly pot' },
   { path: '/admin/digest', url: '/admin/digest', title: 'Admin digest' },
+  { path: '/admin/usage', url: '/admin/usage', title: 'Admin usage' },
 ]
 
 const HISTORY_ROUTES: RouteEntry[] = [
@@ -108,6 +114,29 @@ const TABLES: Record<Site, RouteEntry[]> = {
 /** Exported so the coverage test can compare each site's table with its tree's <Route path> values. */
 export function routesFor(site: Site): { path: string; url: string; title: string }[] {
   return TABLES[site]
+}
+
+/**
+ * Spec 076 (F2): every string `routeTemplate()` can RETURN for a site, sorted. This, not the table, is what the
+ * server accepts as a `route`: signed out on the league and combined sites every entry also has a landing form
+ * (`/(landing)` for the home page, `/(landing)<url>` for the rest). The Redraft site has real pages for a guest,
+ * so it has no landing forms. usageVocabulary.test.ts walks every entry through routeTemplate to keep this honest.
+ */
+export function routeVocabulary(site: Site): string[] {
+  const out = new Set<string>()
+  for (const r of TABLES[site]) {
+    out.add(r.url)
+    if (site !== 'timemachine') out.add(r.url === '/' ? '/(landing)' : `/(landing)${r.url}`)
+  }
+  return [...out].sort()
+}
+
+/** Spec 076: the key actions the server accepts, and for each the closed set of values of each prop. */
+export const EVENT_VOCABULARY: Record<KeyAction, Record<string, string[]>> = {
+  'sign-in': {},
+  'league-added': { via: ['espn', 'id', 'sleeper'] },
+  'mock-started': { from: ['live', 'setup'] },
+  'result-shared': { daily: ['no', 'yes'], sport: ['nba', 'nfl'], who: ['guest', 'member'] },
 }
 
 const OBJECTS: Record<Site, RouteObject[]> = {
@@ -168,10 +197,21 @@ function ownerOptedOut(): boolean {
   }
 }
 
-function enabled(): boolean {
+function umamiEnabled(): boolean {
   if (ownerOptedOut()) return false
   if (debugMode()) return true
   return websiteId() !== '' && OWN_HOSTS.includes(location.hostname)
+}
+
+function ownEnabled(): boolean {
+  if (ownerOptedOut()) return false
+  if (debugMode()) return true
+  return OWN_HOSTS.includes(location.hostname) || (import.meta.env.DEV && import.meta.env.VITE_USAGE_COLLECT === '1')
+}
+
+/** Neither sink on: every public function returns before touching a latch. */
+function anySinkEnabled(): boolean {
+  return umamiEnabled() || ownEnabled()
 }
 
 // ---- Sending --------------------------------------------------------------------------------
@@ -197,7 +237,7 @@ function deliver(payload: Payload) {
 
 function send(payload: Payload) {
   try {
-    if (!enabled()) return
+    if (!umamiEnabled()) return
     if (debugMode()) {
       console.debug('[analytics]', payload)
       return
@@ -210,10 +250,42 @@ function send(payload: Payload) {
   }
 }
 
+// The own sink's body: exactly the vocabulary fields (data-model.md "What the browser sends"). Built from the
+// site and the route template or the event, never from the Umami payload, so a field added there cannot leak here.
+type OwnBody =
+  | { kind: 'view'; site: Site; route: string }
+  | { kind: 'league-view'; site: Site; route: string; league: string }
+  | { kind: 'event'; site: Site; name: string; props: Record<string, string> }
+
+function sendOwn(body: OwnBody) {
+  try {
+    if (!ownEnabled()) return
+    if (debugMode()) {
+      console.debug('[analytics:own]', body)
+      return
+    }
+    // Bare fetch, on purpose: no X-Sleeper-User, X-Guest-Id, X-League-Session or X-Admin-Token. The bearer token
+    // is the one header allowed, and only when the build has one (the same gate every /api call is behind).
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (API_TOKEN) headers.Authorization = `Bearer ${API_TOKEN}`
+    void fetch(apiUrl('/api/usage'), {
+      method: 'POST',
+      keepalive: true,
+      referrerPolicy: 'no-referrer',
+      headers,
+      body: JSON.stringify(body),
+    }).catch(() => {
+      // A refused or failed send is nothing the visitor needs to hear about.
+    })
+  } catch {
+    // Same: nothing in here may reach React.
+  }
+}
+
 /** Once, from main.tsx. Adds the tracker script only when analytics is on for this build and host. */
 export function initAnalytics(): void {
   try {
-    if (status !== 'idle' || !enabled() || debugMode()) return
+    if (status !== 'idle' || !umamiEnabled() || debugMode()) return
     status = 'loading'
     const el = document.createElement('script')
     el.async = true
@@ -260,7 +332,7 @@ function outsideReferrer(): string | undefined {
 /** One page view per signedIn+pathname change (AppShell's effect; also guards StrictMode doubles). */
 export function trackPageView(pathname: string, signedIn: boolean): void {
   try {
-    if (!enabled()) return
+    if (!anySinkEnabled()) return
     const key = `${signedIn}|${pathname}`
     if (key === lastPageKey) return
     lastPageKey = key
@@ -276,6 +348,7 @@ export function trackPageView(pathname: string, signedIn: boolean): void {
     }
     firstViewSent = true
     send(payload)
+    sendOwn({ kind: 'view', site: currentSite().site, route: url })
   } catch {
     // never reaches React
   }
@@ -284,12 +357,14 @@ export function trackPageView(pathname: string, signedIn: boolean): void {
 /** A `league-view` event: which sport and league a league-scoped page was for. Once per signedIn+pathname. */
 export function trackLeagueView(pathname: string, signedIn: boolean, sport: Sport, leagueId: string): void {
   try {
-    if (!enabled()) return
+    if (!anySinkEnabled()) return
     const key = `${signedIn}|${pathname}`
     if (key === lastLeagueKey) return
     lastLeagueKey = key
     const { url, title } = routeTemplate(pathname, signedIn)
     send({ ...basePayload(url, title), name: 'league-view', data: { route: url, sport, league: leagueId } })
+    // The sport is the server's to look up from the league table; the browser sends the league id only.
+    sendOwn({ kind: 'league-view', site: currentSite().site, route: url, league: leagueId })
   } catch {
     // never reaches React
   }
@@ -298,11 +373,12 @@ export function trackLeagueView(pathname: string, signedIn: boolean, sport: Spor
 /** A named key action, fired by the caller only after the action succeeded. */
 export function trackAction(name: KeyAction, data?: Record<string, string>): void {
   try {
-    if (!enabled()) return
+    if (!anySinkEnabled()) return
     // An action carries the page it happened on, as a template like everything else. Sign-in
     // happens signed out, so its page is the landing form.
     const { url, title } = routeTemplate(location.pathname, name !== 'sign-in')
     send({ ...basePayload(url, title), name, ...(data ? { data } : {}) })
+    sendOwn({ kind: 'event', site: currentSite().site, name, props: data ?? {} })
   } catch {
     // never reaches React
   }

@@ -72,7 +72,7 @@ describe('redraftCopy', () => {
     expect(copy.weeksPlayed(1)).toBe('1 week played')
     expect(copy.sharedReduced).toBe("The picks and lineups show tomorrow, once today's game is over.")
     expect(copy.analyticsLine).toBe(
-      'We count page visits and a few actions, like signing in. We never record your username. No cookies. We keep a random id in this browser so your games stay yours.',
+      'We count page visits and a few actions, like signing in or sharing a result, ourselves. The counts hold no username, address or id of yours, and we set no cookies. We keep a random id in this browser so your games stay yours.',
     )
   })
 

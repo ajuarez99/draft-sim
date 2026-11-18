@@ -9,6 +9,7 @@ import {
   type SportDigest,
 } from '../api'
 import { AdminTokenRequiredError } from '../apiError'
+import { readToken, writeToken } from '../adminToken'
 import { signedPct } from '../components/LockInPanel'
 import {
   keyPlayersCard,
@@ -29,26 +30,6 @@ import {
  * Edits live in component state only (FR-013). A card is keyed by its generated text, so a reload that
  * produces the same text keeps the edits and one that changes the text drops them (Reset also restores it).
  */
-
-const TOKEN_KEY = 'bk.adminToken'
-
-// sessionStorage can throw (private windows, blocked site data); the page must work without it.
-function readToken(): string | null {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY)
-  } catch {
-    return null
-  }
-}
-
-function writeToken(token: string | null) {
-  try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token)
-    else sessionStorage.removeItem(TOKEN_KEY)
-  } catch {
-    /* no storage: the token just lasts as long as this component does */
-  }
-}
 
 async function copyText(text: string): Promise<boolean> {
   try {

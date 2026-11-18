@@ -1248,3 +1248,60 @@ verification then confirmed the combined build's `/history` links resolve (`veri
 **The rule:** a component that renders on more than one site gets every link from a `site.ts` helper that
 returns null where the route does not exist, and renders no link on null. Test it by collecting every
 `a[href]` on each build's page and resolving them.
+
+## 62. Check whether rows already answer the question before designing a counter
+
+**2026-11-17.** Spec 076 began from the assumption that "games started, finished, abandoned" had to be counted
+from the browser as events, starting at deploy. `historical_game` already held every game with its status and
+dates, exactly, with history from before the feature. The funnel is read from those rows; the one thing they
+lacked, whether a game was started as a guest, became a single nullable column (`started_as_guest`). Browser
+counters were kept only for what rows cannot show (page views, shares).
+
+**What caught it:** reading the schema against the spec's list of events, while planning.
+
+**The rule:** before adding an event or counter, query the tables for the same fact. A counter that starts on
+deploy day is worse than rows that go back, and the two can disagree.
+
+## 63. A NOT NULL column with its default dropped breaks every writer that does not know the column
+
+**2026-11-17.** The first V51 shape added `started_as_guest boolean NOT NULL` and dropped the default after the
+backfill. Every process that inserts into `historical_game` without the column then fails: the old container
+during a deploy overlap, a rollback, and other branches' tests on the shared local database (`plan-review.md`
+F1, HIGH). The shipped shape is nullable, where null means "not recorded".
+
+**What caught it:** the plan review, which grepped every insert on `historical_game` in main and test.
+
+**The rule:** in a one-deploy migration a new column is nullable (or keeps its default) so old code keeps
+working. Make null mean something honest ("not recorded") and let readers treat it that way. Tighten it in a
+later migration only when no old writer can exist.
+
+## 64. When a page leaves a group out of a total, check every other number against the same exclusion
+
+**2026-11-17.** The `/admin/usage` page leaves the owner's signed-in games out of the funnel. Two traps. The
+numbers beside the headline (the per-day table, the guest line) had to use the same exclusion, and the groups
+being subtracted had to stay disjoint: claiming a guest's games re-owns the rows (lesson 60), so a claimed game
+was both a guest game and the owner's and was subtracted twice, giving "Started signed in: -1" (`code-review.md`
+CR-01, MEDIUM; CR-02 was the owner left out of three numbers under a sentence claiming all). Both were fixed,
+and live verification showed 5 started with the claimed games counted once. One number still disagreed: shares
+carry no identity, so the shares row includes the owner's own, under a sentence saying every number leaves his
+games out (`verification.md` V-01, reworded afterwards, not re-checked in a browser).
+
+**What caught it:** the bug-hunt review for the double subtraction; the live check against the page text for
+the shares row.
+
+**The rule:** an exclusion is a property of the whole section. List every number in it, apply the same filter
+or say in words why it cannot be applied, and test with a row that a write (a claim) has moved between groups.
+This extends lesson 60: a claim changes which group a row belongs to, not only who owns it.
+
+## 65. A closed vocabulary must be built from what the sender can emit, not from the table it was derived from
+
+**2026-11-17.** The server accepts only route templates from a closed list. The plan built that list from what
+`routesFor(site)` exports, but `routeTemplate()` in `web/src/analytics.ts` also emits landing forms for a
+signed-out visitor (`/(landing)` and `/(landing)` plus the entry's url), which are not routes. Every signed-out
+view on the league and combined sites would have been refused (`plan-review.md` F2, HIGH). Verification 1c
+confirmed the landing views are stored.
+
+**What caught it:** the plan review compared the sender's output with the accepted set.
+
+**The rule:** build the allowed set from the sender's real output, and test it by running every case the
+sender can produce through the server's check, not by listing the structure it came from.
