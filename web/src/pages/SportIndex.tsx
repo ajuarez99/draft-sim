@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom'
 import type { HistoricalSport, SeasonRef } from '../api'
 import RedraftFoot from '../components/RedraftFoot'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
 import { useSeasonList } from '../redraftData'
+import { canonicalUrl, sportIndexPath, sportPage } from '../redraftPages'
 import { tmSeason } from '../site'
 import { currentSite } from '../siteEnv'
 
@@ -27,9 +28,14 @@ export default function SportIndex({ sport }: { sport: HistoricalSport }) {
   const seasons = list?.seasons ?? []
   const first = seasons[0]?.label
   const last = seasons[seasons.length - 1]?.label
-  usePageTitle(list && first && last ? copy.sportIndexTitle(sport, first, last) : copy.brand)
-  const newest = seasons[seasons.length - 1]
   const cfg = currentSite()
+  // While the list loads the range is unknown, so the description and JSON-LD wait; the canonical is known from the route.
+  usePageHead(
+    list && first && last
+      ? sportPage(cfg, sport, { first, last, count: seasons.length })
+      : { title: copy.brand, canonical: canonicalUrl(cfg, sportIndexPath(sport)) },
+  )
+  const newest = seasons[seasons.length - 1]
   const newestTo = newest ? tmSeason(cfg, sport, newest.slug) : null
   return (
     <div className="content tm tm-page">

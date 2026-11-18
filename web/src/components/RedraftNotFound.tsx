@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import * as copy from '../redraftCopy'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import { offeredSports } from '../redraftData'
 import { tmDaily, tmHome, tmSportIndex } from '../site'
 import { currentSite } from '../siteEnv'
@@ -27,7 +27,7 @@ export function RedraftWhereTo() {
 
 /** Spec 074 §6: the in-app twin of the static 404.html (same words, same links), for an unoffered season or an unknown path. */
 export default function RedraftNotFound() {
-  usePageTitle(copy.notFoundTitle)
+  usePageHead({ title: copy.notFoundTitle, description: null, noindex: true, jsonLd: [] }) // 404.html's head
   return (
     <div className="content tm tm-page">
       <header className="tm-hero">

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import fixtureJson from './__fixtures__/redraft-seasons.json'
 import { ApiError } from './apiError'
@@ -10,7 +10,8 @@ import HistoricalDraft from './pages/HistoricalDraft'
 import SeasonPage from './pages/SeasonPage'
 import SportIndex from './pages/SportIndex'
 import { GUEST_KEY, __resetGuestForTests } from './guest'
-import { pageParts } from './landingHtml'
+import RedraftNotFound from './components/RedraftNotFound'
+import { pageHeadTags, pageParts } from './landingHtml'
 import * as copy from './redraftCopy'
 import { __resetRedraftDataForTests } from './redraftData'
 import { indexablePages } from './redraftPages'
@@ -120,7 +121,8 @@ describe('SeasonPage', () => {
     api.getPublicSeasonPage.mockRejectedValue(new ApiError(404))
     at('/nba/1950-51', <SeasonPage sport="NBA" slug="1950-51" />)
     expect(await screen.findByRole('heading', { name: 'Nothing at this address' })).toBeInTheDocument()
-    expect(document.title).toBe(copy.notFoundTitle)
+    // The title is a passive effect: it can land a tick after the heading does (flaked 1 in 4 full runs, 2026-11-18).
+    await waitFor(() => expect(document.title).toBe(copy.notFoundTitle))
   })
 
   it('a failed load says so and retries', async () => {
@@ -419,5 +421,87 @@ describe('static HTML vs the mounted page', () => {
     const marks = (root: ParentNode) =>
       [...root.querySelectorAll('[data-dynamic]')].map((e) => e.getAttribute('data-dynamic')).filter((m) => m !== 'noscript')
     expect(marks(mounted)).toEqual(marks(staticContent(path)))
+  })
+})
+
+// 2026-11-18 prod check: after a client-side move the canonical (and og:url, description, JSON-LD) still named the FIRST page
+// loaded; only document.title followed the route. Each mounted page now writes the per-page head tags its static file has.
+describe('the head follows a client-side move', () => {
+  const pages = indexablePages(cfg, data)
+  const entry = (path: string) => pages.find((p) => p.path === path)!
+
+  /** The per-page head tags, read the same way from the live document and from a static file's head. */
+  function perPageHead(head: ParentNode) {
+    const meta = (sel: string) => head.querySelector(sel)?.getAttribute('content') ?? null
+    return {
+      canonical: head.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? null,
+      ogUrl: meta('meta[property="og:url"]'),
+      description: meta('meta[name="description"]'),
+      ogTitle: meta('meta[property="og:title"]'),
+      ogDescription: meta('meta[property="og:description"]'),
+      twitterTitle: meta('meta[name="twitter:title"]'),
+      twitterDescription: meta('meta[name="twitter:description"]'),
+      robots: meta('meta[name="robots"]'),
+      jsonLd: [...head.querySelectorAll('script[type="application/ld+json"]')].map((s) => JSON.parse(s.textContent ?? '')),
+    }
+  }
+  const staticHead = (path: string) =>
+    perPageHead(new DOMParser().parseFromString(`<head>${pageHeadTags(entry(path), cfg)}</head>`, 'text/html').head)
+
+  function Season({ sport }: { sport: 'NBA' | 'NFL' }) {
+    const { season = '' } = useParams()
+    return <SeasonPage key={`${sport}/${season}`} sport={sport} slug={season} />
+  }
+  let go: (to: string) => void = () => {}
+  function Nav() {
+    go = useNavigate()
+    return null
+  }
+
+  beforeEach(() => {
+    document.head.innerHTML = ''
+  })
+  afterEach(() => {
+    document.head.innerHTML = ''
+  })
+
+  it('season -> sport index -> the other sport\'s season -> season: canonical, og:url, description and JSON-LD each match that page\'s static file', async () => {
+    // A real first visit: the head and embedded data are /nba/2016-17's static file.
+    document.head.innerHTML = pageHeadTags(entry('/nba/2016-17'), cfg)
+    embed(nba)
+    render(
+      <MemoryRouter initialEntries={['/nba/2016-17']}>
+        <Nav />
+        <Routes>
+          <Route path="/nba" element={<SportIndex sport="NBA" />} />
+          <Route path="/nfl" element={<SportIndex sport="NFL" />} />
+          <Route path="/nba/:season" element={<Season sport="NBA" />} />
+          <Route path="/nfl/:season" element={<Season sport="NFL" />} />
+          <Route path="*" element={<RedraftNotFound />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(perPageHead(document.head)).toEqual(staticHead('/nba/2016-17'))
+
+    for (const path of ['/nfl', '/nfl/2007', '/nba/1976-77', '/nba/2016-17']) {
+      act(() => go(path))
+      await waitFor(() => expect(document.title).toBe(entry(path).title))
+      await waitFor(() => expect(perPageHead(document.head)).toEqual(staticHead(path)))
+      expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute('href', `https://www.ballknowers.co${path}`)
+    }
+
+    // A page that is never indexed drops the canonical and og:url and says noindex, as 404.html does.
+    act(() => go('/nowhere'))
+    await waitFor(() => expect(document.title).toBe(copy.notFoundTitle))
+    const head = perPageHead(document.head)
+    expect(head.canonical).toBeNull()
+    expect(head.ogUrl).toBeNull()
+    expect(head.description).toBeNull()
+    expect(head.robots).toBe('noindex')
+    expect(head.jsonLd).toEqual([])
+
+    // ...and moving back to an indexable page takes the noindex off again.
+    act(() => go('/nfl/2007'))
+    await waitFor(() => expect(perPageHead(document.head)).toEqual(staticHead('/nfl/2007')))
   })
 })

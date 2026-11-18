@@ -1860,9 +1860,12 @@ button.on-clock-identity:focus-visible { outline: 2px solid var(--brand); outlin
 .topbar-wordmark {
   flex: 0 0 auto; font-size: 20px; letter-spacing: 0.03em; line-height: 1;
   color: var(--text); text-decoration: none; white-space: nowrap; border-radius: 6px;
+  /* 44px touch target (2026-11-18: it was the 18-20px line box); the text is centred in it, so it looks the same. */
+  display: inline-flex; align-items: center; min-height: 44px;
 }
 .topbar-wordmark:hover { color: var(--brand); }
-.topbar-wordmark:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+/* The box is now the 44px target, so the ring sits on it rather than 3px outside (which would cross the 48px bar). */
+.topbar-wordmark:focus-visible { outline: 2px solid var(--brand); outline-offset: 0; }
 .topbar-links { display: flex; align-items: center; gap: 2px; min-width: 0; }
 .topbar-link {
   appearance: none; -webkit-appearance: none; margin: 0; border: 0; background: none; cursor: pointer;

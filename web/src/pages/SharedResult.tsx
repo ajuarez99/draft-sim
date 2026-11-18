@@ -7,7 +7,7 @@ import { RedraftWhereTo } from '../components/RedraftNotFound'
 import { useStartDaily } from '../components/DailyCards'
 import { sportOf } from '../historicalCopy'
 import { dayLabel } from '../historicalDaily'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
 import { tmSeason } from '../site'
 import { currentSite } from '../siteEnv'
@@ -41,7 +41,7 @@ export function useNoindex(): void {
 }
 
 export function NoFinishedGame() {
-  usePageTitle(copy.brand)
+  usePageHead({ title: copy.brand, description: copy.appShellDescription, noindex: true, jsonLd: [] }) // app-shell.html's head
   useNoindex()
   return (
     <div className="content tm tm-page">
@@ -71,7 +71,7 @@ export function useAt(iso: string | null, onElapsed: () => void): void {
 }
 
 export default function SharedResult({ pub, onReducedEnd }: { pub: PublicGame; onReducedEnd?: () => void }) {
-  usePageTitle(copy.brand)
+  usePageHead({ title: copy.brand, description: copy.appShellDescription, noindex: true, jsonLd: [] }) // app-shell.html's head
   useNoindex()
   useAt(pub.reducedUntil ?? null, () => onReducedEnd?.())
   const { starting, error, start } = useStartDaily()

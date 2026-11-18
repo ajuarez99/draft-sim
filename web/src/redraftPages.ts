@@ -39,7 +39,8 @@ export const seasonPath = (s: HistoricalSport, slug: string) => `${sportPath(s)}
 export const sportIndexPath = sportPath
 export const DAILY_PATH = '/daily'
 
-const absolute = (cfg: SiteConfig, path: string) => {
+/** The absolute, slashless URL of a path on this site (the home page keeps its single slash): what canonical and og:url carry. */
+export const canonicalUrl = (cfg: SiteConfig, path: string) => {
   const origin = siteOrigin(cfg)
   return path === '/' ? `${origin}/` : `${origin}${path}`
 }
@@ -48,7 +49,7 @@ function siteApplication(cfg: SiteConfig) {
   return {
     '@type': 'WebApplication',
     name: copy.brand,
-    url: absolute(cfg, tmHome(cfg)),
+    url: canonicalUrl(cfg, tmHome(cfg)),
     applicationCategory: 'GameApplication',
     operatingSystem: 'Web',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
@@ -75,7 +76,7 @@ function breadcrumb(cfg: SiteConfig, trail: { name: string; path: string }[]) {
       '@type': 'ListItem',
       position: i + 1,
       name: t.name,
-      item: absolute(cfg, t.path),
+      item: canonicalUrl(cfg, t.path),
     })),
   }
 }
@@ -111,7 +112,7 @@ export const EMPTY_REDRAFT_DATA: RedraftSeasonData = {
 }
 
 function homePage(cfg: SiteConfig): RedraftPage {
-  const canonical = absolute(cfg, '/')
+  const canonical = canonicalUrl(cfg, '/')
   return {
     kind: 'home',
     path: '/',
@@ -125,8 +126,8 @@ function homePage(cfg: SiteConfig): RedraftPage {
   }
 }
 
-function dailyPage(cfg: SiteConfig): RedraftPage {
-  const canonical = absolute(cfg, DAILY_PATH)
+export function dailyPage(cfg: SiteConfig): RedraftPage {
+  const canonical = canonicalUrl(cfg, DAILY_PATH)
   return {
     kind: 'daily',
     path: DAILY_PATH,
@@ -143,9 +144,9 @@ function dailyPage(cfg: SiteConfig): RedraftPage {
   }
 }
 
-function sportPage(cfg: SiteConfig, s: HistoricalSport, r: SportRange): RedraftPage {
+export function sportPage(cfg: SiteConfig, s: HistoricalSport, r: SportRange): RedraftPage {
   const path = sportPath(s)
-  const canonical = absolute(cfg, path)
+  const canonical = canonicalUrl(cfg, path)
   const title = copy.sportIndexTitle(s, r.first, r.last)
   const description = copy.sportIndexDescription(s, r.first, r.last, r.count)
   return {
@@ -165,9 +166,10 @@ function sportPage(cfg: SiteConfig, s: HistoricalSport, r: SportRange): RedraftP
   }
 }
 
-function seasonPageEntry(cfg: SiteConfig, p: SeasonPage): RedraftPage {
+/** A season's entry. Takes only what it reads, so a mounted page can build it from the slug before its data loads. */
+export function seasonPageEntry(cfg: SiteConfig, p: Pick<SeasonPage, 'sport' | 'slug' | 'label'>): RedraftPage {
   const path = seasonPath(p.sport, p.slug)
-  const canonical = absolute(cfg, path)
+  const canonical = canonicalUrl(cfg, path)
   const title = copy.seasonTitle(p.label, p.sport)
   const description = copy.seasonDescription(p.label, p.sport)
   return {
@@ -211,7 +213,7 @@ export function notFoundPage(cfg: SiteConfig): RedraftPage {
     file: '404.html',
     title: copy.notFoundTitle,
     description: copy.notFoundBody,
-    canonical: absolute(cfg, '/404'),
+    canonical: canonicalUrl(cfg, '/404'),
     h1: copy.notFoundH1,
     jsonLd: [],
     noindex: true,
@@ -226,7 +228,7 @@ export function appShellPage(cfg: SiteConfig): RedraftPage {
     file: 'app-shell.html',
     title: copy.appShellTitle,
     description: copy.appShellDescription,
-    canonical: absolute(cfg, '/app-shell'),
+    canonical: canonicalUrl(cfg, '/app-shell'),
     h1: copy.appShellTitle,
     jsonLd: [],
     noindex: true,

@@ -17,10 +17,10 @@ import ClaimLine from '../components/ClaimLine'
 import RedraftFoot from '../components/RedraftFoot'
 import { noteClaim, peekGuestId } from '../guest'
 import { sportOf, summaryStatus } from '../historicalCopy'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
 import { useHomeLists } from '../redraftData'
-import { SPORTS } from '../redraftPages'
+import { SPORTS, homePageEntry } from '../redraftPages'
 import { tmDaily, tmGame, tmSportIndex } from '../site'
 import { currentSite } from '../siteEnv'
 import { clearDraftQueue } from '../useDraftQueue'
@@ -41,7 +41,7 @@ function when(iso: string): string {
 const SPORT_LABEL: Record<HistoricalSport, string> = { NBA: 'Basketball', NFL: 'Football' }
 
 export default function HistoricalDraft() {
-  usePageTitle(copy.homeTitle)
+  usePageHead(homePageEntry(currentSite()))
   const user = useUser()
   const navigate = useNavigate()
   const location = useLocation()

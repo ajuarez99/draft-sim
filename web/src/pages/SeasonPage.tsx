@@ -16,7 +16,8 @@ import RedraftNotFound from '../components/RedraftNotFound'
 import SignInForm from '../components/SignInForm'
 import { notCountedReason, pts1, sportOf, statLong } from '../historicalCopy'
 import { peekGuestId } from '../guest'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
+import { seasonPageEntry } from '../redraftPages'
 import * as copy from '../redraftCopy'
 import { useSeasonPage } from '../redraftData'
 import { tmDaily, tmGame, tmSeason, tmSportIndex } from '../site'
@@ -313,7 +314,7 @@ function SeasonShell({ sport, slug, children }: { sport: HistoricalSport; slug: 
 export default function SeasonPage({ sport, slug }: { sport: HistoricalSport; slug: string }) {
   const { page, status, retry } = useSeasonPage(sport, slug)
   const label = page?.label ?? slug
-  usePageTitle(copy.seasonTitle(label, sport)) // V-08i: from the slug at once, so a season-to-season click never flashes the bare brand
+  usePageHead(seasonPageEntry(currentSite(), { sport, slug, label })) // V-08i: from the slug at once, so a season-to-season click never flashes the bare brand
   if (status === 'missing') return <RedraftNotFound />
   if (!page) {
     return (

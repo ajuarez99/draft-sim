@@ -4,9 +4,9 @@ import { getYesterdayDaily, type YesterdayDaily } from '../api'
 import DailyCards, { useDailyGames, useStartDaily } from '../components/DailyCards'
 import RedraftFoot from '../components/RedraftFoot'
 import { dayLabel } from '../historicalDaily'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
-import { SPORTS } from '../redraftPages'
+import { SPORTS, dailyPage } from '../redraftPages'
 import { tmSeason } from '../site'
 import { currentSite } from '../siteEnv'
 import { useUser } from '../user'
@@ -83,7 +83,7 @@ function Yesterday({ day }: { day: string | null }) {
 }
 
 export default function DailyPage() {
-  usePageTitle(copy.dailyTitle)
+  usePageHead(dailyPage(currentSite()))
   const user = useUser()
   const games = useDailyGames()
   const { starting, error, start } = useStartDaily()

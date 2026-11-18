@@ -16,11 +16,11 @@ import { useFailure } from '../useFailure'
 import { ApiError } from '../apiError'
 import SharedResult, { NoFinishedGame, useNoindex } from './SharedResult'
 import ClaimLine from '../components/ClaimLine'
-import { brand, keepResultBody, keepResultHeading, notCountedNote } from '../redraftCopy'
+import { appShellDescription, brand, keepResultBody, keepResultHeading, notCountedNote } from '../redraftCopy'
 import SignInForm from '../components/SignInForm'
 import { peekGuestId } from '../guest'
 import { useUser } from '../user'
-import { usePageTitle } from '../pageTitle'
+import { usePageHead } from '../pageTitle'
 import NotFound from '../components/NotFound'
 import { tmHome } from '../site'
 import { currentSite } from '../siteEnv'
@@ -152,7 +152,7 @@ export default function HistoricalRoom() {
   // result. 'pending' holds the loading screen until the public answer settles, so the owner never sees the shared
   // page flash and a stranger never sees a not-found flash. 'none' is the "No finished game here" page.
   const [shared, setShared] = useState<PublicGame | 'none' | null>(null)
-  usePageTitle(brand)
+  usePageHead({ title: brand, description: appShellDescription, noindex: true, jsonLd: [] }) // app-shell.html's head
   // A game page is never worth indexing, whoever is looking (owner room, shared result or "no game"): V-08g.
   useNoindex()
 

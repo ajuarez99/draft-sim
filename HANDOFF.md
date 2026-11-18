@@ -16,10 +16,15 @@ waiting to merge, apart from the unmerged list further down.
 - **074, in the browser pane:** V-02 passes (a client-side move from `/nba` into `/nba/2020-21`, and from `/nfl`
   into `/nfl/2007`, leaves focus on the season's `<h1>`). V-05: footer links are 44 px at 375 px, no sideways
   scroll. Football season page `/nfl/2007` renders its static content. Sitemap: 86 URLs.
-- **New defect, not fixed:** after a client-side move between season pages, `<link rel="canonical">` keeps the
-  *previous* page's URL (title updates, canonical does not). The served HTML for each URL is correct (curl), so
-  crawlers that fetch the URL fresh are unaffected. Small fix in the Redraft route code; nothing changed yet.
-- Also seen: the Redraft wordmark link in the top bar is 18 px tall at 375 px (under the 44 px target).
+- **Defect found today, FIXED on branch `claude/redraft-canonical-fix-75cfdf` (not merged, not deployed):** after a
+  client-side move, `<link rel="canonical">` (and og:url, description, og/twitter title+description, JSON-LD) kept
+  the FIRST page's values; only the title followed. The served HTML was always right (curl), so crawlers fetching
+  a URL fresh were unaffected. `usePageTitle` → `usePageHead` (`web/src/pageTitle.ts`), fed the same `RedraftPage`
+  entry the static head is written from; 404 and game pages drop canonical/og:url and add noindex, as their static
+  files do. Vitest walks season → index → season and compares the live head to `pageHeadTags`; verified in the
+  browser pane on the built Redraft site (local data, NBA only: /nba → 2016-17 → /nba → 1985-86 → /daily, one
+  document load). Prod not re-checked until it deploys.
+- Wordmark link in the top bar: was 18 px tall at 375 px, now a 44 px target (same branch; measured 44 px, look unchanged).
 
 **Still owed, and why it was not done today:**
 - **Allan only:** `ballknowers.co` → `www` still answers **302** (measured today), wants a 301 at the registrar;
