@@ -1,6 +1,58 @@
 # Ball Knowers — handoff
 
+## CURRENT STATE 2026-11-18 (read this first; everything below is history)
+
+Checked against `git log origin/main` (tip `725d547`), `git worktree list`, Railway logs and prod on 2026-11-18.
+
+**On main and deployed:** everything through **076**. The two blocks right below (076, 074) were written before
+their merge and say "NOT committed"; that is stale, see the dated notes added at their tops. No feature branch is
+waiting to merge, apart from the unmerged list further down.
+
+**Checked on prod today (read-only, except one junk `POST /api/usage {}` that the server answers 204 and does not count):**
+- **076:** backend booted 15:33 UTC and logged `Successfully applied 1 migration ... now at version v51` (the
+  `started_as_guest` backfill is an `update` inside V51, so it ran too); the lock allowlist includes `/api/usage`;
+  `GET /api/admin/usage` is 403 without the token; CORS preflight from `https://www.ballknowers.co` is allowed;
+  the live Redraft bundle (`index-DnsKIrul.js`) contains the `/api/usage` sender.
+- **074, in the browser pane:** V-02 passes (a client-side move from `/nba` into `/nba/2020-21`, and from `/nfl`
+  into `/nfl/2007`, leaves focus on the season's `<h1>`). V-05: footer links are 44 px at 375 px, no sideways
+  scroll. Football season page `/nfl/2007` renders its static content. Sitemap: 86 URLs.
+- **New defect, not fixed:** after a client-side move between season pages, `<link rel="canonical">` keeps the
+  *previous* page's URL (title updates, canonical does not). The served HTML for each URL is correct (curl), so
+  crawlers that fetch the URL fresh are unaffected. Small fix in the Redraft route code; nothing changed yet.
+- Also seen: the Redraft wordmark link in the top bar is 18 px tall at 375 px (under the 44 px target).
+
+**Still owed, and why it was not done today:**
+- **Allan only:** `ballknowers.co` → `www` still answers **302** (measured today), wants a 301 at the registrar;
+  Search Console + Bing verification and sitemap submission; `APP_OWNER_SLEEPER_USER_ID` is **not set** on the
+  `draft-sim` service (so the owner's own Redraft games count in the 076 funnel until it is); Umami
+  (`VITE_UMAMI_WEBSITE_ID`) still unset; 020 AI recap still needs `ANTHROPIC_API_KEY`; 053 Kaggle provenance call.
+- **076 `X-Real-IP`:** not provable yet. No "usage sends not counted" line in the logs so far; look again after a
+  day of real traffic. A real cross-origin send from `leagues.ballknowers.co` was not made.
+- **074 guest flow on prod** (limit, claim, shared reduced daily) was **not run**: it writes guest games to prod.
+  V-04 (no guest flash for a signed-in visitor) was not run either.
+- Older, unchanged since 11-13: 055's 12 rows at `through_week` 2, 057's real week 1–2 score entry, the NBA 2026
+  score drift (`claude/nba-2026-score-drift.md`).
+
+**Unmerged work (branches kept, each still has a worktree):**
+- `038-season-wrapped` — plan, review and T001 measurements (3 commits, Oct 16); nothing built. Far behind main.
+- `021-codebase-cleanup` (`../draft-sim-021`) — 24 commits off October main; needs a rebase over ~50 merged specs.
+- `054-weekly-median-what-if` — one doc commit `1b866fc`, the 11-03 prod check table for
+  `specs/054-weekly-median-what-if/verification.md`. **Not on main**; cherry-pick it.
+- `037-review-fixes` — `369bf97`, a rivalry-code refactor (5 files) never merged. Check against current rivalry code
+  before reviving.
+- `adp-multi-source` — `b6a1a57` (Sep 2), multi-source ADP (FantasyPros CSV, Yahoo, ESPN). Two months stale.
+
+**Worktree tidy-up 2026-11-18:** 50 clean worktrees whose commits were already on `origin/main` were removed
+(`git worktree remove`; branches kept), plus `013-fan-first-redesign` (patch-equivalent to main). Left in place:
+`074-redraft-seo` (remove failed, likely a Windows file lock), and nine merged worktrees with leftover untracked
+files — mostly `pr-description.md` drafts for PRs that have merged, the 045 capture folders, a `launch.json` tweak
+in 039, and an uncommitted `PlayerStatsLeaderboardReadIT` edit in `funny-bouman-bad4bb`. The main checkout is still
+parked on `017-nba-schedule-grid` with old uncommitted edits; don't read its HANDOFF.
+
 ## UPDATE 2026-11-17: spec 076 (usage analytics we own) built, reviewed and live-verified locally; NOT committed, NOT merged, NOT deployed
+
+**Amended 2026-11-18:** merged to main as `725d547` and deployed (V51 applied on prod at 15:33 UTC). See CURRENT
+STATE above for what was checked after deploy.
 
 **State in plain words:** built, bug-hunt reviewed (0 high, 2 medium, 6 low, all fixed), live-verified locally
 2026-11-17. **Uncommitted** in worktree `.claude/worktrees/076-usage-analytics`, branch `076-usage-analytics`, on
@@ -70,6 +122,11 @@ site-wide, the crawler word list.
 emptied again.
 
 ## UPDATE 2026-11-17: spec 074 (Ball Knowers Redraft: rename, static season pages, guests) built and verified locally; NOT committed, NOT deployed
+
+**Amended 2026-11-18:** merged and deployed 2026-11-17 (`e6a63a9`, `d6a2ac4`). Next item 2's V-02 and V-05 were
+re-checked on prod 2026-11-18 and pass; V-04 and the guest flow were not. Football pages were checked on prod
+(curl 2026-11-17, browser 2026-11-18), which covers the intent of item 3 for real data; T047's fixture rebuild is
+still not done.
 
 **Read this block first for 074.** The sections below it do not cover specs 063 to 073 either. Check
 `git log origin/main` and `claude/` before trusting them.
