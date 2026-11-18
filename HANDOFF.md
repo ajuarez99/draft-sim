@@ -37,7 +37,8 @@ waiting to merge, apart from the unmerged list further down.
 - `038-season-wrapped` — plan, review and T001 measurements (3 commits, Oct 16); nothing built. Far behind main.
 - `021-codebase-cleanup` (`../draft-sim-021`) — 24 commits off October main; needs a rebase over ~50 merged specs.
 - `054-weekly-median-what-if` — one doc commit `1b866fc`, the 11-03 prod check table for
-  `specs/054-weekly-median-what-if/verification.md`. **Not on main**; cherry-pick it.
+  `specs/054-weekly-median-what-if/verification.md`. Cherry-picked to main 2026-11-18 as `9c1146c`; the branch
+  can go.
 - `037-review-fixes` — `369bf97`, a rivalry-code refactor (5 files) never merged. Check against current rivalry code
   before reviving.
 - `adp-multi-source` — `b6a1a57` (Sep 2), multi-source ADP (FantasyPros CSV, Yahoo, ESPN). Two months stale.
