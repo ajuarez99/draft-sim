@@ -266,7 +266,11 @@ class RedraftPublicMvcIT {
         // and the HTTP route: no identity, one row per sport, nothing written
         JsonNode http = ok("/api/history/public/daily/yesterday");
         assertEquals(2, http.size());
-        assertEquals(LocalDate.now(HistoricalDailyService.ZONE).minusDays(1).toString(), http.get(0).get("date").asText());
+        LocalDate yesterday = LocalDate.now(HistoricalDailyService.ZONE).minusDays(1);
+        assertEquals(yesterday.toString(), http.get(0).get("date").asText());
+        // spec 078: the day's number rides along whether or not that day's puzzle was dealt
+        assertEquals((int) com.ballknowers.draftsim.historical.DailyNumber.of(yesterday),
+                http.get(0).get("dailyNumber").asInt());
         assertEquals(before, (int) jdbc.queryForObject("select count(*) from historical_daily", Integer.class));
     }
 
@@ -294,6 +298,8 @@ class RedraftPublicMvcIT {
                 g.get("reducedUntil").asText());
         JsonNode s = g.get("state");
         assertEquals("COMPLETE", s.get("status").asText());
+        // spec 078: the reduced copy keeps the day's number (the share preview reads it)
+        assertEquals((int) com.ballknowers.draftsim.historical.DailyNumber.of(today), s.get("dailyNumber").asInt());
         assertEquals(0, s.get("picks").size(), "no picks while the day's answer key is still today's");
         assertEquals(0, s.get("available").size());
         JsonNode res = s.get("result");

@@ -234,7 +234,8 @@ export const keepResultBody = 'Sign in with your Sleeper username to save this r
 
 export const sharedKicker = (label: string, s: HistoricalSport, tail: string | null) =>
   `Shared result · ${label} ${s} Redraft${tail ? ` · ${tail}` : ''}`
-export const sharedDailyTail = (day: string) => `Game of the day, ${day}`
+/** Spec 078: the shared kicker's tail is dailyName(sharedDailyHead, date, n, ', '): "Game of the day #8, Nov 21". */
+export const sharedDailyHead = 'Game of the day'
 export const sharedChosenTail = 'Chosen season'
 /** The share text's own line: it goes to somebody outside the page, so it says what a chosen season is not. */
 export const shareChosenLine = 'Chosen season, not the game of the day'

@@ -280,7 +280,7 @@ public class HistoricalGameService {
                 .map(r -> new HistoricalGameState.GameSummary(r.id(), r.sport(), r.seasonLabel(), r.status(),
                         r.userSlot(), r.finish(), r.formatVersion(), r.outcome(), r.createdAt(),
                         r.draftScore(), r.dailyDate() == null ? null : r.dailyDate().toString(),
-                        r.chosenSeason()))
+                        DailyNumber.of(r.dailyDate()), r.chosenSeason()))
                 .toList();
     }
 
@@ -307,7 +307,7 @@ public class HistoricalGameService {
                 full.teams(), full.rounds(), full.rosterPositions(), full.userSlot(), full.myPicks(),
                 full.currentPickNo(), full.onTheClockSlot(), full.isUsersTurn(), List.of(), List.of(),
                 reduced(full.result(), full.userSlot()), full.reversalRound(), full.dailyDate(),
-                full.chosenSeason()), until));
+                full.dailyNumber(), full.chosenSeason()), until));
     }
 
     /**
@@ -663,7 +663,8 @@ public class HistoricalGameService {
         return new HistoricalGameState(row.id(), row.sport(), row.status(), view, row.teams(), row.rounds(),
                 row.rosterPositions(), row.userSlot(), myPicks, row.currentPickNo(), onTheClock, usersTurn,
                 views, available, result, row.reversalRound(),
-                row.dailyDate() == null ? null : row.dailyDate().toString(), row.chosenSeason());
+                row.dailyDate() == null ? null : row.dailyDate().toString(), DailyNumber.of(row.dailyDate()),
+                row.chosenSeason());
     }
 
     // ---- plumbing ---------------------------------------------------------------------------------------

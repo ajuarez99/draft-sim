@@ -48,6 +48,8 @@ public class HistoricalDailyService {
      * One sport's game of the day, as one player sees it. Mirrored in {@code web/src/api.ts}.
      *
      * @param date        the puzzle's ISO date (a day in US Eastern time)
+     * @param dailyNumber the day's running number, "daily #8" (spec 078, {@link DailyNumber}); null only for a
+     *                    date before day 1
      * @param seasonLabel the season everyone drafts today
      * @param gameId      the caller's game for today, or null if not started
      * @param gameStatus  DRAFTING or COMPLETE, or null if not started
@@ -57,15 +59,17 @@ public class HistoricalDailyService {
      * @param nextAt      the ISO-8601 instant the next day's game starts (a string, so the wire form never
      *                    depends on how Jackson is configured to write dates)
      */
-    public record DailyView(String sport, String date, String seasonLabel, Long gameId, String gameStatus,
+    public record DailyView(String sport, String date, Integer dailyNumber, String seasonLabel, Long gameId,
+                            String gameStatus,
                             Integer draftScore, int streak, int bestStreak, String nextAt) {}
 
     /**
      * Yesterday's game of the day for one sport, as anyone may read it (spec 074, no identity). {@code seasonLabel}
      * and {@code slug} (the season page's address segment, which is the label) are null when no puzzle was dealt for
-     * that day. Mirrored in {@code web/src/api.ts}.
+     * that day. {@code dailyNumber} (spec 078) is the day's running number, set whether or not a puzzle was dealt.
+     * Mirrored in {@code web/src/api.ts}.
      */
-    public record YesterdayDaily(String sport, String date, String seasonLabel, String slug) {}
+    public record YesterdayDaily(String sport, String date, Integer dailyNumber, String seasonLabel, String slug) {}
 
     /** What {@link #start} did: the game, and whether this call created it. */
     public record Started(HistoricalGameState state, boolean created) {}
@@ -84,7 +88,7 @@ public class HistoricalDailyService {
         for (HistoricalSport sport : sports.all()) {
             Optional<DailyRow> puzzle = games.findDailyPuzzle(sport.code(), date);
             String label = puzzle.map(p -> sport.label(p.seasonStart())).orElse(null);
-            out.add(new YesterdayDaily(sport.code(), date.toString(), label, label));
+            out.add(new YesterdayDaily(sport.code(), date.toString(), DailyNumber.of(date), label, label));
         }
         return out;
     }
@@ -153,7 +157,7 @@ public class HistoricalDailyService {
                 .orElse(null);
         DailyStreak streak = DailyStreak.of(games.completedDailyDates(sleeperUserId, sport.code()), date);
         Instant nextAt = date.plusDays(1).atStartOfDay(ZONE).toInstant();
-        return new DailyView(sport.code(), date.toString(), sport.label(puzzle.seasonStart()),
+        return new DailyView(sport.code(), date.toString(), DailyNumber.of(date), sport.label(puzzle.seasonStart()),
                 mine.map(GameRow::id).orElse(null), mine.map(GameRow::status).orElse(null), score,
                 streak.current(), streak.best(), nextAt.toString());
     }

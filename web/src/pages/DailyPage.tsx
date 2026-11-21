@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { getYesterdayDaily, type YesterdayDaily } from '../api'
 import DailyCards, { useDailyGames, useStartDaily } from '../components/DailyCards'
 import RedraftFoot from '../components/RedraftFoot'
-import { dayLabel } from '../historicalDaily'
+import { dailyName } from '../historicalDaily'
 import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
 import { SPORTS, dailyPage } from '../redraftPages'
@@ -62,7 +62,7 @@ function Yesterday({ day }: { day: string | null }) {
           return r && r.slug && r.seasonLabel && to ? (
             <li key={s} className="tm-game">
               <div className="tm-game-text">
-                <strong>{copy.yesterdayRow(s, dayLabel(r.date))}</strong>
+                <strong>{copy.yesterdayRow(s, dailyName('', r.date, r.dailyNumber))}</strong>
                 <span>{r.seasonLabel}</span>
               </div>
               <div className="tm-game-actions">

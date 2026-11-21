@@ -4930,6 +4930,8 @@ export type HistoricalGameState = {
   result: HistoricalResult | null
   /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
   dailyDate?: string | null
+  /** Spec 078: that day's running number (daily #8, day 1 = 2026-11-14); null for free play. Absent from an old backend. */
+  dailyNumber?: number | null
   /** Spec 074: true when the player picked this season from a season page. Always sent (backend deploys first). */
   chosenSeason: boolean
 }
@@ -4956,6 +4958,8 @@ export type HistoricalGameSummary = {
   draftScore?: number | null
   /** Spec 071: the ISO date of the game of the day this game is; null for free play. Absent from an old backend. */
   dailyDate?: string | null
+  /** Spec 078: that day's running number (daily #8, day 1 = 2026-11-14); null for free play. Absent from an old backend. */
+  dailyNumber?: number | null
   /** Spec 074: true when the player picked this season from a season page. Always sent (backend deploys first). */
   chosenSeason: boolean
 }
@@ -4968,6 +4972,8 @@ export type HistoricalDaily = {
   sport: HistoricalSport
   /** The puzzle's ISO date, a calendar day in US Eastern time. */
   date: string
+  /** Spec 078: the day's running number (daily #8). Null before day 1; absent from an old backend. */
+  dailyNumber?: number | null
   seasonLabel: string
   /** Your game for today; null if you have not started it. */
   gameId: number | null
@@ -5236,6 +5242,8 @@ export type SeasonList = {
 export type YesterdayDaily = {
   sport: HistoricalSport
   date: string
+  /** Spec 078: the day's running number, set whether or not a game was dealt. Absent from an old backend. */
+  dailyNumber?: number | null
   seasonLabel: string | null
   slug: string | null
 }

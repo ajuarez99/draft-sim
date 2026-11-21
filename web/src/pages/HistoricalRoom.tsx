@@ -34,7 +34,7 @@ import HistoricalRoomLayout from '../components/HistoricalRoomLayout'
 import HistoricalResults from '../components/HistoricalResults'
 import HistoricalAwardPanel from '../components/HistoricalAwardPanel'
 import HistoricalSeasonReveal from '../components/HistoricalSeasonReveal'
-import { dayLabel } from '../historicalDaily'
+import { dailyName } from '../historicalDaily'
 import { LoadingScreen } from '../components/Skeleton'
 import { cardToPlayerRef, coverageText, historicalSeats, notCountedReason, sportOf, statLong, teamName } from '../historicalCopy'
 import { usePickReveal } from '../usePickReveal'
@@ -350,7 +350,7 @@ export default function HistoricalRoom() {
   )
 
   if (complete && state.result) {
-    const kicker = `You drafted ${state.season.label}${state.dailyDate ? ` · game of the day, ${dayLabel(state.dailyDate)}` : ''}`
+    const kicker = `You drafted ${state.season.label}${state.dailyDate ? ` · ${dailyName('game of the day', state.dailyDate, state.dailyNumber, ', ')}` : ''}`
     // The award panel is not mounted during the reveal, so an XP or badge toast cannot give the ending away.
     if (replaying || (sawDrafting.current && !seasonDone && motionAllowed())) {
       return (

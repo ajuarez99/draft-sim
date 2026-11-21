@@ -17,7 +17,7 @@ const SAMPLE_ARGS: Record<string, unknown[]> = {
   sportIndexH1: ['NBA'], sportIndexTagline: ['1970-71', '2024-25'], decadeSeasons: [10], namingRule: ['NBA'],
   eraNote: ['NBA'], seasonsEmpty: ['NFL'], yesterdayRow: ['NBA', 'Mon'], yesterdayNone: ['NFL'], sportTile: ['NBA'],
   sportTileRange: ['1970-71', '2024-25'], sportTileCount: [56], claimLine: [2], claimLeftBehind: [1],
-  sharedKicker: ['2016-17', 'NBA', 'Chosen season'], sharedDailyTail: ['Mon'], sharedFinish: [3, 12],
+  sharedKicker: ['2016-17', 'NBA', 'Chosen season'], sharedFinish: [3, 12],
   sharedPlayToday: ['NFL'], sharedHowPlayed: ['2007'], seasonTitle: ['2016-17', 'NBA'],
   seasonDescription: ['2016-17', 'NBA'], sportIndexTitle: ['NBA', '1970-71', '2024-25'],
   sportIndexDescription: ['NFL', '2000', '2025', 26],

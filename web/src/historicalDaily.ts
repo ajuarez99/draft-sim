@@ -12,6 +12,17 @@ export function dayLabel(isoDate: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/**
+ * Spec 078: a game of the day's name, `prefix` plus its running number (the server's DailyNumber) and its date:
+ * dailyName('Daily', '2026-11-21', 8) is "Daily #8 · Nov 21". With no number (an old backend, or a made-up day
+ * before day 1) the number is left out and the rest reads as before: "Daily · Nov 21". An empty prefix gives
+ * "#8 · Nov 21", or just "Nov 21". `sep` sits before the date.
+ */
+export function dailyName(prefix: string, isoDate: string, dailyNumber?: number | null, sep = ' · '): string {
+  const head = typeof dailyNumber === 'number' ? `${prefix} #${dailyNumber}`.trim() : prefix
+  return head ? `${head}${sep}${dayLabel(isoDate)}` : dayLabel(isoDate)
+}
+
 /** Time left until `nextAtIso`, as "5h 12m", "12m" or "under a minute". Null when that moment has passed. */
 export function countdown(nextAtIso: string, nowMs: number): string | null {
   const left = new Date(nextAtIso).getTime() - nowMs

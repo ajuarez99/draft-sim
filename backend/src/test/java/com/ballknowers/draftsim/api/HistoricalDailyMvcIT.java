@@ -129,6 +129,7 @@ class HistoricalDailyMvcIT {
             assertEquals("1895-96", a.state().season().label());
             assertEquals(a.state().season().label(), b.state().season().label());
             assertEquals(DAY.toString(), a.state().dailyDate());
+            assertNull(a.state().dailyNumber(), "spec 078: a made-up 1895 day is before day 1, so it has no number");
 
             var rowA = games.find(a.state().id()).orElseThrow();
             var rowB = games.find(b.state().id()).orElseThrow();

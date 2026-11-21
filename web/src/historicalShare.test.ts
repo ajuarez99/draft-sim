@@ -82,6 +82,14 @@ describe('shareText', () => {
     const text = shareText({ ...game, dailyDate: '2026-11-14' }, result, 'u')
     expect(text.split('\n')[0]).toBe('Ball Knowers Redraft daily · Nov 14 · 2020 NFL')
   })
+  it('numbers the game of the day when the server sends dailyNumber (spec 078)', () => {
+    const { game, result } = fixture()
+    const text = shareText({ ...game, dailyDate: '2026-11-21', dailyNumber: 8 }, result, 'u')
+    expect(text.split('\n')[0]).toBe('Ball Knowers Redraft daily #8 · Nov 21 · 2020 NFL')
+    expect(shareText({ ...game, dailyDate: '2026-11-21', dailyNumber: null }, result, 'u').split('\n')[0]).toBe(
+      'Ball Knowers Redraft daily · Nov 21 · 2020 NFL',
+    )
+  })
   it('says "Chosen season" on the line under the title when the player picked the season, and not otherwise', () => {
     const { game, result } = fixture()
     expect(shareText({ ...game, chosenSeason: true }, result, 'u').split(String.fromCharCode(10)).slice(0, 2)).toEqual([
