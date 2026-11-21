@@ -27,9 +27,11 @@ waiting to merge, apart from the unmerged list further down.
 - Wordmark link in the top bar: was 18 px tall at 375 px, now a 44 px target (same branch; measured 44 px, look unchanged).
 
 **Still owed, and why it was not done today:**
-- **Allan only:** `ballknowers.co` → `www` still answers **302** (measured today), wants a 301 at the registrar;
-  Search Console + Bing verification and sitemap submission; `APP_OWNER_SLEEPER_USER_ID` is **not set** on the
-  `draft-sim` service (so the owner's own Redraft games count in the 076 funnel until it is); Umami
+- **Done since (amended 2026-11-20):** apex now answers **301** to `www` (curl, 2026-11-18); Google Search Console
+  Domain property for `ballknowers.co` verified by a TXT record on `@` and the sitemap submitted (Allan, 2026-11-20;
+  the first TXT attempt sat on host `google-site-verification` and failed for two days); `APP_OWNER_SLEEPER_USER_ID`
+  is set on `draft-sim` (Railway variables, 2026-11-20). Bing import from Search Console: not confirmed.
+- **Allan only:** Umami
   (`VITE_UMAMI_WEBSITE_ID`) still unset; 020 AI recap still needs `ANTHROPIC_API_KEY`; 053 Kaggle provenance call.
 - **076 `X-Real-IP`:** not provable yet. No "usage sends not counted" line in the logs so far; look again after a
   day of real traffic. A real cross-origin send from `leagues.ballknowers.co` was not made.
